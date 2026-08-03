@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+lahatheque-frontend/node_modules/
+
+# Next.js
+.next/
+lahatheque-frontend/.next/
+out/
+lahatheque-frontend/out/
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+db.sqlite3
+*.log
+logs/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+
+# System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
