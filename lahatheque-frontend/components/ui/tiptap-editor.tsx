@@ -1,0 +1,619 @@
+"use client"
+
+/**
+ * TiptapEditor — éditeur riche ultra-intuitif pour LahaAcademia
+ *
+ * Extensions : StarterKit, Image (inline upload), VideoEmbed (custom)
+ * Upload  : Cloudflare R2 (images) & Cloudflare Stream (vidéos) via uploadToCloudinary()
+ * Thème   : tokens laha uniquement, jour/nuit automatique
+ */
+
+import { useEditor, EditorContent, NodeViewWrapper, NodeViewProps } from "@tiptap/react"
+import StarterKit from "@tiptap/starter-kit"
+import Image from "@tiptap/extension-image"
+import Link from "@tiptap/extension-link"
+import Placeholder from "@tiptap/extension-placeholder"
+import { Node, mergeAttributes } from "@tiptap/core"
+import { ReactNodeViewRenderer } from "@tiptap/react"
+import { useRef, useCallback, useState } from "react"
+import { uploadToCloudflare } from "@/lib/cloudflare"
+import { CLOUDFLARE_STREAM_SUBDOMAIN } from "@/lib/constants/cloudflare"
+import {
+  Bold,
+  Italic,
+  Strikethrough,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  Quote,
+  Code,
+  Minus,
+  Link2,
+  Image as ImageIcon,
+  Video,
+  Undo,
+  Redo,
+  Globe,
+  Film,
+  X,
+  Upload,
+  Check,
+} from "lucide-react"
+import { toast } from "sonner"
+
+// ─── Extension vidéo custom ──────────────────────────────────────────────────
+
+const VideoEmbed = Node.create({
+  name: "videoEmbed",
+  group: "block",
+  atom: true,
+
+  addAttributes() {
+    return {
+      stream_id: { default: null },
+      video_url: { default: null },
+      title: { default: "" },
+    }
+  },
+
+  parseHTML() {
+    return [{ tag: "div[data-video-embed]" }]
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "div",
+      mergeAttributes({ "data-video-embed": "" }, HTMLAttributes),
+    ]
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(VideoEmbedView) as any
+  },
+})
+
+function VideoEmbedView({ node, deleteNode }: NodeViewProps) {
+  const { stream_id, video_url, title } = node.attrs
+  const src = stream_id
+    ? `https://${CLOUDFLARE_STREAM_SUBDOMAIN}/${stream_id}/iframe`
+    : video_url
+
+  return (
+    <NodeViewWrapper className="my-4 relative group">
+      <div className="relative rounded-xl overflow-hidden border border-border bg-black aspect-video max-w-2xl mx-auto">
+        {src ? (
+          <iframe
+            src={src}
+            className="w-full h-full border-none"
+            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            Vidéo non disponible
+          </div>
+        )}
+      </div>
+      <button
+        onClick={deleteNode}
+        type="button"
+        className="absolute top-2 right-2 bg-rose-600 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold shadow-md"
+        title="Supprimer la vidéo"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </NodeViewWrapper>
+  )
+}
+
+// ─── Modale générique pour l'éditeur ─────────────────────────────────────────
+
+function EditorModal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-card border border-border sm:max-w-md w-full rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="flex justify-between items-center px-5 py-3.5 border-b border-border bg-muted/20">
+          <h4 className="text-sm font-bold text-foreground">{title}</h4>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-5 overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Composants Toolbar ──────────────────────────────────────────────────────
+
+function ToolbarButton({
+  onClick,
+  active,
+  disabled,
+  children,
+  title,
+  label,
+}: {
+  onClick: () => void
+  active?: boolean
+  disabled?: boolean
+  children: React.ReactNode
+  title: string
+  label?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 ${
+        active
+          ? "bg-laha-gold/15 text-laha-gold"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+      } ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
+    >
+      {children}
+      {label && <span className="hidden sm:inline">{label}</span>}
+    </button>
+  )
+}
+
+function ToolbarDivider() {
+  return <div className="w-px h-5 bg-border mx-1 shrink-0" />
+}
+
+// ─── TiptapEditor ────────────────────────────────────────────────────────────
+
+interface TiptapEditorProps {
+  content: string
+  onChange: (html: string) => void
+  placeholder?: string
+  minHeight?: string
+  stickyOffset?: string
+}
+
+export function TiptapEditor({
+  content,
+  onChange,
+  placeholder = "Rédigez votre réponse...",
+  minHeight = "200px",
+  stickyOffset = "64px",
+}: TiptapEditorProps) {
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
+
+  const [activeModal, setActiveModal] = useState<"link" | "image" | "video" | null>(null)
+  const [linkUrl, setLinkUrl] = useState("")
+  const [imageUrl, setImageUrl] = useState("")
+  const [videoInput, setVideoInput] = useState("")
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [2, 3] },
+        dropcursor: { color: "var(--laha-gold, #c9a84c)", width: 2 },
+      }),
+      Image.configure({
+        HTMLAttributes: {
+          class: "rounded-xl max-w-full h-auto border border-border my-4 block",
+        },
+        allowBase64: false,
+      }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          class: "text-laha-gold underline underline-offset-2",
+          rel: "noopener noreferrer",
+          target: "_blank",
+        },
+      }) as any,
+      Placeholder.configure({ placeholder }),
+      VideoEmbed,
+    ],
+    content,
+    editorProps: {
+      attributes: {
+        class: "outline-none",
+      },
+    },
+    onUpdate({ editor }) {
+      onChange(editor.getHTML())
+    },
+  })
+
+  const handleImageUpload = useCallback(
+    async (file: File) => {
+      if (!editor) return
+      const toastId = toast.loading("Upload de l'image en cours...")
+      try {
+        const res = await uploadToCloudflare(file, undefined, "guides", "image")
+        editor
+          .chain()
+          .focus()
+          .setImage({ src: res.secure_url, alt: file.name })
+          .run()
+        toast.success("Image insérée avec succès !", { id: toastId })
+        setActiveModal(null)
+      } catch {
+        toast.error("Échec du téléchargement de l'image", { id: toastId })
+      }
+    },
+    [editor]
+  )
+
+  const handleVideoUpload = useCallback(
+    async (file: File) => {
+      if (!editor) return
+      const toastId = toast.loading("Upload de la vidéo vers Cloudflare Stream...")
+      try {
+        const res = await uploadToCloudflare(file, undefined, "guides", "video")
+        editor
+          .chain()
+          .focus()
+          .insertContent({
+            type: "videoEmbed",
+            attrs: { stream_id: res.public_id, title: file.name },
+          })
+          .run()
+        toast.success("Vidéo insérée avec succès !", { id: toastId })
+        setActiveModal(null)
+      } catch {
+        toast.error("Échec du téléchargement de la vidéo", { id: toastId })
+      }
+    },
+    [editor]
+  )
+
+  const applyLink = () => {
+    if (!editor) return
+    if (!linkUrl.trim()) {
+      editor.chain().focus().unsetLink().run()
+    } else {
+      let href = linkUrl.trim()
+      if (!href.startsWith("http://") && !href.startsWith("https://")) {
+        href = `https://${href}`
+      }
+      editor.chain().focus().setLink({ href }).run()
+    }
+    setActiveModal(null)
+  }
+
+  const applyImageUrl = () => {
+    if (!editor || !imageUrl.trim()) return
+    let src = imageUrl.trim()
+    if (!src.startsWith("http://") && !src.startsWith("https://")) {
+      src = `https://${src}`
+    }
+    editor.chain().focus().setImage({ src, alt: "Image" }).run()
+    setImageUrl("")
+    setActiveModal(null)
+  }
+
+  const applyVideoInput = () => {
+    if (!editor || !videoInput.trim()) return
+    const val = videoInput.trim()
+    const isUrl = val.startsWith("http://") || val.startsWith("https://")
+    editor
+      .chain()
+      .focus()
+      .insertContent({
+        type: "videoEmbed",
+        attrs: isUrl
+          ? { video_url: val, stream_id: null, title: "Vidéo" }
+          : { stream_id: val, video_url: null, title: "Vidéo" },
+      })
+      .run()
+    setVideoInput("")
+    setActiveModal(null)
+  }
+
+  if (!editor) return null
+
+  return (
+    <div className="border border-border rounded-2xl overflow-hidden bg-background focus-within:border-laha-gold transition-colors shadow-sm flex flex-col">
+      {/* Inputs fichiers cachés */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) handleImageUpload(file)
+          e.target.value = ""
+        }}
+      />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) handleVideoUpload(file)
+          e.target.value = ""
+        }}
+      />
+
+      {/* Toolbar fixe en haut de l'éditeur */}
+      <div className="flex flex-wrap items-center gap-1 px-3 py-2.5 border-b border-border bg-card/95 backdrop-blur shadow-sm overflow-x-auto shrink-0">
+        {/* Annuler / Rétablir */}
+        <div className="flex items-center gap-0.5">
+          <ToolbarButton
+            onClick={() => editor.chain().focus().undo().run()}
+            disabled={!editor.can().undo()}
+            title="Annuler l'action"
+          >
+            <Undo className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().redo().run()}
+            disabled={!editor.can().redo()}
+            title="Rétablir l'action"
+          >
+            <Redo className="w-4 h-4" />
+          </ToolbarButton>
+        </div>
+
+        <ToolbarDivider />
+
+        {/* Titres */}
+        <div className="flex items-center gap-0.5">
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            active={editor.isActive("heading", { level: 2 })}
+            title="Titre de section"
+            label="Titre H2"
+          >
+            <Heading2 className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            active={editor.isActive("heading", { level: 3 })}
+            title="Sous-titre"
+            label="H3"
+          >
+            <Heading3 className="w-4 h-4" />
+          </ToolbarButton>
+        </div>
+
+        <ToolbarDivider />
+
+        {/* Mise en forme */}
+        <div className="flex items-center gap-0.5">
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            active={editor.isActive("bold")}
+            title="Gras"
+          >
+            <Bold className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            active={editor.isActive("italic")}
+            title="Italique"
+          >
+            <Italic className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            active={editor.isActive("strike")}
+            title="Texte barré"
+          >
+            <Strikethrough className="w-4 h-4" />
+          </ToolbarButton>
+        </div>
+
+        <ToolbarDivider />
+
+        {/* Listes & Citations */}
+        <div className="flex items-center gap-0.5">
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            active={editor.isActive("bulletList")}
+            title="Liste à puces"
+          >
+            <List className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            active={editor.isActive("orderedList")}
+            title="Liste numérotée"
+          >
+            <ListOrdered className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            active={editor.isActive("blockquote")}
+            title="Mettre en encadré / citation"
+          >
+            <Quote className="w-4 h-4" />
+          </ToolbarButton>
+        </div>
+
+        <ToolbarDivider />
+
+        {/* Liens et Médias (avec texte clair pour non-techniciens) */}
+        <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-xl border border-border/50">
+          <ToolbarButton
+            onClick={() => {
+              setLinkUrl(editor.getAttributes("link").href || "")
+              setActiveModal("link")
+            }}
+            active={editor.isActive("link")}
+            title="Ajouter un lien internet"
+            label="Lien web"
+          >
+            <Link2 className="w-4 h-4 text-laha-gold" />
+          </ToolbarButton>
+
+          <ToolbarButton
+            onClick={() => setActiveModal("image")}
+            title="Insérer une photo ou illustration"
+            label="Ajouter Image"
+          >
+            <ImageIcon className="w-4 h-4 text-emerald-500" />
+          </ToolbarButton>
+
+          <ToolbarButton
+            onClick={() => setActiveModal("video")}
+            title="Insérer une vidéo explicative"
+            label="Ajouter Vidéo"
+          >
+            <Video className="w-4 h-4 text-sky-500" />
+          </ToolbarButton>
+        </div>
+      </div>
+
+      {/* Zone d'édition principale avec défilement interne */}
+      <div
+        style={{ minHeight }}
+        className="p-5 sm:p-7 prose prose-sm dark:prose-invert max-w-none focus:outline-none overflow-y-auto max-h-[60vh] sm:max-h-[650px]"
+      >
+        <EditorContent editor={editor} />
+      </div>
+
+      {/* ── Modale Lien ── */}
+      {activeModal === "link" && (
+        <EditorModal title="Insérer un lien web" onClose={() => setActiveModal(null)}>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Saisissez ou collez l'adresse de la page web (ex: www.exemple.com).
+            </p>
+            <input
+              type="text"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://www.exemple.com"
+              className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm text-foreground outline-none focus:border-laha-gold"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              {editor.isActive("link") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    editor.chain().focus().unsetLink().run()
+                    setActiveModal(null)
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
+                >
+                  Supprimer le lien
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={applyLink}
+                className="px-4 py-1.5 bg-foreground text-background text-xs font-bold rounded-lg hover:opacity-90"
+              >
+                Appliquer
+              </button>
+            </div>
+          </div>
+        </EditorModal>
+      )}
+
+      {/* ── Modale Image ── */}
+      {activeModal === "image" && (
+        <EditorModal title="Ajouter une image" onClose={() => setActiveModal(null)}>
+          <div className="space-y-5">
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                Option 1 : Choisir un fichier depuis votre appareil
+              </label>
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                className="w-full py-4 border-2 border-dashed border-border hover:border-laha-gold/60 rounded-xl bg-muted/20 flex flex-col items-center justify-center gap-2 transition-colors group"
+              >
+                <Upload className="w-6 h-6 text-muted-foreground group-hover:text-laha-gold transition-colors" />
+                <span className="text-xs font-bold text-foreground">Parcourir vos fichiers...</span>
+              </button>
+            </div>
+
+            <div className="border-t border-border pt-4">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
+                Option 2 : Coller l'adresse d'une image web
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://domaine.com/photo.jpg"
+                  className="flex-1 h-10 px-3 bg-background border border-border rounded-xl text-sm text-foreground outline-none focus:border-laha-gold"
+                />
+                <button
+                  type="button"
+                  onClick={applyImageUrl}
+                  className="px-4 py-2 bg-foreground text-background text-xs font-bold rounded-xl hover:opacity-90"
+                >
+                  Valider
+                </button>
+              </div>
+            </div>
+          </div>
+        </EditorModal>
+      )}
+
+      {/* ── Modale Vidéo ── */}
+      {activeModal === "video" && (
+        <EditorModal title="Ajouter une vidéo" onClose={() => setActiveModal(null)}>
+          <div className="space-y-5">
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                Option 1 : Importer une vidéo depuis votre ordinateur
+              </label>
+              <button
+                type="button"
+                onClick={() => videoInputRef.current?.click()}
+                className="w-full py-4 border-2 border-dashed border-border hover:border-sky-500/60 rounded-xl bg-muted/20 flex flex-col items-center justify-center gap-2 transition-colors group"
+              >
+                <Upload className="w-6 h-6 text-muted-foreground group-hover:text-sky-500 transition-colors" />
+                <span className="text-xs font-bold text-foreground">Téléverser une vidéo (Cloudflare)...</span>
+              </button>
+            </div>
+
+            <div className="border-t border-border pt-4">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
+                Option 2 : Coller un lien ou un ID vidéo
+              </label>
+              <p className="text-[11px] text-muted-foreground mb-2">
+                Entrez un lien web (ex: YouTube, Vimeo) ou un identifiant Cloudflare Stream.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={videoInput}
+                  onChange={(e) => setVideoInput(e.target.value)}
+                  placeholder="Ex: https://youtube.com/... ou ID Cloudflare"
+                  className="flex-1 h-10 px-3 bg-background border border-border rounded-xl text-sm text-foreground outline-none focus:border-laha-gold"
+                />
+                <button
+                  type="button"
+                  onClick={applyVideoInput}
+                  className="px-4 py-2 bg-foreground text-background text-xs font-bold rounded-xl hover:opacity-90"
+                >
+                  Valider
+                </button>
+              </div>
+            </div>
+          </div>
+        </EditorModal>
+      )}
+    </div>
+  )
+}
