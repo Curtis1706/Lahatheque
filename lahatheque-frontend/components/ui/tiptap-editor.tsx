@@ -61,7 +61,7 @@ const VideoEmbed = Node.create({
     return [{ tag: "div[data-video-embed]" }]
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ HTMLAttributes }: { HTMLAttributes: any }) {
     return [
       "div",
       mergeAttributes({ "data-video-embed": "" }, HTMLAttributes),
