@@ -201,7 +201,7 @@ export default function ContactPage() {
 
               {/* Submit Button */}
               <button 
-                className="mt-6 bg-primary hover:bg-[#2E3F66] text-white font-bold text-sm py-4 px-8 rounded flex items-center justify-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg w-full md:w-auto md:self-start" 
+                className="mt-6 bg-primary hover:bg-navy-hover text-white font-bold text-sm py-4 px-8 rounded flex items-center justify-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg w-full md:w-auto md:self-start" 
                 type="submit"
               >
                 Contactez-nous dès maintenant 

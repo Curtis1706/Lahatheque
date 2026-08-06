@@ -178,7 +178,7 @@ export default function HomePage() {
       </section>
 
       {/* Bandeau Chiffres Clés */}
-      <section className="bg-[#1B2A4E] py-12 px-6 md:px-10 text-white text-center">
+      <section className="bg-navy py-12 px-6 md:px-10 text-white text-center">
         <div className="max-w-7xl mx-auto mb-8">
           <h2 className="font-serif text-2xl md:text-3xl font-bold mb-2">Spécialiste du contenu éducatif</h2>
           <p className="text-sm text-white/80">Le plus grand catalogue d'ouvrages universitaires africains</p>
@@ -414,7 +414,7 @@ export default function HomePage() {
       </section>
 
       {/* Présence Panafricaine */}
-      <section className="py-20 px-6 md:px-10 bg-[#1B2A4E] text-white">
+      <section className="py-20 px-6 md:px-10 bg-navy text-white">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="font-serif text-3xl font-bold mb-8">Une présence panafricaine</h2>
@@ -434,18 +434,18 @@ export default function HomePage() {
             </div>
           </div>
           
-          <div className="bg-[#0F1A33] p-8 rounded-xl border border-[#2E3F66] text-center">
+          <div className="bg-navy-dark p-8 rounded-xl border border-navy-hover text-center">
             <Globe className="w-16 h-16 text-gold mx-auto mb-4 opacity-90" />
             <p className="text-base font-medium mb-4">Déjà présent dans plusieurs pays :</p>
             <div className="flex flex-wrap justify-center gap-3 text-xs font-bold">
-              <span className="px-4 py-2 bg-[#2E3F66] border border-[#2E3F66] rounded-full">Bénin</span>
-              <span className="px-4 py-2 bg-[#2E3F66] border border-[#2E3F66] rounded-full">Sénégal</span>
-              <span className="px-4 py-2 bg-[#2E3F66] border border-[#2E3F66] rounded-full">Niger</span>
-              <span className="px-4 py-2 bg-[#2E3F66] border border-[#2E3F66] rounded-full">Togo</span>
-              <span className="px-4 py-2 bg-[#2E3F66] border border-[#2E3F66] rounded-full">Côte d'Ivoire</span>
-              <span className="px-4 py-2 bg-[#2E3F66] border border-[#2E3F66] rounded-full">Gabon</span>
-              <span className="px-4 py-2 bg-[#2E3F66] border border-[#2E3F66] rounded-full">RDC</span>
-              <span className="px-4 py-2 bg-[#2E3F66] border border-[#2E3F66] rounded-full">Mali</span>
+              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Bénin</span>
+              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Sénégal</span>
+              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Niger</span>
+              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Togo</span>
+              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Côte d'Ivoire</span>
+              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Gabon</span>
+              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">RDC</span>
+              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Mali</span>
             </div>
           </div>
         </div>
@@ -518,7 +518,7 @@ export default function HomePage() {
       </section>
 
       {/* Newsletter */}
-      <section className="py-16 px-6 md:px-10 bg-[#1B2A4E] text-white">
+      <section className="py-16 px-6 md:px-10 bg-navy text-white">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           <div>
             <h3 className="font-serif text-xl font-bold mb-2">Restez informé</h3>
@@ -526,7 +526,7 @@ export default function HomePage() {
           </div>
           <form className="flex w-full md:w-auto gap-2" onSubmit={(e) => e.preventDefault()}>
             <input 
-              className="w-full md:w-80 h-12 px-4 rounded bg-[#2E3F66] border border-[#E8E4DC] text-white placeholder:text-white/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold text-sm" 
+              className="w-full md:w-80 h-12 px-4 rounded bg-navy-hover border border-border text-white placeholder:text-white/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold text-sm" 
               placeholder="Votre adresse email" 
               type="email"
               required

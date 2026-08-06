@@ -197,7 +197,7 @@ export default function AboutPage() {
       </section>
 
       {/* Closing Statement */}
-      <section className="bg-[#1B2A4E] text-white py-16 md:py-24">
+      <section className="bg-navy text-white py-16 md:py-24">
         <div className="max-w-4xl mx-auto px-6 md:px-12 text-center space-y-10">
           <p className="font-serif text-xl md:text-2xl font-bold leading-relaxed max-w-2xl mx-auto">
             "Notre ambition est claire : faire de la lecture numérique un levier d'égalité, de réussite et de développement intellectuel."
@@ -213,15 +213,15 @@ export default function AboutPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-            <div className="flex flex-col items-center gap-2 bg-[#0F1A33] border border-[#2E3F66] p-6 rounded-lg">
+            <div className="flex flex-col items-center gap-2 bg-navy-dark border border-navy-hover p-6 rounded-lg">
               <Sparkles className="w-8 h-8 text-gold" />
               <p className="text-xs font-bold text-gold uppercase tracking-widest mt-1">Nous diffusons des rêves</p>
             </div>
-            <div className="flex flex-col items-center gap-2 bg-[#0F1A33] border border-[#2E3F66] p-6 rounded-lg">
+            <div className="flex flex-col items-center gap-2 bg-navy-dark border border-navy-hover p-6 rounded-lg">
               <Book className="w-8 h-8 text-gold" />
               <p className="text-xs font-bold text-gold uppercase tracking-widest mt-1">Nous diffusons des savoirs</p>
             </div>
-            <div className="flex flex-col items-center gap-2 bg-[#0F1A33] border border-[#2E3F66] p-6 rounded-lg">
+            <div className="flex flex-col items-center gap-2 bg-navy-dark border border-navy-hover p-6 rounded-lg">
               <Sun className="w-8 h-8 text-gold" />
               <p className="text-xs font-bold text-gold uppercase tracking-widest mt-1">Nous diffusons l'avenir</p>
             </div>
@@ -230,7 +230,7 @@ export default function AboutPage() {
       </section>
 
       {/* Newsletter Section */}
-      <section className="py-16 bg-[#1B2A4E] text-white border-t border-white/10">
+      <section className="py-16 bg-navy text-white border-t border-white/10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 px-6 md:px-12">
           <div>
             <h3 className="font-serif text-xl font-bold mb-2">Abonnez-vous à notre newsletter</h3>
@@ -238,7 +238,7 @@ export default function AboutPage() {
           </div>
           <form className="flex w-full md:w-auto gap-2" onSubmit={(e) => e.preventDefault()}>
             <input 
-              className="w-full md:w-80 h-12 px-4 rounded bg-[#2E3F66] border border-[#E8E4DC] text-white placeholder:text-white/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold text-sm" 
+              className="w-full md:w-80 h-12 px-4 rounded bg-navy-hover border border-border text-white placeholder:text-white/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold text-sm" 
               placeholder="Adresse email" 
               type="email"
               required
