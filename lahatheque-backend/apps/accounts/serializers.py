@@ -10,7 +10,17 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
+class RegisterSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, min_length=8)
+    first_name = serializers.CharField(required=False, allow_blank=True, default='')
+    last_name = serializers.CharField(required=False, allow_blank=True, default='')
+    phone = serializers.CharField(required=False, allow_blank=True, default='')
+    country = serializers.CharField(required=False, default='BJ')
+    role = serializers.ChoiceField(choices=['student', 'teacher', 'author', 'librarian', 'publisher'], default='student')
+
 class OTPSerializer(serializers.ModelSerializer):
     class Meta:
         model = OTP
         fields = ['id', 'code', 'channel', 'expires_at']
+

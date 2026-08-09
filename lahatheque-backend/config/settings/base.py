@@ -80,13 +80,19 @@ TEMPLATES = [
 
 AUTH_USER_MODEL = 'accounts.User'
 
-# Base de données par défaut (SQLite dev, PostgreSQL en staging/prod)
+# Base de données PostgreSQL Neon (serverless managé)
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=config('DATABASE_URL', default='postgres://lahatheque_user:password@ep-sample-pooler.us-east-2.aws.neon.tech/lahatheque_db?sslmode=require'),
+        conn_max_age=0, # Neon ferme les connexions inactives après 5 min
+        ssl_require=True,
+    )
 }
+DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True # PgBouncer mode transaction Neon
+DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+
 
 # Configuration REST Framework
 REST_FRAMEWORK = {

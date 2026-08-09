@@ -15,6 +15,8 @@ import {
   CheckCircle
 } from "lucide-react";
 import HeroCarousel from "@/components/ui/hero-carousel";
+import { Book } from "@/components/ui/book";
+import { CountingNumber } from "@/components/ui/counting-number";
 
 const bestSellers = [
   {
@@ -23,9 +25,8 @@ const bestSellers = [
     author: "Pr. M. N'DIA",
     category: "Droit",
     price: "15 000 FCFA",
-    coverBg: "bg-[#1B2A4E]",
-    titleColor: "text-white",
-    spineBorder: "border-[#0a1128]",
+    color: "var(--navy)",
+    textColor: "#FFFFFF",
     tag: "Droit"
   },
   {
@@ -34,9 +35,8 @@ const bestSellers = [
     author: "Dr. K. YAO",
     category: "Économie",
     price: "13 000 FCFA",
-    coverBg: "bg-[#F5F3EF]",
-    titleColor: "text-navy",
-    spineBorder: "border-[#d5c39a]",
+    color: "var(--background-secondary)",
+    textColor: "var(--navy)",
     tag: "Économie"
   },
   {
@@ -45,9 +45,8 @@ const bestSellers = [
     author: "Pr. E. TRAORÉ",
     category: "Gestion",
     price: "14 500 FCFA",
-    coverBg: "bg-[#2E3F66]",
-    titleColor: "text-white",
-    spineBorder: "border-[#1c3047]",
+    color: "var(--navy-hover)",
+    textColor: "#FFFFFF",
     tag: "Gestion"
   },
   {
@@ -56,9 +55,8 @@ const bestSellers = [
     author: "Pr. A. DIALLO",
     category: "Droit",
     price: "11 500 FCFA",
-    coverBg: "bg-[#FDFCFA]",
-    titleColor: "text-navy",
-    spineBorder: "border-[#E8E4DC]",
+    color: "var(--background)",
+    textColor: "var(--navy)",
     tag: "Droit"
   },
   {
@@ -67,9 +65,8 @@ const bestSellers = [
     author: "Dr. S. DIABY",
     category: "Gestion",
     price: "16 000 FCFA",
-    coverBg: "bg-[#0F1A33]",
-    titleColor: "text-gold-light",
-    spineBorder: "border-[#1B2A4E]",
+    color: "var(--navy-dark)",
+    textColor: "var(--gold-light)",
     tag: "Management"
   },
   {
@@ -78,9 +75,8 @@ const bestSellers = [
     author: "Pr. J. KOUADIO",
     category: "Finance",
     price: "13 500 FCFA",
-    coverBg: "bg-[#F5F3EF]",
-    titleColor: "text-gold-dark",
-    spineBorder: "border-[#E8E4DC]",
+    color: "var(--background-secondary)",
+    textColor: "var(--gold-dark)",
     tag: "Finance"
   }
 ];
@@ -185,19 +181,27 @@ export default function HomePage() {
         </div>
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
           <div>
-            <span className="block text-3xl md:text-4xl font-serif text-gold font-bold mb-2">+500 000</span>
+            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+              +<CountingNumber target={5000} />
+            </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Ouvrages disponibles</span>
           </div>
           <div>
-            <span className="block text-3xl md:text-4xl font-serif text-gold font-bold mb-2">+1 200</span>
+            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+              +<CountingNumber target={1200} />
+            </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Étudiants inscrits</span>
           </div>
           <div>
-            <span className="block text-3xl md:text-4xl font-serif text-gold font-bold mb-2">+180</span>
+            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+              +<CountingNumber target={180} />
+            </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Universités partenaires</span>
           </div>
           <div>
-            <span className="block text-3xl md:text-4xl font-serif text-gold font-bold mb-2">+80</span>
+            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+              +<CountingNumber target={80} />
+            </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Éditeurs africains</span>
           </div>
         </div>
@@ -219,27 +223,20 @@ export default function HomePage() {
               key={book.id} 
               className="group bg-background border border-border rounded-lg p-4 hover:shadow-[0_8px_30px_rgba(27,42,78,0.06)] transition-all duration-300 flex flex-col justify-between"
             >
-              {/* simulated 3D book cover */}
+              {/* 3D book cover */}
               <div className="relative mb-4 flex-grow bg-background-secondary rounded flex items-center justify-center p-4 aspect-[2/3] overflow-visible">
                 <button className="absolute top-2 right-2 w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center text-foreground-muted hover:text-error transition-colors z-10 shadow-sm">
                   <Heart className="w-4 h-4" />
                 </button>
                 
-                {/* 3D effect book wrapper */}
-                <div 
-                  className={`w-[80%] h-[90%] ${book.coverBg} rounded shadow-lg relative overflow-hidden flex flex-col items-center justify-center p-3 text-center border-l-[3px] ${book.spineBorder} transform group-hover:scale-105 group-hover:-rotate-2 transition-all duration-300`}
-                >
-                  <span className={`text-[7px] uppercase tracking-wider mb-1 ${book.titleColor} opacity-75`}>
-                    {book.category}
-                  </span>
-                  <h4 className={`${book.titleColor} font-serif text-[10px] md:text-xs font-bold leading-tight mb-2 line-clamp-3`}>
-                    {book.title}
-                  </h4>
-                  <span className={`text-[7px] ${book.titleColor} opacity-60 line-clamp-1`}>
-                    {book.author}
-                  </span>
-                  <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-r from-black/20 to-transparent" />
-                </div>
+                <Book 
+                  title={book.title} 
+                  variant="stripe" 
+                  color={book.color} 
+                  textColor={book.textColor} 
+                  width={{ sm: 120, md: 130, lg: 135, xl: 125 }}
+                  textured
+                />
               </div>
 
               <div className="mt-auto">

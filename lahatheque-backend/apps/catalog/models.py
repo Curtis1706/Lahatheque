@@ -25,6 +25,10 @@ class Ouvrage(models.Model):
     title = models.CharField(max_length=255)
     subtitle = models.CharField(max_length=255, blank=True)
     publisher = models.ForeignKey('publishers_portal.Publisher', on_delete=models.PROTECT, related_name='ouvrages')
+    authors = models.ManyToManyField(BookAuthor, related_name='ouvrages', blank=True)
+    discipline = models.ForeignKey(Discipline, null=True, blank=True, on_delete=models.SET_NULL, related_name='ouvrages')
+    institution = models.ForeignKey('partners.Institution', null=True, blank=True, on_delete=models.SET_NULL, related_name='ouvrages')
+    country = models.CharField(max_length=2, default='BJ')
     format_type = models.CharField(max_length=20, choices=[('pdf', 'PDF'), ('epub', 'EPUB'), ('audio', 'Audio')])
     file = models.FileField(upload_to='books/')
     file_size_bytes = models.BigIntegerField(default=0)
@@ -35,6 +39,7 @@ class Ouvrage(models.Model):
     table_of_contents = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=30, default='draft')
     protection_type = models.CharField(max_length=30, default='lcp')
+
 
 class MetadataONIX(models.Model):
     ouvrage = models.OneToOneField(Ouvrage, on_delete=models.CASCADE, related_name='onix_metadata')

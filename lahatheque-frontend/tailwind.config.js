@@ -13,6 +13,7 @@ module.exports = {
         background: {
           DEFAULT: "var(--background)",
           secondary: "var(--background-secondary)",
+          200: "var(--ds-background-200)",
         },
         border: "var(--border)",
         foreground: {
@@ -41,6 +42,11 @@ module.exports = {
           light: "var(--gold-light)",
           dark: "var(--gold-dark)",
         },
+        gray: {
+          200: "var(--ds-gray-200)",
+          1000: "var(--ds-gray-1000)",
+          "alpha-400": "var(--ds-gray-alpha-400)",
+        },
         success: {
           DEFAULT: "var(--success)",
         },
@@ -53,6 +59,10 @@ module.exports = {
         info: {
           DEFAULT: "var(--info)",
         },
+      },
+      boxShadow: {
+        book: "var(--ds-shadow-book)",
+        "book-border": "var(--ds-shadow-book-border)",
       },
     },
   },
