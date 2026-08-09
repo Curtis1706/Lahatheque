@@ -42,8 +42,9 @@ Ces règles sont TOUJOURS actives, sur tout écran/composant/page construit pour
 - Avant de coder un composant UI (carte, table, stepper, drawer, dropzone, badge, form…), cherche-le via les tools MCP `21st`. N'écris jamais un composant générique from scratch sans être passé par cette recherche.
 - `search` et `get_inspiration` sont gratuits et illimités — les utiliser librement et largement. `get_component` (code d'un composant) et `generate` (génération IA) sont limités par un quota quotidien — les réserver aux candidats déjà présélectionnés via les métadonnées (nom, description, preview), pas à un usage spéculatif sur chaque résultat.
 - Si un appel `get_component`/`generate` échoue ou renvoie `locked=true`, appelle `get_usage` pour vérifier le quota restant avant de retenter.
-- Tout composant importé de 21st.dev est adapté avant intégration : couleurs remplacées par les tokens `globals.css`, comportement rendu mobile-first, props renommées pour matcher les types TS du projet.
-- Si rien de pertinent n'est trouvé après recherche large, code à la main — mais dis-le explicitement ("recherche 21st.dev effectuée, rien de pertinent, composant codé à la main").
+- **Notification de Quotas** : Informer immédiatement et explicitement l'utilisateur dès que le quota de téléchargement de code source de `21st.dev` est épuisé.
+- Tout composant importé de `21st.dev` est adapté avant intégration : couleurs remplacées par les tokens `globals.css`, comportement rendu mobile-first, props renommées pour matcher les types TS du projet.
+- Si rien de pertinent n'est trouvé après recherche large ou si le quota est épuisé, coder à la main en s'inspirant des métadonnées (nom, description, aperçus) et le mentionner explicitement ("recherche 21st.dev effectuée, quota épuisé ou rien de pertinent, composant codé à la main").
 
 ## 📱 Mobile-first — non négociable
 - Chaque écran est designé mobile (~375–390px) → tablette → desktop, jamais l'inverse.
