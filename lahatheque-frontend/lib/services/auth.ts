@@ -6,7 +6,7 @@ export interface RegisterPayload {
   last_name: string;
   phone?: string;
   country: string;
-  role: "student" | "teacher" | "author" | "publisher";
+  role: "student" | "teacher" | "author" | "publisher" | "librarian";
 }
 
 export async function registerUser(payload: RegisterPayload): Promise<{ success: boolean; data?: any; error?: string }> {

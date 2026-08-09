@@ -15,12 +15,13 @@ import {
   Phone, 
   Globe,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Library
 } from "lucide-react";import { registerUser } from "@/lib/services/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [role, setRole] = useState<"student" | "teacher" | "author" | "publisher">("student");
+  const [role, setRole] = useState<"student" | "teacher" | "author" | "publisher" | "librarian">("student");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -56,6 +57,10 @@ export default function RegisterPage() {
             router.push("/student");
           } else if (role === "publisher") {
             router.push("/publisher");
+          } else if (role === "teacher") {
+            router.push("/teacher");
+          } else if (role === "librarian") {
+            router.push("/librarian");
           } else {
             router.push("/catalog");
           }
@@ -99,6 +104,7 @@ export default function RegisterPage() {
               { id: "teacher", label: "Enseignant", icon: BookOpen },
               { id: "author", label: "Auteur", icon: UserCheck },
               { id: "publisher", label: "Éditeur", icon: Building2 },
+              { id: "librarian", label: "Bibliothécaire", icon: Library },
             ].map((item) => {
               const Icon = item.icon;
               const active = role === item.id;
