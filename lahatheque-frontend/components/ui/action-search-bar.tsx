@@ -1,0 +1,140 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Search, Send, GraduationCap, Building2, FileText, ArrowRight } from "lucide-react";
+import { Book } from "@/lib/types/catalog";
+import { mockBooks } from "@/lib/mock/catalog";
+
+export interface ActionItem {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  description?: string;
+  category: "discipline" | "book" | "institution";
+  value: string;
+}
+
+interface ActionSearchBarProps {
+  onSearch: (query: string) => void;
+  onSelectAction: (category: string, value: string) => void;
+}
+
+export function ActionSearchBar({ onSearch, onSelectAction }: ActionSearchBarProps) {
+  const [query, setQuery] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
+  const [actions, setActions] = useState<ActionItem[]>([]);
+
+  // Actions de suggestions dynamiques (inspirées de Raycast/21st.dev)
+  const defaultActions: ActionItem[] = [
+    {
+      id: "act-1",
+      label: "Droit & Sciences Politiques",
+      icon: <GraduationCap className="w-4 h-4 text-gold" />,
+      description: "Filtrer par discipline",
+      category: "discipline",
+      value: "Droit & Sciences Politiques"
+    },
+    {
+      id: "act-2",
+      label: "Économie & Gestion",
+      icon: <GraduationCap className="w-4 h-4 text-gold" />,
+      description: "Filtrer par discipline",
+      category: "discipline",
+      value: "Économie & Gestion"
+    },
+    {
+      id: "act-3",
+      label: "Université d'Abomey-Calavi (UAC)",
+      icon: <Building2 className="w-4 h-4 text-gold" />,
+      description: "Filtrer par établissement",
+      category: "institution",
+      value: "UAC"
+    },
+    // Ajouter les livres populaires
+    ...mockBooks.slice(0, 2).map((book, idx) => ({
+      id: `book-${idx}`,
+      label: book.title,
+      icon: <FileText className="w-4 h-4 text-gold/80" />,
+      description: "Consulter la fiche",
+      category: "book" as const,
+      value: book.id
+    }))
+  ];
+
+  useEffect(() => {
+    if (!query) {
+      setActions(defaultActions);
+      return;
+    }
+    const filtered = defaultActions.filter(action =>
+      action.label.toLowerCase().includes(query.toLowerCase())
+    );
+    setActions(filtered);
+  }, [query]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setQuery(val);
+    onSearch(val);
+  };
+
+  return (
+    <div className="w-full max-w-2xl relative">
+      <div className="relative flex items-center">
+        <Search className="absolute left-4 w-5 h-5 text-foreground-muted pointer-events-none" />
+        <input
+          type="text"
+          value={query}
+          onChange={handleInputChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setTimeout(() => setIsFocused(false), 250)}
+          placeholder="Rechercher par titre, auteur, établissement (Action Search Bar)..."
+          className="w-full pl-12 pr-10 py-3.5 rounded-xl border border-border bg-background-secondary text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-navy transition-all shadow-sm text-sm sm:text-base"
+        />
+        {query.length > 0 && (
+          <button 
+            onClick={() => { setQuery(""); onSearch(""); }}
+            className="absolute right-4 text-foreground-muted hover:text-navy"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Dropdown de suggestions interactif Raycast */}
+      {isFocused && actions.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="p-2 border-b border-border bg-background-secondary">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted px-2">Suggestions et Filtres rapides</span>
+          </div>
+          <ul className="max-h-60 overflow-y-auto divide-y divide-border/40">
+            {actions.map(action => (
+              <li
+                key={action.id}
+                onMouseDown={() => {
+                  if (action.category === "book") {
+                    // Aller à la notice
+                    window.location.href = `/catalog/${action.value}`;
+                  } else {
+                    onSelectAction(action.category, action.value);
+                  }
+                  setIsFocused(false);
+                }}
+                className="px-4 py-2.5 flex items-center justify-between hover:bg-background-secondary cursor-pointer transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {action.icon}
+                  <span className="text-xs sm:text-sm font-semibold text-navy line-clamp-1">{action.label}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-foreground-muted font-medium">
+                  <span>{action.description}</span>
+                  <ArrowRight className="w-3 h-3" />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Book } from "@/lib/types/catalog";
 import { searchBooks } from "@/lib/services/catalog";
+import { ActionSearchBar } from "@/components/ui/action-search-bar";
 
 export default function CatalogSearchPage() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -78,27 +79,18 @@ export default function CatalogSearchPage() {
           </p>
         </div>
 
-        {/* Barre de Recherche Principale */}
-        <div className="relative max-w-4xl mx-auto md:mx-0">
-          <div className="relative flex items-center">
-            <Search className="absolute left-4 w-5 h-5 text-foreground-muted pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher par titre, auteur, résumé (PostgreSQL Full-Text)..."
-              className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-border bg-background-secondary text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent transition-all shadow-sm text-sm sm:text-base"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery("")}
-                className="absolute right-4 text-foreground-muted hover:text-navy p-1"
-                aria-label="Effacer la recherche"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+        {/* Barre de Recherche Principale Raycast */}
+        <div className="flex justify-center md:justify-start">
+          <ActionSearchBar 
+            onSearch={(val) => setSearchQuery(val)}
+            onSelectAction={(category, value) => {
+              if (category === "discipline") {
+                setSelectedDiscipline(value);
+              } else if (category === "institution") {
+                setSelectedInstitution(value);
+              }
+            }}
+          />
         </div>
 
         {/* Bouton Filtre Mobile */}
