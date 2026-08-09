@@ -41,6 +41,7 @@ Ces règles sont TOUJOURS actives, sur tout écran/composant/page construit pour
 ## 🧩 Composants — 21st.dev avant tout
 - Avant de coder un composant UI (carte, table, stepper, drawer, dropzone, badge, form…), cherche-le via les tools MCP `21st`. N'écris jamais un composant générique from scratch sans être passé par cette recherche.
 - `search` et `get_inspiration` sont gratuits et illimités — les utiliser librement et largement. `get_component` (code d'un composant) et `generate` (génération IA) sont limités par un quota quotidien — les réserver aux candidats déjà présélectionnés via les métadonnées (nom, description, preview), pas à un usage spéculatif sur chaque résultat.
+- **Éviter les composants payants / Premium** : Privilégier les composants gratuits. Si un composant est payant ou nécessite un upgrade, ne pas l'utiliser et chercher une alternative gratuite.
 - Si un appel `get_component`/`generate` échoue ou renvoie `locked=true`, appelle `get_usage` pour vérifier le quota restant avant de retenter.
 - **Notification de Quotas** : Informer immédiatement et explicitement l'utilisateur dès que le quota de téléchargement de code source de `21st.dev` est épuisé.
 - Tout composant importé de `21st.dev` est adapté avant intégration : couleurs remplacées par les tokens `globals.css`, comportement rendu mobile-first, props renommées pour matcher les types TS du projet.
@@ -81,3 +82,25 @@ Ces règles sont TOUJOURS actives, sur tout écran/composant/page construit pour
 - Upload de fichier : barre de progression réelle (même simulée en mock), jamais un simple spinner sans indication d'avancement.
 - Actions asynchrones sur bouton (valider, envoyer) : état de chargement inline sur le bouton lui-même (spinner + désactivation), pas de blocage de toute la page pour une action locale.
 - Respecte `prefers-reduced-motion` sur toutes les animations de chargement.
+
+## 🔑 Gestion du quota 21st.dev (protocole obligatoire)
+
+Le quota de téléchargement de code source (`get_component` / `generate`) est limité par clé API. Le protocole suivant est **obligatoire** dès que le quota est épuisé ou proche de l'être.
+
+### Détection du quota
+- Appeler `get_usage` avant toute session intensive de recherche 21st.dev.
+- Si `get_component` retourne `locked=true` ou si `get_usage` indique `0 remaining` → **NE PAS coder à la main sans avertir l'utilisateur**.
+
+### Protocole copier-coller (quota épuisé)
+Quand le quota est épuisé, appliquer **strictement ce protocole pas-à-pas** :
+
+1. **Annoncer clairement** : "Quota 21st.dev épuisé. Je vais vous demander les codes sources un par un."
+2. **Identifier la liste complète** des composants à récupérer avant de commencer (ne pas demander au fur et à mesure sans plan).
+3. **Demander le premier composant** : fournir l'URL exacte du composant sur 21st.dev et demander d'y copier le code source complet depuis l'onglet "Code".
+4. **Attendre** que l'utilisateur colle le code source dans le chat.
+5. **Intégrer** ce composant (adaptation tokens, mobile-first, TypeScript) avant de demander le suivant.
+6. **Répéter** (étapes 3→5) pour chaque composant suivant, un par un — jamais deux à la fois.
+7. Si l'utilisateur change la clé API entre temps : appeler `get_usage` pour vérifier, reprendre avec `get_component` si le quota est rétabli.
+
+### Interdiction
+- Ne jamais coder un composant UI générique "à la main" comme alternative silencieuse au quota épuisé sans avoir déclenché ce protocole et l'avoir signalé explicitement à l'utilisateur.

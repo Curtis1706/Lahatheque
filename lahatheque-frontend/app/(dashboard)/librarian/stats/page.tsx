@@ -19,6 +19,7 @@ import {
   Lock
 } from "lucide-react";
 import Link from "next/link";
+import { DataTable } from "@/components/ui/data-table";
 
 export default function LibrarianStatsPage() {
   const [bouquets, setBouquets] = useState<BouquetSubscription[]>([]);
@@ -148,34 +149,59 @@ export default function LibrarianStatsPage() {
           Rapports de consommation par discipline
         </h3>
 
-        {loading ? (
-          <div className="h-48 bg-background border border-border animate-pulse rounded-xl" />
-        ) : (
-          <div className="bg-background border border-border rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-background-secondary border-b border-border text-navy font-bold text-xs uppercase tracking-wider">
-                    <th className="p-4">Discipline</th>
-                    <th className="p-4 text-center">Consultations en ligne</th>
-                    <th className="p-4 text-center">Téléchargements</th>
-                    <th className="p-4 text-center">Volume (Pages lues)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {stats.map((row) => (
-                    <tr key={row.discipline} className="hover:bg-background-secondary/30 transition-colors">
-                      <td className="p-4 font-bold text-navy">{row.discipline}</td>
-                      <td className="p-4 text-center text-foreground-muted">{row.views}</td>
-                      <td className="p-4 text-center text-foreground-muted">{row.downloads}</td>
-                      <td className="p-4 text-center font-bold text-navy">{row.pages_read.toLocaleString()} pages</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        <div className="pt-2">
+          <DataTable
+            data={stats}
+            rowKey="discipline"
+            loading={loading}
+            skeletonRows={3}
+            emptyMessage="Aucune donnée de consommation disponible."
+            columns={[
+              {
+                key: "discipline",
+                header: "Discipline",
+                cell: (row) => <span className="font-bold text-navy">{row.discipline as string}</span>,
+              },
+              {
+                key: "views",
+                header: "Consultations en ligne",
+                className: "text-center",
+                cell: (row) => <span className="text-foreground-muted">{row.views as number}</span>,
+              },
+              {
+                key: "downloads",
+                header: "Téléchargements",
+                className: "text-center",
+                cell: (row) => <span className="text-foreground-muted">{row.downloads as number}</span>,
+              },
+              {
+                key: "pages_read",
+                header: "Volume (Pages lues)",
+                className: "text-center",
+                cell: (row) => <span className="font-bold text-navy">{(row.pages_read as number).toLocaleString()} pages</span>,
+              }
+            ]}
+            mobileCard={(row) => (
+              <div className="space-y-2">
+                <p className="font-bold text-navy text-sm">{row.discipline as string}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-foreground-muted block">Consultations :</span>
+                    <span className="font-medium text-navy">{row.views as number}</span>
+                  </div>
+                  <div>
+                    <span className="text-foreground-muted block">Téléchargements :</span>
+                    <span className="font-medium text-navy">{row.downloads as number}</span>
+                  </div>
+                  <div className="col-span-2 pt-1">
+                    <span className="text-foreground-muted block">Pages lues :</span>
+                    <span className="font-bold text-navy">{(row.pages_read as number).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          />
+        </div>
       </div>
 
     </div>

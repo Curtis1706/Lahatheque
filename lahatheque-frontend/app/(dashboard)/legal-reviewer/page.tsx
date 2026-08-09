@@ -6,24 +6,23 @@ import { LegalContract, ClientDebt } from "@/lib/types/legal";
 import { 
   Scale, 
   FileText, 
-  Search, 
   Download, 
   BellRing, 
   AlertTriangle, 
   CheckCircle,
   Plus, 
   ArrowRight,
-  TrendingUp,
   Percent,
   Mail
 } from "lucide-react";
 import Link from "next/link";
+import { KpiGrid } from "@/components/ui/kpi-card";
+import { DataTable } from "@/components/ui/data-table";
 
 export default function LegalReviewerPage() {
   const [contracts, setContracts] = useState<LegalContract[]>([]);
   const [debts, setDebts] = useState<ClientDebt[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
   const [remindingId, setRemindingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,11 +62,7 @@ export default function LegalReviewerPage() {
     }
   };
 
-  const filteredContracts = contracts.filter(c => 
-    c.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.book_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.author_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -101,6 +96,49 @@ export default function LegalReviewerPage() {
         </div>
       </div>
 
+      {/* KPI Cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-36">
+              <div className="w-10 h-10 rounded-xl bg-background-secondary" />
+              <div className="h-7 w-20 bg-background-secondary rounded" />
+              <div className="h-3.5 w-32 bg-background-secondary rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <KpiGrid
+          cols={3}
+          cards={[
+            {
+              label: "Contrats actifs",
+              value: contracts.length,
+              icon: FileText,
+              trend: 3,
+              sparkline: [30, 40, 45, 55, 50, 65, 70],
+            },
+            {
+              label: "Factures en attente",
+              value: debts.filter(d => d.status === "pending").length,
+              icon: AlertTriangle,
+              trend: -5,
+              sparkline: [60, 55, 65, 50, 45, 40, 35],
+            },
+            {
+              label: "Taux de redevance moyen",
+              value: contracts.length > 0
+                ? Math.round(contracts.reduce((s, c) => s + c.royalty_rate, 0) / contracts.length)
+                : 0,
+              formatValue: (v) => `${v}%`,
+              icon: Percent,
+              trend: 1,
+              sparkline: [40, 42, 44, 45, 46, 47, 48],
+            },
+          ]}
+        />
+      )}
+
       {/* Action shortcuts */}
       <div className="flex flex-wrap gap-4 items-center justify-between">
         <h2 className="font-serif text-lg font-bold text-navy flex items-center gap-2">
@@ -123,68 +161,92 @@ export default function LegalReviewerPage() {
         {/* Left: Contracts lists with search */}
         <div className="lg:col-span-8 space-y-4">
           
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-navy"
-              placeholder="Rechercher par référence, auteur, titre de livre..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          {loading ? (
-            <div className="p-6 space-y-4 animate-pulse bg-background border border-border rounded-xl">
-              <div className="h-10 bg-background-secondary rounded" />
-              <div className="h-10 bg-background-secondary rounded" />
-            </div>
-          ) : filteredContracts.length === 0 ? (
-            <div className="p-10 text-center text-xs text-foreground-muted bg-background border border-border rounded-xl">
-              Aucun contrat ne correspond à votre recherche.
-            </div>
-          ) : (
-            <div className="bg-background border border-border rounded-xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-background-secondary border-b border-border text-navy font-bold text-xs uppercase tracking-wider">
-                      <th className="p-4">Réf. Contrat</th>
-                      <th className="p-4">Auteur / Ouvrage</th>
-                      <th className="p-4 text-center">Part Redevance</th>
-                      <th className="p-4 text-right">Contrat PDF</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {filteredContracts.map((ctr) => (
-                      <tr key={ctr.id} className="hover:bg-background-secondary/30 transition-colors">
-                        <td className="p-4 font-mono text-xs font-bold text-navy">{ctr.reference}</td>
-                        <td className="p-4">
-                          <p className="font-bold text-navy text-sm">{ctr.book_title}</p>
-                          <p className="text-xs text-foreground-muted">Auteur : {ctr.author_name}</p>
-                        </td>
-                        <td className="p-4 text-center">
-                          <span className="inline-flex items-center gap-0.5 text-xs font-bold text-gold">
-                            <Percent className="w-3.5 h-3.5" /> {ctr.royalty_rate}%
-                          </span>
-                        </td>
-                        <td className="p-4 text-right">
-                          <button
-                            className="p-2 rounded bg-background-secondary border border-border hover:border-navy text-navy hover:text-navy-hover transition-all"
-                            title="Télécharger le contrat signé"
-                            onClick={() => alert(`Téléchargement de ${ctr.contract_file}...`)}
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Table des contrats — DataTable (21st.dev #22162) */}
+          <DataTable
+            data={contracts}
+            rowKey="id"
+            loading={loading}
+            skeletonRows={3}
+            searchPlaceholder="Rechercher par référence, auteur, titre..."
+            emptyMessage="Aucun contrat enregistré pour le moment."
+            headerActions={
+              <Link
+                href="/legal-reviewer/contracts"
+                className="inline-flex items-center gap-1.5 bg-navy hover:bg-navy-hover text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Nouveau contrat
+              </Link>
+            }
+            columns={[
+              {
+                key: "reference",
+                header: "Réf. Contrat",
+                cell: (ctr) => (
+                  <span className="font-mono text-xs font-bold text-navy">{ctr.reference as string}</span>
+                ),
+              },
+              {
+                key: "book_title",
+                header: "Auteur / Ouvrage",
+                cell: (ctr) => (
+                  <div>
+                    <p className="font-bold text-navy text-sm">{ctr.book_title as string}</p>
+                    <p className="text-xs text-foreground-muted">Auteur : {ctr.author_name as string}</p>
+                  </div>
+                ),
+              },
+              {
+                key: "royalty_rate",
+                header: "Part Redevance",
+                className: "text-center",
+                cell: (ctr) => (
+                  <span className="inline-flex items-center gap-0.5 text-xs font-bold text-gold">
+                    <Percent className="w-3.5 h-3.5" /> {ctr.royalty_rate as number}%
+                  </span>
+                ),
+                hideOnMobile: true,
+              },
+              {
+                key: "contract_file",
+                header: "PDF",
+                className: "text-right",
+                cell: (ctr) => (
+                  <button
+                    className="p-2 rounded bg-background-secondary border border-border hover:border-navy text-navy hover:text-navy-hover transition-all"
+                    title="Télécharger le contrat signé"
+                    onClick={(e) => { e.stopPropagation(); alert(`Téléchargement de ${ctr.contract_file}...`); }}
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                ),
+              },
+            ]}
+            mobileCard={(ctr) => (
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-navy text-sm">{ctr.book_title as string}</p>
+                    <p className="text-xs text-foreground-muted">Auteur : {ctr.author_name as string}</p>
+                    <p className="font-mono text-[10px] text-foreground-muted mt-0.5">{ctr.reference as string}</p>
+                  </div>
+                  <span className="inline-flex items-center gap-0.5 text-xs font-bold text-gold shrink-0">
+                    <Percent className="w-3 h-3" /> {ctr.royalty_rate as number}%
+                  </span>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); alert(`Téléchargement de ${ctr.contract_file}...`); }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-navy border border-border px-3 py-1.5 rounded hover:bg-background-secondary"
+                    title="Télécharger le contrat"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Télécharger PDF
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          />
+
         </div>
 
         {/* Right: Client Debts & Reminders */}

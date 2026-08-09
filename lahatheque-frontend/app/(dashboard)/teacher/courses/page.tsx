@@ -17,6 +17,7 @@ import {
   ArrowUpRight
 } from "lucide-react";
 import Link from "next/link";
+import { Modal } from "@/components/ui/modal";
 import { mockBooks } from "@/lib/mock/catalog";
 
 export default function TeacherCoursesPage() {
@@ -190,116 +191,115 @@ export default function TeacherCoursesPage() {
         </div>
       )}
 
-      {/* Modal 1: Create Course */}
-      {showCourseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60">
-          <div className="bg-background rounded-lg border border-border shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="border-b border-border pb-2">
-              <h3 className="font-serif text-lg font-bold text-navy">Créer un nouveau cours</h3>
-            </div>
-            <form onSubmit={handleCreateCourse} className="space-y-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-navy">Nom du cours *</label>
-                <input 
-                  type="text" 
-                  required
-                  className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy"
-                  placeholder="Ex: Macroéconomie Internationale"
-                  value={newCourseName}
-                  onChange={(e) => setNewCourseName(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-navy">Code du cours *</label>
-                <input 
-                  type="text" 
-                  required
-                  className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy"
-                  placeholder="Ex: ECO-2200"
-                  value={newCourseCode}
-                  onChange={(e) => setNewCourseCode(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button 
-                  type="button"
-                  onClick={() => setShowCourseModal(false)}
-                  className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
-                >
-                  Annuler
-                </button>
-                <button 
-                  type="submit"
-                  className="bg-navy hover:bg-navy-hover text-white text-xs font-bold px-4 py-2 rounded"
-                >
-                  Créer le cours
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={showCourseModal}
+        onClose={() => setShowCourseModal(false)}
+        title="Créer un nouveau cours"
+        maxWidth={500}
+        footer={
+          <>
+            <button 
+              type="button"
+              onClick={() => setShowCourseModal(false)}
+              className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
+            >
+              Annuler
+            </button>
+            <button 
+              type="submit"
+              form="create-course-form"
+              className="bg-navy hover:bg-navy-hover text-white text-xs font-bold px-4 py-2 rounded"
+            >
+              Créer le cours
+            </button>
+          </>
+        }
+      >
+        <form id="create-course-form" onSubmit={handleCreateCourse} className="space-y-4 pt-2 pb-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-navy">Nom du cours *</label>
+            <input 
+              type="text" 
+              required
+              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy"
+              placeholder="Ex: Macroéconomie Internationale"
+              value={newCourseName}
+              onChange={(e) => setNewCourseName(e.target.value)}
+            />
           </div>
-        </div>
-      )}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-navy">Code du cours *</label>
+            <input 
+              type="text" 
+              required
+              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy"
+              placeholder="Ex: ECO-2200"
+              value={newCourseCode}
+              onChange={(e) => setNewCourseCode(e.target.value)}
+            />
+          </div>
+        </form>
+      </Modal>
 
-      {/* Modal 2: Recommend Book */}
-      {showRecModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60">
-          <div className="bg-background rounded-lg border border-border shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="border-b border-border pb-2">
-              <h3 className="font-serif text-lg font-bold text-navy">Recommander un manuel à vos cours</h3>
-            </div>
-            <form onSubmit={handleAddRecommendation} className="space-y-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-navy">Associer au cours *</label>
-                <select 
-                  className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy cursor-pointer"
-                  value={recCourseId}
-                  onChange={(e) => setRecCourseId(e.target.value)}
-                  required
-                >
-                  <option value="">-- Choisir un cours --</option>
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-navy">Ouvrage à recommander *</label>
-                <select 
-                  className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy cursor-pointer"
-                  value={recBookId}
-                  onChange={(e) => setRecBookId(e.target.value)}
-                  required
-                >
-                  <option value="">-- Choisir un ouvrage --</option>
-                  {mockBooks.map((book) => (
-                    <option key={book.id} value={book.id}>
-                      {book.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button 
-                  type="button"
-                  onClick={() => setShowRecModal(false)}
-                  className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
-                >
-                  Annuler
-                </button>
-                <button 
-                  type="submit"
-                  disabled={submittingRec}
-                  className="bg-navy hover:bg-navy-hover text-white text-xs font-bold px-4 py-2 rounded disabled:opacity-50"
-                >
-                  {submittingRec ? "Envoi..." : "Recommander"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={showRecModal}
+        onClose={() => setShowRecModal(false)}
+        title="Recommander un manuel à vos cours"
+        maxWidth={500}
+        footer={
+          <>
+            <button 
+              type="button"
+              onClick={() => setShowRecModal(false)}
+              className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
+            >
+              Annuler
+            </button>
+            <button 
+              type="submit"
+              form="recommend-book-form"
+              className="bg-gold hover:bg-gold-dark text-white text-xs font-bold px-4 py-2 rounded"
+            >
+              Ajouter la recommandation
+            </button>
+          </>
+        }
+      >
+        <form id="recommend-book-form" onSubmit={handleAddRecommendation} className="space-y-4 pt-2 pb-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-navy">Associer au cours *</label>
+            <select 
+              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy cursor-pointer"
+              value={recCourseId}
+              onChange={(e) => setRecCourseId(e.target.value)}
+              required
+            >
+              <option value="">-- Choisir un cours --</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
-      )}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-navy">Ouvrage à recommander *</label>
+            <select 
+              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy cursor-pointer"
+              value={recBookId}
+              onChange={(e) => setRecBookId(e.target.value)}
+              required
+            >
+              <option value="">-- Choisir un ouvrage --</option>
+              {mockBooks.map((book) => (
+                <option key={book.id} value={book.id}>
+                  {book.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        </form>
+      </Modal>
 
     </div>
   );
