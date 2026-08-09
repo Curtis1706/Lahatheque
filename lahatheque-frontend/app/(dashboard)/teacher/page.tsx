@@ -18,6 +18,7 @@ import {
   Calendar
 } from "lucide-react";
 import Link from "next/link";
+import { KpiGrid } from "@/components/ui/kpi-card";
 
 export default function TeacherDashboardPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -96,40 +97,47 @@ export default function TeacherDashboardPage() {
         </div>
       </div>
 
-      {/* Quick Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <div className="bg-background border border-border p-6 rounded flex items-center justify-between shadow-sm">
-          <div>
-            <span className="text-xs text-foreground-muted font-medium block font-sans">Vos cours actifs</span>
-            <span className="text-2xl font-bold text-navy mt-1">{loading ? "..." : courses.length} cours</span>
-          </div>
-          <div className="w-10 h-10 rounded bg-navy-light text-navy flex items-center justify-center">
-            <GraduationCap className="w-5 h-5" />
-          </div>
+      {/* KPI Cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-36">
+              <div className="w-10 h-10 rounded-xl bg-background-secondary" />
+              <div className="h-7 w-20 bg-background-secondary rounded" />
+              <div className="h-3.5 w-28 bg-background-secondary rounded" />
+            </div>
+          ))}
         </div>
-
-        <div className="bg-background border border-border p-6 rounded flex items-center justify-between shadow-sm">
-          <div>
-            <span className="text-xs text-foreground-muted font-medium block font-sans">Livres recommandés</span>
-            <span className="text-2xl font-bold text-navy mt-1">
-              {loading ? "..." : courses.reduce((sum, c) => sum + c.recommended_books.length, 0)} ouvrages
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded bg-gold/10 text-gold-dark flex items-center justify-center">
-            <Bookmark className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-background border border-border p-6 rounded flex items-center justify-between shadow-sm">
-          <div>
-            <span className="text-xs text-foreground-muted font-medium block font-sans">Spécimens demandés</span>
-            <span className="text-2xl font-bold text-navy mt-1">{loading ? "..." : specimens.length} demandes</span>
-          </div>
-          <div className="w-10 h-10 rounded bg-navy-light text-navy flex items-center justify-center">
-            <FileText className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
+      ) : (
+        <KpiGrid
+          cols={3}
+          cards={[
+            {
+              label: "Cours actifs",
+              value: courses.length,
+              formatValue: (v) => `${v} cours`,
+              icon: GraduationCap,
+              trend: 0,
+              sparkline: [50, 50, 60, 55, 65, 65, 70],
+            },
+            {
+              label: "Ouvrages recommandés",
+              value: courses.reduce((sum, c) => sum + c.recommended_books.length, 0),
+              icon: Bookmark,
+              trend: 10,
+              sparkline: [30, 40, 45, 55, 60, 65, 75],
+            },
+            {
+              label: "Spécimens demandés",
+              value: specimens.length,
+              formatValue: (v) => `${v} demandes`,
+              icon: FileText,
+              trend: 3,
+              sparkline: [20, 25, 30, 28, 35, 40, 45],
+            },
+          ]}
+        />
+      )}
 
       {/* Grid: Resume of Courses & Specimens */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

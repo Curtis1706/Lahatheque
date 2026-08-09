@@ -26,6 +26,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import Link from "next/link";
+import { KpiGrid, type KpiCardProps } from "@/components/ui/kpi-card";
 
 export default function PublisherDashboardPage() {
   const [stats, setStats] = useState<PublisherStats | null>(null);
@@ -165,67 +166,54 @@ export default function PublisherDashboardPage() {
         </div>
       )}
 
-      {/* Stats Grid (Metric Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {loading ? (
-          // Skeletons pour les Metrics Cards
-          Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="bg-background border border-border p-6 rounded animate-pulse space-y-3">
-              <div className="w-8 h-8 rounded bg-background-secondary" />
-              <div className="h-6 w-24 bg-background-secondary rounded" />
-              <div className="h-4 w-32 bg-background-secondary rounded" />
+      {/* KPI Cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-36">
+              <div className="w-10 h-10 rounded-xl bg-background-secondary" />
+              <div className="h-7 w-20 bg-background-secondary rounded" />
+              <div className="h-3.5 w-32 bg-background-secondary rounded" />
             </div>
-          ))
-        ) : (
-          stats && (
-            <>
-              {/* Card 1 */}
-              <div className="bg-background border border-border p-6 rounded hover:shadow-md transition-shadow flex items-start gap-4">
-                <div className="w-12 h-12 rounded bg-gold/10 text-gold flex items-center justify-center shrink-0">
-                  <DollarSign className="w-6 h-6" />
-                </div>
-                <div>
-                  <span className="block text-2xl font-bold text-navy">{stats.total_royalties.toLocaleString()} FCFA</span>
-                  <span className="text-xs text-foreground-muted font-medium">Redevances cumulées</span>
-                </div>
-              </div>
-
-              {/* Card 2 */}
-              <div className="bg-background border border-border p-6 rounded hover:shadow-md transition-shadow flex items-start gap-4">
-                <div className="w-12 h-12 rounded bg-gold/10 text-gold flex items-center justify-center shrink-0">
-                  <Eye className="w-6 h-6" />
-                </div>
-                <div>
-                  <span className="block text-2xl font-bold text-navy">{stats.total_views.toLocaleString()}</span>
-                  <span className="text-xs text-foreground-muted font-medium">Consultations</span>
-                </div>
-              </div>
-
-              {/* Card 3 */}
-              <div className="bg-background border border-border p-6 rounded hover:shadow-md transition-shadow flex items-start gap-4">
-                <div className="w-12 h-12 rounded bg-gold/10 text-gold flex items-center justify-center shrink-0">
-                  <Download className="w-6 h-6" />
-                </div>
-                <div>
-                  <span className="block text-2xl font-bold text-navy">{stats.total_downloads.toLocaleString()}</span>
-                  <span className="text-xs text-foreground-muted font-medium">Téléchargements</span>
-                </div>
-              </div>
-
-              {/* Card 4 */}
-              <div className="bg-background border border-border p-6 rounded hover:shadow-md transition-shadow flex items-start gap-4">
-                <div className="w-12 h-12 rounded bg-gold/10 text-gold flex items-center justify-center shrink-0">
-                  <TrendingUp className="w-6 h-6" />
-                </div>
-                <div>
-                  <span className="block text-2xl font-bold text-navy">{stats.average_commission_rate}%</span>
-                  <span className="text-xs text-foreground-muted font-medium">Commission de distribution</span>
-                </div>
-              </div>
-            </>
-          )
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        stats && (
+          <KpiGrid
+            cols={4}
+            cards={[
+              {
+                label: "Redevances cumulées",
+                value: stats.total_royalties,
+                formatValue: (v) => `${v.toLocaleString("fr-FR")} FCFA`,
+                icon: DollarSign,
+                trend: 12,
+                sparkline: [30, 45, 40, 60, 55, 75, 70],
+              },
+              {
+                label: "Consultations",
+                value: stats.total_views,
+                icon: Eye,
+                trend: 8,
+                sparkline: [20, 35, 50, 45, 65, 60, 80],
+              },
+              {
+                label: "Téléchargements",
+                value: stats.total_downloads,
+                icon: Download,
+                trend: -3,
+                sparkline: [70, 65, 55, 60, 45, 50, 40],
+              },
+              {
+                label: "Commission de distribution",
+                value: stats.average_commission_rate,
+                formatValue: (v) => `${v}%`,
+                icon: TrendingUp,
+              },
+            ] satisfies KpiCardProps[]}
+          />
+        )
+      )}
 
       {/* Catalogue / Table Section */}
       <div className="bg-background border border-border rounded shadow-sm overflow-hidden">

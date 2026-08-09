@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { getBorrowedBooks, getFavoriteBooks } from "@/lib/services/student";
 import { StudentBookAccess } from "@/lib/types/student";
+import { KpiGrid } from "@/components/ui/kpi-card";
 
 export default function StudentDashboardPage() {
   const [activeTab, setActiveTab] = useState<"borrowed" | "favorites">("borrowed");
@@ -70,38 +71,44 @@ export default function StudentDashboardPage() {
           </div>
         </div>
 
-        {/* Statistiques Rapides */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-background-secondary p-5 rounded-2xl border border-border flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-navy-light flex items-center justify-center text-navy">
-              <BookOpen className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-2xl font-serif font-bold text-navy">{loading ? "..." : borrowedBooks.length}</span>
-              <span className="block text-xs font-semibold text-foreground-muted uppercase tracking-wider">Ouvrages Actifs</span>
-            </div>
+        {/* KPI Cards — Statistiques rapides */}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-36">
+                <div className="w-10 h-10 rounded-xl bg-background-secondary" />
+                <div className="h-7 w-20 bg-background-secondary rounded" />
+                <div className="h-3.5 w-28 bg-background-secondary rounded" />
+              </div>
+            ))}
           </div>
-
-          <div className="bg-background-secondary p-5 rounded-2xl border border-border flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gold/10 flex items-center justify-center text-gold-dark">
-              <Bookmark className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-2xl font-serif font-bold text-navy">{loading ? "..." : favoriteBooks.length}</span>
-              <span className="block text-xs font-semibold text-foreground-muted uppercase tracking-wider">Favoris Enregistrés</span>
-            </div>
-          </div>
-
-          <div className="bg-background-secondary p-5 rounded-2xl border border-border flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-navy-light flex items-center justify-center text-navy">
-              <Clock className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-2xl font-serif font-bold text-navy">14 Jours</span>
-              <span className="block text-xs font-semibold text-foreground-muted uppercase tracking-wider">Prochaine Échéance</span>
-            </div>
-          </div>
-        </div>
+        ) : (
+          <KpiGrid
+            cols={3}
+            cards={[
+              {
+                label: "Ouvrages actifs",
+                value: borrowedBooks.length,
+                icon: BookOpen,
+                trend: 2,
+                sparkline: [40, 50, 45, 60, 55, 70, 65],
+              },
+              {
+                label: "Favoris enregistrés",
+                value: favoriteBooks.length,
+                icon: Bookmark,
+                trend: 5,
+                sparkline: [20, 30, 35, 30, 45, 50, 55],
+              },
+              {
+                label: "Jours avant échéance",
+                value: 14,
+                formatValue: (v) => `${v} jours`,
+                icon: Clock,
+              },
+            ]}
+          />
+        )}
 
         {/* Onglets Emprunts / Favoris */}
         <div className="space-y-6">

@@ -17,7 +17,7 @@ import {
   XCircle
 } from "lucide-react";
 import Link from "next/link";
-import { StatisticsCard12 } from "@/components/ui/statistics-card-12";
+import { KpiGrid, type KpiCardProps } from "@/components/ui/kpi-card";
 
 export default function AuthorDashboardPage() {
   const [submissions, setSubmissions] = useState<AuthorSubmission[]>([]);
@@ -111,32 +111,47 @@ export default function AuthorDashboardPage() {
         </div>
       </div>
 
-      {/* Metrics (StatisticsCard12 de 21st.dev) */}
-      <StatisticsCard12
-        cards={[
-          {
-            icon: TrendingUp,
-            value: loading ? "..." : `${totalVentes} ex.`,
-            label: "Ventes de livres cumulées",
-            infoText: "Volume global de ventes physiques/numériques",
-            badgeType: "neutral"
-          },
-          {
-            icon: Download,
-            value: "550 téléchargements",
-            label: "Lectures et Téléchargements",
-            infoText: "Accès via bouquets universitaires",
-            badgeType: "success"
-          },
-          {
-            icon: DollarSign,
-            value: loading ? "..." : `${totalGains.toLocaleString()} FCFA`,
-            label: "Redevances accumulées",
-            infoText: "Dernier versement effectué le 05/08/2026",
-            badgeType: "success"
-          }
-        ]}
-      />
+      {/* KPI Cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-36">
+              <div className="w-10 h-10 rounded-xl bg-background-secondary" />
+              <div className="h-7 w-20 bg-background-secondary rounded" />
+              <div className="h-3.5 w-32 bg-background-secondary rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <KpiGrid
+          cols={3}
+          cards={[
+            {
+              label: "Ventes cumulées",
+              value: totalVentes,
+              formatValue: (v) => `${v} ex.`,
+              icon: TrendingUp,
+              trend: 18,
+              sparkline: [25, 40, 35, 55, 50, 70, 65],
+            },
+            {
+              label: "Lectures & Téléchargements",
+              value: 550,
+              icon: Download,
+              trend: 12,
+              sparkline: [30, 45, 50, 60, 55, 75, 80],
+            },
+            {
+              label: "Redevances accumulées",
+              value: totalGains,
+              formatValue: (v) => `${v.toLocaleString("fr-FR")} FCFA`,
+              icon: DollarSign,
+              trend: 9,
+              sparkline: [40, 50, 45, 65, 60, 75, 70],
+            },
+          ] satisfies KpiCardProps[]}
+        />
+      )}
 
       {/* Grid: Submissions & Royalties Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

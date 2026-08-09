@@ -16,7 +16,7 @@ import {
   ShieldAlert
 } from "lucide-react";
 import Link from "next/link";
-import { StatisticsCard12 } from "@/components/ui/statistics-card-12";
+import { KpiGrid, type KpiCardProps } from "@/components/ui/kpi-card";
 
 export default function LibrarianDashboardPage() {
   const [affiliations, setAffiliations] = useState<StudentAffiliation[]>([]);
@@ -77,32 +77,46 @@ export default function LibrarianDashboardPage() {
         </div>
       </div>
 
-      {/* Metrics (StatisticsCard12 de 21st.dev) */}
-      <StatisticsCard12
-        cards={[
-          {
-            icon: UserCheck,
-            value: loading ? "..." : approvedCount,
-            label: "Étudiants Affiliés Validés",
-            infoText: "Accès actifs validés par votre établissement",
-            badgeType: "success"
-          },
-          {
-            icon: Clock,
-            value: loading ? "..." : pendingAffiliations.length,
-            label: "Demandes d'Affiliation en attente",
-            infoText: "À valider ou rejeter par vos services",
-            badgeType: "warning"
-          },
-          {
-            icon: TrendingUp,
-            value: "51 400 pages",
-            label: "Consommations globales",
-            infoText: "+14% de consultations ce mois-ci",
-            badgeType: "neutral"
-          }
-        ]}
-      />
+      {/* KPI Cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-36">
+              <div className="w-10 h-10 rounded-xl bg-background-secondary" />
+              <div className="h-7 w-20 bg-background-secondary rounded" />
+              <div className="h-3.5 w-32 bg-background-secondary rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <KpiGrid
+          cols={3}
+          cards={[
+            {
+              label: "Étudiants affiliés validés",
+              value: approvedCount,
+              icon: UserCheck,
+              trend: 5,
+              sparkline: [30, 40, 35, 55, 50, 65, 70],
+            },
+            {
+              label: "Demandes en attente",
+              value: pendingAffiliations.length,
+              icon: Clock,
+              trend: -2,
+              sparkline: [60, 55, 65, 50, 45, 40, 35],
+            },
+            {
+              label: "Consommations globales",
+              value: 51400,
+              formatValue: (v) => `${v.toLocaleString("fr-FR")} pages`,
+              icon: TrendingUp,
+              trend: 14,
+              sparkline: [40, 50, 55, 65, 60, 75, 80],
+            },
+          ] satisfies KpiCardProps[]}
+        />
+      )}
 
       {/* Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
