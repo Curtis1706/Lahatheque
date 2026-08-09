@@ -15,6 +15,7 @@ import {
   DollarSign,
   FileText
 } from "lucide-react";
+import { Dropzone } from "@/components/ui/dropzone";
 
 export default function NewSubmissionPage() {
   const router = useRouter();
@@ -253,69 +254,27 @@ export default function NewSubmissionPage() {
               {/* Manuscript dropzone */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-navy block">Fichier numérique du livre * (PDF, EPUB)</label>
-                <div 
-                  onClick={() => manuscriptRef.current?.click()}
-                  className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:bg-background-secondary transition-colors relative"
-                >
-                  <input 
-                    type="file" 
-                    ref={manuscriptRef} 
-                    className="hidden" 
-                    accept=".pdf,.epub"
-                    onChange={handleManuscriptSelect}
-                  />
-                  <Upload className="w-8 h-8 text-foreground-muted mx-auto mb-2" />
-                  <p className="text-sm font-bold text-navy">Déposez ou sélectionnez le fichier</p>
-                  <p className="text-xs text-foreground-muted mt-1">PDF ou EPUB — 50 Mo maximum</p>
-                </div>
-                {manuscriptFile && (
-                  <div className="border border-border rounded p-3 space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-navy truncate max-w-[200px]">{manuscriptFile.name}</span>
-                      <span className="text-foreground-muted">{(manuscriptFile.size / 1024 / 1024).toFixed(2)} Mo</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="h-1.5 bg-background-secondary rounded-full overflow-hidden flex-1">
-                        <div className="h-full bg-gold" style={{ width: `${manuscriptProgress}%` }} />
-                      </div>
-                      <span className="font-bold text-navy">{manuscriptProgress}%</span>
-                    </div>
-                  </div>
-                )}
+                <Dropzone 
+                  onFileSelect={(file) => {
+                    setManuscriptFile(file);
+                    setManuscriptProgress(100);
+                  }}
+                  acceptTypes={[".pdf", ".epub"]}
+                  maxSizeMB={50}
+                />
               </div>
 
               {/* Cover dropzone */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-navy block">Image de couverture (Optionnelle - JPG, PNG)</label>
-                <div 
-                  onClick={() => coverRef.current?.click()}
-                  className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:bg-background-secondary transition-colors relative"
-                >
-                  <input 
-                    type="file" 
-                    ref={coverRef} 
-                    className="hidden" 
-                    accept="image/*"
-                    onChange={handleCoverSelect}
-                  />
-                  <Upload className="w-8 h-8 text-foreground-muted mx-auto mb-2" />
-                  <p className="text-sm font-bold text-navy">Déposez ou sélectionnez l'image de couverture</p>
-                  <p className="text-xs text-foreground-muted mt-1">JPG ou PNG — 5 Mo maximum</p>
-                </div>
-                {coverFile && (
-                  <div className="border border-border rounded p-3 space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-navy truncate max-w-[200px]">{coverFile.name}</span>
-                      <span className="text-foreground-muted">{(coverFile.size / 1024).toFixed(0)} Ko</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="h-1.5 bg-background-secondary rounded-full overflow-hidden flex-1">
-                        <div className="h-full bg-gold" style={{ width: `${coverProgress}%` }} />
-                      </div>
-                      <span className="font-bold text-navy">{coverProgress}%</span>
-                    </div>
-                  </div>
-                )}
+                <Dropzone 
+                  onFileSelect={(file) => {
+                    setCoverFile(file);
+                    setCoverProgress(100);
+                  }}
+                  acceptTypes={[".jpg", ".jpeg", ".png"]}
+                  maxSizeMB={5}
+                />
               </div>
             </div>
           )}
