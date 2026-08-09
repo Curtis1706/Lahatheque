@@ -125,6 +125,7 @@ REST_FRAMEWORK = {
 
 # ── JWT Configuration (SimpleJWT) ─────────────────────────────────────────────
 SIMPLE_JWT = {
+    'SIGNING_KEY': config('JWT_SECRET_KEY', default=SECRET_KEY),
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
     'REFRESH_TOKEN_LIFETIME': timedelta(hours=12),
     'ROTATE_REFRESH_TOKENS': True,
