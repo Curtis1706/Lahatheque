@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import { DataTable } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export default function SubmissionsListPage() {
   const [submissions, setSubmissions] = useState<BookSubmission[]>([]);
@@ -57,29 +58,13 @@ export default function SubmissionsListPage() {
   const getStatusBadge = (status: BookSubmission["status"]) => {
     switch (status) {
       case "approved":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-success/10 text-success border border-success/20">
-            <CheckCircle className="w-3 h-3" /> Approved
-          </span>
-        );
+        return <StatusBadge status="success" leftIcon={CheckCircle} leftLabel="Approved" />;
       case "pending":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-warning/10 text-warning border border-warning/20">
-            <Clock className="w-3 h-3" /> En attente
-          </span>
-        );
+        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En attente" />;
       case "rejected":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-error/10 text-error border border-error/20">
-            <XCircle className="w-3 h-3" /> Rejeté
-          </span>
-        );
+        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Rejeté" />;
       case "draft":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-navy-hover/10 text-foreground-muted border border-navy-hover/20">
-            <FileText className="w-3 h-3" /> Brouillon
-          </span>
-        );
+        return <StatusBadge status="default" leftIcon={FileText} leftLabel="Brouillon" />;
     }
   };
 

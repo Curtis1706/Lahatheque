@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { KpiGrid, type KpiCardProps } from "@/components/ui/kpi-card";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export default function AuthorDashboardPage() {
   const [submissions, setSubmissions] = useState<AuthorSubmission[]>([]);
@@ -49,35 +50,15 @@ export default function AuthorDashboardPage() {
   const getStatusBadge = (status: AuthorSubmission["status"]) => {
     switch (status) {
       case "approved":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-success/10 text-success border border-success/20">
-            <CheckCircle className="w-2.5 h-2.5" /> Approuvé
-          </span>
-        );
+        return <StatusBadge status="success" leftIcon={CheckCircle} leftLabel="Approuvé" />;
       case "pending":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-warning/10 text-warning border border-warning/20">
-            <Clock className="w-2.5 h-2.5" /> Soumis
-          </span>
-        );
+        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="Soumis" />;
       case "under_review":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-warning/10 text-warning border border-warning/20">
-            <Clock className="w-2.5 h-2.5" /> En relecture
-          </span>
-        );
+        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En relecture" />;
       case "rejected":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-error/10 text-error border border-error/20">
-            <XCircle className="w-2.5 h-2.5" /> Refusé
-          </span>
-        );
+        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Refusé" />;
       case "draft":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-background-secondary text-foreground-muted border border-border">
-            Brouillon
-          </span>
-        );
+        return <StatusBadge status="default" leftLabel="Brouillon" />;
     }
   };
 
@@ -224,13 +205,10 @@ export default function AuthorDashboardPage() {
                   </div>
                   <div className="flex justify-between items-center text-[10px] text-foreground-muted">
                     <span>Période : {stmt.statement_period}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                      stmt.status === "paid" 
-                        ? "bg-success/10 text-success border border-success/20" 
-                        : "bg-warning/10 text-warning border border-warning/20"
-                    }`}>
-                      {stmt.status === "paid" ? "Payé" : "En cours"}
-                    </span>
+                    <StatusBadge
+                      status={stmt.status === "paid" ? "success" : "warning"}
+                      leftLabel={stmt.status === "paid" ? "Payé" : "En cours"}
+                    />
                   </div>
                 </div>
               ))}

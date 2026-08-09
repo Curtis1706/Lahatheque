@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { KpiGrid } from "@/components/ui/kpi-card";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export default function TeacherDashboardPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -47,23 +48,11 @@ export default function TeacherDashboardPage() {
   const getStatusBadge = (status: SpecimenRequest["status"]) => {
     switch (status) {
       case "approved":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-success/10 text-success border border-success/20">
-            <CheckCircle className="w-2.5 h-2.5" /> Accordé
-          </span>
-        );
+        return <StatusBadge status="success" leftIcon={CheckCircle} leftLabel="Accordé" />;
       case "pending":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-warning/10 text-warning border border-warning/20">
-            <Clock className="w-2.5 h-2.5" /> En attente
-          </span>
-        );
+        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En attente" />;
       case "rejected":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-error/10 text-error border border-error/20">
-            <XCircle className="w-2.5 h-2.5" /> Refusé
-          </span>
-        );
+        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Refusé" />;
     }
   };
 

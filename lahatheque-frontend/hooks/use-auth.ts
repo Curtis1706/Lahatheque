@@ -10,7 +10,7 @@ export interface User {
   email: string
   first_name: string
   last_name: string
-  role: 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client'
+  role: 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client' | 'publisher' | 'librarian' | 'legal_reviewer' | 'layout_artist'
   active_roles: string[]  // Source de vérité Phase 8 — lire ceci plutôt que role
   phone?: string
   is_verified: boolean

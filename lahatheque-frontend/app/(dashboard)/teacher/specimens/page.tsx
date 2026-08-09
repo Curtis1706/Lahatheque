@@ -20,6 +20,7 @@ import {
 import Link from "next/link";
 import { DataTable } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { mockBooks } from "@/lib/mock/catalog";
 
 export default function TeacherSpecimensPage() {
@@ -71,23 +72,11 @@ export default function TeacherSpecimensPage() {
   const getStatusBadge = (status: SpecimenRequest["status"]) => {
     switch (status) {
       case "approved":
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-success/10 text-success border border-success/20">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Accordé (Actif)
-          </span>
-        );
+        return <StatusBadge status="success" leftIcon={CheckCircle2} leftLabel="Accordé (Actif)" />;
       case "pending":
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-warning/10 text-warning border border-warning/20">
-            <Clock className="w-3.5 h-3.5" /> En attente de validation
-          </span>
-        );
+        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En attente de validation" />;
       case "rejected":
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-error/10 text-error border border-error/20">
-            <XCircle className="w-3.5 h-3.5" /> Refusé
-          </span>
-        );
+        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Refusé" />;
     }
   };
 
