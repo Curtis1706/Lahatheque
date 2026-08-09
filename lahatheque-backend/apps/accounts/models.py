@@ -3,6 +3,8 @@ import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
+from django.utils import timezone
+
 ROLE_CHOICES = (
     ('student', 'Étudiant'),
     ('teacher', 'Enseignant'),
@@ -42,4 +44,5 @@ class OTP(models.Model):
     code = models.CharField(max_length=6)
     channel = models.CharField(max_length=10, choices=[('sms', 'SMS'), ('email', 'Email')])
     is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
     expires_at = models.DateTimeField()
