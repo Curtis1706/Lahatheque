@@ -89,7 +89,7 @@ export const DesktopSidebar = ({
   return (
     <motion.div
       className={cn(
-        "h-full px-4 py-4 hidden md:flex md:flex-col bg-navy-dark text-white w-[260px] flex-shrink-0 border-r border-navy-hover z-50",
+        "h-screen sticky top-0 px-4 py-6 hidden md:flex md:flex-col bg-navy-dark text-white w-[260px] flex-shrink-0 border-r border-navy-hover z-50",
         className
       )}
       animate={{
@@ -157,16 +157,19 @@ export const MobileSidebar = ({
 export const SidebarLink = ({
   link,
   className,
+  onClick,
   ...props
 }: {
   link: Links;
   className?: string;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   props?: LinkProps;
 }) => {
   const { open, animate } = useSidebar();
   return (
     <Link
       href={link.href}
+      onClick={onClick}
       className={cn(
         "flex items-center justify-start gap-4 group/sidebar py-2.5 px-2 rounded-lg hover:bg-navy-hover/50 transition-colors",
         className

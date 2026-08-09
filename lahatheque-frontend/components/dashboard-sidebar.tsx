@@ -12,7 +12,9 @@ import {
   Briefcase, 
   ShieldCheck,
   Settings,
-  DollarSign
+  DollarSign,
+  LogOut,
+  User as UserIcon
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -20,30 +22,33 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const Logo = () => (
-  <Link href="#" className="font-normal flex space-x-2 items-center text-sm py-1 relative z-20">
-    <div className="p-1.5 bg-background border border-border rounded-lg shadow-xs flex-shrink-0">
-      <Image src="/logo.png" alt="LAHA" width={20} height={20} className="rounded-sm" />
-    </div>
-    <motion.span
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="font-serif text-lg font-bold text-white whitespace-pre"
-    >
-      LAHAThèque
-    </motion.span>
+  <Link href="/" className="flex items-center justify-center py-2 relative z-20 w-full">
+    <Image 
+      src="/logo.png" 
+      alt="LAHAThèque" 
+      width={140} 
+      height={45} 
+      className="h-10 w-auto object-contain shrink-0" 
+      priority
+    />
   </Link>
 );
 
 const LogoIcon = () => (
-  <Link href="#" className="font-normal flex space-x-2 items-center text-sm py-1 relative z-20">
-    <div className="p-1.5 bg-background border border-border rounded-lg shadow-xs flex-shrink-0">
-      <Image src="/logo.png" alt="LAHA" width={20} height={20} className="rounded-sm" />
-    </div>
+  <Link href="/" className="flex items-center justify-center py-2 relative z-20 w-full">
+    <Image 
+      src="/logo.png" 
+      alt="LAHAThèque" 
+      width={40} 
+      height={40} 
+      className="h-9 w-9 object-contain shrink-0" 
+      priority
+    />
   </Link>
 );
 
 export function DashboardSidebar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
 
   // Définition des liens selon le rôle
@@ -52,7 +57,9 @@ export function DashboardSidebar() {
       case "student":
         return [
           { label: "Mon Espace", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Catalogue", href: "/catalog", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Mes Ouvrages", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-5 h-5" /> },
+          { label: "Historique & Notes", href: "/student/history", icon: <FileCheck className="w-5 h-5" /> },
         ];
       case "teacher":
         return [
@@ -97,6 +104,8 @@ export function DashboardSidebar() {
 
   const links = getLinks();
 
+  const userDisplayName = user ? `${user.first_name} ${user.last_name}` : "Mon Profil";
+
   return (
     <Sidebar open={open} setOpen={setOpen}>
       <SidebarBody className="justify-between gap-10">
@@ -108,12 +117,35 @@ export function DashboardSidebar() {
             ))}
           </div>
         </div>
-        <div>
+        <div className="pt-4 border-t border-navy-hover flex flex-col gap-1">
           <SidebarLink
             link={{
-              label: "Paramètres",
+              label: userDisplayName,
               href: "/profile",
-              icon: <Settings className="w-5 h-5" />,
+              icon: user?.avatar || user?.profile_photo ? (
+                <Image
+                  src={user.avatar || user.profile_photo || ""}
+                  alt="Avatar"
+                  width={24}
+                  height={24}
+                  className="w-6 h-6 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-navy-hover flex items-center justify-center text-gold border border-gold/30 text-xs font-bold shrink-0">
+                  {user?.first_name?.[0] || "U"}
+                </div>
+              ),
+            }}
+          />
+          <SidebarLink
+            onClick={(e) => {
+              e.preventDefault();
+              logout();
+            }}
+            link={{
+              label: "Déconnexion",
+              href: "#",
+              icon: <LogOut className="w-5 h-5 text-error/80" />,
             }}
           />
         </div>

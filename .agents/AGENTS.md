@@ -38,6 +38,10 @@ Ces règles sont TOUJOURS actives, sur tout écran/composant/page construit pour
 - Si un token manquant est nécessaire (ex: nouveau badge de statut), ajoute-le dans `globals.css` d'abord, puis utilise-le. Ne jamais improviser une couleur en attendant.
 - Les statuts de workflow (`pending`, `approved`, `rejected`, `in_review`…) mappent vers des tokens sémantiques existants (succès/attention/erreur/neutre), jamais vers des couleurs Tailwind par défaut.
 
+## ✨ Sobriété Visuelle & Finitions Chic (Règle Absolue)
+- **Interdiction des bordures blanches ou des dégradés artificiels par-ci par-là** (ex: `border-white/10`, `bg-gradient-to-r` improvisés sur les cartes et bannières).
+- Le design doit rester extrêmement **chic, sobre et élégant** : utiliser des fonds sémantiques purs (`bg-navy`, `bg-background`, `bg-background-secondary`), des bordures subtiles uniques (`border-border`), et réserver les touches de `gold` pour les accents d'emphase nobles.
+
 ## 🧩 Composants — 21st.dev avant tout
 - Avant de coder un composant UI (carte, table, stepper, drawer, dropzone, badge, form…), cherche-le via les tools MCP `21st`. N'écris jamais un composant générique from scratch sans être passé par cette recherche.
 - `search` et `get_inspiration` sont gratuits et illimités — les utiliser librement et largement. `get_component` (code d'un composant) et `generate` (génération IA) sont limités par un quota quotidien — les réserver aux candidats déjà présélectionnés via les métadonnées (nom, description, preview), pas à un usage spéculatif sur chaque résultat.
