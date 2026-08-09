@@ -23,3 +23,22 @@ export interface BookSubmission {
   summary: string;
   reject_reason?: string; // Motif de rejet en cas de statut 'rejected'
 }
+
+export interface RoyaltyPayment {
+  id: string;
+  amount: number;
+  currency: string;
+  status: 'paid' | 'processing';
+  payment_date: string;
+  payment_method: string;
+}
+
+export interface SalesTransaction {
+  id: string;
+  book_title: string;
+  transaction_date: string;
+  type: 'purchase' | 'subscription_share'; // Vente directe ou quote-part d'un bouquet
+  sale_price: number;
+  royalty_earned: number;
+  currency: string;
+}

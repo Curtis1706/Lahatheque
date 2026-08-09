@@ -37,3 +37,15 @@ export async function deleteBookSubmission(id: string): Promise<boolean> {
   }
   return false;
 }
+
+export async function getRoyaltyPayments() {
+  await delay(700);
+  const { mockRoyaltyPayments } = await import("../mock/publisher");
+  return [...mockRoyaltyPayments];
+}
+
+export async function getSalesTransactions() {
+  await delay(900);
+  const { mockSalesTransactions } = await import("../mock/publisher");
+  return [...mockSalesTransactions];
+}

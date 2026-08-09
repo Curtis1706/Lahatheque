@@ -1,4 +1,4 @@
-import { BookSubmission, PublisherStats } from "../types/publisher";
+import { BookSubmission, PublisherStats, RoyaltyPayment, SalesTransaction } from "../types/publisher";
 
 export const mockPublisherStats: PublisherStats = {
   total_royalties: 1245000, // En FCFA
@@ -76,5 +76,71 @@ export const mockBookSubmissions: BookSubmission[] = [
     status: "draft",
     created_at: "2026-08-08T11:00:00Z",
     summary: "Manuel d'apprentissage pratique de la comptabilité selon le référentiel révisé du SYSCOHADA, avec de nombreux exercices d'entraînement."
+  }
+];
+
+export const mockRoyaltyPayments: RoyaltyPayment[] = [
+  {
+    id: "pay-101",
+    amount: 500000,
+    currency: "FCFA",
+    status: "paid",
+    payment_date: "2026-06-30T12:00:00Z",
+    payment_method: "Virement Bancaire (Ecobank BJ)"
+  },
+  {
+    id: "pay-102",
+    amount: 450000,
+    currency: "FCFA",
+    status: "paid",
+    payment_date: "2026-03-31T12:00:00Z",
+    payment_method: "Virement Bancaire (Ecobank BJ)"
+  },
+  {
+    id: "pay-103",
+    amount: 295000,
+    currency: "FCFA",
+    status: "processing",
+    payment_date: "2026-09-30T12:00:00Z",
+    payment_method: "Virement Bancaire (Ecobank BJ)"
+  }
+];
+
+export const mockSalesTransactions: SalesTransaction[] = [
+  {
+    id: "tx-201",
+    book_title: "Introduction à la Microéconomie Africaine",
+    transaction_date: "2026-08-05T14:30:00Z",
+    type: "purchase",
+    sale_price: 12000,
+    royalty_earned: 10200, // 85% de redevance (15% de commission plateforme)
+    currency: "FCFA"
+  },
+  {
+    id: "tx-202",
+    book_title: "Algorithmique Appliquée en Python",
+    transaction_date: "2026-08-04T10:15:00Z",
+    type: "subscription_share",
+    sale_price: 9500,
+    royalty_earned: 1425, // Rétribution proportionnelle à la lecture
+    currency: "FCFA"
+  },
+  {
+    id: "tx-203",
+    book_title: "Introduction à la Microéconomie Africaine",
+    transaction_date: "2026-08-03T18:00:00Z",
+    type: "purchase",
+    sale_price: 12000,
+    royalty_earned: 10200,
+    currency: "FCFA"
+  },
+  {
+    id: "tx-204",
+    book_title: "Algorithmique Appliquée en Python",
+    transaction_date: "2026-08-01T09:00:00Z",
+    type: "purchase",
+    sale_price: 9500,
+    royalty_earned: 8075,
+    currency: "FCFA"
   }
 ];
