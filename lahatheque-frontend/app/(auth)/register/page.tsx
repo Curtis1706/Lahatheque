@@ -222,34 +222,32 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-200">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays</label>
-              <div className="relative">
-                <Globe className="absolute left-3.5 top-3.5 w-4 h-4 text-foreground-muted pointer-events-none" />
-                <select
-                  value={formData.country}
-                  onChange={(e) => handleCountryChange(e.target.value)}
-                  className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
-                >
-                  <option value="BJ">Bénin (BJ)</option>
-                  <option value="SN">Sénégal (SN)</option>
-                  <option value="TG">Togo (TG)</option>
-                  <option value="CI">Côte d'Ivoire (CI)</option>
-                  <option value="NE">Niger (NE)</option>
-                  <option value="CD">RDC (CD)</option>
-                </select>
-              </div>
+          <div className="space-y-2 animate-in fade-in duration-200">
+            <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays</label>
+            <div className="relative">
+              <Globe className="absolute left-3.5 top-3.5 w-4 h-4 text-foreground-muted pointer-events-none" />
+              <select
+                value={formData.country}
+                onChange={(e) => handleCountryChange(e.target.value)}
+                className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
+              >
+                <option value="BJ">Bénin (BJ)</option>
+                <option value="SN">Sénégal (SN)</option>
+                <option value="TG">Togo (TG)</option>
+                <option value="CI">Côte d'Ivoire (CI)</option>
+                <option value="NE">Niger (NE)</option>
+                <option value="CD">RDC (CD)</option>
+              </select>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-navy">Numéro de Téléphone *</label>
-              <PhoneInput
-                value={formData.phone}
-                onChange={(val: any) => setFormData({ ...formData, phone: val || "" })}
-                className="w-full"
-              />
-            </div>
+          <div className="space-y-2 animate-in fade-in duration-200">
+            <label className="text-xs font-bold uppercase tracking-wider text-navy">Numéro de Téléphone *</label>
+            <PhoneInput
+              value={formData.phone}
+              onChange={(val: any) => setFormData({ ...formData, phone: val || "" })}
+              className="w-full"
+            />
           </div>
 
           <div className="space-y-2">
