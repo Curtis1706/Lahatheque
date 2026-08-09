@@ -3,8 +3,7 @@
 import { cn } from "@/lib/utils";
 import Link, { LinkProps } from "next/link";
 import React, { useState, createContext, useContext } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface Links {
   label: string;
@@ -75,7 +74,6 @@ export const SidebarBody = (props: React.ComponentProps<typeof motion.div>) => {
   return (
     <>
       <DesktopSidebar {...props} />
-      <MobileSidebar {...(props as React.ComponentProps<"div">)} />
     </>
   );
 };
@@ -101,56 +99,6 @@ export const DesktopSidebar = ({
     >
       {children}
     </motion.div>
-  );
-};
-
-export const MobileSidebar = ({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<"div">) => {
-  const { open, setOpen } = useSidebar();
-  return (
-    <>
-      <div
-        className={cn(
-          "h-14 px-4 flex flex-row md:hidden items-center justify-between bg-navy-dark w-full border-b border-navy-hover z-50 sticky top-0"
-        )}
-        {...props}
-      >
-        <div className="flex justify-between items-center w-full">
-          <Menu
-            className="text-white cursor-pointer"
-            onClick={() => setOpen(!open)}
-          />
-        </div>
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              initial={{ x: "-100%", opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: "-100%", opacity: 0 }}
-              transition={{
-                duration: 0.3,
-                ease: "easeInOut",
-              }}
-              className={cn(
-                "fixed h-full w-full inset-0 bg-navy-dark p-6 z-[100] flex flex-col justify-between text-white",
-                className
-              )}
-            >
-              <div
-                className="absolute right-6 top-6 z-50 text-white/50 hover:text-white cursor-pointer"
-                onClick={() => setOpen(!open)}
-              >
-                <X />
-              </div>
-              {children}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </>
   );
 };
 

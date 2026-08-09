@@ -113,7 +113,11 @@ export function DashboardSidebar() {
           {open ? <Logo /> : <LogoIcon />}
           <div className="mt-8 flex flex-col gap-2">
             {links.map((link, idx) => (
-              <SidebarLink key={idx} link={link} />
+              <SidebarLink 
+                key={idx} 
+                link={link} 
+                onClick={() => setOpen(false)}
+              />
             ))}
           </div>
         </div>

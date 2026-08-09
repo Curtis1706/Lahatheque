@@ -4,14 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { 
-  GraduationCap, 
   BookOpen, 
   Bookmark, 
-  Building2, 
   ArrowUpRight, 
-  CheckCircle2,
-  Sparkles,
-  Search,
+  Sparkles, 
+  Search, 
   Play
 } from "lucide-react";
 import { getBorrowedBooks, getFavoriteBooks, getRecommendedBooks, getStudyStats } from "@/lib/services/student";
@@ -72,34 +69,18 @@ export default function StudentDashboardPage() {
       animate={{ opacity: 1 }}
       className="min-h-screen bg-background text-foreground py-6 sm:py-8 px-4 sm:px-6 lg:px-8 space-y-8 max-w-7xl mx-auto w-full min-w-0"
     >
-      {/* Banner Welcome Student */}
-      <div className="bg-navy text-white rounded-3xl p-5 sm:p-8 border border-navy-hover shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="space-y-2 z-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-dark text-gold text-xs font-bold uppercase tracking-wider border border-gold/30">
-            <GraduationCap className="w-4 h-4" />
-            Espace Étudiant • Licence Droit & Sciences Politiques
-          </div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-serif font-bold tracking-tight">
-            Portail d&apos;Étude & Bibliothèque Numérique
-          </h1>
-          <p className="text-xs sm:text-sm text-white/80 max-w-xl">
-            Accédez à vos manuels universitaires de référence, consultez les lectures prescrites par vos enseignants et reprenez votre lecture en 1 clic.
-          </p>
+      {/* 1. LES KPIS EN PREMIER (Data Visualization Charts par 21st.dev) */}
+      {!loading && stats ? (
+        <StudentKpiCharts stats={stats} />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-40" />
+          ))}
         </div>
+      )}
 
-        <div className="bg-navy-dark p-4 sm:p-5 rounded-2xl border border-navy-hover space-y-2 text-xs z-10 w-full md:w-auto shrink-0">
-          <div className="flex items-center gap-2 text-gold font-bold text-sm">
-            <Building2 className="w-4 h-4 shrink-0" />
-            <span>Université d&apos;Abomey-Calavi (UAC)</span>
-          </div>
-          <div className="flex items-center gap-2 text-white/90">
-            <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
-            <span>Matricule : <strong className="text-white">1029384-UAC</strong> (Affiliation active)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Hero Card : Continuer la Lecture (Mobile-First avec 3D Book Cover & 21st.dev ReadingProgress) */}
+      {/* 2. SECTION CONTINUER LA LECTURE (Hero Reader Card avec Couverture 3D & 21st.dev ReadingProgress) */}
       {!loading && activeBook && (
         <div className="bg-navy-dark rounded-3xl p-5 sm:p-8 text-white border border-navy-hover shadow-md relative overflow-hidden flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-6 w-full lg:w-auto">
@@ -148,18 +129,7 @@ export default function StudentDashboardPage() {
         </div>
       )}
 
-      {/* 4 Data Visualization KPI Cards (Graphiques d'activité, jauges circulaires & répartition) */}
-      {!loading && stats ? (
-        <StudentKpiCharts stats={stats} />
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-40" />
-          ))}
-        </div>
-      )}
-
-      {/* Barre de Recherche rapide + Toggle Grille / Liste */}
+      {/* 3. BARRE DE RECHERCHE RAPIDE & TOGGLE GRILLE / LISTE */}
       <div className="bg-background border border-border p-4 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-xs">
         <div className="relative flex-1">
           <Search className="w-5 h-5 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2 shrink-0" />
@@ -176,7 +146,7 @@ export default function StudentDashboardPage() {
         <ViewToggle mode={viewMode} onChange={setViewMode} className="self-end sm:self-auto" />
       </div>
 
-      {/* Onglets des collections d'ouvrages */}
+      {/* 4. ONGLETS DES COLLECTIONS D'OUVRAGES */}
       <Tabs defaultValue="borrowed" className="space-y-6">
         <TabsList className="flex-wrap">
           <TabsTrigger value="borrowed" className="gap-2 min-h-[44px]">
