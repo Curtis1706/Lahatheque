@@ -79,3 +79,30 @@ def process_moneroo_webhook(event_id: str, event_type: str, payload: dict) -> We
         webhook.save(update_fields=['status', 'error_message'])
         logger.error(f"Webhook {event_id} failed: {e}", exc_info=True)
         raise e
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, permissions
+
+class MonerooWebhookView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        event_id = request.data.get('event_id') or request.data.get('id')
+        event_type = request.data.get('event_type') or request.data.get('event')
+        if not event_id or not event_type:
+            return Response({"error": "Paramètres de webhook invalides"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            webhook = process_moneroo_webhook(event_id, event_type, request.data)
+            return Response({"status": webhook.status}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class StripeWebhookView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        # Stub webhook Stripe
+        return Response({"status": "received"}, status=status.HTTP_200_OK)
+

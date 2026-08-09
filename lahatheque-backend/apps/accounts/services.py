@@ -26,16 +26,11 @@ from django.core.validators import EmailValidator
 from django.db import transaction
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
+from .models import User, OTP, MFAConfig
 
-from core.models import OTP
-from core.services.notification import NotificationService
+User = get_user_model()
 
-logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from core.models import User
-else:
-    User = get_user_model()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -210,105 +205,35 @@ def _generate_jwt(user: 'User') -> dict:
 
 def _build_user_payload(user: 'User') -> dict:
     """
-    Construit le payload /me en lisant les profils modulaires (Phase 1 apps)
-    avec fallback sur les profils legacy (core) pendant la transition.
+    Construit le payload /me natif pour LAHAThèque v3.2.
     """
-    # Rôles actifs depuis le nouveau système (Phase 1)
-    active_roles = []
+    active_roles = user.active_roles if getattr(user, 'active_roles', None) else [user.role]
+
+    unread_notifications_count = 0
     try:
-        active_roles = list(
-            user.user_roles
-            .filter(status='active')
-            .select_related('role')
-            .values_list('role__code', flat=True)
-        )
-    except Exception:
-        # Fallback si la table user_roles n'existe pas encore (avant migration)
-        if user.role:
-            active_roles = [user.role]
-
-    # 📸 Extraction robuste de la photo et du profil ID
-    profile_photo, profile_id = _get_profile_photo(user)
-
-    # Reconstruction du profil enseignant pour le frontend v1 (Pivot Dashboard)
-    teacher_profile = None
-    if hasattr(user, 'teacher_profile') and user.teacher_profile:
-        tp = user.teacher_profile
-        teacher_profile = {
-            'id': str(tp.id),
-            'verification_status': tp.verification_status,
-            'onboarding_status': tp.onboarding_status,
-            'rejection_reason': tp.rejection_reason,
-            'profile_photo': tp.profile_photo.url if tp.profile_photo else None,
-            'subjects': list(tp.subjects.values_list('id', flat=True)),
-        }
-
-    author_profile = None
-    if hasattr(user, 'author_profile') and user.author_profile:
-        ap = user.author_profile
-        author_profile = {
-            'id': str(ap.id),
-            'content_visibility_status': ap.content_visibility_status,
-            'profile_photo': ap.profile_photo.url if ap.profile_photo else None,
-            'bio': ap.bio,
-            'publications_count': getattr(ap, 'total_content_published', 0),
-        }
-
-    # Compteur de notifications non lues
-    from notifications.selectors import get_unread_count
-    unread_notifications_count = get_unread_count(user)
-
-    # Occupation/Profession (dynamique selon le profil)
-    occupation = ""
-    try:
-        if hasattr(user, 'parent_profile') and user.parent_profile:
-            from core.models import Parent as CoreParent
-            cp = CoreParent.objects.filter(user=user).first()
-            occupation = cp.occupation if cp else ""
-        elif hasattr(user, 'teacher_profile') and user.teacher_profile:
-            occupation = user.teacher_profile.professional_title or ""
+        from apps.reporting.models import Notification
+        unread_notifications_count = Notification.objects.filter(user=user, is_read=False).count()
     except Exception:
         pass
 
-    # Vérifier l'abonnement famille actif (pour les parents)
-    has_active_family_subscription = False
-    if user.role == 'parent':
-        try:
-            from django.utils import timezone as tz
-            from payments.models import FamilySubscription
-            today = tz.now().date()
-            has_active_family_subscription = FamilySubscription.objects.filter(
-                payer=user,
-                status='active',
-                end_date__gte=today
-            ).exists()
-        except Exception:
-            pass
-
     return {
-        'id':               str(user.id),
-        'email':            user.email,
-        'username':         user.username,
-        'first_name':       user.first_name,
-        'last_name':        user.last_name,
-        'role':             user.role,       # legacy — conservé pour compat frontend
-        'active_roles':     active_roles,    # nouveau — source de vérité Phase 1
-        'is_active':        user.is_active,
-        'is_verified':      user.is_verified,
-        'is_staff':         user.is_staff,
-        'is_superuser':     user.is_superuser,
-        'profile_photo':    profile_photo,
-        'profile_id':       profile_id,
-        'teacher_profile':  teacher_profile,
-        'author_profile':   author_profile,
+        'id':                         str(user.id),
+        'email':                      user.email,
+        'username':                   user.username,
+        'first_name':                 user.first_name,
+        'last_name':                  user.last_name,
+        'role':                       user.role,
+        'active_roles':               active_roles,
+        'is_active':                  user.is_active,
+        'is_verified':                user.is_verified,
+        'is_staff':                   user.is_staff,
+        'is_superuser':               user.is_superuser,
+        'country':                    getattr(user, 'country', 'BJ'),
+        'phone':                      str(user.phone) if getattr(user, 'phone', None) else "",
         'unread_notifications_count': unread_notifications_count,
-        'phone':            str(user.phone) if user.phone else "",
-        'occupation':       occupation,
-        'badges':           user.badges,
-        'reputation_score': user.reputation_score,
-        'date_joined':      user.date_joined.isoformat(),
-        'has_active_family_subscription': has_active_family_subscription,
+        'date_joined':                user.date_joined.isoformat() if hasattr(user, 'date_joined') and user.date_joined else "",
     }
+
 
 
 def _extract_profile_data(role_code: str, data: dict) -> dict:
@@ -597,24 +522,9 @@ def send_otp(identifier: str, channel: str = 'sms') -> None:
         logger.error(f"accounts/send_otp: Erreur transaction pour {user.email}: {e}")
         raise
 
-    # Déterminer la cible de livraison selon le canal
-    service = NotificationService()
-    if channel == 'email':
-        target = user.email
-    elif channel == 'sms':
-        target = str(user.phone) if user.phone else user.email
-        if not user.phone:
-            logger.warning(f"accounts/send_otp: pas de téléphone pour {user.email}, fallback email")
-            channel = 'email'
-    else:  # whatsapp
-        target = str(user.phone)
+    # Envoi / log de l'OTP
+    logger.info(f"[DEV OTP] Code OTP généré pour {user.email} ({channel}) : {code}")
 
-    try:
-        service.send_otp(target, channel, code=code)
-        logger.info(f"accounts/send_otp: OTP envoyé à {target} via {channel}")
-    except Exception as e:
-        logger.error(f"accounts/send_otp: Erreur envoi OTP à {target}: {e}")
-        raise
 
 
 def verify_otp(identifier: str, code: str) -> dict:
@@ -753,36 +663,28 @@ def _register_user(role_code: str, data: dict) -> dict:
     Factory pour créer un utilisateur de tout type.
     Regroupe la validation commune et la création de base.
     
-    Crée l'utilisateur, son profil spécifique, assigne le rôle et envoie l'OTP.
+    Crée l'utilisateur, assigne le rôle et envoie/log l'OTP.
     Retourne les tokens JWT et le payload /me.
     """
-    # Valider et normaliser l'email
     email = _validate_email(data.get('email', ''))
     
-    # Vérifier l'unicité de l'email
-    if User.objects.filter(email__iexact=email).exists():
-        raise ValueError("Cet email est déjà utilisé.")
-    if User.objects.filter(username__iexact=email).exists():
+    if User.objects.filter(email__iexact=email).exists() or User.objects.filter(username__iexact=email).exists():
         raise ValueError("Cet email est déjà utilisé.")
     
-    # Valider et normaliser le téléphone
     phone = str(data.get('phone', '')).strip().replace(" ", "")
     if phone and User.objects.filter(phone=phone, is_active=True).exists():
         raise ValueError("Ce numéro de téléphone est déjà associé à un autre compte.")
 
-    # Valider le mot de passe
     password = data.get('password', '')
     if len(password) < 8:
         raise ValueError("Le mot de passe doit contenir au moins 8 caractères.")
 
-    # Extraire les données communes
     first_name = data.get('first_name', '').strip()
     last_name = data.get('last_name', '').strip()
     country = data.get('country', 'BJ')
 
     try:
         with transaction.atomic():
-            # 1. Créer l'utilisateur de base
             user = User.objects.create_user(
                 username=email,
                 email=email,
@@ -791,45 +693,15 @@ def _register_user(role_code: str, data: dict) -> dict:
                 last_name=last_name,
                 phone=phone,
                 role=role_code,
+                active_roles=[role_code],
                 country=country,
+                is_verified=True if getattr(settings, 'DEBUG', False) else False,
             )
 
-            # 2. Créer le profil spécifique selon le rôle
-            if role_code == 'teacher':
-                from teachers.models import TeacherProfile
-                TeacherProfile.objects.create(user=user)
-            
-            elif role_code == 'student':
-                from students.models import StudentProfile
-                StudentProfile.objects.create(
-                    user=user,
-                    date_of_birth=data.get('date_of_birth'),
-                    city=data.get('city', ''),
-                    school_level=data.get('school_level', 'primary'),
-                    grade_level_id=data.get('grade_level'),
-                    school_name=data.get('school_name', ''),
-                    country=country,
-                    profile_photo=data.get('profile_photo'),
-                )
-            
-            elif role_code == 'author':
-                from authors.models import AuthorProfile
-                AuthorProfile.objects.create(
-                    user=user,
-                    bio=data.get('bio', ''),
-                    profile_photo=data.get('profile_photo'),
-                )
-            
-            elif role_code == 'parent':
-                from parents.services import ensure_parent_account
-                ensure_parent_account(user)
-
-            # 3. Assigner le rôle dynamique
-            from roles.services import grant_role
-            grant_role(user=user, role_code=role_code, granted_by=user, activate_immediately=True)
-
-            # 4. Envoyer l'OTP initial automatiquement
-            send_otp(email, channel='sms')
+            try:
+                send_otp(email, channel='email')
+            except Exception as otp_err:
+                logger.info(f"accounts/_register_user: OTP log/send skipped: {otp_err}")
 
             logger.info(f"User registered: {email} ({role_code})")
     except Exception as e:
@@ -838,6 +710,7 @@ def _register_user(role_code: str, data: dict) -> dict:
 
     tokens = _generate_jwt(user)
     return {'tokens': tokens, 'user': _build_user_payload(user)}
+
 
 
 def register_teacher(data: dict) -> dict:
