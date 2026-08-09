@@ -86,16 +86,7 @@ export default function StudentAffiliationsPage() {
     }
   };
 
-  const getStatusBadge = (status: StudentAffiliation["status"]) => {
-    switch (status) {
-      case "approved":
-        return <StatusBadge status="success" leftIcon={CheckCircle} leftLabel="Approuvé" />;
-      case "pending":
-        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En attente" />;
-      case "rejected":
-        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Rejeté" />;
-    }
-  };
+
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -163,7 +154,7 @@ export default function StudentAffiliationsPage() {
             {
               key: "status",
               header: "Statut",
-              cell: (aff) => getStatusBadge(aff.status as StudentAffiliation["status"]),
+              cell: (aff) => <StatusBadge status={aff.status as string} />,
             },
             {
               key: "actions",
@@ -204,7 +195,7 @@ export default function StudentAffiliationsPage() {
                   <p className="font-bold text-navy text-sm">{aff.student_name as string}</p>
                   <p className="text-xs text-foreground-muted">{aff.student_email as string}</p>
                 </div>
-                {getStatusBadge(aff.status as StudentAffiliation["status"])}
+                <StatusBadge status={aff.status as string} />
               </div>
 
               <div className="text-xs text-foreground-muted space-y-0.5">

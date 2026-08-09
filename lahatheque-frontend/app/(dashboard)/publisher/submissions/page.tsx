@@ -55,18 +55,7 @@ export default function SubmissionsListPage() {
     }
   };
 
-  const getStatusBadge = (status: BookSubmission["status"]) => {
-    switch (status) {
-      case "approved":
-        return <StatusBadge status="success" leftIcon={CheckCircle} leftLabel="Approved" />;
-      case "pending":
-        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En attente" />;
-      case "rejected":
-        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Rejeté" />;
-      case "draft":
-        return <StatusBadge status="default" leftIcon={FileText} leftLabel="Brouillon" />;
-    }
-  };
+
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -127,7 +116,7 @@ export default function SubmissionsListPage() {
             {
               key: "status",
               header: "Statut",
-              cell: (sub) => getStatusBadge(sub.status as BookSubmission["status"]),
+              cell: (sub) => <StatusBadge status={sub.status} />,
             },
             {
               key: "actions",
@@ -157,7 +146,7 @@ export default function SubmissionsListPage() {
             <div className="space-y-2">
               <div className="flex justify-between items-start">
                 <span className="font-bold text-navy text-sm">{sub.title as string}</span>
-                {getStatusBadge(sub.status as BookSubmission["status"])}
+                <StatusBadge status={sub.status} />
               </div>
               <p className="text-xs text-foreground-muted">Auteurs : {(sub.authors as string[]).join(", ")}</p>
               <div className="flex justify-between items-center pt-2">
@@ -214,7 +203,7 @@ export default function SubmissionsListPage() {
               </div>
               <div>
                 <span className="text-foreground-muted block text-xs">Statut</span>
-                <span className="block mt-1">{getStatusBadge(selectedBook.status)}</span>
+                <span className="block mt-1"><StatusBadge status={selectedBook.status} /></span>
               </div>
             </div>
             <div>

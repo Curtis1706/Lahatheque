@@ -46,16 +46,7 @@ export default function TeacherDashboardPage() {
     loadTeacherData();
   }, []);
 
-  const getStatusBadge = (status: SpecimenRequest["status"]) => {
-    switch (status) {
-      case "approved":
-        return <StatusBadge status="success" leftIcon={CheckCircle} leftLabel="Accordé" />;
-      case "pending":
-        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En attente" />;
-      case "rejected":
-        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Refusé" />;
-    }
-  };
+
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -204,7 +195,7 @@ export default function TeacherDashboardPage() {
                 <div key={spec.id} className="p-4 space-y-2 hover:bg-background-secondary/20 transition-colors">
                   <div className="flex items-center justify-between">
                     <p className="font-bold text-navy text-xs truncate max-w-[180px]">{spec.book_title}</p>
-                    {getStatusBadge(spec.status)}
+                    <StatusBadge status={spec.status} />
                   </div>
                   <p className="text-[10px] text-foreground-muted flex items-center gap-1">
                     <Calendar className="w-3 h-3" />

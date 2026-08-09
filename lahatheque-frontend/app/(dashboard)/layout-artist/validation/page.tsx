@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Music
 } from "lucide-react";
+import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
 import Link from "next/link";
 
 export default function LayoutValidationPage() {
@@ -98,11 +99,11 @@ export default function LayoutValidationPage() {
           <div className="h-12 bg-background-secondary rounded" />
         </div>
       ) : pendingItems.length === 0 ? (
-        <div className="p-12 text-center border border-border rounded-xl bg-background-secondary max-w-md mx-auto space-y-3">
-          <CheckCircle2 className="w-12 h-12 text-success mx-auto" />
-          <h3 className="text-base font-bold text-navy">Tout est validé</h3>
-          <p className="text-xs text-foreground-muted">Aucun ouvrage en attente de publication pour le moment.</p>
-        </div>
+        <EmptyState className="py-12 border border-border rounded-xl bg-background-secondary max-w-md mx-auto">
+          <EmptyIcon icon={CheckCircle2} />
+          <EmptyTitle>Tout est validé</EmptyTitle>
+          <EmptyDescription>Aucun ouvrage en attente de publication pour le moment.</EmptyDescription>
+        </EmptyState>
       ) : (
         <div className="space-y-6">
           {pendingItems.map((item) => (

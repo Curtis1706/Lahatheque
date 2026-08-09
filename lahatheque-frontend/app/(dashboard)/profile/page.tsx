@@ -14,7 +14,6 @@ import {
   Eye,
   EyeOff
 } from "lucide-react";
-import { DashboardHeader } from "@/components/ui/dashboard-header";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -65,11 +64,9 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <main className="flex-1 p-6 lg:p-8 max-w-5xl mx-auto w-full space-y-8">
-        
-        {/* Header */}
-        <div className="space-y-1">
+    <div className="p-6 lg:p-8 max-w-5xl space-y-8">
+      {/* Header */}
+      <div className="space-y-1">
           <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy">Mon Profil & Paramètres</h1>
           <p className="text-sm text-foreground-muted">Gérez vos informations personnelles, vos identifiants et vos abonnements de notification.</p>
         </div>
@@ -246,7 +243,6 @@ export default function ProfilePage() {
 
         </div>
 
-      </main>
     </div>
   );
 }

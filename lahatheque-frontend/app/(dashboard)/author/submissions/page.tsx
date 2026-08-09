@@ -20,6 +20,7 @@ import Link from "next/link";
 import { DataTable } from "@/components/ui/data-table";
 import { Dropzone } from "@/components/ui/dropzone";
 import { Modal } from "@/components/ui/modal";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export default function AuthorSubmissionsPage() {
   const [submissions, setSubmissions] = useState<AuthorSubmission[]>([]);
@@ -62,41 +63,6 @@ export default function AuthorSubmissionsPage() {
       alert("Erreur lors de la soumission.");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const getStatusBadge = (status: AuthorSubmission["status"]) => {
-    switch (status) {
-      case "approved":
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-success/10 text-success border border-success/20">
-            <CheckCircle className="w-3.5 h-3.5" /> Approuvé / Publié
-          </span>
-        );
-      case "pending":
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-warning/10 text-warning border border-warning/20">
-            <Clock className="w-3.5 h-3.5" /> Soumis
-          </span>
-        );
-      case "under_review":
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-warning/10 text-warning border border-warning/20">
-            <Clock className="w-3.5 h-3.5" /> En relecture
-          </span>
-        );
-      case "rejected":
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-error/10 text-error border border-error/20">
-            <XCircle className="w-3.5 h-3.5" /> Refusé
-          </span>
-        );
-      case "draft":
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-background-secondary text-foreground-muted border border-border">
-            Brouillon
-          </span>
-        );
     }
   };
 
@@ -179,14 +145,14 @@ export default function AuthorSubmissionsPage() {
             {
               key: "status",
               header: "Statut",
-              cell: (sub) => getStatusBadge(sub.status as AuthorSubmission["status"]),
+              cell: (sub) => <StatusBadge status={sub.status as string} />,
             },
           ]}
           mobileCard={(sub) => (
             <div className="space-y-2">
-              <div className="flex justify-between items-start gap-2">
-                <p className="font-bold text-navy text-sm">{sub.title as string}</p>
-                {getStatusBadge(sub.status as AuthorSubmission["status"])}
+              <div className="flex justify-between items-start">
+                <span className="font-bold text-navy text-sm">{sub.title as string}</span>
+                <StatusBadge status={sub.status as string} />
               </div>
               <div className="text-xs text-foreground-muted space-y-0.5">
                 <p><span className="font-bold text-navy">Discipline :</span> {sub.discipline as string}</p>

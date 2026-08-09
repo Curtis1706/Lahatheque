@@ -71,18 +71,7 @@ const handleDelete = async (id: string) => {
     }
   };
 
-  const getStatusBadge = (status: BookSubmission["status"]) => {
-    switch (status) {
-      case "approved":
-        return <StatusBadge status="success" leftIcon={CheckCircle} leftLabel="Approuvé" />;
-      case "pending":
-        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En attente" />;
-      case "rejected":
-        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Rejeté" />;
-      case "draft":
-        return <StatusBadge status="default" leftIcon={FileText} leftLabel="Brouillon" />;
-    }
-  };
+
 
   const formatSalesModel = (model: BookSubmission["sales_model"]) => {
     switch (model) {
@@ -230,7 +219,7 @@ const handleDelete = async (id: string) => {
           {
             key: "status",
             header: "Statut",
-            cell: (sub) => getStatusBadge(sub.status as BookSubmission["status"]),
+            cell: (sub) => <StatusBadge status={sub.status as string} />,
           },
           {
             key: "id",
@@ -264,7 +253,7 @@ const handleDelete = async (id: string) => {
                 <p className="font-bold text-navy text-base">{sub.title as string}</p>
                 {sub.subtitle && <p className="text-xs text-foreground-muted">{sub.subtitle as string}</p>}
               </div>
-              {getStatusBadge(sub.status as BookSubmission["status"])}
+              <StatusBadge status={sub.status as string} />
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
@@ -326,7 +315,7 @@ const handleDelete = async (id: string) => {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-foreground-muted block">Statut du dépôt :</span>
-                <div className="mt-1">{getStatusBadge(selectedBook.status)}</div>
+                <div className="mt-1"><StatusBadge status={selectedBook.status} /></div>
               </div>
               <div>
                 <span className="text-foreground-muted block">Date de dépôt :</span>

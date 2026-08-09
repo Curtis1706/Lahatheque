@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Modal } from "@/components/ui/modal";
+import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
 import { mockBooks } from "@/lib/mock/catalog";
 
 export default function TeacherCoursesPage() {
@@ -143,11 +144,11 @@ export default function TeacherCoursesPage() {
           <div className="bg-background border border-border h-48 rounded-xl" />
         </div>
       ) : courses.length === 0 ? (
-        <div className="p-12 text-center border border-border rounded-xl bg-background-secondary max-w-md mx-auto space-y-3">
-          <GraduationCap className="w-12 h-12 text-gold mx-auto" />
-          <h3 className="text-base font-bold text-navy">Aucun cours</h3>
-          <p className="text-xs text-foreground-muted">Créez votre premier cours pour commencer à recommander des livres.</p>
-        </div>
+        <EmptyState className="py-12 border border-border rounded-xl bg-background-secondary max-w-md mx-auto">
+          <EmptyIcon icon={GraduationCap} />
+          <EmptyTitle>Aucun cours</EmptyTitle>
+          <EmptyDescription>Créez votre premier cours pour commencer à recommander des livres.</EmptyDescription>
+        </EmptyState>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {courses.map((course) => (

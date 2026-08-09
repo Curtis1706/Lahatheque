@@ -48,21 +48,6 @@ export default function AuthorDashboardPage() {
   const totalVentes = statements.reduce((sum, s) => sum + s.sales_count, 0);
   const totalGains = statements.reduce((sum, s) => sum + s.amount, 0);
 
-  const getStatusBadge = (status: AuthorSubmission["status"]) => {
-    switch (status) {
-      case "approved":
-        return <StatusBadge status="success" leftIcon={CheckCircle} leftLabel="Approuvé" />;
-      case "pending":
-        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="Soumis" />;
-      case "under_review":
-        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En relecture" />;
-      case "rejected":
-        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Refusé" />;
-      case "draft":
-        return <StatusBadge status="default" leftLabel="Brouillon" />;
-    }
-  };
-
   return (
     <div className="p-6 lg:p-8 space-y-8">
       
@@ -170,7 +155,7 @@ export default function AuthorDashboardPage() {
                     <p className="font-bold text-navy text-sm leading-snug">{sub.title}</p>
                     <p className="text-[10px] text-foreground-muted">{sub.discipline} — Fichier : {sub.file_name}</p>
                   </div>
-                  {getStatusBadge(sub.status)}
+                  <StatusBadge status={sub.status} />
                 </div>
               ))}
             </div>

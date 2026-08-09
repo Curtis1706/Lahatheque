@@ -69,16 +69,7 @@ export default function TeacherSpecimensPage() {
     }
   };
 
-  const getStatusBadge = (status: SpecimenRequest["status"]) => {
-    switch (status) {
-      case "approved":
-        return <StatusBadge status="success" leftIcon={CheckCircle2} leftLabel="Accordé (Actif)" />;
-      case "pending":
-        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En attente de validation" />;
-      case "rejected":
-        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Refusé" />;
-    }
-  };
+
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -145,14 +136,14 @@ export default function TeacherSpecimensPage() {
             {
               key: "status",
               header: "Statut",
-              cell: (req) => getStatusBadge(req.status as SpecimenRequest["status"]),
+              cell: (req) => <StatusBadge status={req.status as string} />,
             },
           ]}
           mobileCard={(req) => (
             <div className="space-y-2">
-              <div className="flex justify-between items-start gap-2">
-                <p className="font-bold text-navy text-sm">{req.book_title as string}</p>
-                {getStatusBadge(req.status as SpecimenRequest["status"])}
+              <div className="flex justify-between items-start">
+                <span className="font-bold text-navy text-sm">{req.book_title as string}</span>
+                <StatusBadge status={req.status as string} />
               </div>
               <p className="text-xs text-foreground-muted">Auteur : {req.author as string}</p>
               <div className="flex justify-between items-center pt-2 text-[10px] text-foreground-muted">

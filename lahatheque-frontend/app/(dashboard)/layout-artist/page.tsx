@@ -130,18 +130,7 @@ export default function LayoutArtistPage() {
     }
   };
 
-  const getStatusBadge = (status: BookCatalogItem["status"]) => {
-    switch (status) {
-      case "approved":
-        return <StatusBadge status="success" leftIcon={CheckCircle2} leftLabel="Validé & Vitrine" />;
-      case "pending":
-        return <StatusBadge status="warning" leftIcon={Clock} leftLabel="En attente validation" />;
-      case "rejected":
-        return <StatusBadge status="error" leftIcon={XCircle} leftLabel="Refusé" />;
-      default:
-        return <StatusBadge status="default" leftLabel="Brouillon" />;
-    }
-  };
+
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -293,17 +282,14 @@ export default function LayoutArtistPage() {
               {
                 key: "status",
                 header: "Statut",
-                cell: (item) => getStatusBadge(item.status as BookCatalogItem["status"]),
+                cell: (item) => <StatusBadge status={item.status as string} />,
               },
             ]}
             mobileCard={(item) => (
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-bold text-navy text-sm">{item.title as string}</p>
-                    <p className="text-xs text-foreground-muted">{item.authors as string}</p>
-                  </div>
-                  {getStatusBadge(item.status as BookCatalogItem["status"])}
+              <div className="space-y-2">
+                <div className="flex justify-between items-start">
+                  <p className="font-bold text-navy text-sm">{item.title as string}</p>
+                  <StatusBadge status={item.status as string} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
