@@ -6,6 +6,7 @@ import { StudentAffiliation, BouquetSubscription } from "@/lib/types/librarian";
 import { 
   Users, 
   UserCheck, 
+  BookOpen,
   Bookmark, 
   Building2, 
   CheckCircle, 
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { KpiGrid, type KpiCardProps } from "@/components/ui/kpi-card";
+import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
 
 export default function LibrarianDashboardPage() {
   const [affiliations, setAffiliations] = useState<StudentAffiliation[]>([]);
@@ -140,9 +142,11 @@ export default function LibrarianDashboardPage() {
               <div className="h-10 bg-background-secondary rounded" />
             </div>
           ) : pendingAffiliations.length === 0 ? (
-            <div className="p-10 text-center text-xs text-foreground-muted">
-              Aucune demande d'affiliation en attente.
-            </div>
+            <EmptyState className="py-8">
+              <EmptyIcon icon={Users} />
+              <EmptyTitle>Aucune demande en attente</EmptyTitle>
+              <EmptyDescription>Les demandes d'affiliation apparaîtront ici.</EmptyDescription>
+            </EmptyState>
           ) : (
             <div className="divide-y divide-border/40">
               {pendingAffiliations.slice(0, 3).map((aff) => (
@@ -179,9 +183,11 @@ export default function LibrarianDashboardPage() {
               <div className="h-12 bg-background-secondary rounded" />
             </div>
           ) : bouquets.length === 0 ? (
-            <div className="p-8 text-center text-xs text-foreground-muted">
-              Aucun abonnement de bouquet souscrit.
-            </div>
+            <EmptyState className="py-8">
+              <EmptyIcon icon={BookOpen} />
+              <EmptyTitle>Aucun abonnement</EmptyTitle>
+              <EmptyDescription>Aucun bouquet souscrit pour le moment.</EmptyDescription>
+            </EmptyState>
           ) : (
             <div className="divide-y divide-border/40 p-2">
               {bouquets.map((bq) => (

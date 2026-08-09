@@ -18,6 +18,7 @@ import {
   Bookmark
 } from "lucide-react";
 import Link from "next/link";
+import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
 import { DataTable } from "@/components/ui/data-table";
 
 export default function AuthorRoyaltiesPage() {
@@ -161,9 +162,11 @@ export default function AuthorRoyaltiesPage() {
               <div className="h-12 bg-background-secondary rounded" />
             </div>
           ) : contracts.length === 0 ? (
-            <div className="p-8 text-center text-xs text-foreground-muted bg-background border border-border rounded-xl">
-              Aucun contrat actif enregistré.
-            </div>
+            <EmptyState className="py-12 border border-border rounded-xl bg-background">
+              <EmptyIcon icon={FileText} />
+              <EmptyTitle>Aucun contrat actif</EmptyTitle>
+              <EmptyDescription>Vos contrats d’auteur apparaîtront ici une fois signés.</EmptyDescription>
+            </EmptyState>
           ) : (
             <div className="space-y-4">
               {contracts.map((ctr) => (

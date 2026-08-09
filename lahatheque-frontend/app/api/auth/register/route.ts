@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     const validation = registerSchema.safeParse(rawBody)
 
     if (!validation.success) {
-      const fieldErrors = validation.error.flatten().fieldErrors
+      const fieldErrors = validation.error.flatten().fieldErrors as Record<string, string[] | undefined>
       const firstErrorKey = Object.keys(fieldErrors)[0]
       const errorMessage = firstErrorKey && fieldErrors[firstErrorKey]?.[0]
         ? `${firstErrorKey}: ${fieldErrors[firstErrorKey]?.[0]}`

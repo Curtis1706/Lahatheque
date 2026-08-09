@@ -21,6 +21,9 @@ import {
   Sparkles
 } from "lucide-react";
 import Link from "next/link";
+import { DataTable } from "@/components/ui/data-table";
+import { Modal } from "@/components/ui/modal";
+import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
 import { Dropzone } from "@/components/ui/dropzone";
 import { useSliderWithInput } from "@/lib/hooks/use-slider-with-input";
 
@@ -350,9 +353,11 @@ export default function LegalContractsPage() {
                 <div className="h-10 bg-background-secondary rounded" />
               </div>
             ) : preEditions.length === 0 ? (
-              <div className="p-8 text-center text-xs text-foreground-muted bg-background border border-border rounded-xl">
-                Aucune fiche de pré-édition enregistrée.
-              </div>
+              <EmptyState className="py-12 border border-border rounded-xl bg-background">
+                <EmptyIcon icon={FileText} />
+                <EmptyTitle>Aucune fiche de pré-édition</EmptyTitle>
+                <EmptyDescription>Les fiches de pré-édition enregistrées apparaîtront ici.</EmptyDescription>
+              </EmptyState>
             ) : (
               <div className="bg-background border border-border rounded-xl shadow-sm overflow-hidden">
                 <div className="divide-y divide-border/40">

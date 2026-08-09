@@ -20,6 +20,7 @@ import {
 import Link from "next/link";
 import { KpiGrid } from "@/components/ui/kpi-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
 
 export default function TeacherDashboardPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -150,9 +151,11 @@ export default function TeacherDashboardPage() {
               <div className="h-12 bg-background-secondary rounded" />
             </div>
           ) : courses.length === 0 ? (
-            <div className="p-8 text-center text-xs text-foreground-muted">
-              Aucun cours actif pour le moment.
-            </div>
+            <EmptyState className="py-8">
+              <EmptyIcon icon={GraduationCap} />
+              <EmptyTitle>Aucun cours actif</EmptyTitle>
+              <EmptyDescription>Vos cours apparaîtront ici une fois ajoutés.</EmptyDescription>
+            </EmptyState>
           ) : (
             <div className="divide-y divide-border/40">
               {courses.slice(0, 3).map((course) => (
@@ -190,9 +193,11 @@ export default function TeacherDashboardPage() {
               <div className="h-12 bg-background-secondary rounded" />
             </div>
           ) : specimens.length === 0 ? (
-            <div className="p-8 text-center text-xs text-foreground-muted">
-              Aucune demande de spécimen active.
-            </div>
+            <EmptyState className="py-8">
+              <EmptyIcon icon={FileText} />
+              <EmptyTitle>Aucune demande active</EmptyTitle>
+              <EmptyDescription>Vos demandes de spécimens apparaîtront ici.</EmptyDescription>
+            </EmptyState>
           ) : (
             <div className="divide-y divide-border/40">
               {specimens.map((spec) => (

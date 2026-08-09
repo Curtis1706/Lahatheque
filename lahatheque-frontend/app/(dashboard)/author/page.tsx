@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { KpiGrid, type KpiCardProps } from "@/components/ui/kpi-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
 
 export default function AuthorDashboardPage() {
   const [submissions, setSubmissions] = useState<AuthorSubmission[]>([]);
@@ -156,9 +157,11 @@ export default function AuthorDashboardPage() {
               <div className="h-10 bg-background-secondary rounded" />
             </div>
           ) : submissions.length === 0 ? (
-            <div className="p-10 text-center text-xs text-foreground-muted">
-              Aucun manuscrit soumis.
-            </div>
+            <EmptyState className="py-8">
+              <EmptyIcon icon={FileText} />
+              <EmptyTitle>Aucun manuscrit soumis</EmptyTitle>
+              <EmptyDescription>Déposez votre premier manuscrit pour le faire étudier.</EmptyDescription>
+            </EmptyState>
           ) : (
             <div className="divide-y divide-border/40">
               {submissions.slice(0, 3).map((sub) => (
@@ -192,9 +195,11 @@ export default function AuthorDashboardPage() {
               <div className="h-10 bg-background-secondary rounded" />
             </div>
           ) : statements.length === 0 ? (
-            <div className="p-8 text-center text-xs text-foreground-muted">
-              Aucun relevé disponible.
-            </div>
+            <EmptyState className="py-8">
+              <EmptyIcon icon={DollarSign} />
+              <EmptyTitle>Aucun relevé disponible</EmptyTitle>
+              <EmptyDescription>Vos relevés de droits d'auteur apparaîtront ici.</EmptyDescription>
+            </EmptyState>
           ) : (
             <div className="divide-y divide-border/40">
               {statements.slice(0, 3).map((stmt) => (

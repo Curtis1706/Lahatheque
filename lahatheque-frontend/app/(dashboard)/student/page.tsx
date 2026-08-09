@@ -14,9 +14,10 @@ import {
 import { getBorrowedBooks, getFavoriteBooks } from "@/lib/services/student";
 import { StudentBookAccess } from "@/lib/types/student";
 import { KpiGrid } from "@/components/ui/kpi-card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
 
 export default function StudentDashboardPage() {
-  const [activeTab, setActiveTab] = useState<"borrowed" | "favorites">("borrowed");
   const [borrowedBooks, setBorrowedBooks] = useState<StudentBookAccess[]>([]);
   const [favoriteBooks, setFavoriteBooks] = useState<StudentBookAccess[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,32 +112,17 @@ export default function StudentDashboardPage() {
         )}
 
         {/* Onglets Emprunts / Favoris */}
-        <div className="space-y-6">
-          <div className="flex border-b border-border gap-6">
-            <button
-              onClick={() => setActiveTab("borrowed")}
-              className={`pb-3 text-xs sm:text-sm font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-colors ${
-                activeTab === "borrowed"
-                  ? "border-gold text-navy"
-                  : "border-transparent text-foreground-muted hover:text-navy"
-              }`}
-            >
+        <Tabs defaultValue="borrowed" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="borrowed" className="gap-2">
               <BookOpen className="w-4 h-4" />
-              Mes Emprunts & Accès ({loading ? "..." : borrowedBooks.length})
-            </button>
-
-            <button
-              onClick={() => setActiveTab("favorites")}
-              className={`pb-3 text-xs sm:text-sm font-bold uppercase tracking-wider flex items-center gap-2 border-b-2 transition-colors ${
-                activeTab === "favorites"
-                  ? "border-gold text-navy"
-                  : "border-transparent text-foreground-muted hover:text-navy"
-              }`}
-            >
+              Mes Emprunts ({loading ? "..." : borrowedBooks.length})
+            </TabsTrigger>
+            <TabsTrigger value="favorites" className="gap-2">
               <Bookmark className="w-4 h-4" />
               Mes Favoris ({loading ? "..." : favoriteBooks.length})
-            </button>
-          </div>
+            </TabsTrigger>
+          </TabsList>
 
           {/* Squelette de chargement */}
           {loading ? (
@@ -147,11 +133,13 @@ export default function StudentDashboardPage() {
           ) : (
             <>
               {/* Contenu Emprunts */}
-              {activeTab === "borrowed" && (
-                borrowedBooks.length === 0 ? (
-                  <div className="text-center py-10 border border-border rounded-2xl bg-background-secondary">
-                    <p className="text-sm text-foreground-muted">Aucun emprunt actif actuellement.</p>
-                  </div>
+              <TabsContent value="borrowed">
+                {borrowedBooks.length === 0 ? (
+                  <EmptyState>
+                    <EmptyIcon icon={BookOpen} />
+                    <EmptyTitle>Aucun emprunt actif</EmptyTitle>
+                    <EmptyDescription>Consultez le catalogue pour emprunter vos premiers ouvrages.</EmptyDescription>
+                  </EmptyState>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {borrowedBooks.map((book) => (
@@ -193,15 +181,17 @@ export default function StudentDashboardPage() {
                       </div>
                     ))}
                   </div>
-                )
-              )}
+                )}
+              </TabsContent>
 
               {/* Contenu Favoris */}
-              {activeTab === "favorites" && (
-                favoriteBooks.length === 0 ? (
-                  <div className="text-center py-10 border border-border rounded-2xl bg-background-secondary">
-                    <p className="text-sm text-foreground-muted">Aucun favori enregistré.</p>
-                  </div>
+              <TabsContent value="favorites">
+                {favoriteBooks.length === 0 ? (
+                  <EmptyState>
+                    <EmptyIcon icon={Bookmark} />
+                    <EmptyTitle>Aucun favori enregistré</EmptyTitle>
+                    <EmptyDescription>Ajoutez des ouvrages à vos favoris depuis le catalogue pour les retrouver ici.</EmptyDescription>
+                  </EmptyState>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {favoriteBooks.map((book) => (
@@ -234,18 +224,18 @@ export default function StudentDashboardPage() {
                             href={`/catalog/reader/${book.id}`}
                             className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-1.5"
                           >
-                            Consulter l'extrait
+                            Consulter l&apos;extrait
                             <ArrowUpRight className="w-3.5 h-3.5" />
                           </Link>
                         </div>
                       </div>
                     ))}
                   </div>
-                )
-              )}
+                )}
+              </TabsContent>
             </>
           )}
-        </div>
+        </Tabs>
 
       </div>
     </div>
