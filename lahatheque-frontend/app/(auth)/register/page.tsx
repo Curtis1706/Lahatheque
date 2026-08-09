@@ -67,6 +67,7 @@ export default function RegisterPage() {
     try {
       const res = await registerUser({
         email: formData.email,
+        password: formData.password,
         first_name: formData.first_name,
         last_name: formData.last_name,
         phone: formData.phone || undefined,

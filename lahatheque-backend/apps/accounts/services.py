@@ -296,8 +296,8 @@ def login(identifier: str, password: str, request=None) -> dict:
     if not user.is_active:
         raise AccountInactive("Ce compte est désactivé.")
 
-    if user.is_suspended:
-        reason = user.suspension_reason or "Comportement non conforme."
+    if getattr(user, 'is_suspended', False):
+        reason = getattr(user, 'suspension_reason', None) or "Comportement non conforme."
         raise AccountSuspended(f"Votre compte est suspendu. Raison : {reason}")
 
     # Synchronisation Onboarding Automatique (Self-healing)

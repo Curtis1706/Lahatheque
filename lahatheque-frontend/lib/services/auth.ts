@@ -1,7 +1,6 @@
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 export interface RegisterPayload {
   email: string;
+  password: string;
   first_name: string;
   last_name: string;
   phone?: string;
@@ -10,25 +9,24 @@ export interface RegisterPayload {
 }
 
 export async function registerUser(payload: RegisterPayload): Promise<{ success: boolean; data?: any; error?: string }> {
-  await delay(1000); // simulation délai réseau
-  
-  if (!payload.email.includes("@")) {
-    return { success: false, error: "Adresse email invalide." };
-  }
+  try {
+    const res = await fetch('/api/auth/register/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  // Stocker l'utilisateur dans le stockage de session (mock)
-  if (typeof window !== "undefined") {
-    sessionStorage.setItem("user_role", payload.role);
-    sessionStorage.setItem("user_email", payload.email);
-    sessionStorage.setItem("user_name", `${payload.first_name} ${payload.last_name}`);
-  }
+    const data = await res.json();
 
-  return {
-    success: true,
-    data: {
-      message: "Inscription réussie",
-      role: payload.role,
-      email: payload.email
+    if (!res.ok) {
+      return { success: false, error: data.error || data.detail || 'Erreur lors de l\'inscription.' };
     }
-  };
+
+    return {
+      success: true,
+      data: data,
+    };
+  } catch {
+    return { success: false, error: 'Impossible d\'effectuer l\'inscription. Vérifiez votre connexion.' };
+  }
 }
