@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { DataTable } from "@/components/ui/data-table";
+import { Modal } from "@/components/ui/modal";
 
 export default function SubmissionsListPage() {
   const [submissions, setSubmissions] = useState<BookSubmission[]>([]);
@@ -201,87 +202,90 @@ export default function SubmissionsListPage() {
       </div>
 
       {/* Details Modal */}
-      {selectedBook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60">
-          <div className="bg-background rounded-lg border border-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-border flex items-center justify-between">
-              <h3 className="font-serif text-lg font-bold text-navy">Soumission {selectedBook.id}</h3>
-              <button onClick={() => setSelectedBook(null)} className="text-foreground-muted hover:text-navy">
-                <XCircle className="w-6 h-6" />
-              </button>
+      <Modal
+        open={selectedBook !== null}
+        onClose={() => setSelectedBook(null)}
+        title={`Soumission ${selectedBook?.id || ""}`}
+        maxWidth={500}
+        footer={
+          <button 
+            onClick={() => setSelectedBook(null)}
+            className="bg-navy hover:bg-navy-hover text-white text-xs font-bold px-5 py-2 rounded"
+          >
+            Fermer
+          </button>
+        }
+      >
+        {selectedBook && (
+          <div className="space-y-4 pt-2">
+            <div>
+              <span className="text-foreground-muted block text-xs uppercase tracking-wider">Titre de l'ouvrage</span>
+              <span className="text-base font-bold text-navy">{selectedBook.title}</span>
             </div>
-            <div className="p-6 space-y-4 text-sm">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="text-foreground-muted block text-xs uppercase tracking-wider">Titre de l'ouvrage</span>
-                <span className="text-base font-bold text-navy">{selectedBook.title}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-foreground-muted block text-xs">Date de dépôt</span>
-                  <span className="font-medium">{new Date(selectedBook.created_at).toLocaleDateString("fr-FR")}</span>
-                </div>
-                <div>
-                  <span className="text-foreground-muted block text-xs">Statut</span>
-                  <span className="block mt-1">{getStatusBadge(selectedBook.status)}</span>
-                </div>
-              </div>
-              <div>
-                <span className="text-foreground-muted block text-xs">Auteurs</span>
-                <span className="font-medium">{selectedBook.authors.join(", ")}</span>
+                <span className="text-foreground-muted block text-xs">Date de dépôt</span>
+                <span className="font-medium">{new Date(selectedBook.created_at).toLocaleDateString("fr-FR")}</span>
               </div>
               <div>
-                <span className="text-foreground-muted block text-xs">Résumé</span>
-                <p className="text-foreground-muted mt-1 leading-relaxed bg-background-secondary p-3 rounded border border-border text-xs">
-                  {selectedBook.summary}
-                </p>
+                <span className="text-foreground-muted block text-xs">Statut</span>
+                <span className="block mt-1">{getStatusBadge(selectedBook.status)}</span>
               </div>
-              {selectedBook.reject_reason && (
-                <div className="bg-error/5 border border-error/20 p-3 rounded text-error text-xs">
-                  <span className="font-bold block mb-1">Motif de rejet :</span>
-                  <span>{selectedBook.reject_reason}</span>
-                </div>
-              )}
             </div>
-            <div className="p-6 border-t border-border flex justify-end">
-              <button 
-                onClick={() => setSelectedBook(null)}
-                className="bg-navy hover:bg-navy-hover text-white text-xs font-bold px-5 py-2 rounded"
-              >
-                Fermer
-              </button>
+            <div>
+              <span className="text-foreground-muted block text-xs">Auteurs</span>
+              <span className="font-medium">{selectedBook.authors.join(", ")}</span>
             </div>
+            <div>
+              <span className="text-foreground-muted block text-xs">Résumé</span>
+              <p className="text-foreground-muted mt-1 leading-relaxed bg-background-secondary p-3 rounded border border-border text-xs">
+                {selectedBook.summary}
+              </p>
+            </div>
+            {selectedBook.reject_reason && (
+              <div className="bg-error/5 border border-error/20 p-3 rounded text-error text-xs mt-4">
+                <span className="font-bold block mb-1">Motif de rejet :</span>
+                <span>{selectedBook.reject_reason}</span>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Delete Confirmation Modal */}
-      {bookToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60">
-          <div className="bg-background rounded-lg border border-border shadow-2xl max-w-sm w-full p-6 space-y-4">
-            <div className="flex items-center gap-3 text-error">
-              <AlertTriangle className="w-6 h-6" />
-              <h3 className="text-base font-bold">Confirmer la suppression</h3>
-            </div>
-            <p className="text-xs text-foreground-muted leading-relaxed">
-              Voulez-vous vraiment supprimer le brouillon de l'ouvrage <span className="font-bold text-navy">"{bookToDelete.title}"</span> ?
-            </p>
-            <div className="flex justify-end gap-2">
-              <button 
-                onClick={() => setBookToDelete(null)}
-                className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
-              >
-                Annuler
-              </button>
-              <button 
-                onClick={() => handleDelete(bookToDelete.id)}
-                className="bg-error hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded"
-              >
-                Supprimer
-              </button>
-            </div>
+      <Modal
+        open={bookToDelete !== null}
+        onClose={() => setBookToDelete(null)}
+        title={
+          <div className="flex items-center gap-3 text-error">
+            <AlertTriangle className="w-6 h-6" />
+            <span>Confirmer la suppression</span>
           </div>
-        </div>
-      )}
+        }
+        maxWidth={400}
+        footer={
+          <>
+            <button 
+              onClick={() => setBookToDelete(null)}
+              className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
+            >
+              Annuler
+            </button>
+            <button 
+              onClick={() => bookToDelete && handleDelete(bookToDelete.id)}
+              className="bg-error hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded"
+            >
+              Supprimer
+            </button>
+          </>
+        }
+      >
+        {bookToDelete && (
+          <p className="text-xs text-foreground-muted leading-relaxed pt-2 pb-2">
+            Voulez-vous vraiment supprimer le brouillon de l'ouvrage <span className="font-bold text-navy">"{bookToDelete.title}"</span> ?
+          </p>
+        )}
+      </Modal>
 
     </div>
   );

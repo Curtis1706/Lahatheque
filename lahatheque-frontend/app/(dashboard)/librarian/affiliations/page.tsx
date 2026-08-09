@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { DataTable } from "@/components/ui/data-table";
+import { Modal } from "@/components/ui/modal";
 
 export default function StudentAffiliationsPage() {
   const [affiliations, setAffiliations] = useState<StudentAffiliation[]>([]);
@@ -252,44 +253,49 @@ export default function StudentAffiliationsPage() {
       </div>
 
       {/* Modal: Rejection Reason Confirmation */}
-      {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60">
-          <div className="bg-background rounded-lg border border-border shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="border-b border-border pb-2 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-error shrink-0" />
-              <h3 className="font-serif text-lg font-bold text-navy">Rejeter l'affiliation étudiant</h3>
-            </div>
-            <form onSubmit={handleRejectSubmit} className="space-y-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-navy">Motif du rejet *</label>
-                <textarea 
-                  required
-                  rows={3}
-                  className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy resize-none"
-                  placeholder="Ex: Numéro de carte étudiant invalide ou expiré."
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button 
-                  type="button"
-                  onClick={() => setShowRejectModal(false)}
-                  className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
-                >
-                  Annuler
-                </button>
-                <button 
-                  type="submit"
-                  className="bg-error hover:bg-error-hover text-white text-xs font-bold px-4 py-2 rounded"
-                >
-                  Confirmer le rejet
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={showRejectModal}
+        onClose={() => setShowRejectModal(false)}
+        title={
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-error shrink-0" />
+            <span>Rejeter l'affiliation étudiant</span>
           </div>
-        </div>
-      )}
+        }
+        maxWidth={500}
+        footer={
+          <>
+            <button 
+              type="button"
+              onClick={() => setShowRejectModal(false)}
+              className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
+            >
+              Annuler
+            </button>
+            <button 
+              type="submit"
+              form="reject-affiliation-form"
+              className="bg-error hover:bg-error-hover text-white text-xs font-bold px-4 py-2 rounded"
+            >
+              Confirmer le rejet
+            </button>
+          </>
+        }
+      >
+        <form id="reject-affiliation-form" onSubmit={handleRejectSubmit} className="space-y-4 pt-2 pb-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-navy">Motif du rejet *</label>
+            <textarea 
+              required
+              rows={3}
+              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy resize-none"
+              placeholder="Ex: Numéro de carte étudiant invalide ou expiré."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+          </div>
+        </form>
+      </Modal>
 
     </div>
   );

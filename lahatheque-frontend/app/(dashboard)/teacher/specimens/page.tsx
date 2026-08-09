@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { DataTable } from "@/components/ui/data-table";
+import { Modal } from "@/components/ui/modal";
 import { mockBooks } from "@/lib/mock/catalog";
 
 export default function TeacherSpecimensPage() {
@@ -178,55 +179,56 @@ export default function TeacherSpecimensPage() {
       </div>
 
       {/* Modal: Request Specimen */}
-      {showSpecimenModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60">
-          <div className="bg-background rounded-lg border border-border shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="border-b border-border pb-2">
-              <h3 className="font-serif text-lg font-bold text-navy">Demander un spécimen d'évaluation</h3>
-            </div>
-            <form onSubmit={handleRequestSpecimen} className="space-y-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-navy">Sélectionner un manuel *</label>
-                <select 
-                  className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy cursor-pointer"
-                  value={selectedBookId}
-                  onChange={(e) => setSelectedBookId(e.target.value)}
-                  required
-                >
-                  <option value="">-- Choisir un ouvrage --</option>
-                  {mockBooks.map((book) => (
-                    <option key={book.id} value={book.id}>
-                      {book.title} ({book.authors_details.map(a => a.last_name).join(", ")})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="bg-background-secondary p-3.5 rounded border border-border flex items-start gap-2.5 text-[11px] text-foreground-muted leading-relaxed">
-                <AlertTriangle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-                <span>
-                  L'accès spécimen numérique est accordé gratuitement pour une durée de 30 jours renouvelables après validation de votre affiliation par notre service éditorial.
-                </span>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button 
-                  type="button"
-                  onClick={() => setShowSpecimenModal(false)}
-                  className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
-                >
-                  Annuler
-                </button>
-                <button 
-                  type="submit"
-                  disabled={submittingSpecimen}
-                  className="bg-gold hover:bg-gold-dark text-white text-xs font-bold px-4 py-2 rounded disabled:opacity-50"
-                >
-                  {submittingSpecimen ? "Envoi..." : "Envoyer la demande"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={showSpecimenModal}
+        onClose={() => setShowSpecimenModal(false)}
+        title="Demander un spécimen d'évaluation"
+        maxWidth={500}
+        footer={
+          <>
+            <button 
+              type="button"
+              onClick={() => setShowSpecimenModal(false)}
+              className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
+            >
+              Annuler
+            </button>
+            <button 
+              type="submit"
+              form="request-specimen-form"
+              disabled={submittingSpecimen}
+              className="bg-gold hover:bg-gold-dark text-white text-xs font-bold px-4 py-2 rounded disabled:opacity-50"
+            >
+              {submittingSpecimen ? "Envoi..." : "Envoyer la demande"}
+            </button>
+          </>
+        }
+      >
+        <form id="request-specimen-form" onSubmit={handleRequestSpecimen} className="space-y-4 pt-2 pb-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-navy">Sélectionner un manuel *</label>
+            <select 
+              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy cursor-pointer"
+              value={selectedBookId}
+              onChange={(e) => setSelectedBookId(e.target.value)}
+              required
+            >
+              <option value="">-- Choisir un ouvrage --</option>
+              {mockBooks.map((book) => (
+                <option key={book.id} value={book.id}>
+                  {book.title} ({book.authors_details.map(a => a.last_name).join(", ")})
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
-      )}
+          <div className="bg-background-secondary p-3.5 rounded border border-border flex items-start gap-2.5 text-[11px] text-foreground-muted leading-relaxed">
+            <AlertTriangle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+            <span>
+              L'accès spécimen numérique est accordé gratuitement pour une durée de 30 jours renouvelables après validation de votre affiliation par notre service éditorial.
+            </span>
+          </div>
+        </form>
+      </Modal>
 
     </div>
   );

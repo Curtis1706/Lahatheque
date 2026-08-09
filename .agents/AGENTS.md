@@ -41,6 +41,7 @@ Ces règles sont TOUJOURS actives, sur tout écran/composant/page construit pour
 ## 🧩 Composants — 21st.dev avant tout
 - Avant de coder un composant UI (carte, table, stepper, drawer, dropzone, badge, form…), cherche-le via les tools MCP `21st`. N'écris jamais un composant générique from scratch sans être passé par cette recherche.
 - `search` et `get_inspiration` sont gratuits et illimités — les utiliser librement et largement. `get_component` (code d'un composant) et `generate` (génération IA) sont limités par un quota quotidien — les réserver aux candidats déjà présélectionnés via les métadonnées (nom, description, preview), pas à un usage spéculatif sur chaque résultat.
+- **Éviter les composants payants / Premium** : Privilégier les composants gratuits. Si un composant est payant ou nécessite un upgrade, ne pas l'utiliser et chercher une alternative gratuite.
 - Si un appel `get_component`/`generate` échoue ou renvoie `locked=true`, appelle `get_usage` pour vérifier le quota restant avant de retenter.
 - **Notification de Quotas** : Informer immédiatement et explicitement l'utilisateur dès que le quota de téléchargement de code source de `21st.dev` est épuisé.
 - Tout composant importé de `21st.dev` est adapté avant intégration : couleurs remplacées par les tokens `globals.css`, comportement rendu mobile-first, props renommées pour matcher les types TS du projet.

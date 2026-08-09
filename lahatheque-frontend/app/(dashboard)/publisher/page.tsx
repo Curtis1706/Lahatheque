@@ -25,6 +25,7 @@ import {
 import Link from "next/link";
 import { KpiGrid, type KpiCardProps } from "@/components/ui/kpi-card";
 import { DataTable } from "@/components/ui/data-table";
+import { Modal } from "@/components/ui/modal";
 
 export default function PublisherDashboardPage() {
   const [stats, setStats] = useState<PublisherStats | null>(null);
@@ -320,105 +321,105 @@ const handleDelete = async (id: string) => {
 
 
       {/* Modal: Book Details */}
-      {selectedBook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60">
-          <div className="bg-background rounded-lg border border-border shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-border flex items-center justify-between">
-              <h3 className="font-serif text-lg font-bold text-navy">Fiche détaillée du dépôt</h3>
-              <button 
-                onClick={() => setSelectedBook(null)}
-                className="text-foreground-muted hover:text-navy"
-              >
-                <XCircle className="w-6 h-6" />
-              </button>
+      <Modal
+        open={selectedBook !== null}
+        onClose={() => setSelectedBook(null)}
+        title="Fiche détaillée du dépôt"
+        maxWidth={650}
+        footer={
+          <button 
+            onClick={() => setSelectedBook(null)}
+            className="bg-navy hover:bg-navy-hover text-white text-sm font-bold px-6 py-2 rounded"
+          >
+            Fermer
+          </button>
+        }
+      >
+        {selectedBook && (
+          <div className="space-y-6 pt-2">
+            <div>
+              <h4 className="text-xl font-serif font-bold text-navy">{selectedBook.title}</h4>
+              {selectedBook.subtitle && <p className="text-sm text-foreground-muted">{selectedBook.subtitle}</p>}
             </div>
-            <div className="p-6 space-y-6">
+
+            <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <h4 className="text-xl font-serif font-bold text-navy">{selectedBook.title}</h4>
-                {selectedBook.subtitle && <p className="text-sm text-foreground-muted">{selectedBook.subtitle}</p>}
+                <span className="text-foreground-muted block">Statut du dépôt :</span>
+                <div className="mt-1">{getStatusBadge(selectedBook.status)}</div>
               </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-foreground-muted block">Statut du dépôt :</span>
-                  <div className="mt-1">{getStatusBadge(selectedBook.status)}</div>
-                </div>
-                <div>
-                  <span className="text-foreground-muted block">Date de dépôt :</span>
-                  <span className="font-bold text-navy">{new Date(selectedBook.created_at).toLocaleDateString("fr-FR")}</span>
-                </div>
-                <div>
-                  <span className="text-foreground-muted block">Auteurs :</span>
-                  <span className="font-medium text-navy">{selectedBook.authors.join(", ")}</span>
-                </div>
-                <div>
-                  <span className="text-foreground-muted block">Modèle commercial :</span>
-                  <span className="font-medium text-navy">{formatSalesModel(selectedBook.sales_model)}</span>
-                </div>
-                <div>
-                  <span className="text-foreground-muted block">Prix public :</span>
-                  <span className="font-bold text-navy">{selectedBook.price.toLocaleString()} {selectedBook.currency}</span>
-                </div>
-                {selectedBook.isbn_digital && (
-                  <div>
-                    <span className="text-foreground-muted block">ISBN Numérique :</span>
-                    <span className="font-medium text-navy">{selectedBook.isbn_digital}</span>
-                  </div>
-                )}
+              <div>
+                <span className="text-foreground-muted block">Date de dépôt :</span>
+                <span className="font-bold text-navy">{new Date(selectedBook.created_at).toLocaleDateString("fr-FR")}</span>
               </div>
-
-              {selectedBook.reject_reason && (
-                <div className="bg-error/5 border border-error/20 p-4 rounded text-error text-sm">
-                  <p className="font-bold mb-1">Motif du rejet :</p>
-                  <p>{selectedBook.reject_reason}</p>
+              <div>
+                <span className="text-foreground-muted block">Auteurs :</span>
+                <span className="font-medium text-navy">{selectedBook.authors.join(", ")}</span>
+              </div>
+              <div>
+                <span className="text-foreground-muted block">Modèle commercial :</span>
+                <span className="font-medium text-navy">{formatSalesModel(selectedBook.sales_model)}</span>
+              </div>
+              <div>
+                <span className="text-foreground-muted block">Prix public :</span>
+                <span className="font-bold text-navy">{selectedBook.price.toLocaleString()} {selectedBook.currency}</span>
+              </div>
+              {selectedBook.isbn_digital && (
+                <div>
+                  <span className="text-foreground-muted block">ISBN Numérique :</span>
+                  <span className="font-medium text-navy">{selectedBook.isbn_digital}</span>
                 </div>
               )}
-
-              <div className="pt-4 border-t border-border">
-                <span className="text-foreground-muted block text-xs font-bold uppercase tracking-wider mb-2">Résumé / Présentation</span>
-                <p className="text-sm leading-relaxed text-foreground-muted">{selectedBook.summary}</p>
-              </div>
             </div>
-            <div className="p-6 border-t border-border flex justify-end">
-              <button 
-                onClick={() => setSelectedBook(null)}
-                className="bg-navy hover:bg-navy-hover text-white text-sm font-bold px-6 py-2 rounded"
-              >
-                Fermer
-              </button>
+
+            {selectedBook.reject_reason && (
+              <div className="bg-error/5 border border-error/20 p-4 rounded text-error text-sm">
+                <p className="font-bold mb-1">Motif du rejet :</p>
+                <p>{selectedBook.reject_reason}</p>
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-border">
+              <span className="text-foreground-muted block text-xs font-bold uppercase tracking-wider mb-2">Résumé / Présentation</span>
+              <p className="text-sm leading-relaxed text-foreground-muted">{selectedBook.summary}</p>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Modal: Confirm Delete */}
-      {bookToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60">
-          <div className="bg-background rounded-lg border border-border shadow-2xl max-w-md w-full p-6 space-y-6">
-            <div className="flex items-center gap-3 text-error">
-              <AlertTriangle className="w-8 h-8 shrink-0" />
-              <h3 className="text-lg font-bold">Confirmer la suppression</h3>
-            </div>
-            <p className="text-sm text-foreground-muted">
-              Êtes-vous sûr de vouloir supprimer définitivement le brouillon de l'ouvrage <span className="font-bold text-navy">"{bookToDelete.title}"</span> ? Cette action est irréversible.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button 
-                onClick={() => setBookToDelete(null)}
-                className="border border-border text-navy bg-background hover:bg-background-secondary text-sm font-bold px-4 py-2 rounded"
-              >
-                Annuler
-              </button>
-              <button 
-                onClick={() => handleDelete(bookToDelete.id)}
-                className="bg-error hover:bg-red-700 text-white text-sm font-bold px-4 py-2 rounded"
-              >
-                Supprimer
-              </button>
-            </div>
+      <Modal
+        open={bookToDelete !== null}
+        onClose={() => setBookToDelete(null)}
+        title={
+          <div className="flex items-center gap-3 text-error">
+            <AlertTriangle className="w-6 h-6 shrink-0" />
+            <span>Confirmer la suppression</span>
           </div>
-        </div>
-      )}
+        }
+        maxWidth={450}
+        footer={
+          <>
+            <button 
+              onClick={() => setBookToDelete(null)}
+              className="border border-border text-navy bg-background hover:bg-background-secondary text-sm font-bold px-4 py-2 rounded"
+            >
+              Annuler
+            </button>
+            <button 
+              onClick={() => bookToDelete && handleDelete(bookToDelete.id)}
+              className="bg-error hover:bg-red-700 text-white text-sm font-bold px-4 py-2 rounded"
+            >
+              Supprimer
+            </button>
+          </>
+        }
+      >
+        {bookToDelete && (
+          <p className="text-sm text-foreground-muted pt-2 pb-2">
+            Êtes-vous sûr de vouloir supprimer définitivement le brouillon de l'ouvrage <span className="font-bold text-navy">"{bookToDelete.title}"</span> ? Cette action est irréversible.
+          </p>
+        )}
+      </Modal>
 
     </div>
   );

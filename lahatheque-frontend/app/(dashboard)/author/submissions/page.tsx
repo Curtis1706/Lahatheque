@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { DataTable } from "@/components/ui/data-table";
 import { Dropzone } from "@/components/ui/dropzone";
+import { Modal } from "@/components/ui/modal";
 
 export default function AuthorSubmissionsPage() {
   const [submissions, setSubmissions] = useState<AuthorSubmission[]>([]);
@@ -204,73 +205,72 @@ export default function AuthorSubmissionsPage() {
       </div>
 
       {/* Modal: Submit Manuscript */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60">
-          <div className="bg-background rounded-lg border border-border shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="border-b border-border pb-2">
-              <h3 className="font-serif text-lg font-bold text-navy">Déposer un nouveau manuscrit</h3>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-navy">Titre de l'œuvre *</label>
-                <input 
-                  type="text" 
-                  required
-                  className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy"
-                  placeholder="Ex: Traité de Droit Administratif"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-navy">Discipline académique *</label>
-                <select 
-                  className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy cursor-pointer"
-                  value={discipline}
-                  onChange={(e) => setDiscipline(e.target.value)}
-                  required
-                >
-                  <option value="">-- Choisir une discipline --</option>
-                  <option value="Droit & Sciences Politiques">Droit & Sciences Politiques</option>
-                  <option value="Économie & Gestion">Économie & Gestion</option>
-                  <option value="Sciences & Technologies">Sciences & Technologies</option>
-                  <option value="Lettres, Langues & Arts">Lettres, Langues & Arts</option>
-                </select>
-              </div>
-              
-              {/* Dropzone component uploader */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-navy">Fichier du manuscrit (PDF ou EPUB) *</label>
-                <Dropzone onFileSelect={(file) => setSelectedFile(file)} />
-              </div>
-
-              <div className="bg-background-secondary p-3.5 rounded border border-border flex items-start gap-2.5 text-[11px] text-foreground-muted leading-relaxed">
-                <AlertTriangle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-                <span>
-                  En déposant ce manuscrit, vous certifiez en être l'auteur légal et acceptez que l'équipe éditoriale procède à une lecture d'étude de conformité.
-                </span>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button 
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
-                >
-                  Annuler
-                </button>
-                <button 
-                  type="submit"
-                  disabled={submitting || !selectedFile}
-                  className="bg-gold hover:bg-gold-dark text-white text-xs font-bold px-4 py-2 rounded disabled:opacity-50"
-                >
-                  {submitting ? "Envoi..." : "Déposer l'œuvre"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title="Déposer un nouveau manuscrit"
+        maxWidth={500}
+        footer={
+          <>
+            <button 
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
+            >
+              Annuler
+            </button>
+            <button 
+              type="submit"
+              form="submit-manuscript-form"
+              disabled={submitting || !selectedFile}
+              className="bg-gold hover:bg-gold-dark text-white text-xs font-bold px-4 py-2 rounded disabled:opacity-50"
+            >
+              {submitting ? "Dépôt en cours..." : "Soumettre à lecture"}
+            </button>
+          </>
+        }
+      >
+        <form id="submit-manuscript-form" onSubmit={handleSubmit} className="space-y-4 pt-2 pb-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-navy">Titre de l'œuvre *</label>
+            <input 
+              type="text" 
+              required
+              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy"
+              placeholder="Ex: Traité de Droit Administratif"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
           </div>
-        </div>
-      )}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-navy">Discipline académique *</label>
+            <select 
+              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy cursor-pointer"
+              value={discipline}
+              onChange={(e) => setDiscipline(e.target.value)}
+              required
+            >
+              <option value="">-- Choisir une discipline --</option>
+              <option value="Droit & Sciences Politiques">Droit & Sciences Politiques</option>
+              <option value="Économie & Gestion">Économie & Gestion</option>
+              <option value="Sciences & Technologies">Sciences & Technologies</option>
+              <option value="Lettres, Langues & Arts">Lettres, Langues & Arts</option>
+            </select>
+          </div>
+          
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-navy">Fichier du manuscrit (PDF ou EPUB) *</label>
+            <Dropzone onFileSelect={(file) => setSelectedFile(file)} />
+          </div>
+
+          <div className="bg-background-secondary p-3.5 rounded border border-border flex items-start gap-2.5 text-[11px] text-foreground-muted leading-relaxed">
+            <AlertTriangle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+            <span>
+              En déposant ce manuscrit, vous certifiez en être l'auteur légal et acceptez que l'équipe éditoriale procède à une lecture d'étude de conformité.
+            </span>
+          </div>
+        </form>
+      </Modal>
 
     </div>
   );
