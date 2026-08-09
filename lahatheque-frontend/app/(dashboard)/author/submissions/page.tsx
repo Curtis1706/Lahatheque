@@ -17,6 +17,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
+import { DataTable } from "@/components/ui/data-table";
 import { Dropzone } from "@/components/ui/dropzone";
 
 export default function AuthorSubmissionsPage() {
@@ -125,76 +126,82 @@ export default function AuthorSubmissionsPage() {
       </div>
 
       {/* Main List */}
-      {loading ? (
-        <div className="p-6 space-y-4 animate-pulse bg-background border border-border rounded-xl">
-          <div className="h-10 bg-background-secondary rounded" />
-          <div className="h-10 bg-background-secondary rounded" />
-        </div>
-      ) : submissions.length === 0 ? (
-        <div className="p-12 text-center border border-border rounded-xl bg-background-secondary max-w-md mx-auto space-y-3">
-          <FileText className="w-12 h-12 text-gold mx-auto" />
-          <h3 className="text-base font-bold text-navy">Aucun dépôt</h3>
-          <p className="text-xs text-foreground-muted">Vous n'avez pas encore déposé de livre ou manuscrit.</p>
-        </div>
-      ) : (
-        <div className="bg-background border border-border rounded-xl shadow-sm overflow-hidden">
-          
-          {/* Desktop view */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-background-secondary border-b border-border text-navy font-bold text-xs uppercase tracking-wider">
-                  <th className="p-4">Titre de l'œuvre</th>
-                  <th className="p-4">Discipline</th>
-                  <th className="p-4">Date de soumission</th>
-                  <th className="p-4">Nom du fichier</th>
-                  <th className="p-4">Statut</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {submissions.map((sub) => (
-                  <tr key={sub.id} className="hover:bg-background-secondary/30 transition-colors">
-                    <td className="p-4">
-                      <p className="font-bold text-navy">{sub.title}</p>
-                      <p className="text-[10px] text-foreground-muted font-mono">Réf : {sub.id}</p>
-                    </td>
-                    <td className="p-4 text-foreground-muted">{sub.discipline}</td>
-                    <td className="p-4 text-foreground-muted">
-                      {new Date(sub.submitted_at).toLocaleDateString("fr-FR")}
-                    </td>
-                    <td className="p-4 text-foreground-muted font-mono text-xs">{sub.file_name}</td>
-                    <td className="p-4">{getStatusBadge(sub.status)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile view */}
-          <div className="md:hidden divide-y divide-border/40">
-            {submissions.map((sub) => (
-              <div key={sub.id} className="p-4 space-y-2">
-                <div className="flex justify-between items-start gap-2">
-                  <p className="font-bold text-navy text-sm">{sub.title}</p>
-                  {getStatusBadge(sub.status)}
+      <div className="pt-2">
+        <DataTable
+          data={submissions}
+          rowKey="id"
+          loading={loading}
+          skeletonRows={4}
+          filterKey="status"
+          filterOptions={[
+            { value: "draft", label: "Brouillon" },
+            { value: "pending", label: "Soumis" },
+            { value: "under_review", label: "En relecture" },
+            { value: "approved", label: "Approuvé / Publié" },
+            { value: "rejected", label: "Refusé" },
+          ]}
+          searchPlaceholder="Rechercher un manuscrit..."
+          emptyMessage="Vous n'avez pas encore déposé de livre ou manuscrit."
+          columns={[
+            {
+              key: "title",
+              header: "Titre de l'œuvre",
+              cell: (sub) => (
+                <div>
+                  <p className="font-bold text-navy">{sub.title as string}</p>
+                  <p className="text-[10px] text-foreground-muted font-mono">Réf : {sub.id as string}</p>
                 </div>
-                <div className="text-xs text-foreground-muted space-y-0.5">
-                  <p><span className="font-bold text-navy">Discipline :</span> {sub.discipline}</p>
-                  <p><span className="font-bold text-navy">Fichier :</span> {sub.file_name}</p>
-                </div>
-                <div className="flex justify-between items-center pt-2 text-[10px] text-foreground-muted">
-                  <span>Réf : {sub.id}</span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    Soumis le {new Date(sub.submitted_at).toLocaleDateString("fr-FR")}
-                  </span>
-                </div>
+              ),
+            },
+            {
+              key: "discipline",
+              header: "Discipline",
+              cell: (sub) => <span className="text-foreground-muted">{sub.discipline as string}</span>,
+              hideOnMobile: true,
+            },
+            {
+              key: "submitted_at",
+              header: "Date de soumission",
+              cell: (sub) => (
+                <span className="text-foreground-muted">
+                  {new Date(sub.submitted_at as string).toLocaleDateString("fr-FR")}
+                </span>
+              ),
+              hideOnMobile: true,
+            },
+            {
+              key: "file_name",
+              header: "Nom du fichier",
+              cell: (sub) => <span className="text-foreground-muted font-mono text-xs">{sub.file_name as string}</span>,
+              hideOnMobile: true,
+            },
+            {
+              key: "status",
+              header: "Statut",
+              cell: (sub) => getStatusBadge(sub.status as AuthorSubmission["status"]),
+            },
+          ]}
+          mobileCard={(sub) => (
+            <div className="space-y-2">
+              <div className="flex justify-between items-start gap-2">
+                <p className="font-bold text-navy text-sm">{sub.title as string}</p>
+                {getStatusBadge(sub.status as AuthorSubmission["status"])}
               </div>
-            ))}
-          </div>
-
-        </div>
-      )}
+              <div className="text-xs text-foreground-muted space-y-0.5">
+                <p><span className="font-bold text-navy">Discipline :</span> {sub.discipline as string}</p>
+                <p><span className="font-bold text-navy">Fichier :</span> {sub.file_name as string}</p>
+              </div>
+              <div className="flex justify-between items-center pt-2 text-[10px] text-foreground-muted">
+                <span>Réf : {sub.id as string}</span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  Soumis le {new Date(sub.submitted_at as string).toLocaleDateString("fr-FR")}
+                </span>
+              </div>
+            </div>
+          )}
+        />
+      </div>
 
       {/* Modal: Submit Manuscript */}
       {showModal && (

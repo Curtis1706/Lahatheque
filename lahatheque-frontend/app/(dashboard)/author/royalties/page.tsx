@@ -18,6 +18,7 @@ import {
   Bookmark
 } from "lucide-react";
 import Link from "next/link";
+import { DataTable } from "@/components/ui/data-table";
 
 export default function AuthorRoyaltiesPage() {
   const [statements, setStatements] = useState<RoyaltyStatement[]>([]);
@@ -71,88 +72,81 @@ export default function AuthorRoyaltiesPage() {
             Historique des relevés de redevances
           </h3>
 
-          {loading ? (
-            <div className="p-6 space-y-4 animate-pulse bg-background border border-border rounded-xl">
-              <div className="h-10 bg-background-secondary rounded" />
-              <div className="h-10 bg-background-secondary rounded" />
-            </div>
-          ) : statements.length === 0 ? (
-            <div className="p-10 text-center text-xs text-foreground-muted">
-              Aucun relevé disponible.
-            </div>
-          ) : (
-            <div className="bg-background border border-border rounded-xl shadow-sm overflow-hidden">
-              
-              {/* Desktop View */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-background-secondary border-b border-border text-navy font-bold text-xs uppercase tracking-wider">
-                      <th className="p-4">Ouvrage</th>
-                      <th className="p-4 text-center">Ventes</th>
-                      <th className="p-4 text-center">Lectures Bouquet</th>
-                      <th className="p-4 text-center">Montant de droits</th>
-                      <th className="p-4 text-center">Période / Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {statements.map((stmt) => (
-                      <tr key={stmt.id} className="hover:bg-background-secondary/30 transition-colors">
-                        <td className="p-4">
-                          <p className="font-bold text-navy">{stmt.book_title}</p>
-                          <p className="text-[10px] text-foreground-muted">Réf : {stmt.id}</p>
-                        </td>
-                        <td className="p-4 text-center text-foreground-muted">{stmt.sales_count} ex.</td>
-                        <td className="p-4 text-center text-foreground-muted">{stmt.downloads_count}</td>
-                        <td className="p-4 text-center font-bold text-navy">
-                          {stmt.amount.toLocaleString()} {stmt.currency}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex flex-col items-center gap-1.5">
-                            <span className="text-xs text-foreground-muted">{stmt.statement_period}</span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              stmt.status === "paid"
-                                ? "bg-success/10 text-success border border-success/20"
-                                : "bg-warning/10 text-warning border border-warning/20"
-                            }`}>
-                              {stmt.status === "paid" ? "Payé" : "En cours"}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile View */}
-              <div className="md:hidden divide-y divide-border/40">
-                {statements.map((stmt) => (
-                  <div key={stmt.id} className="p-4 space-y-2">
-                    <div className="flex justify-between items-start gap-2">
-                      <p className="font-bold text-navy text-sm">{stmt.book_title}</p>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        stmt.status === "paid" 
-                          ? "bg-success/10 text-success" 
-                          : "bg-warning/10 text-warning"
-                      }`}>
-                        {stmt.status === "paid" ? "Payé" : "En cours"}
+          <div className="pt-2">
+            <DataTable
+              data={statements}
+              rowKey="id"
+              loading={loading}
+              skeletonRows={4}
+              emptyMessage="Aucun relevé disponible."
+              columns={[
+                {
+                  key: "book_title",
+                  header: "Ouvrage",
+                  cell: (stmt) => (
+                    <div>
+                      <p className="font-bold text-navy">{stmt.book_title as string}</p>
+                      <p className="text-[10px] text-foreground-muted">Réf : {stmt.id as string}</p>
+                    </div>
+                  ),
+                },
+                {
+                  key: "sales_count",
+                  header: "Ventes",
+                  className: "text-center",
+                  cell: (stmt) => <span className="text-foreground-muted">{stmt.sales_count as number} ex.</span>,
+                  hideOnMobile: true,
+                },
+                {
+                  key: "downloads_count",
+                  header: "Lectures Bouquet",
+                  className: "text-center",
+                  cell: (stmt) => <span className="text-foreground-muted">{stmt.downloads_count as number}</span>,
+                  hideOnMobile: true,
+                },
+                {
+                  key: "amount",
+                  header: "Montant de droits",
+                  className: "text-center",
+                  cell: (stmt) => (
+                    <span className="font-bold text-navy">
+                      {(stmt.amount as number).toLocaleString()} {stmt.currency as string}
+                    </span>
+                  ),
+                },
+                {
+                  key: "status",
+                  header: "Période / Statut",
+                  cell: (stmt) => (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <span className="text-xs text-foreground-muted">{stmt.statement_period as string}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${(stmt.status as string) === "paid" ? "bg-success/10 text-success border border-success/20" : "bg-warning/10 text-warning border border-warning/20"}`}>
+                        {(stmt.status as string) === "paid" ? "Payé" : "En cours"}
                       </span>
                     </div>
-                    <div className="flex justify-between text-xs text-foreground-muted">
-                      <span>Ventes : {stmt.sales_count} ex.</span>
-                      <span>Lectures : {stmt.downloads_count}</span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-border/40 text-xs">
-                      <span className="text-foreground-muted">{stmt.statement_period}</span>
-                      <span className="font-bold text-navy">{stmt.amount.toLocaleString()} {stmt.currency}</span>
-                    </div>
+                  ),
+                },
+              ]}
+              mobileCard={(stmt) => (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start gap-2">
+                    <p className="font-bold text-navy text-sm">{stmt.book_title as string}</p>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${(stmt.status as string) === "paid" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
+                      {(stmt.status as string) === "paid" ? "Payé" : "En cours"}
+                    </span>
                   </div>
-                ))}
-              </div>
-
-            </div>
-          )}
+                  <div className="flex justify-between text-xs text-foreground-muted">
+                    <span>Ventes : {stmt.sales_count as number} ex.</span>
+                    <span>Lectures : {stmt.downloads_count as number}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-border/40 text-xs">
+                    <span className="text-foreground-muted">{stmt.statement_period as string}</span>
+                    <span className="font-bold text-navy">{(stmt.amount as number).toLocaleString()} {stmt.currency as string}</span>
+                  </div>
+                </div>
+              )}
+            />
+          </div>
         </div>
 
         {/* Right: Active Publishing Contracts */}

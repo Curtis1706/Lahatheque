@@ -14,6 +14,7 @@ import {
   Calendar,
   CreditCard
 } from "lucide-react";
+import { DataTable } from "@/components/ui/data-table";
 
 export default function RoyaltiesPage() {
   const [stats, setStats] = useState<PublisherStats | null>(null);
@@ -124,54 +125,87 @@ export default function RoyaltiesPage() {
             <span className="text-xs text-foreground-muted font-medium">SYSCOHADA Standard</span>
           </div>
 
-          {loading ? (
-            <div className="p-6 space-y-4 animate-pulse">
-              <div className="h-8 bg-background-secondary rounded" />
-              <div className="h-10 bg-background-secondary rounded" />
-              <div className="h-10 bg-background-secondary rounded" />
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-background-secondary border-b border-border text-navy font-bold text-xs uppercase tracking-wider">
-                    <th className="p-4">Ouvrage</th>
-                    <th className="p-4">Type de vente</th>
-                    <th className="p-4">Prix de vente</th>
-                    <th className="p-4 text-right">Votre Redevance</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {transactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-background-secondary/30 transition-colors">
-                      <td className="p-4">
-                        <p className="font-bold text-navy">{tx.book_title}</p>
-                        <p className="text-[10px] text-foreground-muted flex items-center gap-1 mt-0.5">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(tx.transaction_date).toLocaleDateString("fr-FR")} à {new Date(tx.transaction_date).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </td>
-                      <td className="p-4">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${
-                          tx.type === "purchase" 
-                            ? "bg-navy-hover/10 text-navy" 
-                            : "bg-gold/10 text-gold-dark"
-                        }`}>
-                          {tx.type === "purchase" ? "Achat direct" : "Part bouquet"}
-                        </span>
-                      </td>
-                      <td className="p-4 text-foreground-muted font-medium">
-                        {tx.sale_price.toLocaleString()} {tx.currency}
-                      </td>
-                      <td className="p-4 text-right font-bold text-navy">
-                        +{tx.royalty_earned.toLocaleString()} {tx.currency}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="pt-2">
+            <DataTable
+              data={transactions}
+              rowKey="id"
+              loading={loading}
+              skeletonRows={4}
+              emptyMessage="Aucune transaction de vente enregistrée."
+              columns={[
+                {
+                  key: "book_title",
+                  header: "Ouvrage",
+                  cell: (tx) => (
+                    <div>
+                      <p className="font-bold text-navy">{tx.book_title as string}</p>
+                      <p className="text-[10px] text-foreground-muted flex items-center gap-1 mt-0.5">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(tx.transaction_date as string).toLocaleDateString("fr-FR")} à {new Date(tx.transaction_date as string).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  )
+                },
+                {
+                  key: "type",
+                  header: "Type de vente",
+                  cell: (tx) => (
+                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${
+                      tx.type === "purchase" 
+                        ? "bg-navy-hover/10 text-navy" 
+                        : "bg-gold/10 text-gold-dark"
+                    }`}>
+                      {tx.type === "purchase" ? "Achat direct" : "Part bouquet"}
+                    </span>
+                  )
+                },
+                {
+                  key: "sale_price",
+                  header: "Prix de vente",
+                  cell: (tx) => (
+                    <span className="text-foreground-muted font-medium">
+                      {(tx.sale_price as number).toLocaleString()} {tx.currency as string}
+                    </span>
+                  ),
+                  hideOnMobile: true
+                },
+                {
+                  key: "royalty_earned",
+                  header: "Votre Redevance",
+                  className: "text-right",
+                  cell: (tx) => (
+                    <span className="font-bold text-navy">
+                      +{(tx.royalty_earned as number).toLocaleString()} {tx.currency as string}
+                    </span>
+                  )
+                }
+              ]}
+              mobileCard={(tx) => (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <p className="font-bold text-navy text-sm">{tx.book_title as string}</p>
+                    <span className="font-bold text-navy">
+                      +{(tx.royalty_earned as number).toLocaleString()} {tx.currency as string}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${
+                      tx.type === "purchase" 
+                        ? "bg-navy-hover/10 text-navy" 
+                        : "bg-gold/10 text-gold-dark"
+                    }`}>
+                      {tx.type === "purchase" ? "Achat direct" : "Part bouquet"}
+                    </span>
+                    <span className="text-foreground-muted">Prix: {(tx.sale_price as number).toLocaleString()} {tx.currency as string}</span>
+                  </div>
+                  <p className="text-[10px] text-foreground-muted flex items-center gap-1 pt-1">
+                    <Calendar className="w-3 h-3" />
+                    {new Date(tx.transaction_date as string).toLocaleDateString("fr-FR")} à {new Date(tx.transaction_date as string).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              )}
+            />
+          </div>
         </div>
 
         {/* Right : Payments disbursements history */}

@@ -19,8 +19,10 @@ import {
   ShieldCheck,
   Languages
 } from "lucide-react";
-import Link from "next/link";
 import { Dropzone } from "@/components/ui/dropzone";
+import { KpiGrid } from "@/components/ui/kpi-card";
+import { DataTable } from "@/components/ui/data-table";
+import Link from "next/link";
 
 export default function LayoutArtistPage() {
   const [items, setItems] = useState<BookCatalogItem[]>([]);
@@ -199,64 +201,147 @@ export default function LayoutArtistPage() {
         </div>
       </div>
 
-      {activeTab === "list" ? (
-        /* LIST OF OUVRA GES */
-        loading ? (
-          <div className="p-6 space-y-4 animate-pulse bg-background border border-border rounded-xl">
-            <div className="h-10 bg-background-secondary rounded" />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="p-12 text-center border border-border rounded-xl bg-background-secondary max-w-sm mx-auto space-y-3">
-            <BookOpen className="w-12 h-12 text-gold mx-auto" />
-            <h3 className="text-base font-bold text-navy">Aucun ouvrage</h3>
-            <p className="text-xs text-foreground-muted">Aucune fiche de catalogue n'a encore été créée.</p>
-          </div>
-        ) : (
-          <div className="bg-background border border-border rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-background-secondary border-b border-border text-navy font-bold text-xs uppercase tracking-wider">
-                    <th className="p-4">Ouvrage / Auteur</th>
-                    <th className="p-4">ISBN / Année</th>
-                    <th className="p-4">Discipline / Institution</th>
-                    <th className="p-4 text-center">Format / Audio</th>
-                    <th className="p-4">Statut</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {items.map((item) => (
-                    <tr key={item.id} className="hover:bg-background-secondary/30 transition-colors">
-                      <td className="p-4">
-                        <p className="font-bold text-navy">{item.title}</p>
-                        <p className="text-xs text-foreground-muted">{item.authors}</p>
-                      </td>
-                      <td className="p-4">
-                        <p className="font-mono text-xs text-navy font-bold">{item.isbn}</p>
-                        <p className="text-xs text-foreground-muted">Publié en {item.year}</p>
-                      </td>
-                      <td className="p-4 text-xs">
-                        <p className="font-bold text-navy">{item.discipline}</p>
-                        <p className="text-foreground-muted">{item.university} ({item.faculty})</p>
-                      </td>
-                      <td className="p-4 text-center">
-                        <div className="inline-flex flex-col items-center gap-1">
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-navy-light text-navy">{item.format}</span>
-                          {item.has_audio && (
-                            <span className="inline-flex items-center gap-0.5 text-[9px] text-gold font-bold">
-                              <Music className="w-2.5 h-2.5" /> Audio LCP
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4">{getStatusBadge(item.status)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* KPI Cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-36">
+              <div className="w-10 h-10 rounded-xl bg-background-secondary" />
+              <div className="h-7 w-20 bg-background-secondary rounded" />
+              <div className="h-3.5 w-32 bg-background-secondary rounded" />
             </div>
-          </div>
-        )
+          ))}
+        </div>
+      ) : (
+        <KpiGrid
+          cols={3}
+          cards={[
+            {
+              label: "Fiches cataloguées",
+              value: items.length,
+              icon: BookOpen,
+              trend: 8,
+              sparkline: [20, 30, 35, 45, 50, 60, 65],
+            },
+            {
+              label: "Ouvrages validés",
+              value: items.filter(i => i.status === "approved").length,
+              icon: ShieldCheck,
+              trend: 12,
+              sparkline: [10, 15, 20, 25, 35, 40, 50],
+            },
+            {
+              label: "En attente de validation",
+              value: items.filter(i => i.status === "pending").length,
+              icon: Clock,
+              trend: -4,
+              sparkline: [50, 45, 55, 40, 35, 30, 25],
+            },
+          ]}
+        />
+      )}
+
+      {activeTab === "list" ? (
+        /* LIST OF OUVRAGES — DataTable (#22162) */
+        <div className="pt-2">
+          <DataTable
+            data={items}
+            rowKey="id"
+            loading={loading}
+            skeletonRows={4}
+            searchPlaceholder="Rechercher par titre, auteur, ISBN..."
+            filterKey="status"
+            filterOptions={[
+              { value: "pending", label: "En attente" },
+              { value: "approved", label: "Approuvé" },
+              { value: "rejected", label: "Rejeté" },
+            ]}
+            emptyMessage="Aucune fiche de catalogue n'a encore été créée."
+            columns={[
+              {
+                key: "title",
+                header: "Ouvrage / Auteur",
+                cell: (item) => (
+                  <div>
+                    <p className="font-bold text-navy">{item.title as string}</p>
+                    <p className="text-xs text-foreground-muted">{item.authors as string}</p>
+                  </div>
+                ),
+              },
+              {
+                key: "isbn",
+                header: "ISBN / Année",
+                cell: (item) => (
+                  <div>
+                    <p className="font-mono text-xs text-navy font-bold">{item.isbn as string}</p>
+                    <p className="text-xs text-foreground-muted">Publié en {item.year as string}</p>
+                  </div>
+                ),
+                hideOnMobile: true,
+              },
+              {
+                key: "discipline",
+                header: "Discipline / Institution",
+                cell: (item) => (
+                  <div className="text-xs">
+                    <p className="font-bold text-navy">{item.discipline as string}</p>
+                    <p className="text-foreground-muted">{item.university as string} ({item.faculty as string})</p>
+                  </div>
+                ),
+                hideOnMobile: true,
+              },
+              {
+                key: "format",
+                header: "Format / Audio",
+                className: "text-center",
+                cell: (item) => (
+                  <div className="inline-flex flex-col items-center gap-1">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-navy-light text-navy">{item.format as string}</span>
+                    {(item.has_audio as boolean) && (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] text-gold font-bold">
+                        <Music className="w-2.5 h-2.5" /> Audio LCP
+                      </span>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: "status",
+                header: "Statut",
+                cell: (item) => getStatusBadge(item.status as BookCatalogItem["status"]),
+              },
+            ]}
+            mobileCard={(item) => (
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-navy text-sm">{item.title as string}</p>
+                    <p className="text-xs text-foreground-muted">{item.authors as string}</p>
+                  </div>
+                  {getStatusBadge(item.status as BookCatalogItem["status"])}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-foreground-muted block">ISBN :</span>
+                    <span className="font-mono font-bold text-navy">{item.isbn as string}</span>
+                  </div>
+                  <div>
+                    <span className="text-foreground-muted block">Discipline :</span>
+                    <span className="font-medium text-navy">{item.discipline as string}</span>
+                  </div>
+                  <div>
+                    <span className="text-foreground-muted block">Format :</span>
+                    <span className="font-medium text-navy">{item.format as string}</span>
+                  </div>
+                  <div>
+                    <span className="text-foreground-muted block">Audio LCP :</span>
+                    <span className="font-medium text-navy">{(item.has_audio as boolean) ? "Oui" : "Non"}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          />
+        </div>
       ) : (
         /* CREATE FORM WITH IA ASSIST */
         <form onSubmit={handleSubmit} className="bg-background border border-border rounded-xl p-6 shadow-sm space-y-6">

@@ -18,6 +18,7 @@ import {
   UserCheck
 } from "lucide-react";
 import Link from "next/link";
+import { DataTable } from "@/components/ui/data-table";
 
 export default function StudentAffiliationsPage() {
   const [affiliations, setAffiliations] = useState<StudentAffiliation[]>([]);
@@ -123,124 +124,132 @@ export default function StudentAffiliationsPage() {
       </div>
 
       {/* Main List */}
-      {loading ? (
-        <div className="p-6 space-y-4 animate-pulse bg-background border border-border rounded-xl">
-          <div className="h-10 bg-background-secondary rounded" />
-          <div className="h-10 bg-background-secondary rounded" />
-        </div>
-      ) : affiliations.length === 0 ? (
-        <div className="p-12 text-center border border-border rounded-xl bg-background-secondary max-w-md mx-auto space-y-3">
-          <UserCheck className="w-12 h-12 text-gold mx-auto" />
-          <h3 className="text-base font-bold text-navy">Aucun étudiant</h3>
-          <p className="text-xs text-foreground-muted">Aucune demande d'affiliation enregistrée pour le moment.</p>
-        </div>
-      ) : (
-        <div className="bg-background border border-border rounded-xl shadow-sm overflow-hidden">
-          
-          {/* Desktop view */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-background-secondary border-b border-border text-navy font-bold text-xs uppercase tracking-wider">
-                  <th className="p-4">Étudiant</th>
-                  <th className="p-4">Carte Étudiant / Coordonnées</th>
-                  <th className="p-4">Date de demande</th>
-                  <th className="p-4">Statut</th>
-                  <th className="p-4 text-right">Actions de modération</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {affiliations.map((aff) => (
-                  <tr key={aff.id} className="hover:bg-background-secondary/30 transition-colors">
-                    <td className="p-4">
-                      <p className="font-bold text-navy">{aff.student_name}</p>
-                      <p className="text-xs text-foreground-muted">{aff.student_email}</p>
-                    </td>
-                    <td className="p-4">
-                      <p className="font-mono text-navy font-bold text-xs">{aff.student_card_number}</p>
-                      <p className="text-xs text-foreground-muted">{aff.faculty}</p>
-                    </td>
-                    <td className="p-4 text-foreground-muted">
-                      {new Date(aff.requested_at).toLocaleDateString("fr-FR")}
-                    </td>
-                    <td className="p-4">{getStatusBadge(aff.status)}</td>
-                    <td className="p-4 text-right">
-                      {aff.status === "pending" ? (
-                        <div className="inline-flex gap-2">
-                          <button
-                            onClick={() => handleApprove(aff.id)}
-                            disabled={actioningId === aff.id}
-                            className="p-1.5 rounded bg-success/10 text-success border border-success/20 hover:bg-success hover:text-white transition-all"
-                            title="Approuver l'accès"
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => { setRejectId(aff.id); setShowRejectModal(true); }}
-                            disabled={actioningId === aff.id}
-                            className="p-1.5 rounded bg-error/10 text-error border border-error/20 hover:bg-error hover:text-white transition-all"
-                            title="Rejeter la demande"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-foreground-muted italic">Traité</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile view */}
-          <div className="md:hidden divide-y divide-border/40">
-            {affiliations.map((aff) => (
-              <div key={aff.id} className="p-4 space-y-3">
-                <div className="flex justify-between items-start gap-2">
-                  <div>
-                    <p className="font-bold text-navy text-sm">{aff.student_name}</p>
-                    <p className="text-xs text-foreground-muted">{aff.student_email}</p>
-                  </div>
-                  {getStatusBadge(aff.status)}
+      <div className="pt-2">
+        <DataTable
+          data={affiliations}
+          rowKey="id"
+          loading={loading}
+          skeletonRows={4}
+          filterKey="status"
+          filterOptions={[
+            { value: "pending", label: "En attente" },
+            { value: "approved", label: "Validé" },
+            { value: "rejected", label: "Rejeté" },
+          ]}
+          searchPlaceholder="Rechercher un étudiant..."
+          emptyMessage="Aucune demande d'affiliation enregistrée pour le moment."
+          columns={[
+            {
+              key: "student_name",
+              header: "Étudiant",
+              cell: (aff) => (
+                <div>
+                  <p className="font-bold text-navy">{aff.student_name as string}</p>
+                  <p className="text-xs text-foreground-muted">{aff.student_email as string}</p>
                 </div>
-
-                <div className="text-xs text-foreground-muted space-y-0.5">
-                  <p><span className="font-bold text-navy">Carte :</span> {aff.student_card_number}</p>
-                  <p><span className="font-bold text-navy">Faculté :</span> {aff.faculty}</p>
+              ),
+            },
+            {
+              key: "student_card_number",
+              header: "Carte Étudiant / Coordonnées",
+              cell: (aff) => (
+                <div>
+                  <p className="font-mono text-navy font-bold text-xs">{aff.student_card_number as string}</p>
+                  <p className="text-xs text-foreground-muted">{aff.faculty as string}</p>
                 </div>
-
-                <div className="flex justify-between items-center pt-2">
-                  <span className="text-[10px] text-foreground-muted">
-                    Demandé le {new Date(aff.requested_at).toLocaleDateString("fr-FR")}
-                  </span>
-                  
-                  {aff.status === "pending" && (
-                    <div className="flex gap-2">
+              ),
+              hideOnMobile: true,
+            },
+            {
+              key: "requested_at",
+              header: "Date de demande",
+              cell: (aff) => (
+                <span className="text-foreground-muted">
+                  {new Date(aff.requested_at as string).toLocaleDateString("fr-FR")}
+                </span>
+              ),
+              hideOnMobile: true,
+            },
+            {
+              key: "status",
+              header: "Statut",
+              cell: (aff) => getStatusBadge(aff.status as StudentAffiliation["status"]),
+            },
+            {
+              key: "actions",
+              header: "Actions de modération",
+              className: "text-right",
+              cell: (aff) => (
+                <div className="flex justify-end gap-2 items-center">
+                  {(aff.status as string) === "pending" ? (
+                    <div className="inline-flex gap-2">
                       <button
-                        onClick={() => handleApprove(aff.id)}
+                        onClick={() => handleApprove(aff.id as string)}
                         disabled={actioningId === aff.id}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold bg-success text-white"
+                        className="p-1.5 rounded bg-success/10 text-success border border-success/20 hover:bg-success hover:text-white transition-all"
+                        title="Approuver l'accès"
                       >
-                        <Check className="w-3.5 h-3.5" /> Valider
+                        <Check className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => { setRejectId(aff.id); setShowRejectModal(true); }}
+                        onClick={() => { setRejectId(aff.id as string); setShowRejectModal(true); }}
                         disabled={actioningId === aff.id}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold bg-error text-white"
+                        className="p-1.5 rounded bg-error/10 text-error border border-error/20 hover:bg-error hover:text-white transition-all"
+                        title="Rejeter la demande"
                       >
-                        <X className="w-3.5 h-3.5" /> Refuser
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
+                  ) : (
+                    <span className="text-xs text-foreground-muted italic">Traité</span>
                   )}
                 </div>
+              ),
+            },
+          ]}
+          mobileCard={(aff) => (
+            <div className="space-y-3">
+              <div className="flex justify-between items-start gap-2">
+                <div>
+                  <p className="font-bold text-navy text-sm">{aff.student_name as string}</p>
+                  <p className="text-xs text-foreground-muted">{aff.student_email as string}</p>
+                </div>
+                {getStatusBadge(aff.status as StudentAffiliation["status"])}
               </div>
-            ))}
-          </div>
 
-        </div>
-      )}
+              <div className="text-xs text-foreground-muted space-y-0.5">
+                <p><span className="font-bold text-navy">Carte :</span> {aff.student_card_number as string}</p>
+                <p><span className="font-bold text-navy">Faculté :</span> {aff.faculty as string}</p>
+              </div>
+
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-[10px] text-foreground-muted">
+                  Demandé le {new Date(aff.requested_at as string).toLocaleDateString("fr-FR")}
+                </span>
+                
+                {(aff.status as string) === "pending" && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApprove(aff.id as string)}
+                      disabled={actioningId === aff.id}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold bg-success text-white"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Valider
+                    </button>
+                    <button
+                      onClick={() => { setRejectId(aff.id as string); setShowRejectModal(true); }}
+                      disabled={actioningId === aff.id}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold bg-error text-white"
+                    >
+                      <X className="w-3.5 h-3.5" /> Refuser
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        />
+      </div>
 
       {/* Modal: Rejection Reason Confirmation */}
       {showRejectModal && (
