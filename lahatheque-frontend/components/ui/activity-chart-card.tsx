@@ -19,7 +19,7 @@ export interface ActivityChartCardProps {
 }
 
 /**
- * Composant 21st.dev (par ravikatiyar162) adapté sans dépendances externes shadcn card/dropdown.
+ * Composant 21st.dev (par ravikatiyar162) fixe sans aucun débordement de barres.
  */
 export const ActivityChartCard = ({
   title = "Activité d'étude",
@@ -62,26 +62,26 @@ export const ActivityChartCard = ({
 
   return (
     <div
-      className={cn("w-full bg-background border border-border rounded-2xl p-5 space-y-4 shadow-xs relative", className)}
+      className={cn("w-full bg-background border border-border rounded-2xl p-5 space-y-3 shadow-xs relative overflow-hidden flex flex-col justify-between h-full", className)}
       aria-labelledby="activity-card-title"
     >
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 id="activity-card-title" className="font-serif text-lg font-bold text-navy">
+      <div className="flex items-center justify-between gap-2 z-10">
+        <h3 id="activity-card-title" className="font-serif text-base font-bold text-navy truncate">
           {title}
         </h3>
 
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background-secondary border border-border text-xs font-semibold text-foreground-muted hover:text-navy transition-colors min-h-[36px]"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-background-secondary border border-border text-[11px] font-semibold text-foreground-muted hover:text-navy transition-colors min-h-[32px]"
           >
             {selectedRange}
-            <ChevronDown className="h-3.5 w-3.5" />
+            <ChevronDown className="h-3 w-3" />
           </button>
 
           {dropdownOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-32 bg-background border border-border rounded-xl shadow-md z-30 py-1 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1 w-32 bg-background border border-border rounded-xl shadow-md z-40 py-1 overflow-hidden">
               {dropdownOptions.map((option) => (
                 <button
                   key={option}
@@ -89,7 +89,7 @@ export const ActivityChartCard = ({
                     setSelectedRange(option);
                     setDropdownOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-background-secondary text-foreground transition-colors"
+                  className="w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-background-secondary text-foreground transition-colors"
                 >
                   {option}
                 </button>
@@ -100,22 +100,22 @@ export const ActivityChartCard = ({
       </div>
 
       {/* Content */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 pt-1">
         {/* Total Value */}
         <div className="flex flex-col shrink-0">
-          <p className="text-4xl font-serif font-bold tracking-tight text-navy">
+          <p className="text-3xl font-serif font-bold tracking-tight text-navy">
             {totalValue}
           </p>
-          <div className="flex items-center gap-1 text-xs text-foreground-muted pt-1">
-            <TrendingUp className="h-3.5 w-3.5 text-gold" />
-            <span>+12% d&apos;assiduité</span>
+          <div className="flex items-center gap-1 text-[11px] text-foreground-muted">
+            <TrendingUp className="h-3 w-3 text-gold shrink-0" />
+            <span>+12% assiduité</span>
           </div>
         </div>
 
-        {/* Bar Chart */}
+        {/* Bar Chart Container (Fixé avec overflow-hidden) */}
         <motion.div
           key={selectedRange}
-          className="flex h-24 w-full items-end justify-between gap-1.5 pt-2"
+          className="flex h-16 w-full items-end justify-between gap-1 overflow-hidden"
           variants={chartVariants}
           initial="hidden"
           animate="visible"
@@ -124,20 +124,20 @@ export const ActivityChartCard = ({
           {data.map((item, index) => (
             <div
               key={index}
-              className="flex h-full w-full flex-col items-center justify-end gap-1.5"
+              className="flex h-full w-full flex-col items-center justify-end gap-1 overflow-hidden"
               role="presentation"
             >
               <div className="w-full bg-background-secondary rounded-t-md h-full flex items-end overflow-hidden border-x border-t border-border">
                 <motion.div
                   className="w-full rounded-t-sm bg-navy hover:bg-gold transition-colors"
                   style={{
-                    height: `${maxValue > 0 ? (item.value / maxValue) * 100 : 0}%`,
+                    height: `${maxValue > 0 ? Math.min(100, (item.value / maxValue) * 100) : 0}%`,
                   }}
                   variants={barVariants}
                   aria-label={`${item.day}: ${item.value} heures`}
                 />
               </div>
-              <span className="text-[10px] font-medium text-foreground-muted">
+              <span className="text-[9px] font-medium text-foreground-muted">
                 {item.day}
               </span>
             </div>

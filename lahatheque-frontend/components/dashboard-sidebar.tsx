@@ -14,12 +14,115 @@ import {
   Settings,
   DollarSign,
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  ChevronDown,
+  ChevronUp,
+  GraduationCap,
+  HelpCircle,
+  Bookmark
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+
+/**
+ * Bouton de toggle avec icône SVG animée qui se transforme en X (du composant 21st.dev)
+ */
+export const AnimatedMenuToggle = ({
+  toggle,
+  isOpen,
+}: {
+  toggle: () => void;
+  isOpen: boolean;
+}) => (
+  <button
+    onClick={toggle}
+    aria-label="Toggle sidebar"
+    className="focus:outline-none p-1.5 rounded-lg hover:bg-navy-hover/50 text-gold transition-colors"
+  >
+    <motion.div animate={{ y: isOpen ? 0 : 0 }} transition={{ duration: 0.3 }}>
+      <motion.svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        initial="closed"
+        animate={isOpen ? "open" : "closed"}
+        transition={{ duration: 0.3 }}
+        className="text-gold"
+      >
+        <motion.path
+          fill="transparent"
+          strokeWidth="2.5"
+          stroke="currentColor"
+          strokeLinecap="round"
+          variants={{
+            closed: { d: "M 2 2.5 L 22 2.5" },
+            open: { d: "M 3 16.5 L 17 2.5" },
+          }}
+        />
+        <motion.path
+          fill="transparent"
+          strokeWidth="2.5"
+          stroke="currentColor"
+          strokeLinecap="round"
+          variants={{
+            closed: { d: "M 2 12 L 22 12", opacity: 1 },
+            open: { opacity: 0 },
+          }}
+          transition={{ duration: 0.2 }}
+        />
+        <motion.path
+          fill="transparent"
+          strokeWidth="2.5"
+          stroke="currentColor"
+          strokeLinecap="round"
+          variants={{
+            closed: { d: "M 2 21.5 L 22 21.5" },
+            open: { d: "M 3 2.5 L 17 16.5" },
+          }}
+        />
+      </motion.svg>
+    </motion.div>
+  </button>
+);
+
+/**
+ * Section accordéon dépliable (du composant 21st.dev)
+ */
+export const CollapsibleSection = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mb-2">
+      <button
+        className="w-full flex items-center justify-between py-2 px-3 rounded-xl hover:bg-navy-hover/50 text-white/90 text-xs font-bold uppercase tracking-wider transition-colors"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="truncate">{title}</span>
+        {open ? <ChevronUp className="w-3.5 h-3.5 text-gold shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-gold shrink-0" />}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <div className="p-1 space-y-1">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 const Logo = () => (
   <Link href="/" className="flex items-center justify-center py-2 relative z-20 w-full">
@@ -51,7 +154,6 @@ export function DashboardSidebar() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
 
-  // Définition des liens selon le rôle
   const getLinks = () => {
     switch (user?.role) {
       case "student":
@@ -103,15 +205,35 @@ export function DashboardSidebar() {
   };
 
   const links = getLinks();
-
-  const userDisplayName = user ? `${user.first_name} ${user.last_name}` : "Mon Profil";
+  const userDisplayName = user ? `${user.first_name} ${user.last_name}` : "Profil";
 
   return (
     <Sidebar open={open} setOpen={setOpen}>
-      <SidebarBody className="justify-between gap-10">
+      <SidebarBody className="justify-between gap-6">
         <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-          {open ? <Logo /> : <LogoIcon />}
-          <div className="mt-8 flex flex-col gap-2">
+          {/* Header avec Logo + Animated SVG Menu Toggle Button */}
+          <div className="flex items-center justify-between pb-3 border-b border-navy-hover">
+            {open ? <Logo /> : <LogoIcon />}
+            <AnimatedMenuToggle toggle={() => setOpen(!open)} isOpen={open} />
+          </div>
+
+          {/* User Profile Card Unique en haut (21st.dev Profile Card) */}
+          {open && user && (
+            <div className="p-3 my-4 rounded-xl bg-navy/60 border border-navy-hover flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-navy-dark text-gold font-serif font-bold flex items-center justify-center text-xs border border-gold/30 shrink-0">
+                {user.first_name?.[0] || "U"}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-xs text-white truncate">{userDisplayName}</p>
+                <p className="text-[10px] text-gold truncate">
+                  {user.role === "student" ? "Licence Droit • UAC" : user.email}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation Links */}
+          <div className="mt-2 flex flex-col gap-1">
             {links.map((link, idx) => (
               <SidebarLink 
                 key={idx} 
@@ -120,25 +242,35 @@ export function DashboardSidebar() {
               />
             ))}
           </div>
+
+          {/* Sections dépliables CollapsibleSection (21st.dev) */}
+          {open && (
+            <div className="mt-6 pt-4 border-t border-navy-hover space-y-2">
+              <CollapsibleSection title="Options Universitaires">
+                <SidebarLink 
+                  link={{ label: "Bibliothèque UAC", href: "/student/catalog", icon: <GraduationCap className="w-4 h-4 text-gold" /> }} 
+                />
+                <SidebarLink 
+                  link={{ label: "Mes Favoris", href: "/student/books", icon: <Bookmark className="w-4 h-4 text-gold" /> }} 
+                />
+              </CollapsibleSection>
+
+              <CollapsibleSection title="Aide & Support">
+                <SidebarLink 
+                  link={{ label: "Centre d'Aide", href: "/contact", icon: <HelpCircle className="w-4 h-4 text-gold" /> }} 
+                />
+              </CollapsibleSection>
+            </div>
+          )}
         </div>
-        <div className="pt-4 border-t border-navy-hover flex flex-col gap-1">
+
+        {/* Footer Actions (Sans doublon du nom utilisateur) */}
+        <div className="pt-3 border-t border-navy-hover flex flex-col gap-1 shrink-0">
           <SidebarLink
             link={{
-              label: userDisplayName,
+              label: "Mon Profil",
               href: "/profile",
-              icon: user?.avatar || user?.profile_photo ? (
-                <Image
-                  src={user.avatar || user.profile_photo || ""}
-                  alt="Avatar"
-                  width={24}
-                  height={24}
-                  className="w-6 h-6 rounded-full object-cover shrink-0"
-                />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-navy-hover flex items-center justify-center text-gold border border-gold/30 text-xs font-bold shrink-0">
-                  {user?.first_name?.[0] || "U"}
-                </div>
-              ),
+              icon: <UserIcon className="w-5 h-5 text-white/70" />,
             }}
           />
           <SidebarLink
