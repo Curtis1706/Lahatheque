@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Mail, Phone, ArrowLeft, ArrowRight, CheckCircle, Clock } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function ForgotPasswordPage() {
   const [method, setMethod] = useState<"email" | "phone">("email");
@@ -66,26 +65,36 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               
               {/* Reset Method Toggle */}
-              <Tabs defaultValue="email" className="w-full" onValueChange={(val: string) => setMethod(val as "email" | "phone")}>
-                <TabsList className="grid w-full grid-cols-2 bg-background-secondary p-1 rounded border border-border/40">
-                  <TabsTrigger 
-                    value="email" 
-                    className="rounded py-2 text-xs font-bold transition-all data-[state=active]:bg-background data-[state=active]:text-navy data-[state=active]:shadow-sm"
+              <div className="w-full space-y-4">
+                <div className="grid w-full grid-cols-2 bg-background-secondary p-1 rounded-xl border border-border mb-4">
+                  <button 
+                    type="button"
+                    onClick={() => setMethod("email")}
+                    className={`rounded-lg py-2 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      method === "email" 
+                        ? "bg-background text-navy shadow-sm border border-border/40" 
+                        : "text-foreground-muted hover:text-navy"
+                    }`}
                   >
-                    <Mail className="w-3.5 h-3.5 mr-2" />
+                    <Mail className="h-3.5 w-3.5" />
                     Par Email
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="phone" 
-                    className="rounded py-2 text-xs font-bold transition-all data-[state=active]:bg-background data-[state=active]:text-navy data-[state=active]:shadow-sm"
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setMethod("phone")}
+                    className={`rounded-lg py-2 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      method === "phone" 
+                        ? "bg-background text-navy shadow-sm border border-border/40" 
+                        : "text-foreground-muted hover:text-navy"
+                    }`}
                   >
-                    <Phone className="w-3.5 h-3.5 mr-2" />
+                    <Phone className="h-3.5 w-3.5" />
                     Par Téléphone
-                  </TabsTrigger>
-                </TabsList>
+                  </button>
+                </div>
 
-                <TabsContent value="email" className="mt-4 space-y-4">
-                  <div className="space-y-1.5">
+                {method === "email" ? (
+                  <div className="space-y-2 animate-in fade-in duration-200">
                     <label htmlFor="email" className="text-xs font-bold text-navy">Adresse email *</label>
                     <div className="relative">
                       <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-foreground-muted pointer-events-none" />
@@ -95,15 +104,13 @@ export default function ForgotPasswordPage() {
                         required={method === "email"}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 rounded border border-border bg-background-secondary text-foreground text-sm focus:outline-none focus:border-navy"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-border bg-background-secondary text-foreground text-sm focus:outline-none focus:border-navy"
                         placeholder="nom@universite.edu"
                       />
                     </div>
                   </div>
-                </TabsContent>
-
-                <TabsContent value="phone" className="mt-4 space-y-4">
-                  <div className="space-y-1.5">
+                ) : (
+                  <div className="space-y-2 animate-in fade-in duration-200">
                     <label htmlFor="phone" className="text-xs font-bold text-navy">Numéro de téléphone *</label>
                     <PhoneInput
                       value={phone}
@@ -111,13 +118,13 @@ export default function ForgotPasswordPage() {
                       className="w-full"
                     />
                   </div>
-                </TabsContent>
-              </Tabs>
+                )}
+              </div>
 
               <button
                 type="submit"
                 disabled={loading || (method === "email" ? !email : !phone)}
-                className="w-full py-3 bg-gold hover:bg-gold-dark text-white text-xs font-bold rounded shadow transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-navy hover:bg-navy-hover text-white text-xs font-bold rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>

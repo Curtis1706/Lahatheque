@@ -8,7 +8,6 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, Loader2, Mail, Lock, Phone, ArrowRight } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth, type LoginResponse } from "@/hooks/use-auth";
 
 export default function LoginPage() {
@@ -62,17 +61,23 @@ function LoginContent() {
       if (result.success) {
         const role = result.user?.role as any;
         if (role === "admin" || role === "super_admin") {
-          router.push("/dashboard/admin");
+          router.push("/admin");
         } else if (role === "student") {
-          router.push("/dashboard/student");
+          router.push("/student");
         } else if (role === "teacher") {
           router.push("/teacher");
         } else if (role === "author") {
-          router.push("/dashboard/author");
+          router.push("/author");
         } else if (role === "publisher") {
           router.push("/publisher");
+        } else if (role === "librarian") {
+          router.push("/librarian");
+        } else if (role === "layout_artist") {
+          router.push("/layout-artist");
+        } else if (role === "legal_reviewer") {
+          router.push("/legal-reviewer");
         } else {
-          router.push("/dashboard");
+          router.push("/student");
         }
       } else {
         setError(result.error || "Identifiants invalides");
@@ -98,14 +103,13 @@ function LoginContent() {
       <div className="w-full max-w-md">
         
         {/* Logo Header */}
-        <div className="text-center mb-6">
-          <Link href="/" className="inline-flex items-center space-x-3 mb-4 group">
-            <div className="p-2 bg-background rounded-xl border border-border shadow-sm group-hover:border-gold/30 transition-colors">
-              <Image src="/logo.png" alt="LAHA Editions" width={36} height={36} className="rounded" />
+        <div className="text-center mb-8 flex flex-col items-center justify-center">
+          <Link href="/" className="inline-flex flex-col items-center mb-2 group">
+            <div className="p-1.5 bg-background rounded-3xl border border-border shadow-lg group-hover:border-gold/30 transition-colors">
+              <Image src="/logo.jpg" alt="LAHA Editions" width={80} height={80} className="rounded-2xl" />
             </div>
-            <span className="font-serif text-2xl font-bold text-navy">LAHAThèque</span>
           </Link>
-          <p className="text-xs text-foreground-muted">Accédez à votre bibliothèque universitaire numérique</p>
+          <p className="text-xs text-foreground-muted mt-2">Accédez à votre bibliothèque universitaire numérique</p>
         </div>
 
         {/* Auth form card inspired by @bankkroll component */}
@@ -113,79 +117,103 @@ function LoginContent() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="relative overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xl"
+          className="relative overflow-hidden rounded-3xl border border-border bg-background shadow-xl"
         >
-          <div className="p-8">
-            <div className="mb-6 text-center">
-              <h1 className="text-xl font-bold text-navy">Bon retour</h1>
-              <p className="text-xs text-foreground-muted mt-1">Connectez-vous pour continuer</p>
+          <div className="p-6 sm:p-10">
+            <div className="mb-8 text-center">
+              <h1 className="text-2xl font-serif font-bold text-navy">Bon retour</h1>
+              <p className="text-xs text-foreground-muted mt-1.5">Connectez-vous pour continuer</p>
             </div>
 
             {error && (
-              <div className="mb-4 animate-in fade-in slide-in-from-top-1 rounded-lg border border-error/20 bg-error/10 p-3 text-xs text-error font-medium">
+              <div className="mb-6 animate-in fade-in slide-in-from-top-1 rounded-xl border border-error/20 bg-error/10 p-3.5 text-xs text-error font-medium">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
               
               {/* Tab Selector for Identity type */}
-              <Tabs defaultValue="email" className="w-full" onValueChange={(val: string) => setLoginMethod(val as "email" | "phone")}>
-                <TabsList className="grid w-full grid-cols-2 bg-background-secondary p-1 rounded border border-border/40 mb-4">
-                  <TabsTrigger 
-                    value="email" 
-                    className="rounded py-2 text-xs font-bold transition-all data-[state=active]:bg-background data-[state=active]:text-navy data-[state=active]:shadow-sm"
+              <div className="w-full space-y-4">
+                <div className="grid w-full grid-cols-2 bg-background-secondary p-1 rounded-xl border border-border mb-6">
+                  <button 
+                    type="button"
+                    onClick={() => setLoginMethod("email")}
+                    className={`rounded-lg py-2.5 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      loginMethod === "email" 
+                        ? "bg-background text-navy shadow-sm border border-border/40" 
+                        : "text-foreground-muted hover:text-navy"
+                    }`}
                   >
-                    <Mail className="h-3.5 w-3.5 mr-2" />
+                    <Mail className="h-3.5 w-3.5" />
                     Adresse Email
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="phone" 
-                    className="rounded py-2 text-xs font-bold transition-all data-[state=active]:bg-background data-[state=active]:text-navy data-[state=active]:shadow-sm"
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setLoginMethod("phone")}
+                    className={`rounded-lg py-2.5 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      loginMethod === "phone" 
+                        ? "bg-background text-navy shadow-sm border border-border/40" 
+                        : "text-foreground-muted hover:text-navy"
+                    }`}
                   >
-                    <Phone className="h-3.5 w-3.5 mr-2" />
+                    <Phone className="h-3.5 w-3.5" />
                     Téléphone (Indicatif)
-                  </TabsTrigger>
-                </TabsList>
+                  </button>
+                </div>
 
-                <TabsContent value="email" className="mt-0 space-y-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="email" className="text-xs font-bold text-navy">Identifiant ou Email *</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-foreground-muted pointer-events-none" />
-                      <input
-                        type="text"
-                        id="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required={loginMethod === "email"}
-                        className="w-full pl-10 pr-4 py-3 rounded border border-border bg-background-secondary text-foreground text-sm focus:outline-none focus:border-navy"
-                        placeholder="Ex: marc.sow@uac.edu"
+                <AnimatePresence mode="wait">
+                  {loginMethod === "email" ? (
+                    <motion.div 
+                      key="email"
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 8 }}
+                      transition={{ duration: 0.15 }}
+                      className="space-y-2"
+                    >
+                      <label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-navy">Identifiant ou Email *</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-foreground-muted pointer-events-none" />
+                        <input
+                          type="text"
+                          id="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          required={loginMethod === "email"}
+                          className="w-full pl-10 pr-4 py-3.5 rounded-xl border border-border bg-background-secondary text-foreground text-sm focus:outline-none focus:border-navy transition-all focus:bg-background"
+                          placeholder="Ex: marc.sow@uac.edu"
+                        />
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      key="phone"
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 8 }}
+                      transition={{ duration: 0.15 }}
+                      className="space-y-2"
+                    >
+                      <label htmlFor="phone" className="text-xs font-bold uppercase tracking-wider text-navy">Numéro de téléphone *</label>
+                      <PhoneInput
+                        value={formData.phone}
+                        onChange={(val: any) => setFormData({ ...formData, phone: val || "" })}
+                        className="w-full"
                       />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="phone" className="mt-0 space-y-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="phone" className="text-xs font-bold text-navy">Numéro de téléphone *</label>
-                    <PhoneInput
-                      value={formData.phone}
-                      onChange={(val: any) => setFormData({ ...formData, phone: val || "" })}
-                      className="w-full"
-                    />
-                  </div>
-                </TabsContent>
-              </Tabs>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               {/* Password */}
-              <div className="space-y-1.5">
+              <div className="space-y-2 pt-2">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-xs font-bold text-navy">Mot de passe *</label>
+                  <label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-navy">Mot de passe *</label>
                   <Link 
                     href="/forgot-password" 
-                    className="text-xs text-gold hover:text-gold-dark font-bold transition-colors"
+                    className="text-xs text-gold hover:text-gold-hover font-bold transition-colors"
                   >
                     Mot de passe oublié ?
                   </Link>
@@ -199,13 +227,13 @@ function LoginContent() {
                     value={formData.password}
                     onChange={handleChange}
                     required
-                    className="w-full pl-10 pr-10 py-3 rounded border border-border bg-background-secondary text-foreground text-sm focus:outline-none focus:border-navy"
+                    className="w-full pl-10 pr-10 py-3.5 rounded-xl border border-border bg-background-secondary text-foreground text-sm focus:outline-none focus:border-navy transition-all focus:bg-background"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-foreground-muted hover:text-navy transition-colors p-1"
+                    className="absolute right-3.5 top-1/2 transform -translate-y-1/2 text-foreground-muted hover:text-navy transition-colors p-1"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -216,7 +244,7 @@ function LoginContent() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 bg-navy hover:bg-navy-hover text-white text-xs font-bold rounded shadow transition-all disabled:opacity-75 flex items-center justify-center gap-2 mt-6"
+                className="w-full py-4 bg-navy hover:bg-navy-hover text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-75 flex items-center justify-center gap-2 mt-8"
               >
                 {isLoading ? (
                   <>
@@ -238,7 +266,7 @@ function LoginContent() {
         {/* Register Link */}
         <p className="text-center text-xs text-foreground-muted mt-6">
           Pas encore inscrit ?{" "}
-          <Link href="/register" className="text-gold hover:text-gold-dark font-bold underline transition-colors">
+          <Link href="/register" className="text-gold hover:text-gold-hover font-bold transition-colors">
             Créer un compte
           </Link>
         </p>
