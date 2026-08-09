@@ -18,6 +18,9 @@ import logging
 import secrets
 import string
 from datetime import timedelta
+
+logger = logging.getLogger(__name__)
+
 from typing import TYPE_CHECKING, Optional, Tuple
 
 from django.contrib.auth import get_user_model, authenticate
@@ -29,7 +32,6 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 from .models import User, OTP, MFAConfig
 
-User = get_user_model()
 
 
 
@@ -216,6 +218,7 @@ def _build_user_payload(user: 'User') -> dict:
     except Exception:
         pass
 
+
     return {
         'id':                         str(user.id),
         'email':                      user.email,
@@ -318,78 +321,17 @@ def login(identifier: str, password: str, request=None) -> dict:
 
 
 def ensure_teacher_role(user: 'User') -> None:
-    """
-    S'assure que l'utilisateur possède :
-    1. Un TeacherProfile (créé si absent)
-    2. Le rôle dynamique 'teacher' actif (créé/activé si absent)
-    
-    C'est la fonction d'auto-réparation (self-healing) appelée lors de l'onboarding.
-    """
-    try:
-        from teachers.models import TeacherProfile
-        from roles.services import grant_role
-        
-        # 1. Profil
-        TeacherProfile.objects.get_or_create(user=user)
-        
-        # 2. Rôle Dynamique
-        grant_role(user=user, role_code='teacher', granted_by=user, activate_immediately=True)
-        
-        # 3. Synchro Onboarding Status
-        _sync_teacher_onboarding(user)
-        
-        logger.info(f"Rôle enseignant auto-réparé/confirmé pour {user.email}")
-    except Exception as e:
-        logger.error(f"Échec ensure_teacher_role pour {user.email}: {e}")
-
+    """Stub de compatibilité pour le rôle enseignant."""
+    pass
 
 def ensure_parent_role(user: 'User') -> None:
-    """
-    S'assure qu'un compte parent legacy possede aussi les donnees modulaires
-    attendues par les permissions /api/v1/parents/.
-    """
-    try:
-        from parents.services import ensure_parent_account
-
-        _, report = ensure_parent_account(user)
-        if any(report.get(key) for key in (
-            'legacy_parent_created',
-            'parent_profile_created',
-            'parent_role_created',
-            'legacy_links_created',
-            'modular_links_created',
-            'quota_adjusted',
-        )):
-            logger.info(f"Compte parent auto-réparé/confirmé pour {user.email}: {report}")
-    except Exception as e:
-        logger.error(f"Échec ensure_parent_role pour {user.email}: {e}")
-
+    """Stub de compatibilité pour le rôle parent."""
+    pass
 
 def _sync_teacher_onboarding(user: 'User') -> None:
-    """
-    S'assure que si un prof est déjà validé dans le système (legacy ou nouveau),
-    son onboarding_status est bien à 'complete'.
-    IMPORTANT: Cette fonction ne doit JAMAIS auto-approuver un compte.
-    """
-    try:
-        from teachers.models import TeacherProfile
-        profile, created = TeacherProfile.objects.get_or_create(user=user)
-        
-        # Source de vérité pour l'approbation : Profil Modulaire OU Legacy Teacher
-        is_already_approved = (
-            profile.verification_status == TeacherProfile.VerificationStatus.APPROVED or
-            (hasattr(user, 'teacher') and getattr(user.teacher, 'is_validated', False))
-        )
-        
-        if is_already_approved:
-            # On synchronise uniquement vers COMPLETE si ce n'est pas déjà le cas
-            # Mais on ne touche JAMAIS au statut de vérification ici (source de vérité externe)
-            if profile.onboarding_status != TeacherProfile.OnboardingStatus.COMPLETE:
-                profile.onboarding_status = TeacherProfile.OnboardingStatus.COMPLETE
-                profile.save(update_fields=['onboarding_status', 'updated_at'])
-                logger.info(f"Onboarding auto-complété pour {user.email} (basé sur statut validé)")
-    except Exception as e:
-        logger.error(f"Erreur sync_teacher_onboarding pour {user.email}: {e}")
+    """Stub de compatibilité pour l'onboarding enseignant."""
+    pass
+
 
 
 def logout(refresh_token: str) -> None:
@@ -795,65 +737,17 @@ def admin_create_user_wizard(admin_user: 'User', data: dict) -> dict:
                     user.is_superuser = True
                 user.save(update_fields=['is_staff', 'is_superuser'])
 
-            # 3. Créer le profil spécifique
-            if role_code == 'teacher':
-                from teachers.models import TeacherProfile
-                TeacherProfile.objects.create(
-                    user=user,
-                    verification_status=TeacherProfile.VerificationStatus.UNSUBMITTED,
-                    onboarding_status=TeacherProfile.OnboardingStatus.NOT_STARTED
-                )
-
-            elif role_code == 'student':
-                from students.models import StudentProfile
-                StudentProfile.objects.create(
-                    user=user,
-                    date_of_birth=profile_data.get('date_of_birth'),
-                    city=profile_data.get('city', ''),
-                    school_level=profile_data.get('school_level', 'primary'),
-                    grade_level_id=profile_data.get('grade_level'),
-                    school_name=profile_data.get('school_name', ''),
-                    country=country
-                )
-
-            elif role_code == 'parent':
-                from parents.services import ensure_parent_account
-                parent_profile, _ = ensure_parent_account(user)
-                occupation = profile_data.get('occupation', '')
-                if occupation and parent_profile.occupation != occupation:
-                    parent_profile.occupation = occupation
-                    parent_profile.save(update_fields=['occupation', 'updated_at'])
-
-            elif role_code == 'author':
-                from authors.models import AuthorProfile
-                AuthorProfile.objects.create(
-                    user=user,
-                    bio=profile_data.get('bio', '')
-                )
-
-            # 4. Assigner le rôle dynamique
-            from roles.services import grant_role
-            grant_role(user=user, role_code=role_code, granted_by=admin_user, activate_immediately=True)
-
             logger.info(f"admin_create_user_wizard: Utilisateur {email} ({role_code}) créé par {admin_user.email}")
-
-            # 5. Envoyer l'email de bienvenue (ASYNCHRONE via Celery)
-            from accounts.tasks import send_welcome_email_async
-            send_welcome_email_async.delay(
-                email=email,
-                first_name=first_name,
-                password=password,
-                role_code=role_code
-            )
 
             return {
                 'id': str(user.id),
                 'email': user.email,
                 'role': role_code,
                 'status': 'success',
-                'message': f'Utilisateur créé. Email de bienvenue en cours d\'envoi à {email}.'
+                'message': f'Utilisateur créé avec succès pour {email}.'
             }
 
     except Exception as e:
         logger.error(f"admin_create_user_wizard: Échec création pour {email}: {e}", exc_info=True)
         raise e
+
