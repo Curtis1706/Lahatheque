@@ -16,7 +16,7 @@ import {
   Globe,
   Sparkles,
   AlertCircle
-} from "lucide-react";
+} from "lucide-react";import { registerUser } from "@/lib/services/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -40,27 +40,31 @@ export default function RegisterPage() {
     setSuccess("");
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/register/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, role }),
+      const res = await registerUser({
+        email: formData.email,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        phone: formData.phone || undefined,
+        country: formData.country,
+        role: role
       });
 
-      const data = await res.json();
-      if (res.ok) {
-        setSuccess("Compte créé avec succès ! Redirection vers le tableau de bord...");
+      if (res.success) {
+        setSuccess("Compte créé avec succès ! Redirection...");
         setTimeout(() => {
           if (role === "student") {
-            router.push("/dashboard/student");
+            router.push("/student");
+          } else if (role === "publisher") {
+            router.push("/publisher");
           } else {
             router.push("/catalog");
           }
         }, 1500);
       } else {
-        setError(data.error || data.detail || "Erreur lors de l'inscription.");
+        setError(res.error || "Erreur lors de l'inscription.");
       }
     } catch {
-      setError("Impossible de contacter le serveur. Vérifiez votre connexion.");
+      setError("Une erreur inattendue est survenue.");
     } finally {
       setLoading(false);
     }

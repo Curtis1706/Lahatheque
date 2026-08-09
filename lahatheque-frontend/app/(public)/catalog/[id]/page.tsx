@@ -10,8 +10,10 @@ import {
   ShieldCheck, 
   Award, 
   Clock,
-  Sparkles
+  Sparkles,
+  AlertTriangle
 } from "lucide-react";
+import { getBookById } from "@/lib/services/catalog";
 
 export default async function BookDetailPage({
   params,
@@ -19,24 +21,28 @@ export default async function BookDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const book = await getBookById(id);
 
-  // Mock Ouvrage pour l'affichage de démonstration
-  const book = {
-    id,
-    isbn: "978-2-84299-123-4",
-    title: "Droit Constitutionnel des États d'Afrique Francophone",
-    subtitle: "Principes généraux et évolutions démocratiques",
-    authors: [{ first_name: "Jean-Marc", last_name: "Agossou" }],
-    discipline: "Droit & Sciences Politiques",
-    publisher: "LAHA Éditions",
-    institution: "Université d'Abomey-Calavi (UAC)",
-    format_type: "PDF (Document Numérique Protégé)",
-    language: "Français",
-    country: "Bénin (BJ)",
-    publication_date: "2024-10-15",
-    page_count: 420,
-    summary: `Cet ouvrage propose une analyse approfondie et synthétique des institutions politiques et du droit constitutionnel en Afrique subsaharienne francophone. Il traite des évolutions récentes du constitutionnalisme, de la séparation des pouvoirs, du contrôle de constitutionnalité et du droit des élections. Rédigé par le Professeur Jean-Marc Agossou, cet ouvrage s'adresse en priorité aux étudiants de Licence et Master en Droit, aux enseignants-chercheurs ainsi qu'aux praticiens du droit constitutionnel.`,
-  };
+  if (!book) {
+    return (
+      <div className="min-h-screen bg-background text-foreground py-20 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center text-center space-y-4">
+        <div className="w-16 h-16 rounded-full bg-error/10 text-error flex items-center justify-center">
+          <AlertTriangle className="w-8 h-8" />
+        </div>
+        <h1 className="font-serif text-2xl font-bold text-navy">Ouvrage introuvable</h1>
+        <p className="text-sm text-foreground-muted max-w-sm">
+          Le document demandé n'existe pas ou n'est plus disponible dans notre catalogue.
+        </p>
+        <Link
+          href="/catalog"
+          className="inline-flex items-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-bold px-6 py-3 rounded-lg shadow"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Retour au catalogue
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground py-10 px-4 sm:px-6 lg:px-8">
@@ -56,20 +62,21 @@ export default async function BookDetailPage({
           
           {/* Couverture / Aperçu Visuel */}
           <div className="space-y-4 text-center">
-            <div className="bg-navy-dark text-white rounded-2xl p-8 min-h-[320px] flex flex-col justify-between items-center relative border border-navy/30 shadow-md">
-              <div className="w-16 h-16 rounded-full bg-gold/20 flex items-center justify-center text-gold my-auto">
+            {/* Simulation 3D de reliure de livre premium */}
+            <div className="bg-gradient-to-r from-navy-dark to-navy text-white rounded-r-2xl rounded-l-md p-8 min-h-[340px] flex flex-col justify-between items-center relative border-y border-r border-navy-hover border-l-[6px] border-l-gold shadow-lg transform hover:scale-[1.02] transition-transform duration-300">
+              <div className="w-16 h-16 rounded-full bg-gold/10 text-gold flex items-center justify-center my-auto shadow-inner">
                 <FileText className="w-8 h-8" />
               </div>
               <div className="space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gold block">
-                  {book.discipline}
+                <span className="text-[9px] font-bold uppercase tracking-widest text-gold block">
+                  {book.discipline_detail.name}
                 </span>
-                <h2 className="font-serif font-bold text-sm leading-snug text-white/95">
+                <h2 className="font-serif font-bold text-sm leading-snug text-white/90 line-clamp-3 px-2">
                   {book.title}
                 </h2>
               </div>
-              <span className="absolute top-4 right-4 px-2.5 py-1 rounded bg-navy text-gold text-[10px] font-bold uppercase tracking-wider border border-gold/30">
-                PDF
+              <span className="absolute top-4 right-4 px-2 py-0.5 rounded bg-background text-gold text-[9px] font-bold uppercase tracking-wider border border-gold/30">
+                {book.format_type.toUpperCase()}
               </span>
             </div>
 
@@ -91,7 +98,7 @@ export default async function BookDetailPage({
             <div className="space-y-4">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-light text-navy text-xs font-bold uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5 text-gold" />
-                {book.discipline}
+                {book.discipline_detail.name}
               </span>
 
               <h1 className="text-2xl sm:text-3xl font-serif font-bold text-navy leading-tight">
@@ -105,20 +112,20 @@ export default async function BookDetailPage({
               )}
 
               <p className="text-sm font-semibold text-navy">
-                Par {book.authors.map((a) => `${a.first_name} ${a.last_name}`).join(", ")}
+                Par {book.authors_details.map((a) => `${a.first_name} ${a.last_name}`).join(", ")}
               </p>
 
               {/* Table de Métadonnées */}
               <div className="grid grid-cols-2 gap-4 py-4 border-y border-border text-xs sm:text-sm">
                 <div>
                   <span className="text-foreground-muted block text-xs font-semibold uppercase tracking-wider">Éditeur</span>
-                  <span className="font-medium text-navy">{book.publisher}</span>
+                  <span className="font-medium text-navy">{book.publisher_name}</span>
                 </div>
                 <div>
                   <span className="text-foreground-muted block text-xs font-semibold uppercase tracking-wider">Établissement</span>
                   <span className="font-medium text-navy flex items-center gap-1">
                     <Building2 className="w-3.5 h-3.5 text-gold inline" />
-                    {book.institution}
+                    {book.institution_name}
                   </span>
                 </div>
                 <div>
@@ -129,14 +136,14 @@ export default async function BookDetailPage({
                   <span className="text-foreground-muted block text-xs font-semibold uppercase tracking-wider">Pays & Langue</span>
                   <span className="font-medium text-navy flex items-center gap-1">
                     <Globe className="w-3.5 h-3.5 text-gold inline" />
-                    {book.country} • {book.language}
+                    {book.country} • {book.language === "fr" ? "Français" : book.language.toUpperCase()}
                   </span>
                 </div>
               </div>
 
               {/* Synopsis */}
               <div className="space-y-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-navy">Résumé / Presentation</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-navy">Résumé / Présentation</h3>
                 <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
                   {book.summary}
                 </p>
@@ -150,7 +157,7 @@ export default async function BookDetailPage({
                 {/* Accès Lecteur Protégé */}
                 <Link
                   href={`/catalog/reader/${id}`}
-                  className="flex-1 px-5 py-3 rounded-xl bg-navy text-white text-xs sm:text-sm font-semibold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 shadow-sm"
+                  className="flex-1 px-5 py-3 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm"
                 >
                   <BookOpen className="w-4 h-4" />
                   Consulter dans le lecteur

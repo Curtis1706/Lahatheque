@@ -14,24 +14,11 @@ import {
   X,
   Sparkles
 } from "lucide-react";
-
-interface Ouvrage {
-  id: string;
-  isbn: string;
-  title: string;
-  subtitle?: string;
-  authors_details?: Array<{ first_name: string; last_name: string }>;
-  discipline_detail?: { id: number; name: string };
-  publisher_name?: string;
-  institution_name?: string;
-  format_type: "pdf" | "epub" | "audio";
-  language: string;
-  country: string;
-  summary?: string;
-}
+import { Book } from "@/lib/types/catalog";
+import { searchBooks } from "@/lib/services/catalog";
 
 export default function CatalogSearchPage() {
-  const [books, setBooks] = useState<Ouvrage[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
@@ -41,73 +28,21 @@ export default function CatalogSearchPage() {
   const [selectedFormat, setSelectedFormat] = useState("");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Mock data for initial demonstration if API is unreachable
-  const mockBooks: Ouvrage[] = [
-    {
-      id: "1",
-      isbn: "978-2-84299-123-4",
-      title: "Droit Constitutionnel des États d'Afrique Francophone",
-      subtitle: "Principes généraux et évolutions démocratiques",
-      authors_details: [{ first_name: "Jean-Marc", last_name: "Agossou" }],
-      discipline_detail: { id: 1, name: "Droit & Sciences Politiques" },
-      publisher_name: "LAHA Éditions",
-      institution_name: "Université d'Abomey-Calavi (UAC)",
-      format_type: "pdf",
-      language: "fr",
-      country: "BJ",
-      summary: "Ouvrage de référence analysant les évolutions constitutionnelles récentes et l'organisation des pouvoirs publics en Afrique subsaharienne."
-    },
-    {
-      id: "2",
-      isbn: "978-2-84299-567-8",
-      title: "Économie du Développement et Politiques Publiques",
-      subtitle: "Modèles d'industrialisation et intégration régionale",
-      authors_details: [{ first_name: "Amina", last_name: "Diallo" }],
-      discipline_detail: { id: 2, name: "Économie & Gestion" },
-      publisher_name: "Presses Universitaires du Sénégal",
-      institution_name: "Université Cheikh Anta Diop (UCAD)",
-      format_type: "epub",
-      language: "fr",
-      country: "SN",
-      summary: "Une étude empirique rigoureuse sur les moteurs de la croissance inclusive et le financement des infrastructures en Afrique de l'Ouest."
-    },
-    {
-      id: "3",
-      isbn: "978-2-84299-901-2",
-      title: "Précis de Pathologie Médicale et Thérapeutique",
-      subtitle: "Guide clinique à l'usage des étudiants en médecine",
-      authors_details: [{ first_name: "Koffi", last_name: "Mensah" }],
-      discipline_detail: { id: 3, name: "Médecine & Santé" },
-      publisher_name: "LAHA Éditions",
-      institution_name: "Université de Lomé",
-      format_type: "audio",
-      language: "fr",
-      country: "TG",
-      summary: "Synthèse clinique des pathologies tropicales et chroniques avec recommandations thalassémiques et schémas thérapeutiques."
-    }
-  ];
-
   useEffect(() => {
     const fetchBooks = async () => {
       setLoading(true);
       try {
-        const params = new URLSearchParams();
-        if (searchQuery) params.append("q", searchQuery);
-        if (selectedDiscipline) params.append("discipline", selectedDiscipline);
-        if (selectedInstitution) params.append("institution", selectedInstitution);
-        if (selectedLanguage) params.append("language", selectedLanguage);
-        if (selectedCountry) params.append("country", selectedCountry);
-        if (selectedFormat) params.append("format", selectedFormat);
-
-        const res = await fetch(`http://localhost:8000/api/v1/catalog/books/?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          setBooks(data.results || data);
-        } else {
-          setBooks(mockBooks);
-        }
-      } catch {
-        setBooks(mockBooks);
+        const data = await searchBooks({
+          q: searchQuery || undefined,
+          discipline: selectedDiscipline || undefined,
+          institution: selectedInstitution || undefined,
+          language: selectedLanguage || undefined,
+          country: selectedCountry || undefined,
+          format: selectedFormat || undefined
+        });
+        setBooks(data);
+      } catch (err) {
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -314,22 +249,22 @@ export default function CatalogSearchPage() {
                     className="group bg-background-secondary rounded-2xl border border-border overflow-hidden flex flex-col hover:border-gold transition-all duration-300 shadow-sm hover:shadow-md"
                   >
                     {/* Fausse Couverture 3D Stylisée */}
-                    <div className="p-6 bg-navy-dark text-white relative flex items-center justify-center min-h-[200px]">
+                    <div className="p-6 bg-gradient-to-r from-navy-dark to-navy text-white relative flex items-center justify-center min-h-[220px] rounded-t-xl rounded-b-sm border-l-[5px] border-l-gold border-r border-y border-navy-hover shadow transition-transform group-hover:scale-[1.01] duration-300">
                       <div className="text-center space-y-2">
-                        <div className="w-12 h-12 rounded-full bg-gold/20 flex items-center justify-center mx-auto text-gold">
+                        <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center mx-auto text-gold shadow-inner">
                           {book.format_type === "audio" ? (
-                            <Headphones className="w-6 h-6" />
+                            <Headphones className="w-5 h-5" />
                           ) : (
-                            <FileText className="w-6 h-6" />
+                            <FileText className="w-5 h-5" />
                           )}
                         </div>
-                        <h4 className="font-serif font-bold text-xs line-clamp-2 px-2 text-white/90">
+                        <h4 className="font-serif font-bold text-[11px] line-clamp-2 px-2 text-white/95 leading-snug">
                           {book.title}
                         </h4>
                       </div>
                       
                       {/* Badge Format */}
-                      <span className="absolute top-3 right-3 px-2.5 py-1 rounded-md bg-navy text-gold text-[10px] font-bold uppercase tracking-wider border border-gold/30">
+                      <span className="absolute top-3 right-3 px-2 py-0.5 rounded bg-background text-gold text-[9px] font-bold uppercase tracking-wider border border-gold/30">
                         {book.format_type}
                       </span>
                     </div>
