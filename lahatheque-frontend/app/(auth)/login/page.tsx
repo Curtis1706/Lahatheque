@@ -1,26 +1,26 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState, useEffect, Suspense } from "react"
-import { motion } from "framer-motion"
-import { useRouter, useSearchParams } from "next/navigation"
-import Image from "next/image"
-import Link from "next/link"
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Phone } from "lucide-react"
-
-import BlurText from "@/components/ui/blur-text"
-import { GlowingEffect } from "@/components/ui/glowing-effect"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PhoneInput } from "@/components/ui/phone-input"
-import { useAuth, type LoginResponse } from "@/hooks/use-auth"
+import * as React from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { Eye, EyeOff, Loader2, Mail, Lock, Phone, ArrowRight } from "lucide-react";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth, type LoginResponse } from "@/hooks/use-auth";
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-laha-black flex items-center justify-center text-laha-gold">Chargement...</div>}>
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center text-navy font-bold">
+        Chargement de l'espace connexion...
+      </div>
+    }>
       <LoginContent />
     </Suspense>
-  )
+  );
 }
 
 function LoginContent() {
@@ -28,147 +28,131 @@ function LoginContent() {
     email: "",
     phone: "",
     password: "",
-  })
-  const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email")
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { login } = useAuth()
+  });
+  const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login } = useAuth();
 
-  // Gérer les messages d'erreur depuis l'URL
   useEffect(() => {
-    const message = searchParams.get('message')
+    const message = searchParams.get("message");
     if (message) {
-      setError(message)
+      setError(message);
     }
-  }, [searchParams])
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
 
     try {
-      const loginIdentity = loginMethod === "email" ? formData.email : formData.phone
-      const result: LoginResponse = await login(loginIdentity, formData.password)
+      const loginIdentity = loginMethod === "email" ? formData.email : formData.phone;
+      if (!loginIdentity) {
+        setError(loginMethod === "email" ? "Veuillez entrer votre email" : "Veuillez entrer votre numéro de téléphone");
+        setIsLoading(false);
+        return;
+      }
+      
+      const result: LoginResponse = await login(loginIdentity, formData.password);
       
       if (result.success) {
-        // Redirection directe selon le rôle (plus d'OTP au login)
-        const role = result.user?.role
-        if (role === 'admin' || role === 'super_admin') {
-          router.push('/dashboard/admin')
-        } else if (role === 'student') {
-          router.push('/dashboard/student')
-        } else if (role === 'teacher') {
-          router.push('/dashboard/teacher')
-        } else if (role === 'author') {
-          router.push('/dashboard/author')
-        } else if (role === 'parent') {
-          router.push('/dashboard/parent')
-        } else if (role === 'super_client') {
-          router.push('/dashboard/super_client')
+        const role = result.user?.role as any;
+        if (role === "admin" || role === "super_admin") {
+          router.push("/dashboard/admin");
+        } else if (role === "student") {
+          router.push("/dashboard/student");
+        } else if (role === "teacher") {
+          router.push("/teacher");
+        } else if (role === "author") {
+          router.push("/dashboard/author");
+        } else if (role === "publisher") {
+          router.push("/publisher");
         } else {
-          router.push('/dashboard')
+          router.push("/dashboard");
         }
       } else {
-        setError(result.error || "Identifiants invalides")
+        setError(result.error || "Identifiants invalides");
       }
-    } catch (error) {
-      console.error('Erreur lors de la connexion:', error)
-      setError("Erreur interne du serveur")
+    } catch (err) {
+      console.error("Erreur lors de la connexion:", err);
+      setError("Erreur interne du serveur");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  // Fonctions OTP conservées uniquement pour référence si besoin futur, 
-  // mais inutilisées dans le flux de login standard maintenant.
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
-    })
-    // Clear error when user starts typing
-    if (error) {
-      setError("")
-    }
-  }
+    });
+    if (error) setError("");
+  };
 
   return (
-    <div className="min-h-screen bg-hero-gradient flex items-center justify-center p-4 transition-colors duration-500">
-      <div className="w-full max-w-lg">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <Link href="/" className="inline-flex items-center space-x-4 mb-10 group transition-all">
-            <div className="p-2 bg-background rounded-2xl shadow-lg border border-transparent group-hover:border-laha-gold/30 transition-colors">
-              <Image src="/logo.png" alt="LAHA Editions" width={48} height={48} className="rounded-lg" />
+    <div className="min-h-screen bg-background-secondary flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        
+        {/* Logo Header */}
+        <div className="text-center mb-6">
+          <Link href="/" className="inline-flex items-center space-x-3 mb-4 group">
+            <div className="p-2 bg-background rounded-xl border border-border shadow-sm group-hover:border-gold/30 transition-colors">
+              <Image src="/logo.png" alt="LAHA Editions" width={36} height={36} className="rounded" />
             </div>
-            <span className="font-heading text-3xl font-bold text-foreground">Lahacademia</span>
+            <span className="font-serif text-2xl font-bold text-navy">LAHAThèque</span>
           </Link>
-
-          <BlurText
-            text="Bon retour parmi nous !"
-            delay={150}
-            animateBy="words"
-            direction="top"
-            className="font-heading text-4xl font-bold text-foreground mb-3"
-          />
-
-          <BlurText
-            text="Connectez-vous pour accéder à votre espace personnel"
-            delay={200}
-            animateBy="words"
-            direction="bottom"
-            className="text-muted-foreground font-medium"
-          />
+          <p className="text-xs text-foreground-muted">Accédez à votre bibliothèque universitaire numérique</p>
         </div>
 
-        {/* Login Form */}
+        {/* Auth form card inspired by @bankkroll component */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-          className="relative"
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="relative overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xl"
         >
-          <div className="relative rounded-3xl border border-transparent p-8 sm:p-10 bg-card/60 dark:bg-laha-black-light/50 backdrop-blur-xl shadow-2xl overflow-hidden">
-            <GlowingEffect spread={60} glow={true} disabled={false} proximity={64} inactiveZone={0.01} />
+          <div className="p-8">
+            <div className="mb-6 text-center">
+              <h1 className="text-xl font-bold text-navy">Bon retour</h1>
+              <p className="text-xs text-foreground-muted mt-1">Connectez-vous pour continuer</p>
+            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Error Message */}
-              {error && (
-                <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-300 text-sm">
-                  {error}
-                </div>
-              )}
+            {error && (
+              <div className="mb-4 animate-in fade-in slide-in-from-top-1 rounded-lg border border-error/20 bg-error/10 p-3 text-xs text-error font-medium">
+                {error}
+              </div>
+            )}
 
-              {/* Login Method Toggle */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              
+              {/* Tab Selector for Identity type */}
               <Tabs defaultValue="email" className="w-full" onValueChange={(val: string) => setLoginMethod(val as "email" | "phone")}>
-                <TabsList className="grid w-full grid-cols-2 bg-muted/50 border border-transparent p-1 rounded-xl mb-8">
+                <TabsList className="grid w-full grid-cols-2 bg-background-secondary p-1 rounded border border-border/40 mb-4">
                   <TabsTrigger 
                     value="email" 
-                    className="rounded-lg py-2.5 data-[state=active]:bg-background data-[state=active]:text-laha-gold data-[state=active]:shadow-sm transition-all"
+                    className="rounded py-2 text-xs font-bold transition-all data-[state=active]:bg-background data-[state=active]:text-navy data-[state=active]:shadow-sm"
                   >
-                    <Mail className="h-4 w-4 mr-2" />
-                    Email
+                    <Mail className="h-3.5 w-3.5 mr-2" />
+                    Adresse Email
                   </TabsTrigger>
                   <TabsTrigger 
                     value="phone" 
-                    className="rounded-lg py-2.5 data-[state=active]:bg-background data-[state=active]:text-laha-gold data-[state=active]:shadow-sm transition-all"
+                    className="rounded py-2 text-xs font-bold transition-all data-[state=active]:bg-background data-[state=active]:text-navy data-[state=active]:shadow-sm"
                   >
-                    <Phone className="h-4 w-4 mr-2" />
-                    Téléphone
+                    <Phone className="h-3.5 w-3.5 mr-2" />
+                    Téléphone (Indicatif)
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="email" className="mt-0 space-y-6">
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-semibold text-foreground/80 mb-2 ml-1">
-                      Adresse email ou Pseudo
-                    </label>
-                    <div className="relative group">
-                      <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-laha-gold transition-colors" />
+                <TabsContent value="email" className="mt-0 space-y-4">
+                  <div className="space-y-1.5">
+                    <label htmlFor="email" className="text-xs font-bold text-navy">Identifiant ou Email *</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-foreground-muted pointer-events-none" />
                       <input
                         type="text"
                         id="email"
@@ -176,18 +160,16 @@ function LoginContent() {
                         value={formData.email}
                         onChange={handleChange}
                         required={loginMethod === "email"}
-                        className="w-full pl-12 pr-4 py-4 bg-background border border-transparent rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-laha-gold/30 focus:border-laha-gold/50 transition-all text-base shadow-sm"
-                        placeholder="votre@email.com ou votre pseudo"
+                        className="w-full pl-10 pr-4 py-3 rounded border border-border bg-background-secondary text-foreground text-sm focus:outline-none focus:border-navy"
+                        placeholder="Ex: marc.sow@uac.edu"
                       />
                     </div>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="phone" className="mt-0 space-y-6">
-                  <div>
-                    <label htmlFor="phone" className="block text-sm font-semibold text-foreground/80 mb-2 ml-1">
-                      Numéro de téléphone
-                    </label>
+                <TabsContent value="phone" className="mt-0 space-y-4">
+                  <div className="space-y-1.5">
+                    <label htmlFor="phone" className="text-xs font-bold text-navy">Numéro de téléphone *</label>
                     <PhoneInput
                       value={formData.phone}
                       onChange={(val: any) => setFormData({ ...formData, phone: val || "" })}
@@ -197,13 +179,19 @@ function LoginContent() {
                 </TabsContent>
               </Tabs>
 
-              {/* Password Field */}
-              <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-foreground/80 mb-2 ml-1">
-                  Mot de passe
-                </label>
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-laha-gold transition-colors" />
+              {/* Password */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="password" className="text-xs font-bold text-navy">Mot de passe *</label>
+                  <Link 
+                    href="/forgot-password" 
+                    className="text-xs text-gold hover:text-gold-dark font-bold transition-colors"
+                  >
+                    Mot de passe oublié ?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-foreground-muted pointer-events-none" />
                   <input
                     type={showPassword ? "text" : "password"}
                     id="password"
@@ -211,68 +199,51 @@ function LoginContent() {
                     value={formData.password}
                     onChange={handleChange}
                     required
-                    className="w-full pl-12 pr-12 py-4 bg-background border border-transparent rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-laha-gold/30 focus:border-laha-gold/50 transition-all text-base shadow-sm"
-                    placeholder="•••••••• ou Code PIN"
+                    className="w-full pl-10 pr-10 py-3 rounded border border-border bg-background-secondary text-foreground text-sm focus:outline-none focus:border-navy"
+                    placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-foreground-muted hover:text-navy transition-colors p-1"
                   >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
 
-              {/* Remember Me & Forgot Password */}
-              <div className="flex items-center justify-between px-1">
-                <label className="flex items-center cursor-pointer group">
-                  <input type="checkbox" className="h-4 w-4 rounded border-border bg-background text-laha-gold focus:ring-laha-gold" />
-                  <span className="ml-2 text-sm text-muted-foreground group-hover:text-foreground transition-colors font-medium">Se souvenir de moi</span>
-                </label>
-                <Link href="/forgot-password" className="text-sm text-laha-gold font-bold hover:underline transition-all">
-                  Mot de passe oublié ?
-                </Link>
-              </div>
-
-              {/* Submit Button */}
+              {/* Submit */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-14 bg-gradient-to-r from-laha-gold to-laha-gold-warm py-3 rounded-xl text-laha-black font-bold hover:scale-[1.02] shadow-lg shadow-laha-gold/20 transition-all disabled:opacity-70 flex items-center justify-center gap-3 text-lg"
+                className="w-full py-3 bg-navy hover:bg-navy-hover text-white text-xs font-bold rounded shadow transition-all disabled:opacity-75 flex items-center justify-center gap-2 mt-6"
               >
                 {isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 border-3 border-laha-black/20 border-t-laha-black rounded-full animate-spin" />
-                    <span>Connexion en cours...</span>
-                  </div>
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
+                    Connexion en cours...
+                  </>
                 ) : (
                   <>
                     Se connecter
-                    <ArrowRight className="h-6 w-6" />
+                    <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </button>
-            </form>
 
+            </form>
           </div>
         </motion.div>
 
-        {/* Sign Up Link */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.5 }}
-          className="text-center mt-10"
-        >
-          <p className="text-muted-foreground font-medium">
-            Pas encore de compte ?{" "}
-            <Link href="/account-type" className="text-laha-gold font-bold hover:underline ml-1">
-              Créer un compte
-            </Link>
-          </p>
-        </motion.div>
+        {/* Register Link */}
+        <p className="text-center text-xs text-foreground-muted mt-6">
+          Pas encore inscrit ?{" "}
+          <Link href="/register" className="text-gold hover:text-gold-dark font-bold underline transition-colors">
+            Créer un compte
+          </Link>
+        </p>
+
       </div>
     </div>
-  )
+  );
 }
