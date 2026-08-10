@@ -19,7 +19,10 @@ import {
   ShieldCheck,
   PenTool,
   DollarSign,
-  Users
+  Users,
+  ShoppingCart,
+  Sparkles,
+  PackageCheck
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -279,12 +282,39 @@ export function MobileBottomNav() {
                   </Link>
 
                   <Link
+                    href="/student/orders"
+                    onClick={() => setMenuOpen(false)}
+                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
+                  >
+                    <PackageCheck className="w-4 h-4 text-gold" />
+                    Mes Commandes
+                  </Link>
+
+                  <Link
+                    href="/cart"
+                    onClick={() => setMenuOpen(false)}
+                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
+                  >
+                    <ShoppingCart className="w-4 h-4 text-gold" />
+                    Mon Panier
+                  </Link>
+
+                  <Link
+                    href="/subscriptions"
+                    onClick={() => setMenuOpen(false)}
+                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4 text-gold" />
+                    Abonnements
+                  </Link>
+
+                  <Link
                     href="/profile"
                     onClick={() => setMenuOpen(false)}
-                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors col-span-2"
+                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
                   >
                     <UserIcon className="w-4 h-4 text-gold" />
-                    Mon Profil & Paramètres
+                    Mon Profil
                   </Link>
                 </div>
               </div>

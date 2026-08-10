@@ -14,6 +14,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { getBookById } from "@/lib/services/catalog";
+import { BookActionButtons } from "@/components/catalog/book-action-buttons";
 
 export default async function BookDetailPage({
   params,
@@ -150,45 +151,8 @@ export default async function BookDetailPage({
               </div>
             </div>
 
-            {/* Zone de Boutons d'Action (Correction 5 — Placeholders Désactivés) */}
-            <div className="pt-6 border-t border-border space-y-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                
-                {/* Accès Lecteur Protégé */}
-                <Link
-                  href={`/catalog/reader/${id}`}
-                  className="flex-1 px-5 py-3 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm"
-                >
-                  <BookOpen className="w-4 h-4" />
-                  Consulter dans le lecteur
-                </Link>
-
-                {/* Bouton Télécharger (Placeholder désactivé - Correction 5) */}
-                <button
-                  disabled
-                  title="Module de téléchargement sécurisé bientôt disponible"
-                  className="px-5 py-3 rounded-xl bg-background border border-border text-foreground-muted text-xs sm:text-sm font-semibold cursor-not-allowed opacity-60 flex items-center justify-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Télécharger (Bientôt disponible)
-                </button>
-
-                {/* Bouton Acheter (Placeholder désactivé - Correction 5) */}
-                <button
-                  disabled
-                  title="Module de paiement bientôt disponible"
-                  className="px-5 py-3 rounded-xl bg-gold/10 border border-gold/30 text-gold-dark text-xs sm:text-sm font-semibold cursor-not-allowed opacity-60 flex items-center justify-center gap-2"
-                >
-                  <ShoppingBag className="w-4 h-4" />
-                  Acheter (Bientôt disponible)
-                </button>
-
-              </div>
-
-              <p className="text-[11px] text-foreground-muted text-center sm:text-left italic">
-                * Les fonctions d'achat individuel et de téléchargement hors ligne seront activées lors de la prochaine phase. L'accès en lecture directe reste entièrement disponible.
-              </p>
-            </div>
+              {/* Zone d'Achat & Consultation */}
+              <BookActionButtons book={book} />
 
           </div>
 

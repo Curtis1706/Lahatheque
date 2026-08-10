@@ -109,13 +109,21 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
             <span className="text-[11px] text-foreground-muted shrink-0">ISBN: {book.isbn}</span>
           )}
 
-          <Link
-            href={`/catalog/reader/${book.id}`}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors shadow-xs ml-auto min-h-[38px]"
-          >
-            Lire l&apos;ouvrage
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </Link>
+          <div className="flex items-center gap-2 ml-auto">
+            <Link
+              href={`/catalog/${book.id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gold hover:bg-gold-hover text-navy text-xs font-bold transition-all shadow-xs"
+            >
+              Commander
+            </Link>
+            <Link
+              href={`/catalog/reader/${book.id}`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors shadow-xs"
+            >
+              Lire
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
         </div>
       </div>
     </motion.div>

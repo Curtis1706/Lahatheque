@@ -19,7 +19,11 @@ import {
   ChevronUp,
   GraduationCap,
   HelpCircle,
-  Bookmark
+  Bookmark,
+  ShoppingBag,
+  ShoppingCart,
+  Sparkles,
+  PackageCheck
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -160,6 +164,9 @@ export function DashboardSidebar() {
         return [
           { label: "Mon Espace", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
           { label: "Mes Ouvrages", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Mes Commandes", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
+          { label: "Mon Panier", href: "/cart", icon: <ShoppingCart className="w-5 h-5" /> },
+          { label: "Abonnements & Bouquets", href: "/student/subscriptions", icon: <Sparkles className="w-5 h-5" /> },
           { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-5 h-5" /> },
           { label: "Historique & Notes", href: "/student/history", icon: <FileCheck className="w-5 h-5" /> },
         ];

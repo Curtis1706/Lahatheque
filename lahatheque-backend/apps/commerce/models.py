@@ -50,3 +50,61 @@ class WebhookEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
 
+class Order(models.Model):
+    PAYMENT_STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('paid', 'Payé'),
+        ('failed', 'Échoué'),
+        ('refunded', 'Remboursé'),
+    ]
+    ORDER_STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('processing', 'En traitement'),
+        ('completed', 'Terminée'),
+        ('cancelled', 'Annulée'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='commandes')
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.ForeignKey(Currency, on_delete=models.PROTECT)
+    statut_paiement = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    statut_commande = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default='pending')
+    payment_transaction = models.ForeignKey(PaymentTransaction, null=True, blank=True, on_delete=models.SET_NULL, related_name='commandes')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+class LigneCommande(models.Model):
+    FORMAT_CHOICES = [
+        ('digital', 'Numérique (EPUB/PDF)'),
+        ('paper', 'Livre Papier'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    commande = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='lignes')
+    ouvrage = models.ForeignKey('catalog.Ouvrage', on_delete=models.CASCADE, related_name='lignes_commandes')
+    format_type = models.CharField(max_length=20, choices=FORMAT_CHOICES, default='digital')
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.IntegerField(default=1)
+
+class PhysicalDelivery(models.Model):
+    STATUS_CHOICES = [
+        ('en_preparation', 'En préparation'),
+        ('expedie', 'Expédié'),
+        ('livre', 'Livré'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    commande = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='livraison')
+    shipping_address = models.TextField()
+    city = models.CharField(max_length=100)
+    country = models.CharField(max_length=2, default='BJ')
+    tracking_number = models.CharField(max_length=100, blank=True, default='')
+    carrier_name = models.CharField(max_length=100, blank=True, default='')
+    statut = models.CharField(max_length=30, choices=STATUS_CHOICES, default='en_preparation')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+

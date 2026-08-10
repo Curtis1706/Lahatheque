@@ -47,25 +47,38 @@ export default function proxy(request: NextRequest) {
     isLoggedIn = request.cookies.has('laha_access') || request.cookies.has('laha_refresh')
   }
 
-  // 2. Si l'utilisateur est connecté et tente d'accéder à des pages publiques
-  const isPublicPage = pathname === '/' || pathname === '/login' || pathname.startsWith('/register')
-  if (isLoggedIn && isPublicPage) {
-    let dashboardUrl = '/dashboard'
-    if (role === 'student') {
-      dashboardUrl = '/student'
-    } else if (role === 'teacher' || role === 'author') {
-      dashboardUrl = '/teacher'
-    } else if (role === 'librarian') {
-      dashboardUrl = '/librarian'
-    } else if (role === 'publisher') {
-      dashboardUrl = '/publisher'
-    } else if (role === 'legal_reviewer') {
-      dashboardUrl = '/legal-reviewer'
-    } else if (role === 'layout_artist') {
-      dashboardUrl = '/layout-artist'
-    } else if (['admin', 'super_admin'].includes(role)) {
-      dashboardUrl = '/admin'
+  // Helper pour obtenir la bonne URL de redirection selon le rôle
+  const getRoleDashboardUrl = (userRole: string): string => {
+    switch (userRole) {
+      case 'student':
+      case 'parent':
+      case 'super_client':
+        return '/student'
+      case 'teacher':
+        return '/teacher'
+      case 'author':
+        return '/author'
+      case 'librarian':
+        return '/librarian'
+      case 'publisher':
+        return '/publisher'
+      case 'legal_reviewer':
+        return '/legal-reviewer'
+      case 'layout_artist':
+        return '/layout-artist'
+      case 'admin':
+        return '/admin'
+      case 'super_admin':
+        return '/super-admin'
+      default:
+        return '/student'
     }
+  }
+
+  // 2. Si l'utilisateur est connecté et tente d'accéder aux pages d'authentification
+  const isAuthPage = pathname === '/login' || pathname.startsWith('/register')
+  if (isLoggedIn && isAuthPage) {
+    const dashboardUrl = getRoleDashboardUrl(role)
     return NextResponse.redirect(new URL(dashboardUrl, request.url))
   }
 
@@ -95,6 +108,6 @@ export const config = {
     '/super-admin/:path*',
     '/login',
     '/register/:path*',
-    '/',
   ],
 }
+

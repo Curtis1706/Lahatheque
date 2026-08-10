@@ -379,15 +379,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const switchRole = (role: string) => {
     setActiveRole(role)
-    setActiveRole(role)
     
     // Redirection intelligente selon le rôle
-    if (role === 'teacher') router.push('/dashboard/teacher')
-    else if (role === 'author') router.push('/dashboard/author')
-    else if (role === 'student') router.push('/dashboard/student')
-    else if (role === 'super_client') router.push('/dashboard/super_client')
-    else if (role === 'parent') router.push('/dashboard/parent')
-    else if (role === 'admin' || role === 'super_admin') router.push('/dashboard/admin')
+    if (role === 'teacher') router.push('/teacher')
+    else if (role === 'author') router.push('/author')
+    else if (role === 'student') router.push('/student')
+    else if (role === 'super_client') router.push('/student')
+    else if (role === 'parent') router.push('/student')
+    else if (role === 'admin') router.push('/admin')
+    else if (role === 'super_admin') router.push('/super-admin')
   }
 
   const value = React.useMemo(() => ({

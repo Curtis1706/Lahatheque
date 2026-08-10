@@ -39,6 +39,12 @@ class Ouvrage(models.Model):
     table_of_contents = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=30, default='draft')
     protection_type = models.CharField(max_length=30, default='lcp')
+    price_digital = models.DecimalField(max_digits=10, decimal_places=2, default=5000.00)
+    price_paper = models.DecimalField(max_digits=10, decimal_places=2, default=7500.00)
+
+    @property
+    def price(self):
+        return self.price_digital
 
 
 class MetadataONIX(models.Model):

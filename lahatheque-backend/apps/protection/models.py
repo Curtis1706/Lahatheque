@@ -1,4 +1,4 @@
-"""Modèles de protection et traçabilité (ProtectionConfig, TraceAcces)."""
+import uuid
 from django.db import models
 from django.conf import settings
 
@@ -21,3 +21,21 @@ class TraceAcces(models.Model):
     access_type = models.CharField(max_length=50) # read_online / download_lcp / audio_stream
     page_number = models.IntegerField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+
+class Annotation(models.Model):
+    TYPE_CHOICES = [("highlight", "Surlignage"), ("note", "Note")]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='annotations')
+    ouvrage = models.ForeignKey('catalog.Ouvrage', on_delete=models.CASCADE, related_name='annotations')
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='highlight')
+    position_data = models.JSONField(default=dict)
+    selected_text = models.TextField(blank=True, default='')
+    note_content = models.TextField(blank=True, null=True)
+    color = models.CharField(max_length=20, blank=True, default='gold')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['user', 'ouvrage'])]
+        ordering = ['-created_at']
