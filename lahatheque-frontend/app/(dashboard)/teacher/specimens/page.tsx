@@ -8,19 +8,18 @@ import {
 import { SpecimenRequest } from "@/lib/types/teacher";
 import { 
   BookOpen, 
-  FileText, 
-  Calendar,
-  CheckCircle2,
-  XCircle,
   Clock,
   Plus,
   ArrowLeft,
-  AlertTriangle
+  Sparkles,
+  GraduationCap
 } from "lucide-react";
 import Link from "next/link";
-import { DataTable } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { BookCover } from "@/components/features/student/book-cover";
+import { StudentBookAccess } from "@/lib/types/student";
+import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
 import { mockBooks } from "@/lib/mock/catalog";
 
 export default function TeacherSpecimensPage() {
@@ -69,147 +68,146 @@ export default function TeacherSpecimensPage() {
     }
   };
 
-
-
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      
+    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto w-full min-w-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div className="space-y-1">
           <Link
             href="/teacher"
-            className="inline-flex items-center gap-1 text-xs font-bold text-navy hover:text-gold transition-colors mb-2"
+            className="inline-flex items-center gap-1 text-xs font-bold text-navy hover:underline mb-1"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Retour au Tableau de Bord
           </Link>
-          <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy">Demandes de Spécimens</h1>
-          <p className="text-sm text-foreground-muted">Visualisez et effectuez des demandes d'évaluation de manuels pour vos cours.</p>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gold">
+            <GraduationCap className="w-4 h-4" />
+            <span>Spécimens Numériques d&apos;Évaluation</span>
+          </div>
+          <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy">
+            Demandes de Spécimens Enseignant
+          </h1>
+          <p className="text-xs sm:text-sm text-foreground-muted max-w-2xl">
+            Demandez et consultez les manuels de référence mis gratuitement à votre disposition pour évaluation avant prescription à vos cohortes d&apos;étudiants.
+          </p>
         </div>
 
         <button
           onClick={() => setShowSpecimenModal(true)}
-          className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-gold-dark text-white font-bold text-sm px-5 py-3 rounded shadow-sm self-start sm:self-auto transition-colors"
+          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 self-start md:self-auto shrink-0 min-h-[44px]"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 text-gold" />
           Demander un Spécimen
         </button>
       </div>
 
-      {/* Main Content */}
-      {/* Main Content — DataTable */}
-      <div className="pt-4">
-        <DataTable
-          data={specimens}
-          rowKey="id"
-          loading={loading}
-          skeletonRows={3}
-          emptyMessage="Vous n'avez pas encore demandé de spécimen pédagogique."
-          columns={[
-            {
-              key: "id",
-              header: "Référence",
-              cell: (req) => <span className="font-mono font-bold text-navy text-xs">{req.id as string}</span>,
-            },
-            {
-              key: "book_title",
-              header: "Ouvrage demandé",
-              cell: (req) => <span className="font-bold text-navy">{req.book_title as string}</span>,
-            },
-            {
-              key: "author",
-              header: "Auteur",
-              cell: (req) => <span className="text-foreground-muted">{req.author as string}</span>,
-              hideOnMobile: true,
-            },
-            {
-              key: "requested_at",
-              header: "Date de demande",
-              cell: (req) => (
-                <span className="text-foreground-muted">
-                  {new Date(req.requested_at as string).toLocaleDateString("fr-FR")}
-                </span>
-              ),
-              hideOnMobile: true,
-            },
-            {
-              key: "status",
-              header: "Statut",
-              cell: (req) => <StatusBadge status={req.status as string} />,
-            },
-          ]}
-          mobileCard={(req) => (
-            <div className="space-y-2">
-              <div className="flex justify-between items-start">
-                <span className="font-bold text-navy text-sm">{req.book_title as string}</span>
-                <StatusBadge status={req.status as string} />
-              </div>
-              <p className="text-xs text-foreground-muted">Auteur : {req.author as string}</p>
-              <div className="flex justify-between items-center pt-2 text-[10px] text-foreground-muted">
-                <span>Réf : {req.id as string}</span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  Demandé le {new Date(req.requested_at as string).toLocaleDateString("fr-FR")}
-                </span>
-              </div>
-            </div>
-          )}
-        />
-      </div>
+      {/* Grille de Spécimens Mobile-First */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="bg-background-secondary h-44 rounded-2xl border border-border" />
+          ))}
+        </div>
+      ) : specimens.length === 0 ? (
+        <EmptyState>
+          <EmptyIcon icon={BookOpen} />
+          <EmptyTitle>Aucun spécimen demandé</EmptyTitle>
+          <EmptyDescription>Vous n&apos;avez encore soumis aucune demande d&apos;évaluation d&apos;ouvrage.</EmptyDescription>
+        </EmptyState>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {specimens.map((spec) => {
+            const dummyBook: StudentBookAccess = {
+              id: spec.book_id,
+              title: spec.book_title,
+              author: spec.author,
+              discipline: spec.discipline,
+              institution: "UAC",
+              format: "PDF",
+              cover_bg: spec.cover_bg,
+              cover_color: spec.cover_color,
+              progress_percent: 100,
+              isbn: "978-2-84299-SPEC",
+              edition_year: 2024,
+              page_count: 320,
+              is_favorite: false
+            };
 
-      {/* Modal: Request Specimen */}
+            return (
+              <div key={spec.id} className="bg-background border border-border p-5 rounded-2xl flex items-start gap-4 shadow-xs">
+                <BookCover book={dummyBook} size="sm" />
+
+                <div className="space-y-2 min-w-0 flex-1">
+                  <StatusBadge status={spec.status} />
+
+                  <h3 className="font-serif font-bold text-navy text-base leading-snug line-clamp-2">
+                    {spec.book_title}
+                  </h3>
+
+                  <p className="text-xs text-foreground-muted font-medium truncate">Par {spec.author}</p>
+
+                  <div className="pt-2 border-t border-border space-y-1 text-[11px] text-foreground-muted">
+                    <p className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-gold shrink-0" />
+                      Demandé le {spec.requested_at}
+                    </p>
+                    {spec.reason && (
+                      <p className="italic text-[10px] truncate" title={spec.reason}>
+                        &ldquo;{spec.reason}&rdquo;
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modale de Demande de Spécimen */}
       <Modal
         open={showSpecimenModal}
         onClose={() => setShowSpecimenModal(false)}
-        title="Demander un spécimen d'évaluation"
-        maxWidth={500}
-        footer={
-          <>
-            <button 
-              type="button"
-              onClick={() => setShowSpecimenModal(false)}
-              className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
-            >
-              Annuler
-            </button>
-            <button 
-              type="submit"
-              form="request-specimen-form"
-              disabled={submittingSpecimen}
-              className="bg-gold hover:bg-gold-dark text-white text-xs font-bold px-4 py-2 rounded disabled:opacity-50"
-            >
-              {submittingSpecimen ? "Envoi..." : "Envoyer la demande"}
-            </button>
-          </>
-        }
+        title="Nouvelle Demande de Spécimen Enseignant"
       >
-        <form id="request-specimen-form" onSubmit={handleRequestSpecimen} className="space-y-4 pt-2 pb-2">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-navy">Sélectionner un manuel *</label>
-            <select 
-              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy cursor-pointer"
+        <form onSubmit={handleRequestSpecimen} className="space-y-4 pt-2">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-navy uppercase tracking-wider">
+              Sélectionner un Manuel dans le Catalogue
+            </label>
+            <select
               value={selectedBookId}
               onChange={(e) => setSelectedBookId(e.target.value)}
               required
+              className="w-full px-3 py-2.5 rounded-xl bg-background-secondary border border-border text-xs font-medium text-foreground focus:outline-none focus:border-gold min-h-[44px]"
             >
-              <option value="">-- Choisir un ouvrage --</option>
-              {mockBooks.map((book) => (
-                <option key={book.id} value={book.id}>
-                  {book.title} ({book.authors_details.map(a => a.last_name).join(", ")})
+              <option value="">-- Choisir un manuel --</option>
+              {mockBooks.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.title} ({b.authors_details.map(a => `${a.first_name} ${a.last_name}`).join(", ")})
                 </option>
               ))}
             </select>
           </div>
-          <div className="bg-background-secondary p-3.5 rounded border border-border flex items-start gap-2.5 text-[11px] text-foreground-muted leading-relaxed">
-            <AlertTriangle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-            <span>
-              L'accès spécimen numérique est accordé gratuitement pour une durée de 30 jours renouvelables après validation de votre affiliation par notre service éditorial.
-            </span>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <button
+              type="button"
+              onClick={() => setShowSpecimenModal(false)}
+              className="px-4 py-2 rounded-xl bg-background-secondary text-foreground text-xs font-semibold hover:bg-border transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={submittingSpecimen}
+              className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors shadow-xs"
+            >
+              {submittingSpecimen ? "Envoi en cours..." : "Soumettre la demande"}
+            </button>
           </div>
         </form>
       </Modal>
-
     </div>
   );
 }
