@@ -1,46 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { 
-  getAuthorSubmissions, 
-  submitManuscript 
-} from "@/lib/services/author";
-import { AuthorSubmission } from "@/lib/types/author";
-import { 
-  ArrowLeft, 
-  Plus, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  FileText, 
-  Calendar,
-  AlertTriangle
-} from "lucide-react";
 import Link from "next/link";
-import { DataTable } from "@/components/ui/data-table";
-import { Dropzone } from "@/components/ui/dropzone";
-import { Modal } from "@/components/ui/modal";
+import { getAuthorSubmissions, getAuthorStats } from "@/lib/services/author";
+import { AuthorSubmission, AuthorStats } from "@/lib/types/author";
+import { 
+  PenTool, 
+  Plus, 
+  ArrowLeft, 
+  Clock, 
+  AlertTriangle, 
+  ArrowUpRight
+} from "lucide-react";
+import { AuthorKpiCharts } from "@/components/features/author/author-kpi-charts";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
 
 export default function AuthorSubmissionsPage() {
   const [submissions, setSubmissions] = useState<AuthorSubmission[]>([]);
+  const [stats, setStats] = useState<AuthorStats | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // State de modale
-  const [showModal, setShowModal] = useState(false);
-  const [title, setTitle] = useState("");
-  const [discipline, setDiscipline] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     async function loadSubmissions() {
       try {
         setLoading(true);
-        const data = await getAuthorSubmissions();
-        setSubmissions(data);
+        const [subsData, statsData] = await Promise.all([
+          getAuthorSubmissions(),
+          getAuthorStats()
+        ]);
+        setSubmissions(subsData);
+        setStats(statsData);
       } catch (err) {
-        console.error("Erreur de chargement des manuscrits", err);
+        console.error("Erreur de chargement des dépôts", err);
       } finally {
         setLoading(false);
       }
@@ -48,196 +40,108 @@ export default function AuthorSubmissionsPage() {
     loadSubmissions();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || !discipline || !selectedFile) return;
-    try {
-      setSubmitting(true);
-      const sub = await submitManuscript(title, discipline, selectedFile.name);
-      setSubmissions(prev => [sub, ...prev]);
-      setShowModal(false);
-      setTitle("");
-      setDiscipline("");
-      setSelectedFile(null);
-    } catch (err) {
-      alert("Erreur lors de la soumission.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto w-full min-w-0">
+      {/* 1. VISUALISATIONS DE DONNÉES ET KPIS 21st.dev EN PREMIER */}
+      {!loading && stats ? (
+        <AuthorKpiCharts stats={stats} />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-40" />
+          ))}
+        </div>
+      )}
+
+      {/* 2. EN-TÊTE DE PAGE */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div className="space-y-1">
-          <Link
-            href="/author"
-            className="inline-flex items-center gap-1 text-xs font-bold text-navy hover:text-gold transition-colors mb-2"
-          >
+          <Link href="/author" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Retour au Tableau de Bord
+            Retour au tableau de bord
           </Link>
-          <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy">Manuscrits & Dépôts</h1>
-          <p className="text-sm text-foreground-muted">Déposez vos travaux pour étude de conformité éditoriale et légale.</p>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gold">
+            <PenTool className="w-4 h-4" />
+            <span>Suivi des Manuscrits & Dépôts</span>
+          </div>
+          <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy">
+            Mes Dépôts de Manuscrits
+          </h1>
+          <p className="text-xs sm:text-sm text-foreground-muted max-w-2xl">
+            Suivez le statut de validation de vos projets de livres soumis au comité d&apos;édition LAHA Éditions.
+          </p>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-gold-dark text-white font-bold text-sm px-5 py-3 rounded shadow-sm self-start sm:self-auto transition-colors"
+        <Link
+          href="/author/submissions/new"
+          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 self-start md:self-auto shrink-0 min-h-[44px]"
         >
-          <Plus className="w-4 h-4" />
-          Déposer un manuscrit
-        </button>
+          <Plus className="w-4 h-4 text-gold" />
+          Déposer un Nouveau Manuscrit
+        </Link>
       </div>
 
-      {/* Main List */}
-      <div className="pt-2">
-        <DataTable
-          data={submissions}
-          rowKey="id"
-          loading={loading}
-          skeletonRows={4}
-          filterKey="status"
-          filterOptions={[
-            { value: "draft", label: "Brouillon" },
-            { value: "pending", label: "Soumis" },
-            { value: "under_review", label: "En relecture" },
-            { value: "approved", label: "Approuvé / Publié" },
-            { value: "rejected", label: "Refusé" },
-          ]}
-          searchPlaceholder="Rechercher un manuscrit..."
-          emptyMessage="Vous n'avez pas encore déposé de livre ou manuscrit."
-          columns={[
-            {
-              key: "title",
-              header: "Titre de l'œuvre",
-              cell: (sub) => (
-                <div>
-                  <p className="font-bold text-navy">{sub.title as string}</p>
-                  <p className="text-[10px] text-foreground-muted font-mono">Réf : {sub.id as string}</p>
+      {/* 3. LISTE DES DÉPÔTS */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+          <div className="bg-background-secondary h-48 rounded-2xl border border-border" />
+          <div className="bg-background-secondary h-48 rounded-2xl border border-border" />
+        </div>
+      ) : submissions.length === 0 ? (
+        <EmptyState>
+          <EmptyIcon icon={PenTool} />
+          <EmptyTitle>Aucun manuscrit actuellement soumis</EmptyTitle>
+          <EmptyDescription>Soumettez votre premier manuscrit pour étude avant finalisation et publication.</EmptyDescription>
+        </EmptyState>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {submissions.map((sub) => (
+            <div key={sub.id} className="bg-background border border-border p-6 rounded-3xl space-y-4 shadow-xs flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <StatusBadge status={sub.status} />
+                  <span className="text-[11px] font-bold text-gold uppercase tracking-wider bg-navy/5 px-2 py-0.5 rounded border border-gold/20">
+                    {sub.version_type}
+                  </span>
                 </div>
-              ),
-            },
-            {
-              key: "discipline",
-              header: "Discipline",
-              cell: (sub) => <span className="text-foreground-muted">{sub.discipline as string}</span>,
-              hideOnMobile: true,
-            },
-            {
-              key: "submitted_at",
-              header: "Date de soumission",
-              cell: (sub) => (
-                <span className="text-foreground-muted">
-                  {new Date(sub.submitted_at as string).toLocaleDateString("fr-FR")}
-                </span>
-              ),
-              hideOnMobile: true,
-            },
-            {
-              key: "file_name",
-              header: "Nom du fichier",
-              cell: (sub) => <span className="text-foreground-muted font-mono text-xs">{sub.file_name as string}</span>,
-              hideOnMobile: true,
-            },
-            {
-              key: "status",
-              header: "Statut",
-              cell: (sub) => <StatusBadge status={sub.status as string} />,
-            },
-          ]}
-          mobileCard={(sub) => (
-            <div className="space-y-2">
-              <div className="flex justify-between items-start">
-                <span className="font-bold text-navy text-sm">{sub.title as string}</span>
-                <StatusBadge status={sub.status as string} />
+
+                <h2 className="font-serif font-bold text-navy text-lg leading-snug">
+                  {sub.title}
+                </h2>
+
+                {sub.summary && (
+                  <p className="text-xs text-foreground-muted line-clamp-3">
+                    {sub.summary}
+                  </p>
+                )}
               </div>
-              <div className="text-xs text-foreground-muted space-y-0.5">
-                <p><span className="font-bold text-navy">Discipline :</span> {sub.discipline as string}</p>
-                <p><span className="font-bold text-navy">Fichier :</span> {sub.file_name as string}</p>
-              </div>
-              <div className="flex justify-between items-center pt-2 text-[10px] text-foreground-muted">
-                <span>Réf : {sub.id as string}</span>
+
+              {sub.status === "changes_requested" && sub.feedback_history && sub.feedback_history.length > 0 && (
+                <div className="p-3 rounded-2xl bg-warning/10 border border-warning/30 text-warning text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>Remarques de l&apos;équipe éditoriale</span>
+                  </div>
+                  <p className="text-[11px] italic">
+                    &ldquo;{sub.feedback_history[0].message}&rdquo;
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-border flex items-center justify-between text-xs text-foreground-muted">
                 <span className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  Soumis le {new Date(sub.submitted_at as string).toLocaleDateString("fr-FR")}
+                  <Clock className="w-3.5 h-3.5 text-gold" />
+                  Déposé le {new Date(sub.submitted_at).toLocaleDateString("fr-FR")}
                 </span>
+                <Link href={`/author/submissions/${sub.id}`} className="text-navy font-bold hover:underline flex items-center gap-1">
+                  Fiche & Suivi
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
             </div>
-          )}
-        />
-      </div>
-
-      {/* Modal: Submit Manuscript */}
-      <Modal
-        open={showModal}
-        onClose={() => setShowModal(false)}
-        title="Déposer un nouveau manuscrit"
-        maxWidth={500}
-        footer={
-          <>
-            <button 
-              type="button"
-              onClick={() => setShowModal(false)}
-              className="border border-border text-navy bg-background hover:bg-background-secondary text-xs font-bold px-4 py-2 rounded"
-            >
-              Annuler
-            </button>
-            <button 
-              type="submit"
-              form="submit-manuscript-form"
-              disabled={submitting || !selectedFile}
-              className="bg-gold hover:bg-gold-dark text-white text-xs font-bold px-4 py-2 rounded disabled:opacity-50"
-            >
-              {submitting ? "Dépôt en cours..." : "Soumettre à lecture"}
-            </button>
-          </>
-        }
-      >
-        <form id="submit-manuscript-form" onSubmit={handleSubmit} className="space-y-4 pt-2 pb-2">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-navy">Titre de l'œuvre *</label>
-            <input 
-              type="text" 
-              required
-              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy"
-              placeholder="Ex: Traité de Droit Administratif"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-navy">Discipline académique *</label>
-            <select 
-              className="bg-background border border-border rounded p-3 text-sm focus:outline-none focus:border-navy cursor-pointer"
-              value={discipline}
-              onChange={(e) => setDiscipline(e.target.value)}
-              required
-            >
-              <option value="">-- Choisir une discipline --</option>
-              <option value="Droit & Sciences Politiques">Droit & Sciences Politiques</option>
-              <option value="Économie & Gestion">Économie & Gestion</option>
-              <option value="Sciences & Technologies">Sciences & Technologies</option>
-              <option value="Lettres, Langues & Arts">Lettres, Langues & Arts</option>
-            </select>
-          </div>
-          
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-navy">Fichier du manuscrit (PDF ou EPUB) *</label>
-            <Dropzone onFileSelect={(file) => setSelectedFile(file)} />
-          </div>
-
-          <div className="bg-background-secondary p-3.5 rounded border border-border flex items-start gap-2.5 text-[11px] text-foreground-muted leading-relaxed">
-            <AlertTriangle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-            <span>
-              En déposant ce manuscrit, vous certifiez en être l'auteur légal et acceptez que l'équipe éditoriale procède à une lecture d'étude de conformité.
-            </span>
-          </div>
-        </form>
-      </Modal>
-
+          ))}
+        </div>
+      )}
     </div>
   );
 }

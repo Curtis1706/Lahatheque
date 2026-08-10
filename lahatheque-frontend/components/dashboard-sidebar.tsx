@@ -19,7 +19,8 @@ import {
   ChevronUp,
   GraduationCap,
   HelpCircle,
-  Bookmark
+  Bookmark,
+  ShoppingBag
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -184,8 +185,10 @@ export function DashboardSidebar() {
       case "author":
         return [
           { label: "Tableau de bord", href: "/author", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Mes Manuscrits", href: "/author/submissions", icon: <PenTool className="w-5 h-5" /> },
-          { label: "Mes Redevances", href: "/author/royalties", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Mes Livres", href: "/author/books", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Mes Dépôts", href: "/author/submissions", icon: <PenTool className="w-5 h-5" /> },
+          { label: "Droits & Paiements", href: "/author/royalties", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Mes Achats Client", href: "/author/purchases", icon: <ShoppingBag className="w-5 h-5" /> },
         ];
       case "legal_reviewer":
         return [
