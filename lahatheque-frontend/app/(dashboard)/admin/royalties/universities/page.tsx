@@ -1,0 +1,73 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Building2 } from "lucide-react";
+import { DataTable, DataTableColumn } from "@/components/ui/data-table";
+import { getAdminRoyalties } from "@/lib/services/admin";
+import { AdminRoyalty } from "@/lib/types/admin";
+import { StatusBadge } from "@/components/ui/status-badge";
+
+export default function AdminUniversityRoyaltiesPage() {
+  const [data, setData] = useState<AdminRoyalty[]>([]);
+
+  useEffect(() => {
+    getAdminRoyalties().then((items) =>
+      setData(items.filter((i) => i.beneficiary_type === "university"))
+    );
+  }, []);
+
+  const columns: DataTableColumn<AdminRoyalty>[] = [
+    {
+      key: "beneficiary_name",
+      header: "Université Partenaire",
+      cell: (row) => <span className="font-semibold text-xs text-foreground">{row.beneficiary_name}</span>,
+    },
+    {
+      key: "total_reads",
+      header: "Consultations Cumulées",
+      cell: (row) => (
+        <span className="font-mono text-xs font-semibold text-foreground">
+          {row.total_reads.toLocaleString("fr-FR")} accès
+        </span>
+      ),
+    },
+    {
+      key: "payout_amount",
+      header: "Redevance Due (15%)",
+      cell: (row) => (
+        <span className="font-mono text-xs font-bold text-gold-dark">
+          {row.payout_amount.toLocaleString("fr-FR")} FCFA
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Statut",
+      cell: (row) => <StatusBadge status={row.status} />,
+    },
+  ];
+
+  return (
+    <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto space-y-6">
+      <div>
+        <Link
+          href="/admin/royalties"
+          className="inline-flex items-center gap-1 text-xs font-medium text-gold hover:text-gold-dark mb-2"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Retour aux Redevances
+        </Link>
+        <div className="pb-4 border-b border-border">
+          <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy">
+            Redevances Universités Partenaires (15%)
+          </h1>
+          <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">
+            Suivi des reversements statutaires calculés sur les consultations en bibliothèques.
+          </p>
+        </div>
+      </div>
+
+      <DataTable data={data} columns={columns} rowKey="id" />
+    </div>
+  );
+}

@@ -23,7 +23,11 @@ import {
   ShoppingBag,
   PackageCheck,
   ShoppingCart,
-  Sparkles
+  Sparkles,
+  BellRing,
+  FileSpreadsheet,
+  Key,
+  Activity
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -210,6 +214,20 @@ export function DashboardSidebar() {
         return [
           { label: "Tableau de bord", href: "/layout-artist", icon: <LayoutDashboard className="w-5 h-5" /> },
           { label: "Maquettes", href: "/layout-artist/validation", icon: <PenTool className="w-5 h-5" /> },
+        ];
+      case "admin":
+      case "super_admin":
+        return [
+          { label: "Vue d'ensemble", href: "/admin", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Gestion Utilisateurs", href: "/admin/users", icon: <Users className="w-5 h-5" /> },
+          { label: "Catalogue & Prix", href: "/admin/catalog", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="w-5 h-5" /> },
+          { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="w-5 h-5" /> },
+          { label: "Reporting & Exports", href: "/admin/reports", icon: <FileSpreadsheet className="w-5 h-5" /> },
+          { label: "Clés API & Partenaires", href: "/admin/api", icon: <Key className="w-5 h-5" /> },
+          { label: "Traçabilité & Logs", href: "/admin/logs", icon: <Activity className="w-5 h-5" /> },
+          { label: "Paramètres Globaux", href: "/admin/settings", icon: <Settings className="w-5 h-5" /> },
         ];
       default:
         return [
