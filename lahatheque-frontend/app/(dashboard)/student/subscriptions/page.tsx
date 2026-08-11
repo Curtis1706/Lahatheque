@@ -20,9 +20,13 @@ import {
 import { fetchStudentSubscriptionState, cancelStudentSubscription } from "@/lib/services/student-subscriptions";
 import { SubscriptionApiResponse, BillingFrequency, StudentSubscription } from "@/lib/types/student-subscriptions";
 import { SubscriptionCancelModal } from "@/components/student/subscriptions/SubscriptionCancelModal";
+import { StudentKpiCharts } from "@/components/features/student/student-kpi-charts";
+import { fetchStudentStudyStats } from "@/lib/services/student";
+import { StudentStudyStats } from "@/lib/types/student";
 
 export default function StudentSubscriptionsPage() {
   const [subData, setSubData] = useState<SubscriptionApiResponse | null>(null);
+  const [stats, setStats] = useState<StudentStudyStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [billingFreq, setBillingFreq] = useState<BillingFrequency>("annual");
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
@@ -33,8 +37,12 @@ export default function StudentSubscriptionsPage() {
   useEffect(() => {
     async function loadSubData() {
       setLoading(true);
-      const data = await fetchStudentSubscriptionState();
+      const [data, statsData] = await Promise.all([
+        fetchStudentSubscriptionState(),
+        fetchStudentStudyStats()
+      ]);
       setSubData(data);
+      setStats(statsData);
       setLoading(false);
     }
     loadSubData();
@@ -78,6 +86,16 @@ export default function StudentSubscriptionsPage() {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
+      {/* 1. KPIS ET VISUALISATIONS DE DONNÉES 21st.dev EN PREMIER */}
+      {!loading && stats ? (
+        <StudentKpiCharts stats={stats} />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-40" />
+          ))}
+        </div>
+      )}
       
       {/* En-tête de section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">

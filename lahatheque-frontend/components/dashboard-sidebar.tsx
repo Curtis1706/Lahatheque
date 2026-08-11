@@ -21,9 +21,9 @@ import {
   HelpCircle,
   Bookmark,
   ShoppingBag,
+  PackageCheck,
   ShoppingCart,
-  Sparkles,
-  PackageCheck
+  Sparkles
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -161,20 +161,25 @@ export function DashboardSidebar() {
   const getLinks = () => {
     switch (user?.role) {
       case "student":
+      case "super_client":
+      case "parent":
         return [
-          { label: "Mon Espace", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Mes Ouvrages", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
-          { label: "Mes Commandes", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
-          { label: "Mon Panier", href: "/cart", icon: <ShoppingCart className="w-5 h-5" /> },
-          { label: "Abonnements & Bouquets", href: "/student/subscriptions", icon: <Sparkles className="w-5 h-5" /> },
+          { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Ma Bibliothèque de Livres", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Mes Commandes & Factures", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
+          { label: "Mon Abonnement & Pass", href: "/student/subscriptions", icon: <Sparkles className="w-5 h-5" /> },
           { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-5 h-5" /> },
           { label: "Historique & Notes", href: "/student/history", icon: <FileCheck className="w-5 h-5" /> },
         ];
       case "teacher":
         return [
-          { label: "Tableau de bord", href: "/teacher", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Mes Cours", href: "/teacher/courses", icon: <PenTool className="w-5 h-5" /> },
-          { label: "Spécimens", href: "/teacher/specimens", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Ma Bibliothèque de Livres", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Mes Cours Prescrits & Spécimens", href: "/teacher", icon: <PenTool className="w-5 h-5" /> },
+          { label: "Mes Commandes & Factures", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
+          { label: "Mon Abonnement & Pass", href: "/student/subscriptions", icon: <Sparkles className="w-5 h-5" /> },
+          { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-5 h-5" /> },
+          { label: "Historique & Notes", href: "/student/history", icon: <FileCheck className="w-5 h-5" /> },
         ];
       case "librarian":
         return [
@@ -194,7 +199,7 @@ export function DashboardSidebar() {
           { label: "Mes Livres", href: "/author/books", icon: <BookOpen className="w-5 h-5" /> },
           { label: "Mes Dépôts", href: "/author/submissions", icon: <PenTool className="w-5 h-5" /> },
           { label: "Droits & Paiements", href: "/author/royalties", icon: <DollarSign className="w-5 h-5" /> },
-          { label: "Mes Achats Client", href: "/author/purchases", icon: <ShoppingBag className="w-5 h-5" /> },
+          {label: "Mes Achats & Commandes", href: "/author/purchases", icon: <ShoppingBag className="w-5 h-5" /> },
         ];
       case "legal_reviewer":
         return [
@@ -208,7 +213,9 @@ export function DashboardSidebar() {
         ];
       default:
         return [
-          { label: "Accueil", href: "/", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Ma Bibliothèque de Livres", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-5 h-5" /> },
         ];
     }
   };
@@ -230,12 +237,12 @@ export function DashboardSidebar() {
           {open && user && (
             <div className="p-3 my-4 rounded-xl bg-navy/60 border border-navy-hover flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-navy-dark text-gold font-serif font-bold flex items-center justify-center text-xs border border-gold/30 shrink-0">
-                {user.first_name?.[0] || "U"}
+                {user.first_name?.[0] || "L"}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-xs text-white truncate">{userDisplayName}</p>
                 <p className="text-[10px] text-gold truncate">
-                  {user.role === "student" ? "Licence Droit • UAC" : user.email}
+                  {user.role === "teacher" ? "Lecteur • Enseignant" : user.role === "author" ? "Auteur • LAHA Éditions" : "Lecteur • LAHAThèque"}
                 </p>
               </div>
             </div>

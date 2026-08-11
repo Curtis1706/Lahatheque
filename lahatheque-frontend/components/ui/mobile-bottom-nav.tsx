@@ -36,14 +36,16 @@ export function MobileBottomNav() {
   const getNavConfig = () => {
     switch (user?.role) {
       case "student":
+      case "super_client":
+      case "parent":
         return {
           leftItems: [
             { label: "Aperçu", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Ouvrages", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
+            { label: "Livres", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
           ],
           centerCta: { label: "Catalogue", href: "/student/catalog", icon: <Briefcase className="w-6 h-6" /> },
           rightItems: [
-            { label: "Historique", href: "/student/history", icon: <FileCheck className="w-5 h-5" /> },
+            { label: "Commandes", href: "/student/orders", icon: <FileCheck className="w-5 h-5" /> },
           ]
         };
       case "teacher":
@@ -214,7 +216,7 @@ export function MobileBottomNav() {
                     </h3>
                     <div className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gold px-2 py-0.5 rounded bg-navy/5 border border-gold/30">
                       <GraduationCap className="w-3 h-3" />
-                      {user?.role === "student" ? "Étudiant Affilié" : user?.role || "Membre"}
+                      {user?.role === "teacher" ? "Lecteur • Enseignant" : "Lecteur • LAHAThèque"}
                     </div>
                   </div>
                 </div>

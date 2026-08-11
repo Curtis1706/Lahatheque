@@ -13,15 +13,20 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Sparkles
+  Sparkles,
+  ArrowLeft
 } from "lucide-react";
 import { StudentOrder, OrderFormatFilter, OrderStatusFilter } from "@/lib/types/student-orders";
 import { fetchStudentOrders } from "@/lib/services/student-orders";
+import { fetchStudentStudyStats } from "@/lib/services/student";
+import { StudentStudyStats } from "@/lib/types/student";
+import { StudentKpiCharts } from "@/components/features/student/student-kpi-charts";
 import { OrderTrackerStepper } from "@/components/student/orders/OrderTrackerStepper";
 import { OrderDetailModal } from "@/components/student/orders/OrderDetailModal";
 
 export default function StudentOrdersPage() {
   const [orders, setOrders] = useState<StudentOrder[]>([]);
+  const [stats, setStats] = useState<StudentStudyStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [formatFilter, setFormatFilter] = useState<OrderFormatFilter>("all");
@@ -32,18 +37,22 @@ export default function StudentOrdersPage() {
   const [selectedOrderForModal, setSelectedOrderForModal] = useState<StudentOrder | null>(null);
 
   useEffect(() => {
-    async function loadOrders() {
+    async function loadData() {
       setLoading(true);
-      const data = await fetchStudentOrders();
-      setOrders(data);
+      const [ordersData, statsData] = await Promise.all([
+        fetchStudentOrders(),
+        fetchStudentStudyStats()
+      ]);
+      setOrders(ordersData);
+      setStats(statsData);
       setLoading(false);
     }
-    loadOrders();
+    loadData();
   }, []);
 
   // Dérivation du badge selon la matrice statut_paiement × statut_commande × PhysicalDelivery.statut
   const renderStatusBadge = (order: StudentOrder) => {
-    const { statut_paiement, statut_commande, livraison } = order;
+    const { statut_paiement, statut_commande } = order;
 
     if (statut_paiement === "paid" && statut_commande === "completed") {
       return (
@@ -52,70 +61,54 @@ export default function StudentOrdersPage() {
         </span>
       );
     }
-
-    if (statut_paiement === "paid" && (statut_commande === "processing" || statut_commande === "pending")) {
-      const deliveryText = livraison?.statut === "expedie" ? "Payé - Expédié" : "Payé - Expédition en cours";
+    if (statut_paiement === "paid" && statut_commande !== "completed") {
       return (
-        <span className="px-2.5 py-1 rounded-full bg-gold/10 text-gold-dark border border-gold/30 font-bold text-[10px] uppercase">
-          {deliveryText}
+        <span className="px-2.5 py-1 rounded-full bg-navy/10 text-navy border border-navy/30 font-bold text-[10px] uppercase">
+          En Cours de Traitement
         </span>
       );
     }
-
     if (statut_paiement === "pending") {
       return (
-        <span className="px-2.5 py-1 rounded-full bg-gold/10 text-gold-dark border border-gold/30 font-bold text-[10px] uppercase">
-          Paiement en attente
+        <span className="px-2.5 py-1 rounded-full bg-warning/10 text-warning border border-warning/30 font-bold text-[10px] uppercase">
+          Paiement En Attente
         </span>
       );
     }
-
-    if (statut_paiement === "refunded") {
-      return (
-        <span className="px-2.5 py-1 rounded-full bg-background-secondary text-foreground-muted border border-border font-bold text-[10px] uppercase">
-          Remboursé
-        </span>
-      );
-    }
-
     return (
       <span className="px-2.5 py-1 rounded-full bg-error/10 text-error border border-error/30 font-bold text-[10px] uppercase">
-        {statut_paiement === "failed" ? "Échoué" : statut_commande === "cancelled" ? "Annulé" : statut_paiement}
+        Annulée / Échouée
       </span>
     );
   };
 
-  // Filtrage combiné par recherche, format et statut
+  // Filtrage combiné (Recherche, Format, Statut)
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      // 1. Recherche texte (N° commande ou titre ouvrage)
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch = !q || 
-        order.id.toLowerCase().includes(q) || 
-        order.lignes.some(l => l.ouvrage_title.toLowerCase().includes(q));
+      // 1. Recherche texte (id commande ou titre ouvrage)
+      if (searchQuery.trim() !== "") {
+        const query = searchQuery.toLowerCase();
+        const matchId = order.id.toLowerCase().includes(query);
+        const matchOuvrage = order.lignes.some((l) =>
+          l.ouvrage_title.toLowerCase().includes(query)
+        );
+        if (!matchId && !matchOuvrage) return false;
+      }
 
-      if (!matchesSearch) return false;
-
-      // 2. Filtre par format
+      // 2. Filtre par format (digital / paper)
       if (formatFilter === "digital") {
         if (!order.lignes.some(l => l.format_type === "digital")) return false;
       } else if (formatFilter === "paper") {
         if (!order.lignes.some(l => l.format_type === "paper")) return false;
       }
 
-      // 3. Filtre par statut (selon la matrice d'or)
-      if (statusFilter === "in_progress") {
-        const isInProgress = order.statut_paiement === "pending" || 
-          (order.statut_paiement === "paid" && order.statut_commande !== "completed");
-        if (!isInProgress) return false;
-      } else if (statusFilter === "completed") {
-        const isCompleted = order.statut_paiement === "paid" && order.statut_commande === "completed";
-        if (!isCompleted) return false;
+      // 3. Filtre par statut
+      if (statusFilter === "completed") {
+        if (order.statut_commande !== "completed" || order.statut_paiement !== "paid") return false;
+      } else if (statusFilter === "in_progress") {
+        if (order.statut_paiement !== "paid" || order.statut_commande === "completed") return false;
       } else if (statusFilter === "failed_cancelled") {
-        const isFailed = order.statut_paiement === "failed" || 
-          order.statut_paiement === "refunded" || 
-          order.statut_commande === "cancelled";
-        if (!isFailed) return false;
+        if (order.statut_commande !== "cancelled" && order.statut_paiement !== "failed") return false;
       }
 
       return true;
@@ -123,307 +116,256 @@ export default function StudentOrdersPage() {
   }, [orders, searchQuery, formatFilter, statusFilter]);
 
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / itemsPerPage));
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
   const paginatedOrders = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredOrders.slice(start, start + itemsPerPage);
-  }, [filteredOrders, currentPage]);
-
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-    }
-  };
+  }, [filteredOrders, currentPage, itemsPerPage]);
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
-      
-      {/* Header avec Titre & Actions Commander */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
-            <ShoppingBag className="w-4 h-4 text-gold" />
-            Espace Étudiant
-          </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Mes Commandes & Suivi d'Achats
-          </h1>
-          <p className="text-xs text-foreground-muted mt-1">
-            Consultez vos reçus d'achat, débloquez vos ouvrages numériques et suivez vos livraisons physiques.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 shrink-0 self-start md:self-auto">
-          <Link
-            href="/cart"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-background-secondary hover:bg-background text-navy text-xs font-bold transition-all shadow-xs"
-          >
-            <ShoppingBag className="w-4 h-4 text-gold" />
-            Mon Panier
-          </Link>
-          <Link
-            href="/student/catalog"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gold hover:bg-gold-hover text-navy text-xs font-bold transition-all shadow-md active:scale-95"
-          >
-            <BookOpen className="w-4 h-4" />
-            Passer une commande
-          </Link>
-        </div>
-      </div>
-
-      {/* Barre de Recherche & Filtres Doubles (Format & Statut) */}
-      <div className="bg-background border border-border rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
-        
-        {/* Recherche rapide */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            placeholder="Rechercher par N° de commande ou titre d'ouvrage..."
-            className="w-full pl-10 pr-4 py-2.5 bg-background-secondary border border-border rounded-xl text-xs text-foreground focus:outline-none focus:border-navy transition-colors"
-          />
-        </div>
-
-        {/* Filtres doubles */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs pt-2 border-t border-border">
-          
-          {/* Filter Format */}
-          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-navy mr-1 flex items-center gap-1">
-              <Filter className="w-3 h-3 text-gold" /> Format:
-            </span>
-            <button
-              onClick={() => { setFormatFilter("all"); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
-                formatFilter === "all" ? "bg-navy text-white shadow-sm" : "bg-background-secondary text-foreground-muted hover:text-navy"
-              }`}
-            >
-              Tous
-            </button>
-            <button
-              onClick={() => { setFormatFilter("digital"); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
-                formatFilter === "digital" ? "bg-navy text-white shadow-sm" : "bg-background-secondary text-foreground-muted hover:text-navy"
-              }`}
-            >
-              Numériques
-            </button>
-            <button
-              onClick={() => { setFormatFilter("paper"); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
-                formatFilter === "paper" ? "bg-navy text-white shadow-sm" : "bg-background-secondary text-foreground-muted hover:text-navy"
-              }`}
-            >
-              Colis Papier
-            </button>
-          </div>
-
-          {/* Filter Statut */}
-          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-navy mr-1">Statut:</span>
-            <button
-              onClick={() => { setStatusFilter("all"); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
-                statusFilter === "all" ? "bg-navy text-white shadow-sm" : "bg-background-secondary text-foreground-muted hover:text-navy"
-              }`}
-            >
-              Tous
-            </button>
-            <button
-              onClick={() => { setStatusFilter("in_progress"); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
-                statusFilter === "in_progress" ? "bg-navy text-white shadow-sm" : "bg-background-secondary text-foreground-muted hover:text-navy"
-              }`}
-            >
-              En cours
-            </button>
-            <button
-              onClick={() => { setStatusFilter("completed"); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
-                statusFilter === "completed" ? "bg-navy text-white shadow-sm" : "bg-background-secondary text-foreground-muted hover:text-navy"
-              }`}
-            >
-              Payés & Livrés
-            </button>
-            <button
-              onClick={() => { setStatusFilter("failed_cancelled"); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
-                statusFilter === "failed_cancelled" ? "bg-navy text-white shadow-sm" : "bg-background-secondary text-foreground-muted hover:text-navy"
-              }`}
-            >
-              Échoués
-            </button>
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* Skeletons de chargement */}
-      {loading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-background border border-border rounded-3xl p-6 space-y-4 animate-pulse">
-              <div className="h-6 bg-background-secondary rounded-lg w-1/3" />
-              <div className="h-16 bg-background-secondary rounded-xl w-full" />
-              <div className="h-12 bg-background-secondary rounded-xl w-full" />
-            </div>
+    <div className="space-y-8 max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+      {/* 1. VISUALISATIONS KPIS 21ST.DEV EN PREMIER */}
+      {!loading && stats ? (
+        <StudentKpiCharts stats={stats} />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-40" />
           ))}
         </div>
-      ) : filteredOrders.length === 0 ? (
-        /* État vide */
-        <div className="bg-background border border-border rounded-3xl p-12 text-center space-y-4 max-w-md mx-auto">
-          <div className="w-16 h-16 rounded-full bg-navy/5 text-navy flex items-center justify-center mx-auto">
-            <Package className="w-8 h-8 text-gold" />
-          </div>
-          <h2 className="font-serif font-bold text-lg text-navy">Aucune commande trouvée</h2>
-          <p className="text-xs text-foreground-muted">
-            {searchQuery || formatFilter !== "all" || statusFilter !== "all"
-              ? "Aucun résultat ne correspond à vos critères de recherche ou de filtre."
-              : "Vous n'avez pas encore passé de commande d'ouvrage numérique ou papier."}
-          </p>
-          <Link
-            href="/student/catalog"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gold hover:bg-gold-hover text-navy text-xs font-bold transition-all shadow-md active:scale-95"
-          >
-            <ShoppingBag className="w-4 h-4 text-navy" />
-            Passer une commande (Explorer le catalogue)
+      )}
+      
+      {/* En-tête de section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+        <div>
+          <Link href="/student" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Retour à mon espace
           </Link>
+          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+            <ShoppingBag className="w-4 h-4 text-gold" />
+            Historique & Suivi des Commandes
+          </div>
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+            Mes Commandes & Factures
+          </h1>
+          <p className="text-xs text-foreground-muted mt-1">
+            Retrouvez l&apos;intégralité de vos achats d&apos;ouvrages numériques et imprimés, et suivez l&apos;avancement des livraisons physiques.
+          </p>
+        </div>
+
+        <Link
+          href="/student/catalog"
+          className="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-xs"
+        >
+          <BookOpen className="w-4 h-4 text-gold" />
+          Parcourir le Catalogue
+        </Link>
+      </div>
+
+      {/* Barre de Recherche et Filtres */}
+      <div className="bg-background border border-border p-4 rounded-2xl space-y-4 shadow-xs">
+        <div className="flex flex-col md:flex-row gap-3">
+          {/* Recherche */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Rechercher par N° de commande ou titre d'ouvrage..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-9 pr-4 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-foreground placeholder:text-foreground-muted min-h-[40px]"
+            />
+          </div>
+
+          {/* Filtres par format */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+            {[
+              { id: "all", label: "Tous les formats" },
+              { id: "digital", label: "Numérique" },
+              { id: "paper", label: "Imprimé (Papier)" },
+            ].map((btn) => (
+              <button
+                key={btn.id}
+                onClick={() => {
+                  setFormatFilter(btn.id as OrderFormatFilter);
+                  setCurrentPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors border ${
+                  formatFilter === btn.id
+                    ? "bg-navy text-white border-navy"
+                    : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
+                }`}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Filtres par statut */}
+        <div className="flex items-center gap-2 pt-2 border-t border-border overflow-x-auto">
+          <span className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider shrink-0 flex items-center gap-1">
+            <Filter className="w-3 h-3 text-gold" />
+            Statut :
+          </span>
+          {[
+            { id: "all", label: "Tous" },
+            { id: "completed", label: "Livrées / Terminées" },
+            { id: "in_progress", label: "En cours" },
+            { id: "failed_cancelled", label: "Annulées / Échouées" },
+          ].map((st) => (
+            <button
+              key={st.id}
+              onClick={() => {
+                setStatusFilter(st.id as OrderStatusFilter);
+                setCurrentPage(1);
+              }}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors ${
+                statusFilter === st.id
+                  ? "bg-navy/10 text-navy border border-navy/30 font-bold"
+                  : "text-foreground-muted hover:text-navy"
+              }`}
+            >
+              {st.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Liste des Commandes */}
+      {loading ? (
+        <div className="space-y-4 animate-pulse">
+          <div className="h-32 bg-background-secondary rounded-2xl" />
+          <div className="h-32 bg-background-secondary rounded-2xl" />
+        </div>
+      ) : paginatedOrders.length === 0 ? (
+        <div className="bg-background border border-border p-8 rounded-2xl text-center space-y-3">
+          <Package className="w-10 h-10 text-foreground-muted mx-auto" />
+          <h3 className="font-serif font-bold text-navy text-lg">Aucune commande trouvée</h3>
+          <p className="text-xs text-foreground-muted">
+            Aucun achat ne correspond à vos critères de recherche actuels.
+          </p>
         </div>
       ) : (
-        /* Liste des cartes de commande */
-        <div className="space-y-6">
+        <div className="space-y-4">
           {paginatedOrders.map((order) => {
-            const totalVal = typeof order.total_amount === "string" ? parseFloat(order.total_amount) : order.total_amount;
-
+            const hasPaperItem = order.lignes.some((l) => l.format_type === "paper");
             return (
               <div
                 key={order.id}
-                className="bg-background border border-border rounded-3xl p-5 sm:p-6 space-y-5 shadow-sm transition-all hover:border-border/80"
+                className="bg-background border border-border rounded-2xl p-5 space-y-4 shadow-xs hover:border-gold/50 transition-colors"
               >
-                {/* Entête commande */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
-                  <div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-serif font-bold text-navy text-sm sm:text-base">
-                        Commande #{order.id.substring(0, 12)}
-                      </span>
-                      {renderStatusBadge(order)}
-                    </div>
-                    <p className="text-[11px] text-foreground-muted mt-1 flex items-center gap-1.5">
-                      <Clock className="w-3 h-3 text-gold shrink-0" />
-                      Passée le {new Date(order.created_at).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </p>
+                {/* En-tête de carte */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-serif font-bold text-navy text-sm">
+                      {order.id}
+                    </span>
+                    <span className="text-xs text-foreground-muted">
+                      Passée le {new Date(order.created_at).toLocaleDateString("fr-FR")}
+                    </span>
+                    {renderStatusBadge(order)}
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-4">
-                    <span className="font-serif font-bold text-gold-dark text-base sm:text-lg">
-                      {totalVal.toLocaleString("fr-FR")} FCFA
-                    </span>
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
                     <button
                       onClick={() => setSelectedOrderForModal(order)}
-                      className="px-3 py-1.5 rounded-xl border border-border bg-background-secondary hover:bg-background text-navy font-bold text-xs transition-colors flex items-center gap-1.5"
+                      className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border text-navy text-xs font-semibold hover:border-gold transition-colors inline-flex items-center gap-1.5"
                     >
-                      <FileText className="w-3.5 h-3.5 text-gold shrink-0" />
-                      Voir reçu
+                      <FileText className="w-3.5 h-3.5 text-gold" />
+                      Détails & Facture
                     </button>
                   </div>
                 </div>
 
-                {/* Articles commandés */}
-                <div className="space-y-2.5">
-                  <p className="text-[11px] font-bold text-navy uppercase tracking-wider">Ovrages commandés :</p>
-                  <div className="space-y-2">
-                    {order.lignes?.map((item) => {
-                      const itemPrice = typeof item.unit_price === "string" ? parseFloat(item.unit_price) : item.unit_price;
-                      
-                      // Règle d'or #2 : Déblocage numérique immédiat dès que statut_paiement === 'paid'
-                      const isDigitalPaid = item.format_type === "digital" && order.statut_paiement === "paid";
-
-                      return (
-                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between text-xs bg-background-secondary p-3.5 rounded-2xl border border-border/60 gap-3">
-                          <div className="flex items-start gap-3 min-w-0">
-                            <BookOpen className="w-4 h-4 text-navy shrink-0 mt-0.5" />
-                            <div className="min-w-0">
-                              <p className="font-bold text-navy truncate">{item.ouvrage_title}</p>
-                              <p className="text-[10px] text-foreground-muted mt-0.5">
-                                {item.format_type === "digital" ? "Format Numérique (Consultation illimitée)" : "Exemplaire Papier"} x {item.quantity}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 border-border/40 pt-2 sm:pt-0">
-                            <span className="font-semibold text-navy">
-                              {itemPrice.toLocaleString("fr-FR")} FCFA
-                            </span>
-
-                            {isDigitalPaid && (
-                              <Link
-                                href={`/catalog/reader/${item.ouvrage}`}
-                                className="px-3.5 py-1.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-[11px] font-bold transition-all shadow-sm flex items-center gap-1.5"
-                              >
-                                <Sparkles className="w-3.5 h-3.5 text-gold shrink-0" />
-                                Lire sur Liseuse
-                              </Link>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                {/* Tracker de Livraison Physique (si présent) */}
+                {hasPaperItem && order.livraison && (
+                  <div className="bg-background-secondary p-4 rounded-xl border border-border space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-navy">
+                      <span className="flex items-center gap-1.5">
+                        <Package className="w-4 h-4 text-gold" />
+                        Livraison physique ({order.livraison.city})
+                      </span>
+                      {order.livraison.tracking_number && (
+                        <span className="text-[11px] font-mono text-foreground-muted">
+                          Suivi : {order.livraison.tracking_number}
+                        </span>
+                      )}
+                    </div>
+                    <OrderTrackerStepper status={order.livraison.statut} />
                   </div>
-                </div>
-
-                {/* Stepper de Livraison Physique */}
-                {order.livraison && (
-                  <OrderTrackerStepper
-                    status={order.livraison.statut}
-                    carrierName={order.livraison.carrier_name}
-                    trackingNumber={order.livraison.tracking_number}
-                  />
                 )}
 
+                {/* Articles de la commande */}
+                <div className="space-y-2">
+                  {order.lignes.map((ligne) => (
+                    <div key={ligne.id} className="flex items-center justify-between gap-4 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <BookOpen className="w-4 h-4 text-gold shrink-0" />
+                        <span className="font-semibold text-navy truncate">
+                          {ligne.ouvrage_title}
+                        </span>
+                        <span className="text-[10px] text-foreground-muted bg-background-secondary px-2 py-0.5 rounded border border-border shrink-0">
+                          {ligne.format_type === "paper" ? "Imprimé" : "Numérique"}
+                        </span>
+                      </div>
+                      <span className="font-serif font-bold text-navy shrink-0">
+                        {Number(ligne.unit_price).toLocaleString("fr-FR")} {order.currency || "FCFA"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pied de carte : Total */}
+                <div className="flex items-center justify-between pt-2 border-t border-border text-xs">
+                  <span className="text-foreground-muted">
+                    Total TTC ({order.lignes.length} article{order.lignes.length > 1 ? "s" : ""})
+                  </span>
+                  <strong className="font-serif text-navy text-base font-bold">
+                    {Number(order.total_amount).toLocaleString("fr-FR")} {order.currency || "FCFA"}
+                  </strong>
+                </div>
               </div>
             );
           })}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-border text-xs">
-              <span className="text-foreground-muted">
-                Page <span className="font-bold text-navy">{currentPage}</span> sur {totalPages} ({filteredOrders.length} commandes)
-              </span>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-xl border border-border hover:bg-background-secondary disabled:opacity-40 transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4 text-navy" />
-                </button>
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-xl border border-border hover:bg-background-secondary disabled:opacity-40 transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4 text-navy" />
-                </button>
-              </div>
-            </div>
-          )}
-
         </div>
       )}
 
-      {/* Modale de Détail & Reçu */}
-      <OrderDetailModal
-        order={selectedOrderForModal}
-        isOpen={!!selectedOrderForModal}
-        onClose={() => setSelectedOrderForModal(null)}
-      />
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-border pt-4 text-xs text-foreground-muted">
+          <span>Page {currentPage} sur {totalPages}</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg bg-background-secondary border border-border disabled:opacity-40 hover:border-gold transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg bg-background-secondary border border-border disabled:opacity-40 hover:border-gold transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
+      {/* Modale de Détail de Commande */}
+      {selectedOrderForModal && (
+        <OrderDetailModal
+          order={selectedOrderForModal}
+          isOpen={!!selectedOrderForModal}
+          onClose={() => setSelectedOrderForModal(null)}
+        />
+      )}
     </div>
   );
 }

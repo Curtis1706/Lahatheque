@@ -28,4 +28,6 @@ export async function getStudyStats(): Promise<StudentStudyStats> {
   return { ...mockStudyStats };
 }
 
+export const fetchStudentStudyStats = getStudyStats;
+
 

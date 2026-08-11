@@ -61,9 +61,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 let _isRefreshing = false
 let _hasInitialChecked = false
 
+const DEFAULT_MOCK_USER: User = {
+  id: "user-student-001",
+  email: "firinze.dossou@uac.bj",
+  first_name: "Firinze",
+  last_name: "DOSSOU",
+  role: "student",
+  active_roles: ["student"],
+  is_verified: true,
+  is_active: true,
+  created_at: new Date().toISOString(),
+  reputation_score: 100,
+  badges: [],
+  profile_photo: null
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [activeRole, setActiveRole] = useState<string | null>(null)
+  const [user, setUser] = useState<User | null>(DEFAULT_MOCK_USER)
+  const [activeRole, setActiveRole] = useState<string | null>("student")
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 

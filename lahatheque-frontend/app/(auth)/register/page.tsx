@@ -6,10 +6,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { 
-  GraduationCap, 
   BookOpen, 
-  Building2, 
   UserCheck, 
+  Building2, 
   ArrowRight, 
   Mail, 
   Lock, 
@@ -17,14 +16,16 @@ import {
   Sparkles,
   AlertCircle,
   Library,
-  Globe
+  Handshake,
+  ShieldCheck
 } from "lucide-react";
 import { registerUser } from "@/lib/services/auth";
 import { PhoneInput } from "@/components/ui/phone-input";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [role, setRole] = useState<"student" | "teacher" | "author" | "publisher" | "librarian">("student");
+  // Rôles en auto-inscription directe selon Cahier des Charges v3.2 : Lecteur ou Auteur
+  const [role, setRole] = useState<"student" | "author">("student");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -78,16 +79,10 @@ export default function RegisterPage() {
       if (res.success) {
         setSuccess("Compte créé avec succès ! Redirection...");
         setTimeout(() => {
-          if (role === "student") {
-            router.push("/student");
-          } else if (role === "publisher") {
-            router.push("/publisher");
-          } else if (role === "teacher") {
-            router.push("/teacher");
-          } else if (role === "librarian") {
-            router.push("/librarian");
+          if (role === "author") {
+            router.push("/author");
           } else {
-            router.push("/catalog");
+            router.push("/student");
           }
         }, 1500);
       } else {
@@ -117,46 +112,55 @@ export default function RegisterPage() {
             </div>
           </Link>
 
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-light text-navy text-xs font-bold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy/5 text-navy text-xs font-bold uppercase tracking-wider border border-gold/20">
             <Sparkles className="w-3.5 h-3.5 text-gold" />
             Création de Compte LAHAThèque
           </div>
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-navy">
             Rejoignez la Bibliothèque Numérique
           </h1>
+          <p className="text-xs text-foreground-muted max-w-md">
+            Créez votre compte en auto-inscription directe pour accéder immédiatement à vos lectures ou déposer vos manuscrits.
+          </p>
         </div>
 
-        {/* Sélection du Rôle */}
+        {/* Sélection du Profil (Auto-inscription directe : Lecteur vs Auteur) */}
         <div className="space-y-3">
           <label className="text-xs font-bold uppercase tracking-wider text-navy block text-center sm:text-left">
-            Sélectionnez votre profil
+            Sélectionnez votre profil d&apos;inscription
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {[
-              { id: "student", label: "Étudiant", icon: GraduationCap },
-              { id: "teacher", label: "Enseignant", icon: BookOpen },
-              { id: "author", label: "Auteur", icon: UserCheck },
-              { id: "publisher", label: "Éditeur", icon: Building2 },
-              { id: "librarian", label: "Bibliothécaire", icon: Library },
-            ].map((item) => {
-              const Icon = item.icon;
-              const active = role === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setRole(item.id as typeof role)}
-                  className={`p-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
-                    active 
-                      ? "bg-navy text-white border-navy ring-2 ring-gold shadow-md" 
-                      : "bg-background text-foreground border-border hover:border-gold"
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 ${active ? "text-gold" : "text-foreground-muted"}`} />
-                  <span className="text-[10px] leading-tight text-center">{item.label}</span>
-                </button>
-              );
-            })}
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => setRole("student")}
+              className={`p-4 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                role === "student"
+                  ? "bg-navy text-white border-navy ring-2 ring-gold shadow-md"
+                  : "bg-background text-foreground border-border hover:border-gold"
+              }`}
+            >
+              <BookOpen className={`w-6 h-6 ${role === "student" ? "text-gold" : "text-foreground-muted"}`} />
+              <div className="text-center">
+                <span className="font-bold block text-sm">Lecteur</span>
+                <span className="text-[10px] text-foreground-muted block font-normal">Étudiant, Élève, Enseignant, Particulier</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setRole("author")}
+              className={`p-4 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                role === "author"
+                  ? "bg-navy text-white border-navy ring-2 ring-gold shadow-md"
+                  : "bg-background text-foreground border-border hover:border-gold"
+              }`}
+            >
+              <UserCheck className={`w-6 h-6 ${role === "author" ? "text-gold" : "text-foreground-muted"}`} />
+              <div className="text-center">
+                <span className="font-bold block text-sm">Auteur</span>
+                <span className="text-[10px] text-foreground-muted block font-normal">Dépôt & étude de manuscrits</span>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -178,7 +182,7 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-navy">Prénom</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-navy">Prénom *</label>
               <div className="relative">
                 <User className="absolute left-3.5 top-3.5 w-4 h-4 text-foreground-muted pointer-events-none" />
                 <input
@@ -187,13 +191,13 @@ export default function RegisterPage() {
                   value={formData.first_name}
                   onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                   placeholder="Jean"
-                  className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none transition-all"
+                  className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none transition-all min-h-[44px]"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-navy">Nom</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-navy">Nom *</label>
               <div className="relative">
                 <User className="absolute left-3.5 top-3.5 w-4 h-4 text-foreground-muted pointer-events-none" />
                 <input
@@ -201,15 +205,15 @@ export default function RegisterPage() {
                   required
                   value={formData.last_name}
                   onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                  placeholder="Agossou"
-                  className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none transition-all"
+                  placeholder="Kouadio"
+                  className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none transition-all min-h-[44px]"
                 />
               </div>
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-navy">Adresse Email</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-navy">Adresse Email *</label>
             <div className="relative">
               <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-foreground-muted pointer-events-none" />
               <input
@@ -217,52 +221,32 @@ export default function RegisterPage() {
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="etudiant@univ.edu"
-                className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none transition-all"
+                placeholder="jean.kouadio@example.com"
+                className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none transition-all min-h-[44px]"
               />
             </div>
           </div>
 
-          <div className="space-y-2 animate-in fade-in duration-200">
-            <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays</label>
-            <div className="relative">
-              <Globe className="absolute left-3.5 top-3.5 w-4 h-4 text-foreground-muted pointer-events-none" />
-              <select
-                value={formData.country}
-                onChange={(e) => handleCountryChange(e.target.value)}
-                className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
-              >
-                <option value="BJ">Bénin (BJ)</option>
-                <option value="SN">Sénégal (SN)</option>
-                <option value="TG">Togo (TG)</option>
-                <option value="CI">Côte d'Ivoire (CI)</option>
-                <option value="NE">Niger (NE)</option>
-                <option value="CD">RDC (CD)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-2 animate-in fade-in duration-200">
-            <label className="text-xs font-bold uppercase tracking-wider text-navy">Numéro de Téléphone *</label>
+          {/* Numéro de Téléphone avec sélection d'indicatif pays */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-navy">Numéro de Téléphone</label>
             <PhoneInput
               value={formData.phone}
-              onChange={(val: any) => setFormData({ ...formData, phone: val || "" })}
-              className="w-full"
+              onChange={(phone) => setFormData({ ...formData, phone })}
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-navy">Mot de passe</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-navy">Mot de Passe *</label>
             <div className="relative">
               <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-foreground-muted pointer-events-none" />
               <input
                 type="password"
                 required
-                minLength={8}
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="•••••••• (min 8 caractères)"
-                className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none transition-all"
+                placeholder="••••••••"
+                className="w-full pl-10 pr-3 py-3 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none transition-all min-h-[44px]"
               />
             </div>
           </div>
@@ -270,21 +254,36 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 rounded-xl bg-navy text-white text-xs sm:text-sm font-semibold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 shadow-lg hover:shadow-xl mt-6 cursor-pointer"
+            className="w-full py-3.5 px-4 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs sm:text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
           >
-            {loading ? "Création du compte..." : "S'inscrire sur LAHAThèque"}
-            <ArrowRight className="w-4 h-4" />
+            {loading ? "Création en cours..." : `Créer mon compte ${role === "author" ? "Auteur" : "Lecteur"}`}
+            <ArrowRight className="w-4 h-4 text-gold" />
           </button>
         </form>
 
-        {/* Lien Login */}
-        <div className="text-center pt-4 border-t border-border mt-4">
-          <p className="text-xs text-foreground-muted">
-            Déjà inscrit ?{" "}
-            <Link href="/login" className="text-gold font-bold hover:text-gold-hover transition-colors">
-              Se connecter
-            </Link>
+        {/* Bloc d'Accès Institutionnel / Partenaires (Universités, Éditeurs tiers, Grossistes) selon v3.2 */}
+        <div className="bg-background-secondary p-4 rounded-2xl border border-border space-y-2 text-xs">
+          <div className="flex items-center gap-2 text-navy font-bold">
+            <Handshake className="w-4 h-4 text-gold shrink-0" />
+            <span>Universités, Éditeurs Tiers & Grossistes</span>
+          </div>
+          <p className="text-[11px] text-foreground-muted">
+            Les comptes institutionnels (conventions universités 15%, maisons d&apos;édition partenaires et licences grossistes) sont soumis à validation préalable par LAHA Éditions.
           </p>
+          <Link
+            href="/contact"
+            className="inline-flex items-center gap-1 text-[11px] font-bold text-navy hover:text-gold transition-colors pt-1"
+          >
+            Faire une demande de partenariat institutionnel →
+          </Link>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center pt-2 border-t border-border text-xs text-foreground-muted">
+          Vous avez déjà un compte ?{" "}
+          <Link href="/login" className="font-bold text-navy hover:underline">
+            Se connecter
+          </Link>
         </div>
 
       </motion.div>
