@@ -267,7 +267,7 @@ export function DashboardSidebar() {
   return (
     <Sidebar open={open} setOpen={setOpen}>
       <SidebarBody className="justify-between gap-6">
-        <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex flex-col flex-1 overflow-y-auto scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] overflow-x-hidden">
           {/* Header avec Logo + Animated SVG Menu Toggle Button */}
           <div className="flex items-center justify-between pb-3 border-b border-navy-hover">
             {open ? <Logo /> : <LogoIcon />}

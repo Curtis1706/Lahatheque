@@ -6,7 +6,6 @@ import { motion, animate, useMotionValue, useTransform } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ─── Utilitaire SVG (inspiré de ravikatiyar162/stats-widget — 21st.dev #4157) ─
 function generateSmoothPath(
   points: number[],
   width: number,
@@ -16,7 +15,7 @@ function generateSmoothPath(
   const xStep = width / (points.length - 1);
   const coords = points.map((p, i) => [
     i * xStep,
-    height - (p / 100) * (height * 0.8) - height * 0.1,
+    height - (p / 100) * (height * 0.7) - height * 0.15,
   ]);
   let path = `M ${coords[0][0]} ${coords[0][1]}`;
   for (let i = 0; i < coords.length - 1; i++) {
@@ -28,39 +27,76 @@ function generateSmoothPath(
   return path;
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+export type KpiTheme = "gold" | "navy" | "emerald" | "blue" | "amber" | "rose";
+
 export interface KpiCardProps {
-  /** Titre affiché sous la valeur */
   label: string;
-  /** Valeur numérique principale (count-up animé) */
   value: number;
-  /** Formater la valeur affichée, ex: (v) => v + " F CFA" */
   formatValue?: (v: number) => string;
-  /** Icône Lucide */
   icon: LucideIcon;
-  /** Variation en % vs période précédente (positif = hausse, négatif = baisse) */
   trend?: number;
-  /** Libellé de la période de comparaison, défaut: "mois dernier" */
   trendPeriod?: string;
-  /** Points de données pour le mini sparkline (valeurs entre 0 et 100) */
   sparkline?: number[];
+  theme?: KpiTheme;
+  subtext?: string;
   className?: string;
 }
 
-// ─── KpiCard ─────────────────────────────────────────────────────────────────
+const themeStyles: Record<
+  KpiTheme,
+  {
+    iconBg: string;
+    iconColor: string;
+    lineColor: string;
+  }
+> = {
+  gold: {
+    iconBg: "bg-gold/15 text-gold border-gold/30",
+    iconColor: "text-gold",
+    lineColor: "var(--gold)",
+  },
+  navy: {
+    iconBg: "bg-navy/10 text-navy border-navy/20",
+    iconColor: "text-navy",
+    lineColor: "var(--navy)",
+  },
+  emerald: {
+    iconBg: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30",
+    iconColor: "text-emerald-600",
+    lineColor: "#10b981",
+  },
+  blue: {
+    iconBg: "bg-blue-500/15 text-blue-600 border-blue-500/30",
+    iconColor: "text-blue-600",
+    lineColor: "#3b82f6",
+  },
+  amber: {
+    iconBg: "bg-amber-500/15 text-amber-600 border-amber-500/30",
+    iconColor: "text-amber-600",
+    lineColor: "#f59e0b",
+  },
+  rose: {
+    iconBg: "bg-rose-500/15 text-rose-600 border-rose-500/30",
+    iconColor: "text-rose-600",
+    lineColor: "#f43f5e",
+  },
+};
+
 export function KpiCard({
   label,
   value,
   formatValue,
   icon: Icon,
   trend,
-  trendPeriod = "mois dernier",
+  trendPeriod = "ce mois",
   sparkline,
+  theme = "navy",
+  subtext,
   className,
 }: KpiCardProps) {
   const isPositive = trend === undefined ? true : trend >= 0;
+  const activeTheme = themeStyles[theme] || themeStyles.navy;
 
-  // Count-up Framer Motion (inspiré de ravikatiyar162/card-10 — 21st.dev #7461)
   const motionValue = useMotionValue(0);
   const displayValue = useTransform(motionValue, (latest) => {
     const rounded = Math.round(latest);
@@ -71,132 +107,109 @@ export function KpiCard({
 
   useEffect(() => {
     const controls = animate(motionValue, value, {
-      duration: 1.6,
+      duration: 1.4,
       ease: "easeOut",
     });
     return controls.stop;
   }, [value, motionValue]);
 
-  // Mini sparkline SVG animé
   const svgW = 120;
-  const svgH = 48;
+  const svgH = 40;
   const linePathRef = useRef<SVGPathElement>(null);
-  const areaPathRef = useRef<SVGPathElement>(null);
 
   const linePath = useMemo(
-    () => (sparkline ? generateSmoothPath(sparkline, svgW, svgH) : ""),
+    () => (sparkline && sparkline.length >= 2 ? generateSmoothPath(sparkline, svgW, svgH) : ""),
     [sparkline]
   );
-  const areaPath = useMemo(
-    () => (linePath ? `${linePath} L ${svgW} ${svgH} L 0 ${svgH} Z` : ""),
-    [linePath]
-  );
-
-  useEffect(() => {
-    const path = linePathRef.current;
-    const area = areaPathRef.current;
-    if (!path || !area || !linePath) return;
-    const length = path.getTotalLength();
-    path.style.transition = "none";
-    path.style.strokeDasharray = `${length} ${length}`;
-    path.style.strokeDashoffset = `${length}`;
-    area.style.transition = "none";
-    area.style.opacity = "0";
-    path.getBoundingClientRect();
-    path.style.transition =
-      "stroke-dashoffset 0.9s ease-in-out, stroke 0.4s ease";
-    path.style.strokeDashoffset = "0";
-    area.style.transition = "opacity 0.9s ease-in-out 0.2s, fill 0.4s ease";
-    area.style.opacity = "1";
-  }, [linePath]);
-
-  const gradIdPos = `kpi-grad-pos-${label.replace(/\s+/g, "-")}`;
-  const gradIdNeg = `kpi-grad-neg-${label.replace(/\s+/g, "-")}`;
-  const ariaLabel = `${label}: ${value}${
-    trend !== undefined
-      ? `. Variation de ${trend > 0 ? "+" : ""}${trend}% par rapport au ${trendPeriod}.`
-      : ""
-  }`;
 
   return (
     <div
-      role="region"
-      aria-label={ariaLabel}
       className={cn(
-        "bg-background border border-border rounded-2xl p-5 flex flex-col gap-3",
-        "shadow-sm hover:border-gold/40 hover:shadow-md transition-all duration-200",
+        "rounded-2xl bg-background-secondary border border-border p-5 flex flex-col justify-between gap-4 transition-colors hover:border-gold/50",
         className
       )}
     >
-      {/* En-tête : icône + mini sparkline */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="w-10 h-10 rounded-xl bg-background-secondary border border-border flex items-center justify-center text-navy flex-shrink-0">
-          <Icon className="w-5 h-5" aria-hidden="true" />
+      {/* Top section: Icon & Sparkline */}
+      <div className="flex items-start justify-between gap-3">
+        <div
+          className={cn(
+            "w-10 h-10 rounded-xl flex items-center justify-center border shrink-0",
+            activeTheme.iconBg
+          )}
+        >
+          <Icon className="w-5 h-5" />
         </div>
 
-        {sparkline && sparkline.length >= 2 && (
-          <svg
-            viewBox={`0 0 ${svgW} ${svgH}`}
-            className="w-24 h-10 flex-shrink-0"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <path
-              ref={linePathRef}
-              d={linePath}
-              fill="none"
-              stroke={isPositive ? "var(--success)" : "var(--destructive)"}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+        {/* Clean Line Sparkline without heavy dark gradients */}
+        {linePath && (
+          <div className="relative w-24 h-10 shrink-0">
+            <svg
+              viewBox={`0 0 ${svgW} ${svgH}`}
+              className="w-full h-full"
+              preserveAspectRatio="none"
+            >
+              <path
+                ref={linePathRef}
+                d={linePath}
+                fill="none"
+                stroke={activeTheme.lineColor}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
         )}
       </div>
 
-      {/* Valeur count-up animée */}
-      <motion.p className="text-3xl font-bold text-navy leading-none tabular-nums">
-        {displayValue}
-      </motion.p>
+      {/* Main Content: Value & Label */}
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between gap-2 flex-wrap">
+          <motion.p className="text-2xl sm:text-3xl font-bold font-serif text-navy tracking-tight tabular-nums">
+            {displayValue}
+          </motion.p>
 
-      {/* Label + badge trend */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-xs sm:text-sm text-foreground-muted font-medium">
+          {trend !== undefined && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border shrink-0",
+                isPositive
+                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                  : "bg-rose-500/10 text-rose-600 border-rose-500/30"
+              )}
+            >
+              {isPositive ? (
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              ) : (
+                <ArrowDownRight className="w-3.5 h-3.5" />
+              )}
+              {isPositive ? "+" : ""}
+              {trend}%
+            </span>
+          )}
+        </div>
+
+        <p className="text-xs sm:text-sm font-semibold text-foreground">
           {label}
-        </span>
+        </p>
 
-        {trend !== undefined && (
-          <span
-            className={cn(
-              "inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold border",
-              isPositive
-                ? "bg-success/10 text-success border-success/20"
-                : "bg-destructive/10 text-destructive border-destructive/20"
-            )}
-            title={`${isPositive ? "+" : ""}${trend}% par rapport au ${trendPeriod}`}
-          >
-            {isPositive ? (
-              <ArrowUpRight className="w-3 h-3" aria-hidden="true" />
-            ) : (
-              <ArrowDownRight className="w-3 h-3" aria-hidden="true" />
-            )}
-            {isPositive ? "+" : ""}
-            {trend}%
-          </span>
+        {subtext && (
+          <p className="text-[11px] font-medium text-foreground-muted">
+            {subtext}
+          </p>
         )}
       </div>
     </div>
   );
 }
 
-// ─── KpiGrid : grille responsive de KPI cards ─────────────────────────────────
 export interface KpiGridProps {
   cards: KpiCardProps[];
   cols?: 2 | 3 | 4;
   className?: string;
 }
 
-export function KpiGrid({ cards, cols = 4, className }: KpiGridProps) {
+export function KpiGrid({ cards, cols = 3, className }: KpiGridProps) {
   const colClass =
     cols === 2
       ? "sm:grid-cols-2"
@@ -205,7 +218,7 @@ export function KpiGrid({ cards, cols = 4, className }: KpiGridProps) {
       : "sm:grid-cols-2 lg:grid-cols-4";
 
   return (
-    <div className={cn(`grid grid-cols-1 ${colClass} gap-4`, className)}>
+    <div className={cn(`grid grid-cols-1 ${colClass} gap-4 sm:gap-6`, className)}>
       {cards.map((card, i) => (
         <KpiCard key={`${card.label}-${i}`} {...card} />
       ))}

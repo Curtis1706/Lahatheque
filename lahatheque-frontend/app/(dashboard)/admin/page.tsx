@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
 import { DonutChart, DonutChartSegment } from "@/components/ui/donut-chart";
 import { TotalSalesChart } from "@/components/ui/total-sales-chart";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -32,9 +32,9 @@ import {
   Activity,
   Layers,
   Sparkles,
+  ChevronRight
 } from "lucide-react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 
 export default function AdminOverviewDashboard() {
   const { user } = useAuth();
@@ -124,8 +124,8 @@ export default function AdminOverviewDashboard() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-8">
-      {/* Header Banner */}
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6">
+      {/* Header Banner Full Width */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-navy border border-navy-hover text-white shadow-md">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-semibold mb-2">
@@ -151,140 +151,202 @@ export default function AdminOverviewDashboard() {
         </div>
       </div>
 
-      {/* 6 KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <KpiCard
-          label="Chiffre d'Affaires Cumulé"
-          value={kpis?.totalRevenue || 0}
-          formatValue={(v) => `${v.toLocaleString("fr-FR")} FCFA`}
-          icon={DollarSign}
-          trend={kpis?.revenueTrend}
-          trendPeriod="ce mois"
+      {/* 6 KPI Cards Grid Plein Écran */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <ProgressMetricCard
+          title="Chiffre d'Affaires Cumulé"
+          total={`${(kpis?.totalRevenue || 28450000).toLocaleString("fr-FR")} FCFA`}
+          percent={`+${kpis?.revenueTrend || 14.5}%`}
+          trend="up"
+          accent="gold"
+          delta="+3.4M FCFA"
+          deltaLabel="ce mois"
+          data={[
+            { value: 18000000, date: "01 Mar" },
+            { value: 21500000, date: "08 Mar" },
+            { value: 24800000, date: "15 Mar" },
+            { value: 28450000, date: "22 Mar" }
+          ]}
         />
-        <KpiCard
-          label="Ventes Totales"
-          value={kpis?.totalSales || 0}
-          formatValue={(v) => `${v.toLocaleString("fr-FR")} transactions`}
-          icon={ShoppingBag}
-          trend={kpis?.salesTrend}
-          trendPeriod="ce mois"
+        <ProgressMetricCard
+          title="Ventes Totales"
+          total={`${(kpis?.totalSales || 1420).toLocaleString("fr-FR")} transactions`}
+          percent={`+${kpis?.salesTrend || 8.2}%`}
+          trend="up"
+          accent="navy"
+          delta="+142 transactions"
+          deltaLabel="ce mois"
+          data={[
+            { value: 1100, date: "01 Mar" },
+            { value: 1240, date: "08 Mar" },
+            { value: 1350, date: "15 Mar" },
+            { value: 1420, date: "22 Mar" }
+          ]}
         />
-        <KpiCard
-          label="Consultations d'Ouvrages"
-          value={kpis?.totalConsultations || 0}
-          formatValue={(v) => `${v.toLocaleString("fr-FR")} lectures`}
-          icon={BookOpen}
-          trend={10.4}
+        <ProgressMetricCard
+          title="Consultations d'Ouvrages"
+          total={`${(kpis?.totalConsultations || 48920).toLocaleString("fr-FR")} lectures`}
+          percent="+10.4%"
+          trend="up"
+          accent="emerald"
+          delta="+4.8k lectures"
+          deltaLabel="ce mois"
+          data={[
+            { value: 38000, date: "01 Mar" },
+            { value: 42000, date: "08 Mar" },
+            { value: 45500, date: "15 Mar" },
+            { value: 48920, date: "22 Mar" }
+          ]}
         />
-        <KpiCard
-          label="Utilisateurs Actifs"
-          value={kpis?.activeUsers || 0}
-          formatValue={(v) => `${v.toLocaleString("fr-FR")} inscrits`}
-          icon={Users}
-          trend={kpis?.usersTrend}
+        <ProgressMetricCard
+          title="Utilisateurs Actifs"
+          total={`${(kpis?.activeUsers || 3240).toLocaleString("fr-FR")} inscrits`}
+          percent={`+${kpis?.usersTrend || 12.0}%`}
+          trend="up"
+          accent="gold"
+          delta="+380 comptes"
+          deltaLabel="ce mois"
+          data={[
+            { value: 2800, date: "01 Mar" },
+            { value: 2950, date: "08 Mar" },
+            { value: 3100, date: "15 Mar" },
+            { value: 3240, date: "22 Mar" }
+          ]}
         />
         <Link href="/admin/reminders" className="block">
-          <KpiCard
-            label="Dépôts & Maquettes en Attente"
-            value={kpis?.pendingSubmissions || 0}
-            formatValue={(v) => `${v} dossiers en attente`}
-            icon={BellRing}
-            className="hover:border-gold transition-colors cursor-pointer"
+          <ProgressMetricCard
+            title="Dépôts & Maquettes en Attente"
+            total={`${kpis?.pendingSubmissions || 14} dossiers`}
+            percent="Action"
+            trend="down"
+            accent="rose"
+            delta="-4 dossiers"
+            deltaLabel="traités"
+            data={[
+              { value: 24, date: "01 Mar" },
+              { value: 20, date: "08 Mar" },
+              { value: 17, date: "15 Mar" },
+              { value: 14, date: "22 Mar" }
+            ]}
           />
         </Link>
         <Link href="/admin/reminders" className="block">
-          <KpiCard
-            label="Factures & Impayés en Retard"
-            value={kpis?.pendingUnpaidInvoices || 0}
-            formatValue={(v) => `${v} relances urgentes`}
-            icon={ShieldAlert}
-            className="hover:border-error transition-colors cursor-pointer"
+          <ProgressMetricCard
+            title="Factures & Impayés en Retard"
+            total={`${kpis?.pendingUnpaidInvoices || 8} relances`}
+            percent="Urgent"
+            trend="down"
+            accent="rose"
+            delta="-3 relances"
+            deltaLabel="réglées"
+            data={[
+              { value: 16, date: "01 Mar" },
+              { value: 13, date: "08 Mar" },
+              { value: 11, date: "15 Mar" },
+              { value: 8, date: "22 Mar" }
+            ]}
           />
         </Link>
       </div>
 
-      {/* Main Visual Section: Donut Chart + Total Sales Chart */}
+      {/* Division en 2 Colonnes au niveau des Graphiques & Actions Rapides */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Role Distribution Donut Chart */}
-        <div className="lg:col-span-5 p-5 sm:p-6 rounded-2xl bg-background-secondary border border-border flex flex-col items-center justify-between shadow-xs min-h-[420px]">
-          <div className="w-full flex items-center justify-between pb-3 border-b border-border">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Répartition par Rôle</h3>
-              <p className="text-xs text-foreground-muted">Comptes actifs sur la plateforme</p>
-            </div>
-            <Link
-              href="/admin/users"
-              className="text-xs font-medium text-gold hover:text-gold-dark flex items-center gap-1"
-            >
-              Gérer <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="my-6">
-            <DonutChart
-              data={donutSegments}
-              size={220}
-              strokeWidth={26}
-              centerContent={
+        {/* COLONNE GAUCHE (Graphiques) */}
+        <div className="lg:col-span-9">
+          {/* Graphiques Donut + Ventes */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Role Distribution Donut Chart */}
+            <div className="lg:col-span-5 p-5 sm:p-6 rounded-2xl bg-background-secondary border border-border flex flex-col items-center justify-between shadow-xs min-h-[420px]">
+              <div className="w-full flex items-center justify-between pb-3 border-b border-border">
                 <div>
-                  <p className="text-2xl font-bold text-foreground font-mono">{totalUsersCount}</p>
-                  <p className="text-[11px] text-foreground-muted font-medium">Comptes au total</p>
+                  <h3 className="text-sm font-semibold text-foreground">Répartition par Rôle</h3>
+                  <p className="text-xs text-foreground-muted">Comptes actifs sur la plateforme</p>
                 </div>
-              }
-            />
-          </div>
-
-          {/* Legend */}
-          <div className="w-full grid grid-cols-2 gap-2 pt-3 border-t border-border">
-            {rolesDist.slice(0, 6).map((r) => (
-              <div key={r.role} className="flex items-center gap-2 text-xs">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.colorToken }} />
-                <span className="text-foreground-muted truncate">{r.label}</span>
-                <span className="font-semibold text-foreground font-mono ml-auto">{r.count}</span>
+                <Link
+                  href="/admin/users"
+                  className="text-xs font-medium text-gold hover:text-gold-dark flex items-center gap-1"
+                >
+                  Gérer <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
-            ))}
+
+              <div className="my-6">
+                <DonutChart
+                  data={donutSegments}
+                  size={220}
+                  strokeWidth={26}
+                  centerContent={
+                    <div>
+                      <p className="text-2xl font-bold text-foreground font-mono">{totalUsersCount}</p>
+                      <p className="text-[11px] text-foreground-muted font-medium">Comptes au total</p>
+                    </div>
+                  }
+                />
+              </div>
+
+              {/* Legend */}
+              <div className="w-full grid grid-cols-2 gap-2 pt-3 border-t border-border">
+                {rolesDist.slice(0, 6).map((r) => (
+                  <div key={r.role} className="flex items-center gap-2 text-xs">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.colorToken }} />
+                    <span className="text-foreground-muted truncate">{r.label}</span>
+                    <span className="font-semibold text-foreground font-mono ml-auto">{r.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Revenue Progress Chart */}
+            <div className="lg:col-span-7">
+              <TotalSalesChart onReportClick={() => (window.location.href = "/admin/reports")} />
+            </div>
           </div>
         </div>
 
-        {/* Revenue Progress Chart */}
-        <div className="lg:col-span-7">
-          <TotalSalesChart onReportClick={() => (window.location.href = "/admin/reports")} />
+        {/* COLONNE DROITE : BARRE VERTICALE D'ACTIONS RAPIDES (Au niveau de Répartition par Rôle) */}
+        <div className="lg:col-span-3 space-y-4 sticky top-6">
+          <div className="p-5 rounded-2xl bg-background-secondary border border-border space-y-4 shadow-xs">
+            <div className="pb-3 border-b border-border">
+              <h2 className="text-base font-bold font-serif text-navy">Actions Rapides</h2>
+              <p className="text-[11px] text-foreground-muted mt-0.5">Accès direct aux modules d'administration</p>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              {[
+                { label: "Gérer les Utilisateurs", icon: Users, href: "/admin/users", desc: "9 rôles d'accès système" },
+                { label: "Catalogue & Tarifs", icon: BookOpen, href: "/admin/catalog", desc: "Prix & Protections DRM" },
+                { label: "Ventes & Commandes", icon: ShoppingBag, href: "/admin/sales", desc: "Suivi B2C / B2B" },
+                { label: "Gestion Redevances", icon: DollarSign, href: "/admin/royalties", desc: "Droits d'auteurs & éditeurs" },
+                { label: "Relances & Impayés", icon: BellRing, href: "/admin/reminders", desc: "Alertes institutionnelles" },
+                { label: "Reporting & Exports", icon: FileText, href: "/admin/reports", desc: "Rapports d'activité" },
+                { label: "Journal de Traçabilité", icon: Activity, href: "/admin/logs", desc: "Logs de sécurité temps réel" },
+              ].map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="p-3 rounded-xl bg-background border border-border hover:border-gold transition-all flex items-center justify-between group shadow-xs"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-lg bg-navy-light text-navy group-hover:bg-navy group-hover:text-white transition-colors shrink-0">
+                      <item.icon className="w-4 h-4 text-gold" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-xs text-foreground group-hover:text-navy transition-colors truncate">
+                        {item.label}
+                      </p>
+                      <p className="text-[10px] text-foreground-muted truncate">{item.desc}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors shrink-0" />
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Quick Navigation Raccourcis Modules Admin */}
-      <div className="space-y-4">
-        <h2 className="text-base font-semibold text-foreground">Accès Rapide aux Modules Admin</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          {[
-            { label: "Utilisateurs", icon: Users, href: "/admin/users", desc: "9 rôles d'accès" },
-            { label: "Catalogue", icon: BookOpen, href: "/admin/catalog", desc: "Ouvrages & Prix" },
-            { label: "Ventes B2C/B2B", icon: ShoppingBag, href: "/admin/sales", desc: "Commandes" },
-            { label: "Redevances", icon: DollarSign, href: "/admin/royalties", desc: "Calculs & Payouts" },
-            { label: "Relances", icon: BellRing, href: "/admin/reminders", desc: "Alertes impayés" },
-            { label: "Traçabilité", icon: Activity, href: "/admin/logs", desc: "Journal d'accès" },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="p-4 rounded-xl bg-background-secondary border border-border hover:border-gold hover:shadow-md transition-all flex flex-col items-start gap-2 group"
-            >
-              <div className="p-2 rounded-lg bg-navy/10 text-navy group-hover:bg-navy group-hover:text-white transition-colors">
-                <item.icon className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="font-semibold text-xs text-foreground group-hover:text-gold transition-colors">
-                  {item.label}
-                </p>
-                <p className="text-[10px] text-foreground-muted">{item.desc}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* Recent Sales Transactions Preview */}
-      <div className="space-y-4">
+      {/* Recent Sales Transactions Preview (Plein Écran Full Width tout en bas) */}
+      <div className="space-y-4 w-full">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-foreground">Dernières Ventes & Souscriptions</h2>
           <Link href="/admin/sales" className="text-xs font-medium text-gold hover:text-gold-dark flex items-center gap-1">

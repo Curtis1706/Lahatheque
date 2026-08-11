@@ -106,7 +106,7 @@ function LoginContent() {
         <div className="text-center mb-8 flex flex-col items-center justify-center">
           <Link href="/" className="inline-flex flex-col items-center mb-2 group">
             <div className="p-1.5 bg-background rounded-3xl border border-border shadow-lg group-hover:border-gold/30 transition-colors">
-              <Image src="/logo.jpg" alt="LAHA Editions" width={80} height={80} className="rounded-2xl" />
+              <Image src="/logo.jpg" alt="LAHA Editions" width={80} height={80} style={{ width: "auto", height: "auto" }} className="rounded-2xl" />
             </div>
           </Link>
           <p className="text-xs text-foreground-muted mt-2">Accédez à votre bibliothèque universitaire numérique</p>

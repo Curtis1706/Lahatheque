@@ -5,6 +5,7 @@ import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
 import { CreateAccountModal } from "@/components/features/admin/create-account-modal";
+import { SendEmailModal } from "@/components/features/admin/send-email-modal";
 import { getAdminUsers } from "@/lib/services/admin";
 import { AdminUser, AdminRole } from "@/lib/types/admin";
 import {
@@ -27,6 +28,7 @@ export default function AdminUsersGlobalPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inspectUser, setInspectUser] = useState<AdminUser | null>(null);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<AdminUser | null>(null);
+  const [emailUser, setEmailUser] = useState<AdminUser | null>(null);
 
   const loadUsers = async () => {
     try {
@@ -129,6 +131,13 @@ export default function AdminUsersGlobalPage() {
       className: "text-right",
       cell: (row) => (
         <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={() => setEmailUser(row)}
+            className="p-1.5 rounded-lg hover:bg-navy-light text-navy transition-colors"
+            title="Envoyer un e-mail"
+          >
+            <Mail className="w-4 h-4" />
+          </button>
           <button
             onClick={() => setInspectUser(row)}
             className="p-1.5 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-foreground transition-colors"
@@ -290,6 +299,16 @@ export default function AdminUsersGlobalPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Modal d'envoi d'e-mail */}
+      {emailUser && (
+        <SendEmailModal
+          isOpen={!!emailUser}
+          onClose={() => setEmailUser(null)}
+          recipientEmail={emailUser.email}
+          recipientName={`${emailUser.first_name} ${emailUser.last_name}`}
+        />
       )}
     </div>
   );

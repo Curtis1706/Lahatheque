@@ -3,26 +3,32 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import { 
-  LayoutDashboard, 
-  BookOpen, 
-  Briefcase, 
-  FileCheck, 
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  LayoutDashboard,
+  BookOpen,
+  FileCheck,
+  Briefcase,
   User as UserIcon,
   Menu as MenuIcon,
   X,
-  LogOut,
+  GraduationCap,
   Building2,
   CheckCircle2,
-  GraduationCap,
-  ShieldCheck,
   PenTool,
   DollarSign,
   Users,
   ShoppingCart,
   Sparkles,
-  PackageCheck
+  PackageCheck,
+  ShieldCheck,
+  BellRing,
+  FileSpreadsheet,
+  Key,
+  Activity,
+  Settings,
+  ShoppingBag,
+  LogOut
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -32,12 +38,88 @@ export function MobileBottomNav() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Configuration des items de navigation selon le rôle
-  const getNavConfig = () => {
+  // Configuration des items de navigation rapide du bas selon le rôle
+  const getBottomNavConfig = () => {
     switch (user?.role) {
-      case "student":
-      case "super_client":
-      case "parent":
+      case "admin":
+      case "super_admin":
+        return {
+          leftItems: [
+            { label: "Vue d'ensemble", href: "/admin", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Utilisateurs", href: "/admin/users", icon: <Users className="w-5 h-5" /> },
+          ],
+          centerCta: { label: "Catalogue", href: "/admin/catalog", icon: <BookOpen className="w-6 h-6" /> },
+          rightItems: [
+            { label: "Ventes", href: "/admin/sales", icon: <ShoppingBag className="w-5 h-5" /> },
+            { label: "Logs", href: "/admin/logs", icon: <Activity className="w-5 h-5" /> },
+          ]
+        };
+      case "teacher":
+        return {
+          leftItems: [
+            { label: "Aperçu", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Cours", href: "/teacher", icon: <PenTool className="w-5 h-5" /> },
+          ],
+          centerCta: { label: "Spécimens", href: "/teacher", icon: <BookOpen className="w-6 h-6" /> },
+          rightItems: [
+            { label: "Livres", href: "/student/books", icon: <Briefcase className="w-5 h-5" /> },
+          ]
+        };
+      case "librarian":
+        return {
+          leftItems: [
+            { label: "Aperçu", href: "/librarian", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Affiliations", href: "/librarian/affiliations", icon: <Users className="w-5 h-5" /> },
+          ],
+          centerCta: { label: "Catalogue", href: "/student/catalog", icon: <Briefcase className="w-6 h-6" /> },
+          rightItems: [
+            { label: "Stats", href: "/librarian/stats", icon: <FileCheck className="w-5 h-5" /> },
+          ]
+        };
+      case "publisher":
+        return {
+          leftItems: [
+            { label: "Aperçu", href: "/publisher", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Dépôts", href: "/publisher/submissions", icon: <Briefcase className="w-5 h-5" /> },
+          ],
+          centerCta: { label: "Nouveau", href: "/publisher/submissions/new", icon: <PenTool className="w-6 h-6" /> },
+          rightItems: [
+            { label: "Redevances", href: "/publisher/royalties", icon: <DollarSign className="w-5 h-5" /> },
+          ]
+        };
+      case "author":
+        return {
+          leftItems: [
+            { label: "Aperçu", href: "/author", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Livres", href: "/author/books", icon: <BookOpen className="w-5 h-5" /> },
+          ],
+          centerCta: { label: "Déposer", href: "/author/submissions/new", icon: <PenTool className="w-6 h-6" /> },
+          rightItems: [
+            { label: "Redevances", href: "/author/royalties", icon: <DollarSign className="w-5 h-5" /> },
+          ]
+        };
+      case "layout_artist":
+        return {
+          leftItems: [
+            { label: "Aperçu", href: "/layout-artist", icon: <LayoutDashboard className="w-5 h-5" /> },
+          ],
+          centerCta: { label: "Maquettes", href: "/layout-artist/validation", icon: <PenTool className="w-6 h-6" /> },
+          rightItems: [
+            { label: "Profil", href: "/profile", icon: <UserIcon className="w-5 h-5" /> },
+          ]
+        };
+      case "legal_reviewer":
+        return {
+          leftItems: [
+            { label: "Aperçu", href: "/legal-reviewer", icon: <LayoutDashboard className="w-5 h-5" /> },
+          ],
+          centerCta: { label: "Contrats", href: "/legal-reviewer/contracts", icon: <ShieldCheck className="w-6 h-6" /> },
+          rightItems: [
+            { label: "Profil", href: "/profile", icon: <UserIcon className="w-5 h-5" /> },
+          ]
+        };
+      default:
+        // Student / Super Client
         return {
           leftItems: [
             { label: "Aperçu", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -48,68 +130,126 @@ export function MobileBottomNav() {
             { label: "Commandes", href: "/student/orders", icon: <FileCheck className="w-5 h-5" /> },
           ]
         };
-      case "teacher":
-        return {
-          leftItems: [
-            { label: "Aperçu", href: "/teacher", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Cours", href: "/teacher/courses", icon: <PenTool className="w-5 h-5" /> },
-          ],
-          centerCta: { label: "Spécimens", href: "/teacher/specimens", icon: <BookOpen className="w-6 h-6" /> },
-          rightItems: [
-            { label: "Recherche", href: "/catalog", icon: <Briefcase className="w-5 h-5" /> },
-          ]
-        };
-      case "librarian":
-        return {
-          leftItems: [
-            { label: "Aperçu", href: "/librarian", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Affiliations", href: "/librarian/affiliations", icon: <Users className="w-5 h-5" /> },
-          ],
-          centerCta: { label: "Catalogue", href: "/catalog", icon: <Briefcase className="w-6 h-6" /> },
-          rightItems: [
-            { label: "Stats", href: "/librarian/stats", icon: <FileCheck className="w-5 h-5" /> },
-          ]
-        };
-      case "publisher":
-        return {
-          leftItems: [
-            { label: "Aperçu", href: "/publisher", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Soumissions", href: "/publisher/submissions", icon: <Briefcase className="w-5 h-5" /> },
-          ],
-          centerCta: { label: "Nouvelle", href: "/publisher/submissions/new", icon: <PenTool className="w-6 h-6" /> },
-          rightItems: [
-            { label: "Redevances", href: "/publisher/royalties", icon: <DollarSign className="w-5 h-5" /> },
-          ]
-        };
-      case "author":
-        return {
-          leftItems: [
-            { label: "Aperçu", href: "/author", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Manuscrits", href: "/author/submissions", icon: <PenTool className="w-5 h-5" /> },
-          ],
-          centerCta: { label: "Nouveau", href: "/submit", icon: <PenTool className="w-6 h-6" /> },
-          rightItems: [
-            { label: "Redevances", href: "/author/royalties", icon: <DollarSign className="w-5 h-5" /> },
-          ]
-        };
-      default:
-        return {
-          leftItems: [
-            { label: "Accueil", href: "/", icon: <LayoutDashboard className="w-5 h-5" /> },
-          ],
-          centerCta: { label: "Catalogue", href: "/catalog", icon: <Briefcase className="w-6 h-6" /> },
-          rightItems: [
-            { label: "Connexion", href: "/login", icon: <UserIcon className="w-5 h-5" /> },
-          ]
-        };
     }
   };
 
-  const nav = getNavConfig();
+  // Liste dynamique des liens complets pour le tiroir de menu mobile (Drawer Sheet)
+  const getDrawerMenuLinks = () => {
+    switch (user?.role) {
+      case "admin":
+      case "super_admin":
+        return [
+          { label: "Vue d'ensemble", href: "/admin", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
+          { label: "Tous les Utilisateurs", href: "/admin/users", icon: <Users className="w-4 h-4 text-gold" /> },
+          { label: "Maquettistes", href: "/admin/users/layout-artists", icon: <PenTool className="w-4 h-4 text-gold" /> },
+          { label: "Chef Maquettiste", href: "/admin/users/chief-layout", icon: <ShieldCheck className="w-4 h-4 text-gold" /> },
+          { label: "Gestionnaires", href: "/admin/users/managers", icon: <Briefcase className="w-4 h-4 text-gold" /> },
+          { label: "Juristes & Relecteurs", href: "/admin/users/legal", icon: <FileCheck className="w-4 h-4 text-gold" /> },
+          { label: "Auteurs", href: "/admin/users/authors", icon: <BookOpen className="w-4 h-4 text-gold" /> },
+          { label: "Universités & Inst.", href: "/admin/users/universities", icon: <GraduationCap className="w-4 h-4 text-gold" /> },
+          { label: "Éditeurs Tiers", href: "/admin/users/publishers", icon: <Briefcase className="w-4 h-4 text-gold" /> },
+          { label: "Clients & Lecteurs", href: "/admin/users/clients", icon: <Users className="w-4 h-4 text-gold" /> },
+          { label: "Grossistes", href: "/admin/users/wholesalers", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
+          { label: "Catalogue & Prix", href: "/admin/catalog", icon: <BookOpen className="w-4 h-4 text-gold" /> },
+          { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="w-4 h-4 text-gold" /> },
+          { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="w-4 h-4 text-gold" /> },
+          { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="w-4 h-4 text-gold" /> },
+          { label: "Reporting & Exports", href: "/admin/reports", icon: <FileSpreadsheet className="w-4 h-4 text-gold" /> },
+          { label: "Clés API", href: "/admin/api", icon: <Key className="w-4 h-4 text-gold" /> },
+          { label: "Traçabilité & Logs", href: "/admin/logs", icon: <Activity className="w-4 h-4 text-gold" /> },
+          { label: "Paramètres Globaux", href: "/admin/settings", icon: <Settings className="w-4 h-4 text-gold" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+        ];
+      case "author":
+        return [
+          { label: "Mon Espace Auteur", href: "/author", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
+          { label: "Mes Livres", href: "/author/books", icon: <BookOpen className="w-4 h-4 text-gold" /> },
+          { label: "Mes Dépôts & Manuscrits", href: "/author/submissions", icon: <PenTool className="w-4 h-4 text-gold" /> },
+          { label: "Droits & Redevances", href: "/author/royalties", icon: <DollarSign className="w-4 h-4 text-gold" /> },
+          { label: "Mes Achats", href: "/author/purchases", icon: <ShoppingBag className="w-4 h-4 text-gold" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+        ];
+      case "publisher":
+        return [
+          { label: "Espace Éditeur", href: "/publisher", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
+          { label: "Dépôts & Soumissions", href: "/publisher/submissions", icon: <Briefcase className="w-4 h-4 text-gold" /> },
+          { label: "Nouveau Dépôt", href: "/publisher/submissions/new", icon: <PenTool className="w-4 h-4 text-gold" /> },
+          { label: "Redevances & Droits", href: "/publisher/royalties", icon: <DollarSign className="w-4 h-4 text-gold" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+        ];
+      case "layout_artist":
+        return [
+          { label: "Espace Maquettiste", href: "/layout-artist", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
+          { label: "Validation des Maquettes", href: "/layout-artist/validation", icon: <PenTool className="w-4 h-4 text-gold" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+        ];
+      case "legal_reviewer":
+        return [
+          { label: "Espace Juridique", href: "/legal-reviewer", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
+          { label: "Relecture Contrats", href: "/legal-reviewer/contracts", icon: <ShieldCheck className="w-4 h-4 text-gold" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+        ];
+      case "librarian":
+        return [
+          { label: "Espace Bibliothécaire", href: "/librarian", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
+          { label: "Gestion Affiliations", href: "/librarian/affiliations", icon: <Users className="w-4 h-4 text-gold" /> },
+          { label: "Statistiques d'Usage", href: "/librarian/stats", icon: <FileCheck className="w-4 h-4 text-gold" /> },
+          { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-4 h-4 text-gold" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+        ];
+      case "teacher":
+        return [
+          { label: "Mon Espace Enseignant", href: "/student", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
+          { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="w-4 h-4 text-gold" /> },
+          { label: "Mes Cours Prescrits", href: "/teacher", icon: <PenTool className="w-4 h-4 text-gold" /> },
+          { label: "Mes Commandes", href: "/student/orders", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
+          { label: "Mon Abonnement", href: "/student/subscriptions", icon: <Sparkles className="w-4 h-4 text-gold" /> },
+          { label: "Catalogue", href: "/student/catalog", icon: <Briefcase className="w-4 h-4 text-gold" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+        ];
+      default:
+        // Student / Super Client
+        return [
+          { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
+          { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="w-4 h-4 text-gold" /> },
+          { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-4 h-4 text-gold" /> },
+          { label: "Historique & Notes", href: "/student/history", icon: <FileCheck className="w-4 h-4 text-gold" /> },
+          { label: "Mes Commandes", href: "/student/orders", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
+          { label: "Mon Panier", href: "/cart", icon: <ShoppingCart className="w-4 h-4 text-gold" /> },
+          { label: "Mon Abonnement & Pass", href: "/student/subscriptions", icon: <Sparkles className="w-4 h-4 text-gold" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+        ];
+    }
+  };
+
+  const nav = getBottomNavConfig();
+  const drawerLinks = getDrawerMenuLinks();
+
+  const getRoleBadgeLabel = () => {
+    switch (user?.role) {
+      case "admin":
+      case "super_admin":
+        return "ADMINISTRATEUR • LAHATHÈQUE";
+      case "author":
+        return "AUTEUR • LAHATHÈQUE";
+      case "publisher":
+        return "ÉDITEUR TIERS • LAHATHÈQUE";
+      case "layout_artist":
+        return "MAQUETTISTE • LAHATHÈQUE";
+      case "legal_reviewer":
+        return "RELECTEUR JURIDIQUE";
+      case "librarian":
+        return "BIBLIOTHÉCAIRE RÉFÉRENT";
+      case "teacher":
+        return "ENSEIGNANT CHERCHEUR";
+      default:
+        return "ÉTUDIANT / LECTEUR";
+    }
+  };
 
   return (
     <>
-      {/* Barre de navigation mobile pleine largeur en bas (Modèle LahaAcademia) */}
+      {/* Barre de navigation mobile en bas */}
       <nav
         aria-label="Navigation Mobile"
         className="fixed bottom-0 left-0 right-0 w-full bg-navy-dark border-t border-navy-hover z-50 md:hidden py-1 px-2 shadow-2xl flex items-center justify-between"
@@ -123,34 +263,28 @@ export function MobileBottomNav() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-colors font-mono text-[9px] uppercase tracking-wider",
-                  isActive ? "text-gold font-bold" : "text-white/60 hover:text-white"
+                  "flex flex-col items-center justify-center text-[10px] font-medium py-1 px-2 transition-colors",
+                  isActive ? "text-gold font-bold" : "text-white/70 hover:text-white"
                 )}
               >
                 {item.icon}
-                <span className="mt-0.5">{item.label}</span>
+                <span className="mt-0.5 truncate">{item.label}</span>
               </Link>
             );
           })}
         </div>
 
-        {/* Bouton Central Doré Flottant (LahaAcademia Center Gold CTA Badge) */}
-        {nav.centerCta && (
-          <div className="relative flex justify-center items-center px-2">
-            <Link
-              href={nav.centerCta.href}
-              className={cn(
-                "bg-gold text-navy font-bold rounded-full p-3.5 -mt-6 shadow-xl border-4 border-navy-dark hover:scale-105 transition-transform flex items-center justify-center",
-                pathname === nav.centerCta.href && "ring-2 ring-gold ring-offset-2 ring-offset-navy-dark"
-              )}
-              title={nav.centerCta.label}
-            >
-              {nav.centerCta.icon}
-            </Link>
-          </div>
-        )}
+        {/* CTA Central (Bouton doré surélevé) */}
+        <div className="relative -top-4 px-2">
+          <Link
+            href={nav.centerCta.href}
+            className="flex flex-col items-center justify-center w-13 h-13 rounded-full bg-gold text-navy shadow-lg shadow-gold/20 border-4 border-navy-dark hover:scale-105 transition-transform"
+          >
+            {nav.centerCta.icon}
+          </Link>
+        </div>
 
-        {/* Items Droite + Menu Drawer */}
+        {/* Items Droite + Menu Toggle */}
         <div className="flex items-center justify-around flex-1">
           {nav.rightItems.map((item) => {
             const isActive = pathname === item.href;
@@ -159,22 +293,22 @@ export function MobileBottomNav() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-colors font-mono text-[9px] uppercase tracking-wider",
-                  isActive ? "text-gold font-bold" : "text-white/60 hover:text-white"
+                  "flex flex-col items-center justify-center text-[10px] font-medium py-1 px-2 transition-colors",
+                  isActive ? "text-gold font-bold" : "text-white/70 hover:text-white"
                 )}
               >
                 {item.icon}
-                <span className="mt-0.5">{item.label}</span>
+                <span className="mt-0.5 truncate">{item.label}</span>
               </Link>
             );
           })}
 
           {/* Bouton Menu Drawer */}
           <button
-            onClick={() => setMenuOpen(true)}
+            onClick={() => setMenuOpen(!menuOpen)}
             className={cn(
-              "flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-colors font-mono text-[9px] uppercase tracking-wider",
-              menuOpen ? "text-gold font-bold" : "text-white/60 hover:text-white"
+              "flex flex-col items-center justify-center text-[10px] font-medium py-1 px-2 transition-colors",
+              menuOpen ? "text-gold font-bold" : "text-white/70 hover:text-white"
             )}
           >
             <MenuIcon className="w-5 h-5" />
@@ -183,7 +317,7 @@ export function MobileBottomNav() {
         </div>
       </nav>
 
-      {/* Drawer Bottom Sheet Menu (Modèle LahaAcademia Drawer Sheet) */}
+      {/* Drawer Bottom Sheet Menu */}
       <AnimatePresence>
         {menuOpen && (
           <>
@@ -207,16 +341,16 @@ export function MobileBottomNav() {
               {/* Header Drawer */}
               <div className="flex items-center justify-between border-b border-border pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-navy text-gold font-bold flex items-center justify-center text-sm border border-gold/30">
+                  <div className="w-10 h-10 rounded-full bg-navy text-gold font-bold flex items-center justify-center text-sm border border-gold/30 shrink-0">
                     {user?.first_name ? user.first_name.slice(0, 1).toUpperCase() : "U"}
                   </div>
                   <div>
                     <h3 className="font-serif font-bold text-navy text-base">
-                      {user?.first_name || user?.last_name ? `${user.first_name} ${user.last_name}`.trim() : "Compte Utilisateur"}
+                      {user?.first_name || user?.last_name ? `${user.first_name} ${user.last_name}`.trim() : "Compte LAHAThèque"}
                     </h3>
                     <div className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gold px-2 py-0.5 rounded bg-navy/5 border border-gold/30">
                       <GraduationCap className="w-3 h-3" />
-                      {user?.role === "teacher" ? "Lecteur • Enseignant" : "Lecteur • LAHAThèque"}
+                      {getRoleBadgeLabel()}
                     </div>
                   </div>
                 </div>
@@ -233,91 +367,34 @@ export function MobileBottomNav() {
               <div className="bg-background-secondary p-4 rounded-2xl border border-border space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-navy font-bold">
                   <Building2 className="w-4 h-4 text-gold shrink-0" />
-                  <span>Université d&apos;Abomey-Calavi (UAC)</span>
+                  <span>Direction & Plateforme LAHAThèque</span>
                 </div>
                 <div className="flex items-center gap-2 text-foreground-muted">
                   <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
-                  <span>Matricule : <strong className="text-navy">1029384-UAC</strong></span>
+                  <span>Compte Vérifié : <strong className="text-navy">{user?.email || "admin@lahatheque.com"}</strong></span>
                 </div>
               </div>
 
-              {/* Navigation Links in Sheet */}
+              {/* Dynamic Navigation Links in Sheet reflecting exact role sidebar */}
               <div className="space-y-2">
                 <p className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
-                  Accès Rapide
+                  Menu & Navigation Rôle ({user?.role || "standard"})
                 </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <Link
-                    href="/student"
-                    onClick={() => setMenuOpen(false)}
-                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
-                  >
-                    <LayoutDashboard className="w-4 h-4 text-gold" />
-                    Mon Espace
-                  </Link>
-
-                  <Link
-                    href="/student/books"
-                    onClick={() => setMenuOpen(false)}
-                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
-                  >
-                    <BookOpen className="w-4 h-4 text-gold" />
-                    Mes Ouvrages
-                  </Link>
-
-                  <Link
-                    href="/student/catalog"
-                    onClick={() => setMenuOpen(false)}
-                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
-                  >
-                    <Briefcase className="w-4 h-4 text-gold" />
-                    Catalogue
-                  </Link>
-
-                  <Link
-                    href="/student/history"
-                    onClick={() => setMenuOpen(false)}
-                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
-                  >
-                    <FileCheck className="w-4 h-4 text-gold" />
-                    Historique
-                  </Link>
-
-                  <Link
-                    href="/student/orders"
-                    onClick={() => setMenuOpen(false)}
-                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
-                  >
-                    <PackageCheck className="w-4 h-4 text-gold" />
-                    Mes Commandes
-                  </Link>
-
-                  <Link
-                    href="/cart"
-                    onClick={() => setMenuOpen(false)}
-                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
-                  >
-                    <ShoppingCart className="w-4 h-4 text-gold" />
-                    Mon Panier
-                  </Link>
-
-                  <Link
-                    href="/subscriptions"
-                    onClick={() => setMenuOpen(false)}
-                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
-                  >
-                    <Sparkles className="w-4 h-4 text-gold" />
-                    Abonnements
-                  </Link>
-
-                  <Link
-                    href="/profile"
-                    onClick={() => setMenuOpen(false)}
-                    className="p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors"
-                  >
-                    <UserIcon className="w-4 h-4 text-gold" />
-                    Mon Profil
-                  </Link>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {drawerLinks.map((link) => (
+                    <Link
+                      key={link.href + link.label}
+                      href={link.href}
+                      onClick={() => setMenuOpen(false)}
+                      className={cn(
+                        "p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors truncate",
+                        pathname === link.href && "border-gold bg-gold/10 font-bold"
+                      )}
+                    >
+                      {link.icon}
+                      <span className="truncate">{link.label}</span>
+                    </Link>
+                  ))}
                 </div>
               </div>
 
@@ -341,3 +418,5 @@ export function MobileBottomNav() {
     </>
   );
 }
+
+export default MobileBottomNav;
