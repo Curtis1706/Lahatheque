@@ -8,9 +8,12 @@ import { AdminCatalogBook } from "@/lib/types/admin";
 import { BookOpen, Search, Tag, History, Shield, Eye } from "lucide-react";
 import Link from "next/link";
 
+import { ViewToggle, ViewMode } from "@/components/features/student/view-toggle";
+
 export default function AdminCatalogPage() {
   const [books, setBooks] = useState<AdminCatalogBook[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   useEffect(() => {
     async function loadCatalog() {
@@ -97,6 +100,7 @@ export default function AdminCatalogPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
           <Link
             href="/admin/catalog/pricing"
             className="px-3.5 py-2 rounded-xl bg-background-secondary border border-border text-foreground font-semibold text-xs hover:border-gold transition-colors flex items-center gap-1.5"
@@ -114,22 +118,47 @@ export default function AdminCatalogPage() {
         </div>
       </div>
 
-      {/* Main Table */}
-      <DataTable
-        data={books}
-        columns={columns}
-        rowKey="id"
-        loading={loading}
-        filterKey="status"
-        filterOptions={[
-          { value: "all", label: "Tous les Statuts" },
-          { value: "published", label: "Publié" },
-          { value: "in_review", label: "En Relecture" },
-          { value: "submitted", label: "Soumis" },
-        ]}
-        filterPlaceholder="Filtrer par statut..."
-        searchPlaceholder="Rechercher par titre, auteur ou ISBN..."
-      />
+      {/* Mode de vue conditionnel (Grille / Liste) */}
+      {viewMode === "grid" ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {books.map((book) => (
+            <div key={book.id} className="p-4 rounded-2xl bg-background border border-border space-y-3 hover:border-gold/50 transition-all flex flex-col justify-between">
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-navy-light text-navy font-bold">
+                    {book.discipline}
+                  </span>
+                  <StatusBadge status={book.status} />
+                </div>
+                <h3 className="font-serif font-bold text-sm text-foreground line-clamp-2">{book.title}</h3>
+                <p className="text-xs text-foreground-muted truncate">Par {book.authors.join(", ")}</p>
+                <p className="text-xs text-gold font-medium">{book.publisher_name}</p>
+              </div>
+
+              <div className="pt-3 border-t border-border flex items-center justify-between font-mono text-xs">
+                <span className="font-bold text-navy">{book.price_digital.toLocaleString("fr-FR")} FCFA</span>
+                <span className="text-[10px] text-foreground-muted uppercase font-bold">{book.protection_type}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <DataTable
+          data={books}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          filterKey="status"
+          filterOptions={[
+            { value: "all", label: "Tous les Statuts" },
+            { value: "published", label: "Publié" },
+            { value: "in_review", label: "En Relecture" },
+            { value: "submitted", label: "Soumis" },
+          ]}
+          filterPlaceholder="Filtrer par statut..."
+          searchPlaceholder="Rechercher par titre, auteur ou ISBN..."
+        />
+      )}
     </div>
   );
 }

@@ -99,20 +99,27 @@ export const AnimatedMenuToggle = ({
  */
 export const CollapsibleSection = ({
   title,
+  icon,
+  defaultOpen = false,
   children,
 }: {
   title: string;
+  icon?: React.ReactNode;
+  defaultOpen?: boolean;
   children: React.ReactNode;
 }) => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="mb-2">
+    <div className="mb-1">
       <button
-        className="w-full flex items-center justify-between py-2 px-3 rounded-xl hover:bg-navy-hover/50 text-white/90 text-xs font-bold uppercase tracking-wider transition-colors"
+        className="w-full flex items-center justify-between py-2 px-3 rounded-xl hover:bg-navy-hover/50 text-white/90 text-xs font-semibold transition-colors group"
         onClick={() => setOpen(!open)}
       >
-        <span className="truncate">{title}</span>
+        <div className="flex items-center gap-2.5 min-w-0">
+          {icon && <span className="shrink-0">{icon}</span>}
+          <span className="truncate">{title}</span>
+        </div>
         {open ? <ChevronUp className="w-3.5 h-3.5 text-gold shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-gold shrink-0" />}
       </button>
       <AnimatePresence>
@@ -121,8 +128,8 @@ export const CollapsibleSection = ({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="overflow-hidden"
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden pl-3 border-l border-gold/30 ml-4 my-1 space-y-0.5"
           >
             <div className="p-1 space-y-1">{children}</div>
           </motion.div>
@@ -219,7 +226,23 @@ export function DashboardSidebar() {
       case "super_admin":
         return [
           { label: "Vue d'ensemble", href: "/admin", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Gestion Utilisateurs", href: "/admin/users", icon: <Users className="w-5 h-5" /> },
+          { 
+            label: "Gestion Utilisateurs", 
+            href: "/admin/users", 
+            icon: <Users className="w-5 h-5" />,
+            sublinks: [
+              { label: "Tous les Utilisateurs", href: "/admin/users", icon: <Users className="w-4 h-4 text-gold" /> },
+              { label: "Maquettistes", href: "/admin/users/layout-artists", icon: <PenTool className="w-4 h-4 text-gold" /> },
+              { label: "Chef Maquettiste", href: "/admin/users/chief-layout", icon: <ShieldCheck className="w-4 h-4 text-gold" /> },
+              { label: "Gestionnaires", href: "/admin/users/managers", icon: <Briefcase className="w-4 h-4 text-gold" /> },
+              { label: "Juristes & Relecteurs", href: "/admin/users/legal", icon: <FileCheck className="w-4 h-4 text-gold" /> },
+              { label: "Auteurs", href: "/admin/users/authors", icon: <BookOpen className="w-4 h-4 text-gold" /> },
+              { label: "Universités & Inst.", href: "/admin/users/universities", icon: <GraduationCap className="w-4 h-4 text-gold" /> },
+              { label: "Éditeurs Tiers", href: "/admin/users/publishers", icon: <Briefcase className="w-4 h-4 text-gold" /> },
+              { label: "Clients & Lecteurs", href: "/admin/users/clients", icon: <Users className="w-4 h-4 text-gold" /> },
+              { label: "Grossistes", href: "/admin/users/wholesalers", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
+            ]
+          },
           { label: "Catalogue & Prix", href: "/admin/catalog", icon: <BookOpen className="w-5 h-5" /> },
           { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="w-5 h-5" /> },
           { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="w-5 h-5" /> },
@@ -268,13 +291,24 @@ export function DashboardSidebar() {
 
           {/* Navigation Links */}
           <div className="mt-2 flex flex-col gap-1">
-            {links.map((link, idx) => (
-              <SidebarLink 
-                key={idx} 
-                link={link} 
-                onClick={() => setOpen(false)}
-              />
-            ))}
+            {links.map((link: any, idx: number) => {
+              if (link.sublinks && open) {
+                return (
+                  <CollapsibleSection key={idx} title={link.label} icon={link.icon} defaultOpen={false}>
+                    {link.sublinks.map((sub: any, sIdx: number) => (
+                      <SidebarLink key={sIdx} link={sub} onClick={() => setOpen(false)} />
+                    ))}
+                  </CollapsibleSection>
+                );
+              }
+              return (
+                <SidebarLink 
+                  key={idx} 
+                  link={link} 
+                  onClick={() => setOpen(false)}
+                />
+              );
+            })}
           </div>
 
           {/* Sections dépliables CollapsibleSection (21st.dev) */}

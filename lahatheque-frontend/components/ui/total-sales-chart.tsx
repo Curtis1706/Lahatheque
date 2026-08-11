@@ -136,14 +136,6 @@ export function TotalSalesChart({
       {/* Sparkline Interactive Curve */}
       <div className="relative w-full h-[140px] pt-2">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-          <defs>
-            <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--gold)" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="var(--gold)" stopOpacity="0.0" />
-            </linearGradient>
-          </defs>
-          
-          <path d={areaPath} fill="url(#salesGradient)" />
           <motion.path
             d={svgPath}
             fill="none"

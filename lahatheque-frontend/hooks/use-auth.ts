@@ -76,9 +76,32 @@ const DEFAULT_MOCK_USER: User = {
   profile_photo: null
 };
 
+function getInitialUserFromCookie(): User | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const cookie = document.cookie
+      .split(";")
+      .find((c) => c.trim().startsWith("user_session_client="));
+    if (cookie) {
+      const raw = decodeURIComponent(cookie.split("=").slice(1).join("="));
+      const obj = JSON.parse(raw);
+      const userData = obj.user || obj;
+      if (userData && userData.id) {
+        return userData as User;
+      }
+    }
+  } catch (e) {
+    console.warn("Error parsing initial user_session_client cookie", e);
+  }
+  return null;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(DEFAULT_MOCK_USER)
-  const [activeRole, setActiveRole] = useState<string | null>("student")
+  const [user, setUser] = useState<User | null>(getInitialUserFromCookie)
+  const [activeRole, setActiveRole] = useState<string | null>(() => {
+    const u = getInitialUserFromCookie();
+    return u?.role || null;
+  })
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -113,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       logger.debug('Syncing user data with backend (BFF)', { context: 'useAuth' })
       // Appel via BFF : le cookie HttpOnly est joint automatiquement par le navigateur
-      const response = await fetch('/api/auth/session/', {
+      const response = await fetch('/api/auth/session', {
         method: 'GET',
         cache: 'no-store'
       })
@@ -140,14 +163,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Access token expiré → tenter un refresh silencieux avant de déconnecter
         logger.warn('Access token expiré (401), tentative de refresh silencieux...', { context: 'useAuth' })
         try {
-          const refreshRes = await fetch('/api/auth/session/', {
+          const refreshRes = await fetch('/api/auth/session', {
             method: 'PUT',
             credentials: 'include',
           })
           if (refreshRes.ok) {
             // Refresh réussi → re-tenter le GET pour récupérer le user
             logger.debug('Refresh silencieux réussi, re-synchronisation...', { context: 'useAuth' })
-            const retryRes = await fetch('/api/auth/session/', { method: 'GET', cache: 'no-store' })
+            const retryRes = await fetch('/api/auth/session', { method: 'GET', cache: 'no-store' })
             if (retryRes.ok) {
               const retryData = await retryRes.json()
               if (retryData?.user?.id) {
@@ -221,7 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (localToken) {
           logger.debug('Migration BFF: token localStorage détecté, migration en cours...', { context: 'useAuth' })
           try {
-            const migrateRes = await fetch('/api/auth/session/', {
+            const migrateRes = await fetch('/api/auth/session', {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ access: localToken, refresh: localRefresh }),
@@ -265,7 +288,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       // Appel du Route Handler BFF pour gérer la session HttpOnly
-      const response = await fetch('/api/auth/session/', {
+      const response = await fetch('/api/auth/session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -319,7 +342,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Migrer les tokens vers les cookies HttpOnly via le BFF
       if (accessToken) {
-        const migrateRes = await fetch('/api/auth/session/', {
+        const migrateRes = await fetch('/api/auth/session', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ access: accessToken, refresh: refreshToken }),
@@ -349,7 +372,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       // Déconnexion via le BFF (détruit les cookies HttpOnly et notifie Django)
-      await fetch('/api/auth/session/', {
+      await fetch('/api/auth/session', {
         method: 'DELETE',
       }).catch(err => logger.debug('BFF logout failed', err))
 
@@ -374,7 +397,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 2. Migration BFF en arrière-plan : stockage sécurisé dans cookie HttpOnly
     try {
-      const migrateRes = await fetch('/api/auth/session/', {
+      const migrateRes = await fetch('/api/auth/session', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ access: token }),

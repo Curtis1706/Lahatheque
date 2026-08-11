@@ -71,7 +71,7 @@ export default function proxy(request: NextRequest) {
       case 'super_admin':
         return '/super-admin'
       default:
-        return '/student'
+        return '/login'
     }
   }
 

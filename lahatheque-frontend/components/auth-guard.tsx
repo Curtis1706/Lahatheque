@@ -84,8 +84,13 @@ export function AuthGuard({ children, requiredRole, requiredRoles }: AuthGuardPr
       return
     }
     const effectiveRole = activeRole || user.role
+    if (!effectiveRole) {
+      router.push('/login')
+      return
+    }
     if (!resolveAuthorization(user, effectiveRole, allowedRoles)) {
-      router.push(`/${effectiveRole}`)
+      const targetPath = effectiveRole === 'super_admin' ? '/super-admin' : effectiveRole === 'legal_reviewer' ? '/legal-reviewer' : effectiveRole === 'layout_artist' ? '/layout-artist' : `/${effectiveRole}`
+      router.push(targetPath)
     }
   }, [user, loading, activeRole, requiredRole, requiredRoles, router])
 
@@ -117,7 +122,7 @@ export function AuthGuard({ children, requiredRole, requiredRoles }: AuthGuardPr
         // navigator.locks : un seul onglet tient le verrou → pas de double refresh
         const doRefresh = async () => {
           try {
-            const res = await fetch('/api/auth/session/', {
+            const res = await fetch('/api/auth/session', {
               method: 'PUT',
               credentials: 'include',
             })
@@ -170,7 +175,7 @@ export function AuthGuard({ children, requiredRole, requiredRoles }: AuthGuardPr
     const antiMDInterval = setInterval(async () => {
       if (cancelled) return
       try {
-        const res = await fetch('/api/auth/session/', { cache: 'no-store' })
+        const res = await fetch('/api/auth/session', { cache: 'no-store' })
         if (res.ok) {
           const data = await res.json().catch(() => null)
           if (data && data.authenticated === false) {

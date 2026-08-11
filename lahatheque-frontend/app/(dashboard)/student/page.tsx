@@ -58,9 +58,9 @@ export default function StudentDashboardPage() {
 
   const filteredBorrowed = borrowedBooks.filter((book) =>
     searchQuery === "" ||
-    book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    book.discipline.toLowerCase().includes(searchQuery.toLowerCase())
+    (book.title && book.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (book.author && book.author.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (book.discipline && book.discipline.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (

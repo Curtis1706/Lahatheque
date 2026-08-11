@@ -141,29 +141,6 @@ export function KpiCard({
             preserveAspectRatio="none"
             aria-hidden="true"
           >
-            <defs>
-              <linearGradient id={gradIdPos} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--success)" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="var(--success)" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id={gradIdNeg} x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="0%"
-                  stopColor="var(--destructive)"
-                  stopOpacity={0.35}
-                />
-                <stop
-                  offset="100%"
-                  stopColor="var(--destructive)"
-                  stopOpacity={0}
-                />
-              </linearGradient>
-            </defs>
-            <path
-              ref={areaPathRef}
-              d={areaPath}
-              fill={`url(#${isPositive ? gradIdPos : gradIdNeg})`}
-            />
             <path
               ref={linePathRef}
               d={linePath}

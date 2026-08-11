@@ -126,7 +126,7 @@ export default function AdminOverviewDashboard() {
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-8">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-navy-dark via-navy to-navy-hover text-white shadow-md">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-navy border border-navy-hover text-white shadow-md">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-semibold mb-2">
             <Sparkles className="w-3.5 h-3.5" />

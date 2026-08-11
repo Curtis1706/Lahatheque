@@ -1,13 +1,5 @@
-/**
- * DataTable — table de données avec recherche + filtre de statut intégrés
- * Inspiré de felipemenezes098/table-12 (21st.dev #22162)
- * Pattern adapté sans TanStack Table (filtrage natif React state).
- * Tokenisé LAHAThèque (globals.css). Mobile-first : table sur lg+, cards sur mobile.
- */
-"use client";
-
 import * as React from "react";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,6 +44,12 @@ export interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   /** Header actions (boutons à droite de la barre search/filter) */
   headerActions?: React.ReactNode;
+  /** Nombre d'éléments par page par défaut (ex: 10) */
+  pageSize?: number;
+  /** Options du nombre d'éléments par page */
+  pageSizeOptions?: number[];
+  /** Afficher la pagination (défaut: true) */
+  showPagination?: boolean;
 }
 
 // ─── DataTable ────────────────────────────────────────────────────────────────
@@ -71,9 +69,19 @@ export function DataTable<T extends Record<string, any>>({
   rowKey,
   onRowClick,
   headerActions,
+  pageSize = 10,
+  pageSizeOptions = [10, 20, 50, 100, 240],
+  showPagination = true,
 }: DataTableProps<T>) {
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [itemsPerPage, setItemsPerPage] = React.useState(pageSize);
+
+  // Reset page to 1 when search or filter changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
 
   // Filtrage natif React
   const filtered = React.useMemo(() => {
@@ -96,6 +104,15 @@ export function DataTable<T extends Record<string, any>>({
 
     return rows;
   }, [data, search, statusFilter, filterKey]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
+
+  const paginatedData = React.useMemo(() => {
+    if (!showPagination) return filtered;
+    const start = (safeCurrentPage - 1) * itemsPerPage;
+    return filtered.slice(start, start + itemsPerPage);
+  }, [filtered, safeCurrentPage, itemsPerPage, showPagination]);
 
   const hasFilters = Boolean(search || statusFilter !== "all");
 
@@ -202,7 +219,7 @@ export function DataTable<T extends Record<string, any>>({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {filtered.map((row) => (
+                {paginatedData.map((row) => (
                   <tr
                     key={String(row[rowKey])}
                     onClick={() => onRowClick?.(row)}
@@ -229,7 +246,7 @@ export function DataTable<T extends Record<string, any>>({
 
           {/* Cards Mobile (sous lg) */}
           <div className="lg:hidden divide-y divide-border/60">
-            {filtered.map((row) =>
+            {paginatedData.map((row) =>
               mobileCard ? (
                 <div
                   key={String(row[rowKey])}
@@ -266,6 +283,61 @@ export function DataTable<T extends Record<string, any>>({
               )
             )}
           </div>
+
+          {/* ── Footer avec Pagination ── */}
+          {showPagination && filtered.length > 0 && (
+            <div className="p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-foreground-muted bg-background-secondary/30">
+              <div>
+                Affichage de <strong className="text-foreground">{Math.min((safeCurrentPage - 1) * itemsPerPage + 1, filtered.length)}</strong> à <strong className="text-foreground">{Math.min(safeCurrentPage * itemsPerPage, filtered.length)}</strong> sur <strong className="text-foreground">{filtered.length}</strong> éléments
+              </div>
+
+              <div className="flex items-center gap-4">
+                {pageSizeOptions.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span>Par page :</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="px-2 py-1 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-navy"
+                    >
+                      {pageSizeOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                    disabled={safeCurrentPage <= 1}
+                    className="p-1.5 rounded-lg border border-border bg-background hover:bg-background-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-foreground"
+                    aria-label="Page précédente"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <span className="px-3 py-1 font-semibold text-foreground">
+                    {safeCurrentPage} / {totalPages}
+                  </span>
+
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                    disabled={safeCurrentPage >= totalPages}
+                    className="p-1.5 rounded-lg border border-border bg-background hover:bg-background-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-foreground"
+                    aria-label="Page suivante"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

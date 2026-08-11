@@ -126,4 +126,5 @@ export interface AdminAccessLog {
   action_type: string;
   resource: string;
   timestamp: string;
+  details?: string;
 }

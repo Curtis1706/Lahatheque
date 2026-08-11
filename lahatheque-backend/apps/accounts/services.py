@@ -288,7 +288,7 @@ def login(identifier: str, password: str, request=None) -> dict:
         raise AuthenticationFailed("Identifiants invalides.")
 
     # Utiliser authenticate() de Django pour que les signaux Axes soient déclenchés
-    user = authenticate(request=request, username=user_obj.username, password=password)
+    user = authenticate(request=request, username=user_obj.email, password=password)
 
     if user is None:
         raise AuthenticationFailed("Identifiants invalides.")
