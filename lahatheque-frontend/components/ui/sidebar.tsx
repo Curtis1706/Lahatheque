@@ -114,16 +114,10 @@ export const SidebarLink = ({
   props?: LinkProps;
 }) => {
   const { open, animate } = useSidebar();
-  return (
-    <Link
-      href={link.href}
-      onClick={onClick}
-      className={cn(
-        "flex items-center justify-start gap-4 group/sidebar py-2.5 px-2 rounded-lg hover:bg-navy-hover/50 transition-colors",
-        className
-      )}
-      {...props}
-    >
+  const isButton = link.href === "#";
+
+  const content = (
+    <>
       <div className="text-white/60 group-hover/sidebar:text-gold transition-colors flex-shrink-0">
         {link.icon}
       </div>
@@ -136,6 +130,34 @@ export const SidebarLink = ({
       >
         {link.label}
       </motion.span>
+    </>
+  );
+
+  const commonClasses = cn(
+    "flex items-center justify-start gap-4 group/sidebar py-2.5 px-2 rounded-lg hover:bg-navy-hover/50 transition-colors w-full text-left",
+    className
+  );
+
+  if (isButton) {
+    return (
+      <button
+        type="button"
+        onClick={onClick as any}
+        className={commonClasses}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={link.href}
+      onClick={onClick}
+      className={commonClasses}
+      {...(props as any)}
+    >
+      {content}
     </Link>
   );
 };

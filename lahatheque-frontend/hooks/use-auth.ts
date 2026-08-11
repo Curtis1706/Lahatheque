@@ -124,10 +124,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(prev => {
             if (!prev || JSON.stringify(prev) !== JSON.stringify(syncData.user)) {
               setSessionCookie(syncData.user)
+              if (syncData.user.role) {
+                setActiveRole(syncData.user.role)
+              }
               return syncData.user
             }
             return prev
           })
+          if (syncData.user.role) {
+            setActiveRole(syncData.user.role)
+          }
           return syncData.user
         }
       } else if (response.status === 401) {
@@ -159,10 +165,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (refreshError) {
           logger.error('Erreur réseau lors du refresh silencieux', refreshError as Error, { context: 'useAuth' })
+          setUser(null)
+          setSessionCookie(null)
         }
+      } else {
+        // Autre erreur BFF (ex. 500, 502) → par précaution on vide la session
+        setUser(null)
+        setSessionCookie(null)
       }
     } catch (error) {
       logger.error('Error refreshing user data', error as Error, { context: 'useAuth' })
+      setUser(null)
+      setSessionCookie(null)
     } finally {
       _isRefreshing = false
     }
@@ -191,6 +205,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const userData = sessionObj.user || sessionObj
             if (userData?.id) {
               setUser(userData)
+              if (userData.role) {
+                setActiveRole(userData.role)
+              }
             }
           } catch (e) {
             logger.warn('Could not parse user_session_client cookie', { context: 'useAuth' })

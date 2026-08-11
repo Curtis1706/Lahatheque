@@ -85,7 +85,7 @@ export function AuthGuard({ children, requiredRole, requiredRoles }: AuthGuardPr
     }
     const effectiveRole = activeRole || user.role
     if (!resolveAuthorization(user, effectiveRole, allowedRoles)) {
-      router.push(`/dashboard/${effectiveRole}`)
+      router.push(`/${effectiveRole}`)
     }
   }, [user, loading, activeRole, requiredRole, requiredRoles, router])
 
