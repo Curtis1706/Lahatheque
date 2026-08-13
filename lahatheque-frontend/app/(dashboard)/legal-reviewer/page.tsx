@@ -1,42 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getLegalContracts, getClientDebts, remindClientDebt } from "@/lib/services/legal";
-import { LegalContract, ClientDebt } from "@/lib/types/legal";
-import { 
-  Scale, 
-  FileText, 
-  Download, 
-  BellRing, 
-  AlertTriangle, 
-  CheckCircle,
-  Plus, 
-  ArrowRight,
-  Percent,
-  Mail
-} from "lucide-react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { KpiGrid } from "@/components/ui/kpi-card";
-import { DataTable } from "@/components/ui/data-table";
+import { useAuth } from "@/hooks/use-auth";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { getLegalKpis } from "@/lib/services/legal";
+import type { LegalKpis } from "@/lib/types/legal";
+import {
+  Scale,
+  FileText,
+  Percent,
+  Sparkles,
+  BellRing,
+  AlertTriangle,
+  PlusCircle,
+  ChevronRight,
+  ArrowRight,
+  BookOpen,
+  DollarSign,
+  ShieldCheck,
+  PenTool,
+} from "lucide-react";
 
-export default function LegalReviewerPage() {
-  const [contracts, setContracts] = useState<LegalContract[]>([]);
-  const [debts, setDebts] = useState<ClientDebt[]>([]);
+export default function LegalReviewerOverviewPage() {
+  const { user } = useAuth();
+  const [kpis, setKpis] = useState<LegalKpis | null>(null);
   const [loading, setLoading] = useState(true);
-  const [remindingId, setRemindingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [contractsData, debtsData] = await Promise.all([
-          getLegalContracts(),
-          getClientDebts()
-        ]);
-        setContracts(contractsData);
-        setDebts(debtsData);
+        const kpiData = await getLegalKpis();
+        setKpis(kpiData);
       } catch (err) {
-        console.error("Erreur de chargement", err);
+        console.error("Erreur de chargement du dashboard juriste", err);
       } finally {
         setLoading(false);
       }
@@ -44,269 +42,188 @@ export default function LegalReviewerPage() {
     loadData();
   }, []);
 
-  const handleRemind = async (id: string) => {
-    try {
-      setRemindingId(id);
-      const success = await remindClientDebt(id);
-      if (success) {
-        setDebts(prev => prev.map(d => {
-          if (d.id === id) return { ...d, status: "reminded" as const };
-          return d;
-        }));
-        alert("Email de relance de facture impayée envoyé au client avec succès !");
-      }
-    } catch (err) {
-      alert("Erreur lors de l'envoi de la relance.");
-    } finally {
-      setRemindingId(null);
-    }
-  };
-
-
-
   return (
-    <div className="p-6 lg:p-8 space-y-8">
-      
-      {/* Header Banner */}
-      <div className="bg-navy-dark text-white rounded-3xl p-6 sm:p-8 border border-navy/30 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="space-y-2 z-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy text-gold text-xs font-bold uppercase tracking-wider border border-gold/20">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+      {/* Banner Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-bold mb-2 uppercase tracking-wider">
             <Scale className="w-3.5 h-3.5" />
-            Portail Juriste & Conformité Légale
+            Espace Juriste • Gestion Légale &amp; Droits
           </div>
-          <h1 className="text-2xl sm:text-3xl font-serif font-bold">
-            Marc-Aurèle DE SOUZA
+          <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
+            Bonjour, {user?.first_name || "Juriste"} 👋
           </h1>
-          <p className="text-xs sm:text-sm text-white/80 max-w-xl">
-            Gérez les contrats d'édition, définissez les clés de répartition des redevances et supervisez les relances de factures clients impayées.
+          <p className="text-xs sm:text-sm text-navy-light mt-1">
+            Gérez la base contractuelle, validez les droits d&apos;auteur et pilotez les redevances et relances.
           </p>
         </div>
 
-        <div className="bg-navy/80 p-4 rounded-2xl border border-gold/20 space-y-1.5 text-xs z-10 w-full md:w-auto shrink-0">
-          <div className="flex items-center justify-between gap-6 text-foreground-muted font-semibold">
-            <span>Contrats Actifs :</span>
-            <span className="text-gold font-bold">{contracts.length} contrats</span>
-          </div>
-          <div className="flex items-center justify-between gap-6 text-foreground-muted font-semibold">
-            <span>Relances en attente :</span>
-            <span className="text-warning font-bold flex items-center gap-1">
-              <AlertTriangle className="w-3.5 h-3.5 text-warning" /> {debts.filter(d => d.status === "pending").length} factures
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-36">
-              <div className="w-10 h-10 rounded-xl bg-background-secondary" />
-              <div className="h-7 w-20 bg-background-secondary rounded" />
-              <div className="h-3.5 w-32 bg-background-secondary rounded" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <KpiGrid
-          cols={3}
-          cards={[
-            {
-              label: "Contrats actifs",
-              value: contracts.length,
-              icon: FileText,
-              trend: 3,
-              sparkline: [30, 40, 45, 55, 50, 65, 70],
-            },
-            {
-              label: "Factures en attente",
-              value: debts.filter(d => d.status === "pending").length,
-              icon: AlertTriangle,
-              trend: -5,
-              sparkline: [60, 55, 65, 50, 45, 40, 35],
-            },
-            {
-              label: "Taux de redevance moyen",
-              value: contracts.length > 0
-                ? Math.round(contracts.reduce((s, c) => s + c.royalty_rate, 0) / contracts.length)
-                : 0,
-              formatValue: (v) => `${v}%`,
-              icon: Percent,
-              trend: 1,
-              sparkline: [40, 42, 44, 45, 46, 47, 48],
-            },
-          ]}
-        />
-      )}
-
-      {/* Action shortcuts */}
-      <div className="flex flex-wrap gap-4 items-center justify-between">
-        <h2 className="font-serif text-lg font-bold text-navy flex items-center gap-2">
-          <FileText className="w-5 h-5 text-gold" />
-          Moteur d'indexation et gestion des contrats
-        </h2>
-
         <Link
-          href="/legal-reviewer/contracts"
-          className="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy-hover text-white font-bold text-xs px-5 py-3 rounded-lg shadow-sm transition-colors"
+          href="/legal-reviewer/contracts/new"
+          className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 shadow-sm shrink-0 min-h-[44px]"
         >
-          <Plus className="w-4 h-4" />
-          Enregistrer un Contrat / Pré-édition
+          <PlusCircle className="w-4 h-4" />
+          Nouveau Contrat
         </Link>
       </div>
 
-      {/* Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* Left: Contracts lists with search */}
-        <div className="lg:col-span-8 space-y-4">
-          
-          {/* Table des contrats — DataTable (21st.dev #22162) */}
-          <DataTable
-            data={contracts}
-            rowKey="id"
-            loading={loading}
-            skeletonRows={3}
-            searchPlaceholder="Rechercher par référence, auteur, titre..."
-            emptyMessage="Aucun contrat enregistré pour le moment."
-            headerActions={
-              <Link
-                href="/legal-reviewer/contracts"
-                className="inline-flex items-center gap-1.5 bg-navy hover:bg-navy-hover text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Nouveau contrat
-              </Link>
-            }
-            columns={[
-              {
-                key: "reference",
-                header: "Réf. Contrat",
-                cell: (ctr) => (
-                  <span className="font-mono text-xs font-bold text-navy">{ctr.reference as string}</span>
-                ),
-              },
-              {
-                key: "book_title",
-                header: "Auteur / Ouvrage",
-                cell: (ctr) => (
-                  <div>
-                    <p className="font-bold text-navy text-sm">{ctr.book_title as string}</p>
-                    <p className="text-xs text-foreground-muted">Auteur : {ctr.author_name as string}</p>
-                  </div>
-                ),
-              },
-              {
-                key: "royalty_rate",
-                header: "Part Redevance",
-                className: "text-center",
-                cell: (ctr) => (
-                  <span className="inline-flex items-center gap-0.5 text-xs font-bold text-gold">
-                    <Percent className="w-3.5 h-3.5" /> {ctr.royalty_rate as number}%
-                  </span>
-                ),
-                hideOnMobile: true,
-              },
-              {
-                key: "contract_file",
-                header: "PDF",
-                className: "text-right",
-                cell: (ctr) => (
-                  <button
-                    className="p-2 rounded bg-background-secondary border border-border hover:border-navy text-navy hover:text-navy-hover transition-all"
-                    title="Télécharger le contrat signé"
-                    onClick={(e) => { e.stopPropagation(); alert(`Téléchargement de ${ctr.contract_file}...`); }}
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-                ),
-              },
-            ]}
-            mobileCard={(ctr) => (
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-bold text-navy text-sm">{ctr.book_title as string}</p>
-                    <p className="text-xs text-foreground-muted">Auteur : {ctr.author_name as string}</p>
-                    <p className="font-mono text-[10px] text-foreground-muted mt-0.5">{ctr.reference as string}</p>
-                  </div>
-                  <span className="inline-flex items-center gap-0.5 text-xs font-bold text-gold shrink-0">
-                    <Percent className="w-3 h-3" /> {ctr.royalty_rate as number}%
-                  </span>
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); alert(`Téléchargement de ${ctr.contract_file}...`); }}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-navy border border-border px-3 py-1.5 rounded hover:bg-background-secondary"
-                    title="Télécharger le contrat"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Télécharger PDF
-                  </button>
-                </div>
-              </div>
-            )}
+      {/* 5 KPI Cards animées (KpiCard de components/ui/kpi-card.tsx) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Link href="/legal-reviewer/contracts" className="block">
+          <KpiCard
+            label="Contrats Stockés"
+            value={kpis?.totalContracts || 4}
+            icon={ShieldCheck}
+            trend={12}
+            trendPeriod="ce mois"
+            theme="gold"
+            subtext="Archivage légal"
+            sparkline={[3, 3, 4, 4]}
           />
+        </Link>
 
-        </div>
+        <Link href="/legal-reviewer/royalties?tab=suggestions" className="block">
+          <KpiCard
+            label="Suggestions IA Droits"
+            value={kpis?.pendingAiSuggestions || 2}
+            icon={Sparkles}
+            trend={0}
+            theme="amber"
+            subtext="À valider"
+            sparkline={[1, 2, 2, 2]}
+          />
+        </Link>
 
-        {/* Right: Client Debts & Reminders */}
-        <div className="lg:col-span-4 bg-background border border-border rounded-xl shadow-sm overflow-hidden space-y-4 p-5">
-          <h3 className="font-serif text-base font-bold text-navy flex items-center gap-2 border-b border-border pb-3">
-            <BellRing className="w-5 h-5 text-gold" />
-            Relances dettes & Factures en retard
-          </h3>
+        <Link href="/legal-reviewer/relances?tab=debts" className="block">
+          <KpiCard
+            label="Clients en Impayé"
+            value={kpis?.clientsInDebt || 2}
+            icon={AlertTriangle}
+            trend={-5}
+            theme="rose"
+            subtext="Factures échues"
+            sparkline={[3, 3, 2, 2]}
+          />
+        </Link>
 
-          {loading ? (
-            <div className="space-y-4 animate-pulse">
-              <div className="h-12 bg-background-secondary rounded" />
-            </div>
-          ) : debts.length === 0 ? (
-            <div className="text-center text-xs text-foreground-muted p-6">
-              Aucun client débiteur en retard.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {debts.map((debt) => (
-                <div key={debt.id} className="p-4 border border-border rounded-xl bg-background-secondary/20 space-y-3 hover:border-gold/30 transition-colors">
-                  <div className="flex justify-between items-start gap-4">
-                    <div>
-                      <h4 className="font-bold text-navy text-xs leading-snug">{debt.client_name}</h4>
-                      <p className="text-[10px] text-foreground-muted">{debt.client_email}</p>
-                    </div>
-                    <span className="font-bold text-navy text-xs shrink-0">
-                      {debt.amount.toLocaleString()} {debt.currency}
-                    </span>
-                  </div>
+        <Link href="/legal-reviewer/relances?tab=authors" className="block">
+          <KpiCard
+            label="Relances Envoyées"
+            value={kpis?.authorRemindersSent || 2}
+            icon={BellRing}
+            trend={15}
+            theme="emerald"
+            subtext="Auteurs &amp; Ventes"
+            sparkline={[1, 1, 2, 2]}
+          />
+        </Link>
 
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-foreground-muted">Échéance : {new Date(debt.due_date).toLocaleDateString("fr-FR")}</span>
-                    {debt.status === "reminded" ? (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-success/10 text-success border border-success/20 font-bold">
-                        <CheckCircle className="w-3.5 h-3.5" /> Relancé
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-warning/10 text-warning border border-warning/20 font-bold">
-                        <AlertTriangle className="w-3.5 h-3.5 text-warning" /> En retard
-                      </span>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => handleRemind(debt.id)}
-                    disabled={remindingId === debt.id}
-                    className="w-full py-2 bg-navy hover:bg-navy-hover text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    {remindingId === debt.id ? "Relance en cours..." : "Relancer par e-mail"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
+        <Link href="/legal-reviewer/pre-editions" className="block">
+          <KpiCard
+            label="Pré-éditions Actives"
+            value={kpis?.activePreEditions || 2}
+            icon={PenTool}
+            trend={8}
+            theme="navy"
+            subtext="Avant dépôt"
+            sparkline={[1, 2, 2, 2]}
+          />
+        </Link>
       </div>
 
+      {/* Raccourcis & Actions Rapides */}
+      <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
+        <div className="pb-3 border-b border-border flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold font-serif text-navy">Actions Rapides &amp; Module Juridique</h2>
+            <p className="text-[11px] text-foreground-muted mt-0.5">Accès direct aux 6 sous-modules</p>
+          </div>
+          <Link
+            href="/legal-reviewer/contracts"
+            className="text-xs font-bold text-gold hover:text-gold-dark flex items-center gap-1"
+          >
+            Tous les contrats <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            {
+              label: "Téléverser un Contrat",
+              desc: "Enregistrer un nouveau contrat PDF/Word indexé",
+              icon: PlusCircle,
+              href: "/legal-reviewer/contracts/new",
+              primary: true,
+            },
+            {
+              label: "Valider Suggestions IA",
+              desc: "Examiner et ajuster les partages de droits co-auteurs",
+              icon: Sparkles,
+              href: "/legal-reviewer/royalties?tab=suggestions",
+            },
+            {
+              label: "Nouveau Contrat Pré-édition",
+              desc: "Pré-enregistrer un ouvrage avant dépôt effectif",
+              icon: PenTool,
+              href: "/legal-reviewer/pre-editions",
+            },
+            {
+              label: "Droits d'Auteur & Rétroactivité",
+              desc: "Gérer et ajuster les taux de droits par livre",
+              icon: Percent,
+              href: "/legal-reviewer/royalties",
+            },
+            {
+              label: "Redevances Universités & Tiers",
+              desc: "Suivre les 15% fixes et modifier les taux partenaires",
+              icon: DollarSign,
+              href: "/legal-reviewer/redevances",
+            },
+            {
+              label: "Relances Impayés Clients",
+              desc: "Configurer le seuil et la fréquence des relances",
+              icon: BellRing,
+              href: "/legal-reviewer/relances",
+            },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`p-4 rounded-2xl border transition-all flex items-center justify-between group shadow-xs ${
+                item.primary
+                  ? "bg-navy border-navy-hover text-white hover:border-gold"
+                  : "bg-background border-border hover:border-gold text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={`p-2.5 rounded-xl shrink-0 ${
+                    item.primary ? "bg-gold/20 text-gold" : "bg-navy-light text-navy"
+                  }`}
+                >
+                  <item.icon className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className={`font-bold text-xs truncate ${
+                      item.primary ? "text-white" : "text-navy"
+                    }`}
+                  >
+                    {item.label}
+                  </p>
+                  <p className="text-[10px] text-foreground-muted truncate">{item.desc}</p>
+                </div>
+              </div>
+              <ChevronRight
+                className={`w-4 h-4 shrink-0 transition-colors ${
+                  item.primary ? "text-gold" : "text-foreground-muted group-hover:text-gold"
+                }`}
+              />
+            </Link>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

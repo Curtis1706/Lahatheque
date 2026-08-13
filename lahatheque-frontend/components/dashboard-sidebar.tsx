@@ -36,7 +36,8 @@ import {
   ArrowUpCircle,
   PlusCircle,
   CheckSquare,
-  History
+  History,
+  Percent
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -249,8 +250,12 @@ export function DashboardSidebar() {
         ];
       case "legal_reviewer":
         return [
-          { label: "Tableau de bord", href: "/legal-reviewer", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Contrats", href: "/legal-reviewer/contracts", icon: <ShieldCheck className="w-5 h-5" /> },
+          { label: "Vue d'ensemble", href: "/legal-reviewer", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Contrats Légaux", href: "/legal-reviewer/contracts", icon: <ShieldCheck className="w-5 h-5" /> },
+          { label: "Droits d'Auteur", href: "/legal-reviewer/royalties", icon: <Percent className="w-5 h-5" /> },
+          { label: "Pré-éditions", href: "/legal-reviewer/pre-editions", icon: <PenTool className="w-5 h-5" /> },
+          { label: "Redevances", href: "/legal-reviewer/redevances", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Relances & Impayés", href: "/legal-reviewer/relances", icon: <BellRing className="w-5 h-5" /> },
         ];
       case "layout_artist":
         return [
@@ -332,7 +337,7 @@ export function DashboardSidebar() {
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-xs text-white truncate">{userDisplayName}</p>
                 <p className="text-[10px] text-gold truncate">
-                  {user.role === "teacher" ? "Lecteur • Enseignant" : user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : user.role === "chief_layout" ? "Chef Maquettiste • Validateur" : user.role === "layout_artist" ? "Maquettiste • Création Catalogue" : "Lecteur • LAHAThèque"}
+                  {user.role === "teacher" ? "Lecteur • Enseignant" : user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : user.role === "legal_reviewer" ? "Juriste • Gestion Légale & Droits" : user.role === "chief_layout" ? "Chef Maquettiste • Validateur" : user.role === "layout_artist" ? "Maquettiste • Création Catalogue" : "Lecteur • LAHAThèque"}
                 </p>
               </div>
             </div>
