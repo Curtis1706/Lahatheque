@@ -91,20 +91,22 @@ Ces règles sont TOUJOURS actives, sur tout écran/composant/page construit pour
 
 Le quota de téléchargement de code source (`get_component` / `generate`) est limité par clé API. Le protocole suivant est **obligatoire** dès que le quota est épuisé ou proche de l'être.
 
-### Détection du quota
+### Détection & Basculement Multi-Clés (21st, 21st-2...21st-8)
+- 8 instances de serveurs MCP 21st.dev sont enregistrées dans le projet (`21st`, `21st-2`, `21st-3`, `21st-4`, `21st-5`, `21st-6`, `21st-7`, `21st-8`).
 - Appeler `get_usage` avant toute session intensive de recherche 21st.dev.
-- Si `get_component` retourne `locked=true` ou si `get_usage` indique `0 remaining` → **NE PAS coder à la main sans avertir l'utilisateur**.
+- Si un appel `get_component` ou `generate` sur le serveur `21st` retourne `locked=true` ou si `get_usage` indique `0 remaining`, **basculer immédiatement sur le serveur suivant** (`21st-2`, puis `21st-3`, etc.).
+- Déclencher le protocole copier-coller et la notification à l'utilisateur **uniquement si TOUTES les 8 instances sont épuisées**.
 
-### Protocole copier-coller (quota épuisé)
-Quand le quota est épuisé, appliquer **strictement ce protocole pas-à-pas** :
+### Protocole copier-coller (toutes les clés épuisées)
+Quand les quotas de TOUTES les instances (21st à 21st-8) sont épuisés, appliquer **strictement ce protocole pas-à-pas** :
 
-1. **Annoncer clairement** : "Quota 21st.dev épuisé. Je vais vous demander les codes sources un par un."
+1. **Annoncer clairement** : "Quotas de toutes les clés 21st.dev épuisés. Je vais vous demander les codes sources un par un."
 2. **Identifier la liste complète** des composants à récupérer avant de commencer (ne pas demander au fur et à mesure sans plan).
 3. **Demander le premier composant** : fournir l'URL exacte du composant sur 21st.dev et demander d'y copier le code source complet depuis l'onglet "Code".
 4. **Attendre** que l'utilisateur colle le code source dans le chat.
 5. **Intégrer** ce composant (adaptation tokens, mobile-first, TypeScript) avant de demander le suivant.
 6. **Répéter** (étapes 3→5) pour chaque composant suivant, un par un — jamais deux à la fois.
-7. Si l'utilisateur change la clé API entre temps : appeler `get_usage` pour vérifier, reprendre avec `get_component` si le quota est rétabli.
+7. Si l'utilisateur réinitialise/ajoute des clés API : vérifier avec `get_usage`, reprendre avec `get_component`.
 
 ### Interdiction
-- Ne jamais coder un composant UI générique "à la main" comme alternative silencieuse au quota épuisé sans avoir déclenché ce protocole et l'avoir signalé explicitement à l'utilisateur.
+- Ne jamais coder un composant UI générique "à la main" comme alternative silencieuse aux quotas épuisés sans avoir essayé l'ensemble des 8 serveurs MCP et déclenché ce protocole en dernier recours.

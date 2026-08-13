@@ -1,17 +1,83 @@
-export interface BookCatalogItem {
+// ─── Types Maquettiste & Chef Maquettiste ─────────────────────────────────────
+// Alignés sur le plan de specs techniques Django — Section 4 (Rôle 2) & Section C (IA)
+
+export type LayoutDepositStatus =
+  | "draft"              // Brouillon (non encore soumis)
+  | "pending_validation" // En attente de validation par le Chef Maquettiste
+  | "revision_requested" // Correction demandée par le Chef Maquettiste
+  | "published";         // Validé et publié sur la vitrine publique
+
+export type ClassificationSource = "ai_suggested" | "manual_override";
+
+export type DRMProtectionStatus = "applied" | "pending" | "none";
+
+export interface AudioTrack {
   id: string;
-  title: string;
-  isbn: string;
-  authors: string;
-  year: string;
-  discipline: string;
-  language: string;
-  country: string;
-  faculty: string;
-  university: string;
-  format: "PDF" | "EPUB" | "AUDIO" | "PAPIER";
-  has_audio: boolean;
-  status: "draft" | "pending" | "approved" | "rejected";
-  created_at: string;
-  suggested_summary?: string;
+  name: string;
+  url: string;
+  duration?: string;
+  protection_status: DRMProtectionStatus;
 }
+
+export interface DepositFiles {
+  book_file_url?: string;
+  book_file_name?: string;
+  book_file_size?: number; // octets
+  format: "PDF" | "EPUB" | "AUDIO" | "PAPIER";
+  cover_url?: string;
+  cover_name?: string;
+  audio_files?: AudioTrack[];
+}
+
+export interface DepositClassification {
+  country: string;
+  university: string;
+  faculty: string;
+  department?: string;
+  discipline: string;
+  collection?: string;
+  source: ClassificationSource;
+}
+
+export interface DepositMetadata {
+  title: string;
+  authors: string[];
+  publication_year: number;
+  language: string;
+  language_source: ClassificationSource;
+  summary: string;
+  summary_source: ClassificationSource;
+  isbn?: string;
+}
+
+export interface LayoutDeposit {
+  id: string;
+  maquettiste_id: string;
+  maquettiste_name: string;
+  metadata: DepositMetadata;
+  classification: DepositClassification;
+  files: DepositFiles;
+  status: LayoutDepositStatus;
+  created_at: string;
+  submitted_at?: string;
+  validated_at?: string;
+  chef_comment?: string;
+  default_price: number;
+  admin_price?: number;
+}
+
+export interface MaquettisteKpi {
+  draftCount: number;
+  pendingValidationCount: number;
+  revisionRequestedCount: number;
+  publishedCount: number;
+}
+
+export interface ChefMaquettisteKpi {
+  pendingValidationCount: number;
+  validatedThisMonth: number;
+  revisionRequestedThisMonth: number;
+  averageProcessingTimeHours: number;
+}
+
+export type DepositFilterStatus = "all" | "draft" | "pending_validation" | "revision_requested" | "published";

@@ -33,7 +33,10 @@ import {
   AlertTriangle,
   Package,
   FileBarChart,
-  ArrowUpCircle
+  ArrowUpCircle,
+  PlusCircle,
+  CheckSquare,
+  History
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -251,8 +254,22 @@ export function DashboardSidebar() {
         ];
       case "layout_artist":
         return [
-          { label: "Tableau de bord", href: "/layout-artist", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Maquettes", href: "/layout-artist/validation", icon: <PenTool className="w-5 h-5" /> },
+          { label: "Vue d'ensemble", href: "/layout-artist", icon: <LayoutDashboard className="w-5 h-5" /> },
+          {
+            label: "Mes Dépôts",
+            href: "/layout-artist/deposits",
+            icon: <BookOpen className="w-5 h-5" />,
+            sublinks: [
+              { label: "Tous mes dépôts", href: "/layout-artist/deposits", icon: <BookOpen className="w-4 h-4 text-gold" /> },
+              { label: "Nouveau dépôt", href: "/layout-artist/deposits/new", icon: <PlusCircle className="w-4 h-4 text-gold" /> },
+            ],
+          },
+        ];
+      case "chief_layout":
+        return [
+          { label: "Vue d'ensemble", href: "/chief-layout", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Dépôts à valider", href: "/chief-layout/validation", icon: <CheckSquare className="w-5 h-5" /> },
+          { label: "Historique validations", href: "/chief-layout/history", icon: <History className="w-5 h-5" /> },
         ];
       case "admin":
       case "super_admin":
@@ -315,7 +332,7 @@ export function DashboardSidebar() {
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-xs text-white truncate">{userDisplayName}</p>
                 <p className="text-[10px] text-gold truncate">
-                  {user.role === "teacher" ? "Lecteur • Enseignant" : user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : "Lecteur • LAHAThèque"}
+                  {user.role === "teacher" ? "Lecteur • Enseignant" : user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : user.role === "chief_layout" ? "Chef Maquettiste • Validateur" : user.role === "layout_artist" ? "Maquettiste • Création Catalogue" : "Lecteur • LAHAThèque"}
                 </p>
               </div>
             </div>
