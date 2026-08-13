@@ -1,129 +1,172 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { BookOpen, Search, Filter, GraduationCap, Building2 } from "lucide-react";
-import { getBorrowedBooks } from "@/lib/services/student";
-import { StudentBookAccess } from "@/lib/types/student";
-import { BookCard } from "@/components/features/student/book-card";
-import { BookListItem } from "@/components/features/student/book-list-item";
-import { ViewToggle, ViewMode } from "@/components/features/student/view-toggle";
-import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
+import React, { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
+import { Search, Filter, BookOpen, Eye, ArrowLeft, Sparkles } from "lucide-react";
+import { BookSampleModal } from "@/components/features/student/book-sample-modal";
+import { getClientLibraryBooks } from "@/lib/services/student";
+import type { ClientBookAccess } from "@/lib/types/student";
 
 export default function StudentCatalogPage() {
-  const [books, setBooks] = useState<StudentBookAccess[]>([]);
+  const [books, setBooks] = useState<ClientBookAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDiscipline, setSelectedDiscipline] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [selectedFormat, setSelectedFormat] = useState("all");
+  const [sampleBook, setSampleBook] = useState<ClientBookAccess | null>(null);
 
   useEffect(() => {
-    async function loadCatalog() {
-      try {
-        setLoading(true);
-        const data = await getBorrowedBooks();
-        setBooks(data);
-      } catch (err) {
-        console.error("Erreur de chargement du catalogue étudiant", err);
-      } finally {
-        setLoading(false);
-      }
+    async function loadData() {
+      setLoading(true);
+      const data = await getClientLibraryBooks();
+      setBooks(data);
+      setLoading(false);
     }
-    loadCatalog();
+    loadData();
   }, []);
 
-  const disciplines = Array.from(new Set(books.map((b) => b.discipline)));
-
-  const filteredBooks = books.filter((book) => {
-    const matchesSearch =
-      book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      book.institution.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesDiscipline = selectedDiscipline === "all" || book.discipline === selectedDiscipline;
-    return matchesSearch && matchesDiscipline;
-  });
+  const filteredBooks = useMemo(() => {
+    return books.filter((b) => {
+      if (selectedFormat !== "all" && b.format !== selectedFormat) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = b.title.toLowerCase().includes(q);
+        const matchAuthor = b.author.toLowerCase().includes(q);
+        const matchDisc = b.discipline.toLowerCase().includes(q);
+        if (!matchTitle && !matchAuthor && !matchDisc) return false;
+      }
+      return true;
+    });
+  }, [books, searchQuery, selectedFormat]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto w-full min-w-0">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs text-foreground-muted">
+        <Link href="/student" className="hover:text-navy">Mon Espace</Link>
+        <span>/</span>
+        <span className="text-navy font-semibold">Catalogue &amp; Découverte</span>
+      </div>
+
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gold">
-            <GraduationCap className="w-4 h-4" />
-            <span>Catalogue Institutionnel Connecté</span>
+      <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <Link href="/student" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Mon Espace
+          </Link>
+          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+            <Search className="w-4 h-4 text-gold" />
+            Découverte du Fonds Documentaire LAHAThèque
           </div>
-          <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy">
-            Catalogue d&apos;Ouvrages de votre Établissement
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+            Catalogue Général &amp; Extraits Gratuits
           </h1>
-          <p className="text-xs sm:text-sm text-foreground-muted max-w-2xl">
-            Explorez l&apos;ensemble des manuels universitaires et thèses académiques accessibles dans le cadre de votre affiliation.
+          <p className="text-xs text-foreground-muted mt-1">
+            Explorez les ouvrages disponibles, lisez des extraits gratuits en 1 clic sans friction et choisissez votre mode d&apos;accès.
           </p>
         </div>
-
-        <div className="bg-background-secondary p-3 px-4 rounded-xl border border-border flex items-center gap-2 text-xs font-semibold text-navy self-start md:self-auto shrink-0">
-          <Building2 className="w-4 h-4 text-gold shrink-0" />
-          <span>Accès : Université d&apos;Abomey-Calavi (UAC)</span>
-        </div>
       </div>
 
-      {/* Search, Filter & Toggle Bar */}
-      <div className="bg-background border border-border p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between shadow-xs">
-        <div className="relative w-full md:w-96">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
+      {/* Moteur de Recherche & Filtres */}
+      <div className="p-4 rounded-2xl bg-background border border-border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+        <div className="relative w-full sm:w-96">
           <input
             type="text"
-            placeholder="Rechercher par titre, auteur, discipline..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-background-secondary border border-border text-sm focus:outline-none focus:border-gold transition-colors text-foreground min-h-[44px]"
+            placeholder="Rechercher par titre, auteur, discipline..."
+            className="w-full pl-9 pr-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[40px]"
           />
+          <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-3" />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-2 text-xs text-foreground-muted font-medium">
-            <Filter className="w-3.5 h-3.5" />
-            <span>Discipline :</span>
-            <select
-              value={selectedDiscipline}
-              onChange={(e) => setSelectedDiscipline(e.target.value)}
-              className="px-3 py-2.5 rounded-xl bg-background-secondary border border-border text-xs font-medium text-foreground focus:outline-none focus:border-gold min-h-[44px]"
+        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+          {[
+            { id: "all", label: "Tous les formats" },
+            { id: "EPUB", label: "Livres EPUB" },
+            { id: "PDF", label: "Documents PDF" },
+            { id: "Audio", label: "Livres Audio" },
+          ].map((fmt) => (
+            <button
+              key={fmt.id}
+              type="button"
+              onClick={() => setSelectedFormat(fmt.id)}
+              className={`px-3.5 py-2 rounded-xl text-[11px] font-bold whitespace-nowrap transition-colors border ${
+                selectedFormat === fmt.id
+                  ? "bg-navy text-white border-navy"
+                  : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
+              }`}
             >
-              <option value="all">Toutes les disciplines</option>
-              {disciplines.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
+              {fmt.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Book Grid vs List Mobile-First */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
-          {Array.from({ length: 6 }).map((_, idx) => (
-            <div key={idx} className="bg-background-secondary h-64 rounded-2xl border border-border" />
-          ))}
-        </div>
-      ) : filteredBooks.length === 0 ? (
-        <EmptyState>
-          <EmptyIcon icon={BookOpen} />
-          <EmptyTitle>Aucun ouvrage disponible</EmptyTitle>
-          <EmptyDescription>Aucun manuel ne correspond aux critères de recherche spécifiés.</EmptyDescription>
-        </EmptyState>
-      ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredBooks.map((book) => (
-            <BookCard key={book.id} book={book} />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredBooks.map((book) => (
-            <BookListItem key={book.id} book={book} />
-          ))}
-        </div>
-      )}
+      {/* Grille de Cartes d'Ouvrages du Catalogue */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+        {filteredBooks.map((book) => (
+          <div
+            key={book.id}
+            className="p-4 rounded-3xl bg-background border border-border hover:border-gold transition-all space-y-3 flex flex-col justify-between shadow-xs group"
+          >
+            <div className="space-y-3">
+              <div className="w-full h-48 rounded-2xl bg-navy overflow-hidden border border-border relative">
+                {book.cover_url ? (
+                  <img src={book.cover_url} alt={book.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white font-serif font-bold text-xl">
+                    {book.title.slice(0, 1)}
+                  </div>
+                )}
+                <span className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-navy/80 text-gold text-[10px] font-mono font-bold">
+                  {book.format}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold text-foreground-muted uppercase tracking-wider block">{book.discipline}</span>
+                <h3 className="font-serif font-bold text-navy text-sm line-clamp-2 mt-0.5">{book.title}</h3>
+                <p className="text-xs text-foreground-muted truncate">Par {book.author}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-3 border-t border-border">
+              <div className="flex items-baseline justify-between text-xs">
+                <span className="text-foreground-muted">Prix numérique :</span>
+                <span className="font-mono font-bold text-navy">
+                  {(book.price_digital || 0) > 0 ? `${(book.price_digital || 0).toLocaleString("fr-FR")} XOF` : "Accès Libre"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSampleBook(book)}
+                  className="px-2 py-2 rounded-xl bg-gold/15 text-navy text-[11px] font-bold hover:bg-gold transition-colors inline-flex items-center justify-center gap-1 min-h-[38px]"
+                >
+                  <Eye className="w-3.5 h-3.5 text-gold group-hover:text-navy" />
+                  Extrait Gratuit
+                </button>
+                <Link
+                  href={`/student/catalog/${book.id}`}
+                  className="px-2 py-2 rounded-xl bg-navy text-white text-[11px] font-bold hover:bg-navy-hover transition-colors inline-flex items-center justify-center gap-1 min-h-[38px]"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-gold" />
+                  Fiche
+                </Link>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modale d'extrait gratuit lisible sans friction */}
+      <BookSampleModal
+        book={sampleBook}
+        isOpen={sampleBook !== null}
+        onClose={() => setSampleBook(null)}
+      />
     </div>
   );
 }

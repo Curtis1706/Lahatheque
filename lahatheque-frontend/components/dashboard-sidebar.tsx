@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   PackageCheck,
   ShoppingCart,
+  Search,
   Sparkles,
   BellRing,
   FileSpreadsheet,
@@ -183,15 +184,14 @@ export function DashboardSidebar() {
   const getLinks = () => {
     switch (user?.role) {
       case "student":
-      case "super_client":
-      case "parent":
         return [
           { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Ma Bibliothèque de Livres", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
-          { label: "Mes Commandes & Factures", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
-          { label: "Mon Abonnement & Pass", href: "/student/subscriptions", icon: <Sparkles className="w-5 h-5" /> },
-          { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-5 h-5" /> },
-          { label: "Historique & Notes", href: "/student/history", icon: <FileCheck className="w-5 h-5" /> },
+          { label: "Catalogue & Découverte", href: "/student/catalog", icon: <Search className="w-5 h-5" /> },
+          { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Achats & Commandes Papier", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
+          { label: "Abonnements & Pass", href: "/student/subscriptions", icon: <Sparkles className="w-5 h-5" /> },
+          { label: "Profil & Paramètres", href: "/student/profile", icon: <UserIcon className="w-5 h-5" /> },
+          { label: "Mon Université (Bouquet)", href: "/student/university", icon: <GraduationCap className="w-5 h-5" /> },
         ];
       case "teacher":
         return [
