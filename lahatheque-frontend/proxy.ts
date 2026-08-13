@@ -52,8 +52,10 @@ export default function proxy(request: NextRequest) {
     switch (userRole) {
       case 'student':
       case 'parent':
-      case 'super_client':
         return '/student'
+      case 'super_client':
+      case 'wholesaler':
+        return '/wholesaler'
       case 'teacher':
         return '/teacher'
       case 'author':
@@ -87,7 +89,7 @@ export default function proxy(request: NextRequest) {
   }
 
   // 3. Si l'utilisateur n'est pas connecté et tente d'accéder à un espace protégé
-  const protectedRoutes = ['/student', '/teacher', '/librarian', '/publisher', '/author', '/legal-reviewer', '/layout-artist', '/chief-layout', '/manager', '/admin', '/super-admin']
+  const protectedRoutes = ['/student', '/wholesaler', '/teacher', '/librarian', '/publisher', '/author', '/legal-reviewer', '/layout-artist', '/chief-layout', '/manager', '/admin', '/super-admin']
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   
   if (!isLoggedIn && isProtectedRoute) {
