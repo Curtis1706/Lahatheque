@@ -1,42 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getStudentAffiliations, getBouquetSubscriptions } from "@/lib/services/librarian";
-import { StudentAffiliation, BouquetSubscription } from "@/lib/types/librarian";
-import { 
-  Users, 
-  UserCheck, 
-  BookOpen,
-  Bookmark, 
-  Building2, 
-  CheckCircle, 
-  Clock, 
-  ArrowRight,
-  FileText,
-  TrendingUp,
-  ShieldAlert
-} from "lucide-react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { KpiGrid, type KpiCardProps } from "@/components/ui/kpi-card";
-import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
+import { useAuth } from "@/hooks/use-auth";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { getUniversityKpis } from "@/lib/services/librarian";
+import type { UniversityKpis } from "@/lib/types/librarian";
+import {
+  GraduationCap,
+  BookOpen,
+  Eye,
+  DollarSign,
+  Sparkles,
+  ChevronRight,
+  ArrowRight,
+  FileBarChart,
+  PackageCheck,
+  Building2,
+  Percent,
+} from "lucide-react";
 
-export default function LibrarianDashboardPage() {
-  const [affiliations, setAffiliations] = useState<StudentAffiliation[]>([]);
-  const [bouquets, setBouquets] = useState<BouquetSubscription[]>([]);
+export default function UniversityOverviewPage() {
+  const { user } = useAuth();
+  const [kpis, setKpis] = useState<UniversityKpis | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [affData, bqData] = await Promise.all([
-          getStudentAffiliations(),
-          getBouquetSubscriptions()
-        ]);
-        setAffiliations(affData);
-        setBouquets(bqData);
+        const data = await getUniversityKpis();
+        setKpis(data);
       } catch (err) {
-        console.error("Erreur de chargement des données bibliothécaire", err);
+        console.error("Erreur de chargement du dashboard université", err);
       } finally {
         setLoading(false);
       }
@@ -44,186 +40,199 @@ export default function LibrarianDashboardPage() {
     loadData();
   }, []);
 
-  const pendingAffiliations = affiliations.filter(a => a.status === "pending");
-  const approvedCount = affiliations.filter(a => a.status === "approved").length;
-
   return (
-    <div className="p-6 lg:p-8 space-y-8">
-      
-      {/* Header Banner */}
-      <div className="bg-navy-dark text-white rounded-3xl p-6 sm:p-8 border border-navy/30 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="space-y-2 z-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy text-gold text-xs font-bold uppercase tracking-wider border border-gold/20">
-            <Building2 className="w-3.5 h-3.5" />
-            Portail Gestionnaire Institutionnel
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+      {/* Banner Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-bold mb-2 uppercase tracking-wider">
+            <GraduationCap className="w-3.5 h-3.5" />
+            {kpis?.institutionName || "Université d'Abomey-Calavi (UAC)"}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-serif font-bold">
-            Université d'Abomey-Calavi (UAC)
+          <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
+            Espace Université — Tableau de Bord Institutionnel 🎓
           </h1>
-          <p className="text-xs sm:text-sm text-white/80 max-w-xl">
-            Gérez les accès abonnés de votre établissement, validez les affiliations d'étudiants et suivez le tableau de bord des consommations de ressources.
+          <p className="text-xs sm:text-sm text-navy-light mt-1">
+            Suivez les ventes et l&apos;utilisation des ressources par faculté, gérez les bouquets et votre redevance de 15%.
           </p>
         </div>
 
-        <div className="bg-navy/80 p-4 rounded-2xl border border-gold/20 space-y-1.5 text-xs z-10 w-full md:w-auto shrink-0">
-          <div className="flex items-center justify-between gap-6 text-foreground-muted font-semibold">
-            <span>Abonnements Actifs :</span>
-            <span className="text-gold font-bold">{bouquets.length} bouquets</span>
-          </div>
-          <div className="flex items-center justify-between gap-6 text-foreground-muted font-semibold">
-            <span>Statut Institution :</span>
-            <span className="text-success font-bold flex items-center gap-1">
-              <CheckCircle className="w-3 h-3 text-success" /> En règle
-            </span>
-          </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/librarian/bouquets"
+            className="px-3.5 py-2.5 rounded-xl bg-navy-dark text-white font-bold text-xs hover:bg-navy-hover border border-navy-hover transition-all flex items-center gap-2 shadow-sm min-h-[44px]"
+          >
+            <Sparkles className="w-4 h-4 text-gold" />
+            Bouquets Documentaires
+          </Link>
+          <Link
+            href="/librarian/catalog"
+            className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 shadow-sm min-h-[44px]"
+          >
+            <BookOpen className="w-4 h-4" />
+            Mon Catalogue Établissement
+          </Link>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-36">
-              <div className="w-10 h-10 rounded-xl bg-background-secondary" />
-              <div className="h-7 w-20 bg-background-secondary rounded" />
-              <div className="h-3.5 w-32 bg-background-secondary rounded" />
-            </div>
+      {/* 5 KPI Cards animées (KpiCard de components/ui/kpi-card.tsx) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Link href="/librarian/catalog" className="block">
+          <KpiCard
+            label="Ouvrages Rattachés"
+            value={kpis?.totalBooksCount || 4}
+            icon={BookOpen}
+            trend={8}
+            trendPeriod="ce mois"
+            theme="gold"
+            subtext="FADESP, FASEG, FSS, FSA"
+            sparkline={[3, 3, 4, 4]}
+          />
+        </Link>
+
+        <Link href="/librarian/stats" className="block">
+          <KpiCard
+            label="Consultations &amp; Usages"
+            value={kpis?.totalConsultations || 9360}
+            icon={Eye}
+            trend={14}
+            theme="blue"
+            subtext={`${kpis?.totalDownloads || 3140} téléch. • ${kpis?.totalAudioListens || 1230} audio`}
+            sparkline={[6000, 7500, 8800, 9360]}
+          />
+        </Link>
+
+        <Link href="/librarian/stats" className="block">
+          <KpiCard
+            label="Revenus Générés"
+            value={kpis?.totalRevenue || 51950000}
+            formatValue={(v) => `${v.toLocaleString("fr-FR")} XOF`}
+            icon={DollarSign}
+            trend={12}
+            theme="emerald"
+            subtext="Ventes brutes des ouvrages"
+            sparkline={[30000000, 42000000, 48000000, 51950000]}
+          />
+        </Link>
+
+        <Link href="/librarian/redevances" className="block">
+          <KpiCard
+            label="Redevances 15% Dues"
+            value={kpis?.pendingRoyalties || 7792500}
+            formatValue={(v) => `${v.toLocaleString("fr-FR")} XOF`}
+            icon={Percent}
+            trend={0}
+            theme="amber"
+            subtext={`Solde restant : ${(kpis?.remainingBalance || 2042500).toLocaleString("fr-FR")} XOF`}
+            sparkline={[5000000, 6500000, 7792500, 7792500]}
+          />
+        </Link>
+
+        <Link href="/librarian/bouquets" className="block">
+          <KpiCard
+            label="Bouquets Actifs"
+            value={kpis?.activeBundlesCount || 2}
+            icon={Sparkles}
+            trend={0}
+            theme="amber"
+            subtext="Abonnements souscrits"
+            sparkline={[1, 2, 2, 2]}
+          />
+        </Link>
+      </div>
+
+      {/* Raccourcis d'Action */}
+      <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
+        <div className="pb-3 border-b border-border flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold font-serif text-navy">Gestion des Ressources &amp; Suivi Institutionnel</h2>
+            <p className="text-[11px] text-foreground-muted mt-0.5">Accès direct aux statistiques, bouquets et redevances 15%</p>
+          </div>
+          <Link
+            href="/librarian/stats"
+            className="text-xs font-bold text-gold hover:text-gold-dark flex items-center gap-1"
+          >
+            Voir les statistiques <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            {
+              label: "Catalogue par Faculté",
+              desc: "Arborescence FADESP, FASEG, FSS, FSA...",
+              icon: GraduationCap,
+              href: "/librarian/catalog",
+              primary: true,
+            },
+            {
+              label: "Statistiques Ventes & Usage",
+              desc: "Téléchargements, lectures et écoutes audio",
+              icon: FileBarChart,
+              href: "/librarian/stats",
+            },
+            {
+              label: "Bouquets Documentaires",
+              desc: "Gérer et souscrire des packs pour étudiants",
+              icon: Sparkles,
+              href: "/librarian/bouquets",
+            },
+            {
+              label: "Achats Livres Papier",
+              desc: "Commandes unitaires et groupées papier",
+              icon: PackageCheck,
+              href: "/librarian/purchases",
+            },
+            {
+              label: "Redevances 15% & Relevés",
+              desc: "Suivi du taux fixe 15% et des paiements",
+              icon: Percent,
+              href: "/librarian/redevances",
+            },
+            {
+              label: "Profil & Coordonnées",
+              desc: "Coordonnées de l'établissement et RIB",
+              icon: Building2,
+              href: "/librarian/profile",
+            },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`p-4 rounded-2xl border transition-all flex items-center justify-between group shadow-xs ${
+                item.primary
+                  ? "bg-navy border-navy-hover text-white hover:border-gold"
+                  : "bg-background border-border hover:border-gold text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={`p-2.5 rounded-xl shrink-0 ${
+                    item.primary ? "bg-gold/20 text-gold" : "bg-navy-light text-navy"
+                  }`}
+                >
+                  <item.icon className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className={`font-bold text-xs truncate ${
+                      item.primary ? "text-white" : "text-navy"
+                    }`}
+                  >
+                    {item.label}
+                  </p>
+                  <p className="text-[10px] text-foreground-muted truncate">{item.desc}</p>
+                </div>
+              </div>
+              <ChevronRight
+                className={`w-4 h-4 shrink-0 transition-colors ${
+                  item.primary ? "text-gold" : "text-foreground-muted group-hover:text-gold"
+                }`}
+              />
+            </Link>
           ))}
         </div>
-      ) : (
-        <KpiGrid
-          cols={3}
-          cards={[
-            {
-              label: "Étudiants affiliés validés",
-              value: approvedCount,
-              icon: UserCheck,
-              trend: 5,
-              sparkline: [30, 40, 35, 55, 50, 65, 70],
-            },
-            {
-              label: "Demandes en attente",
-              value: pendingAffiliations.length,
-              icon: Clock,
-              trend: -2,
-              sparkline: [60, 55, 65, 50, 45, 40, 35],
-            },
-            {
-              label: "Consommations globales",
-              value: 51400,
-              formatValue: (v) => `${v.toLocaleString("fr-FR")} pages`,
-              icon: TrendingUp,
-              trend: 14,
-              sparkline: [40, 50, 55, 65, 60, 75, 80],
-            },
-          ] satisfies KpiCardProps[]}
-        />
-      )}
-
-      {/* Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* Left: Pending affiliations overview */}
-        <div className="lg:col-span-7 bg-background border border-border rounded-xl shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-border flex items-center justify-between">
-            <h3 className="font-serif text-base font-bold text-navy">Demandes d'affiliation en attente</h3>
-            <Link 
-              href="/librarian/affiliations" 
-              className="text-xs text-gold hover:text-gold-dark font-bold flex items-center gap-1"
-            >
-              Traiter les demandes
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          {loading ? (
-            <div className="p-6 space-y-4 animate-pulse">
-              <div className="h-10 bg-background-secondary rounded" />
-              <div className="h-10 bg-background-secondary rounded" />
-            </div>
-          ) : pendingAffiliations.length === 0 ? (
-            <EmptyState className="py-8">
-              <EmptyIcon icon={Users} />
-              <EmptyTitle>Aucune demande en attente</EmptyTitle>
-              <EmptyDescription>Les demandes d'affiliation apparaîtront ici.</EmptyDescription>
-            </EmptyState>
-          ) : (
-            <div className="divide-y divide-border/40">
-              {pendingAffiliations.slice(0, 3).map((aff) => (
-                <div key={aff.id} className="p-5 flex justify-between items-start gap-4 hover:bg-background-secondary/20 transition-colors">
-                  <div className="space-y-1">
-                    <p className="font-bold text-navy text-sm">{aff.student_name}</p>
-                    <p className="text-xs text-foreground-muted">{aff.student_email}</p>
-                    <p className="text-[10px] text-foreground-muted font-mono">{aff.student_card_number} — {aff.faculty}</p>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-warning/10 text-warning border border-warning/20 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> En attente
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Right: Bouquet Subscriptions overview */}
-        <div className="lg:col-span-5 bg-background border border-border rounded-xl shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-border flex items-center justify-between">
-            <h3 className="font-serif text-base font-bold text-navy">Abonnements Bouquets</h3>
-            <Link 
-              href="/librarian/stats" 
-              className="text-xs text-gold hover:text-gold-dark font-bold flex items-center gap-1"
-            >
-              Statistiques détaillées
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          {loading ? (
-            <div className="p-6 space-y-4 animate-pulse">
-              <div className="h-12 bg-background-secondary rounded" />
-            </div>
-          ) : bouquets.length === 0 ? (
-            <EmptyState className="py-8">
-              <EmptyIcon icon={BookOpen} />
-              <EmptyTitle>Aucun abonnement</EmptyTitle>
-              <EmptyDescription>Aucun bouquet souscrit pour le moment.</EmptyDescription>
-            </EmptyState>
-          ) : (
-            <div className="divide-y divide-border/40 p-2">
-              {bouquets.map((bq) => (
-                <div key={bq.id} className="p-4 space-y-3 hover:bg-background-secondary/20 transition-colors rounded-lg">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-bold text-navy text-xs leading-snug">{bq.name}</h4>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-success/10 text-success border border-success/20">
-                      Actif
-                    </span>
-                  </div>
-                  
-                  {/* Progress bar of licenses */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-foreground-muted">
-                      <span>Licences utilisées</span>
-                      <span className="font-semibold">{bq.active_licenses} / {bq.max_licenses}</span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-border overflow-hidden">
-                      <div 
-                        className="h-full bg-gold rounded-full" 
-                        style={{ width: `${(bq.active_licenses / bq.max_licenses) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <p className="text-[9px] text-foreground-muted">
-                    Expire le {new Date(bq.end_date).toLocaleDateString("fr-FR")}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
       </div>
-
     </div>
   );
 }

@@ -1,209 +1,200 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { 
-  getBouquetSubscriptions, 
-  getUsageStats, 
-  renewSubscription 
-} from "@/lib/services/librarian";
-import { BouquetSubscription, UsageStats } from "@/lib/types/librarian";
-import { 
-  ArrowLeft, 
-  Bookmark, 
-  TrendingUp, 
-  Calendar, 
-  Download, 
-  BookOpen, 
-  RefreshCw,
-  CheckCircle2,
-  Lock
-} from "lucide-react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { DataTable } from "@/components/ui/data-table";
+import { FileBarChart, ArrowLeft, Eye, Download, Headphones, DollarSign, GraduationCap, Percent } from "lucide-react";
+import { DataTable, DataTableColumn } from "@/components/ui/data-table";
+import { getUniversityBooks } from "@/lib/services/librarian";
+import type { UniversityBook } from "@/lib/types/librarian";
 
-export default function LibrarianStatsPage() {
-  const [bouquets, setBouquets] = useState<BouquetSubscription[]>([]);
-  const [stats, setStats] = useState<UsageStats[]>([]);
+export default function UniversityStatsPage() {
+  const [books, setBooks] = useState<UniversityBook[]>([]);
   const [loading, setLoading] = useState(true);
-  const [renewingId, setRenewingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"sales" | "usage">("sales");
 
   useEffect(() => {
-    async function loadStatsData() {
-      try {
-        setLoading(true);
-        const [bqData, statsData] = await Promise.all([
-          getBouquetSubscriptions(),
-          getUsageStats()
-        ]);
-        setBouquets(bqData);
-        setStats(statsData);
-      } catch (err) {
-        console.error("Erreur de chargement des statistiques", err);
-      } finally {
-        setLoading(false);
-      }
+    async function loadData() {
+      setLoading(true);
+      const data = await getUniversityBooks();
+      setBooks(data);
+      setLoading(false);
     }
-    loadStatsData();
+    loadData();
   }, []);
 
-  const handleRenew = async (id: string) => {
-    try {
-      setRenewingId(id);
-      const success = await renewSubscription(id);
-      if (success) {
-        setBouquets(prev => prev.map(bq => {
-          if (bq.id === id) {
-            const nextYear = new Date();
-            nextYear.setFullYear(nextYear.getFullYear() + 1);
-            return {
-              ...bq,
-              end_date: nextYear.toISOString(),
-              status: "active" as const
-            };
-          }
-          return bq;
-        }));
-        alert("Abonnement renouvelé pour 1 an avec succès !");
-      }
-    } catch (err) {
-      alert("Erreur lors du renouvellement.");
-    } finally {
-      setRenewingId(null);
-    }
-  };
+  const totalConsultations = books.reduce((acc, b) => acc + b.consultations_count, 0);
+  const totalDownloads = books.reduce((acc, b) => acc + b.downloads_count, 0);
+  const totalAudio = books.reduce((acc, b) => acc + b.audio_listens_count, 0);
+  const totalRevenue = books.reduce((acc, b) => acc + b.revenue_generated, 0);
+  const totalRoyalty15 = books.reduce((acc, b) => acc + b.royalty_15_percent, 0);
+
+  const salesColumns: DataTableColumn<UniversityBook>[] = [
+    {
+      key: "title",
+      header: "Titre de l'Ouvrage",
+      cell: (row) => (
+        <div>
+          <p className="font-serif font-bold text-xs text-navy leading-snug">{row.title}</p>
+          <p className="text-[10px] text-foreground-muted font-mono">ISBN : {row.isbn_digital}</p>
+        </div>
+      ),
+    },
+    {
+      key: "faculty",
+      header: "Faculté Rattachée",
+      cell: (row) => <span className="font-semibold text-xs text-navy">{row.faculty}</span>,
+    },
+    {
+      key: "discipline",
+      header: "Discipline",
+      hideOnMobile: true,
+      cell: (row) => <span className="text-[11px] font-semibold text-foreground">{row.discipline}</span>,
+    },
+    {
+      key: "revenue_generated",
+      header: "Revenus Ventes",
+      cell: (row) => (
+        <span className="font-mono font-bold text-navy text-xs">
+          {row.revenue_generated.toLocaleString("fr-FR")} XOF
+        </span>
+      ),
+    },
+    {
+      key: "royalty_15_percent",
+      header: "Redevance 15%",
+      cell: (row) => (
+        <span className="font-mono font-bold text-gold text-xs">
+          {row.royalty_15_percent.toLocaleString("fr-FR")} XOF
+        </span>
+      ),
+    },
+  ];
+
+  const usageColumns: DataTableColumn<UniversityBook>[] = [
+    {
+      key: "title",
+      header: "Titre de l'Ouvrage",
+      cell: (row) => (
+        <div>
+          <p className="font-serif font-bold text-xs text-navy leading-snug">{row.title}</p>
+          <p className="text-[10px] text-foreground-muted font-mono">ISBN : {row.isbn_digital}</p>
+        </div>
+      ),
+    },
+    {
+      key: "consultations_count",
+      header: "Lectures en Ligne",
+      cell: (row) => (
+        <span className="font-mono font-bold text-xs text-navy">
+          {row.consultations_count.toLocaleString("fr-FR")} vues
+        </span>
+      ),
+    },
+    {
+      key: "downloads_count",
+      header: "Téléchargements (EPUB/PDF)",
+      cell: (row) => (
+        <span className="font-mono font-bold text-xs text-navy">
+          {row.downloads_count.toLocaleString("fr-FR")} fois
+        </span>
+      ),
+    },
+    {
+      key: "audio_listens_count",
+      header: "Écoutes Audio",
+      cell: (row) => (
+        <span className="font-mono font-bold text-gold text-xs">
+          {row.audio_listens_count > 0 ? `${row.audio_listens_count.toLocaleString("fr-FR")} écoutes` : "N/A"}
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
-      
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs text-foreground-muted">
+        <Link href="/librarian" className="hover:text-navy">Vue d&apos;ensemble</Link>
+        <span>/</span>
+        <span className="text-navy font-semibold">Statistiques &amp; Usage</span>
+      </div>
+
       {/* Header */}
-      <div className="space-y-1">
-        <Link
-          href="/librarian"
-          className="inline-flex items-center gap-1 text-xs font-bold text-navy hover:text-gold transition-colors mb-2"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Retour au Tableau de Bord
-        </Link>
-        <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy">Statistiques & Abonnements</h1>
-        <p className="text-sm text-foreground-muted">Analysez l'utilisation des manuels et gérez vos bouquets documentaires.</p>
-      </div>
-
-      {/* Grid: Bouquets Subscription Management */}
-      <div className="space-y-4">
-        <h3 className="font-serif text-lg font-bold text-navy flex items-center gap-2">
-          <Bookmark className="w-5 h-5 text-gold" />
-          Gestion des bouquets documentaires
-        </h3>
-        
-        {loading ? (
-          <div className="h-32 bg-background border border-border animate-pulse rounded-xl" />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {bouquets.map((bq) => (
-              <div key={bq.id} className="bg-background border border-border rounded-xl p-6 shadow-sm flex flex-col justify-between gap-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-start gap-4">
-                    <h4 className="font-serif font-bold text-navy text-base leading-snug">{bq.name}</h4>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-success/10 text-success border border-success/20">
-                      Actif
-                    </span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-foreground-muted">
-                      <span>Utilisation des licences</span>
-                      <span className="font-semibold">{bq.active_licenses} / {bq.max_licenses}</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-border overflow-hidden">
-                      <div 
-                        className="h-full bg-gold rounded-full" 
-                        style={{ width: `${(bq.active_licenses / bq.max_licenses) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-foreground-muted flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    Période d'abonnement : Jusqu'au {new Date(bq.end_date).toLocaleDateString("fr-FR")}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => handleRenew(bq.id)}
-                  disabled={renewingId === bq.id}
-                  className="w-full py-2 bg-navy hover:bg-navy-hover text-white text-xs font-bold rounded shadow transition-colors flex items-center justify-center gap-2"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${renewingId === bq.id ? "animate-spin" : ""}`} />
-                  {renewingId === bq.id ? "Renouvellement..." : "Renouveler l'abonnement"}
-                </button>
-              </div>
-            ))}
+      <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <Link href="/librarian" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Vue d&apos;ensemble
+          </Link>
+          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+            <FileBarChart className="w-4 h-4 text-gold" />
+            Reporting d&apos;Utilisation Institutionnel (Section 12)
           </div>
-        )}
-      </div>
-
-      {/* Usage Analytics Grid */}
-      <div className="space-y-4">
-        <h3 className="font-serif text-lg font-bold text-navy flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-gold" />
-          Rapports de consommation par discipline
-        </h3>
-
-        <div className="pt-2">
-          <DataTable
-            data={stats}
-            rowKey="discipline"
-            loading={loading}
-            skeletonRows={3}
-            emptyMessage="Aucune donnée de consommation disponible."
-            columns={[
-              {
-                key: "discipline",
-                header: "Discipline",
-                cell: (row) => <span className="font-bold text-navy">{row.discipline as string}</span>,
-              },
-              {
-                key: "views",
-                header: "Consultations en ligne",
-                className: "text-center",
-                cell: (row) => <span className="text-foreground-muted">{row.views as number}</span>,
-              },
-              {
-                key: "downloads",
-                header: "Téléchargements",
-                className: "text-center",
-                cell: (row) => <span className="text-foreground-muted">{row.downloads as number}</span>,
-              },
-              {
-                key: "pages_read",
-                header: "Volume (Pages lues)",
-                className: "text-center",
-                cell: (row) => <span className="font-bold text-navy">{(row.pages_read as number).toLocaleString()} pages</span>,
-              }
-            ]}
-            mobileCard={(row) => (
-              <div className="space-y-2">
-                <p className="font-bold text-navy text-sm">{row.discipline as string}</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-foreground-muted block">Consultations :</span>
-                    <span className="font-medium text-navy">{row.views as number}</span>
-                  </div>
-                  <div>
-                    <span className="text-foreground-muted block">Téléchargements :</span>
-                    <span className="font-medium text-navy">{row.downloads as number}</span>
-                  </div>
-                  <div className="col-span-2 pt-1">
-                    <span className="text-foreground-muted block">Pages lues :</span>
-                    <span className="font-bold text-navy">{(row.pages_read as number).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          />
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+            Statistiques Ventes &amp; Consultations
+          </h1>
+          <p className="text-xs text-foreground-muted mt-1">
+            Analyse détaillée des ventes par faculté/discipline et des usages (EPUB/PDF, audios, lectures en ligne).
+          </p>
         </div>
       </div>
 
+      {/* Synthèse par format d'usage */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">
+          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Consultations Web</span>
+          <p className="font-serif font-bold text-xl text-navy font-mono">{totalConsultations.toLocaleString("fr-FR")}</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">
+          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Téléchargements PDF/EPUB</span>
+          <p className="font-serif font-bold text-xl text-navy font-mono">{totalDownloads.toLocaleString("fr-FR")}</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">
+          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Écoutes Audio</span>
+          <p className="font-serif font-bold text-xl text-navy font-mono">{totalAudio.toLocaleString("fr-FR")}</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">
+          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Redevance 15% Dues</span>
+          <p className="font-serif font-bold text-xl text-gold font-mono">{totalRoyalty15.toLocaleString("fr-FR")} XOF</p>
+        </div>
+      </div>
+
+      {/* Onglets Ventes vs Usage */}
+      <div className="flex items-center gap-2 border-b border-border pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("sales")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+            activeTab === "sales"
+              ? "bg-navy text-white"
+              : "bg-background-secondary text-foreground-muted hover:text-navy"
+          }`}
+        >
+          Ventes par Faculté &amp; Discipline
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("usage")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 ${
+            activeTab === "usage"
+              ? "bg-navy text-white"
+              : "bg-background-secondary text-foreground-muted hover:text-navy"
+          }`}
+        >
+          <Eye className="w-3.5 h-3.5 text-gold" />
+          Utilisation &amp; Consultations (EPUB/Audio)
+        </button>
+      </div>
+
+      {/* Table correspondante */}
+      <DataTable
+        data={books}
+        columns={activeTab === "sales" ? salesColumns : usageColumns}
+        rowKey="id"
+        loading={loading}
+        emptyMessage="Aucune donnée statistique disponible."
+        pageSize={10}
+      />
     </div>
   );
 }

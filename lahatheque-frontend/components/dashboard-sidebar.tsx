@@ -221,9 +221,13 @@ export function DashboardSidebar() {
         ];
       case "librarian":
         return [
-          { label: "Tableau de bord", href: "/librarian", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Affiliations", href: "/librarian/affiliations", icon: <Users className="w-5 h-5" /> },
-          { label: "Statistiques", href: "/librarian/stats", icon: <FileCheck className="w-5 h-5" /> },
+          { label: "Vue d'ensemble", href: "/librarian", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Statistiques & Usage", href: "/librarian/stats", icon: <FileBarChart className="w-5 h-5" /> },
+          { label: "Mon Catalogue Établissement", href: "/librarian/catalog", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Bouquets Documentaires", href: "/librarian/bouquets", icon: <Sparkles className="w-5 h-5" /> },
+          { label: "Achats Livres Papier", href: "/librarian/purchases", icon: <PackageCheck className="w-5 h-5" /> },
+          { label: "Redevances 15% & Relevés", href: "/librarian/redevances", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Profil & Paramètres", href: "/librarian/profile", icon: <GraduationCap className="w-5 h-5" /> },
         ];
       case "manager":
         return [
