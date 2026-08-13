@@ -28,7 +28,13 @@ import {
   Activity,
   Settings,
   ShoppingBag,
-  LogOut
+  LogOut,
+  Warehouse,
+  Truck,
+  CheckSquare,
+  History,
+  Percent,
+  UploadCloud
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -38,15 +44,25 @@ export function MobileBottomNav() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Configuration des items de navigation rapide du bas selon le rôle
+  // Helper pour vérifier si un lien est actif sur la route actuelle
+  const checkIsActive = (href: string) => {
+    if (href === "/") return pathname === "/";
+    return (
+      pathname === href ||
+      (pathname.startsWith(href) &&
+        (pathname.length === href.length || pathname[href.length] === "/"))
+    );
+  };
+
+  // Configuration des items de la barre de navigation mobile du bas selon le rôle
   const getBottomNavConfig = () => {
     switch (user?.role) {
       case "admin":
       case "super_admin":
         return {
           leftItems: [
-            { label: "Vue d'ensemble", href: "/admin", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Utilisateurs", href: "/admin/users", icon: <Users className="w-5 h-5" /> },
+            { label: "Aperçu", href: "/admin", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Users", href: "/admin/users", icon: <Users className="w-5 h-5" /> },
           ],
           centerCta: { label: "Catalogue", href: "/admin/catalog", icon: <BookOpen className="w-6 h-6" /> },
           rightItems: [
@@ -54,37 +70,40 @@ export function MobileBottomNav() {
             { label: "Logs", href: "/admin/logs", icon: <Activity className="w-5 h-5" /> },
           ]
         };
-      case "teacher":
+      case "super_client":
         return {
           leftItems: [
-            { label: "Aperçu", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Cours", href: "/teacher", icon: <PenTool className="w-5 h-5" /> },
+            { label: "Aperçu", href: "/wholesaler", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Catalogue", href: "/wholesaler/catalog", icon: <BookOpen className="w-5 h-5" /> },
           ],
-          centerCta: { label: "Spécimens", href: "/teacher", icon: <BookOpen className="w-6 h-6" /> },
+          centerCta: { label: "Commandes", href: "/wholesaler/orders", icon: <PackageCheck className="w-6 h-6" /> },
           rightItems: [
-            { label: "Livres", href: "/student/books", icon: <Briefcase className="w-5 h-5" /> },
+            { label: "Ventes", href: "/wholesaler/notifications", icon: <BellRing className="w-5 h-5" /> },
+            { label: "Profil", href: "/wholesaler/profile", icon: <UserIcon className="w-5 h-5" /> },
           ]
         };
       case "librarian":
         return {
           leftItems: [
             { label: "Aperçu", href: "/librarian", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Affiliations", href: "/librarian/affiliations", icon: <Users className="w-5 h-5" /> },
-          ],
-          centerCta: { label: "Catalogue", href: "/student/catalog", icon: <Briefcase className="w-6 h-6" /> },
-          rightItems: [
             { label: "Stats", href: "/librarian/stats", icon: <FileCheck className="w-5 h-5" /> },
+          ],
+          centerCta: { label: "Bouquets", href: "/librarian/bouquets", icon: <Sparkles className="w-6 h-6" /> },
+          rightItems: [
+            { label: "Redevances", href: "/librarian/redevances", icon: <DollarSign className="w-5 h-5" /> },
+            { label: "Profil", href: "/librarian/profile", icon: <UserIcon className="w-5 h-5" /> },
           ]
         };
       case "publisher":
         return {
           leftItems: [
             { label: "Aperçu", href: "/publisher", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Dépôts", href: "/publisher/submissions", icon: <Briefcase className="w-5 h-5" /> },
+            { label: "Catalogue", href: "/publisher/catalog", icon: <BookOpen className="w-5 h-5" /> },
           ],
-          centerCta: { label: "Nouveau", href: "/publisher/submissions/new", icon: <PenTool className="w-6 h-6" /> },
+          centerCta: { label: "Nouveau", href: "/publisher/catalog/new", icon: <PenTool className="w-6 h-6" /> },
           rightItems: [
-            { label: "Redevances", href: "/publisher/royalties", icon: <DollarSign className="w-5 h-5" /> },
+            { label: "Revenus", href: "/publisher/royalties", icon: <DollarSign className="w-5 h-5" /> },
+            { label: "API", href: "/publisher/api", icon: <ShieldCheck className="w-5 h-5" /> },
           ]
         };
       case "author":
@@ -95,7 +114,8 @@ export function MobileBottomNav() {
           ],
           centerCta: { label: "Déposer", href: "/author/submissions/new", icon: <PenTool className="w-6 h-6" /> },
           rightItems: [
-            { label: "Redevances", href: "/author/royalties", icon: <DollarSign className="w-5 h-5" /> },
+            { label: "Droits", href: "/author/royalties", icon: <DollarSign className="w-5 h-5" /> },
+            { label: "Achats", href: "/author/purchases", icon: <ShoppingBag className="w-5 h-5" /> },
           ]
         };
       case "layout_artist":
@@ -103,8 +123,20 @@ export function MobileBottomNav() {
           leftItems: [
             { label: "Aperçu", href: "/layout-artist", icon: <LayoutDashboard className="w-5 h-5" /> },
           ],
-          centerCta: { label: "Maquettes", href: "/layout-artist/validation", icon: <PenTool className="w-6 h-6" /> },
+          centerCta: { label: "Dépôts", href: "/layout-artist/deposits", icon: <BookOpen className="w-6 h-6" /> },
           rightItems: [
+            { label: "Nouveau", href: "/layout-artist/deposits/new", icon: <PenTool className="w-5 h-5" /> },
+            { label: "Profil", href: "/profile", icon: <UserIcon className="w-5 h-5" /> },
+          ]
+        };
+      case "chief_layout":
+        return {
+          leftItems: [
+            { label: "Aperçu", href: "/chief-layout", icon: <LayoutDashboard className="w-5 h-5" /> },
+          ],
+          centerCta: { label: "Valider", href: "/chief-layout/validation", icon: <CheckSquare className="w-6 h-6" /> },
+          rightItems: [
+            { label: "Historique", href: "/chief-layout/history", icon: <History className="w-5 h-5" /> },
             { label: "Profil", href: "/profile", icon: <UserIcon className="w-5 h-5" /> },
           ]
         };
@@ -112,22 +144,37 @@ export function MobileBottomNav() {
         return {
           leftItems: [
             { label: "Aperçu", href: "/legal-reviewer", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Contrats", href: "/legal-reviewer/contracts", icon: <ShieldCheck className="w-5 h-5" /> },
           ],
-          centerCta: { label: "Contrats", href: "/legal-reviewer/contracts", icon: <ShieldCheck className="w-6 h-6" /> },
+          centerCta: { label: "Droits", href: "/legal-reviewer/royalties", icon: <Percent className="w-6 h-6" /> },
           rightItems: [
+            { label: "Relances", href: "/legal-reviewer/relances", icon: <BellRing className="w-5 h-5" /> },
+            { label: "Profil", href: "/profile", icon: <UserIcon className="w-5 h-5" /> },
+          ]
+        };
+      case "manager":
+        return {
+          leftItems: [
+            { label: "Aperçu", href: "/manager", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Stock", href: "/manager/stock", icon: <Warehouse className="w-5 h-5" /> },
+          ],
+          centerCta: { label: "Livraisons", href: "/manager/delivery", icon: <Truck className="w-6 h-6" /> },
+          rightItems: [
+            { label: "Coordination", href: "/manager/coordination", icon: <Activity className="w-5 h-5" /> },
             { label: "Profil", href: "/profile", icon: <UserIcon className="w-5 h-5" /> },
           ]
         };
       default:
-        // Student / Super Client
+        // Student / Client Lecteur
         return {
           leftItems: [
-            { label: "Aperçu", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Livres", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
+            { label: "Mon Espace", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Bibliothèque", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
           ],
           centerCta: { label: "Catalogue", href: "/student/catalog", icon: <Briefcase className="w-6 h-6" /> },
           rightItems: [
-            { label: "Commandes", href: "/student/orders", icon: <FileCheck className="w-5 h-5" /> },
+            { label: "Commandes", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
+            { label: "Pass", href: "/student/subscriptions", icon: <Sparkles className="w-5 h-5" /> },
           ]
         };
     }
@@ -139,85 +186,102 @@ export function MobileBottomNav() {
       case "admin":
       case "super_admin":
         return [
-          { label: "Vue d'ensemble", href: "/admin", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
-          { label: "Tous les Utilisateurs", href: "/admin/users", icon: <Users className="w-4 h-4 text-gold" /> },
-          { label: "Maquettistes", href: "/admin/users/layout-artists", icon: <PenTool className="w-4 h-4 text-gold" /> },
-          { label: "Chef Maquettiste", href: "/admin/users/chief-layout", icon: <ShieldCheck className="w-4 h-4 text-gold" /> },
-          { label: "Gestionnaires", href: "/admin/users/managers", icon: <Briefcase className="w-4 h-4 text-gold" /> },
-          { label: "Juristes & Relecteurs", href: "/admin/users/legal", icon: <FileCheck className="w-4 h-4 text-gold" /> },
-          { label: "Auteurs", href: "/admin/users/authors", icon: <BookOpen className="w-4 h-4 text-gold" /> },
-          { label: "Universités & Inst.", href: "/admin/users/universities", icon: <GraduationCap className="w-4 h-4 text-gold" /> },
-          { label: "Éditeurs Tiers", href: "/admin/users/publishers", icon: <Briefcase className="w-4 h-4 text-gold" /> },
-          { label: "Clients & Lecteurs", href: "/admin/users/clients", icon: <Users className="w-4 h-4 text-gold" /> },
-          { label: "Grossistes", href: "/admin/users/wholesalers", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
-          { label: "Catalogue & Prix", href: "/admin/catalog", icon: <BookOpen className="w-4 h-4 text-gold" /> },
-          { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="w-4 h-4 text-gold" /> },
-          { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="w-4 h-4 text-gold" /> },
-          { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="w-4 h-4 text-gold" /> },
-          { label: "Reporting & Exports", href: "/admin/reports", icon: <FileSpreadsheet className="w-4 h-4 text-gold" /> },
-          { label: "Clés API", href: "/admin/api", icon: <Key className="w-4 h-4 text-gold" /> },
-          { label: "Traçabilité & Logs", href: "/admin/logs", icon: <Activity className="w-4 h-4 text-gold" /> },
-          { label: "Paramètres Globaux", href: "/admin/settings", icon: <Settings className="w-4 h-4 text-gold" /> },
-          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+          { label: "Vue d'ensemble", href: "/admin", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Tous les Utilisateurs", href: "/admin/users", icon: <Users className="w-4 h-4" /> },
+          { label: "Catalogue & Prix", href: "/admin/catalog", icon: <BookOpen className="w-4 h-4" /> },
+          { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="w-4 h-4" /> },
+          { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="w-4 h-4" /> },
+          { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="w-4 h-4" /> },
+          { label: "Reporting & Exports", href: "/admin/reports", icon: <FileSpreadsheet className="w-4 h-4" /> },
+          { label: "Clés API", href: "/admin/api", icon: <Key className="w-4 h-4" /> },
+          { label: "Traçabilité & Logs", href: "/admin/logs", icon: <Activity className="w-4 h-4" /> },
+          { label: "Paramètres Globaux", href: "/admin/settings", icon: <Settings className="w-4 h-4" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
       case "author":
         return [
-          { label: "Mon Espace Auteur", href: "/author", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
-          { label: "Mes Livres", href: "/author/books", icon: <BookOpen className="w-4 h-4 text-gold" /> },
-          { label: "Mes Dépôts & Manuscrits", href: "/author/submissions", icon: <PenTool className="w-4 h-4 text-gold" /> },
-          { label: "Droits & Redevances", href: "/author/royalties", icon: <DollarSign className="w-4 h-4 text-gold" /> },
-          { label: "Mes Achats", href: "/author/purchases", icon: <ShoppingBag className="w-4 h-4 text-gold" /> },
-          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+          { label: "Mon Espace Auteur", href: "/author", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Mes Livres Publiés", href: "/author/books", icon: <BookOpen className="w-4 h-4" /> },
+          { label: "Mes Dépôts & Manuscrits", href: "/author/submissions", icon: <PenTool className="w-4 h-4" /> },
+          { label: "Droits & Redevances", href: "/author/royalties", icon: <DollarSign className="w-4 h-4" /> },
+          { label: "Mes Achats", href: "/author/purchases", icon: <ShoppingBag className="w-4 h-4" /> },
+          { label: "Mon Profil", href: "/author/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
       case "publisher":
         return [
-          { label: "Espace Éditeur", href: "/publisher", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
-          { label: "Dépôts & Soumissions", href: "/publisher/submissions", icon: <Briefcase className="w-4 h-4 text-gold" /> },
-          { label: "Nouveau Dépôt", href: "/publisher/submissions/new", icon: <PenTool className="w-4 h-4 text-gold" /> },
-          { label: "Redevances & Droits", href: "/publisher/royalties", icon: <DollarSign className="w-4 h-4 text-gold" /> },
-          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+          { label: "Espace Éditeur", href: "/publisher", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Mon Catalogue", href: "/publisher/catalog", icon: <BookOpen className="w-4 h-4" /> },
+          { label: "Nouveau Dépôt Web", href: "/publisher/catalog/new", icon: <PenTool className="w-4 h-4" /> },
+          { label: "Dépôt ONIX 3.0", href: "/publisher/catalog/batch", icon: <UploadCloud className="w-4 h-4" /> },
+          { label: "Statistiques", href: "/publisher/stats", icon: <Activity className="w-4 h-4" /> },
+          { label: "Redevances & Droits", href: "/publisher/royalties", icon: <DollarSign className="w-4 h-4" /> },
+          { label: "Clés API", href: "/publisher/api", icon: <ShieldCheck className="w-4 h-4" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
+        ];
+      case "super_client":
+        return [
+          { label: "Espace Grossiste", href: "/wholesaler", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Catalogue & Prix Gros", href: "/wholesaler/catalog", icon: <BookOpen className="w-4 h-4" /> },
+          { label: "Commandes Groupées", href: "/wholesaler/orders", icon: <PackageCheck className="w-4 h-4" /> },
+          { label: "Nouvelle Commande", href: "/wholesaler/orders/new", icon: <PenTool className="w-4 h-4" /> },
+          { label: "Nouveautés & Ventes", href: "/wholesaler/notifications", icon: <BellRing className="w-4 h-4" /> },
+          { label: "Profil & Facturation", href: "/wholesaler/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
       case "layout_artist":
         return [
-          { label: "Espace Maquettiste", href: "/layout-artist", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
-          { label: "Validation des Maquettes", href: "/layout-artist/validation", icon: <PenTool className="w-4 h-4 text-gold" /> },
-          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+          { label: "Espace Maquettiste", href: "/layout-artist", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Mes Dépôts", href: "/layout-artist/deposits", icon: <BookOpen className="w-4 h-4" /> },
+          { label: "Nouveau Dépôt", href: "/layout-artist/deposits/new", icon: <PenTool className="w-4 h-4" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
+        ];
+      case "chief_layout":
+        return [
+          { label: "Chef Maquettiste", href: "/chief-layout", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Dépôts à Valider", href: "/chief-layout/validation", icon: <CheckSquare className="w-4 h-4" /> },
+          { label: "Historique Validations", href: "/chief-layout/history", icon: <History className="w-4 h-4" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
       case "legal_reviewer":
         return [
-          { label: "Espace Juridique", href: "/legal-reviewer", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
-          { label: "Relecture Contrats", href: "/legal-reviewer/contracts", icon: <ShieldCheck className="w-4 h-4 text-gold" /> },
-          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+          { label: "Espace Juriste", href: "/legal-reviewer", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Contrats Légaux", href: "/legal-reviewer/contracts", icon: <ShieldCheck className="w-4 h-4" /> },
+          { label: "Droits d'Auteur", href: "/legal-reviewer/royalties", icon: <Percent className="w-4 h-4" /> },
+          { label: "Pré-éditions", href: "/legal-reviewer/pre-editions", icon: <PenTool className="w-4 h-4" /> },
+          { label: "Redevances", href: "/legal-reviewer/redevances", icon: <DollarSign className="w-4 h-4" /> },
+          { label: "Relances & Impayés", href: "/legal-reviewer/relances", icon: <BellRing className="w-4 h-4" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
+        ];
+      case "manager":
+        return [
+          { label: "Espace Gestionnaire", href: "/manager", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Stock Papier", href: "/manager/stock", icon: <Warehouse className="w-4 h-4" /> },
+          { label: "Mouvements de Stock", href: "/manager/stock/movements", icon: <PackageCheck className="w-4 h-4" /> },
+          { label: "Alertes de Rupture", href: "/manager/stock/alerts", icon: <BellRing className="w-4 h-4" /> },
+          { label: "Suivi des Expéditions", href: "/manager/delivery", icon: <Truck className="w-4 h-4" /> },
+          { label: "Coordination Admin", href: "/manager/coordination", icon: <Activity className="w-4 h-4" /> },
+          { label: "Rapports Logistiques", href: "/manager/reports", icon: <FileSpreadsheet className="w-4 h-4" /> },
+          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
       case "librarian":
         return [
-          { label: "Espace Bibliothécaire", href: "/librarian", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
-          { label: "Gestion Affiliations", href: "/librarian/affiliations", icon: <Users className="w-4 h-4 text-gold" /> },
-          { label: "Statistiques d'Usage", href: "/librarian/stats", icon: <FileCheck className="w-4 h-4 text-gold" /> },
-          { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-4 h-4 text-gold" /> },
-          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
-        ];
-      case "teacher":
-        return [
-          { label: "Mon Espace Enseignant", href: "/student", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
-          { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="w-4 h-4 text-gold" /> },
-          { label: "Mes Cours Prescrits", href: "/teacher", icon: <PenTool className="w-4 h-4 text-gold" /> },
-          { label: "Mes Commandes", href: "/student/orders", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
-          { label: "Mon Abonnement", href: "/student/subscriptions", icon: <Sparkles className="w-4 h-4 text-gold" /> },
-          { label: "Catalogue", href: "/student/catalog", icon: <Briefcase className="w-4 h-4 text-gold" /> },
-          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+          { label: "Espace Université", href: "/librarian", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Statistiques d'Usage", href: "/librarian/stats", icon: <FileCheck className="w-4 h-4" /> },
+          { label: "Catalogue Établissement", href: "/librarian/catalog", icon: <BookOpen className="w-4 h-4" /> },
+          { label: "Bouquets Documentaires", href: "/librarian/bouquets", icon: <Sparkles className="w-4 h-4" /> },
+          { label: "Achats Livres Papier", href: "/librarian/purchases", icon: <ShoppingBag className="w-4 h-4" /> },
+          { label: "Redevances 15%", href: "/librarian/redevances", icon: <DollarSign className="w-4 h-4" /> },
+          { label: "Profil Établissement", href: "/librarian/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
       default:
-        // Student / Super Client
+        // Student / Client Lecteur
         return [
-          { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-4 h-4 text-gold" /> },
-          { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="w-4 h-4 text-gold" /> },
-          { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-4 h-4 text-gold" /> },
-          { label: "Historique & Notes", href: "/student/history", icon: <FileCheck className="w-4 h-4 text-gold" /> },
-          { label: "Mes Commandes", href: "/student/orders", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
-          { label: "Mon Panier", href: "/cart", icon: <ShoppingCart className="w-4 h-4 text-gold" /> },
-          { label: "Mon Abonnement & Pass", href: "/student/subscriptions", icon: <Sparkles className="w-4 h-4 text-gold" /> },
-          { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4 text-gold" /> },
+          { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Catalogue & Découverte", href: "/student/catalog", icon: <Briefcase className="w-4 h-4" /> },
+          { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="w-4 h-4" /> },
+          { label: "Achats & Livraisons", href: "/student/orders", icon: <PackageCheck className="w-4 h-4" /> },
+          { label: "Abonnements & Pass", href: "/student/subscriptions", icon: <Sparkles className="w-4 h-4" /> },
+          { label: "Profil & Affiliation", href: "/student/profile", icon: <UserIcon className="w-4 h-4" /> },
+          { label: "Mon Université", href: "/student/university", icon: <GraduationCap className="w-4 h-4" /> },
         ];
     }
   };
@@ -236,38 +300,44 @@ export function MobileBottomNav() {
         return "ÉDITEUR TIERS • LAHATHÈQUE";
       case "layout_artist":
         return "MAQUETTISTE • LAHATHÈQUE";
+      case "chief_layout":
+        return "CHEF MAQUETTISTE • VALIDEUR";
       case "legal_reviewer":
         return "RELECTEUR JURIDIQUE";
       case "librarian":
         return "BIBLIOTHÉCAIRE RÉFÉRENT";
-      case "teacher":
-        return "ENSEIGNANT CHERCHEUR";
+      case "manager":
+        return "GESTIONNAIRE LOGISTIQUE";
+      case "super_client":
+        return "GROSSISTE PARTENAIRE";
       default:
-        return "ÉTUDIANT / LECTEUR";
+        return "CLIENT LECTEUR / ÉTUDIANT";
     }
   };
 
   return (
     <>
-      {/* Barre de navigation mobile en bas */}
+      {/* Barre de navigation mobile en bas (Navbar Mobile) */}
       <nav
-        aria-label="Navigation Mobile"
-        className="fixed bottom-0 left-0 right-0 w-full bg-navy-dark border-t border-navy-hover z-50 md:hidden py-1 px-2 shadow-2xl flex items-center justify-between"
+        aria-label="Navigation Mobile Navbar"
+        className="fixed bottom-0 left-0 right-0 w-full bg-navy-dark border-t border-navy-hover z-50 md:hidden py-1.5 px-2 shadow-2xl flex items-center justify-between"
       >
         {/* Items Gauche */}
         <div className="flex items-center justify-around flex-1">
           {nav.leftItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = checkIsActive(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center text-[10px] font-medium py-1 px-2 transition-colors",
-                  isActive ? "text-gold font-bold" : "text-white/70 hover:text-white"
+                  "flex flex-col items-center justify-center text-[10px] font-medium py-1 px-2 transition-colors rounded-lg",
+                  isActive
+                    ? "text-gold font-bold bg-gold/15"
+                    : "text-white/70 hover:text-white"
                 )}
               >
-                {item.icon}
+                <div className={cn(isActive && "text-gold")}>{item.icon}</div>
                 <span className="mt-0.5 truncate">{item.label}</span>
               </Link>
             );
@@ -275,10 +345,15 @@ export function MobileBottomNav() {
         </div>
 
         {/* CTA Central (Bouton doré surélevé) */}
-        <div className="relative -top-4 px-2">
+        <div className="relative -top-3.5 px-2 shrink-0">
           <Link
             href={nav.centerCta.href}
-            className="flex flex-col items-center justify-center w-13 h-13 rounded-full bg-gold text-navy shadow-lg shadow-gold/20 border-4 border-navy-dark hover:scale-105 transition-transform"
+            className={cn(
+              "flex flex-col items-center justify-center w-12 h-12 rounded-full shadow-lg border-4 transition-transform",
+              checkIsActive(nav.centerCta.href)
+                ? "bg-gold text-navy border-gold shadow-gold/40 scale-105"
+                : "bg-gold text-navy border-navy-dark shadow-gold/20 hover:scale-105"
+            )}
           >
             {nav.centerCta.icon}
           </Link>
@@ -287,17 +362,19 @@ export function MobileBottomNav() {
         {/* Items Droite + Menu Toggle */}
         <div className="flex items-center justify-around flex-1">
           {nav.rightItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = checkIsActive(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center text-[10px] font-medium py-1 px-2 transition-colors",
-                  isActive ? "text-gold font-bold" : "text-white/70 hover:text-white"
+                  "flex flex-col items-center justify-center text-[10px] font-medium py-1 px-2 transition-colors rounded-lg",
+                  isActive
+                    ? "text-gold font-bold bg-gold/15"
+                    : "text-white/70 hover:text-white"
                 )}
               >
-                {item.icon}
+                <div className={cn(isActive && "text-gold")}>{item.icon}</div>
                 <span className="mt-0.5 truncate">{item.label}</span>
               </Link>
             );
@@ -305,10 +382,11 @@ export function MobileBottomNav() {
 
           {/* Bouton Menu Drawer */}
           <button
+            type="button"
             onClick={() => setMenuOpen(!menuOpen)}
             className={cn(
-              "flex flex-col items-center justify-center text-[10px] font-medium py-1 px-2 transition-colors",
-              menuOpen ? "text-gold font-bold" : "text-white/70 hover:text-white"
+              "flex flex-col items-center justify-center text-[10px] font-medium py-1 px-2 transition-colors rounded-lg",
+              menuOpen ? "text-gold font-bold bg-gold/15" : "text-white/70 hover:text-white"
             )}
           >
             <MenuIcon className="w-5 h-5" />
@@ -317,7 +395,7 @@ export function MobileBottomNav() {
         </div>
       </nav>
 
-      {/* Drawer Bottom Sheet Menu */}
+      {/* Drawer Bottom Sheet Menu avec mise en surbrillance Or des liens actifs */}
       <AnimatePresence>
         {menuOpen && (
           <>
@@ -356,6 +434,7 @@ export function MobileBottomNav() {
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => setMenuOpen(false)}
                   className="p-2 rounded-full bg-background-secondary border border-border text-foreground-muted hover:text-navy transition-colors"
                 >
@@ -363,44 +442,40 @@ export function MobileBottomNav() {
                 </button>
               </div>
 
-              {/* Institution / Affiliation Info */}
-              <div className="bg-background-secondary p-4 rounded-2xl border border-border space-y-2 text-xs">
-                <div className="flex items-center gap-2 text-navy font-bold">
-                  <Building2 className="w-4 h-4 text-gold shrink-0" />
-                  <span>Direction & Plateforme LAHAThèque</span>
-                </div>
-                <div className="flex items-center gap-2 text-foreground-muted">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
-                  <span>Compte Vérifié : <strong className="text-navy">{user?.email || "admin@lahatheque.com"}</strong></span>
-                </div>
-              </div>
-
-              {/* Dynamic Navigation Links in Sheet reflecting exact role sidebar */}
-              <div className="space-y-2">
+              {/* Dynamic Navigation Links in Sheet with Active Highlight */}
+              <div className="space-y-3">
                 <p className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
-                  Menu & Navigation Rôle ({user?.role || "standard"})
+                  Menu &amp; Navigation Rôle ({user?.role || "standard"})
                 </p>
                 <div className="grid grid-cols-2 gap-2.5">
-                  {drawerLinks.map((link) => (
-                    <Link
-                      key={link.href + link.label}
-                      href={link.href}
-                      onClick={() => setMenuOpen(false)}
-                      className={cn(
-                        "p-3 rounded-xl bg-background-secondary border border-border flex items-center gap-2 text-xs font-semibold text-navy hover:border-gold transition-colors truncate",
-                        pathname === link.href && "border-gold bg-gold/10 font-bold"
-                      )}
-                    >
-                      {link.icon}
-                      <span className="truncate">{link.label}</span>
-                    </Link>
-                  ))}
+                  {drawerLinks.map((link) => {
+                    const isActive = checkIsActive(link.href);
+                    return (
+                      <Link
+                        key={link.href + link.label}
+                        href={link.href}
+                        onClick={() => setMenuOpen(false)}
+                        className={cn(
+                          "p-3 rounded-xl border flex items-center gap-2.5 text-xs transition-colors truncate",
+                          isActive
+                            ? "border-gold bg-gold/15 text-gold font-bold shadow-xs"
+                            : "bg-background-secondary border-border text-navy font-semibold hover:border-gold"
+                        )}
+                      >
+                        <div className={cn(isActive ? "text-gold font-bold" : "text-gold")}>
+                          {link.icon}
+                        </div>
+                        <span className="truncate">{link.label}</span>
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Logout Footer */}
               <div className="pt-3 border-t border-border">
                 <button
+                  type="button"
                   onClick={() => {
                     setMenuOpen(false);
                     logout();

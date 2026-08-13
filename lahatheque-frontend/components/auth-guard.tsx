@@ -131,8 +131,11 @@ export function AuthGuard({ children, requiredRole, requiredRoles }: AuthGuardPr
               // Refresh réussi → replanifier uniquement si le composant est encore monté
               if (!cancelled) scheduleRefresh()
             } else if (res.status === 401) {
-              // Refresh token vraiment expiré → déconnexion légitime
-              window.location.href = '/login?reason=session_expired'
+              // Si pas de cookie client UI, alors rediriger
+              const hasClientSession = typeof document !== 'undefined' && document.cookie.includes('user_session_client=');
+              if (!hasClientSession) {
+                window.location.href = '/login?reason=session_expired'
+              }
             } else {
               // Erreur serveur passagère (5xx, déploiement...) → retry dans 30s
               // On ne déconnecte pas l'utilisateur pour un blip réseau

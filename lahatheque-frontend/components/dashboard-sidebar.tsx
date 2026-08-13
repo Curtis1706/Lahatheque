@@ -141,7 +141,7 @@ export const CollapsibleSection = ({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden pl-3 border-l border-gold/30 ml-4 my-1 space-y-0.5"
+            className="overflow-hidden pl-2 ml-2 my-1 space-y-0.5"
           >
             <div className="p-1 space-y-1">{children}</div>
           </motion.div>

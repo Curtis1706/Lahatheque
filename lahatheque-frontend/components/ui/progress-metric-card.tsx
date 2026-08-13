@@ -52,7 +52,7 @@ const DEFAULT_PERIODS: PeriodOption[] = [
   { label: "30 derniers jours" },
 ];
 
-const REGION_W = 55; // %
+const REGION_W = 38; // %
 const NEUTRAL_PCT = 0.5;
 
 const SIZES: Record<
@@ -210,21 +210,23 @@ export function ProgressMetricCard({
 
       {/* Contenu principal */}
       <div className="relative z-10 flex flex-1 flex-col p-4 sm:p-5 justify-between pointer-events-none">
-        <div className="flex items-center justify-between gap-2 pointer-events-auto">
-          <div className="flex items-center gap-2">
-            <h3 className={`${sz.title}`}>{title}</h3>
+        <div className="flex items-center justify-between gap-1.5 pointer-events-auto flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className={`${sz.title} truncate`}>{title}</h3>
           </div>
-          <div className="flex items-center gap-2 text-xs font-bold">
-            <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full border bg-background" style={{ color: color.text }}>
-              <TrendIcon className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-1.5 text-xs font-bold shrink-0">
+            <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full border bg-background text-[11px]" style={{ color: color.text }}>
+              <TrendIcon className="w-3 h-3" />
               {displayPercent}
             </span>
-            <PeriodSelect
-              value={selectedLabel}
-              options={periods}
-              onChange={handlePeriodChange}
-              accentText={color.text}
-            />
+            <div className="hidden xl:block">
+              <PeriodSelect
+                value={selectedLabel}
+                options={periods}
+                onChange={handlePeriodChange}
+                accentText={color.text}
+              />
+            </div>
           </div>
         </div>
 

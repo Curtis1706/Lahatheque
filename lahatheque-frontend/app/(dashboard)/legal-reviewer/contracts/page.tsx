@@ -47,9 +47,14 @@ export default function LegalContractsListPage() {
       key: "reference",
       header: "Référence & Intitulé",
       cell: (row) => (
-        <Link href={`/legal-reviewer/contracts/${row.id}`} className="hover:text-navy transition-colors">
+        <Link
+          href={`/legal-reviewer/contracts/${row.id}`}
+          className="text-left hover:text-navy transition-colors group block"
+        >
           <p className="font-mono font-bold text-[11px] text-gold">{row.reference}</p>
-          <p className="font-bold text-xs text-navy truncate max-w-[240px]">{row.title}</p>
+          <p className="font-bold text-xs text-navy group-hover:text-gold transition-colors truncate max-w-[280px]">
+            {row.title}
+          </p>
         </Link>
       ),
     },
@@ -87,7 +92,7 @@ export default function LegalContractsListPage() {
         <div className="flex items-center gap-2">
           <Link
             href={`/legal-reviewer/contracts/${row.id}`}
-            className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1"
+            className="px-3.5 py-2 rounded-xl bg-navy hover:bg-navy-dark text-gold font-bold text-[11px] transition-colors whitespace-nowrap min-h-[38px] inline-flex items-center gap-1.5 border border-gold/30 shadow-xs cursor-pointer"
           >
             <FileText className="w-3.5 h-3.5 text-gold" />
             Consulter
@@ -98,7 +103,7 @@ export default function LegalContractsListPage() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/legal-reviewer" className="hover:text-navy">Vue d&apos;ensemble</Link>
@@ -127,14 +132,14 @@ export default function LegalContractsListPage() {
 
         <Link
           href="/legal-reviewer/contracts/new"
-          className="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-xs min-h-[44px]"
+          className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-gold-hover text-navy text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-xs min-h-[44px]"
         >
-          <PlusCircle className="w-4 h-4 text-gold" />
+          <PlusCircle className="w-4 h-4" />
           Nouveau Contrat
         </Link>
       </div>
 
-      {/* Barre de Recherche 21st.dev avec catégories */}
+      {/* Barre de Recherche avec filtres */}
       <ContractSearchBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -144,7 +149,7 @@ export default function LegalContractsListPage() {
         onStatusChange={setStatusFilter}
       />
 
-      {/* Table des contrats */}
+      {/* Table des contrats avec liens directs vers la page dédiée */}
       <DataTable
         data={filteredContracts}
         columns={columns}

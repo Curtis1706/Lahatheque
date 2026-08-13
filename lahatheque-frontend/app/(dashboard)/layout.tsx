@@ -57,7 +57,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="min-h-screen bg-background flex flex-col md:flex-row w-full relative pb-20 md:pb-0">
           <DashboardSidebar />
           <main className="flex-1 min-w-0 flex flex-col overflow-y-auto">
-            {children}
+            <div className="flex-1 min-w-0">{children}</div>
           </main>
           {/* Floating Dock Bottom Navigation for Mobile (21st.dev Floating Nav) */}
           <MobileBottomNav />

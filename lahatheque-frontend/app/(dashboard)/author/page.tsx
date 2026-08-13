@@ -46,7 +46,7 @@ export default function AuthorOverviewPage() {
   }, []);
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8">
       {/* Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
         <div>

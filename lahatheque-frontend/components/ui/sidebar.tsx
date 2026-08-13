@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import Link, { LinkProps } from "next/link";
 import React, { useState, createContext, useContext } from "react";
+import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 
 interface Links {
@@ -114,11 +115,25 @@ export const SidebarLink = ({
   props?: LinkProps;
 }) => {
   const { open, animate } = useSidebar();
+  const pathname = usePathname();
   const isButton = link.href === "#";
+
+  // Vérifier si le lien correspond exactement ou est une sous-page active
+  const isActive =
+    !isButton &&
+    (pathname === link.href ||
+      (link.href !== "/" &&
+        pathname.startsWith(link.href) &&
+        (pathname.length === link.href.length || pathname[link.href.length] === "/")));
 
   const content = (
     <>
-      <div className="text-white/60 group-hover/sidebar:text-gold transition-colors flex-shrink-0">
+      <div
+        className={cn(
+          "transition-colors flex-shrink-0",
+          isActive ? "text-gold font-bold" : "text-white/70 group-hover/sidebar:text-gold"
+        )}
+      >
         {link.icon}
       </div>
       <motion.span
@@ -126,7 +141,12 @@ export const SidebarLink = ({
           display: animate ? (open ? "inline-block" : "none") : "inline-block",
           opacity: animate ? (open ? 1 : 0) : 1,
         }}
-        className="text-white/80 text-sm group-hover/sidebar:text-white transition duration-150 whitespace-pre inline-block !p-0 !m-0 font-medium"
+        className={cn(
+          "text-sm transition duration-150 whitespace-pre inline-block !p-0 !m-0 font-medium",
+          isActive
+            ? "text-gold font-bold"
+            : "text-white/80 group-hover/sidebar:text-white"
+        )}
       >
         {link.label}
       </motion.span>
@@ -134,7 +154,10 @@ export const SidebarLink = ({
   );
 
   const commonClasses = cn(
-    "flex items-center justify-start gap-4 group/sidebar py-2.5 px-2 rounded-lg hover:bg-navy-hover/50 transition-colors w-full text-left",
+    "flex items-center justify-start gap-4 group/sidebar py-2.5 px-3 rounded-xl transition-all w-full text-left relative",
+    isActive
+      ? "bg-gold/10 text-gold font-bold shadow-xs"
+      : "hover:bg-navy-hover/50 text-white/80",
     className
   );
 

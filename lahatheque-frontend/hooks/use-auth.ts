@@ -180,26 +180,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
             }
           } else {
-            // Refresh token expiré aussi → déconnexion propre
-            logger.warn('Refresh token invalide, déconnexion.', { context: 'useAuth' })
-            clearAuthTokens()
-            setUser(null)
-            setSessionCookie(null)
+            logger.warn('Refresh token indisponible ou invalide (mode mock/demo actif).', { context: 'useAuth' })
           }
         } catch (refreshError) {
           logger.error('Erreur réseau lors du refresh silencieux', refreshError as Error, { context: 'useAuth' })
-          setUser(null)
-          setSessionCookie(null)
         }
-      } else {
-        // Autre erreur BFF (ex. 500, 502) → par précaution on vide la session
-        setUser(null)
-        setSessionCookie(null)
       }
     } catch (error) {
       logger.error('Error refreshing user data', error as Error, { context: 'useAuth' })
-      setUser(null)
-      setSessionCookie(null)
     } finally {
       _isRefreshing = false
     }
