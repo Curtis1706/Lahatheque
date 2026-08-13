@@ -101,7 +101,7 @@ export default function PublisherStatsPage() {
             <span className="text-xs font-bold text-navy uppercase tracking-wider">Total Consultations</span>
             <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600"><Eye className="w-4 h-4" /></div>
           </div>
-          <p className="font-serif font-bold text-2xl text-navy font-mono">{totalConsultations.toLocaleString("fr-FR")}</p>
+          <p className="font-bold text-2xl text-navy font-mono">{totalConsultations.toLocaleString("fr-FR")}</p>
           <p className="text-[11px] text-foreground-muted">Lectures uniques sur la plateforme</p>
         </div>
 
@@ -110,7 +110,7 @@ export default function PublisherStatsPage() {
             <span className="text-xs font-bold text-navy uppercase tracking-wider">Total Téléchargements</span>
             <div className="p-2 rounded-xl bg-gold/15 text-gold"><Download className="w-4 h-4" /></div>
           </div>
-          <p className="font-serif font-bold text-2xl text-navy font-mono">{totalDownloads.toLocaleString("fr-FR")}</p>
+          <p className="font-bold text-2xl text-navy font-mono">{totalDownloads.toLocaleString("fr-FR")}</p>
           <p className="text-[11px] text-foreground-muted">Ouvertures autorisées en LCP DRM</p>
         </div>
 
@@ -119,7 +119,7 @@ export default function PublisherStatsPage() {
             <span className="text-xs font-bold text-navy uppercase tracking-wider">Chiffre d&apos;Affaires Cumulé</span>
             <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600"><DollarSign className="w-4 h-4" /></div>
           </div>
-          <p className="font-serif font-bold text-2xl text-gold font-mono">{totalRevenue.toLocaleString("fr-FR")} XOF</p>
+          <p className="font-bold text-2xl text-gold font-mono">{totalRevenue.toLocaleString("fr-FR")} XOF</p>
           <p className="text-[11px] text-foreground-muted">Ventes directes &amp; Bouquets</p>
         </div>
       </div>

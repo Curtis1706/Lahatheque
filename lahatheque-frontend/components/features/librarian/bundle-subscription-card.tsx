@@ -74,7 +74,7 @@ export function BundleSubscriptionCard({
         <div className="flex items-baseline justify-between">
           <span className="text-xs font-bold text-foreground-muted uppercase">Tarif Annuel</span>
           <div className="text-right">
-            <span className="font-serif font-bold text-gold text-xl font-mono">
+            <span className="font-bold text-gold text-xl font-mono">
               {bundle.subscription_price.toLocaleString("fr-FR")} XOF
             </span>
             <span className="text-[10px] text-foreground-muted block">/ an (Accès Institutionnel)</span>

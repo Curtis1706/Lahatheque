@@ -148,8 +148,8 @@ export default function UniversityRedevancesPage() {
         <div className="bg-navy-dark p-4 rounded-2xl border border-gold/30 flex items-center gap-4 shrink-0">
           <div>
             <span className="text-[10px] text-white/60 font-bold uppercase block">Taux Institutionnel Fixe</span>
-            <span className="font-serif font-bold text-gold text-3xl font-mono">15 %</span>
-            <span className="text-[9px] text-white/50 block flex items-center gap-1 mt-0.5">
+            <span className="font-bold text-gold text-3xl font-mono">15 %</span>
+            <span className="text-[9px] text-white/50 flex items-center gap-1 mt-0.5">
               <Lock className="w-3 h-3 text-gold" /> (Fixe &amp; Non modifiable — Section 10.2)
             </span>
           </div>
@@ -160,7 +160,7 @@ export default function UniversityRedevancesPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-5 rounded-3xl bg-background border border-border space-y-2 shadow-xs">
           <span className="text-xs font-bold text-navy uppercase tracking-wider block">Ventes Brutes Générées</span>
-          <p className="font-serif font-bold text-2xl text-navy font-mono">
+          <p className="font-bold text-2xl text-navy font-mono">
             {(kpis?.totalRevenue || 51950000).toLocaleString("fr-FR")} XOF
           </p>
           <p className="text-[11px] text-foreground-muted">Total parutions rattachées UAC</p>
@@ -168,7 +168,7 @@ export default function UniversityRedevancesPage() {
 
         <div className="p-5 rounded-3xl bg-background border border-border space-y-2 shadow-xs">
           <span className="text-xs font-bold text-navy uppercase tracking-wider block">Redevance Dues (15%)</span>
-          <p className="font-serif font-bold text-2xl text-gold font-mono">
+          <p className="font-bold text-2xl text-gold font-mono">
             {(kpis?.pendingRoyalties || 7792500).toLocaleString("fr-FR")} XOF
           </p>
           <p className="text-[11px] text-foreground-muted">Cumul rétribution 15%</p>
@@ -176,7 +176,7 @@ export default function UniversityRedevancesPage() {
 
         <div className="p-5 rounded-3xl bg-background border border-border space-y-2 shadow-xs">
           <span className="text-xs font-bold text-navy uppercase tracking-wider block">Solde Restant Dû</span>
-          <p className="font-serif font-bold text-2xl text-amber-600 font-mono">
+          <p className="font-bold text-2xl text-amber-600 font-mono">
             {(kpis?.remainingBalance || 2042500).toLocaleString("fr-FR")} XOF
           </p>
           <p className="text-[11px] text-foreground-muted">En cours de règlement trimestriel</p>

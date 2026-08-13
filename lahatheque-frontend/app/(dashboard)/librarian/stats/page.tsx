@@ -143,19 +143,19 @@ export default function UniversityStatsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">
           <span className="text-[10px] text-foreground-muted uppercase font-bold block">Consultations Web</span>
-          <p className="font-serif font-bold text-xl text-navy font-mono">{totalConsultations.toLocaleString("fr-FR")}</p>
+          <p className="font-bold text-xl text-navy font-mono">{totalConsultations.toLocaleString("fr-FR")}</p>
         </div>
         <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">
           <span className="text-[10px] text-foreground-muted uppercase font-bold block">Téléchargements PDF/EPUB</span>
-          <p className="font-serif font-bold text-xl text-navy font-mono">{totalDownloads.toLocaleString("fr-FR")}</p>
+          <p className="font-bold text-xl text-navy font-mono">{totalDownloads.toLocaleString("fr-FR")}</p>
         </div>
         <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">
           <span className="text-[10px] text-foreground-muted uppercase font-bold block">Écoutes Audio</span>
-          <p className="font-serif font-bold text-xl text-navy font-mono">{totalAudio.toLocaleString("fr-FR")}</p>
+          <p className="font-bold text-xl text-navy font-mono">{totalAudio.toLocaleString("fr-FR")}</p>
         </div>
         <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">
           <span className="text-[10px] text-foreground-muted uppercase font-bold block">Redevance 15% Dues</span>
-          <p className="font-serif font-bold text-xl text-gold font-mono">{totalRoyalty15.toLocaleString("fr-FR")} XOF</p>
+          <p className="font-bold text-xl text-gold font-mono">{totalRoyalty15.toLocaleString("fr-FR")} XOF</p>
         </div>
       </div>
 

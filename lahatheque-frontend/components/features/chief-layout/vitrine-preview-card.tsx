@@ -69,7 +69,7 @@ export function VitrinePreviewCard({ deposit, className }: VitrinePreviewCardPro
           <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-navy-hover text-xs">
             <div>
               <span className="text-white/60 text-[10px] uppercase font-bold tracking-wider block">Prix public</span>
-              <span className="font-serif font-bold text-gold text-lg font-mono">
+              <span className="font-bold text-gold text-lg font-mono">
                 {displayPrice.toLocaleString("fr-FR")} FCFA
               </span>
               {!deposit.admin_price && (
