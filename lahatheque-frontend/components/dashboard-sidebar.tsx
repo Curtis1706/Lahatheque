@@ -193,16 +193,6 @@ export function DashboardSidebar() {
           { label: "Profil & Paramètres", href: "/student/profile", icon: <UserIcon className="w-5 h-5" /> },
           { label: "Mon Université (Bouquet)", href: "/student/university", icon: <GraduationCap className="w-5 h-5" /> },
         ];
-      case "teacher":
-        return [
-          { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Ma Bibliothèque de Livres", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
-          { label: "Mes Cours Prescrits & Spécimens", href: "/teacher", icon: <PenTool className="w-5 h-5" /> },
-          { label: "Mes Commandes & Factures", href: "/student/orders", icon: <PackageCheck className="w-4 h-4" /> },
-          { label: "Mon Abonnement & Pass", href: "/student/subscriptions", icon: <Sparkles className="w-5 h-5" /> },
-          { label: "Catalogue Universitaire", href: "/student/catalog", icon: <Briefcase className="w-5 h-5" /> },
-          { label: "Historique & Notes", href: "/student/history", icon: <FileCheck className="w-5 h-5" /> },
-        ];
       case "super_client":
         return [
           { label: "Vue d'ensemble", href: "/wholesaler", icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -371,7 +361,7 @@ export function DashboardSidebar() {
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-xs text-white truncate">{userDisplayName}</p>
                 <p className="text-[10px] text-gold truncate">
-                  {user.role === "teacher" ? "Lecteur • Enseignant" : user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "publisher" ? "Éditeur Tiers • Partenaire" : user.role === "super_client" ? "Grossiste • Partenaire Revente" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : user.role === "legal_reviewer" ? "Juriste • Gestion Légale & Droits" : user.role === "chief_layout" ? "Chef Maquettiste • Validateur" : user.role === "layout_artist" ? "Maquettiste • Création Catalogue" : "Lecteur • LAHAThèque"}
+                  {user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "publisher" ? "Éditeur Tiers • Partenaire" : user.role === "super_client" ? "Grossiste • Partenaire Revente" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : user.role === "legal_reviewer" ? "Juriste • Gestion Légale & Droits" : user.role === "chief_layout" ? "Chef Maquettiste • Validateur" : user.role === "layout_artist" ? "Maquettiste • Création Catalogue" : "Lecteur • LAHAThèque"}
                 </p>
               </div>
             </div>

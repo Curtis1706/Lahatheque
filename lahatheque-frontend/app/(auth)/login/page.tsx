@@ -62,10 +62,8 @@ function LoginContent() {
         const role = result.user?.role as any;
         if (role === "admin" || role === "super_admin") {
           router.push("/admin");
-        } else if (role === "student") {
+        } else if (role === "student" || role === "teacher") {
           router.push("/student");
-        } else if (role === "teacher") {
-          router.push("/teacher");
         } else if (role === "author") {
           router.push("/author");
         } else if (role === "publisher") {
@@ -74,8 +72,14 @@ function LoginContent() {
           router.push("/librarian");
         } else if (role === "layout_artist") {
           router.push("/layout-artist");
+        } else if (role === "chief_layout") {
+          router.push("/chief-layout");
+        } else if (role === "manager") {
+          router.push("/manager");
         } else if (role === "legal_reviewer") {
           router.push("/legal-reviewer");
+        } else if (role === "wholesaler") {
+          router.push("/wholesaler");
         } else {
           router.push("/student");
         }
