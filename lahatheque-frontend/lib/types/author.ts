@@ -1,82 +1,95 @@
-export type SubmissionStatus = 
-  | "draft" 
-  | "pending" 
-  | "under_review" 
-  | "changes_requested" 
-  | "approved" 
-  | "published";
+// ─── Modèles TypeScript pour le Dashboard Auteur (author) ───────────────────
+
+export interface AuthorPublishedBook {
+  id: string;
+  title: string;
+  cover_url: string;
+  published_at: string;
+  sales_count: number;
+  downloads_count: number;
+  total_revenue_generated: number; // Revenus totaux générés par l'ouvrage (XOF)
+  author_royalty_share_amount: number; // Part propre rétribuée à cet auteur (XOF)
+  author_percentage_rate: number; // % du contrat de cet auteur
+  format_breakdown: { digital: number; paper: number; audio: number };
+  country_breakdown: { country: string; sales: number }[];
+  isbn_digital: string;
+  isbn_print?: string;
+  discipline: string;
+}
 
 export interface AuthorSubmission {
   id: string;
   title: string;
-  summary?: string;
-  language: string;
-  version_type: "preview" | "brouillon" | "version_finale";
-  status: SubmissionStatus;
+  manuscript_file_url: string;
   submitted_at: string;
-  file_name: string;
-  feedback_history?: {
-    date: string;
-    author_role: "Laha Éditions" | "Chef Maquettiste";
-    message: string;
-  }[];
-  cover_bg?: string;
-  cover_color?: string;
+  version_type: "preview" | "brouillon" | "finale";
+  // Étape 1 Étude (Auteur) vs Étape 2 Préparation Catalogue (Maquettiste)
+  status:
+    | "study_pending"
+    | "correction_requested"
+    | "rejected"
+    | "accepted"
+    | "catalog_preparation"
+    | "validation_pending"
+    | "published";
+  review_notes?: string;
+  suggested_summary?: string;
+  suggested_language?: string;
 }
 
-export interface AuthorBook {
+export interface AuthorRoyaltyPayment {
   id: string;
-  title: string;
-  author: string;
-  discipline: string;
-  institution: string;
-  format: "PDF" | "EPUB" | "Audio";
-  cover_bg: string;
-  cover_color: string;
-  isbn: string;
-  edition_year: number;
-  sales_count: number;
-  downloads_count: number;
+  period: string;
+  total_sales_count: number;
+  gross_revenue: number;
+  author_percentage_rate: number;
+  author_earned_amount: number; // Part propre à cet auteur
+  status: "paid" | "pending";
+  payment_date: string;
+  receipt_url: string;
+}
+
+// Interfaces de rétrocompatibilité pour composants hérités
+export interface AuthorStats {
+  total_sales: number;
+  total_downloads: number;
   total_revenue: number;
-  currency: string;
-  publication_date: string;
-  sales_by_format: { format: string; percentage: number }[];
-  sales_by_country: { country: string; sales: number }[];
+  pending_payout: number;
+  next_payout_date: string;
+  monthly_sales: { month: string; sales: number }[];
 }
 
 export interface RoyaltyStatement {
   id: string;
+  statement_period: string;
   book_title: string;
   sales_count: number;
-  downloads_count: number;
   gross_revenue: number;
+  currency: string;
   royalty_rate_percent: number;
   amount: number;
-  currency: string;
-  statement_period: string;
   status: "paid" | "pending";
   payout_date?: string;
-  pdf_url?: string;
 }
 
-export interface AuthorPurchase {
+export interface AuthorDelegateAccess {
   id: string;
-  order_number: string;
-  book_title: string;
-  author: string;
-  price: number;
-  currency: string;
-  purchase_date: string;
-  format: "PDF" | "EPUB" | "Papier";
-  cover_bg: string;
-  cover_color: string;
+  name: string;
+  email: string;
+  role: "co_author" | "assistant";
+  status: "active" | "invited";
+  added_at: string;
 }
 
-export interface AuthorStats {
-  total_sales: number;
-  total_revenue: number;
-  total_downloads: number;
-  pending_payout: number;
-  next_payout_date: string;
-  monthly_sales: { month: string; sales: number }[];
+export interface AuthorKpis {
+  totalSales: number;
+  totalDownloads: number;
+  totalRevenueGenerated: number;
+  authorPendingRoyalties: number;
+  authorPaidRoyalties: number;
+  nextPaymentDate: string;
+  nextPaymentAmount: number;
+  activeSubmissionsCount: number;
+  publishedBooksCount: number;
+  authorName: string;
 }

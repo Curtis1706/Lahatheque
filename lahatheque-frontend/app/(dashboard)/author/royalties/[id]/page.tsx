@@ -3,32 +3,31 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getRoyaltyStatements } from "@/lib/services/author";
-import { RoyaltyStatement } from "@/lib/types/author";
-import { 
-  ArrowLeft, 
-  DollarSign, 
-  Download, 
-  FileCheck, 
-  CheckCircle2, 
-  Calendar, 
+import { getAuthorRoyaltyPayments } from "@/lib/services/author";
+import type { AuthorRoyaltyPayment } from "@/lib/types/author";
+import {
+  ArrowLeft,
+  DollarSign,
+  Download,
   ShieldCheck,
-  Building2
+  CheckCircle2,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export default function RoyaltyStatementDetailPage() {
   const params = useParams();
-  const [statement, setStatement] = useState<RoyaltyStatement | null>(null);
+  const paymentId = (params?.id as string) || "pay-aut-2025-q2";
+
+  const [payment, setPayment] = useState<AuthorRoyaltyPayment | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadStatement() {
       try {
         setLoading(true);
-        const stmts = await getRoyaltyStatements();
-        const found = stmts.find((s) => s.id === params.id) || stmts[0];
-        setStatement(found);
+        const stmts = await getAuthorRoyaltyPayments();
+        const found = stmts.find((s) => s.id === paymentId) || stmts[0];
+        setPayment(found);
       } catch (err) {
         console.error("Erreur de chargement du relevé de droits", err);
       } finally {
@@ -36,9 +35,9 @@ export default function RoyaltyStatementDetailPage() {
       }
     }
     loadStatement();
-  }, [params.id]);
+  }, [paymentId]);
 
-  if (loading || !statement) {
+  if (loading || !payment) {
     return (
       <div className="p-8 max-w-4xl mx-auto space-y-6 animate-pulse">
         <div className="h-8 w-48 bg-background-secondary rounded-lg" />
@@ -56,11 +55,11 @@ export default function RoyaltyStatementDetailPage() {
           Retour à l&apos;historique des droits
         </Link>
         <div className="flex items-center gap-2">
-          <StatusBadge status={statement.status} />
-          <span className="text-xs font-bold text-navy">{statement.statement_period}</span>
+          <StatusBadge status={payment.status} />
+          <span className="text-xs font-bold text-navy">{payment.period}</span>
         </div>
         <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy pt-1">
-          Relevé Officiel de Droits d&apos;Auteur #{statement.id}
+          Relevé Officiel de Droits d&apos;Auteur #{payment.id}
         </h1>
       </div>
 
@@ -69,43 +68,45 @@ export default function RoyaltyStatementDetailPage() {
         {/* Entête Éditorial LAHA */}
         <div className="flex items-center justify-between border-b border-border pb-6">
           <div className="space-y-1">
-            <span className="text-xs font-bold text-gold uppercase tracking-wider">LAHA Éditions • Relevé de Redevances</span>
-            <h2 className="font-serif font-bold text-navy text-xl">{statement.book_title}</h2>
+            <span className="text-xs font-bold text-gold uppercase tracking-wider">LAHA Éditions • Relevé de Redevances (Part Propre Auteur)</span>
+            <h2 className="font-serif font-bold text-navy text-xl">{payment.period}</h2>
           </div>
-          <button
-            onClick={() => alert("Génération du relevé de droits officiel en format PDF...")}
+          <a
+            href={payment.receipt_url}
+            target="_blank"
+            rel="noreferrer"
             className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors inline-flex items-center gap-2"
           >
             <Download className="w-4 h-4 text-gold" />
-            Télécharger le justificatif PDF
-          </button>
+            Télécharger le relevé PDF
+          </a>
         </div>
 
         {/* Détail du Calcul des Droits (Section 3.4.1) */}
         <div className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-navy">
-            Détail des Calculs de la Période ({statement.statement_period})
+            Détail des Calculs de la Période ({payment.period})
           </h3>
 
           <div className="bg-background-secondary p-5 rounded-2xl border border-border space-y-3 text-xs">
             <div className="flex justify-between border-b border-border pb-2">
               <span className="text-foreground-muted">Nombre de ventes comptabilisées</span>
-              <strong className="text-navy font-bold">{statement.sales_count} exemplaires</strong>
+              <strong className="text-navy font-bold">{payment.total_sales_count} exemplaires</strong>
             </div>
 
             <div className="flex justify-between border-b border-border pb-2">
               <span className="text-foreground-muted">Revenus bruts générés</span>
-              <strong className="text-navy font-bold">{statement.gross_revenue.toLocaleString("fr-FR")} {statement.currency}</strong>
+              <strong className="text-navy font-bold">{payment.gross_revenue.toLocaleString("fr-FR")} XOF</strong>
             </div>
 
             <div className="flex justify-between border-b border-border pb-2">
               <span className="text-foreground-muted">Part de droits contractuelle (Taux d&apos;auteur)</span>
-              <strong className="text-gold font-bold">{statement.royalty_rate_percent}%</strong>
+              <strong className="text-gold font-bold">{payment.author_percentage_rate}%</strong>
             </div>
 
             <div className="flex justify-between text-sm font-bold pt-1">
-              <span className="text-navy font-serif">Net à payer à l&apos;auteur</span>
-              <span className="text-navy font-serif text-lg">{statement.amount.toLocaleString("fr-FR")} {statement.currency}</span>
+              <span className="text-navy font-serif">Net à payer à l&apos;auteur (Part Propre)</span>
+              <span className="text-gold font-serif text-lg">{payment.author_earned_amount.toLocaleString("fr-FR")} XOF</span>
             </div>
           </div>
         </div>
@@ -116,9 +117,7 @@ export default function RoyaltyStatementDetailPage() {
             <ShieldCheck className="w-4 h-4 text-gold" />
             Vérifié par le service juridique LAHA Éditions
           </span>
-          {statement.payout_date && (
-            <span>Date de versement : {new Date(statement.payout_date).toLocaleDateString("fr-FR")}</span>
-          )}
+          <span>Date de versement : {payment.payment_date}</span>
         </div>
       </div>
     </div>

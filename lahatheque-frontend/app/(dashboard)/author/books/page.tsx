@@ -1,160 +1,154 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { getAuthorBooks, getAuthorStats } from "@/lib/services/author";
-import { AuthorBook, AuthorStats } from "@/lib/types/author";
-import { BookOpen, ArrowLeft, Search, Lock } from "lucide-react";
-import { AuthorKpiCharts } from "@/components/features/author/author-kpi-charts";
-import { BookCard } from "@/components/features/student/book-card";
-import { BookListItem } from "@/components/features/student/book-list-item";
-import { ViewToggle, ViewMode } from "@/components/features/student/view-toggle";
-import { EmptyState, EmptyIcon, EmptyTitle, EmptyDescription } from "@/components/ui/empty-state";
-import { StudentBookAccess } from "@/lib/types/student";
+import { BookOpen, ArrowLeft, Eye, Download, DollarSign, ChevronRight, BarChart3 } from "lucide-react";
+import { DataTable, DataTableColumn } from "@/components/ui/data-table";
+import { getAuthorPublishedBooks } from "@/lib/services/author";
+import type { AuthorPublishedBook } from "@/lib/types/author";
 
 export default function AuthorBooksPage() {
-  const [books, setBooks] = useState<AuthorBook[]>([]);
-  const [stats, setStats] = useState<AuthorStats | null>(null);
+  const [books, setBooks] = useState<AuthorPublishedBook[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    async function loadBooks() {
-      try {
-        setLoading(true);
-        const [booksData, statsData] = await Promise.all([
-          getAuthorBooks(),
-          getAuthorStats()
-        ]);
-        setBooks(booksData);
-        setStats(statsData);
-      } catch (err) {
-        console.error("Erreur de chargement des livres auteur", err);
-      } finally {
-        setLoading(false);
-      }
+    async function loadData() {
+      setLoading(true);
+      const data = await getAuthorPublishedBooks();
+      setBooks(data);
+      setLoading(false);
     }
-    loadBooks();
+    loadData();
   }, []);
 
-  const filteredBooks = books.filter((b) =>
-    searchQuery === "" ||
-    b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    b.discipline.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const columns: DataTableColumn<AuthorPublishedBook>[] = [
+    {
+      key: "title",
+      header: "Titre de l'Ouvrage Publié",
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-12 bg-navy rounded overflow-hidden shrink-0 border border-border">
+            {row.cover_url ? (
+              <img src={row.cover_url} alt={row.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white font-bold text-xs">
+                {row.title.slice(0, 1)}
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="font-serif font-bold text-xs text-navy leading-snug">{row.title}</p>
+            <p className="text-[10px] text-foreground-muted font-mono">Publié le {row.published_at}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "sales_count",
+      header: "Ventes Totales",
+      cell: (row) => (
+        <span className="font-mono font-bold text-xs text-navy">
+          {row.sales_count.toLocaleString("fr-FR")} exemplaires
+        </span>
+      ),
+    },
+    {
+      key: "downloads_count",
+      header: "Téléchargements (DRM)",
+      cell: (row) => (
+        <span className="font-mono font-bold text-xs text-navy">
+          {row.downloads_count.toLocaleString("fr-FR")} fois
+        </span>
+      ),
+    },
+    {
+      key: "total_revenue_generated",
+      header: "Chiffre d'Affaires Net",
+      cell: (row) => (
+        <span className="font-mono font-bold text-foreground text-xs">
+          {row.total_revenue_generated.toLocaleString("fr-FR")} XOF
+        </span>
+      ),
+    },
+    {
+      key: "author_royalty_share_amount",
+      header: "Part Rétribuée Auteur (15%)",
+      cell: (row) => (
+        <span className="font-mono font-bold text-gold text-xs">
+          {row.author_royalty_share_amount.toLocaleString("fr-FR")} XOF
+        </span>
+      ),
+    },
+    {
+      key: "id",
+      header: "",
+      cell: (row) => (
+        <Link
+          href={`/author/books/${row.id}`}
+          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1 min-h-[36px]"
+        >
+          <BarChart3 className="w-3.5 h-3.5 text-gold" />
+          Détail
+        </Link>
+      ),
+    },
+  ];
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto w-full min-w-0">
-      {/* 1. VISUALISATIONS DE DONNÉES ET KPIS 21st.dev EN PREMIER */}
-      {!loading && stats ? (
-        <AuthorKpiCharts stats={stats} />
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-40" />
-          ))}
-        </div>
-      )}
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs text-foreground-muted">
+        <Link href="/author" className="hover:text-navy">Vue d&apos;ensemble</Link>
+        <span>/</span>
+        <span className="text-navy font-semibold">Mes Livres Publiés</span>
+      </div>
 
-      {/* 2. EN-TÊTE DE PAGE */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
-        <div className="space-y-1">
+      {/* Header */}
+      <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
           <Link href="/author" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Retour au tableau de bord
+            Vue d&apos;ensemble
           </Link>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gold">
-            <BookOpen className="w-4 h-4" />
-            <span>Catalogue d&apos;Auteur • Ouvrages Publiés</span>
+          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+            <BookOpen className="w-4 h-4 text-gold" />
+            Catalogue Commercial Auteur (Règle Stricte : Publiés Uniquement)
           </div>
-          <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy">
-            Mes Livres Publiés & Statistiques
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+            Mes Livres Publiés
           </h1>
-          <p className="text-xs sm:text-sm text-foreground-muted max-w-2xl">
-            Consultez le nombre de ventes, les téléchargements et les revenus générés par vos ouvrages universitaires.
+          <p className="text-xs text-foreground-muted mt-1">
+            Suivi des ventes, des téléchargements et des revenus générés pour chacun de vos ouvrages actuellement au catalogue.
           </p>
         </div>
-
-        <ViewToggle mode={viewMode} onChange={setViewMode} className="self-end md:self-auto" />
       </div>
 
-      {/* Note d'information sur la gestion exclusive des prix/métadonnées */}
-      <div className="bg-navy/5 border border-gold/30 p-4 rounded-2xl flex items-start gap-3 text-xs text-foreground-muted">
-        <Lock className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-        <div>
-          <strong className="text-navy font-semibold block">Gestion des Métadonnées & Prix réservée à l&apos;Édition</strong>
-          Conformément au cahier des charges LAHAThèque (section 4.1), la fixation des prix de vente et la classification académique relèvent de l&apos;Administrateur et du Maquettiste.
-        </div>
+      {/* Note d'explication de la règle de séparation avec "Mes Dépôts" */}
+      <div className="p-4 rounded-2xl bg-navy/5 border border-navy/20 text-xs text-navy space-y-1">
+        <p className="font-bold flex items-center gap-1.5">
+          <BookOpen className="w-4 h-4 text-gold" />
+          Séparation Stricte &ldquo;Mes Livres&rdquo; vs &ldquo;Mes Dépôts&rdquo; :
+        </p>
+        <p className="text-foreground-muted leading-relaxed">
+          Cette page répertorie **exclusivement vos ouvrages publiés** générant des ventes. Tous les manuscrits en étude éditoriale ou en cours de préparation catalogue restent gérés dans la rubrique <Link href="/author/submissions" className="font-bold text-navy underline">Mes Dépôts</Link>.
+        </p>
       </div>
 
-      {/* Barre de Recherche */}
-      <div className="bg-background border border-border p-3.5 rounded-2xl flex items-center gap-3 shadow-xs">
-        <Search className="w-5 h-5 text-foreground-muted shrink-0 ml-1" />
-        <input
-          type="text"
-          placeholder="Rechercher par titre de livre ou discipline..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-transparent text-sm focus:outline-none text-foreground placeholder:text-foreground-muted min-h-[40px]"
+      {/* Tableau des Livres Publiés */}
+      <div className="space-y-4">
+        <h3 className="font-serif font-bold text-navy text-base">
+          Ouvrages Publiés au Catalogue ({books.length})
+        </h3>
+
+        <DataTable
+          data={books}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          emptyMessage="Aucun livre publié pour le moment."
+          pageSize={10}
         />
       </div>
-
-      {/* Liste des Livres Publiés */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
-          <div className="bg-background-secondary h-64 rounded-2xl border border-border" />
-          <div className="bg-background-secondary h-64 rounded-2xl border border-border" />
-        </div>
-      ) : filteredBooks.length === 0 ? (
-        <EmptyState>
-          <EmptyIcon icon={BookOpen} />
-          <EmptyTitle>Aucun livre trouvé</EmptyTitle>
-          <EmptyDescription>Aucun ouvrage ne correspond à votre recherche actuelle.</EmptyDescription>
-        </EmptyState>
-      ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredBooks.map((b) => {
-            const bookAccess: StudentBookAccess = {
-              id: b.id,
-              title: b.title,
-              author: b.author,
-              discipline: b.discipline,
-              institution: b.institution,
-              format: b.format,
-              cover_bg: b.cover_bg,
-              cover_color: b.cover_color,
-              progress_percent: 100,
-              isbn: b.isbn,
-              edition_year: b.edition_year,
-              page_count: 380,
-              is_favorite: false
-            };
-            return <BookCard key={b.id} book={bookAccess} />;
-          })}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredBooks.map((b) => {
-            const bookAccess: StudentBookAccess = {
-              id: b.id,
-              title: b.title,
-              author: b.author,
-              discipline: b.discipline,
-              institution: b.institution,
-              format: b.format,
-              cover_bg: b.cover_bg,
-              cover_color: b.cover_color,
-              progress_percent: 100,
-              isbn: b.isbn,
-              edition_year: b.edition_year,
-              page_count: 380,
-              is_favorite: false
-            };
-            return <BookListItem key={b.id} book={bookAccess} />;
-          })}
-        </div>
-      )}
     </div>
   );
 }

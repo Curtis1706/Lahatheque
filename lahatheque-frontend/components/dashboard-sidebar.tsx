@@ -275,11 +275,12 @@ export function DashboardSidebar() {
         ];
       case "author":
         return [
-          { label: "Tableau de bord", href: "/author", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Mes Livres", href: "/author/books", icon: <BookOpen className="w-5 h-5" /> },
-          { label: "Mes Dépôts", href: "/author/submissions", icon: <PenTool className="w-5 h-5" /> },
+          { label: "Vue d'ensemble", href: "/author", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Mes Livres Publiés", href: "/author/books", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Mes Dépôts (Manuscrit)", href: "/author/submissions", icon: <PenTool className="w-5 h-5" /> },
           { label: "Droits & Paiements", href: "/author/royalties", icon: <DollarSign className="w-5 h-5" /> },
-          {label: "Mes Achats & Commandes", href: "/author/purchases", icon: <ShoppingBag className="w-5 h-5" /> },
+          { label: "Mes Achats", href: "/author/purchases", icon: <ShoppingBag className="w-5 h-5" /> },
+          { label: "Profil & Délégation", href: "/author/profile", icon: <UserIcon className="w-5 h-5" /> },
         ];
       case "legal_reviewer":
         return [
