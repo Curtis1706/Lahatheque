@@ -37,7 +37,8 @@ import {
   PlusCircle,
   CheckSquare,
   History,
-  Percent
+  Percent,
+  UploadCloud
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -236,9 +237,21 @@ export function DashboardSidebar() {
         ];
       case "publisher":
         return [
-          { label: "Tableau de bord", href: "/publisher", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Soumissions", href: "/publisher/submissions", icon: <Briefcase className="w-5 h-5" /> },
-          { label: "Redevances", href: "/publisher/royalties", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Vue d'ensemble", href: "/publisher", icon: <LayoutDashboard className="w-5 h-5" /> },
+          {
+            label: "Mon Catalogue",
+            href: "/publisher/catalog",
+            icon: <BookOpen className="w-5 h-5" />,
+            sublinks: [
+              { label: "Tous mes Ouvrages", href: "/publisher/catalog", icon: <BookOpen className="w-4 h-4 text-gold" /> },
+              { label: "Nouveau Dépôt Web", href: "/publisher/catalog/new", icon: <PlusCircle className="w-4 h-4 text-gold" /> },
+              { label: "Dépôt en Lot ONIX 3.0", href: "/publisher/catalog/batch", icon: <UploadCloud className="w-4 h-4 text-gold" /> },
+            ],
+          },
+          { label: "Statistiques", href: "/publisher/stats", icon: <FileBarChart className="w-5 h-5" /> },
+          { label: "Redevances & Contrat", href: "/publisher/royalties", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Clés API & Intégration", href: "/publisher/api", icon: <ShieldCheck className="w-5 h-5" /> },
+          { label: "Journaux de Traçabilité", href: "/publisher/logs", icon: <History className="w-5 h-5" /> },
         ];
       case "author":
         return [
@@ -337,7 +350,7 @@ export function DashboardSidebar() {
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-xs text-white truncate">{userDisplayName}</p>
                 <p className="text-[10px] text-gold truncate">
-                  {user.role === "teacher" ? "Lecteur • Enseignant" : user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : user.role === "legal_reviewer" ? "Juriste • Gestion Légale & Droits" : user.role === "chief_layout" ? "Chef Maquettiste • Validateur" : user.role === "layout_artist" ? "Maquettiste • Création Catalogue" : "Lecteur • LAHAThèque"}
+                  {user.role === "teacher" ? "Lecteur • Enseignant" : user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "publisher" ? "Éditeur Tiers • Partenaire" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : user.role === "legal_reviewer" ? "Juriste • Gestion Légale & Droits" : user.role === "chief_layout" ? "Chef Maquettiste • Validateur" : user.role === "layout_artist" ? "Maquettiste • Création Catalogue" : "Lecteur • LAHAThèque"}
                 </p>
               </div>
             </div>

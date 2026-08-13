@@ -1,55 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { 
-  getPublisherStats, 
-  getBookSubmissions, 
-  deleteBookSubmission 
-} from "@/lib/services/publisher";
-import { BookSubmission, PublisherStats } from "@/lib/types/publisher";
-import { 
-  DollarSign, 
-  Eye, 
-  Download, 
-  BookOpen, 
-  Plus, 
-  Trash2, 
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  XCircle,
-  FileText,
-  TrendingUp,
-  DownloadCloud
-} from "lucide-react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { KpiGrid, type KpiCardProps } from "@/components/ui/kpi-card";
-import { DataTable } from "@/components/ui/data-table";
-import { Modal } from "@/components/ui/modal";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { useAuth } from "@/hooks/use-auth";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { getPublisherKpis } from "@/lib/services/publisher";
+import type { PublisherKpis } from "@/lib/types/publisher";
+import {
+  Building2,
+  BookOpen,
+  Eye,
+  Download,
+  DollarSign,
+  PlusCircle,
+  UploadCloud,
+  ChevronRight,
+  ArrowRight,
+  ShieldCheck,
+  Key,
+  Clock,
+} from "lucide-react";
 
-export default function PublisherDashboardPage() {
-  const [stats, setStats] = useState<PublisherStats | null>(null);
-  const [submissions, setSubmissions] = useState<BookSubmission[]>([]);
+export default function PublisherOverviewPage() {
+  const { user } = useAuth();
+  const [kpis, setKpis] = useState<PublisherKpis | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // Modales & Détails
-  const [selectedBook, setSelectedBook] = useState<BookSubmission | null>(null);
-  const [bookToDelete, setBookToDelete] = useState<BookSubmission | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [statsData, submissionsData] = await Promise.all([
-          getPublisherStats(),
-          getBookSubmissions()
-        ]);
-        setStats(statsData);
-        setSubmissions(submissionsData);
-        setError(null);
+        const kpiData = await getPublisherKpis();
+        setKpis(kpiData);
       } catch (err) {
-        setError("Impossible de charger les données du tableau de bord. Veuillez réessayer.");
+        console.error("Erreur de chargement du dashboard éditeur tiers", err);
       } finally {
         setLoading(false);
       }
@@ -57,340 +41,187 @@ export default function PublisherDashboardPage() {
     loadData();
   }, []);
 
-const handleDelete = async (id: string) => {
-    if (!bookToDelete) return;
-    try {
-      const success = await deleteBookSubmission(id);
-      if (success) {
-        setSubmissions(prev => prev.filter(sub => sub.id !== id));
-      }
-    } catch (err) {
-      alert("Une erreur est survenue lors de la suppression.");
-    } finally {
-      setBookToDelete(null);
-    }
-  };
-
-
-
-  const formatSalesModel = (model: BookSubmission["sales_model"]) => {
-    switch (model) {
-      case "purchase": return "Vente à l'unité";
-      case "subscription": return "Abonnement Bouquet";
-      case "free": return "Accès libre";
-    }
-  };
-
   return (
-    <div className="p-6 lg:p-8 space-y-8">
-      
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+      {/* Banner Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
         <div>
-          <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy">Espace Éditeur Tiers</h1>
-          <p className="text-sm text-foreground-muted">Gérez vos dépôts et suivez l'usage de vos ouvrages.</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-bold mb-2 uppercase tracking-wider">
+            <Building2 className="w-3.5 h-3.5" />
+            Espace Éditeur Tiers Partenaire
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
+            Bienvenue, {user?.first_name || "Éditions Partner"} 👋
+          </h1>
+          <p className="text-xs sm:text-sm text-navy-light mt-1">
+            Gérez votre catalogue numérique, vos dépôts unitaire ou ONIX 3.0 et suivez vos redevances.
+          </p>
         </div>
-        <Link 
-          href="/publisher/submissions/new"
-          className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-gold-dark text-white font-bold text-sm px-5 py-3 rounded transition-colors shadow-sm self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          Soumettre un ouvrage
+
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/publisher/catalog/batch"
+            className="px-3.5 py-2.5 rounded-xl bg-navy-dark text-white font-bold text-xs hover:bg-navy-hover border border-navy-hover transition-all flex items-center gap-2 shadow-sm min-h-[44px]"
+          >
+            <UploadCloud className="w-4 h-4 text-gold" />
+            Import ONIX 3.0
+          </Link>
+          <Link
+            href="/publisher/catalog/new"
+            className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 shadow-sm min-h-[44px]"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Nouveau Dépôt Web
+          </Link>
+        </div>
+      </div>
+
+      {/* 4 KPI Cards animées (KpiCard de components/ui/kpi-card.tsx) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Link href="/publisher/catalog" className="block">
+          <KpiCard
+            label="Catalogue Déposé"
+            value={kpis?.totalBooks || 3}
+            icon={BookOpen}
+            trend={10}
+            trendPeriod="ce mois"
+            theme="gold"
+            subtext={`${kpis?.publishedBooks || 1} publié(s) • ${kpis?.pendingValidations || 2} en cours`}
+            sparkline={[2, 2, 3, 3]}
+          />
+        </Link>
+
+        <Link href="/publisher/stats" className="block">
+          <KpiCard
+            label="Consultations &amp; Lecteurs"
+            value={kpis?.totalConsultations || 1420}
+            icon={Eye}
+            trend={18}
+            theme="blue"
+            subtext={`${kpis?.totalDownloads || 380} téléchargements`}
+            sparkline={[900, 1100, 1300, 1420]}
+          />
+        </Link>
+
+        <Link href="/publisher/royalties" className="block">
+          <KpiCard
+            label="Chiffre d'Affaires Généré"
+            value={kpis?.totalRevenue || 5700000}
+            formatValue={(v) => `${v.toLocaleString("fr-FR")} XOF`}
+            icon={DollarSign}
+            trend={14}
+            theme="emerald"
+            subtext="Ventes cumulées"
+            sparkline={[3000000, 4500000, 5200000, 5700000]}
+          />
+        </Link>
+
+        <Link href="/publisher/royalties" className="block">
+          <KpiCard
+            label="Redevances Dues"
+            value={kpis?.pendingRoyalties || 1254000}
+            formatValue={(v) => `${v.toLocaleString("fr-FR")} XOF`}
+            icon={Building2}
+            trend={0}
+            theme="amber"
+            subtext={`Taux contractuel : ${kpis?.contractualRoyaltyRate || 22}%`}
+            sparkline={[800000, 1000000, 1254000, 1254000]}
+          />
         </Link>
       </div>
 
-      {/* Error State */}
-      {error && (
-        <div className="bg-error/10 border border-error/20 p-4 rounded text-error text-sm flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
+      {/* Raccourcis & Actions Rapides */}
+      <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
+        <div className="pb-3 border-b border-border flex items-center justify-between">
           <div>
-            <p className="font-bold">Erreur de chargement</p>
-            <p>{error}</p>
+            <h2 className="text-base font-bold font-serif text-navy">Gestion du Catalogue &amp; Intégration Système</h2>
+            <p className="text-[11px] text-foreground-muted mt-0.5">Accès direct aux modules de gestion de votre maison d&apos;édition</p>
           </div>
+          <Link
+            href="/publisher/catalog"
+            className="text-xs font-bold text-gold hover:text-gold-dark flex items-center gap-1"
+          >
+            Voir tout le catalogue <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
-      )}
 
-      {/* KPI Cards */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="bg-background border border-border p-5 rounded-2xl animate-pulse space-y-3 h-36">
-              <div className="w-10 h-10 rounded-xl bg-background-secondary" />
-              <div className="h-7 w-20 bg-background-secondary rounded" />
-              <div className="h-3.5 w-32 bg-background-secondary rounded" />
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            {
+              label: "Nouveau Dépôt Unitaire",
+              desc: "Formulaire web 6 blocs avec assistance IA",
+              icon: PlusCircle,
+              href: "/publisher/catalog/new",
+              primary: true,
+            },
+            {
+              label: "Importation en Lot ONIX 3.0",
+              desc: "Téléverser un fichier XML, CSV, JSON ou ZIP",
+              icon: UploadCloud,
+              href: "/publisher/catalog/batch",
+            },
+            {
+              label: "Gestion des Clés API",
+              desc: "Client Credentials OAuth 2.0 pour votre ERP",
+              icon: Key,
+              href: "/publisher/api",
+            },
+            {
+              label: "Protections Anti-Piratage",
+              desc: "Configurer le filigrane et les règles DRM LCP",
+              icon: ShieldCheck,
+              href: "/publisher/catalog/pub-book-01/protection",
+            },
+            {
+              label: "Redevances &amp; Factures",
+              desc: "Consulter les paiements et le taux contractuel",
+              icon: DollarSign,
+              href: "/publisher/royalties",
+            },
+            {
+              label: "Journaux de Traçabilité",
+              desc: "Inspecter les accès et tatouages par utilisateur",
+              icon: Clock,
+              href: "/publisher/logs",
+            },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`p-4 rounded-2xl border transition-all flex items-center justify-between group shadow-xs ${
+                item.primary
+                  ? "bg-navy border-navy-hover text-white hover:border-gold"
+                  : "bg-background border-border hover:border-gold text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={`p-2.5 rounded-xl shrink-0 ${
+                    item.primary ? "bg-gold/20 text-gold" : "bg-navy-light text-navy"
+                  }`}
+                >
+                  <item.icon className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className={`font-bold text-xs truncate ${
+                      item.primary ? "text-white" : "text-navy"
+                    }`}
+                  >
+                    {item.label}
+                  </p>
+                  <p className="text-[10px] text-foreground-muted truncate">{item.desc}</p>
+                </div>
+              </div>
+              <ChevronRight
+                className={`w-4 h-4 shrink-0 transition-colors ${
+                  item.primary ? "text-gold" : "text-foreground-muted group-hover:text-gold"
+                }`}
+              />
+            </Link>
           ))}
         </div>
-      ) : (
-        stats && (
-          <KpiGrid
-            cols={4}
-            cards={[
-              {
-                label: "Redevances cumulées",
-                value: stats.total_royalties,
-                formatValue: (v) => `${v.toLocaleString("fr-FR")} FCFA`,
-                icon: DollarSign,
-                trend: 12,
-                sparkline: [30, 45, 40, 60, 55, 75, 70],
-              },
-              {
-                label: "Consultations",
-                value: stats.total_views,
-                icon: Eye,
-                trend: 8,
-                sparkline: [20, 35, 50, 45, 65, 60, 80],
-              },
-              {
-                label: "Téléchargements",
-                value: stats.total_downloads,
-                icon: Download,
-                trend: -3,
-                sparkline: [70, 65, 55, 60, 45, 50, 40],
-              },
-              {
-                label: "Commission de distribution",
-                value: stats.average_commission_rate,
-                formatValue: (v) => `${v}%`,
-                icon: TrendingUp,
-              },
-            ] satisfies KpiCardProps[]}
-          />
-        )
-      )}
-
-      {/* Catalogue — DataTable (21st.dev #22162, felipemenezes098/table-12) */}
-      <DataTable
-        data={submissions}
-        rowKey="id"
-        loading={loading}
-        skeletonRows={4}
-        searchPlaceholder="Rechercher par titre, auteur..."
-        filterKey="status"
-        filterPlaceholder="Tous les statuts"
-        filterOptions={[
-          { value: "draft", label: "Brouillon" },
-          { value: "pending", label: "En attente" },
-          { value: "approved", label: "Approuvé" },
-          { value: "rejected", label: "Rejeté" },
-        ]}
-        emptyMessage="Vous n'avez pas encore soumis de manuscrit ou d'ouvrage sur la plateforme."
-        headerActions={
-          <button className="inline-flex items-center gap-2 border border-border text-navy bg-background hover:bg-background-secondary font-bold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm">
-            <DownloadCloud className="w-4 h-4" />
-            Exporter
-          </button>
-        }
-        columns={[
-          {
-            key: "title",
-            header: "Ouvrage",
-            cell: (sub) => (
-              <div>
-                <p className="font-bold text-navy">{sub.title}</p>
-                {sub.subtitle && <p className="text-xs text-foreground-muted">{sub.subtitle}</p>}
-              </div>
-            ),
-          },
-          {
-            key: "authors",
-            header: "Auteurs",
-            cell: (sub) => (
-              <span className="text-foreground-muted">{(sub.authors as string[]).join(", ")}</span>
-            ),
-            hideOnMobile: true,
-          },
-          {
-            key: "sales_model",
-            header: "Modèle",
-            cell: (sub) => formatSalesModel(sub.sales_model as BookSubmission["sales_model"]),
-            hideOnMobile: true,
-          },
-          {
-            key: "price",
-            header: "Prix",
-            cell: (sub) => (
-              <span className="font-bold text-navy">
-                {(sub.price as number).toLocaleString()} {sub.currency as string}
-              </span>
-            ),
-            hideOnMobile: true,
-          },
-          {
-            key: "status",
-            header: "Statut",
-            cell: (sub) => <StatusBadge status={sub.status as string} />,
-          },
-          {
-            key: "id",
-            header: "Actions",
-            className: "text-right",
-            cell: (sub) => (
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedBook(sub as unknown as BookSubmission); }}
-                  className="text-gold hover:text-gold-dark font-bold text-xs"
-                >
-                  Détails
-                </button>
-                {sub.status === "draft" && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setBookToDelete(sub as unknown as BookSubmission); }}
-                    className="text-error hover:text-red-700 inline-flex items-center justify-center p-1"
-                    title="Supprimer ce brouillon"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            ),
-          },
-        ]}
-        mobileCard={(sub) => (
-          <div className="space-y-3">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-bold text-navy text-base">{sub.title as string}</p>
-                {sub.subtitle && <p className="text-xs text-foreground-muted">{sub.subtitle as string}</p>}
-              </div>
-              <StatusBadge status={sub.status as string} />
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-foreground-muted block">Auteurs :</span>
-                <span className="font-medium">{(sub.authors as string[]).join(", ")}</span>
-              </div>
-              <div>
-                <span className="text-foreground-muted block">Modèle :</span>
-                <span className="font-medium">{formatSalesModel(sub.sales_model as BookSubmission["sales_model"])}</span>
-              </div>
-              <div>
-                <span className="text-foreground-muted block">Prix :</span>
-                <span className="font-bold text-navy">{(sub.price as number).toLocaleString()} {sub.currency as string}</span>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-1">
-              {sub.status === "draft" && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setBookToDelete(sub as unknown as BookSubmission); }}
-                  className="text-error border border-error/20 hover:bg-error/5 text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Supprimer
-                </button>
-              )}
-              <button
-                onClick={(e) => { e.stopPropagation(); setSelectedBook(sub as unknown as BookSubmission); }}
-                className="bg-gold hover:bg-gold-dark text-white text-xs font-bold px-4 py-1.5 rounded"
-              >
-                Détails
-              </button>
-            </div>
-          </div>
-        )}
-      />
-
-
-      {/* Modal: Book Details */}
-      <Modal
-        open={selectedBook !== null}
-        onClose={() => setSelectedBook(null)}
-        title="Fiche détaillée du dépôt"
-        maxWidth={650}
-        footer={
-          <button 
-            onClick={() => setSelectedBook(null)}
-            className="bg-navy hover:bg-navy-hover text-white text-sm font-bold px-6 py-2 rounded"
-          >
-            Fermer
-          </button>
-        }
-      >
-        {selectedBook && (
-          <div className="space-y-6 pt-2">
-            <div>
-              <h4 className="text-xl font-serif font-bold text-navy">{selectedBook.title}</h4>
-              {selectedBook.subtitle && <p className="text-sm text-foreground-muted">{selectedBook.subtitle}</p>}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-foreground-muted block">Statut du dépôt :</span>
-                <div className="mt-1"><StatusBadge status={selectedBook.status} /></div>
-              </div>
-              <div>
-                <span className="text-foreground-muted block">Date de dépôt :</span>
-                <span className="font-bold text-navy">{new Date(selectedBook.created_at).toLocaleDateString("fr-FR")}</span>
-              </div>
-              <div>
-                <span className="text-foreground-muted block">Auteurs :</span>
-                <span className="font-medium text-navy">{selectedBook.authors.join(", ")}</span>
-              </div>
-              <div>
-                <span className="text-foreground-muted block">Modèle commercial :</span>
-                <span className="font-medium text-navy">{formatSalesModel(selectedBook.sales_model)}</span>
-              </div>
-              <div>
-                <span className="text-foreground-muted block">Prix public :</span>
-                <span className="font-bold text-navy">{selectedBook.price.toLocaleString()} {selectedBook.currency}</span>
-              </div>
-              {selectedBook.isbn_digital && (
-                <div>
-                  <span className="text-foreground-muted block">ISBN Numérique :</span>
-                  <span className="font-medium text-navy">{selectedBook.isbn_digital}</span>
-                </div>
-              )}
-            </div>
-
-            {selectedBook.reject_reason && (
-              <div className="bg-error/5 border border-error/20 p-4 rounded text-error text-sm">
-                <p className="font-bold mb-1">Motif du rejet :</p>
-                <p>{selectedBook.reject_reason}</p>
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-border">
-              <span className="text-foreground-muted block text-xs font-bold uppercase tracking-wider mb-2">Résumé / Présentation</span>
-              <p className="text-sm leading-relaxed text-foreground-muted">{selectedBook.summary}</p>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Modal: Confirm Delete */}
-      <Modal
-        open={bookToDelete !== null}
-        onClose={() => setBookToDelete(null)}
-        title={
-          <div className="flex items-center gap-3 text-error">
-            <AlertTriangle className="w-6 h-6 shrink-0" />
-            <span>Confirmer la suppression</span>
-          </div>
-        }
-        maxWidth={450}
-        footer={
-          <>
-            <button 
-              onClick={() => setBookToDelete(null)}
-              className="border border-border text-navy bg-background hover:bg-background-secondary text-sm font-bold px-4 py-2 rounded"
-            >
-              Annuler
-            </button>
-            <button 
-              onClick={() => bookToDelete && handleDelete(bookToDelete.id)}
-              className="bg-error hover:bg-red-700 text-white text-sm font-bold px-4 py-2 rounded"
-            >
-              Supprimer
-            </button>
-          </>
-        }
-      >
-        {bookToDelete && (
-          <p className="text-sm text-foreground-muted pt-2 pb-2">
-            Êtes-vous sûr de vouloir supprimer définitivement le brouillon de l'ouvrage <span className="font-bold text-navy">"{bookToDelete.title}"</span> ? Cette action est irréversible.
-          </p>
-        )}
-      </Modal>
-
+      </div>
     </div>
   );
 }

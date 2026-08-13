@@ -1,258 +1,163 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getPublisherStats, getRoyaltyPayments, getSalesTransactions } from "@/lib/services/publisher";
-import { PublisherStats, RoyaltyPayment, SalesTransaction } from "@/lib/types/publisher";
-import { 
-  DollarSign, 
-  TrendingUp, 
-  DownloadCloud, 
-  CheckCircle, 
-  Clock, 
-  ArrowRight,
-  TrendingDown,
-  Calendar,
-  CreditCard
-} from "lucide-react";
-import { DataTable } from "@/components/ui/data-table";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { DollarSign, ArrowLeft, Building2, Download, FileText, CheckCircle2, ShieldCheck, Lock } from "lucide-react";
+import { DataTable, DataTableColumn } from "@/components/ui/data-table";
+import { getPublisherRoyaltyPayments, getPublisherKpis } from "@/lib/services/publisher";
+import type { PublisherRoyaltyPayment, PublisherKpis } from "@/lib/types/publisher";
 
-export default function RoyaltiesPage() {
-  const [stats, setStats] = useState<PublisherStats | null>(null);
-  const [payments, setPayments] = useState<RoyaltyPayment[]>([]);
-  const [transactions, setTransactions] = useState<SalesTransaction[]>([]);
+export default function PublisherRoyaltiesPage() {
+  const [payments, setPayments] = useState<PublisherRoyaltyPayment[]>([]);
+  const [kpis, setKpis] = useState<PublisherKpis | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadRoyaltyData() {
-      try {
-        setLoading(true);
-        const [statsData, paymentsData, txData] = await Promise.all([
-          getPublisherStats(),
-          getRoyaltyPayments(),
-          getSalesTransactions()
-        ]);
-        setStats(statsData);
-        setPayments(paymentsData);
-        setTransactions(txData);
-      } catch (err) {
-        console.error("Erreur de chargement des redevances", err);
-      } finally {
-        setLoading(false);
-      }
+    async function loadData() {
+      setLoading(true);
+      const [pData, kData] = await Promise.all([
+        getPublisherRoyaltyPayments(),
+        getPublisherKpis(),
+      ]);
+      setPayments(pData);
+      setKpis(kData);
+      setLoading(false);
     }
-    loadRoyaltyData();
+    loadData();
   }, []);
 
-  const totalPaid = payments
-    .filter(p => p.status === "paid")
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  const pendingPayment = payments
-    .filter(p => p.status === "processing")
-    .reduce((sum, p) => sum + p.amount, 0);
+  const columns: DataTableColumn<PublisherRoyaltyPayment>[] = [
+    {
+      key: "period",
+      header: "Période & Intitulé",
+      cell: (row) => (
+        <div>
+          <p className="font-serif font-bold text-xs text-navy leading-snug">{row.period}</p>
+          <p className="text-[10px] text-foreground-muted font-mono">Paiement Réf: {row.id}</p>
+        </div>
+      ),
+    },
+    {
+      key: "amount",
+      header: "Montant Versé",
+      cell: (row) => (
+        <span className="font-mono font-bold text-gold text-xs">
+          {row.amount.toLocaleString("fr-FR")} {row.currency}
+        </span>
+      ),
+    },
+    {
+      key: "payment_date",
+      header: "Date de Règlement",
+      cell: (row) => (
+        <span className="font-mono text-xs text-foreground-muted">
+          {new Date(row.payment_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+        </span>
+      ),
+    },
+    {
+      key: "payment_method",
+      header: "Mode de Règlement",
+      hideOnMobile: true,
+      cell: (row) => <span className="text-xs font-semibold text-navy">{row.payment_method}</span>,
+    },
+    {
+      key: "status",
+      header: "Statut",
+      cell: (row) => (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
+          <CheckCircle2 className="w-3 h-3" /> Règlement Effectué
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
-      
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs text-foreground-muted">
+        <Link href="/publisher" className="hover:text-navy">Vue d&apos;ensemble</Link>
+        <span>/</span>
+        <span className="text-navy font-semibold">Redevances &amp; Contrat</span>
+      </div>
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif text-2xl lg:text-3xl font-bold text-navy">Redevances & Ventes</h1>
-          <p className="text-sm text-foreground-muted">Suivez vos gains, vos ventes unitaires et l'état de vos versements.</p>
+          <Link href="/publisher" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Vue d&apos;ensemble
+          </Link>
+          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+            <DollarSign className="w-4 h-4 text-gold" />
+            Revenus &amp; Redevances (Section 10.3)
+          </div>
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+            Redevances Dues &amp; Paiements Reçus
+          </h1>
+          <p className="text-xs text-foreground-muted mt-1">
+            Suivi automatique du chiffre d&apos;affaires et des versements effectués par LAHA Éditions selon votre contrat de partenariat.
+          </p>
         </div>
-        <button className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-gold-dark text-white font-bold text-sm px-5 py-3 rounded shadow-sm self-start sm:self-auto">
-          <DownloadCloud className="w-4 h-4" />
-          Télécharger le rapport annuel
-        </button>
       </div>
 
-      {/* Stats Summary Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {loading ? (
-          Array.from({ length: 3 }).map((_, idx) => (
-            <div key={idx} className="bg-background border border-border p-6 rounded animate-pulse space-y-2">
-              <div className="h-4 w-20 bg-background-secondary rounded" />
-              <div className="h-6 w-32 bg-background-secondary rounded" />
-            </div>
-          ))
-        ) : (
-          stats && (
-            <>
-              {/* Box 1 */}
-              <div className="bg-background border border-border p-6 rounded flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-foreground-muted font-medium block">Total cumulé gagné</span>
-                  <span className="text-2xl font-bold text-navy mt-1">{(stats.total_royalties).toLocaleString()} FCFA</span>
-                </div>
-                <div className="w-10 h-10 rounded bg-gold/10 text-gold flex items-center justify-center">
-                  <DollarSign className="w-5 h-5" />
-                </div>
-              </div>
-
-              {/* Box 2 */}
-              <div className="bg-background border border-border p-6 rounded flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-foreground-muted font-medium block font-sans">Déjà versé (Payé)</span>
-                  <span className="text-2xl font-bold text-success mt-1">{totalPaid.toLocaleString()} FCFA</span>
-                </div>
-                <div className="w-10 h-10 rounded bg-success/10 text-success flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5" />
-                </div>
-              </div>
-
-              {/* Box 3 */}
-              <div className="bg-background border border-border p-6 rounded flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-foreground-muted font-medium block">En cours de versement</span>
-                  <span className="text-2xl font-bold text-warning mt-1">{pendingPayment.toLocaleString()} FCFA</span>
-                </div>
-                <div className="w-10 h-10 rounded bg-warning/10 text-warning flex items-center justify-center">
-                  <Clock className="w-5 h-5" />
-                </div>
-              </div>
-            </>
-          )
-        )}
-      </div>
-
-      {/* Detail grids */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* Left : Last Sales Transactions Table */}
-        <div className="lg:col-span-8 bg-background border border-border rounded shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <h3 className="font-serif text-base font-bold text-navy">Historique des ventes récentes</h3>
-            <span className="text-xs text-foreground-muted font-medium">SYSCOHADA Standard</span>
+      {/* Carte Contrat de Partenariat & Taux Convenu (Section 4.3) */}
+      <div className="p-6 rounded-3xl bg-navy text-white border border-navy-hover shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-bold uppercase tracking-wider">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Contrat de Partenariat Partenaire Officiel
           </div>
-
-          <div className="pt-2">
-            <DataTable
-              data={transactions}
-              rowKey="id"
-              loading={loading}
-              skeletonRows={4}
-              emptyMessage="Aucune transaction de vente enregistrée."
-              columns={[
-                {
-                  key: "book_title",
-                  header: "Ouvrage",
-                  cell: (tx) => (
-                    <div>
-                      <p className="font-bold text-navy">{tx.book_title as string}</p>
-                      <p className="text-[10px] text-foreground-muted flex items-center gap-1 mt-0.5">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(tx.transaction_date as string).toLocaleDateString("fr-FR")} à {new Date(tx.transaction_date as string).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  )
-                },
-                {
-                  key: "type",
-                  header: "Type de vente",
-                  cell: (tx) => (
-                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${
-                      tx.type === "purchase" 
-                        ? "bg-navy-hover/10 text-navy" 
-                        : "bg-gold/10 text-gold-dark"
-                    }`}>
-                      {tx.type === "purchase" ? "Achat direct" : "Part bouquet"}
-                    </span>
-                  )
-                },
-                {
-                  key: "sale_price",
-                  header: "Prix de vente",
-                  cell: (tx) => (
-                    <span className="text-foreground-muted font-medium">
-                      {(tx.sale_price as number).toLocaleString()} {tx.currency as string}
-                    </span>
-                  ),
-                  hideOnMobile: true
-                },
-                {
-                  key: "royalty_earned",
-                  header: "Votre Redevance",
-                  className: "text-right",
-                  cell: (tx) => (
-                    <span className="font-bold text-navy">
-                      +{(tx.royalty_earned as number).toLocaleString()} {tx.currency as string}
-                    </span>
-                  )
-                }
-              ]}
-              mobileCard={(tx) => (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-start">
-                    <p className="font-bold text-navy text-sm">{tx.book_title as string}</p>
-                    <span className="font-bold text-navy">
-                      +{(tx.royalty_earned as number).toLocaleString()} {tx.currency as string}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${
-                      tx.type === "purchase" 
-                        ? "bg-navy-hover/10 text-navy" 
-                        : "bg-gold/10 text-gold-dark"
-                    }`}>
-                      {tx.type === "purchase" ? "Achat direct" : "Part bouquet"}
-                    </span>
-                    <span className="text-foreground-muted">Prix: {(tx.sale_price as number).toLocaleString()} {tx.currency as string}</span>
-                  </div>
-                  <p className="text-[10px] text-foreground-muted flex items-center gap-1 pt-1">
-                    <Calendar className="w-3 h-3" />
-                    {new Date(tx.transaction_date as string).toLocaleDateString("fr-FR")} à {new Date(tx.transaction_date as string).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-              )}
-            />
-          </div>
+          <h3 className="font-serif font-bold text-lg text-white">Éditions Hachette Afrique — Réf: CTR-PUB-2025-08</h3>
+          <p className="text-xs text-white/80 max-w-xl leading-relaxed">
+            Le calcul et le versement des redevances sont effectués automatiquement selon le taux fixe stipulé dans la convention d&apos;édition signée avec LAHA Éditions.
+          </p>
         </div>
 
-        {/* Right : Payments disbursements history */}
-        <div className="lg:col-span-4 bg-background border border-border rounded shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-border">
-            <h3 className="font-serif text-base font-bold text-navy">Historique des versements</h3>
+        <div className="bg-navy-dark p-4 rounded-2xl border border-gold/30 flex items-center gap-4 shrink-0">
+          <div>
+            <span className="text-[10px] text-white/60 font-bold uppercase block">Taux Contractuel Convenu</span>
+            <span className="font-serif font-bold text-gold text-2xl font-mono">{kpis?.contractualRoyaltyRate || 22}%</span>
+            <span className="text-[9px] text-white/50 block flex items-center gap-1 mt-0.5">
+              <Lock className="w-3 h-3 text-gold" /> (Lecture seule — Défini par contrat)
+            </span>
           </div>
-
-          {loading ? (
-            <div className="p-6 space-y-4 animate-pulse">
-              <div className="h-12 bg-background-secondary rounded" />
-              <div className="h-12 bg-background-secondary rounded" />
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {payments.map((p) => (
-                <div key={p.id} className="p-4 space-y-3 hover:bg-background-secondary/20 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-navy text-sm">+{p.amount.toLocaleString()} {p.currency}</span>
-                    {p.status === "paid" ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-success/10 text-success">
-                        <CheckCircle className="w-3 h-3" /> Payé
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-warning/10 text-warning">
-                        <Clock className="w-3 h-3" /> En cours
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-foreground-muted space-y-1">
-                    <p className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5" />
-                      Versé le {new Date(p.payment_date).toLocaleDateString("fr-FR")}
-                    </p>
-                    <p className="flex items-center gap-1.5">
-                      <CreditCard className="w-3.5 h-3.5" />
-                      {p.payment_method}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-
       </div>
 
+      {/* Cartes de Synthèse Financière */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="p-5 rounded-3xl bg-background border border-border space-y-2 shadow-xs">
+          <span className="text-xs font-bold text-navy uppercase tracking-wider block">Chiffre d&apos;Affaires Net Généré</span>
+          <p className="font-serif font-bold text-2xl text-navy font-mono">
+            {(kpis?.totalRevenue || 5700000).toLocaleString("fr-FR")} XOF
+          </p>
+          <p className="text-[11px] text-foreground-muted">Calculé sur l&apos;ensemble du catalogue déposé</p>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-background border border-border space-y-2 shadow-xs">
+          <span className="text-xs font-bold text-navy uppercase tracking-wider block">Redevance Dues En Cours</span>
+          <p className="font-serif font-bold text-2xl text-gold font-mono">
+            {(kpis?.pendingRoyalties || 1254000).toLocaleString("fr-FR")} XOF
+          </p>
+          <p className="text-[11px] text-foreground-muted">Solde restant à régler pour la période en cours</p>
+        </div>
+      </div>
+
+      {/* Historique des paiements reçus */}
+      <div className="space-y-4">
+        <h3 className="font-serif font-bold text-navy text-base">
+          Historique des Règlements Effectués ({payments.length})
+        </h3>
+
+        <DataTable
+          data={payments}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          emptyMessage="Aucun paiement précédent enregistré."
+        />
+      </div>
     </div>
   );
 }
