@@ -7,6 +7,7 @@ export type AdminRole =
   | "legal_reviewer"
   | "layout_artist"
   | "partner_api"
+  | "manager"
   | "admin"
   | "super_admin";
 

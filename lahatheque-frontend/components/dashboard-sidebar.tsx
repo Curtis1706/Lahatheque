@@ -27,7 +27,13 @@ import {
   BellRing,
   FileSpreadsheet,
   Key,
-  Activity
+  Activity,
+  Warehouse,
+  Truck,
+  AlertTriangle,
+  Package,
+  FileBarChart,
+  ArrowUpCircle
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -198,6 +204,32 @@ export function DashboardSidebar() {
           { label: "Affiliations", href: "/librarian/affiliations", icon: <Users className="w-5 h-5" /> },
           { label: "Statistiques", href: "/librarian/stats", icon: <FileCheck className="w-5 h-5" /> },
         ];
+      case "manager":
+        return [
+          { label: "Vue d'ensemble", href: "/manager", icon: <LayoutDashboard className="w-5 h-5" /> },
+          {
+            label: "Stock",
+            href: "/manager/stock",
+            icon: <Warehouse className="w-5 h-5" />,
+            sublinks: [
+              { label: "Vue globale", href: "/manager/stock", icon: <Warehouse className="w-4 h-4 text-gold" /> },
+              { label: "Mouvements", href: "/manager/stock/movements", icon: <Package className="w-4 h-4 text-gold" /> },
+              { label: "Alertes de rupture", href: "/manager/stock/alerts", icon: <AlertTriangle className="w-4 h-4 text-gold" /> },
+            ],
+          },
+          {
+            label: "Livraison",
+            href: "/manager/delivery",
+            icon: <Truck className="w-5 h-5" />,
+            sublinks: [
+              { label: "À expédier", href: "/manager/delivery", icon: <Package className="w-4 h-4 text-gold" /> },
+              { label: "En transit", href: "/manager/delivery/in-transit", icon: <Truck className="w-4 h-4 text-gold" /> },
+              { label: "Livrées", href: "/manager/delivery/delivered", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
+            ],
+          },
+          { label: "Coordination Admin", href: "/manager/coordination", icon: <ArrowUpCircle className="w-5 h-5" /> },
+          { label: "Rapports & Export", href: "/manager/reports", icon: <FileBarChart className="w-5 h-5" /> },
+        ];
       case "publisher":
         return [
           { label: "Tableau de bord", href: "/publisher", icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -283,7 +315,7 @@ export function DashboardSidebar() {
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-xs text-white truncate">{userDisplayName}</p>
                 <p className="text-[10px] text-gold truncate">
-                  {user.role === "teacher" ? "Lecteur • Enseignant" : user.role === "author" ? "Auteur • LAHA Éditions" : "Lecteur • LAHAThèque"}
+                  {user.role === "teacher" ? "Lecteur • Enseignant" : user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : "Lecteur • LAHAThèque"}
                 </p>
               </div>
             </div>

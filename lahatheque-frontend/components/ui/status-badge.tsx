@@ -1,6 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Clock, XCircle, FileText, AlertCircle } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, FileText, AlertCircle, Package, Truck, AlertTriangle, ArrowUpCircle } from "lucide-react";
 
 const statusConfig: Record<string, { style: string; defaultLabel: string; defaultIcon: React.ElementType }> = {
   success: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Succès", defaultIcon: CheckCircle2 },
@@ -18,6 +18,30 @@ const statusConfig: Record<string, { style: string; defaultLabel: string; defaul
 
   draft: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Brouillon", defaultIcon: FileText },
   default: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Neutre", defaultIcon: AlertCircle },
+
+  // ─── Statuts Gestionnaire — Stock ───────────────────────────────────────────
+  normal: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Stock normal", defaultIcon: CheckCircle2 },
+  low_stock: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Seuil bas", defaultIcon: AlertTriangle },
+  out_of_stock: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Rupture", defaultIcon: XCircle },
+
+  // ─── Statuts Gestionnaire — Livraison ───────────────────────────────────────
+  to_ship: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "À expédier", defaultIcon: Package },
+  shipped: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Expédiée", defaultIcon: Truck },
+  delivered: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Livrée", defaultIcon: CheckCircle2 },
+
+  // ─── Statuts Gestionnaire — Coordination ────────────────────────────────────
+  not_escalated: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Non signalée", defaultIcon: AlertCircle },
+  escalated: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Signalée", defaultIcon: ArrowUpCircle },
+  reported: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Signalée", defaultIcon: ArrowUpCircle },
+  acknowledged: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Prise en compte", defaultIcon: CheckCircle2 },
+  resolved: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Résolue", defaultIcon: CheckCircle2 },
+
+  // ─── Statuts Gestionnaire — Mouvements ──────────────────────────────────────
+  restock: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Réassort", defaultIcon: Package },
+  sale: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Vente", defaultIcon: Package },
+  return: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Retour", defaultIcon: Package },
+  damage: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Endommagé", defaultIcon: XCircle },
+  correction: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Correction", defaultIcon: FileText },
 };
 
 export interface StatusBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {

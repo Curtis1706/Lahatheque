@@ -10,7 +10,7 @@ export interface User {
   email: string
   first_name: string
   last_name: string
-  role: 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client' | 'publisher' | 'librarian' | 'legal_reviewer' | 'layout_artist'
+  role: 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client' | 'publisher' | 'librarian' | 'legal_reviewer' | 'layout_artist' | 'manager'
   active_roles: string[]  // Source de vérité Phase 8 — lire ceci plutôt que role
   phone?: string
   is_verified: boolean
@@ -441,8 +441,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else if (role === 'student') router.push('/student')
     else if (role === 'super_client') router.push('/student')
     else if (role === 'parent') router.push('/student')
-    else if (role === 'admin') router.push('/admin')
-    else if (role === 'super_admin') router.push('/super-admin')
+    else if (role === 'layout_artist') router.push('/layout-artist')
+    else if (role === 'manager') router.push('/manager')
   }
 
   const value = React.useMemo(() => ({
