@@ -8,6 +8,7 @@ export type AdminRole =
   | "layout_artist"
   | "chief_layout"
   | "partner_api"
+  | "wholesaler"
   | "manager"
   | "admin"
   | "super_admin";

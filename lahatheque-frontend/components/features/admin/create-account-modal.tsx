@@ -14,14 +14,15 @@ export interface CreateAccountModalProps {
 }
 
 const ROLE_OPTIONS: { role: AdminRole; label: string; desc: string }[] = [
-  { role: "student", label: "Client Lecteur / Étudiant", desc: "Accès à la liseuse, abonnements et achats unitaires" },
-  { role: "teacher", label: "Enseignant", desc: "Spécimens, prescriptions et livres numériques" },
-  { role: "author", label: "Auteur", desc: "Consultation des droits, redevances et dépôts d'ouvrages" },
-  { role: "publisher", label: "Éditeur Tiers", desc: "Portail éditeur, dépôts ONIX et suivi financier" },
-  { role: "librarian", label: "Bibliothécaire", desc: "Gestion des accès et réservations de l'université" },
-  { role: "layout_artist", label: "Maquettiste", desc: "Dépôt des épreuves PDF/EPUB et suivi de mise en page" },
-  { role: "legal_reviewer", label: "Relecteur Juridique", desc: "Validation des droits et suivi des contrats d'édition" },
-  { role: "partner_api", label: "Université / Partenaire API", desc: "Bouquets institutionnels et accès API REST" },
+  { role: "student", label: "Client Lecteur / Étudiant", desc: "Accès à la liseuse LCP DRM, abonnements et achats" },
+  { role: "author", label: "Auteur", desc: "Consultation des droits propres, redevances et dépôts manuscrit" },
+  { role: "publisher", label: "Éditeur Tiers", desc: "Portail éditeur, dépôts ONIX 3.0 et suivi financier" },
+  { role: "librarian", label: "Université / Bibliothécaire", desc: "Gestion des bouquets institutionnels et statistiques" },
+  { role: "layout_artist", label: "Maquettiste", desc: "Dépôt des épreuves PDF/EPUB et classification catalogue" },
+  { role: "chief_layout", label: "Chef Maquettiste", desc: "Validation des épreuves et publication officielle" },
+  { role: "manager", label: "Gestionnaire Stock & Livraison", desc: "Stock papier physique et suivi des livraisons" },
+  { role: "legal_reviewer", label: "Juriste", desc: "Validation des contrats, droits d'auteur et impayés" },
+  { role: "wholesaler", label: "Grossiste", desc: "Achats en gros à tarifs dégressifs et commandes groupées" },
 ];
 
 export function CreateAccountModal({

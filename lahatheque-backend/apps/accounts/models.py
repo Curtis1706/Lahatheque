@@ -6,14 +6,17 @@ from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
 ROLE_CHOICES = (
-    ('student', 'Étudiant'),
+    ('student', 'Étudiant / Client Lecteur'),
     ('teacher', 'Enseignant'),
-    ('librarian', 'Bibliothécaire'),
-    ('publisher', 'Éditeur'),
+    ('librarian', 'Bibliothécaire / Université'),
+    ('publisher', 'Éditeur Tiers'),
     ('author', 'Auteur'),
-    ('legal_reviewer', 'Relecteur Juridique'),
+    ('legal_reviewer', 'Relecteur Juridique / Juriste'),
     ('layout_artist', 'Maquettiste'),
+    ('chief_layout', 'Chef Maquettiste'),
+    ('manager', 'Gestionnaire Stock & Livraison'),
     ('partner_api', 'Partenaire API'),
+    ('wholesaler', 'Grossiste'),
     ('admin', 'Administrateur'),
     ('super_admin', 'Super Admin'),
 )
