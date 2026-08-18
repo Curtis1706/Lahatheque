@@ -1,6 +1,5 @@
-"use client";
-
 import { useState, useEffect, useCallback, useRef } from "react";
+import { SERVER_ROOT_URL } from "@/lib/api";
 
 export function useAudioPlayer(bookAudioFile: string | null | undefined) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -10,6 +9,7 @@ export function useAudioPlayer(bookAudioFile: string | null | undefined) {
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
 
+  // Initialize audio lazily to avoid SSR issues
   useEffect(() => {
     if (!audioRef.current && typeof Audio !== 'undefined') {
       audioRef.current = new Audio();
@@ -47,7 +47,9 @@ export function useAudioPlayer(bookAudioFile: string | null | undefined) {
 
   useEffect(() => {
     if (audioRef.current && bookAudioFile) {
-      audioRef.current.src = bookAudioFile;
+      audioRef.current.src = bookAudioFile.startsWith('http') 
+        ? bookAudioFile 
+        : `${SERVER_ROOT_URL}${bookAudioFile}`;
     }
   }, [bookAudioFile]);
 

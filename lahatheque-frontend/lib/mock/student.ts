@@ -9,6 +9,25 @@ import type {
 
 export const mockClientBooks: ClientBookAccess[] = [
   {
+    id: "book-001",
+    title: "PromptBreeder: Self-Referential Self-Improvement via Prompt Evolution",
+    author: "DeepMind / LAHAThèque Research",
+    discipline: "Intelligence Artificielle & Recherche",
+    format: "PDF",
+    cover_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80",
+    access_type: "institution_bundle",
+    progress_percent: 75,
+    last_read_chapter: "Section 3 : Self-Referential Mutation & Hyper-Prompts",
+    last_read_at: "2026-08-18T08:00:00Z",
+    isbn_digital: "978-2-01-230916-7",
+    price_digital: 0,
+    has_paper_version: false,
+    description: "Document de recherche sur l'évolution autonome d'instructions IA et la mutation auto-référentielle.",
+    sample_pages_count: 28,
+    is_favorite: true,
+    institution_name: "Université d'Abomey-Calavi (UAC)",
+  },
+  {
     id: "book-cli-01",
     title: "Traité de Droit Administratif Général en Afrique",
     author: "Prof. Augustin CHAKIROU",

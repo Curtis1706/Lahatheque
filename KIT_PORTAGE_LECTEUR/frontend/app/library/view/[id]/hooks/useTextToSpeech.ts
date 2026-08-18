@@ -1,17 +1,18 @@
-"use client";
-
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
+import { http } from "@/lib/api";
 import { ViewMode } from '@react-pdf-viewer/core';
 
 interface UseTextToSpeechProps {
   book: any;
   currentPage: number;
-  rawPdfData: string | ArrayBuffer | Uint8Array | null;
+  rawPdfData: string | ArrayBuffer | null;
   effectiveImmersionMode: boolean;
   viewMode: ViewMode;
 }
 
+// ─── Voix OpenAI ─────────────────────────────────────────────────────────────
+// Chaque voix est un personnage différent — toutes sont ultra-naturelles.
 const OPENAI_VOICES = [
   { voiceURI: 'openai-nova',    name: 'Nova — Douce & Chaleureuse',    lang: 'fr-FR', emoji: '👩' },
   { voiceURI: 'openai-shimmer', name: 'Shimmer — Expressive & Claire', lang: 'fr-FR', emoji: '🌟' },
@@ -37,6 +38,8 @@ function makeVoice(v: typeof OPENAI_VOICES[number]): SpeechSynthesisVoice {
   } as SpeechSynthesisVoice;
 }
 
+// Découpe le texte en chunks. Le premier chunk est volontairement très court 
+// pour démarrer la lecture instantanément (Fast First Chunk strategy).
 function chunkText(text: string, maxLen = 800): string[] {
   const sentences = text.match(/[^.!?…;\n]+[.!?…;\n]*\s*/g) || [text];
   const chunks: string[] = [];
@@ -78,12 +81,14 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
   const fetchRequestIdRef = useRef(0);
   const ttsRateRef = useRef(1);
 
+  // Garder ttsRateRef synchronisé
   const setTtsRate = useCallback((rate: number) => {
     setTtsRateState(rate);
     ttsRateRef.current = rate;
     if (audioRef.current) audioRef.current.playbackRate = rate;
   }, []);
 
+  // Nettoyage des blob URLs pour éviter les fuites mémoire
   const cleanupBlobUrls = useCallback(() => {
     blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
     blobUrlsRef.current = [];
@@ -95,7 +100,7 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
       if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
       cleanupBlobUrls();
     };
-  }, [cleanupBlobUrls]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -103,6 +108,7 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
     };
   }, [rawPdfData]);
 
+  // ─── Voix pour le sélecteur ────────────────────────────────────────────────
   const ttsVoices = useMemo(() => OPENAI_VOICES.map(makeVoice), []);
 
   const categorizedVoices = useMemo(() => {
@@ -118,30 +124,36 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
     return { fr, en, others, tagVoice };
   }, [ttsVoices]);
 
+  // ─── Génération audio via le backend OpenAI ───────────────────────────────
   const generateChunkAudio = useCallback(async (text: string, voiceId: OpenAIVoiceId, speed: number): Promise<string | null> => {
     try {
-      const res = await fetch('/api/bff/legacy/tts/generate/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice: voiceId, speed }),
+      const res = await http.post('/api/bff/legacy/tts/generate/', {
+        text,
+        voice: voiceId,
+        speed
+      }, {
+        responseType: 'blob'
       });
 
-      if (!res.ok) return null;
-      const audioBlob = await res.blob();
+      const audioBlob = res.data;
       const blobUrl = URL.createObjectURL(audioBlob);
       blobUrlsRef.current.push(blobUrl);
       return blobUrl;
-    } catch (e) {
+
+    } catch (e: any) {
+      console.error('[TTS] generateChunkAudio error:', e);
       return null;
     }
   }, []);
 
+  // ─── Cache des chunks pré-générés ────────────────────────────────────────
   const prefetchedChunksRef = useRef<Record<number, Promise<string | null> | string>>({});
 
   const prefetchChunk = (index: number, voiceId: OpenAIVoiceId, speed: number) => {
     if (index >= chunksRef.current.length || !isActiveRef.current) return;
-    if (prefetchedChunksRef.current[index]) return;
+    if (prefetchedChunksRef.current[index]) return; // Déjà en cache ou en cours
 
+    // Stocker la Promise pour éviter les appels multiples
     const promise = generateChunkAudio(chunksRef.current[index], voiceId, speed).then(url => {
       if (url && isActiveRef.current) {
         prefetchedChunksRef.current[index] = url;
@@ -153,14 +165,19 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
     prefetchedChunksRef.current[index] = promise;
   };
 
+  // ─── Lecture séquentielle des chunks (Double Buffering) ─────────────────
   const playFromChunk = useCallback(async (startIndex: number, voiceId: OpenAIVoiceId, speed: number) => {
     const chunks = chunksRef.current;
+    
+    // Nettoyer l'ancien cache si on recommence
     prefetchedChunksRef.current = {};
 
     for (let i = startIndex; i < chunks.length; i++) {
       if (!isActiveRef.current) break;
+
       chunkIndexRef.current = i;
 
+      // Récupérer le chunk courant
       let blobOrPromise = prefetchedChunksRef.current[i];
       let blobUrl: string | null = null;
       
@@ -177,13 +194,16 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
       }
       
       if (!blobUrl || !isActiveRef.current) {
+        if (!blobUrl && isActiveRef.current) toast.error("Erreur de connexion (Serveur vocal).");
         break;
       }
 
+      // Lancer le pré-chargement du chunk SUIVANT en arrière-plan
       if (i + 1 < chunks.length) {
         prefetchChunk(i + 1, voiceId, speed);
       }
 
+      // Jouer le chunk courant
       await new Promise<void>((resolve) => {
         if (!audioRef.current) {
           audioRef.current = new Audio();
@@ -193,17 +213,25 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
         audio.playbackRate = ttsRateRef.current;
 
         audio.onended = () => resolve();
-        audio.onerror = () => resolve();
+        audio.onerror = () => {
+          console.error('[TTS] Audio playback error');
+          resolve();
+        };
         
-        audio.play().catch(() => resolve());
+        audio.play().catch((err) => {
+          console.error('[TTS] Autoplay prevented:', err);
+          resolve();
+        });
       });
     }
 
+    // Lecture terminée
     if (isActiveRef.current) {
       setIsTtsPaused(true);
     }
   }, [generateChunkAudio]);
 
+  // ─── stopTts ─────────────────────────────────────────────────────────────
   const stopTts = useCallback(() => {
     isActiveRef.current = false;
     if (audioRef.current) {
@@ -215,6 +243,7 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
     setIsTtsPaused(false);
   }, [cleanupBlobUrls]);
 
+  // ─── Démarrer la lecture pour la page courante ────────────────────────────
   const startTtsForPage = useCallback(async (text: string, voice: SpeechSynthesisVoice, rate: number) => {
     if (!text.trim()) {
       toast.error("Aucun texte lisible sur cette page.");
@@ -238,6 +267,7 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
     await playFromChunk(0, voiceId, rate);
   }, [cleanupBlobUrls, playFromChunk]);
 
+  // ─── Extraction du texte PDF ──────────────────────────────────────────────
   const extractAndPlayTts = useCallback(async () => {
     if (!book?.file) { toast.error("Aucun document à lire."); return; }
 
@@ -247,6 +277,7 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
     try {
       let extractedText = '';
 
+      // Stratégie 1 : PDF.js côté client
       if (rawPdfData) {
         try {
           let pdfDoc = pdfDocRef.current;
@@ -254,8 +285,16 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
             const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js' as any);
             pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
             const source = typeof rawPdfData === 'string'
-              ? { url: rawPdfData, withCredentials: true, httpHeaders: { 'X-Requested-With': 'XMLHttpRequest' } }
-              : { data: new Uint8Array(rawPdfData.slice(0)) };
+              ? {
+                  url: rawPdfData,
+                  withCredentials: true,
+                  httpHeaders: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                  }
+                }
+              : {
+                  data: new Uint8Array(rawPdfData.slice(0))
+                };
             const loadingTask = pdfjsLib.getDocument(source);
             pdfDoc = await loadingTask.promise;
             pdfDocRef.current = pdfDoc;
@@ -282,31 +321,52 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
         }
       }
 
+      // Stratégie 2 : API backend
+      if (!extractedText && reqId === fetchRequestIdRef.current) {
+        try {
+          const res = await http.get(`/api/bff/legacy/documents/text/?path=${encodeURIComponent(book.file)}`);
+          if (res.data) {
+            extractedText = res.data.pages?.[currentPage]?.text || '';
+            if (effectiveImmersionMode && viewMode === ViewMode.DualPageWithCover) {
+              extractedText += ' ' + (res.data.pages?.[currentPage + 1]?.text || '');
+            }
+          }
+        } catch (err) {
+          console.warn('[TTS] API text fetch failed:', err);
+        }
+      }
+
+      // Stratégie 3 : Couche texte du DOM
       if (!extractedText && reqId === fetchRequestIdRef.current) {
         const spans = document.querySelectorAll('.rpv-core__text-layer span, .flipbook-text-layer span');
         extractedText = Array.from(spans).map(el => el.textContent).join(' ').trim();
       }
 
       if (reqId !== fetchRequestIdRef.current) return;
+
       setIsFetchingTtsText(false);
 
       if (extractedText) {
         setTtsPageText(extractedText);
         await startTtsForPage(extractedText, ttsVoice, ttsRateRef.current);
       } else {
-        const fallback = `Page ${currentPage + 1} de ${book.title || 'document'}.`;
-        toast.info("Texte synthétisé depuis le titre de l'ouvrage.");
+        const fallback = `Page ${currentPage + 1} de ${book.title}. Cette page ne contient pas de texte sélectionnable.`;
+        toast.info("Ce PDF est scanné — le texte n'est pas extractible.");
         await startTtsForPage(fallback, ttsVoice, ttsRateRef.current);
       }
     } catch (err) {
+      console.error('[TTS] extractAndPlayTts error:', err);
       toast.error("Impossible de lancer la lecture vocale.");
       setIsFetchingTtsText(false);
     }
   }, [book, currentPage, rawPdfData, effectiveImmersionMode, viewMode, startTtsForPage, ttsVoice]);
 
+  // ─── toggleTts ────────────────────────────────────────────────────────────
   const toggleTts = useCallback(async () => {
     if (isTtsActive) { stopTts(); return; }
     
+    // ASTUCE AUTOPLAY : Jouer un mini fichier audio silencieux de manière synchrone lors du clic utilisateur
+    // Cela "déverrouille" l'élément Audio pour le reste de la session (Chrome/Safari)
     if (!audioRef.current) {
       audioRef.current = new Audio();
     }
@@ -318,12 +378,14 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
     await extractAndPlayTts();
   }, [isTtsActive, stopTts, extractAndPlayTts]);
 
+  // ─── pauseResumeTts ───────────────────────────────────────────────────────
   const pauseResumeTts = useCallback(() => {
     if (isTtsPaused) {
       if (audioRef.current) {
         audioRef.current.play().catch(() => {});
         setIsTtsPaused(false);
       } else if (ttsPageText) {
+        // Reprendre depuis le chunk interrompu
         isActiveRef.current = true;
         const voiceId = voiceIdFromURI(ttsVoice.voiceURI);
         playFromChunk(chunkIndexRef.current, voiceId, ttsRateRef.current);
@@ -338,6 +400,7 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
     }
   }, [isTtsPaused, ttsPageText, ttsVoice, playFromChunk]);
 
+  // Relancer automatiquement au changement de page si la lecture est active
   useEffect(() => {
     if (isTtsActive) {
       stopTts();
@@ -348,11 +411,14 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
     }
   }, [currentPage]);
 
+  // ─── selectVoice ──────────────────────────────────────────────────────────
   const selectVoice = useCallback((voice: SpeechSynthesisVoice) => {
     setTtsVoice(voice);
+    localStorage.setItem('tts_preferred_voice', voice.voiceURI);
     setShowVoicePicker(false);
 
     if (isTtsActive && ttsPageText) {
+      // Relancer avec la nouvelle voix depuis le début de la page
       if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
       cleanupBlobUrls();
       isActiveRef.current = true;

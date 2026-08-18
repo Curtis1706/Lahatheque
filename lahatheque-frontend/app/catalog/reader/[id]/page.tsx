@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft, Moon, Sun, Loader2,
   Save, Bookmark, Trash2, LayoutGrid, X, CheckCircle2,
-  Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Music, Headphones, StopCircle, Mic2
+  Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Music, Headphones, StopCircle, Mic2,
+  Edit3
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -148,7 +149,7 @@ const fr_FR_Locale = {
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { libraryApi, SERVER_ROOT_URL, http } from "@/lib/api"
+import { libraryApi, SERVER_ROOT_URL } from "@/lib/services/library"
 import { askExpertQuestion } from "@/lib/api-student-qa"
 import { cn } from "@/lib/utils"
 import { HelpCircle, MessageCircle, Send } from "lucide-react"
@@ -188,7 +189,7 @@ function AskExpertModal({ book, isOpen, onClose, onSuccess }: { book: any, isOpe
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         onClick={onClose}
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/80"
       />
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -237,7 +238,7 @@ export default function DocumentReaderPage() {
   const isStudent = user?.role === 'student' || activeRole === 'student'
 
   const [book, setBook] = useState<any>(null)
-  const [rawPdfData, setRawPdfData] = useState<ArrayBuffer | string | null>(null)
+  const [rawPdfData, setRawPdfData] = useState<string | null>(null)
   const [isPdfLoading, setIsPdfLoading] = useState(false)
 
   const {
@@ -279,7 +280,7 @@ export default function DocumentReaderPage() {
 
   const [isSaving, setIsSaving] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.DualPageWithCover)
+  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.SinglePage)
   const [isImmersionMode, setIsImmersionMode] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
 
@@ -346,9 +347,9 @@ export default function DocumentReaderPage() {
 
   // Sidebar component for annotations
   const NotesSidebar = () => (
-    <div className="flex flex-col h-full bg-[#0f1115] text-white">
-      <div className="p-6 border-b border-white/5">
-        <h3 className="text-laha-gold text-[10px] font-black uppercase tracking-[0.2em]">Mes Annotations</h3>
+    <div className="flex flex-col h-full bg-navy-dark text-white">
+      <div className="p-6 border-b border-navy-hover">
+        <h3 className="text-gold text-[10px] font-black uppercase tracking-[0.2em]">Mes Annotations</h3>
         <p className="text-[10px] text-white/30 mt-1 uppercase font-bold">{notes.length} éléments trouvés</p>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
@@ -410,49 +411,54 @@ export default function DocumentReaderPage() {
       },
     },
     sidebarTabs: (defaultTabs) => [
-      defaultTabs[0], // Thumbnails
-      defaultTabs[1], // Bookmarks
+      defaultTabs[0], // Miniatures (Page Thumbnails)
+      defaultTabs[1], // Table des matières (Document Outline)
+      defaultTabs[2], // Pièces jointes (Attachments)
       {
         content: <NotesSidebar />,
-        icon: <Bookmark size={20} />,
+        icon: <Edit3 size={18} />,
         title: 'Mes Annotations',
       },
-      defaultTabs[2], // Attachments
     ],
     renderToolbar: (Toolbar: any) => (
       <Toolbar>
         {(props: any) => {
           const {
             CurrentPageInput,
-            Download,
             EnterFullScreen,
             GoToNextPage,
             GoToPreviousPage,
             NumberOfPages,
-            Print,
             ShowSearchPopover,
             Zoom,
             ZoomIn,
             ZoomOut,
             Rotate,
             SwitchTheme,
-            SwitchSelectionMode,
-            ShowProperties
           } = props;
           return (
-            <div className="rpv-toolbar" style={{ alignItems: 'center', display: 'flex', width: '100%', padding: '0 4px' }}>
+            <div className="rpv-toolbar" style={{ alignItems: 'center', display: 'flex', width: '100%', padding: '0 8px', gap: '4px' }}>
               <div style={{ padding: '0px 2px' }}><ShowSearchPopover /></div>
               <div style={{ padding: '0px 2px' }}><Rotate /></div>
-              <div className="rpv-toolbar__divider" style={{ borderRight: '1px solid rgba(0, 0, 0, 0.1)', height: '24px', margin: '0 8px' }} />
+              <div className="rpv-toolbar__divider" style={{ borderRight: '1px solid #2E3F66', height: '20px', margin: '0 4px' }} />
               <div style={{ padding: '0px 2px' }}><GoToPreviousPage /></div>
-              <div style={{ padding: '0px 2px', width: '4rem' }}><CurrentPageInput /></div>
-              <div style={{ padding: '0px 2px', color: '#666', fontSize: '13px' }}>sur <NumberOfPages /></div>
+              <div style={{ padding: '0px 2px', width: '3.5rem' }}><CurrentPageInput /></div>
+              <div style={{ padding: '0px 4px', fontSize: '12px', fontWeight: 600, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span>sur</span>
+                <NumberOfPages>
+                  {(numProps: any) => (
+                    <span style={{ color: '#D4A017', fontWeight: 700 }}>
+                      {numProps?.numberOfPages || totalPages || 1}
+                    </span>
+                  )}
+                </NumberOfPages>
+              </div>
               <div style={{ padding: '0px 2px' }}><GoToNextPage /></div>
-              <div className="rpv-toolbar__divider" style={{ borderRight: '1px solid rgba(0, 0, 0, 0.1)', height: '24px', margin: '0 8px' }} />
+              <div className="rpv-toolbar__divider" style={{ borderRight: '1px solid #2E3F66', height: '20px', margin: '0 4px' }} />
               <div style={{ padding: '0px 2px' }}><ZoomOut /></div>
               <div style={{ padding: '0px 2px' }}><Zoom /></div>
               <div style={{ padding: '0px 2px' }}><ZoomIn /></div>
-              <div className="rpv-toolbar__divider" style={{ borderRight: '1px solid rgba(0, 0, 0, 0.1)', height: '24px', margin: '0 8px' }} />
+              <div className="rpv-toolbar__divider" style={{ borderRight: '1px solid #2E3F66', height: '20px', margin: '0 4px' }} />
               <div style={{ padding: '0px 2px' }}><SwitchTheme /></div>
               <div style={{ padding: '0px 2px' }}><EnterFullScreen /></div>
             </div>
@@ -466,7 +472,7 @@ export default function DocumentReaderPage() {
   function renderHighlightTarget(props: RenderHighlightTargetProps) {
     return (
       <div
-        className="bg-laha-black/95 border border-laha-gold/30 p-1.5 rounded-xl shadow-2xl flex items-center gap-1 backdrop-blur-xl animate-in fade-in zoom-in duration-200"
+        className="bg-navy border border-gold/30 p-1.5 rounded-xl shadow-2xl flex items-center gap-1 animate-in fade-in zoom-in duration-200"
         style={{
           position: 'absolute',
           left: `${props.selectionRegion.left}%`,
@@ -533,12 +539,9 @@ export default function DocumentReaderPage() {
           setBook(fakeBook)
           
           if (file) {
-            setIsPdfLoading(true)
-            const proxyUrl = `${SERVER_ROOT_URL}api/documents/proxy/?path=${encodeURIComponent(file)}`
-            setRawPdfData(proxyUrl)
-            setIsPdfLoading(false)
+            setRawPdfData(file)
           } else {
-            setRawPdfData(new ArrayBuffer(0))
+            setRawPdfData(null)
           }
           setIsLoading(false)
           return
@@ -552,29 +555,15 @@ export default function DocumentReaderPage() {
 
         // --- SECURE PDF LOAD via fetch → Blob URL (blocks IDM & download managers) ---
         if (data.file) {
-          try {
-            setIsPdfLoading(true)
-            const proxyUrl = `${SERVER_ROOT_URL}api/documents/proxy/?path=${encodeURIComponent(data.file)}`
-            // Instead of downloading the full 21MB PDF into memory, pass the proxy URL directly.
-            // The proxy returns application/x-pdf-viewer which bypasses IDM, and PDF.js will use 
-            // Range requests to load pages instantly on-demand.
-            setRawPdfData(proxyUrl)
-          } catch (pdfErr) {
-            console.error('Erreur chargement PDF sécurisé:', pdfErr)
-            setRawPdfData(new ArrayBuffer(0))
-          } finally {
-            setIsPdfLoading(false)
-          }
+          setRawPdfData(data.file)
         } else {
-          setRawPdfData(new ArrayBuffer(0))
+          setRawPdfData(null)
         }
 
         // Check for Quiz
-        const quizRes = await libraryApi.quizzes.getForBook(id as string)
-        if (quizRes.results && quizRes.results.length > 0) {
+        const quizRes = await libraryApi.getQuizzes(id as string)
+        if (quizRes && quizRes.questions.length > 0) {
           setHasQuiz(true)
-          const attempts = await libraryApi.quizzes.getAttempts(quizRes.results[0].id)
-          setIsQuizValidated(attempts.results?.some((a: any) => a.is_validated))
         }
 
       } catch (err) {
@@ -613,10 +602,14 @@ export default function DocumentReaderPage() {
           const pos = page + 1
           const pct = (pos / totalPages) * 100
           const completed = pct >= 90
-          await http.post(`/api/bff/content/lessons/${lessonId}/progress/`, {
-            last_position: pos,
-            progress: pct,
-            completed,
+          await fetch(`/api/bff/content/lessons/${lessonId}/progress/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              last_position: pos,
+              progress: pct,
+              completed,
+            }),
           })
         }
         return
@@ -679,8 +672,8 @@ export default function DocumentReaderPage() {
 
   if (isLoading || !book || isPdfLoading) {
     return (
-      <div className="h-screen bg-[#080c12] flex flex-col items-center justify-center space-y-4">
-        <Loader2 className="animate-spin text-laha-gold" size={48} />
+      <div className="h-screen bg-navy-dark flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="animate-spin text-gold" size={48} />
         <p className="text-white/40 font-black uppercase tracking-widest text-xs">
           {isPdfLoading ? 'Chargement sécurisé du document...' : 'Préparation de votre salle de lecture...'}
         </p>
@@ -688,61 +681,73 @@ export default function DocumentReaderPage() {
     )
   }
 
-  const hasAudio = !!book.audio_file
+  const hasAudio = !!book.audio_file;
+
+  if (effectiveImmersionMode && book.file) {
+    return (
+      <FlipBookReader
+        fileUrl={rawPdfData || book.file}
+        bookId={id as string}
+        initialPage={currentPage}
+        isMobile={isMobile}
+        onPageChange={setCurrentPage}
+        onClose={() => setIsImmersionMode(false)}
+        hasAudio={hasAudio}
+        isAudioPlaying={isAudioPlaying}
+        onToggleAudio={toggleAudio}
+        onToggleMute={toggleMute}
+        isMuted={isMuted}
+        playbackRate={playbackRate}
+        onTogglePlaybackRate={togglePlaybackRate}
+        audioProgress={audioProgress}
+        audioDuration={audioDuration}
+        onSeek={handleSeek}
+        isTtsActive={isTtsActive}
+        isTtsPaused={isTtsPaused}
+        isFetchingTtsText={isFetchingTtsText}
+        onToggleTts={handleTtsToggle}
+        onPauseResumeTts={pauseResumeTts}
+        onStopTts={stopTts}
+        ttsRate={ttsRate}
+        onToggleTtsRate={() => setTtsRate(ttsRate === 2 ? 0.75 : ttsRate + 0.25)}
+      />
+    );
+  }
 
   return (
     <div
       onContextMenu={(e) => e.preventDefault()}
-      className={cn(
-        "h-screen flex flex-col transition-colors duration-500 select-none",
-        isNightMode ? "bg-[#050505] theme-dark" : "bg-gray-100 theme-light"
-      )}>
+      className="h-screen flex flex-col transition-colors duration-500 select-none bg-navy-dark text-white"
+    >
       {/* Top Bar - Responsive Header */}
-      <header className={cn(
-        "px-4 md:px-8 flex items-center justify-between border-b relative z-[100] backdrop-blur-xl transition-all",
-        "h-auto py-3 md:h-20 md:py-0",
-        isNightMode ? "bg-black/90 border-white/10" : "bg-white/95 border-gray-200 shadow-sm"
-      )}>
+      <header className="px-4 md:px-8 flex items-center justify-between border-b border-navy-hover relative z-[100] bg-navy transition-all h-auto py-3 md:h-20 md:py-0 text-white">
         <div className="flex items-center gap-3 md:gap-6 flex-1 min-w-0">
           <Button
             onClick={() => {
-              syncProgress(currentPage)
-              router.back()
+              syncProgress(currentPage);
+              router.back();
             }}
             variant="ghost"
             size="icon"
-            className={cn(
-              "h-10 w-10 md:h-12 md:w-12 rounded-2xl transition-all shrink-0",
-              isNightMode ? "text-white/40 hover:text-laha-gold hover:bg-white/5" : "text-gray-400 hover:text-black hover:bg-black/5"
-            )}
+            className="h-9 w-9 rounded-lg inline-flex items-center justify-center p-0 text-gold bg-navy-dark hover:bg-navy border border-navy-hover cursor-pointer shrink-0 transition-colors"
           >
-            <ArrowLeft size={isMobile ? 20 : 24} />
+            <ArrowLeft size={18} />
           </Button>
-          <div className="space-y-0.5 md:space-y-1 min-w-0">
+          <div className="space-y-0.5 min-w-0">
             <h1 className={cn(
-              "font-black uppercase tracking-tighter truncate",
-              isMobile ? "text-base" : "text-xl",
-              isNightMode ? "text-white" : "text-black"
+              "font-bold uppercase tracking-tight truncate font-serif text-gold",
+              isMobile ? "text-xs" : "text-base"
             )}>
               {book.title}
             </h1>
-            <div className="flex items-center gap-2 md:gap-3">
-              <Badge className={cn(
-                "border-none text-[8px] md:text-[10px] font-black uppercase px-1.5 py-0.5 rounded-lg shrink-0",
-                book.category === 'audio' ? "bg-purple-500 text-white" :
-                  book.category === 'fiche' ? "bg-blue-500 text-white" :
-                    book.category === 'summary' ? "bg-emerald-500 text-white" :
-                      "bg-laha-gold text-laha-black"
-              )}>
+            <div className="flex items-center gap-2">
+              <Badge className="border border-navy-hover bg-navy-dark text-gold text-[9px] font-bold uppercase px-1.5 py-0.2 rounded shrink-0">
                 {book.category === 'audio' ? "Livre-Audio" :
                   book.category === 'fiche' ? "Analyse" :
                     book.category === 'summary' ? "Résumé" : "Manuel"}
               </Badge>
               {book.file && (
-                <span className={cn(
-                  "text-[10px] md:text-xs font-bold uppercase tracking-widest shrink-0",
-                  isNightMode ? "text-white/30" : "text-gray-400"
-                )}>
+                <span className="text-[10px] font-mono text-white/60 shrink-0">
                   Page {currentPage + 1} / {totalPages}
                 </span>
               )}
@@ -750,31 +755,14 @@ export default function DocumentReaderPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-4 shrink-0">
-        {/*   {book.author_id && !isMobile && isStudent && (
-            <Button
-              onClick={() => setIsQuestionModalOpen(true)}
-              variant="outline"
-              className={cn(
-                "rounded-2xl border h-10 md:h-12 px-4 md:px-6 gap-3 text-[10px] font-black uppercase tracking-widest transition-all shadow-xl group",
-                isNightMode ? "bg-[#d4a017]/10 border-[#d4a017]/30 text-[#d4a017] hover:bg-[#d4a017]/20" : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
-              )}
-            >
-              <HelpCircle size={18} className="group-hover:rotate-12 transition-transform" />
-              <span className="hidden lg:inline">Poser une question</span>
-            </Button>
-          )} */}
-
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             onClick={() => setIsNightMode(!isNightMode)}
             variant="outline"
-            className={cn(
-              "rounded-2xl border-none h-10 md:h-12 px-3 md:px-5 gap-3 text-xs font-black uppercase tracking-widest transition-all shadow-sm",
-              isNightMode ? "bg-white/5 text-laha-gold hover:bg-white/10" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            )}
+            className="inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-navy-hover h-9 px-3 text-xs font-semibold bg-navy-dark text-gold hover:bg-navy cursor-pointer min-h-[36px]"
           >
-            {isNightMode ? <Sun size={18} /> : <Moon size={18} />}
-            <span className="hidden md:inline">{isNightMode ? "Mode Jour" : "Mode Nuit"}</span>
+            {isNightMode ? <Sun size={15} /> : <Moon size={15} />}
+            <span className="hidden md:inline">{isNightMode ? "Jour" : "Nuit"}</span>
           </Button>
 
           <Button
@@ -786,33 +774,29 @@ export default function DocumentReaderPage() {
               })
             }}
             disabled={isSaving}
-            className="bg-laha-gold text-laha-black font-black uppercase text-[10px] md:text-xs tracking-widest h-10 md:h-12 px-4 md:px-8 rounded-2xl shadow-xl shadow-laha-gold/20 hover:scale-105 transition-transform active:scale-95 shrink-0"
+            className="inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap bg-gold text-navy font-bold text-xs h-9 px-3.5 rounded-lg hover:bg-gold-hover transition-colors shrink-0 cursor-pointer min-h-[36px]"
           >
-            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={isMobile ? 16 : 18} />}
-            <span className="ml-2 hidden sm:inline">Sauvegarder</span>
+            {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            <span className="hidden sm:inline">Sauvegarder</span>
           </Button>
 
-          {/* 🔊 Lire à voix haute (TTS) - visible si le livre a un fichier PDF (exclut Word/Excel) */}
+          {/* 🔊 Lire à voix haute (TTS) */}
           {book.file && !book.file.match(/\.(docx|doc|pptx|ppt|xlsx|xls)$/i) && (
             <Button
               onClick={handleTtsToggle}
               disabled={isFetchingTtsText}
               variant="outline"
               className={cn(
-                "rounded-2xl border-2 h-10 md:h-12 px-3 md:px-5 gap-2 text-[10px] font-black uppercase tracking-widest transition-all",
-                isTtsActive
-                  ? "border-blue-500 text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 animate-pulse"
-                  : isNightMode
-                    ? "border-white/20 text-white/60 bg-white/5 hover:bg-white/10 hover:border-white/40"
-                    : "border-gray-300 text-gray-600 bg-gray-50 hover:bg-gray-100"
+                "inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-navy-hover h-9 px-3 text-xs font-semibold bg-navy-dark text-gold hover:bg-navy cursor-pointer min-h-[36px]",
+                isTtsActive && "border-gold bg-gold text-navy font-bold"
               )}
             >
               {isFetchingTtsText
-                ? <Loader2 size={18} className="animate-spin" />
-                : <Headphones size={18} />
+                ? <Loader2 size={15} className="animate-spin" />
+                : <Headphones size={15} />
               }
               <span className="hidden md:inline">
-                {isTtsActive ? 'Arrêter' : 'Lire à voix haute'}
+                {isTtsActive ? 'Arrêter' : 'Lecture Vocale'}
               </span>
             </Button>
           )}
@@ -821,13 +805,10 @@ export default function DocumentReaderPage() {
             <Button
               onClick={() => setIsImmersionMode(true)}
               variant="outline"
-              className={cn(
-                "rounded-2xl border-2 h-12 px-6 gap-3 text-xs font-black uppercase tracking-widest transition-all",
-                isNightMode ? "border-laha-gold/50 text-laha-gold bg-laha-gold/10 hover:bg-laha-gold/20" : "border-laha-gold text-laha-gold bg-laha-gold/5 hover:bg-laha-gold/10"
-              )}
+              className="inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-navy-hover bg-gold text-navy font-bold hover:bg-gold-hover h-9 px-3.5 text-xs transition-colors cursor-pointer min-h-[36px]"
             >
-              <LayoutGrid size={18} />
-              <span className="hidden md:inline">Mode Immersion</span>
+              <LayoutGrid size={15} />
+              <span className="hidden md:inline">Mode Immersion 3D</span>
             </Button>
           )}
 
@@ -836,48 +817,24 @@ export default function DocumentReaderPage() {
               onClick={() => setIsQuizOverlayOpen(true)}
               variant="outline"
               className={cn(
-                "rounded-2xl border-2 h-10 md:h-12 px-4 md:px-6 gap-3 text-[10px] font-black uppercase tracking-widest transition-all",
+                "inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border h-9 px-3.5 text-xs font-bold transition-colors cursor-pointer min-h-[36px]",
                 isQuizValidated
-                  ? "border-emerald-500/50 text-emerald-500 bg-emerald-500/10"
-                  : "border-laha-gold text-laha-black bg-laha-gold hover:bg-yellow-400"
+                  ? "border-success text-success bg-success/10"
+                  : "border-gold text-navy bg-gold hover:bg-gold-hover"
               )}
             >
-              <CheckCircle2 size={18} />
-              <span className="hidden lg:inline">{isQuizValidated ? "Lecture Validée" : "Valider ma lecture"}</span>
+              <CheckCircle2 size={15} />
+              <span className="hidden lg:inline">{isQuizValidated ? "Validée" : "Quiz"}</span>
             </Button>
           )}
         </div>
-
       </header>
-
-      {/* Instruction Banner - User Guide */}
-      <div className={cn(
-        "py-2 px-4 md:px-6 border-b text-[9px] md:text-[10px] font-bold text-center uppercase tracking-[0.2em] relative z-50",
-        isNightMode ? "bg-laha-gold/5 text-laha-gold/50 border-white/5" : "bg-laha-gold/10 text-laha-gold border-laha-gold/10"
-      )}>
-        {isMobile && isImmersionMode ? (
-          <span className="text-laha-gold font-black italic">Mode immersion disponible sur tablette et desktop</span>
-        ) : (
-          <div className="flex items-center justify-center flex-wrap gap-2">
-            <span className="hidden xs:inline">Mode Immersion</span>
-            <span className="hidden xs:inline opacity-30">·</span>
-            <span className="hidden sm:inline">Outils :</span>
-            <span className="flex items-center gap-1.5"><span className="text-laha-gold font-black">H</span> Surligner</span>
-            <span className="opacity-30">·</span>
-            <span className="flex items-center gap-1.5"><span className="text-laha-gold font-black">U</span> Souligner</span>
-            <span className="opacity-30">·</span>
-            <span className="flex items-center gap-1.5"><span className="text-laha-gold font-black">N</span> Annoter</span>
-            <span className="hidden xs:inline opacity-30">·</span>
-            <span className="hidden xs:flex items-center gap-1.5"><span className="text-laha-gold font-black">R</span> Lecture</span>
-          </div>
-        )}
-      </div>
 
       {/* Reader Area */}
       <main
         onWheel={handleWheel}
         className={cn(
-          "laha-reader-zone flex-1 relative overflow-hidden",
+          "laha-reader-zone flex-1 relative overflow-hidden bg-navy-dark",
           isNightMode && "reader-night-mode"
         )}
       >
@@ -894,7 +851,7 @@ export default function DocumentReaderPage() {
             const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(absoluteFileUrl)}`;
             
             return (
-              <div className="h-full w-full bg-white flex items-center justify-center">
+              <div className="h-full w-full bg-navy-dark flex items-center justify-center">
                 <iframe 
                   src={officeUrl} 
                   className="w-full h-full border-none"
@@ -908,22 +865,21 @@ export default function DocumentReaderPage() {
           return (
             <PdfWorker workerUrl="/pdf.worker.min.js">
               {!effectiveImmersionMode && rawPdfData && (
-                <div className="h-full">
+                <div className="h-full bg-navy-dark">
                   <Viewer
-                    fileUrl={typeof rawPdfData === 'string' ? rawPdfData : new Uint8Array(rawPdfData.slice(0))}
+                    fileUrl={rawPdfData}
                     plugins={[
                       defaultLayoutPluginInstance,
                       highlightPluginInstance,
-                      pageNavigationPluginInstance
                     ]}
                     theme={isNightMode ? 'dark' : 'light'}
                     localization={(fr_FR_Locale as any)}
                     initialPage={currentPage}
                     onPageChange={handlePageChange}
                     onDocumentLoad={handleDocumentLoad}
-                    viewMode={isMobile ? ViewMode.SinglePage : viewMode}
+                    viewMode={ViewMode.SinglePage}
                     defaultScale={SpecialZoomLevel.PageFit}
-                    scrollMode={ScrollMode.Page}
+                    scrollMode={ScrollMode.Vertical}
                     transformGetDocumentParams={transformPdfGetDocumentParams}
                     setRenderRange={setViewerRenderRange}
                   />
@@ -938,7 +894,7 @@ export default function DocumentReaderPage() {
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="w-full max-w-sm aspect-[2/3] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-laha-gold/20 relative"
+                className="w-full max-w-sm aspect-[2/3] rounded-2xl overflow-hidden shadow-xl border border-navy-hover relative"
               >
                 <img
                   src={book.cover_image || book.thumbnail_url}
@@ -946,19 +902,19 @@ export default function DocumentReaderPage() {
                   className="w-full h-full object-cover"
                   onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=600&h=900&auto=format&fit=crop"; }}
                 />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-sm opacity-0 hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute inset-0 bg-navy/80 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
                   <Button
                     onClick={toggleAudio}
-                    className="w-24 h-24 rounded-full bg-laha-gold text-black hover:scale-110 transition-transform shadow-2xl"
+                    className="w-20 h-20 rounded-full bg-gold text-navy hover:scale-105 transition-transform shadow-lg"
                   >
-                    {isAudioPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" className="ml-2" />}
+                    {isAudioPlaying ? <Pause size={40} fill="currentColor" /> : <Play size={40} fill="currentColor" className="ml-1" />}
                   </Button>
                 </div>
               </motion.div>
 
               <div className="text-center space-y-2">
-                <h2 className="text-3xl font-black uppercase italic tracking-tighter text-foreground">{book.title}</h2>
-                <p className="text-laha-gold font-black uppercase text-xs tracking-widest italic">{book.author_name || "Auteur Laha"}</p>
+                <h2 className="text-2xl font-bold uppercase font-serif text-gold">{book.title}</h2>
+                <p className="text-white/60 font-medium text-xs tracking-wider">{book.author_name || "Auteur Laha"}</p>
               </div>
             </div>
           )}
@@ -973,303 +929,156 @@ export default function DocumentReaderPage() {
             ${isNightMode ? 'filter: invert(0.9) hue-rotate(180deg) brightness(0.8) contrast(1.2) !important;' : ''}
           }
           .rpv-core__viewer {
-            background-color: ${isNightMode ? '#050505' : '#f3f4f6'} !important;
+            background-color: #0F1A33 !important;
           }
           .rpv-core__inner-pages {
-            background-color: ${isNightMode ? '#050505' : '#f3f4f6'} !important;
+            padding: 1.5rem 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
           }
-          /* Allow selection only for highlight plugin areas if needed, but here we block copy event globally */
+          .rpv-core__page-layer {
+            margin-bottom: 2rem !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+            border-radius: 4px !important;
+          }
+          /* Toolbar and Reader Theme - Clean & Sober */
+          .rpv-default-layout__toolbar {
+            background-color: #1B2A4E !important;
+            border-bottom: 1px solid #2E3F66 !important;
+            color: #E2E8F0 !important;
+          }
+          .rpv-core__button,
+          .rpv-core__icon,
+          .rpv-default-layout__toolbar button,
+          .rpv-default-layout__sidebar-header,
+          .rpv-default-layout__sidebar-headers button {
+            color: #CBD5E1 !important;
+            background: transparent !important;
+            border-radius: 6px !important;
+          }
+          .rpv-core__button:hover,
+          .rpv-default-layout__toolbar button:hover,
+          .rpv-default-layout__sidebar-header:hover,
+          .rpv-default-layout__sidebar-header--selected,
+          .rpv-default-layout__sidebar-headers button:hover {
+            color: #D4A017 !important;
+            background-color: #0F1A33 !important;
+          }
+          .rpv-core__textbox {
+            background-color: #0F1A33 !important;
+            border: 1px solid #2E3F66 !important;
+            color: #FFFFFF !important;
+            border-radius: 6px !important;
+            text-align: center !important;
+            font-weight: bold !important;
+          }
+          .rpv-default-layout__sidebar {
+            background-color: #1B2A4E !important;
+            border-right: 1px solid #2E3F66 !important;
+            color: #E2E8F0 !important;
+          }
+          .rpv-default-layout__sidebar-headers {
+            background-color: #0F1A33 !important;
+            border-bottom: 1px solid #2E3F66 !important;
+          }
+          .rpv-default-layout__sidebar-header {
+            color: #94A3B8 !important;
+          }
+          .rpv-default-layout__sidebar-header--selected {
+            color: #D4A017 !important;
+            border-bottom: 2px solid #D4A017 !important;
+          }
+          .rpv-core__popover-body {
+            background-color: #1B2A4E !important;
+            border: 1px solid #2E3F66 !important;
+            color: #FFFFFF !important;
+            border-radius: 8px !important;
+          }
+          .rpv-core__menu {
+            background-color: #1B2A4E !important;
+            color: #FFFFFF !important;
+          }
+          .rpv-core__menu-item {
+            color: #E2E8F0 !important;
+          }
+          .rpv-core__menu-item:hover {
+            background-color: #0F1A33 !important;
+            color: #D4A017 !important;
+          }
           .rpv-core__text-layer {
             user-select: text !important;
           }
         `}</style>
       </main>
 
-      {/* Floating Audio Player & Progress Tracker */}
-      <div className={cn(
-        "fixed z-[1001] transition-all duration-500 flex flex-col gap-4 pointer-events-auto",
-        isMobile
-          ? "bottom-[calc(2rem+env(safe-area-inset-bottom))] right-4 items-end"
-          : "bottom-10 right-10 items-end"
-      )}>
-        {hasAudio && (
-          <motion.div
-            initial={{ x: 100, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            className={cn(
-              "bg-[#0f1115] border border-white/10 rounded-[2rem] shadow-2xl flex items-center gap-4 ring-1 ring-white/5 p-3 overflow-hidden",
-              !isMobile && "min-w-[300px]"
-            )}
-          >
-            <Button
-              onClick={toggleAudio}
-              className="h-12 w-12 rounded-2xl bg-laha-gold text-laha-black hover:scale-105 transition-transform shrink-0"
-            >
-              {isAudioPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
-            </Button>
-
-            {!isMobile && (
-              <div className="flex-1 space-y-2 pr-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-[9px] font-black uppercase text-laha-gold tracking-widest italic">Image et Description</p>
-                  <p className="text-[9px] font-bold text-white/30">
-                    {Math.floor(audioProgress / 60)}:{(audioProgress % 60).toFixed(0).padStart(2, '0')} / {Math.floor(audioDuration / 60)}:{(audioDuration % 60).toFixed(0).padStart(2, '0')}
-                  </p>
-                </div>
-                <div
-                  className="h-2 w-full bg-white/5 rounded-full overflow-hidden cursor-pointer group/bar relative"
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect()
-                    const x = e.clientX - rect.left
-                    const percentage = Math.max(0, Math.min(1, x / rect.width))
-                    handleSeek(percentage)
-                  }}
-                >
-                  <div
-                    className="h-full bg-laha-gold shadow-[0_0_8px_rgba(212,160,23,0.3)] transition-all duration-300"
-                    style={{ width: `${(audioProgress / audioDuration) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            <Button
-              onClick={toggleMute}
-              variant="ghost"
-              className="h-10 w-10 rounded-xl text-white/40 hover:text-white"
-            >
-              {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-            </Button>
-            <Button
-              onClick={togglePlaybackRate}
-              variant="ghost"
-              className="h-10 px-2 rounded-xl text-laha-gold text-[10px] font-black hover:bg-white/5"
-            >
-              {playbackRate}x
-            </Button>
-          </motion.div>
-        )}
-
-        {/* 🔊 Floating TTS Player Bar (like Edge Read Aloud) */}
-        <AnimatePresence>
-          {isTtsActive && (
-            <motion.div
-              initial={{ y: 80, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 80, opacity: 0 }}
-              className="relative"
-            >
-              {/* Voice Picker Panel (appears above the bar) */}
-              <AnimatePresence>
-                {showVoicePicker && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.97 }}
-                    className={cn(
-                      "absolute w-[300px] max-h-[420px] overflow-y-auto bg-[#0b1018] border border-blue-500/20 rounded-[1.75rem] shadow-2xl shadow-blue-900/30 p-4 space-y-4 z-50",
-                      isMobile ? "right-0 bottom-full mb-3 origin-bottom-right" : "right-full mr-4 bottom-0 origin-bottom-right"
-                    )}
-                  >
-                    <div className="flex items-center justify-between px-1">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Sélecteur de voix</p>
-                      <button onClick={() => setShowVoicePicker(false)} className="text-white/30 hover:text-white transition-colors">
-                        <X size={14} />
-                      </button>
-                    </div>
-
-                    {/* FR voices */}
-                    {categorizedVoices.fr.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[9px] font-black uppercase text-white/20 tracking-widest px-1">🇫🇷 Français</p>
-                        <div className="grid grid-cols-1 gap-1">
-                          {categorizedVoices.fr.map((voice: any) => (
-                            <button
-                              key={voice.voiceURI}
-                              onClick={() => selectVoice(voice)}
-                              className={cn(
-                                "w-full text-left px-3 py-2 rounded-xl text-[11px] font-semibold flex items-center justify-between gap-2 transition-all",
-                                ttsVoice?.voiceURI === voice.voiceURI
-                                  ? "bg-blue-500/25 border border-blue-500/40 text-blue-300"
-                                  : "bg-white/5 border border-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-                              )}
-                            >
-                            <span className="truncate">{voice.name}</span>
-                              <span className="shrink-0 text-[10px] opacity-70">{categorizedVoices.tagVoice(voice)}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* EN voices */}
-                    {categorizedVoices.en.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[9px] font-black uppercase text-white/20 tracking-widest px-1">🇬🇧 English</p>
-                        <div className="grid grid-cols-1 gap-1">
-                          {categorizedVoices.en.map((voice: any) => (
-                            <button
-                              key={voice.voiceURI}
-                              onClick={() => selectVoice(voice)}
-                              className={cn(
-                                "w-full text-left px-3 py-2 rounded-xl text-[11px] font-semibold flex items-center justify-between gap-2 transition-all",
-                                ttsVoice?.voiceURI === voice.voiceURI
-                                  ? "bg-blue-500/25 border border-blue-500/40 text-blue-300"
-                                  : "bg-white/5 border border-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-                              )}
-                            >
-                              <span className="truncate">{voice.name}</span>
-                              <span className="shrink-0 text-[10px] opacity-70">{categorizedVoices.tagVoice(voice)}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Other voices */}
-                    {categorizedVoices.others.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[9px] font-black uppercase text-white/20 tracking-widest px-1">🌐 Autres langues</p>
-                        <div className="grid grid-cols-1 gap-1">
-                          {categorizedVoices.others.map((voice: any) => (
-                            <button
-                              key={voice.voiceURI}
-                              onClick={() => selectVoice(voice)}
-                              className={cn(
-                                "w-full text-left px-3 py-2 rounded-xl text-[11px] font-semibold flex items-center justify-between gap-2 transition-all",
-                                ttsVoice?.voiceURI === voice.voiceURI
-                                  ? "bg-blue-500/25 border border-blue-500/40 text-blue-300"
-                                  : "bg-white/5 border border-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-                              )}
-                            >
-                              <span className="truncate">{voice.name.replace(/Microsoft |Google /, '')}</span>
-                              <span className="shrink-0 text-[9px] text-white/30">{voice.lang}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {(categorizedVoices.fr.length + categorizedVoices.en.length + categorizedVoices.others.length) === 0 && (
-                      <p className="text-center text-white/30 text-[11px] italic py-4">Aucune voix disponible sur cet appareil.</p>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Main TTS bar */}
-              <motion.div
-                className={cn(
-                  "bg-[#0d1117] border border-blue-500/30 rounded-[2rem] shadow-2xl shadow-blue-500/10 flex gap-3 ring-1 ring-blue-500/20",
-                  isMobile ? "flex-row items-center p-3" : "flex-col items-center p-3 w-16"
-                )}
-              >
-                {/* Blue animated indicator */}
-                <div className="relative shrink-0">
-                  <div className="h-10 w-10 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
-                    <Headphones size={18} className="text-blue-400" />
-                  </div>
-                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-blue-500 animate-ping" />
-                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-blue-500" />
-                </div>
-
-                {/* Texte masqué sur desktop pour garder le format vertical fin */}
-                {isMobile && (
-                  <div className="flex-1 space-y-0.5 min-w-0">
-                    <p className="text-[9px] font-black uppercase text-blue-400 tracking-widest">Lecture vocale</p>
-                    <p className="text-[10px] text-white/50 font-semibold truncate">
-                      {ttsVoice ? ttsVoice.name : 'Nova (OpenAI)'}
-                    </p>
-                  </div>
-                )}
-
-                {/* Voice picker toggle */}
-                <Button
-                  onClick={() => setShowVoicePicker((v: boolean) => !v)}
-                  variant="ghost"
-                  title="Changer de voix"
-                  className={cn(
-                    "h-10 w-10 rounded-xl transition-all",
-                    showVoicePicker
-                      ? "bg-blue-500/30 text-blue-300 border border-blue-500/40"
-                      : "text-blue-400/60 hover:text-blue-400 hover:bg-blue-500/10"
-                  )}
-                >
-                  <Mic2 size={16} />
-                </Button>
-
-                {/* Pause / Resume */}
-                <Button
-                  onClick={pauseResumeTts}
-                  className="h-10 w-10 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30"
-                  variant="ghost"
-                >
-                  {isTtsPaused ? <Play size={18} className="ml-0.5" fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
-                </Button>
-
-                {/* Pitch */}
-                <Button
-                  onClick={() => {
-                    const pitches = [0.5, 0.75, 1, 1.25, 1.5, 2]
-                    const nextPitch = pitches[(pitches.indexOf(ttsPitch) + 1) % pitches.length]
-                    setTtsPitch(nextPitch)
-                  }}
-                  variant="ghost"
-                  title="Tonalité de la voix"
-                  className="h-10 w-10 p-0 flex flex-col items-center justify-center rounded-xl text-blue-400 hover:bg-blue-500/10"
-                >
-                  <Music size={12} className="mb-0.5" />
-                  <span className="text-[8px] font-black leading-none">{ttsPitch}x</span>
-                </Button>
-
-                {/* Speed */}
-                <Button
-                  onClick={() => {
-                    const rates = [0.75, 1, 1.25, 1.5, 2]
-                    const nextRate = rates[(rates.indexOf(ttsRate) + 1) % rates.length]
-                    setTtsRate(nextRate)
-                  }}
-                  variant="ghost"
-                  className="h-10 w-10 p-0 flex items-center justify-center rounded-xl text-blue-400 text-[10px] font-black hover:bg-blue-500/10"
-                >
-                  {ttsRate}x
-                </Button>
-
-                {/* Stop */}
-                <Button
-                  onClick={() => { stopTts(); setShowVoicePicker(false) }}
-                  variant="ghost"
-                  className="h-10 w-10 rounded-xl text-red-400/70 hover:text-red-400 hover:bg-red-500/10"
-                >
-                  <StopCircle size={18} />
-                </Button>
-              </motion.div>
-            </motion.div>
+      {/* ── Mode Normal Floating Widgets (Compact & Refined) ── */}
+      {/* Left: Floating Progression Badge */}
+      <div className="fixed bottom-6 left-12 z-40 bg-navy border border-navy-hover rounded-xl shadow-lg px-3.5 py-2 text-white flex items-center gap-3 select-none">
+        <Bookmark size={16} className="text-gold" />
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <span className="text-gold font-mono font-bold text-xs">
+              Page {currentPage + 1} / {totalPages}
+            </span>
+            <span className="text-white/60 text-[10px] font-mono">
+              ({totalPages > 0 ? Math.round(((currentPage + 1) / totalPages) * 100) : 0}%)
+            </span>
+          </div>
+          {totalPages > 0 && (
+            <div className="h-1 w-20 bg-navy-dark rounded-full overflow-hidden border border-navy-hover">
+              <div
+                className="h-full bg-gold transition-all duration-300"
+                style={{ width: `${((currentPage + 1) / totalPages) * 100}%` }}
+              />
+            </div>
           )}
-        </AnimatePresence>
-
-        {book.file && !effectiveImmersionMode && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className={cn(
-              "bg-[#0f1115] border border-white/10 rounded-[2rem] shadow-2xl flex items-center gap-4 ring-1 ring-white/5",
-              isMobile ? "p-3 pr-5" : "p-5"
-            )}
-          >
-            <div className={cn(
-              "rounded-2xl bg-laha-gold flex items-center justify-center text-laha-black shrink-0",
-              isMobile ? "h-10 w-10" : "h-12 w-12"
-            )}>
-              <Bookmark size={isMobile ? 20 : 24} />
-            </div>
-            <div className="space-y-0.5">
-              <p className="text-[9px] font-black uppercase text-white/40 tracking-[0.2em] leading-none">Progression</p>
-              <p className="text-xs md:text-sm font-black text-white">Page {currentPage + 1}</p>
-            </div>
-          </motion.div>
-        )}
+        </div>
       </div>
+
+      {/* Right: Floating Audio Player (if available) */}
+      {hasAudio && (
+        <div className="fixed bottom-6 right-6 z-40 bg-navy border border-navy-hover rounded-xl shadow-lg px-3.5 py-2 text-white flex items-center gap-3 select-none">
+          <button
+            type="button"
+            onClick={toggleAudio}
+            className="h-8 w-8 rounded-lg bg-gold text-navy hover:bg-gold-hover flex items-center justify-center cursor-pointer shrink-0"
+          >
+            {isAudioPlaying ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
+          </button>
+          <div className="space-y-0.5">
+            <p className="text-[10px] font-mono font-bold text-gold uppercase tracking-wider">Narration</p>
+            <div
+              className="h-1 w-24 md:w-32 bg-navy-dark rounded-full overflow-hidden border border-navy-hover cursor-pointer"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect()
+                const x = e.clientX - rect.left
+                const percentage = Math.max(0, Math.min(1, x / rect.width))
+                handleSeek(percentage)
+              }}
+            >
+              <div
+                className="h-full bg-gold transition-all duration-300"
+                style={{ width: `${audioDuration > 0 ? (audioProgress / audioDuration) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={togglePlaybackRate}
+            className="text-[10px] font-mono font-bold text-gold px-1.5 py-0.5 rounded bg-navy-dark hover:bg-navy border border-navy-hover cursor-pointer"
+          >
+            {playbackRate}x
+          </button>
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="text-white/60 hover:text-white cursor-pointer"
+          >
+            {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+          </button>
+        </div>
+      )}
 
       <AnimatePresence>
         {isQuestionModalOpen && isStudent && (
@@ -1282,61 +1091,7 @@ export default function DocumentReaderPage() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {effectiveImmersionMode && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1 }}
-            className="fixed inset-0 z-[1000]"
-          >
-            <FlipBookReader
-              fileUrl={rawPdfData ? (typeof rawPdfData === 'string' ? rawPdfData : new Uint8Array(rawPdfData.slice(0))) : new Uint8Array(0)}
-              bookId={id as string}
-              initialPage={currentPage}
-              isMobile={isMobile}
-              initialAnnotations={(notes as any[]).filter(n => n.rect).map((n: any): FlipBookAnnotation => ({
-                id: n.id,
-                page: n.page ?? 0,
-                type: n.type ?? 'highlight',
-                rect: n.rect,
-                color: n.color ?? 'rgba(255,215,0,0.45)',
-                content: n.content,
-              }))}
-              onPageChange={(p: any) => {
-                setCurrentPage(p)
-              }}
-              onClose={() => setIsImmersionMode(false)}
-              onAskQuestion={isStudent ? () => setIsQuestionModalOpen(true) : undefined}
-              authorName={book.author_name}
-              // Audio Props
-              hasAudio={hasAudio}
-              isAudioPlaying={isAudioPlaying}
-              onToggleAudio={toggleAudio}
-              onToggleMute={toggleMute}
-              isMuted={isMuted}
-              playbackRate={playbackRate}
-              onTogglePlaybackRate={togglePlaybackRate}
-              audioProgress={audioProgress}
-              audioDuration={audioDuration}
-              onSeek={handleSeek}
-              // TTS (Read Aloud) Props
-              isTtsActive={isTtsActive}
-              isTtsPaused={isTtsPaused}
-              isFetchingTtsText={isFetchingTtsText}
-              onToggleTts={handleTtsToggle}
-              onPauseResumeTts={pauseResumeTts}
-              onStopTts={stopTts}
-              ttsRate={ttsRate}
-              onToggleTtsRate={() => {
-                const rates = [0.75, 1, 1.25, 1.5, 2]
-                const nextRate = rates[(rates.indexOf(ttsRate) + 1) % rates.length]
-                setTtsRate(nextRate)
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+
 
       <AnimatePresence>
         {isQuizOverlayOpen && (
@@ -1344,7 +1099,7 @@ export default function DocumentReaderPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[10001] bg-[#0B0F19]/95 backdrop-blur-3xl"
+            className="fixed inset-0 z-[10001] bg-navy-dark"
           >
             <FlipBookQuiz
               bookId={id as string}

@@ -1,8 +1,6 @@
-"use client";
-
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import { libraryApi } from "@/lib/services/library";
+import { libraryApi } from "@/lib/api";
 
 export function useAnnotations(bookId: string | undefined) {
   const [notes, setNotes] = useState<any[]>([]);
@@ -11,7 +9,7 @@ export function useAnnotations(bookId: string | undefined) {
     if (!id || typeof id !== 'string') return;
     try {
       const res = await libraryApi.getAnnotations(id);
-      const rawData = Array.isArray(res) ? res : ((res as any)?.results || []);
+      const rawData = Array.isArray(res) ? res : (res?.results || []);
       const data = Array.isArray(rawData) ? rawData : [];
 
       setNotes(data.map((n: any) => ({
@@ -21,7 +19,7 @@ export function useAnnotations(bookId: string | undefined) {
         quote: n.data?.quote || "",
         type: n.data?.type || 'highlight',
         rect: n.data?.rect || null,
-        color: n.data?.color || 'rgba(212,175,55,0.45)',
+        color: n.data?.color || 'rgba(255,215,0,0.45)',
         page: n.data?.page ?? (n.data?.highlightAreas?.[0]?.pageIndex ?? 0),
       })));
     } catch (err) {
@@ -35,6 +33,7 @@ export function useAnnotations(bookId: string | undefined) {
   }, [bookId, fetchAnnotations]);
 
   const handleDeleteAnnotation = async (noteId: string) => {
+    if (!confirm("Supprimer cette annotation ?")) return;
     try {
       await libraryApi.deleteAnnotation(noteId);
       setNotes(prev => prev.filter(n => n.id !== noteId));
@@ -53,6 +52,7 @@ export function useAnnotations(bookId: string | undefined) {
           quote: props.selectedText,
           highlightAreas: props.highlightAreas,
         },
+        color: 'gold'
       };
       const saved = await libraryApi.saveAnnotation(annotation);
       setNotes(prev => [...prev, {

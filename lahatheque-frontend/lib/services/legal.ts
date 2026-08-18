@@ -90,7 +90,7 @@ export async function createLegalContract(data: Partial<LegalContract>): Promise
     type: data.type || "author_contract",
     signed_at: data.signed_at || new Date().toISOString(),
     expires_at: data.expires_at,
-    file_url: data.file_url || "/mock/contracts/document-sample.pdf",
+    file_url: data.file_url || "/PromptBreeder_Original_Paper-2309.16797v1.pdf",
     file_name: data.file_name || "Contrat_Legal_Signed.pdf",
     file_size: data.file_size || 2500000,
     tags: data.tags || ["contrat"],
