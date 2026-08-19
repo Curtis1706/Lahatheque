@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'apps.ai_engine',
     'apps.audio',
     'apps.reporting',
+    'apps.reader',
 ]
 
 MIDDLEWARE = [
@@ -186,4 +187,12 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# ── DRM & Protection Configuration ───────────────────────────────────────────
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
+DRM_DERIVED_CACHE_DIR = config('DRM_DERIVED_CACHE_DIR', default=str(BASE_DIR / 'var' / 'drm_cache'))
+DRM_DERIVED_CACHE_TTL_HOURS = config('DRM_DERIVED_CACHE_TTL_HOURS', default=24, cast=int)
+DRM_WATERMARK_DEFAULT_OPACITY = 0.20
+DRM_MAX_REMOTE_FILE_SIZE_MB = 200
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+

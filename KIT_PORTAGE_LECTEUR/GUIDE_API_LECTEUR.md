@@ -6,8 +6,8 @@
 >
 > **Fournisseur (Provider)** : **LAHAThèque (`lahatheque.com`)**.
 
-**Version du document** : 2.0 — Août 2026  
-**Statut** : Validé pour implémentation  
+**Version du document** : 2.0 — Août 2026
+**Statut** : Validé pour implémentation
 
 ---
 
@@ -36,6 +36,7 @@
 ## 1. Résumé exécutif & Principes Fondateurs
 
 Le lecteur de documents de **LAHAThèque** combine :
+
 - Un **mode Immersion 3D** haut de gamme (tournage interactif des pages, zoom dynamique, flèches, outils de surlignage/soulignage/notes contextuelles, gomme, barre latérale d'annotations).
 - Un **mode Normal** avec défilement vertical page par page fluide, pagination fine, recherche textuelle, rotation et outils documentaires.
 - Un **moteur audio & TTS** intégré (lecture vocale multilingue avec gestion des vitesses `0.75x` à `2x`, synchronisation).
@@ -48,13 +49,14 @@ L'API Lecteur Hébergé permet à tout éditeur, école, université ou entrepri
 
 ## 2. Pourquoi le modèle « Page Hébergée + Redirection »
 
-| Critère | Package NPM / SDK Front | Iframe Embarquée | Page Hébergée (Redirect LAHAThèque) |
-| :--- | :--- | :--- | :--- |
-| **Compatibilité stacks** | ❌ JS/React uniquement | ⚠️ Vulnérable (cookies tiers) | ✅ **100% Universel (PHP, Python, Laravel, Symfony, Mobile...)** |
-| **Rendu 3D & Animations** | ⚠️ Instable selon le bundle | ⚠️ Conflits CSS / redimensionnement | ✅ **Optimal, plein écran natif** |
-| **Protection DRM & Fichiers** | ❌ Fichier exposé côté client | ⚠️ Fuites d'URL | ✅ **100% Sécurisé côté LAHAThèque (aucun PDF brut exposé)** |
-| **Personnalisation Design** | ⚠️ À coder chez le client | ❌ Complexe à styliser | ✅ **Pilotée proprement par l'API JSON (couleurs, logos)** |
-| **Maintenance & Mises à jour** | ❌ Nécessite republication | ⚠️ Partielle | ✅ **Transparente et centralisée chez LAHAThèque** |
+
+| Critère                        | Package NPM / SDK Front          | Iframe Embarquée                     | Page Hébergée (Redirect LAHAThèque)                            |
+| :-------------------------------- | :--------------------------------- | :-------------------------------------- | :------------------------------------------------------------------ |
+| **Compatibilité stacks**       | ❌ JS/React uniquement           | ⚠️ Vulnérable (cookies tiers)      | ✅**100% Universel (PHP, Python, Laravel, Symfony, Mobile...)**   |
+| **Rendu 3D & Animations**       | ⚠️ Instable selon le bundle    | ⚠️ Conflits CSS / redimensionnement | ✅**Optimal, plein écran natif**                                 |
+| **Protection DRM & Fichiers**   | ❌ Fichier exposé côté client | ⚠️ Fuites d'URL                     | ✅**100% Sécurisé côté LAHAThèque (aucun PDF brut exposé)** |
+| **Personnalisation Design**     | ⚠️ À coder chez le client     | ❌ Complexe à styliser               | ✅**Pilotée proprement par l'API JSON (couleurs, logos)**        |
+| **Maintenance & Mises à jour** | ❌ Nécessite republication      | ⚠️ Partielle                        | ✅**Transparente et centralisée chez LAHAThèque**               |
 
 ---
 
@@ -153,6 +155,7 @@ grant_type=client_credentials
 ```
 
 **Réponse 200 OK** :
+
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5c...",
@@ -241,6 +244,7 @@ Content-Type: application/json
 ```
 
 **Réponse 201 Created** :
+
 ```json
 {
   "success": true,
@@ -273,6 +277,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Réponse 200 OK** :
+
 ```json
 {
   "success": true,
@@ -319,6 +324,7 @@ Authorization: Bearer <access_token>
 LAHAThèque notifie le serveur partenaire en temps réel à chaque étape clé.
 
 #### En-têtes HTTP envoyés :
+
 - `X-Lahatheque-Event` : Type d'événement (`reader.session.opened`, `reader.progress.updated`, `reader.quiz.completed`, `reader.session.finished`).
 - `X-Lahatheque-Delivery` : UUID unique de la notification (idempotence).
 - `X-Lahatheque-Signature` : `t=1755525363,v1=b84e...` (Signature HMAC-SHA256 du timestamp et du payload brut avec le secret du partenaire).
@@ -326,6 +332,7 @@ LAHAThèque notifie le serveur partenaire en temps réel à chaque étape clé.
 #### Exemples de Payloads Webhook :
 
 **1. Événement `reader.progress.updated`** :
+
 ```json
 {
   "event_id": "evt_7f18b320d",
@@ -346,6 +353,7 @@ LAHAThèque notifie le serveur partenaire en temps réel à chaque étape clé.
 ```
 
 **2. Événement `reader.quiz.completed`** :
+
 ```json
 {
   "event_id": "evt_91b7d812a",
@@ -376,16 +384,17 @@ LAHAThèque notifie le serveur partenaire en temps réel à chaque étape clé.
 
 L'API permet de redéfinir dynamiquement l'habillage visuel du lecteur hébergé :
 
-| Propriété | Type | Description | Valeur par défaut |
-| :--- | :--- | :--- | :--- |
-| `brand_name` | string | Titre affiché dans l'en-tête du lecteur | `"LAHAThèque"` |
-| `brand_logo_url` | string | URL du logo du partenaire (hauteur 32px max) | Logo LAHAThèque |
-| `primary_color` | string (HEX) | Couleur de la barre d'outils et de l'en-tête | `#1B2A4E` (Navy) |
-| `accent_color` | string (HEX) | Couleur d'accentuation des boutons actifs et surbrillances | `#D4A017` (Or) |
-| `background_color` | string (HEX) | Arrière-plan du canvas de lecture et de la page | `#0F1A33` (Navy Sombre) |
-| `text_color` | string (HEX) | Couleur principale des textes | `#FFFFFF` |
-| `border_color` | string (HEX) | Couleur des séparateurs et bordures subtiles | `#2E3F66` |
-| `font_family` | string | Police de caractères (`sans`, `serif`, `mono`) | `"Inter, sans-serif"` |
+
+| Propriété        | Type         | Description                                                | Valeur par défaut      |
+| :------------------- | :------------- | :----------------------------------------------------------- | :------------------------ |
+| `brand_name`       | string       | Titre affiché dans l'en-tête du lecteur                  | `"LAHAThèque"`         |
+| `brand_logo_url`   | string       | URL du logo du partenaire (hauteur 32px max)               | Logo LAHAThèque        |
+| `primary_color`    | string (HEX) | Couleur de la barre d'outils et de l'en-tête              | `#1B2A4E` (Navy)        |
+| `accent_color`     | string (HEX) | Couleur d'accentuation des boutons actifs et surbrillances | `#D4A017` (Or)          |
+| `background_color` | string (HEX) | Arrière-plan du canvas de lecture et de la page           | `#0F1A33` (Navy Sombre) |
+| `text_color`       | string (HEX) | Couleur principale des textes                              | `#FFFFFF`               |
+| `border_color`     | string (HEX) | Couleur des séparateurs et bordures subtiles              | `#2E3F66`               |
+| `font_family`      | string       | Police de caractères (`sans`, `serif`, `mono`)            | `"Inter, sans-serif"`   |
 
 Le front-end injecte ces variables CSS directement à la racine de la session `/read/[token]`.
 
@@ -396,6 +405,7 @@ Le front-end injecte ces variables CSS directement à la racine de la session `/
 Le partenaire peut injecter un questionnaire personnalisé directement lors de la création de session.
 
 ### Fonctionnalités du Quiz :
+
 - **Déclenchement automatique** à la dernière page du document ou via le bouton dédié **Quiz** dans l'en-tête.
 - **Questions à choix unique (QCU) ou choix multiple (QCM)**.
 - **Calcul instantané du score** avec seuil de validation (`passing_score_percent`).
@@ -407,12 +417,14 @@ Le partenaire peut injecter un questionnaire personnalisé directement lors de l
 ## 8. Module Synthèse Vocale (TTS) & Narration Audio
 
 ### 1. Synthèse Vocale (TTS)
+
 - **Voix disponibles** : `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`.
 - **Extraction textuelle sécurisée** page par page.
 - **Gestion des débits** : `0.75x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`.
 - **Mise en cache audio** pour éliminer toute latence lors de lectures répétées.
 
 ### 2. Narration Audio Pré-enregistrée (Audiobook)
+
 - Support des fichiers audio d'accompagnement ou des livres-audio exclusifs.
 - Mini-lecteur audio flottant compact ou intégré dans l'en-tête.
 - Barre de progression audio synchronisable avec les chapitres.
@@ -495,6 +507,7 @@ class ReaderSession(models.Model):
 ## 11. Page Front-End Dédiée `/read/[token]`
 
 Structure dans le front-end Next.js :
+
 ```
 app/
 └── read/
@@ -504,6 +517,7 @@ app/
 ```
 
 La page hébergée fonctionne de manière autonome :
+
 1. Valide le token auprès de l'API.
 2. Injecte les variables CSS du thème (`--color-primary`, `--color-accent`, etc.).
 3. Charge les données de l'ouvrage, les annotations de l'utilisateur, et le Quiz éventuel.
@@ -584,9 +598,9 @@ def get_lahatheque_reader_url(book_id: str, user_id: str, user_name: str) -> str
         "client_secret": "VOTRE_CLIENT_SECRET",
         "scope": "reader:sessions"
     }).json()
-    
+  
     access_token = token_resp["access_token"]
-    
+  
     # 2. Créer la session
     session_resp = requests.post(
         "https://lahatheque.com/api/v1/reader/sessions/",
@@ -602,7 +616,7 @@ def get_lahatheque_reader_url(book_id: str, user_id: str, user_name: str) -> str
             }
         }
     ).json()
-    
+  
     return session_resp["data"]["reader_url"]
 ```
 

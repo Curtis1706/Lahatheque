@@ -5,11 +5,13 @@ const DJANGO_API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:800
 
 async function handleProxy(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const resolvedParams = await params
-  const subPath = resolvedParams.path.join('/')
-  const searchParams = request.nextUrl.search
-  const targetUrl = `${DJANGO_API_URL}/v1/${subPath}/${searchParams}`
+  const rawSubPath = (resolvedParams.path || []).join('/')
+  const cleanSubPath = rawSubPath.replace(/^\/+|\/+$/g, '')
+  const searchParams = request.nextUrl.search || ''
+  const targetUrl = `${DJANGO_API_URL}/v1/${cleanSubPath}/${searchParams}`
 
-  const accessToken = request.cookies.get('laha_access')?.value
+  const accessToken = request.cookies.get('laha_access')?.value || request.cookies.get('access_token')?.value
+  const authHeader = request.headers.get('authorization')
 
   const headers = new Headers()
   const contentType = request.headers.get('content-type')
@@ -18,7 +20,10 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   }
   if (accessToken) {
     headers.set('authorization', `Bearer ${accessToken}`)
+  } else if (authHeader) {
+    headers.set('authorization', authHeader)
   }
+
 
   let body: any = undefined
   if (request.method !== 'GET' && request.method !== 'HEAD') {

@@ -1,8 +1,10 @@
+ 
+
 # Feature Specification: Module 1 - Depot et Validation du Catalogue (Maquettiste & Chef Maquettiste)
 
-**Feature Branch**: `001-depot-validation-maquettiste`  
-**Created**: 2026-08-18  
-**Status**: In Review  
+**Feature Branch**: `001-depot-validation-maquettiste`
+**Created**: 2026-08-18
+**Status**: In Review
 **Source Metier**: Cahier des charges LAHATheque v3.2 (Section 2, Section C), Architecture DRM (`docs/drm/`)
 
 ---
@@ -10,6 +12,7 @@
 ## 1. Resume Executif de la Fonctionnalite
 
 Ce module gere l'entree de tout nouvel ouvrage dans la LAHATheque :
+
 1. Le **Maquettiste** televerse les fichiers sources (PDF, EPUB, pistes audio eventuelles) et l'image de couverture haute resolution, renseigne les metadonnees et beneficie de l'assistance automatique de l'IA (suggestions de resume, discipline, langue, pays et universite/faculte).
 2. Le **Chef Maquettiste** examine les depots en attente, verifie la conformite des fichiers et des metadonnees, et valide ou rejette avec motif.
 3. **Mise en ligne automatique et immediate** : La validation declenche instantanement la publication de l'ouvrage sur la vitrine publique avec chiffrement au repos AES-256-GCM sur Cloudflare R2, creation de la configuration DRM par defaut (`ProtectionConfig`) et disponibilite immediate pour les lecteurs.
@@ -27,6 +30,7 @@ En tant que Maquettiste connecte, je veux deposer les fichiers d'un livre (PDF/E
 **Test d'independance** : Soumission d'un formulaire de depot avec fichier PDF valide et couverture ; verification de la creation d'un enregistrement `OuvrageDepot` au statut `en_attente`.
 
 **Scenarios d'acceptation** :
+
 1. **Etant donne** un utilisateur authentifie avec le role `maquettiste`, **Quand** il soumet le titre, l'auteur, le fichier PDF et la couverture, **Alors** le fichier est stocke de maniere securisee, l'entite `OuvrageDepot` est creee au statut `en_attente` et renvoie un code 201 Created.
 2. **Etant donne** un fichier PDF televerse, **Quand** le service IA transverse est sollicite, **Alors** des suggestions de classification (discipline, langue, pays, resume) sont retournees et peuvent etre validees ou surchargees manuellement par le maquettiste.
 3. **Etant donne** un livre comportant des pistes audio, **Quand** le maquettiste joint des fichiers MP3/M4B, **Alors** ces pistes sont associees au depot avec le flag `has_audio = True`.
@@ -42,6 +46,7 @@ En tant que Chef Maquettiste connecte, je veux examiner la liste des depots en a
 **Test d'independance** : Appel de l'endpoint de validation sur un depot `en_attente` ; verification du passage au statut `valide` et de la creation transactionnelle de l'entite `Ouvrage` publiee.
 
 **Scenarios d'acceptation** :
+
 1. **Etant donne** un depot au statut `en_attente`, **Quand** le Chef Maquettiste valide le depot, **Alors** :
    - Le statut du depot passe a `valide` et le champ `validateur` enregistre son identifiant.
    - Une entite `Ouvrage` est creee et marquee `is_published = True`.
@@ -58,6 +63,7 @@ En tant que Chef Maquettiste connecte, je veux rejeter un depot non conforme en 
 **Test d'independance** : Rejet avec motif textuel ; verification du statut `rejete` et de l'enregistrement du motif.
 
 **Scenarios d'acceptation** :
+
 1. **Etant donne** un depot `en_attente`, **Quand** le Chef Maquettiste soumet un rejet avec un motif explicite ("Couverture pixellisee"), **Alors** le statut devient `rejete` et le motif est enregistre.
 2. **Etant donne** une requete de rejet sans motif ou avec un motif vide, **Quand** la requete est executee, **Alors** le systeme renvoie une erreur 400 Bad Request.
 

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { ShieldCheck, Lock, Eye, FileText, Smartphone, Printer, Copy, CheckCircle2, Save } from "lucide-react";
+import { toast } from "sonner";
 import type { ProtectionConfig } from "@/lib/types/publisher";
 
 interface ProtectionConfigCardProps {
@@ -33,11 +34,15 @@ export function ProtectionConfigCard({
     setSaving(true);
     try {
       await onSave(config);
-      alert("Paramètres de protection anti-piratage enregistrés avec succès !");
+      toast.success("Paramètres de protection anti-piratage enregistrés avec succès.");
+    } catch {
+      toast.error("Erreur lors de l'enregistrement de la configuration DRM.");
     } finally {
       setSaving(false);
     }
   };
+
+
 
   return (
     <div className={`p-6 rounded-3xl bg-background border border-border shadow-xs space-y-6 ${className}`}>

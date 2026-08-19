@@ -75,11 +75,19 @@ export async function getPublisherBooks(filters?: {
 }
 
 export async function getPublisherBookDetail(id: string): Promise<PublisherBook | null> {
-  await delay(500);
-  const found = mockPublisherBooks.find((b) => b.id === id);
+  await delay(200);
+  let found = mockPublisherBooks.find((b) => b.id === id);
+  if (!found && /^\d+$/.test(id)) {
+    const formatted = `pub-book-${id.padStart(2, "0")}`;
+    found = mockPublisherBooks.find((b) => b.id === formatted);
+  }
+  if (!found) {
+    found = mockPublisherBooks[0];
+  }
   if (!found) return null;
   return JSON.parse(JSON.stringify(found));
 }
+
 
 export async function createPublisherBook(
   data: Partial<PublisherBook>

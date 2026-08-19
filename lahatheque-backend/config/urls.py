@@ -16,4 +16,5 @@ urlpatterns = [
     path('api/v1/ai/', include('apps.ai_engine.urls')),
     path('api/v1/audio/', include('apps.audio.urls')),
     path('api/v1/reporting/', include('apps.reporting.urls')),
+    path('api/v1/reader/', include('apps.reader.urls')),
 ]

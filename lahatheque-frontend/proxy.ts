@@ -60,6 +60,8 @@ export default function proxy(request: NextRequest) {
         return '/librarian'
       case 'publisher':
         return '/publisher'
+      case 'wholesaler':
+        return '/wholesaler'
       case 'legal_reviewer':
         return '/legal-reviewer'
       case 'layout_artist':
@@ -73,22 +75,36 @@ export default function proxy(request: NextRequest) {
       case 'super_admin':
         return '/super-admin'
       default:
-        return '/login'
+        return ''
     }
   }
 
-  // 2. Si l'utilisateur est connecté et tente d'accéder aux pages d'authentification
+  // 2. Si l'utilisateur est connecté et tente d'accéder aux pages d'authentification (/login, /register)
   const isAuthPage = pathname === '/login' || pathname.startsWith('/register')
-  if (isLoggedIn && isAuthPage) {
+  if (isLoggedIn && isAuthPage && role) {
     const dashboardUrl = getRoleDashboardUrl(role)
-    return NextResponse.redirect(new URL(dashboardUrl, request.url))
+    if (dashboardUrl && dashboardUrl !== pathname) {
+      return NextResponse.redirect(new URL(dashboardUrl, request.url))
+    }
   }
 
   // 3. Si l'utilisateur n'est pas connecté et tente d'accéder à un espace protégé
-  const protectedRoutes = ['/student', '/wholesaler', '/librarian', '/publisher', '/author', '/legal-reviewer', '/layout-artist', '/chief-layout', '/manager', '/admin']
+  const protectedRoutes = [
+    '/student',
+    '/wholesaler',
+    '/librarian',
+    '/publisher',
+    '/author',
+    '/legal-reviewer',
+    '/layout-artist',
+    '/chief-layout',
+    '/manager',
+    '/admin',
+    '/super-admin'
+  ]
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   
-  if (!isLoggedIn && isProtectedRoute) {
+  if (!isLoggedIn && isProtectedRoute && pathname !== '/login') {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
@@ -100,6 +116,7 @@ export default function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     '/student/:path*',
+    '/wholesaler/:path*',
     '/librarian/:path*',
     '/publisher/:path*',
     '/author/:path*',
@@ -113,4 +130,3 @@ export const config = {
     '/register/:path*',
   ],
 }
-

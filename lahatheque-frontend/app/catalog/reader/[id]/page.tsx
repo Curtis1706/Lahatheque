@@ -14,7 +14,8 @@ import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
 
 // Core viewer
-import { Viewer, Worker as PdfWorker, ThemeContext, Position, Tooltip, ViewMode, SpecialZoomLevel, ScrollMode } from '@react-pdf-viewer/core'
+import { Viewer, Worker as PdfWorker, ThemeContext, Position, Tooltip, ViewMode, SpecialZoomLevel, ScrollMode, Plugin, PluginRenderPageLayer } from '@react-pdf-viewer/core'
+
 // Plugins
 import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout'
 import { pageNavigationPlugin } from '@react-pdf-viewer/page-navigation'
@@ -27,6 +28,7 @@ import '@react-pdf-viewer/highlight/lib/styles/index.css'
 
 import { FlipBookReader, Annotation as FlipBookAnnotation } from "@/components/library/FlipBook"
 import { FlipBookQuiz } from "@/components/library/FlipBookQuiz"
+import { ReaderSecurity } from "@/components/features/reader/ReaderSecurity"
 
 
 // Official Localization object for French from @react-pdf-viewer/locales
@@ -157,6 +159,7 @@ import { useAudioPlayer } from "./hooks/useAudioPlayer"
 import { useTextToSpeech } from "./hooks/useTextToSpeech"
 import { useAnnotations } from "./hooks/useAnnotations"
 import { usePdfReaderSecurity } from "./hooks/usePdfReaderSecurity"
+import { getDrmGlobalSettings } from "@/lib/services/protection"
 
 const PDF_RANGE_CHUNK_SIZE = 256 * 1024
 
@@ -240,6 +243,7 @@ export default function DocumentReaderPage() {
   const [book, setBook] = useState<any>(null)
   const [rawPdfData, setRawPdfData] = useState<string | null>(null)
   const [isPdfLoading, setIsPdfLoading] = useState(false)
+  const [drmSettings, setDrmSettings] = useState<any>(null)
 
   const {
     isAudioPlaying,
@@ -342,6 +346,82 @@ export default function DocumentReaderPage() {
   })
 
   const { jumpToHighlightArea } = highlightPluginInstance
+
+  // Plugin de gravure dynamique du filigrane sur chaque page en mode normal
+  const pageWatermarkPlugin = useMemo<Plugin>(() => {
+    const watermarkPosition = drmSettings?.watermark_position || "diagonal";
+    const parsedOp = drmSettings?.watermark_opacity != null ? parseFloat(String(drmSettings.watermark_opacity)) : 0.20;
+    const watermarkOpacity = !isNaN(parsedOp) ? parsedOp : 0.20;
+    const watermarkLahaText = drmSettings?.watermark_laha_template || "LAHAThèque • Document Certifié & Protégé";
+    const watermarkLahaSubtext = drmSettings?.watermark_laha_subtext || "Licence accordée au Lecteur Authentifié • Reproduction interdite";
+
+
+    return {
+      renderPageLayer: (renderProps: PluginRenderPageLayer) => {
+        const positionStyles: React.CSSProperties = {
+          pointerEvents: "none",
+          position: "absolute",
+          left: 0,
+          right: 0,
+          zIndex: 4,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          userSelect: "none",
+          opacity: watermarkOpacity,
+          padding: "0 24px",
+        };
+
+        if (watermarkPosition === "header") {
+          positionStyles.top = "24px";
+        } else if (watermarkPosition === "footer") {
+          positionStyles.bottom = "24px";
+        } else {
+          // diagonal par défaut
+          positionStyles.top = "50%";
+          positionStyles.transform = "translateY(-50%) rotate(-45deg)";
+        }
+
+        const baseFontSize = Math.max(12, Math.floor(renderProps.scale * 16));
+
+        return (
+          <div style={positionStyles} aria-hidden="true">
+            <div
+              style={{
+                fontSize: `${baseFontSize}px`,
+                fontWeight: 700,
+                color: "#B08D42",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                textAlign: "center",
+                lineHeight: 1.3,
+                textShadow: "0 0 1px rgba(0,0,0,0.1)",
+              }}
+            >
+              {watermarkLahaText}
+            </div>
+            {watermarkLahaSubtext && (
+              <div
+                style={{
+                  fontSize: `${Math.max(9, Math.floor(baseFontSize * 0.65))}px`,
+                  fontWeight: 600,
+                  color: "rgba(176, 141, 66, 0.85)",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.04em",
+                  marginTop: "4px",
+                  textAlign: "center",
+                }}
+              >
+                {watermarkLahaSubtext}
+              </div>
+            )}
+          </div>
+        );
+      },
+    };
+  }, [drmSettings]);
+
 
 
 
@@ -553,11 +633,25 @@ export default function DocumentReaderPage() {
           setCurrentPage(data.progress.last_page || 0)
         }
 
-        // --- SECURE PDF LOAD via fetch → Blob URL (blocks IDM & download managers) ---
-        if (data.file) {
-          setRawPdfData(data.file)
-        } else {
-          setRawPdfData(null)
+        // --- CHARGEMENT SÉCURISÉ EN MÉMOIRE (BLOB URL) ---
+        // Empêche les extensions comme Internet Download Manager (IDM) d'intercepter la requête
+        // et garantit un affichage instantané dans le lecteur normal sans erreur 204
+        const targetStreamUrl = (data && data.file) ? data.file : (id === 'lesson_pdf' ? '' : `/api/bff/catalog/books/${id}/stream/`);
+        if (targetStreamUrl) {
+          try {
+            const streamRes = await fetch(targetStreamUrl, {
+              headers: { Accept: 'application/pdf' },
+            });
+            if (streamRes.ok) {
+              const blob = await streamRes.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              setRawPdfData(blobUrl);
+            } else {
+              setRawPdfData(targetStreamUrl);
+            }
+          } catch {
+            setRawPdfData(targetStreamUrl);
+          }
         }
 
         // Check for Quiz
@@ -576,13 +670,39 @@ export default function DocumentReaderPage() {
           progress: { last_page: 0 }
         }
         setBook(demoBook)
-        setRawPdfData(demoBook.file)
-      } finally {
-        setIsLoading(false)
+
+        try {
+          const streamRes = await fetch(demoBook.file)
+          if (streamRes.ok) {
+            const blob = await streamRes.blob()
+            setRawPdfData(URL.createObjectURL(blob))
+          } else {
+            setRawPdfData(demoBook.file)
+          }
+        } catch {
+          setRawPdfData(demoBook.file)
+        }
       }
     }
-    fetchBook()
+
+    const loadAll = async () => {
+      setIsLoading(true);
+      try {
+        const [, drm] = await Promise.all([
+          fetchBook(),
+          getDrmGlobalSettings().catch(() => null),
+        ]);
+        if (drm) {
+          setDrmSettings(drm);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadAll();
   }, [id, router])
+
+
 
 
   // Sync progress with backend
@@ -684,35 +804,59 @@ export default function DocumentReaderPage() {
   const hasAudio = !!book.audio_file;
 
   if (effectiveImmersionMode && book.file) {
+    const parsedDrmOpacity = drmSettings?.watermark_opacity != null ? parseFloat(String(drmSettings.watermark_opacity)) : 0.20;
+    const safeDrmOpacity = !isNaN(parsedDrmOpacity) ? parsedDrmOpacity : 0.20;
+    const currentPosition = drmSettings?.watermark_position || "diagonal";
+    const streamPdfUrl = rawPdfData || (id === 'lesson_pdf' ? book.file : `/api/bff/catalog/books/${id}/stream/`);
+
     return (
-      <FlipBookReader
-        fileUrl={rawPdfData || book.file}
-        bookId={id as string}
-        initialPage={currentPage}
-        isMobile={isMobile}
-        onPageChange={setCurrentPage}
-        onClose={() => setIsImmersionMode(false)}
-        hasAudio={hasAudio}
-        isAudioPlaying={isAudioPlaying}
-        onToggleAudio={toggleAudio}
-        onToggleMute={toggleMute}
-        isMuted={isMuted}
-        playbackRate={playbackRate}
-        onTogglePlaybackRate={togglePlaybackRate}
-        audioProgress={audioProgress}
-        audioDuration={audioDuration}
-        onSeek={handleSeek}
-        isTtsActive={isTtsActive}
-        isTtsPaused={isTtsPaused}
-        isFetchingTtsText={isFetchingTtsText}
-        onToggleTts={handleTtsToggle}
-        onPauseResumeTts={pauseResumeTts}
-        onStopTts={stopTts}
-        ttsRate={ttsRate}
-        onToggleTtsRate={() => setTtsRate(ttsRate === 2 ? 0.75 : ttsRate + 0.25)}
-      />
+      <>
+        <ReaderSecurity
+          allowPrint={drmSettings?.allow_print ?? false}
+          allowCopy={drmSettings?.allow_copy ?? false}
+          watermarkMode="laha"
+          watermarkPosition={currentPosition}
+          watermarkOpacity={safeDrmOpacity}
+          watermarkLahaText={drmSettings?.watermark_laha_template}
+          watermarkLahaSubtext={drmSettings?.watermark_laha_subtext}
+        />
+        <FlipBookReader
+          key={`${id}_${currentPosition}_${safeDrmOpacity}_${drmSettings?.watermark_laha_template || ""}`}
+          fileUrl={streamPdfUrl}
+          bookId={id as string}
+          initialPage={currentPage}
+          isMobile={isMobile}
+          onPageChange={setCurrentPage}
+          onClose={() => setIsImmersionMode(false)}
+          authorName={book?.author_name || "Auteur LAHA"}
+          watermarkMode="laha"
+          watermarkPosition={currentPosition}
+          watermarkOpacity={safeDrmOpacity}
+          watermarkLahaText={drmSettings?.watermark_laha_template}
+          watermarkLahaSubtext={drmSettings?.watermark_laha_subtext}
+          hasAudio={hasAudio}
+          isAudioPlaying={isAudioPlaying}
+          onToggleAudio={toggleAudio}
+          onToggleMute={toggleMute}
+          isMuted={isMuted}
+          playbackRate={playbackRate}
+          onTogglePlaybackRate={togglePlaybackRate}
+          audioProgress={audioProgress}
+          audioDuration={audioDuration}
+          onSeek={handleSeek}
+          isTtsActive={isTtsActive}
+          isTtsPaused={isTtsPaused}
+          isFetchingTtsText={isFetchingTtsText}
+          onToggleTts={handleTtsToggle}
+          onPauseResumeTts={pauseResumeTts}
+          onStopTts={stopTts}
+          ttsRate={ttsRate}
+          onToggleTtsRate={() => setTtsRate(ttsRate === 2 ? 0.75 : ttsRate + 0.25)}
+        />
+      </>
     );
   }
+
 
   return (
     <div
@@ -862,32 +1006,51 @@ export default function DocumentReaderPage() {
             );
           }
 
+          const streamPdfUrl = rawPdfData || (id === 'lesson_pdf' ? book.file : `/api/bff/catalog/books/${id}/stream/`);
+
+          const parsedDrmOpacity = drmSettings?.watermark_opacity != null ? parseFloat(String(drmSettings.watermark_opacity)) : 0.20;
+          const safeDrmOpacity = !isNaN(parsedDrmOpacity) ? parsedDrmOpacity : 0.20;
+          const currentPosition = drmSettings?.watermark_position || "diagonal";
+
           return (
-            <PdfWorker workerUrl="/pdf.worker.min.js">
-              {!effectiveImmersionMode && rawPdfData && (
-                <div className="h-full bg-navy-dark">
-                  <Viewer
-                    fileUrl={rawPdfData}
-                    plugins={[
-                      defaultLayoutPluginInstance,
-                      highlightPluginInstance,
-                    ]}
-                    theme={isNightMode ? 'dark' : 'light'}
-                    localization={(fr_FR_Locale as any)}
-                    initialPage={currentPage}
-                    onPageChange={handlePageChange}
-                    onDocumentLoad={handleDocumentLoad}
-                    viewMode={ViewMode.SinglePage}
-                    defaultScale={SpecialZoomLevel.PageFit}
-                    scrollMode={ScrollMode.Vertical}
-                    transformGetDocumentParams={transformPdfGetDocumentParams}
-                    setRenderRange={setViewerRenderRange}
-                  />
-                </div>
-              )}
-            </PdfWorker>
+            <>
+              <ReaderSecurity
+                allowPrint={drmSettings?.allow_print ?? false}
+                allowCopy={drmSettings?.allow_copy ?? false}
+                watermarkMode="laha"
+                watermarkPosition={currentPosition}
+                watermarkOpacity={safeDrmOpacity}
+                watermarkLahaText={drmSettings?.watermark_laha_template}
+                watermarkLahaSubtext={drmSettings?.watermark_laha_subtext}
+              />
+              <PdfWorker workerUrl="/pdf.worker.min.js">
+
+                  <div className="h-full bg-navy-dark">
+                    <Viewer
+                      fileUrl={streamPdfUrl}
+                      plugins={[
+                        defaultLayoutPluginInstance,
+                        highlightPluginInstance,
+                        pageWatermarkPlugin,
+                      ]}
+                      theme={isNightMode ? 'dark' : 'light'}
+                      localization={(fr_FR_Locale as any)}
+                      initialPage={currentPage}
+                      onPageChange={handlePageChange}
+                      onDocumentLoad={handleDocumentLoad}
+                      viewMode={ViewMode.SinglePage}
+                      defaultScale={SpecialZoomLevel.PageFit}
+                      scrollMode={ScrollMode.Vertical}
+                      transformGetDocumentParams={transformPdfGetDocumentParams}
+                      setRenderRange={setViewerRenderRange}
+                    />
+                  </div>
+                </PdfWorker>
+            </>
           );
         })()}
+
+
 
           {isAudioOnly && (
             <div className="h-full flex flex-col items-center justify-center p-10 space-y-12">

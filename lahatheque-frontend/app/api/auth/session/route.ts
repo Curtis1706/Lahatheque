@@ -213,7 +213,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(`${DJANGO_API_URL}/v1/me/`, {
+    const response = await fetch(`${DJANGO_API_URL}/v1/auth/me/`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     })
 
@@ -261,7 +261,7 @@ export async function PATCH(request: NextRequest) {
     const { access, refresh } = validation.data
 
     // Vérifier que le token est valide côté Django
-    const verifyResponse = await fetch(`${DJANGO_API_URL}/v1/me/`, {
+    const verifyResponse = await fetch(`${DJANGO_API_URL}/v1/auth/me/`, {
       headers: { Authorization: `Bearer ${access}` },
     })
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, forwardRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useMemo, useCallback } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { 
   Loader2, ChevronLeft, ChevronRight, X, Check,
@@ -29,6 +29,10 @@ const getPageRenderWindow = (pageIndex: number, totalPages: number) => {
   return { start, end };
 };
 
+/** Mode "laha" : filigrane institutionnel doré discret.
+ * Mode "partner" : filigrane nominatif légal (nom, email, IP). */
+export type WatermarkMode = "laha" | "partner";
+
 interface FlipBookProps {
   fileUrl: string | Uint8Array;
   bookId: string;
@@ -39,6 +43,24 @@ interface FlipBookProps {
   initialAnnotations?: Annotation[];
   onAskQuestion?: () => void;
   authorName?: string;
+  /** Mode du filigrane gravé sur chaque canvas. Défaut: "laha" */
+  watermarkMode?: WatermarkMode;
+  /** Texte principal du filigrane LAHAThèque personnalisable */
+  watermarkLahaText?: string;
+  /** Sous-texte du filigrane LAHAThèque personnalisable */
+  watermarkLahaSubtext?: string;
+  /** Position du filigrane sur le canvas : diagonal, header, footer. Défaut: diagonal */
+  watermarkPosition?: "diagonal" | "header" | "footer";
+  /** Opacité du filigrane entre 0.05 et 0.50. Défaut: 0.20 */
+  watermarkOpacity?: number;
+  /** Données nominatives pour le mode "partner" */
+  watermarkUser?: {
+    displayName?: string;
+    email?: string;
+    ip?: string;
+  };
+
+
   // Audio support
   hasAudio?: boolean;
   isAudioPlaying?: boolean;
@@ -58,9 +80,11 @@ interface FlipBookProps {
   onPauseResumeTts?: () => void;
   onStopTts?: () => void;
   ttsRate?: number;
+  ttsPitch?: number;
   onToggleTtsRate?: () => void;
   onDocumentLoad?: (numPages: number) => void;
 }
+
 
 // ─── Page Component (display only) ───────────────────────────
 interface PageProps {
@@ -72,30 +96,162 @@ interface PageProps {
   onDelete: (id: string) => void;
   onAnnotationCreate: (ann: any) => void;
   onNoteCreate: (rect: any) => void;
+  watermarkPosition?: "diagonal" | "header" | "footer";
+  watermarkOpacity?: number;
+  watermarkLahaText?: string;
+  watermarkLahaSubtext?: string;
+  watermarkMode?: WatermarkMode;
+  watermarkUser?: {
+    displayName?: string;
+    email?: string;
+    ip?: string;
+  };
 }
 
 const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
-  const { children, pageNumber, annotations, activeTool, activeColor, onDelete, onAnnotationCreate, onNoteCreate } = props;
+  const {
+    children,
+    pageNumber,
+    annotations,
+    activeTool,
+    activeColor,
+    onDelete,
+    onAnnotationCreate,
+    onNoteCreate,
+    watermarkPosition = "diagonal",
+    watermarkOpacity = 0.20,
+    watermarkLahaText,
+    watermarkLahaSubtext,
+    watermarkMode = "laha",
+    watermarkUser,
+  } = props;
 
   const pageAnnotations = useMemo(
     () => annotations.filter(a => a.page === pageNumber - 1),
     [annotations, pageNumber]
   );
 
+  const parsedOp = watermarkOpacity != null ? parseFloat(String(watermarkOpacity)) : 0.20;
+  const safeOpacity = !isNaN(parsedOp) ? parsedOp : 0.20;
+
+  const positionStyles: React.CSSProperties = {
+    pointerEvents: "none",
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 15,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    userSelect: "none",
+    opacity: safeOpacity,
+    padding: "0 24px",
+  };
+
+  if (watermarkPosition === "header") {
+    positionStyles.top = "24px";
+  } else if (watermarkPosition === "footer") {
+    positionStyles.bottom = "28px";
+  } else {
+    // diagonal par défaut
+    positionStyles.top = "50%";
+    positionStyles.transform = "translateY(-50%) rotate(-45deg)";
+  }
+
   return (
+
     <div className="bg-background shadow-md overflow-hidden relative select-none border border-border" ref={ref}>
+
+
+
       <div className="h-full w-full relative">
         {/* Layer 1 — Page Image */}
         {children}
 
-        {/* Layer 2 — Annotations */}
+        {/* Layer 2 — Calque Filigrane Réactif */}
+        <div style={positionStyles} aria-hidden="true">
+          {watermarkMode === "laha" ? (
+            <>
+              <div
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  color: "#B08D42",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  textAlign: "center",
+                  lineHeight: 1.3,
+                  textShadow: "0 0 1px rgba(0,0,0,0.1)",
+                }}
+              >
+                {watermarkLahaText || "LAHAThèque • Document Certifié & Protégé"}
+              </div>
+              {watermarkLahaSubtext && (
+                <div
+                  style={{
+                    fontSize: "9px",
+                    fontWeight: 600,
+                    color: "rgba(176, 141, 66, 0.85)",
+                    fontFamily: "monospace",
+                    letterSpacing: "0.04em",
+                    marginTop: "4px",
+                    textAlign: "center",
+                  }}
+                >
+                  {watermarkLahaSubtext}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "rgba(40, 40, 40, 0.85)",
+                  fontFamily: "monospace",
+                  textAlign: "center",
+                }}
+              >
+                Licence accordée à {watermarkUser?.displayName || "Utilisateur"}
+              </div>
+              {watermarkUser?.email && (
+                <div
+                  style={{
+                    fontSize: "10px",
+                    color: "rgba(60, 60, 60, 0.75)",
+                    fontFamily: "monospace",
+                    textAlign: "center",
+                  }}
+                >
+                  {watermarkUser.email}
+                </div>
+              )}
+              {watermarkUser?.ip && (
+                <div
+                  style={{
+                    fontSize: "9px",
+                    color: "rgba(80, 80, 80, 0.65)",
+                    fontFamily: "monospace",
+                    textAlign: "center",
+                  }}
+                >
+                  IP: {watermarkUser.ip}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Layer 3 — Annotations */}
         <AnnotationLayer
           annotations={pageAnnotations}
           activeTool={activeTool}
           onDelete={onDelete}
         />
 
-        {/* Layer 3 — Selection */}
+        {/* Layer 4 — Selection */}
         <SelectionLayer 
           activeTool={activeTool}
           activeColor={activeColor}
@@ -114,6 +270,7 @@ const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
 });
 Page.displayName = 'Page';
 
+
 // ─── Main FlipBookReader Component ───────────────────────────
 
 export const FlipBookReader: React.FC<FlipBookProps> = ({
@@ -126,6 +283,12 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   initialAnnotations = [],
   onAskQuestion,
   authorName,
+  watermarkMode = 'laha',
+  watermarkPosition = 'diagonal',
+  watermarkOpacity = 0.20,
+  watermarkLahaText,
+  watermarkLahaSubtext,
+  watermarkUser,
   hasAudio = false,
   isAudioPlaying = false,
   onToggleAudio,
@@ -144,9 +307,11 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   onStopTts,
   ttsRate = 1,
   onToggleTtsRate,
+  ttsPitch = 1,
   onDocumentLoad,
 }) => {
   const [numPages, setNumPages]     = useState<number>(0);
+
   const [pages, setPages]           = useState<string[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
   const [currentPage, setCurrentPage] = useState(initialPage);
@@ -209,7 +374,13 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  // ── Keyboard shortcuts ──
+
+
+
+
+
+
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 's')) {
@@ -291,6 +462,8 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
           return new Promise<string>(res => canvas.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.9));
         };
 
+
+
         const initialWindow = getPageRenderWindow(initialPageRef.current, total);
         for (let i = initialWindow.start; i <= initialWindow.end; i++) {
           if (isCancelled) return;
@@ -339,8 +512,10 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             canvas.height = viewport.height;
             canvas.width  = viewport.width;
             await page.render({ canvasContext: ctx, viewport }).promise;
+
             const url = await new Promise<string>(res => canvas.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.9));
             setPages(prev => { if (prev[i]) return prev; const next = [...prev]; next[i] = url; return next; });
+
           }
         } finally {
           renderingIndices.current.delete(i);
@@ -348,7 +523,8 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
       }
     };
     load();
-  }, [currentPage, numPages, pages]);
+  }, [currentPage, numPages, pages, bookId]);
+
 
   const onFlip = (e: any) => {
     setCurrentPage(e.data);
@@ -561,8 +737,10 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
         <div className="relative shadow-2xl rounded-2xl overflow-hidden border border-navy-hover">
 
           <HTMLFlipBook
+            key={`${bookId}_${watermarkPosition}_${watermarkOpacity}_${watermarkLahaText}_${dimensions.width}`}
             width={dimensions.width}
             height={dimensions.height}
+
             size="fixed"
             minWidth={315}
             maxWidth={1000}
@@ -600,7 +778,14 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
                   setPendingNoteRect(rect);
                   setShowNoteModal(true);
                 }}
+                watermarkPosition={watermarkPosition}
+                watermarkOpacity={watermarkOpacity}
+                watermarkLahaText={watermarkLahaText}
+                watermarkLahaSubtext={watermarkLahaSubtext}
+                watermarkMode={watermarkMode}
+                watermarkUser={watermarkUser}
               >
+
                 {pageSrc ? (
                   <img
                     src={pageSrc}

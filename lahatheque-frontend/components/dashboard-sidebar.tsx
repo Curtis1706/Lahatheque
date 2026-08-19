@@ -327,9 +327,27 @@ export function DashboardSidebar() {
           { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="w-5 h-5" /> },
           { label: "Reporting & Exports", href: "/admin/reports", icon: <FileSpreadsheet className="w-5 h-5" /> },
           { label: "Clés API & Partenaires", href: "/admin/api", icon: <Key className="w-5 h-5" /> },
-          { label: "Traçabilité & Logs", href: "/admin/logs", icon: <Activity className="w-5 h-5" /> },
-          { label: "Paramètres Globaux", href: "/admin/settings", icon: <Settings className="w-5 h-5" /> },
+          { 
+            label: "Traçabilité & Logs", 
+            href: "/admin/logs", 
+            icon: <Activity className="w-5 h-5" />,
+            sublinks: [
+              { label: "Traces d'Accès DRM", href: "/admin/security/traces", icon: <ShieldCheck className="w-4 h-4 text-gold" /> },
+              { label: "Logs d'Audit Système", href: "/admin/logs", icon: <Activity className="w-4 h-4 text-gold" /> },
+              { label: "Logs d'Appels API", href: "/admin/api/logs", icon: <Key className="w-4 h-4 text-gold" /> },
+            ]
+          },
+          { 
+            label: "Paramètres Globaux", 
+            href: "/admin/settings", 
+            icon: <Settings className="w-5 h-5" />,
+            sublinks: [
+              { label: "Général & Plateforme", href: "/admin/settings", icon: <Settings className="w-4 h-4 text-gold" /> },
+              { label: "Sécurité DRM & Filigrane", href: "/admin/settings/drm", icon: <ShieldCheck className="w-4 h-4 text-gold" /> },
+            ]
+          },
         ];
+
       default:
         return [
           { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },

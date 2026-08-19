@@ -67,12 +67,13 @@ export const libraryApi = {
       id,
       title: `PromptBreeder: Self-Referential Self-Improvement via Prompt Evolution`,
       author: "Éditions LAHAThèque",
-      file: "/PromptBreeder_Original_Paper-2309.16797v1.pdf",
+      file: "/api/pdf?file=PromptBreeder_Original_Paper-2309.16797v1.pdf",
       total_pages: 28,
       category: "Recherche",
       description: "Ouvrage et document numérique certifié LAHAThèque.",
       progress: { last_page: 0 },
     };
+
   },
 
   async syncProgress(arg1: any, arg2?: number, arg3?: number): Promise<boolean> {

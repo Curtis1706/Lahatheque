@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CreateReaderSessionRequest",
+  "type": "object",
+  "required": ["external_user_ref", "return_url"],
+  "properties": {
+    "source_type": {
+      "type": "string",
+      "enum": ["catalog_book", "external_url", "direct_upload"],
+      "default": "catalog_book",
+      "description": "Provenance du document : catalogue interne ou URL distante SaaS tiers"
+    },
+    "book_id": {
+      "type": "string",
+      "description": "Identifiant de l'ouvrage dans le catalogue (requis si source_type=catalog_book)"
+    },
+    "document_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL distante HTTPS du fichier PDF/Office du SaaS tiers (requis si source_type=external_url)"
+    },
+    "document_title": {
+      "type": "string",
+      "description": "Titre du document externe affiche dans le lecteur"
+    },
+    "document_author": {
+      "type": "string",
+      "description": "Nom de l'auteur / formateur du document externe"
+    },
+    "audio_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL distante optionnelle d'un fichier audio narratif (MP3/AAC/HLS)"
+    },
+    "external_user_ref": {
+      "type": "string",
+      "description": "Identifiant unique de l'utilisateur chez le partenaire"
+    },
+    "external_user_name": {
+      "type": "string",
+      "description": "Nom complet de l'apprenant pour le filigrane nominatif"
+    },
+    "external_user_email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email de l'apprenant pour le filigrane et traçage"
+    },
+    "return_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL de redirection a la fin de la lecture"
+    },
+    "ttl_seconds": {
+      "type": "integer",
+      "default": 3600,
+      "minimum": 300,
+      "maximum": 86400
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "brand_name": { "type": "string", "default": "LAHAThèque" },
+        "brand_logo_url": { "type": "string", "format": "uri" },
+        "primary_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#1B2A4E" },
+        "accent_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#D4A017" },
+        "background_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#0F1A33" },
+        "text_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#FFFFFF" },
+        "border_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#2E3F66" },
+        "font_family": { "type": "string", "default": "Inter, sans-serif" }
+      }
+    },
+    "quiz": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "title": { "type": "string", "default": "Validation de Lecture" },
+        "passing_score_percent": { "type": "number", "minimum": 0, "maximum": 100, "default": 70 },
+        "show_on_last_page": { "type": "boolean", "default": true },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "question", "options"],
+            "properties": {
+              "id": { "type": "string" },
+              "question": { "type": "string" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "correct_answer_index": { "type": "integer", "minimum": 0 },
+              "correct_answer_indices": { "type": "array", "items": { "type": "integer" } },
+              "explanation": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "tts_config": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "voice": { "type": "string", "enum": ["alloy", "echo", "fable", "onyx", "nova", "shimmer"], "default": "alloy" },
+        "default_rate": { "type": "number", "default": 1.0 },
+        "allowed_languages": { "type": "array", "items": { "type": "string" }, "default": ["fr", "en"] }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "properties": {
+        "allow_tts": { "type": "boolean", "default": true },
+        "allow_annotations": { "type": "boolean", "default": true },
+        "allow_quiz": { "type": "boolean", "default": true }
+      }
+    }
+  },
+  "oneOf": [
+    { "required": ["book_id"] },
+    { "required": ["document_url", "document_title"] }
+  ]
+}
