@@ -106,23 +106,24 @@ class DocumentSourceAdapter:
 
         hostname_lower = hostname.lower()
 
-        # Blocage des noms d'hôtes localhost évidents
+        # Blocage des noms d'hôtes localhost évidents (sauf en DEBUG de développement)
         blocked_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "169.254.169.254"}
-        if hostname_lower in blocked_hosts:
+        if hostname_lower in blocked_hosts and not getattr(settings, "DEBUG", False):
             raise DocumentSourceError("Accès aux adresses loopback et métadonnées interdit (Anti-SSRF).")
 
-        # Résolution DNS pour vérifier les adresses IP privées
-        try:
-            ip_info = socket.getaddrinfo(hostname, None)
-            for item in ip_info:
-                ip_str = item[4][0]
-                ip_obj = ipaddress.ip_address(ip_str)
-                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_reserved or ip_obj.is_link_local:
-                    raise DocumentSourceError(
-                        f"L'adresse IP cible ({ip_str}) est privée ou réservée. Requête bloquée par la sécurité Anti-SSRF."
-                    )
-        except socket.gaierror:
-            raise DocumentSourceError(f"Impossible de résoudre le domaine distant: {hostname}")
+        # Résolution DNS pour vérifier les adresses IP privées (désactivé en mode DEBUG de développement)
+        if not getattr(settings, "DEBUG", False):
+            try:
+                ip_info = socket.getaddrinfo(hostname, None)
+                for item in ip_info:
+                    ip_str = item[4][0]
+                    ip_obj = ipaddress.ip_address(ip_str)
+                    if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_reserved or ip_obj.is_link_local:
+                        raise DocumentSourceError(
+                            f"L'adresse IP cible ({ip_str}) est privée ou réservée. Requête bloquée par la sécurité Anti-SSRF."
+                        )
+            except socket.gaierror:
+                raise DocumentSourceError(f"Impossible de résoudre le domaine distant: {hostname}")
 
         # Vérification de la whitelist configurée pour le partenaire
         allowed_sources: List[str] = options.get("allowed_document_sources", [])

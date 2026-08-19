@@ -60,6 +60,10 @@ export default function AdminApiKeysPage() {
     maxFileSizeMb: 200,
     webhookUrl: "",
   });
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const loadKeys = async () => {
     try {
@@ -76,6 +80,10 @@ export default function AdminApiKeysPage() {
   useEffect(() => {
     loadKeys();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterType]);
 
   const handleCreateKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,22 +107,18 @@ export default function AdminApiKeysPage() {
         allowedOrigins: formData.allowedOrigins
           ? formData.allowedOrigins.split(",").map((s) => s.trim()).filter(Boolean)
           : ["*"],
-        webhookUrl: formData.webhookUrl.trim(),
-        scopes: allowByod
-          ? formData.accessMode === "mixed"
-            ? ["reader:sessions", "reader:byod", "catalog:read"]
-            : ["reader:sessions", "reader:byod"]
-          : ["reader:sessions", "catalog:read"],
-        is_active: true,
-        isUnlimited: isVip,
-        dailyRequestLimit: dailyLimit,
-        concurrentSessionsLimit: concurrentLimit,
-        accessMode: formData.accessMode,
-        allowByod: allowByod,
         allowedDocumentSources: formData.allowedDocumentSources
           ? formData.allowedDocumentSources.split(",").map((s) => s.trim()).filter(Boolean)
-          : [],
-        maxFileSizeMb: isVip ? 500 : formData.maxFileSizeMb,
+          : ["*"],
+        webhookUrl: formData.webhookUrl.trim() || "",
+        scopes: allowByod ? ["reader:byod", "catalog:read"] : ["catalog:read"],
+        dailyRequestLimit: dailyLimit,
+        concurrentSessionsLimit: concurrentLimit,
+        is_active: true,
+        isUnlimited: isVip,
+        accessMode: formData.accessMode,
+        allowByod: allowByod,
+        maxFileSizeMb: Number(formData.maxFileSizeMb) || 200,
       });
 
       setKeys((prev) => [created, ...prev]);
@@ -189,6 +193,12 @@ export default function AdminApiKeysPage() {
 
     return matchesSearch && matchesFilter;
   });
+
+  const totalPagesCount = Math.max(1, Math.ceil(filteredKeys.length / itemsPerPage));
+  const paginatedKeys = filteredKeys.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -353,7 +363,7 @@ export default function AdminApiKeysPage() {
       ) : viewMode === "grid" ? (
         /* ================= VUE GRILLE (CARTES DÉTAILLÉES) ================= */
         <div className="space-y-4">
-          {filteredKeys.map((k) => {
+          {paginatedKeys.map((k) => {
             const mode = k.accessMode || (k.allowByod ? "mixed" : "catalog_only");
 
             return (
@@ -583,7 +593,7 @@ export default function AdminApiKeysPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredKeys.map((k) => {
+                {paginatedKeys.map((k) => {
                   const mode = k.accessMode || (k.allowByod ? "mixed" : "catalog_only");
 
                   return (
@@ -723,6 +733,61 @@ export default function AdminApiKeysPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Contrôles de Pagination Clés API */}
+      {!loading && filteredKeys.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-background-secondary border border-border text-xs">
+          <div className="text-foreground-secondary">
+            Affichage de <span className="font-bold text-navy font-mono">{(currentPage - 1) * itemsPerPage + 1}</span> à{" "}
+            <span className="font-bold text-navy font-mono">{Math.min(currentPage * itemsPerPage, filteredKeys.length)}</span> sur{" "}
+            <span className="font-bold text-navy font-mono">{filteredKeys.length}</span> intégrations
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 mr-2">
+              <span className="text-foreground-muted text-[11px]">Par page :</span>
+              {[5, 10, 20].map((size) => (
+                <button
+                  key={size}
+                  onClick={() => {
+                    setItemsPerPage(size);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                    itemsPerPage === size
+                      ? "bg-navy text-white shadow-xs"
+                      : "bg-background text-foreground-secondary hover:text-foreground border border-border"
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-background-secondary disabled:opacity-40 disabled:cursor-not-allowed font-medium text-foreground transition-all cursor-pointer"
+              >
+                Précédent
+              </button>
+
+              <div className="px-3 py-1.5 rounded-lg bg-navy/10 text-navy font-bold font-mono">
+                {currentPage} / {totalPagesCount}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPagesCount, p + 1))}
+                disabled={currentPage === totalPagesCount}
+                className="px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-background-secondary disabled:opacity-40 disabled:cursor-not-allowed font-medium text-foreground transition-all cursor-pointer"
+              >
+                Suivant
+              </button>
+            </div>
           </div>
         </div>
       )}

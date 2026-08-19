@@ -83,6 +83,7 @@ interface FlipBookProps {
   ttsPitch?: number;
   onToggleTtsRate?: () => void;
   onDocumentLoad?: (numPages: number) => void;
+  hideInternalHeader?: boolean;
 }
 
 
@@ -207,39 +208,31 @@ const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
             <>
               <div
                 style={{
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "rgba(40, 40, 40, 0.85)",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  color: "#B4AB6B",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  textAlign: "center",
+                  lineHeight: 1.3,
+                  textShadow: "0 0 1px rgba(0,0,0,0.1)",
+                }}
+              >
+                {watermarkLahaText || (watermarkUser?.displayName ? `LAHALEX • ${watermarkUser.displayName}` : "Document Juridique Sécurisé")}
+              </div>
+              <div
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  color: "rgba(180, 171, 107, 0.9)",
                   fontFamily: "monospace",
+                  letterSpacing: "0.04em",
+                  marginTop: "3px",
                   textAlign: "center",
                 }}
               >
-                Licence accordée à {watermarkUser?.displayName || "Utilisateur"}
+                {watermarkUser?.ip ? `IP: ${watermarkUser.ip} • ` : ""}{watermarkUser?.email || "Licence Authentifiée"}
               </div>
-              {watermarkUser?.email && (
-                <div
-                  style={{
-                    fontSize: "10px",
-                    color: "rgba(60, 60, 60, 0.75)",
-                    fontFamily: "monospace",
-                    textAlign: "center",
-                  }}
-                >
-                  {watermarkUser.email}
-                </div>
-              )}
-              {watermarkUser?.ip && (
-                <div
-                  style={{
-                    fontSize: "9px",
-                    color: "rgba(80, 80, 80, 0.65)",
-                    fontFamily: "monospace",
-                    textAlign: "center",
-                  }}
-                >
-                  IP: {watermarkUser.ip}
-                </div>
-              )}
             </>
           )}
         </div>
@@ -309,6 +302,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   onToggleTtsRate,
   ttsPitch = 1,
   onDocumentLoad,
+  hideInternalHeader = false,
 }) => {
   const [numPages, setNumPages]     = useState<number>(0);
 
@@ -435,9 +429,22 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
           const absoluteUrl = (fileUrl.startsWith('http') || fileUrl.startsWith('blob:'))
             ? fileUrl 
             : `${origin}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
-          pdfSource = absoluteUrl;
-        } else {
+          
+          try {
+            const res = await fetch(absoluteUrl, { headers: { Accept: 'application/pdf' } });
+            if (res.ok) {
+              const buffer = await res.arrayBuffer();
+              pdfSource = { data: new Uint8Array(buffer) };
+            } else {
+              pdfSource = absoluteUrl;
+            }
+          } catch {
+            pdfSource = absoluteUrl;
+          }
+        } else if (typeof fileUrl === 'object' && fileUrl !== null) {
           pdfSource = { data: fileUrl };
+        } else {
+          pdfSource = fileUrl;
         }
 
         const loadingTask = pdfjs.getDocument(pdfSource);
@@ -542,9 +549,9 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
 
   if (isLoading || dimensions.width === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-screen bg-navy-dark space-y-4">
-        <Loader2 className="w-12 h-12 text-gold animate-spin" />
-        <p className="text-gold font-bold uppercase tracking-widest text-xs font-mono">
+      <div className="flex flex-col items-center justify-center h-full min-h-screen bg-[var(--partner-bg,#0F1A33)] space-y-4">
+        <Loader2 className="w-12 h-12 text-[var(--partner-accent,#B4AB6B)] animate-spin" />
+        <p className="text-[var(--partner-accent,#B4AB6B)] font-bold uppercase tracking-widest text-xs font-mono">
           Préparation du livre 3D...
         </p>
       </div>
@@ -554,14 +561,15 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   return (
     <div 
       onContextMenu={(e) => e.preventDefault()}
-      className="laha-reader-zone relative w-full h-screen min-h-screen flex flex-col overflow-hidden select-none bg-navy-dark text-white"
+      className="laha-reader-zone relative w-full h-screen min-h-screen flex flex-col overflow-hidden select-none bg-[var(--partner-bg,#0F1A33)] text-[var(--partner-text,#FFFFFF)]"
     >
       {/* ── Top Header ─────────────────────────────────── */}
-      <header className="w-full bg-navy border-b border-navy-hover px-4 md:px-8 py-2.5 flex items-center justify-between text-white shrink-0 z-50">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="font-bold text-gold text-sm md:text-base tracking-tight font-serif truncate">
-            LAHAThèque • Immersion 3D
-          </span>
+      {!hideInternalHeader && (
+        <header className="w-full bg-navy border-b border-navy-hover px-4 md:px-8 py-2.5 flex items-center justify-between text-white shrink-0 z-50">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="font-bold text-gold text-sm md:text-base tracking-tight font-serif truncate">
+              LAHAThèque • Immersion 3D
+            </span>
 
           {/* Direct Page Jump Input */}
           <div className="flex items-center gap-1.5 bg-navy-dark border border-navy-hover rounded-lg px-2.5 py-1 text-xs">
@@ -703,6 +711,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
           </button>
         </div>
       </header>
+      )}
 
       {/* ── FlipBook Main Canvas (Centered Vertically & Horizontally) ── */}
       <main className="flex-1 w-full h-full flex items-center justify-center relative p-4 md:p-6 overflow-hidden">

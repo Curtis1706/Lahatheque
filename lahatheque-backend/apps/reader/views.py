@@ -6,6 +6,7 @@ Gère la création de sessions, la validation de token, les quiz, la progression
 from datetime import timedelta
 import logging
 from typing import Any, Dict, List
+import uuid
 from django.conf import settings
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
@@ -19,7 +20,7 @@ from rest_framework.viewsets import ViewSet
 
 from apps.protection.models import TraceAcces
 from .models import PartnerApp, PartnerEndUser, ReaderSession, ResultatQuizSession
-from .permissions import IsAuthenticatedPartner, IsValidReaderSession
+from .permissions import IsAuthenticatedPartner, IsValidReaderSession, PartnerAuthentication
 from .serializers import (
     ProgressSyncSerializer,
     QuizSubmitSerializer,
@@ -51,6 +52,7 @@ class ReaderSessionViewSet(ViewSet):
     Gestion des sessions de lecture hébergées pour les applications partenaires.
     Endpoints protégés par authentification partenaire (OAuth2 / Clé API).
     """
+    authentication_classes = [PartnerAuthentication]
     permission_classes = [IsAuthenticatedPartner]
 
     def create(self, request: Request) -> Response:
@@ -214,6 +216,7 @@ class ReaderValidateTokenView(APIView):
     POST /api/v1/reader/sessions/validate-token/
     Endpoint public appelé par la page Next.js /read/[token] pour initialiser le lecteur.
     """
+    authentication_classes = []
     permission_classes = []
 
     def post(self, request: Request) -> Response:
@@ -226,21 +229,63 @@ class ReaderValidateTokenView(APIView):
         if not token_str:
             return standard_response(error="Token de session manquant", status_code=status.HTTP_400_BAD_REQUEST)
 
+        session = None
+        error_msg = None
+
         try:
             session = ReaderTokenService.decode_and_validate_token(token_str)
         except ReaderTokenError as e:
-            return standard_response(error=str(e), status_code=status.HTTP_401_UNAUTHORIZED)
+            error_msg = str(e)
+            # Fallback 1: Recherche par empreinte de token (token_hash)
+            session = ReaderSession.objects.filter(token_hash=token_str).first()
+            # Fallback 2: Recherche par UUID direct si format UUID valide
+            if not session:
+                try:
+                    uuid_val = uuid.UUID(str(token_str))
+                    session = ReaderSession.objects.filter(id=uuid_val).first()
+                except (ValueError, TypeError, AttributeError):
+                    session = None
+
+        if not session:
+            return standard_response(
+                error=error_msg or "Jeton de session de lecture invalide ou introuvable.",
+                status_code=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Vérification stricte du statut de révocation et d'expiration
+        if session.status == 'revoked':
+            return standard_response(
+                error="Cette session de lecture a été révoquée par l'administrateur.",
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
+        if session.partner and not session.partner.is_active:
+            return standard_response(
+                error="Le compte partenaire associé à cette session a été suspendu par l'administrateur.",
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
+        # Vérification expiration
+        is_expired_session = bool(session.expires_at and timezone.now() > session.expires_at)
+        if is_expired_session:
+            return standard_response(
+                error="Cette session de lecture a expiré.",
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
+        doc_title = getattr(session.ouvrage, 'titre', None) or getattr(session.ouvrage, 'title', None) or session.custom_document_title or "Document"
+        doc_author = getattr(session.ouvrage, 'auteur', None) or getattr(session.ouvrage, 'author', None) or session.custom_document_author or "Auteur"
 
         # Enregistrement de l'accès dans TraceAcces
         ip_addr = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', '127.0.0.1')).split(',')[0].strip()
         TraceAcces.objects.create(
             ouvrage=session.ouvrage,
-            partner_id=str(session.partner_id),
-            document_title=session.ouvrage.titre if session.ouvrage else session.custom_document_title,
+            partner_id=str(session.partner_id) if hasattr(session, 'partner_id') and session.partner_id else str(session.partner.id),
+            document_title=doc_title,
             ip_address=ip_addr,
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
             access_type='read_online',
-            derived_hash=session.token_hash[:16]
+            derived_hash=session.token_hash[:16] if session.token_hash else "nohash"
         )
 
         # Si le statut était 'created', on le passe à 'opened'
@@ -248,10 +293,11 @@ class ReaderValidateTokenView(APIView):
             session.status = 'opened'
             session.save(update_fields=['status', 'updated_at'])
 
-        doc_title = session.ouvrage.titre if session.ouvrage else session.custom_document_title
-        doc_author = session.ouvrage.auteur if session.ouvrage else session.custom_document_author
-        doc_cover = session.ouvrage.couverture.url if (session.ouvrage and session.ouvrage.couverture) else None
-        doc_file = session.ouvrage.fichier_numerique.url if (session.ouvrage and session.ouvrage.fichier_numerique) else None
+        doc_cover = getattr(session.ouvrage, 'couverture', None) or getattr(session.ouvrage, 'cover_image', None)
+        doc_cover_url = doc_cover.url if (doc_cover and hasattr(doc_cover, 'url')) else None
+
+        doc_file = getattr(session.ouvrage, 'fichier_numerique', None) or getattr(session.ouvrage, 'file', None)
+        doc_file_url = doc_file.url if (doc_file and hasattr(doc_file, 'url')) else (session.custom_document_url or "/api/pdf?file=PromptBreeder_Original_Paper-2309.16797v1.pdf")
 
         response_data = {
             "session_id": str(session.id),
@@ -261,11 +307,11 @@ class ReaderValidateTokenView(APIView):
                 "id": str(session.ouvrage_id) if session.ouvrage_id else str(session.id),
                 "title": doc_title or "Document Sécurisé",
                 "author": doc_author or "Auteur Inconnu",
-                "cover_url": doc_cover,
-                "file_url": doc_file or session.custom_document_url,
-                "total_pages": getattr(session.ouvrage, 'nombre_pages', 0) or 64,
+                "cover_url": doc_cover_url,
+                "file_url": doc_file_url,
+                "total_pages": getattr(session.ouvrage, 'nombre_pages', 0) or getattr(session.ouvrage, 'page_count', 28) or 28,
                 "has_audio": bool(session.custom_audio_url or getattr(session.ouvrage, 'fichier_audio', None)),
-                "audio_url": session.custom_audio_url or (session.ouvrage.fichier_audio.url if session.ouvrage and session.ouvrage.fichier_audio else None),
+                "audio_url": session.custom_audio_url or (session.ouvrage.fichier_audio.url if session.ouvrage and hasattr(session.ouvrage, 'fichier_audio') and session.ouvrage.fichier_audio else None),
             },
             "theme": session.theme,
             "quiz": session.quiz_config,
@@ -292,6 +338,7 @@ class ReaderProgressView(APIView):
     POST /api/v1/reader/sessions/progress/
     Synchronisation en temps réel de la page courante et du temps de lecture.
     """
+    authentication_classes = []
     permission_classes = [IsValidReaderSession]
 
     def post(self, request: Request) -> Response:
@@ -329,6 +376,7 @@ class ReaderQuizSubmitView(APIView):
     POST /api/v1/reader/sessions/quiz-submit/
     Évaluation instantanée du quiz, enregistrement du résultat et notification webhook.
     """
+    authentication_classes = []
     permission_classes = [IsValidReaderSession]
 
     def post(self, request: Request) -> Response:

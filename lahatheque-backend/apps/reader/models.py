@@ -237,7 +237,11 @@ class ReaderSession(models.Model):
     @property
     def is_valid(self) -> bool:
         """Indique si la session est active et non expirée."""
-        return self.status in ['created', 'opened', 'in_progress'] and timezone.now() < self.expires_at
+        return self.status in ['created', 'opened', 'in_progress'] and (not self.expires_at or timezone.now() < self.expires_at)
+
+    def is_expired(self) -> bool:
+        """Indique si la session a dépassé sa date limite."""
+        return bool(self.expires_at and timezone.now() > self.expires_at)
 
 
 class ResultatQuizSession(models.Model):

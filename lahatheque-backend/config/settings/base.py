@@ -137,6 +137,19 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
+# ── OAuth2 Provider Configuration (DOT) ──────────────────────────────────────
+OAUTH2_PROVIDER_APPLICATION_MODEL = 'oauth2_provider.Application'
+OAUTH2_PROVIDER = {
+    'SCOPES': {
+        'read': 'Lecture',
+        'write': 'Écriture',
+        'reader:sessions': 'Création et gestion des sessions de lecture',
+        'reader:byod': 'Lecture de documents externes distants',
+        'catalog:read': 'Consultation du catalogue',
+    },
+    'ACCESS_TOKEN_EXPIRE_SECONDS': 3600,
+}
+
 # ── Django Axes (Anti Bruteforce) ─────────────────────────────────────────────
 AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = 0.25 # 15 minutes
@@ -164,7 +177,7 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = not DEBUG
 
 # ── FRONTEND & Domaines de Déploiement ────────────────────────────────────────
-FRONTEND_URL = config('FRONTEND_URL', default='https://lahatheque.com')
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000' if DEBUG else 'https://lahatheque.com')
 
 # ── CORS Settings ─────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -172,8 +185,9 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://lahatheque\.com$",
     r"^https://.*\.vercel\.app$",
     r"^https://lahatheque\.vercel\.app$",
-    r"^http://localhost:3000$",
-    r"^http://127\.0\.0\.1:3000$",
+    r"^http://localhost(:\d+)?$",
+    r"^http://127\.0\.0\.1(:\d+)?$",
+    r"^http://0\.0\.0\.0(:\d+)?$",
 ]
 CORS_ALLOWED_ORIGINS = [
     "https://lahatheque.com",

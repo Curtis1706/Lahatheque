@@ -40,8 +40,12 @@ export default function AdminHostedSessionsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [sessionToRevoke, setSessionToRevoke] = useState<PartnerReaderSessionItem | null>(null);
+
+  // États de Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const loadSessions = async () => {
     try {
@@ -58,6 +62,10 @@ export default function AdminHostedSessionsPage() {
   useEffect(() => {
     loadSessions();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterStatus]);
 
   const confirmRevoke = async () => {
     if (!sessionToRevoke) return;
@@ -106,6 +114,12 @@ export default function AdminHostedSessionsPage() {
 
     return matchesSearch && matchesFilter;
   });
+
+  const totalPagesCount = Math.max(1, Math.ceil(filteredSessions.length / itemsPerPage));
+  const paginatedSessions = filteredSessions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const getStatusBadge = (status: PartnerReaderSessionItem["status"]) => {
     switch (status) {
@@ -296,7 +310,7 @@ export default function AdminHostedSessionsPage() {
       ) : viewMode === "grid" ? (
         /* ================= VUE GRILLE (CARTES DÉTAILLÉES) ================= */
         <div className="space-y-3">
-          {filteredSessions.map((session) => (
+          {paginatedSessions.map((session) => (
             <div
               key={session.id}
               className="p-4 rounded-2xl bg-background-secondary border border-border shadow-sm hover:border-border-hover transition-colors space-y-3"
@@ -446,7 +460,7 @@ export default function AdminHostedSessionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredSessions.map((s) => (
+                {paginatedSessions.map((s) => (
                   <tr key={s.id} className="hover:bg-background/60 transition-colors">
                     <td className="py-3 px-4 font-mono">
                       <div className="font-bold text-navy">{s.id.substring(0, 12)}</div>
@@ -510,6 +524,61 @@ export default function AdminHostedSessionsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Contrôles de Pagination */}
+      {!loading && filteredSessions.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-background-secondary border border-border text-xs">
+          <div className="text-foreground-secondary">
+            Affichage de <span className="font-bold text-navy font-mono">{(currentPage - 1) * itemsPerPage + 1}</span> à{" "}
+            <span className="font-bold text-navy font-mono">{Math.min(currentPage * itemsPerPage, filteredSessions.length)}</span> sur{" "}
+            <span className="font-bold text-navy font-mono">{filteredSessions.length}</span> sessions
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 mr-2">
+              <span className="text-foreground-muted text-[11px]">Par page :</span>
+              {[5, 10, 20].map((size) => (
+                <button
+                  key={size}
+                  onClick={() => {
+                    setItemsPerPage(size);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                    itemsPerPage === size
+                      ? "bg-navy text-white shadow-xs"
+                      : "bg-background text-foreground-secondary hover:text-foreground border border-border"
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-background-secondary disabled:opacity-40 disabled:cursor-not-allowed font-medium text-foreground transition-all cursor-pointer"
+              >
+                Précédent
+              </button>
+
+              <div className="px-3 py-1.5 rounded-lg bg-navy/10 text-navy font-bold font-mono">
+                {currentPage} / {totalPagesCount}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPagesCount, p + 1))}
+                disabled={currentPage === totalPagesCount}
+                className="px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-background-secondary disabled:opacity-40 disabled:cursor-not-allowed font-medium text-foreground transition-all cursor-pointer"
+              >
+                Suivant
+              </button>
+            </div>
           </div>
         </div>
       )}

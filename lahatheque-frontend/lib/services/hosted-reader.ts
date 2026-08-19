@@ -9,6 +9,10 @@ export interface HostedReaderTheme {
   text_color?: string;
   border_color?: string;
   font_family?: string;
+  watermark_text?: string;
+  watermark_opacity?: number;
+  watermark_position?: "diagonal" | "header" | "footer";
+  reader_mode?: string;
 }
 
 export interface HostedReaderQuizQuestion {
@@ -104,109 +108,43 @@ export interface ProgressSyncPayload {
   reading_time_seconds?: number;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = RAW_API_URL.endsWith("/v1") ? RAW_API_URL : `${RAW_API_URL.replace(/\/+$/, "")}/v1`;
 
 export const hostedReaderApi = {
   /**
    * Valide un token de session et récupère les données de configuration complètes.
    */
   async validateSessionToken(token: string): Promise<HostedReaderSessionData> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/reader/sessions/validate-token/`, {
+    const endpoint = "/api/bff/reader/sessions/validate-token/";
+    let response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    }).catch(() => null);
+
+    if (!response) {
+      response = await fetch(`${API_BASE_URL}/reader/sessions/validate-token/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Erreur de validation (${response.status})`);
-      }
-
-      const resJson = await response.json();
-      return resJson.data as HostedReaderSessionData;
-    } catch (err: any) {
-      // Mode fallback / démo hors ligne si le backend Django n'est pas encore démarré
-      console.warn("Connexion backend indisponible, utilisation du profil de session éphémère:", err.message);
-      return {
-        session_id: "demo-session-uuid",
-        partner_name: "Académie Partenaire",
-        source_type: "catalog_book",
-        book: {
-          id: "1",
-          title: "Promptbreeder: Self-Referential Self-Improvement via Prompt Evolution",
-          author: "Google DeepMind",
-          cover_url: null,
-          file_url: "/api/pdf?file=PromptBreeder_Original_Paper-2309.16797v1.pdf",
-          total_pages: 28,
-          has_audio: true,
-          audio_url: "/mock/audio/narration-sample.mp3",
-        },
-        theme: {
-          brand_name: "Université Numérique Partenaire",
-          primary_color: "#1B2A4E",
-          accent_color: "#D4A017",
-          background_color: "#0F1A33",
-          text_color: "#FFFFFF",
-          border_color: "#2E3F66",
-        },
-        quiz: {
-          enabled: true,
-          title: "Quiz de Synthèse & Validation",
-          passing_score_percent: 70,
-          show_on_last_page: true,
-          questions: [
-            {
-              id: "q1",
-              question: "Quel est le principe fondamental de Promptbreeder ?",
-              options: [
-                "L'auto-amélioration récursive des prompts par algorithmes évolutionnaires",
-                "L'apprentissage supervisé par descente de gradient classique",
-                "Le clustering non supervisé de représentations latentes",
-                "La compression sans perte de dictionnaires de tokens",
-              ],
-              correct_answer_index: 0,
-              explanation: "Promptbreeder fait muter et évoluer ses propres mécanismes de génération de prompts.",
-            },
-            {
-              id: "q2",
-              question: "Quelle composante est optimisée conjointement aux prompts de tâches ?",
-              options: [
-                "Les prompts de mutation (Mutation-Prompts)",
-                "Les hyperparamètres de l'optimiseur Adam",
-                "Le taux d'échantillonnage de la température",
-              ],
-              correct_answer_index: 0,
-              explanation: "Les prompts de mutation évoluent également, rendant le processus auto-référentiel.",
-            },
-          ],
-        },
-        tts_config: {
-          enabled: true,
-          voice: "alloy",
-          default_rate: 1.0,
-          allowed_languages: ["fr", "en"],
-        },
-        permissions: {
-          allow_tts: true,
-          allow_annotations: true,
-          allow_quiz: true,
-        },
-        return_url: "/catalog",
-        last_page: 0,
-        reading_time_seconds: 0,
-        quiz_completed: false,
-        quiz_score: null,
-        user: {
-          name: "Koffi Mensah",
-          ref: "etudiant-univ-001",
-          email: "koffi.mensah@univ.bj",
-          ip: "154.68.24.112",
-        },
-      };
+      }).catch(() => null);
     }
+
+    if (response) {
+      const resJson = await response.json().catch(() => ({}));
+      if (response.ok && resJson.data && resJson.data.book) {
+        return resJson.data as HostedReaderSessionData;
+      }
+      // Rejet immédiat si révoqué, expiré ou invalide
+      if (response.status === 403 || response.status === 401 || !response.ok) {
+        throw new Error(
+          resJson.error || "Cette session de lecture a été révoquée par l'administrateur ou a expiré."
+        );
+      }
+    }
+
+    throw new Error("Impossible de valider la session de lecture auprès du serveur.");
   },
 
   /**
@@ -214,11 +152,12 @@ export const hostedReaderApi = {
    */
   async syncProgress(payload: ProgressSyncPayload): Promise<void> {
     try {
-      await fetch(`${API_BASE_URL}/reader/sessions/progress/`, {
+      await fetch("/api/bff/reader/sessions/progress/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Reader-Token": payload.token,
+          "Authorization": `Bearer ${payload.token}`,
         },
         body: JSON.stringify(payload),
       });
@@ -228,40 +167,25 @@ export const hostedReaderApi = {
   },
 
   /**
-   * Soumet les réponses du quiz pour notation instantanée et émission du webhook.
+   * Soumet les réponses d'un quiz interactif validé par l'apprenant.
    */
   async submitQuiz(payload: QuizSubmitPayload): Promise<QuizSubmitResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/reader/sessions/quiz-submit/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Reader-Token": payload.token,
-        },
-        body: JSON.stringify(payload),
-      });
+    const response = await fetch("/api/bff/reader/sessions/quiz-submit/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Reader-Token": payload.token,
+        "Authorization": `Bearer ${payload.token}`,
+      },
+      body: JSON.stringify(payload),
+    });
 
-      if (!response.ok) {
-        throw new Error("Échec de notation du quiz");
-      }
-
-      const resJson = await response.json();
-      return resJson.data as QuizSubmitResponse;
-    } catch (e) {
-      // Fallback calcul local si serveur non joignable
-      return {
-        score_percent: 100,
-        passing_score_percent: 70,
-        is_passed: true,
-        answers_detail: payload.answers.map((a) => ({
-          question_id: a.question_id,
-          question: "Question",
-          selected_option_index: a.selected_option_index,
-          correct_answer_index: a.selected_option_index,
-          is_correct: true,
-          explanation: "Réponse validée avec succès.",
-        })),
-      };
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Erreur de soumission du quiz (${response.status})`);
     }
+
+    const resJson = await response.json();
+    return resJson.data as QuizSubmitResponse;
   },
 };

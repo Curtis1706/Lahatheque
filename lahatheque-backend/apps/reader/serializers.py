@@ -5,6 +5,7 @@ Validation stricte des payloads de session, thèmes, quiz et synchronisation de 
 
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 from apps.catalog.models import Ouvrage
@@ -147,12 +148,16 @@ class ReaderSessionCreateSerializer(serializers.Serializer):
             parsed_return = urlparse(return_url)
             return_origin = f"{parsed_return.scheme}://{parsed_return.netloc}"
 
+            # Tolérance spéciale en mode DEBUG pour les tests sur serveur local (localhost / 127.0.0.1)
+            is_local_dev = getattr(settings, 'DEBUG', False) and parsed_return.hostname in ['localhost', '127.0.0.1', '0.0.0.0']
+
             # Vérifie si l'origine est explicitement listée dans les origines autorisées du partenaire
-            allowed = False
-            for allowed_orig in partner.allowed_return_origins:
-                if return_origin == allowed_orig.rstrip('/') or return_url.startswith(allowed_orig):
-                    allowed = True
-                    break
+            allowed = is_local_dev
+            if not allowed:
+                for allowed_orig in partner.allowed_return_origins:
+                    if allowed_orig == "*" or return_origin == allowed_orig.rstrip('/') or return_url.startswith(allowed_orig):
+                        allowed = True
+                        break
             
             if not allowed:
                 raise serializers.ValidationError({

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portail Partenaire VIP LAHALEX — Démo BYOD</title>
+  <style>
+    :root {
+      --primary: #770d28;
+      --primary-dark: #5a0a1e;
+      --accent: #b4ab6b;
+      --bg: #fafafa;
+      --card-bg: #ffffff;
+      --text: #1a1a1a;
+      --text-muted: #666666;
+      --border: #e5e7eb;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .logo-badge {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 20px;
+      letter-spacing: -1px;
+    }
+
+    .vip-tag {
+      background: rgba(180, 171, 107, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(180, 171, 107, 0.4);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    h2 {
+      font-size: 18px;
+      color: var(--primary);
+      font-weight: 700;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    input, select {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg);
+    }
+
+    .doc-preview-box {
+      background: #fdfbf7;
+      border: 1px solid rgba(180, 171, 107, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .doc-info h4 {
+      font-size: 15px;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .doc-info p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .log-box {
+      background: #1e1e1e;
+      color: #00ff66;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 16px;
+      border-radius: 10px;
+      overflow-x: auto;
+      max-height: 220px;
+      white-space: pre-wrap;
+    }
+
+    .badge-status {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo-badge">
+        <div class="logo-box">LX</div>
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <h1 style="font-size: 18px; font-weight: 800; color: var(--primary);">LAHALEX ÉDITIONS JURIDIQUES</h1>
+            <span class="vip-tag">Partenaire Test VIP</span>
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted);">Simulation de portail abonné juriste & intégration BYOD</p>
+        </div>
+      </div>
+
+      <div style="font-size: 12px; font-family: monospace; color: var(--text-muted);">
+        <span class="badge-status"></span>Client ID: laha_client_5e5c3e06
+      </div>
+    </header>
+
+    <!-- Document à tester -->
+    <div class="card">
+      <h2>1. Document Juridique à Diffuser (PDF Local)</h2>
+      
+      <div class="doc-preview-box">
+        <div class="doc-info">
+          <h4>PromptBreeder : Self-Referential Evolution (Document Test)</h4>
+          <p>Source locale : <code>public/PromptBreeder_Original_Paper-2309.16797v1.pdf</code></p>
+          <p>Protection active : Filigrane indélébile <strong>#770D28</strong> • Anti-copie • Anti-téléchargement</p>
+        </div>
+
+        <button id="btnLaunch" class="btn btn-primary" onclick="launchReader()">
+          Ouvrir dans la Liseuse LAHAThèque
+        </button>
+      </div>
+    </div>
+
+    <!-- Paramètres de Session Juriste -->
+    <div class="card">
+      <h2>2. Personnalisation de la Session de Lecture (Simulée)</h2>
+      
+      <div class="grid-2">
+        <div class="field-group">
+          <label>Nom du Juriste (Inscrit sur le filigrane)</label>
+          <input type="text" id="userName" value="Maître Jean Dupont">
+        </div>
+
+        <div class="field-group">
+          <label>Email du Juriste</label>
+          <input type="email" id="userEmail" value="j.dupont@cabinet-associes.bj">
+        </div>
+
+        <div class="field-group">
+          <label>Identifiant Client LAHALEX</label>
+          <input type="text" id="userRef" value="JURISTE-VIP-001">
+        </div>
+
+        <div class="field-group">
+          <label>Adresse IP Simulée</label>
+          <input type="text" id="userIp" value="154.68.24.112">
+        </div>
+      </div>
+    </div>
+
+    <!-- Console des Requêtes API en direct -->
+    <div class="card">
+      <h2>3. Console de Traçabilité API en Temps Réel</h2>
+      <p style="font-size: 12px; color: var(--text-muted);">
+        Visualisez ci-dessous l'échange entre le serveur LAHALEX et l'API LAHAThèque locale (OAuth2 et création de session éphémère).
+      </p>
+
+      <div id="consoleLog" class="log-box">// En attente du premier lancement...
+// Cliquez sur "Ouvrir dans la Liseuse LAHAThèque" ci-dessus.</div>
+    </div>
+  </div>
+
+  <script>
+    async function launchReader() {
+      const btn = document.getElementById("btnLaunch");
+      const consoleLog = document.getElementById("consoleLog");
+
+      btn.disabled = true;
+      btn.innerText = "Génération de la session...";
+
+      const payload = {
+        userName: document.getElementById("userName").value,
+        userEmail: document.getElementById("userEmail").value,
+        userRef: document.getElementById("userRef").value,
+        userIp: document.getElementById("userIp").value,
+        title: "PromptBreeder — Document Test LAHALEX",
+      };
+
+      consoleLog.innerText = `[1/2] Envoi de la requête au backend LAHALEX (http://localhost:4000/api/launch-reader)...\nPayload : ${JSON.stringify(payload, null, 2)}\n`;
+
+      try {
+        const response = await fetch("/api/launch-reader", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        
+        consoleLog.innerText += `\n[2/2] Réponse de l'API LAHAThèque reçue avec succès !\n` + JSON.stringify(data, null, 2);
+        consoleLog.innerText += `\n\n-> Redirection vers la liseuse : ${data.readerUrl}`;
+
+        setTimeout(() => {
+          window.open(data.readerUrl, "_blank");
+          btn.disabled = false;
+          btn.innerText = "Ouvrir dans la Liseuse LAHAThèque";
+        }, 800);
+
+      } catch (err) {
+        consoleLog.innerText += `\n[ERREUR] ${err.message}`;
+        btn.disabled = false;
+        btn.innerText = "Ouvrir dans la Liseuse LAHAThèque";
+      }
+    }
+  </script>
+</body>
+</html>

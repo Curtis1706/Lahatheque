@@ -12,10 +12,12 @@ export async function GET(req: NextRequest) {
   const filePath = path.join(process.cwd(), 'public', fileName);
 
   if (!fs.existsSync(filePath)) {
+    console.error(`[API /api/pdf] ERREUR: Fichier introuvable sur le disque: ${filePath}`);
     return new NextResponse('Fichier PDF introuvable sur le serveur', { status: 404 });
   }
 
   const fileBuffer = fs.readFileSync(filePath);
+  console.log(`[API /api/pdf] Fichier "${fileName}" chargé avec succès (${fileBuffer.length} octets / ${(fileBuffer.length / 1024).toFixed(1)} KB) -> HTTP 200 OK`);
   
   return new NextResponse(fileBuffer, {
     status: 200,
