@@ -58,6 +58,11 @@ L'API LAHATheque permet a n'importe quelle application tierce (LMS universitaire
 ### 2.1 Modele d'Authentification OAuth2 Machine-to-Machine
 L'API LAHATheque repose sur le protocole standard **OAuth2 Client Credentials Grant**. Votre serveur dialogue directement avec le serveur LAHATheque de serveur a serveur.
 
+#### URLs de Base Disponibles :
+* **Production Officielle :** `https://lahatheque.com`
+* **Deploiement Vercel Cloud :** `https://lahatheque.vercel.app` (et sous-domaines preview `*.vercel.app`)
+* **Environnement Local :** `http://localhost:3000`
+
 ```mermaid
 sequenceDiagram
     autonumber

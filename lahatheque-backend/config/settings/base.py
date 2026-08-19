@@ -163,10 +163,31 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = not DEBUG
 
+# ── FRONTEND & Domaines de Déploiement ────────────────────────────────────────
+FRONTEND_URL = config('FRONTEND_URL', default='https://lahatheque.com')
+
 # ── CORS Settings ─────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.lahatheque\.com$",
+    r"^https://lahatheque\.com$",
+    r"^https://.*\.vercel\.app$",
+    r"^https://lahatheque\.vercel\.app$",
     r"^http://localhost:3000$",
+    r"^http://127\.0\.0\.1:3000$",
+]
+CORS_ALLOWED_ORIGINS = [
+    "https://lahatheque.com",
+    "https://lahatheque.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+CSRF_TRUSTED_ORIGINS = [
+    "https://lahatheque.com",
+    "https://*.lahatheque.com",
+    "https://lahatheque.vercel.app",
+    "https://*.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']

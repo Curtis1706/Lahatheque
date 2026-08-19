@@ -42,6 +42,14 @@ LAHATheque telecharge le document en flux continu, lui applique automatiquement 
 
 ## 2. Prerequis & Preparation de votre Serveur de Fichiers
 
+### 2.0 URLs de Base LAHATheque (Production & Vercel)
+Selon votre environnement de deploiement, les requetes API et l'ouverture du lecteur s'effectuent sur l'une des adresses suivantes :
+* **Domaine Officiel :** `https://lahatheque.com`
+* **Domaine Vercel Cloud :** `https://lahatheque.vercel.app`
+* **Developpements Locaux :** `http://localhost:3000`
+
+Les tokens de session sont valables et interchangeables sur l'ensemble de ces domaines.
+
 Pour que LAHATheque puisse recuperer et securiser vos documents distants, trois elements sont indispensables :
 
 ### 2.1 Accessibilite HTTPS du Fichier PDF
