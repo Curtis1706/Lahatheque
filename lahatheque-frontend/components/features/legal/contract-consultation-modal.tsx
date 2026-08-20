@@ -15,7 +15,8 @@ import {
   X,
   ExternalLink,
   ArrowRight,
-  CheckCircle2
+  CheckCircle2,
+  BookOpen,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -57,12 +58,21 @@ export function ContractConsultationModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href={`/catalog/reader/lesson_pdf?file=${encodeURIComponent(contract.file_url || "/PromptBreeder_Original_Paper-2309.16797v1.pdf")}&title=${encodeURIComponent(contract.title)}`}
+              target="_blank"
+              className="px-3.5 py-2 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Ouvrir dans la liseuse officielle LAHAThèque avec FlipBook et défilement continu"
+            >
+              <BookOpen className="w-3.5 h-3.5" /> Ouvrir dans la Liseuse
+            </Link>
             <a
               href={contract.file_url}
               download={contract.file_name}
-              className="px-3.5 py-2 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-hover transition-colors inline-flex items-center gap-1.5 shadow-xs"
+              className="px-3.5 py-2 rounded-xl bg-background-secondary hover:bg-background border border-border text-navy font-bold text-xs transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Télécharger le fichier"
             >
-              <Download className="w-3.5 h-3.5" /> Télécharger PDF
+              <Download className="w-3.5 h-3.5" /> Télécharger
             </a>
           </div>
         </div>
@@ -70,10 +80,10 @@ export function ContractConsultationModal({
         {/* Content Layout 2 Columns: Visionneuse PDF (Gauche) & Métadonnées (Droite) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* Colonne Gauche: Visionneuse PDF sécurisée */}
+          {/* Colonne Gauche: Visionneuse PDF et DOCX */}
           <div className="lg:col-span-7 space-y-4">
             <h3 className="font-serif font-bold text-xs text-navy uppercase tracking-wider flex items-center gap-2">
-              <FileText className="w-4 h-4 text-gold" /> Aperçu du Document PDF Stocké
+              <FileText className="w-4 h-4 text-gold" /> Liseuse &amp; Aperçu de l&apos;Acte Contractuel
             </h3>
 
             <ContractPdfViewer
@@ -82,6 +92,7 @@ export function ContractConsultationModal({
               fileSize={contract.file_size}
               title={contract.title}
               reference={contract.reference}
+              extractedText={(contract as any).extracted_text || (contract as any).extracted_text_preview || contract.notes}
             />
           </div>
 

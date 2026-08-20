@@ -22,7 +22,7 @@ export interface LegalContract {
   expires_at?: string;
   file_url: string;
   file_name: string;
-  file_size?: number; // octets
+  file_size?: number; // octets (jusqu'à 800 Mo)
   tags: string[];
   status: LegalContractStatus;
   linked_book_id?: string;
@@ -44,6 +44,9 @@ export interface BookRoyalty {
   source: ClassificationSource;
   isbn?: string;
   last_updated: string;
+  paper_rate?: number;
+  digital_rate?: number;
+  audio_tts_rate?: number; // Quote-part écoutes Audio TTS (Text-To-Speech)
   history: {
     date: string;
     rate: number;
@@ -66,6 +69,10 @@ export interface AIRoyaltySuggestion {
   proposed_splits: CoAuthorSplit[];
   is_validated: boolean;
   ai_confidence: number; // ex: 92%
+  extracted_clause?: string;
+  suggested_paper_rate?: number;
+  suggested_digital_rate?: number;
+  suggested_audio_tts_rate?: number;
 }
 
 export interface PreEditionContract {
@@ -74,8 +81,10 @@ export interface PreEditionContract {
   author_name: string;
   university: string;
   faculty: string;
-  status: "en_attente_depot" | "depot_lie";
+  status: "en_attente_depot" | "maquette_en_cours" | "depot_lie" | "valide_legalement";
   linked_book_id?: string;
+  code_dossier?: string;
+  notes?: string;
   created_at: string;
 }
 
@@ -98,40 +107,61 @@ export interface ThirdPartyPublisherRoyalty {
   total_sales: number;
   amount_due: number;
   currency: string;
-  last_updated: string;
+  last_updated?: string;
+  status?: string;
+  country?: string;
   contract_reference?: string;
 }
 
 export interface AuthorEmailReport {
-  author_id: string;
-  name: string;
-  email: string;
-  last_report_date: string;
-  next_report_date: string;
-  total_sales_count: number;
-  total_royalties_paid: number;
-  status: "scheduled" | "sent";
+  author_id?: string;
+  report_id?: string;
+  name?: string;
+  author_name?: string;
+  email?: string;
+  author_email?: string;
+  last_report_date?: string;
+  next_report_date?: string;
+  total_sales_count?: number;
+  total_royalties_paid?: number;
+  total_revenue_reported?: number;
+  currency?: string;
+  books_covered?: string[];
+  sent_at?: string;
+  status: "scheduled" | "sent" | "pending";
 }
 
 export interface ClientDebt {
   id: string;
-  client_id: string;
+  client_id?: string;
   client_name: string;
   client_email: string;
-  amount: number;
+  client_type?: string;
+  client_phone?: string;
+  country?: string;
+  amount?: number;
+  unpaid_invoices_count?: number;
+  total_debt_amount?: number;
   currency: string;
-  due_date: string;
+  due_date?: string;
   days_overdue: number;
   reminder_count: number;
   last_reminder_at?: string;
-  status: "pending" | "reminded" | "final_notice";
+  status: "pending" | "reminded" | "final_notice" | "formal_notice" | "relance_niveau_1" | "relance_niveau_2";
 }
 
 export interface DebtReminderConfig {
-  min_amount_threshold: number;      // Seuil min (ex: 5000 FCFA)
-  days_before_first_reminder: number; // Delai (ex: 7 jours)
-  max_reminders_count: number;       // Nombre max (ex: 3)
-  frequency_days: number;            // Frequence entre relances (ex: 5 jours)
+  min_amount_threshold?: number;      // Seuil min (ex: 5000 FCFA)
+  days_before_first_reminder?: number; // Delai (ex: 7 jours)
+  max_reminders_count?: number;       // Nombre max (ex: 3)
+  frequency_days?: number;            // Frequence entre relances (ex: 5 jours)
+  auto_remind_enabled?: boolean;
+  first_reminder_days?: number;
+  second_reminder_days?: number;
+  formal_notice_days?: number;
+  auto_suspend_after_days?: number;
+  cc_accountant?: boolean;
+  accountant_email?: string;
 }
 
 export interface LegalKpis {
@@ -140,4 +170,5 @@ export interface LegalKpis {
   clientsInDebt: number;
   authorRemindersSent: number;
   activePreEditions: number;
+  timeline?: { date: string; value: number }[];
 }

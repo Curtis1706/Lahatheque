@@ -88,7 +88,7 @@ export default function LegalRelancesPage() {
       header: "Redevances Versées",
       cell: (row) => (
         <span className="font-mono font-bold text-gold text-xs">
-          {row.total_royalties_paid.toLocaleString("fr-FR")} XOF
+          {(row.total_royalties_paid || row.total_revenue_reported || 0).toLocaleString("fr-FR")} XOF
         </span>
       ),
     },
@@ -97,7 +97,9 @@ export default function LegalRelancesPage() {
       header: "Prochain Envoi Automatique",
       cell: (row) => (
         <span className="font-mono text-xs text-foreground-muted">
-          {new Date(row.next_report_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+          {row.next_report_date
+            ? new Date(row.next_report_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })
+            : (row.sent_at || "Programmée")}
         </span>
       ),
     },
@@ -129,7 +131,7 @@ export default function LegalRelancesPage() {
       header: "Montant Dû",
       cell: (row) => (
         <span className="font-mono font-bold text-rose-600 text-xs">
-          {row.amount.toLocaleString("fr-FR")} {row.currency}
+          {(row.amount || row.total_debt_amount || 0).toLocaleString("fr-FR")} {row.currency}
         </span>
       ),
     },
@@ -255,7 +257,7 @@ export default function LegalRelancesPage() {
               <div className="flex items-center gap-2 text-foreground-muted">
                 <ShieldCheck className="w-4 h-4 text-gold shrink-0" />
                 <span>
-                  Seuil min : <strong className="text-navy">{reminderConfig.min_amount_threshold.toLocaleString("fr-FR")} FCFA</strong> • Première relance après <strong className="text-navy">{reminderConfig.days_before_first_reminder} jours</strong> • Max : <strong className="text-navy">{reminderConfig.max_reminders_count} relances</strong>
+                  Seuil min : <strong className="text-navy">{(reminderConfig.min_amount_threshold || 5000).toLocaleString("fr-FR")} FCFA</strong> • Première relance après <strong className="text-navy">{reminderConfig.days_before_first_reminder || 7} jours</strong> • Max : <strong className="text-navy">{reminderConfig.max_reminders_count || 3} relances</strong>
                 </span>
               </div>
               <button

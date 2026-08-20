@@ -269,11 +269,14 @@ export default function AuthorProfilePage() {
               />
             </div>
             <div>
-              <label className="block font-bold text-navy mb-1.5">Affiliation Universitaire / Institution</label>
+              <label className="block font-bold text-navy mb-1.5">
+                Affiliation Universitaire / Institution <span className="text-foreground-muted font-normal">(Facultatif)</span>
+              </label>
               <input
                 type="text"
                 value={affiliation}
                 onChange={(e) => setAffiliation(e.target.value)}
+                placeholder="Facultatif — ex: Enseignant-Chercheur ou Auteur indépendant"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
               />
             </div>

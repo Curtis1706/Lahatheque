@@ -7,6 +7,7 @@ import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
 import { getPreEditionContracts, createPreEditionContract } from "@/lib/services/legal";
 import type { PreEditionContract } from "@/lib/types/legal";
+import { toast } from "sonner";
 
 export default function LegalPreEditionsPage() {
   const [preEditions, setPreEditions] = useState<PreEditionContract[]>([]);
@@ -42,8 +43,10 @@ export default function LegalPreEditionsPage() {
         university,
         faculty,
       });
-      setPreEditions((prev) => [created, ...prev]);
-      alert("Le contrat de pré-édition a été enregistré avec succès !");
+      if (created) {
+        setPreEditions((prev) => [created, ...prev]);
+        toast.success("Le dossier de pré-édition a été enregistré avec succès !");
+      }
       setIsModalOpen(false);
       setTitle("");
       setAuthorName("");

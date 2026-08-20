@@ -165,11 +165,11 @@ export default function LegalReviewerOverviewPage() {
             accent="gold"
             delta="+1 contrat"
             deltaLabel="ce mois"
-            data={[
-              { value: 2, date: "01 Mar" },
-              { value: 3, date: "08 Mar" },
-              { value: 3, date: "15 Mar" },
-              { value: 4, date: "22 Mar" }
+            data={kpis?.timeline || [
+              { value: 2, date: "01 Août" },
+              { value: 3, date: "08 Août" },
+              { value: 3, date: "15 Août" },
+              { value: 4, date: "20 Août" }
             ]}
           />
         </Link>
@@ -183,11 +183,11 @@ export default function LegalReviewerOverviewPage() {
             accent="gold"
             delta="2 requêtes"
             deltaLabel="en attente"
-            data={[
-              { value: 1, date: "01 Mar" },
-              { value: 2, date: "08 Mar" },
-              { value: 2, date: "15 Mar" },
-              { value: 2, date: "22 Mar" }
+            data={kpis?.timeline || [
+              { value: 1, date: "01 Août" },
+              { value: 2, date: "08 Août" },
+              { value: 2, date: "15 Août" },
+              { value: 2, date: "20 Août" }
             ]}
           />
         </Link>
@@ -201,11 +201,11 @@ export default function LegalReviewerOverviewPage() {
             accent="rose"
             delta="1.07M FCFA"
             deltaLabel="à recouvrir"
-            data={[
-              { value: 4, date: "01 Mar" },
-              { value: 3, date: "08 Mar" },
-              { value: 3, date: "15 Mar" },
-              { value: 2, date: "22 Mar" }
+            data={kpis?.timeline || [
+              { value: 4, date: "01 Août" },
+              { value: 3, date: "08 Août" },
+              { value: 3, date: "15 Août" },
+              { value: 2, date: "20 Août" }
             ]}
           />
         </Link>
@@ -219,11 +219,11 @@ export default function LegalReviewerOverviewPage() {
             accent="emerald"
             delta="+2 envoyées"
             deltaLabel="ce mois"
-            data={[
-              { value: 1, date: "01 Mar" },
-              { value: 1, date: "08 Mar" },
-              { value: 2, date: "15 Mar" },
-              { value: 2, date: "22 Mar" }
+            data={kpis?.timeline || [
+              { value: 1, date: "01 Août" },
+              { value: 1, date: "08 Août" },
+              { value: 2, date: "15 Août" },
+              { value: 2, date: "20 Août" }
             ]}
           />
         </Link>
@@ -237,11 +237,11 @@ export default function LegalReviewerOverviewPage() {
             accent="navy"
             delta="+1 projet"
             deltaLabel="en attente"
-            data={[
-              { value: 1, date: "01 Mar" },
-              { value: 1, date: "08 Mar" },
-              { value: 2, date: "15 Mar" },
-              { value: 2, date: "22 Mar" }
+            data={kpis?.timeline || [
+              { value: 1, date: "01 Août" },
+              { value: 1, date: "08 Août" },
+              { value: 2, date: "15 Août" },
+              { value: 2, date: "20 Août" }
             ]}
           />
         </Link>
@@ -460,7 +460,7 @@ export default function LegalReviewerOverviewPage() {
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="font-bold text-xs text-navy leading-tight truncate">{debt.client_name}</h4>
                         <span className="font-bold text-xs text-error font-mono shrink-0">
-                          {debt.amount.toLocaleString("fr-FR")} {debt.currency}
+                          {(debt.amount || debt.total_debt_amount || 0).toLocaleString("fr-FR")} {debt.currency}
                         </span>
                       </div>
                       <div className="flex justify-between text-[10px] text-foreground-muted">

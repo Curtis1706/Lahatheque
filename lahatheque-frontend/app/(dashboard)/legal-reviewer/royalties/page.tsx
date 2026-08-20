@@ -16,6 +16,8 @@ import {
 } from "@/lib/services/legal";
 import type { BookRoyalty, AIRoyaltySuggestion, CoAuthorSplit } from "@/lib/types/legal";
 
+import { toast } from "sonner";
+
 export default function LegalRoyaltiesPage() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") === "suggestions" ? "suggestions" : "global";
@@ -53,7 +55,7 @@ export default function LegalRoyaltiesPage() {
             : r
         )
       );
-      alert(
+      toast.success(
         `Taux mis à jour à ${newRate}% ! ${
           applyRetroactively
             ? "Appliqué rétroactivement aux ventes antérieures."
@@ -67,7 +69,7 @@ export default function LegalRoyaltiesPage() {
     const success = await validateAISuggestion(suggestionId, adjustedSplits);
     if (success) {
       setAiSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
-      alert("La suggestion IA de partage de droits a été validée et enregistrée avec succès !");
+      toast.success("La suggestion IA de partage de droits a été validée et enregistrée avec succès !");
     }
   };
 

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck, Download, FileText, ExternalLink, Clock, Tag, Percent, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Download, FileText, ExternalLink, Clock, Tag, Percent, CheckCircle2, BookOpen } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ContractPdfViewer } from "@/components/features/legal/contract-pdf-viewer";
 import { getContractDetail } from "@/lib/services/legal";
@@ -82,20 +82,32 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
           </p>
         </div>
 
-        {/* Liens rapides & Actions de téléchargement */}
+        {/* Liens rapides & Actions de lecture et téléchargement */}
         <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <Link
+            href={`/catalog/reader/lesson_pdf?file=${encodeURIComponent(contract.file_url || "/PromptBreeder_Original_Paper-2309.16797v1.pdf")}&title=${encodeURIComponent(contract.title)}`}
+            target="_blank"
+            className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all inline-flex items-center gap-2 shadow-xs min-h-[44px] cursor-pointer"
+            title="Ouvrir dans la liseuse officielle LAHAThèque (Modes FlipBook 3D et Défilement continu)"
+          >
+            <BookOpen className="w-4 h-4" />
+            Ouvrir dans la Liseuse
+          </Link>
+
           <a
             href={contract.file_url}
             download={contract.file_name}
-            className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
+            className="px-4 py-2.5 rounded-xl bg-background-secondary hover:bg-background border border-border text-navy font-bold text-xs transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] cursor-pointer"
+            title="Télécharger une copie du contrat"
           >
             <Download className="w-4 h-4" />
-            Télécharger le PDF
+            Télécharger
           </a>
 
           <Link
             href="/legal-reviewer/royalties"
-            className="px-4 py-2.5 rounded-xl bg-navy text-gold font-bold text-xs hover:bg-navy-dark transition-colors inline-flex items-center gap-2 border border-gold/30 shadow-xs min-h-[44px]"
+            className="px-4 py-2.5 rounded-xl bg-navy text-gold font-bold text-xs hover:bg-navy-dark transition-colors inline-flex items-center gap-2 border border-gold/30 shadow-xs min-h-[44px] cursor-pointer"
+            title="Consulter les clés de redevances"
           >
             <Percent className="w-4 h-4" />
             Fiche Droits &amp; Taux
@@ -105,10 +117,10 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
 
       {/* Disposition Full Width en 2 colonnes */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Colonne Gauche: Visionneuse PDF 21st.dev interactive */}
+        {/* Colonne Gauche: Visionneuse PDF / DOCX */}
         <div className="lg:col-span-8 space-y-4">
           <h3 className="font-serif font-bold text-sm text-navy uppercase tracking-wider flex items-center gap-2">
-            <FileText className="w-4 h-4 text-gold" /> Preview &amp; Lecture du Document PDF Stocké
+            <FileText className="w-4 h-4 text-gold" /> Liseuse &amp; Aperçu Documentaire
           </h3>
 
           <ContractPdfViewer
@@ -117,6 +129,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
             fileSize={contract.file_size}
             title={contract.title}
             reference={contract.reference}
+            extractedText={(contract as any).extracted_text || (contract as any).extracted_text_preview || contract.notes}
           />
         </div>
 
