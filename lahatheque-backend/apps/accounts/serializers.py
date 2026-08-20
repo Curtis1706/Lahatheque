@@ -1,14 +1,41 @@
 from rest_framework import serializers
+from django.conf import settings
 from .models import User, MFAConfig, OTP
 
 class UserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+    institution_name = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'active_roles', 'country', 'is_verified']
+        fields = [
+            'id', 'email', 'username', 'first_name', 'last_name', 'phone', 
+            'country', 'role', 'active_roles', 'avatar', 'avatar_url', 
+            'pen_name', 'bio', 'institution', 'institution_name',
+            'is_suspended', 'suspension_reason', 'is_verified', 
+            'is_staff', 'is_superuser', 'date_joined'
+        ]
+        read_only_fields = ['id', 'username', 'is_staff', 'is_superuser', 'date_joined']
+
+    def get_avatar_url(self, obj) -> str | None:
+        if obj.avatar:
+            # Si déjà une URL absolue
+            if str(obj.avatar).startswith('http'):
+                return str(obj.avatar)
+            public_url = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
+            return f"{public_url.rstrip('/')}/{str(obj.avatar).lstrip('/')}"
+        return None
+
+    def get_institution_name(self, obj) -> str | None:
+        if obj.institution:
+            return obj.institution.name
+        return None
+
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+
 
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -17,10 +44,33 @@ class RegisterSerializer(serializers.Serializer):
     last_name = serializers.CharField(required=False, allow_blank=True, default='')
     phone = serializers.CharField(required=False, allow_blank=True, default='')
     country = serializers.CharField(required=False, default='BJ')
-    role = serializers.ChoiceField(choices=['student', 'teacher', 'author', 'librarian', 'publisher', 'layout_artist', 'chief_layout', 'legal_reviewer', 'manager', 'wholesaler', 'partner_api'], default='student')
+    role = serializers.ChoiceField(choices=['student', 'author'], default='student')
+    pen_name = serializers.CharField(required=False, allow_blank=True, default='')
+    bio = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class UserProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'phone', 'country', 'pen_name', 'bio', 'avatar']
+
+
+class AdminUserCreateSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    first_name = serializers.CharField(required=False, allow_blank=True, default='')
+    last_name = serializers.CharField(required=False, allow_blank=True, default='')
+    phone = serializers.CharField(required=False, allow_blank=True, default='')
+    country = serializers.CharField(required=False, default='BJ')
+    role = serializers.ChoiceField(choices=[
+        'student', 'teacher', 'author', 'librarian', 'publisher', 
+        'layout_artist', 'chief_layout', 'legal_reviewer', 'manager', 
+        'wholesaler', 'partner_api', 'admin', 'super_admin'
+    ])
+    institution_id = serializers.UUIDField(required=False, allow_null=True)
+    temporary_password = serializers.CharField(required=False, allow_blank=True)
+
 
 class OTPSerializer(serializers.ModelSerializer):
     class Meta:
         model = OTP
         fields = ['id', 'code', 'channel', 'expires_at']
-

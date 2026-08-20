@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { AdminRole } from "@/lib/types/admin";
+import { createAdminUser } from "@/lib/services/admin";
 import { User, Shield, Mail, Phone, Globe, Lock, CheckCircle2, Copy } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,7 +49,7 @@ export function CreateAccountModal({
     setStep(2);
   };
 
-  const handleGenerateAndSubmit = (e: React.FormEvent) => {
+  const handleGenerateAndSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.firstName || !formData.lastName || !formData.email) {
       toast.error("Veuillez remplir tous les champs obligatoires.");
@@ -56,15 +57,29 @@ export function CreateAccountModal({
     }
 
     setIsSubmitting(true);
-    // Simuler la génération d'un mot de passe sécurisé et l'appel API
-    setTimeout(() => {
-      const mockPass = "Laha-" + Math.random().toString(36).substring(2, 8).toUpperCase() + "!";
-      setGeneratedPassword(mockPass);
+    try {
+      const res = await createAdminUser({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        country: formData.country,
+        role: selectedRole,
+      });
+
+      if (res.success) {
+        setGeneratedPassword(res.temporary_password || "Laha-" + Math.random().toString(36).substring(2, 8).toUpperCase() + "!");
+        setStep(3);
+        toast.success("Compte utilisateur créé avec succès !");
+        onSuccess?.();
+      } else {
+        toast.error(res.error || "Erreur lors de la création du compte.");
+      }
+    } catch {
+      toast.error("Impossible de contacter le serveur.");
+    } finally {
       setIsSubmitting(false);
-      setStep(3);
-      toast.success("Compte utilisateur créé avec succès !");
-      onSuccess?.();
-    }, 500);
+    }
   };
 
   const copyPasswordToClipboard = () => {

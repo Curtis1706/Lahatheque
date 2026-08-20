@@ -5,12 +5,33 @@ export interface RegisterPayload {
   last_name: string;
   phone?: string;
   country: string;
-  role: "student" | "teacher" | "author" | "publisher" | "librarian";
+  role: "student" | "author" | "publisher" | "librarian" | "teacher";
+  pen_name?: string;
+  bio?: string;
+}
+
+export interface UserProfileData {
+  id: string;
+  email: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  country: string;
+  role: string;
+  active_roles: string[];
+  avatar_url?: string | null;
+  pen_name?: string;
+  bio?: string;
+  institution_id?: string | null;
+  institution_name?: string | null;
+  is_suspended?: boolean;
+  is_verified?: boolean;
 }
 
 export async function registerUser(payload: RegisterPayload): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    const res = await fetch('/api/auth/register/', {
+    const res = await fetch('/api/bff/auth/register/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -28,5 +49,42 @@ export async function registerUser(payload: RegisterPayload): Promise<{ success:
     };
   } catch {
     return { success: false, error: 'Impossible d\'effectuer l\'inscription. Vérifiez votre connexion.' };
+  }
+}
+
+export async function getProfile(): Promise<{ success: boolean; data?: UserProfileData; error?: string }> {
+  try {
+    const res = await fetch('/api/bff/auth/profile/', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store'
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || 'Erreur de chargement du profil.' };
+    }
+
+    return { success: true, data };
+  } catch {
+    return { success: false, error: 'Impossible de récupérer le profil.' };
+  }
+}
+
+export async function updateProfile(formData: FormData): Promise<{ success: boolean; data?: any; error?: string; message?: string }> {
+  try {
+    const res = await fetch('/api/bff/auth/profile/', {
+      method: 'PATCH',
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || 'Erreur lors de la mise à jour.' };
+    }
+
+    return { success: true, data: data.data, message: data.message };
+  } catch {
+    return { success: false, error: 'Impossible de mettre à jour le profil.' };
   }
 }

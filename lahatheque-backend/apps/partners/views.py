@@ -17,8 +17,8 @@ from rest_framework.response import Response
 
 from apps.reader.models import PartnerApp, ReaderSession, WebhookLog
 from apps.protection.models import TraceAcces
-from .models import Institution, StudentAffiliation
-from .serializers import InstitutionSerializer, StudentAffiliationSerializer
+from .models import Institution, StudentAffiliation, EtudiantInscrit
+from .serializers import InstitutionSerializer, StudentAffiliationSerializer, EtudiantInscritSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +43,202 @@ class InstitutionViewSet(viewsets.ModelViewSet):
 
 
 class StudentAffiliationViewSet(viewsets.ModelViewSet):
-    queryset = StudentAffiliation.objects.all()
+    queryset = StudentAffiliation.objects.all().order_by('-created_at')
     serializer_class = StudentAffiliationSerializer
     permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        institution_id = self.request.query_params.get('institution')
+        if institution_id:
+            qs = qs.filter(institution_id=institution_id)
+        return qs
+
+    @action(detail=False, methods=['post'], url_path='claim')
+    def claim(self, request: Request) -> Response:
+        """
+        POST /api/v1/partners/affiliations/claim/
+        L'étudiant soumet son matricule et/ou sa carte d'étudiant.
+        """
+        user = request.user if request.user.is_authenticated else None
+        if not user:
+            # Fallback pour mode développement
+            user_id = request.data.get('user_id')
+            if user_id:
+                from apps.accounts.models import User
+                user = User.objects.filter(id=user_id).first()
+
+        if not user:
+            return Response({"success": False, "error": "Utilisateur non authentifié."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        institution_id = request.data.get('institution_id')
+        matricule = (request.data.get('matricule') or '').strip()
+        carte_image = request.FILES.get('carte_etudiant_image')
+
+        if not institution_id or not matricule:
+            return Response({"success": False, "error": "L'établissement et le numéro matricule sont obligatoires."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            institution = Institution.objects.get(id=institution_id)
+        except Institution.DoesNotExist:
+            return Response({"success": False, "error": "Établissement introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        # 1. Vérifier si le matricule est dans la liste officielle pré-chargée (EtudiantInscrit)
+        inscrit = EtudiantInscrit.objects.filter(
+            institution=institution, 
+            matricule__iexact=matricule
+        ).first()
+
+        if inscrit:
+            # Correspondance immédiate trouvée !
+            affiliation, _ = StudentAffiliation.objects.update_or_create(
+                student=user,
+                institution=institution,
+                defaults={
+                    'student_card_number': matricule,
+                    'status': 'approved',
+                    'is_validated': True,
+                    'reviewed_at': timezone.now(),
+                }
+            )
+            inscrit.is_claimed = True
+            inscrit.claimed_by = user
+            inscrit.claimed_at = timezone.now()
+            inscrit.save(update_fields=['is_claimed', 'claimed_by', 'claimed_at'])
+
+            user.institution = institution
+            user.save(update_fields=['institution'])
+
+            return Response({
+                "success": True,
+                "status": "approved",
+                "instant_approved": True,
+                "message": f"Félicitations ! Votre statut d'étudiant à {institution.name} a été validé instantanément.",
+                "affiliation": StudentAffiliationSerializer(affiliation).data
+            }, status=status.HTTP_200_OK)
+
+        # 2. Sinon, soumission avec justificatif pour validation par le bibliothécaire
+        affiliation, _ = StudentAffiliation.objects.update_or_create(
+            student=user,
+            institution=institution,
+            defaults={
+                'student_card_number': matricule,
+                'carte_etudiant_image': carte_image if carte_image else None,
+                'status': 'pending',
+                'is_validated': False,
+                'motif_rejet': '',
+            }
+        )
+
+        return Response({
+            "success": True,
+            "status": "pending",
+            "instant_approved": False,
+            "message": "Votre demande d'affiliation a été transmise à la bibliothèque universitaire. Elle sera validée sous 24h.",
+            "affiliation": StudentAffiliationSerializer(affiliation).data
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='review')
+    def review(self, request: Request, pk=None) -> Response:
+        """
+        POST /api/v1/partners/affiliations/<id>/review/
+        Validation ou rejet par le Bibliothécaire ou l'Administrateur.
+        """
+        try:
+            affiliation = StudentAffiliation.objects.get(id=pk)
+        except StudentAffiliation.DoesNotExist:
+            return Response({"success": False, "error": "Affiliation introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        action_type = request.data.get('action') # 'approve' ou 'reject'
+        motif = request.data.get('motif_rejet', '')
+
+        if action_type == 'approve':
+            affiliation.status = 'approved'
+            affiliation.is_validated = True
+            affiliation.motif_rejet = ''
+            affiliation.reviewed_by = request.user if request.user.is_authenticated else None
+            affiliation.reviewed_at = timezone.now()
+            affiliation.save()
+
+            # Lier l'université à l'utilisateur
+            affiliation.student.institution = affiliation.institution
+            affiliation.student.save(update_fields=['institution'])
+
+            return Response({
+                "success": True,
+                "message": f"L'affiliation de {affiliation.student.email} a été validée avec succès.",
+                "affiliation": StudentAffiliationSerializer(affiliation).data
+            })
+
+        elif action_type == 'reject':
+            affiliation.status = 'rejected'
+            affiliation.is_validated = False
+            affiliation.motif_rejet = motif or "Justificatif non conforme ou illisible."
+            affiliation.reviewed_by = request.user if request.user.is_authenticated else None
+            affiliation.reviewed_at = timezone.now()
+            affiliation.save()
+
+            return Response({
+                "success": True,
+                "message": f"L'affiliation de {affiliation.student.email} a été rejetée.",
+                "affiliation": StudentAffiliationSerializer(affiliation).data
+            })
+
+        return Response({"success": False, "error": "Action invalide. Utilisez 'approve' ou 'reject'."}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='import-students-csv')
+    def import_students_csv(self, request: Request) -> Response:
+        """
+        POST /api/v1/partners/affiliations/import-students-csv/
+        Import d'un fichier CSV de matricules étudiants par le Bibliothécaire.
+        """
+        institution_id = request.data.get('institution_id')
+        csv_file = request.FILES.get('file')
+
+        if not institution_id or not csv_file:
+            return Response({"success": False, "error": "L'établissement et le fichier CSV sont obligatoires."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            institution = Institution.objects.get(id=institution_id)
+        except Institution.DoesNotExist:
+            return Response({"success": False, "error": "Établissement introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        import csv
+        import io
+
+        decoded_file = csv_file.read().decode('utf-8-sig')
+        io_string = io.StringIO(decoded_file)
+        reader = csv.DictReader(io_string)
+
+        imported_count = 0
+        for row in reader:
+            matricule = (row.get('matricule') or row.get('Matricule') or '').strip()
+            nom = (row.get('nom') or row.get('Nom') or '').strip()
+            prenom = (row.get('prenom') or row.get('Prenom') or '').strip()
+            faculte = (row.get('faculte') or row.get('Faculte') or '').strip()
+            filiere = (row.get('filiere') or row.get('Filiere') or '').strip()
+
+            if matricule and nom:
+                EtudiantInscrit.objects.update_or_create(
+                    institution=institution,
+                    matricule=matricule,
+                    defaults={
+                        'nom': nom,
+                        'prenom': prenom,
+                        'faculte': faculte,
+                        'filiere': filiere,
+                    }
+                )
+                imported_count += 1
+
+        return Response({
+            "success": True,
+            "imported_count": imported_count,
+            "message": f"{imported_count} étudiants importés avec succès pour {institution.name}."
+        })
 
 
 class PartnerAppAdminViewSet(viewsets.ViewSet):

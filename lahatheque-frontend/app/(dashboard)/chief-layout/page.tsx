@@ -48,7 +48,7 @@ export default function ChefMaquettisteOverviewPage() {
             Espace Chef Maquettiste • Validation Éditoriale
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
-            Bonjour, {user?.first_name || "Chef Maquettiste"} 👋
+            Bonjour, {user?.first_name || "Chef Maquettiste"}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
             Validez les dépôts des maquettistes pour déclencher la mise en ligne automatique sur la vitrine publique.

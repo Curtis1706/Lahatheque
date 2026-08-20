@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions
+from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
@@ -49,6 +50,95 @@ class DisciplineViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Discipline.objects.all()
     serializer_class = DisciplineSerializer
     permission_classes = [permissions.AllowAny]
+
+
+class ChiefLayoutDepositViewSet(viewsets.ModelViewSet):
+    """
+    File d'attente et inspection des maquettes pour le Chef Maquettiste (/chief-layout).
+    """
+    queryset = Ouvrage.objects.all().order_by('-publication_date')
+    serializer_class = OuvrageSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        discipline = self.request.query_params.get('discipline')
+        if discipline:
+            qs = qs.filter(discipline_id=discipline)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        """Dépôt d'une nouvelle maquette par un maquettiste."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ouvrage = serializer.save(status='submitted')
+        return Response({
+            "success": True,
+            "message": "Maquette soumise avec succès au Chef Maquettiste pour validation.",
+            "data": OuvrageSerializer(ouvrage).data
+        }, status=201)
+
+    @action(detail=True, methods=['post'], url_path='validate')
+    def validate_deposit(self, request, pk=None):
+        """
+        POST /api/v1/catalog/deposits/<id>/validate/
+        Validation atomique et mise en ligne immédiate sur le catalogue public.
+        """
+        try:
+            ouvrage = Ouvrage.objects.get(id=pk)
+            ouvrage.status = 'published'
+            ouvrage.save(update_fields=['status'])
+
+            # S'assurer que la configuration DRM par défaut existe
+            try:
+                from apps.protection.models import ProtectionConfig
+                ProtectionConfig.objects.get_or_create(
+                    ouvrage=ouvrage,
+                    defaults={
+                        'watermark_enabled': True,
+                        'invisible_watermark': True,
+                        'allow_printing': False,
+                        'allow_copy': False,
+                    }
+                )
+            except Exception:
+                pass
+
+            return Response({
+                "success": True,
+                "message": f"L'ouvrage « {ouvrage.title} » a été validé et publié immédiatement sur la vitrine publique.",
+                "data": OuvrageSerializer(ouvrage).data
+            })
+        except Ouvrage.DoesNotExist:
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject_deposit(self, request, pk=None):
+        """
+        POST /api/v1/catalog/deposits/<id>/reject/
+        Rejet motivé d'une maquette par le Chef Maquettiste.
+        """
+        motif = request.data.get('motif_rejet', '').strip()
+        if not motif:
+            return Response({"success": False, "error": "Le motif de rejet est obligatoire pour guider le maquettiste."}, status=400)
+
+        try:
+            ouvrage = Ouvrage.objects.get(id=pk)
+            ouvrage.status = 'rejected'
+            ouvrage.save(update_fields=['status'])
+
+            return Response({
+                "success": True,
+                "message": f"La maquette « {ouvrage.title} » a été rejetée. Motif : {motif}",
+                "motif_rejet": motif,
+                "data": OuvrageSerializer(ouvrage).data
+            })
+        except Ouvrage.DoesNotExist:
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
+
 
 class ONIXImportView(APIView):
     def post(self, request):

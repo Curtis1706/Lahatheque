@@ -28,6 +28,12 @@ class User(AbstractUser):
     country = models.CharField(max_length=2, default='BJ') # Code ISO
     role = models.CharField(max_length=30, choices=ROLE_CHOICES, default='student')
     active_roles = models.JSONField(default=list, blank=True)
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+    pen_name = models.CharField(max_length=255, blank=True, default='')
+    bio = models.TextField(blank=True, default='')
+    institution = models.ForeignKey('partners.Institution', null=True, blank=True, on_delete=models.SET_NULL, related_name='members')
+    is_suspended = models.BooleanField(default=False)
+    suspension_reason = models.TextField(blank=True, default='')
     is_verified = models.BooleanField(default=False)
     session_version = models.IntegerField(default=1)
     last_active_at = models.DateTimeField(blank=True, null=True)

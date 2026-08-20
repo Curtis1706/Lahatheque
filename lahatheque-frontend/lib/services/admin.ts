@@ -38,12 +38,82 @@ export async function getRevenueCategoryBreakdown(): Promise<RevenueCategoryBrea
   return MOCK_REVENUE_BREAKDOWN;
 }
 
-export async function getAdminUsers(roleFilter?: AdminRole): Promise<AdminUser[]> {
-  await new Promise((res) => setTimeout(res, 250));
-  if (roleFilter) {
-    return MOCK_ADMIN_USERS.filter((u) => u.role === roleFilter || u.active_roles.includes(roleFilter));
+export async function getAdminUsers(roleFilter?: AdminRole | string, search?: string): Promise<AdminUser[]> {
+  try {
+    let url = '/api/bff/auth/admin/users/?';
+    if (roleFilter && roleFilter !== 'all') {
+      url += `role=${roleFilter}&`;
+    }
+    if (search) {
+      url += `q=${encodeURIComponent(search)}&`;
+    }
+
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      const userList = data.results || (Array.isArray(data) ? data : []);
+      if (userList.length > 0) {
+        return userList.map((u: any) => ({
+          id: u.id,
+          first_name: u.first_name || 'Utilisateur',
+          last_name: u.last_name || '',
+          email: u.email,
+          role: u.role || 'student',
+          active_roles: u.active_roles || [u.role],
+          is_active: !u.is_suspended && (u.is_active !== false),
+          is_verified: u.is_verified || false,
+          country: u.country || 'BJ',
+          phone: u.phone || '',
+          avatar_url: u.avatar_url,
+          institution_name: u.institution_name,
+          date_joined: u.date_joined ? u.date_joined.split('T')[0] : '2026-08-01',
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn('[Admin Service] Fallback to mock users:', err);
+  }
+
+  // Fallback mock
+  if (roleFilter && roleFilter !== "all") {
+    return MOCK_ADMIN_USERS.filter((u) => u.role === roleFilter || (u.active_roles as string[]).includes(roleFilter as string));
   }
   return MOCK_ADMIN_USERS;
+}
+
+export async function createAdminUser(payload: any): Promise<{ success: boolean; data?: any; error?: string; temporary_password?: string }> {
+  try {
+    const res = await fetch('/api/bff/auth/admin/users/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || 'Erreur lors de la création du compte.' };
+    }
+    return { success: true, data: data.user, temporary_password: data.temporary_password };
+  } catch {
+    return { success: false, error: 'Impossible de contacter le serveur.' };
+  }
+}
+
+export async function toggleAdminUserStatus(userId: string, reason?: string): Promise<{ success: boolean; is_suspended?: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/auth/admin/users/${userId}/toggle-status/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || 'Erreur modification statut.' };
+    }
+    return { success: true, is_suspended: data.is_suspended };
+  } catch {
+    return { success: false, error: 'Erreur réseau.' };
+  }
 }
 
 export async function getAdminCatalog(): Promise<AdminCatalogBook[]> {

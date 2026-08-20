@@ -46,6 +46,40 @@ class MeView(APIView):
         payload = _build_user_payload(request.user)
         return Response(payload, status=status.HTTP_200_OK)
 
+
+class ProfileView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        payload = _build_user_payload(request.user)
+        return Response(payload, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        user = request.user
+        data = request.data
+
+        if 'first_name' in data:
+            user.first_name = data.get('first_name', '').strip()
+        if 'last_name' in data:
+            user.last_name = data.get('last_name', '').strip()
+        if 'phone' in data:
+            user.phone = data.get('phone', '').strip().replace(" ", "")
+        if 'country' in data:
+            user.country = data.get('country', 'BJ')
+        if 'pen_name' in data:
+            user.pen_name = data.get('pen_name', '').strip()
+        if 'bio' in data:
+            user.bio = data.get('bio', '').strip()
+
+        # Gestion de l'upload de photo de profil
+        if 'avatar' in request.FILES:
+            user.avatar = request.FILES['avatar']
+
+        user.save()
+        payload = _build_user_payload(user)
+        return Response({"success": True, "data": payload, "message": "Profil mis à jour avec succès."}, status=status.HTTP_200_OK)
+
+
 class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def post(self, request):

@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
 import { CreateAccountModal } from "@/components/features/admin/create-account-modal";
 import { SendEmailModal } from "@/components/features/admin/send-email-modal";
-import { getAdminUsers } from "@/lib/services/admin";
+import { getAdminUsers, toggleAdminUserStatus } from "@/lib/services/admin";
 import { AdminUser, AdminRole } from "@/lib/types/admin";
 import {
   Users,
@@ -46,13 +46,19 @@ export default function AdminUsersGlobalPage() {
     loadUsers();
   }, []);
 
-  const handleToggleActive = (userItem: AdminUser) => {
+  const handleToggleActive = async (userItem: AdminUser) => {
+    const newActiveState = !userItem.is_active;
     setUsers((prev) =>
-      prev.map((u) => (u.id === userItem.id ? { ...u, is_active: !u.is_active } : u))
+      prev.map((u) => (u.id === userItem.id ? { ...u, is_active: newActiveState } : u))
     );
-    toast.success(
-      `Compte ${userItem.email} ${!userItem.is_active ? "réactivé" : "désactivé"} avec succès.`
-    );
+    try {
+      await toggleAdminUserStatus(userItem.id);
+      toast.success(
+        `Compte ${userItem.email} ${newActiveState ? "réactivé" : "suspendu"} avec succès.`
+      );
+    } catch {
+      toast.error("Erreur lors de la modification du statut.");
+    }
   };
 
   const handleDeleteUser = () => {

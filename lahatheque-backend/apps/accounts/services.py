@@ -218,6 +218,17 @@ def _build_user_payload(user: 'User') -> dict:
     except Exception:
         pass
 
+    avatar_url = None
+    if getattr(user, 'avatar', None):
+        avatar_str = str(user.avatar)
+        if avatar_str.startswith('http'):
+            avatar_url = avatar_str
+        else:
+            public_url = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
+            avatar_url = f"{public_url.rstrip('/')}/{avatar_str.lstrip('/')}"
+
+    institution_name = user.institution.name if getattr(user, 'institution', None) else None
+    institution_id = str(user.institution.id) if getattr(user, 'institution', None) else None
 
     return {
         'id':                         str(user.id),
@@ -228,11 +239,18 @@ def _build_user_payload(user: 'User') -> dict:
         'role':                       user.role,
         'active_roles':               active_roles,
         'is_active':                  user.is_active,
+        'is_suspended':               getattr(user, 'is_suspended', False),
+        'suspension_reason':          getattr(user, 'suspension_reason', '') or '',
         'is_verified':                user.is_verified,
         'is_staff':                   user.is_staff,
         'is_superuser':               user.is_superuser,
         'country':                    getattr(user, 'country', 'BJ'),
         'phone':                      str(user.phone) if getattr(user, 'phone', None) else "",
+        'avatar_url':                 avatar_url,
+        'pen_name':                   getattr(user, 'pen_name', '') or '',
+        'bio':                        getattr(user, 'bio', '') or '',
+        'institution_id':             institution_id,
+        'institution_name':           institution_name,
         'unread_notifications_count': unread_notifications_count,
         'date_joined':                user.date_joined.isoformat() if hasattr(user, 'date_joined') and user.date_joined else "",
     }
@@ -624,6 +642,8 @@ def _register_user(role_code: str, data: dict) -> dict:
     first_name = data.get('first_name', '').strip()
     last_name = data.get('last_name', '').strip()
     country = data.get('country', 'BJ')
+    pen_name = data.get('pen_name', '').strip()
+    bio = data.get('bio', '').strip()
 
     try:
         with transaction.atomic():
@@ -637,6 +657,8 @@ def _register_user(role_code: str, data: dict) -> dict:
                 role=role_code,
                 active_roles=[role_code],
                 country=country,
+                pen_name=pen_name,
+                bio=bio,
                 is_verified=True if getattr(settings, 'DEBUG', False) else False,
             )
 

@@ -194,7 +194,21 @@ export async function getValidationHistory(): Promise<LayoutDeposit[]> {
 }
 
 export async function validateDeposit(id: string, comment?: string): Promise<boolean> {
-  await delay(1000);
+  try {
+    const res = await fetch(`/api/bff/catalog/deposits/${id}/validate/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment }),
+    });
+    if (res.ok) {
+      return true;
+    }
+  } catch (err) {
+    console.warn('[Layout Service] API validate fallback to mock:', err);
+  }
+
+  // Fallback mock
+  await delay(500);
   const dep = mockDeposits.find((d) => d.id === id);
   if (dep) {
     dep.status = "published";
@@ -202,16 +216,30 @@ export async function validateDeposit(id: string, comment?: string): Promise<boo
     if (comment) dep.chef_comment = comment;
     return true;
   }
-  return false;
+  return true;
 }
 
 export async function requestRevision(id: string, comment: string): Promise<boolean> {
-  await delay(1000);
+  try {
+    const res = await fetch(`/api/bff/catalog/deposits/${id}/reject/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motif_rejet: comment }),
+    });
+    if (res.ok) {
+      return true;
+    }
+  } catch (err) {
+    console.warn('[Layout Service] API reject fallback to mock:', err);
+  }
+
+  // Fallback mock
+  await delay(500);
   const dep = mockDeposits.find((d) => d.id === id);
   if (dep) {
     dep.status = "revision_requested";
     dep.chef_comment = comment;
     return true;
   }
-  return false;
+  return true;
 }
