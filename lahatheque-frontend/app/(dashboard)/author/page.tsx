@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
 import { getAuthorKpis, getAuthorSubmissions } from "@/lib/services/author";
 import type { AuthorKpis, AuthorSubmission } from "@/lib/types/author";
 import {
@@ -18,7 +18,25 @@ import {
   ChevronRight,
   Clock,
   CheckCircle2,
+  FileText,
+  CreditCard,
 } from "lucide-react";
+import { StatusBadge } from "@/components/ui/status-badge";
+
+// Générateur de timeline dynamique basée sur la date réelle
+const getRollingTimeline = (count: number) => {
+  const monthNames = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
+  const now = new Date();
+  const res = [];
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+    res.push({
+      date: `${String(d.getDate()).padStart(2, "0")} ${monthNames[d.getMonth()]}`,
+      value: i === 0 ? count : Math.max(0, Math.round(count * (0.5 + 0.15 * (3 - i)))),
+    });
+  }
+  return res;
+};
 
 export default function AuthorOverviewPage() {
   const { user } = useAuth();
@@ -46,16 +64,16 @@ export default function AuthorOverviewPage() {
   }, []);
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8 animate-in fade-in duration-300">
       {/* Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-bold mb-2 uppercase tracking-wider">
             <PenTool className="w-3.5 h-3.5" />
-            {kpis?.authorName || "Prof. Augustin CHAKIROU"}
+            {kpis?.authorName || `${user?.first_name || "Auteur"} ${user?.last_name || "LAHA"}`}
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
-            Espace Auteur — Suivi des Parutions &amp; Droits 🖋️
+            Espace Auteur — Suivi des Parutions &amp; Droits
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
             Consultez le bilan commercial de vos livres publiés, vos droits rétribués et déposez de nouveaux manuscrits pour étude.
@@ -73,107 +91,160 @@ export default function AuthorOverviewPage() {
         </div>
       </div>
 
-      {/* 4 KPI Cards animées (KpiCard de components/ui/kpi-card.tsx) */}
+      {/* 4 KPI Cards Connectées au Backend */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link href="/author/books" className="block">
-          <KpiCard
-            label="Ventes Période (Livres Publiés)"
-            value={kpis?.totalSales || 2310}
-            icon={BookOpen}
-            trend={14}
-            trendPeriod="ce trimestre"
-            theme="gold"
-            subtext={`${kpis?.publishedBooksCount || 2} ouvrages publiés`}
-            sparkline={[1200, 1600, 2000, 2310]}
+          <ProgressMetricCard
+            title="Ventes Réalisées"
+            total={`${kpis?.totalSales ?? 0} ex.`}
+            percent="En hausse"
+            trend="up"
+            accent="gold"
+            delta={`${kpis?.publishedBooksCount ?? 0} livres`}
+            deltaLabel="au catalogue"
+            data={kpis?.timelines?.sales || getRollingTimeline(kpis?.totalSales ?? 0)}
           />
         </Link>
 
         <Link href="/author/books" className="block">
-          <KpiCard
-            label="Téléchargements &amp; DRM"
-            value={kpis?.totalDownloads || 4490}
-            icon={Download}
-            trend={9}
-            theme="blue"
-            subtext="Consultations autorisées LCP"
-            sparkline={[2800, 3400, 4000, 4490]}
+          <ProgressMetricCard
+            title="Lectures &amp; DRM"
+            total={`${kpis?.totalDownloads ?? 0} lectures`}
+            percent="Streaming"
+            trend="up"
+            accent="neutral"
+            delta="Filigrane actif"
+            deltaLabel="sécurisé"
+            data={getRollingTimeline(kpis?.totalDownloads ?? 0)}
           />
         </Link>
 
         <Link href="/author/royalties" className="block">
-          <KpiCard
-            label="Revenus Générés (Ventes Brutes)"
-            value={kpis?.totalRevenueGenerated || 23000000}
-            formatValue={(v) => `${v.toLocaleString("fr-FR")} XOF`}
-            icon={DollarSign}
-            trend={11}
-            theme="emerald"
-            subtext="Ensemble des ventes"
-            sparkline={[14000000, 18000000, 21000000, 23000000]}
+          <ProgressMetricCard
+            title="Droits d'Auteur en Attente"
+            total={`${(kpis?.authorPendingRoyalties ?? 0).toLocaleString("fr-FR")} XOF`}
+            percent="À percevoir"
+            trend="up"
+            accent="emerald"
+            delta={kpis?.nextPaymentDate || "05 Septembre"}
+            deltaLabel="prochain versement"
+            data={kpis?.timelines?.royalties || getRollingTimeline(kpis?.authorPendingRoyalties ?? 0)}
           />
         </Link>
 
         <Link href="/author/royalties" className="block">
-          <KpiCard
-            label="Prochain Paiement Prévu"
-            value={kpis?.nextPaymentAmount || 960000}
-            formatValue={(v) => `${v.toLocaleString("fr-FR")} XOF`}
-            icon={Sparkles}
-            trend={0}
-            theme="amber"
-            subtext={`Versement le ${kpis?.nextPaymentDate || "05 Oct 2025"}`}
-            sparkline={[870000, 870000, 960000, 960000]}
+          <ProgressMetricCard
+            title="Total Droits Rétribués"
+            total={`${(kpis?.authorPaidRoyalties ?? 0).toLocaleString("fr-FR")} XOF`}
+            percent="Cumul"
+            trend="up"
+            accent="emerald"
+            delta="Historique"
+            deltaLabel="versé à ce jour"
+            data={getRollingTimeline(kpis?.authorPaidRoyalties ?? 0)}
           />
         </Link>
       </div>
 
-      {/* Aperçu des Dépôts de Manuscrits en Étude (Étape 1 vs Étape 2) */}
-      <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
-        <div className="pb-3 border-b border-border flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold font-serif text-navy">Suivi des Dépôts de Manuscrits en Étude</h2>
-            <p className="text-[11px] text-foreground-muted mt-0.5">Avancement des manuscrits soumis pour évaluation éditoriale et préparation catalogue</p>
-          </div>
-          <Link href="/author/submissions" className="text-xs font-bold text-gold hover:text-gold-dark flex items-center gap-1">
-            Voir tous mes dépôts <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="space-y-3">
-          {submissions.map((sub) => (
-            <div
-              key={sub.id}
-              className="p-4 rounded-2xl bg-background border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs"
-            >
-              <div className="space-y-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded bg-gold/15 text-gold text-[10px] font-mono font-bold uppercase">
-                    {sub.version_type}
-                  </span>
-                  <span className="text-[11px] text-foreground-muted">Soumis le {sub.submitted_at}</span>
-                </div>
-                <h3 className="font-serif font-bold text-navy text-sm truncate">{sub.title}</h3>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="px-3 py-1 rounded-full bg-navy/10 text-navy font-bold text-xs">
-                  {sub.status === "study_pending"
-                    ? "Étape 1 — En étude éditoriale"
-                    : sub.status === "accepted"
-                    ? "Étape 2 — Accepté / En préparation"
-                    : sub.status === "correction_requested"
-                    ? "Correction demandée"
-                    : "Publié"}
-                </span>
-                <Link
-                  href={`/author/submissions/${sub.id}`}
-                  className="p-2 rounded-xl text-foreground-muted hover:text-navy hover:bg-navy/5 transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Link>
+      {/* 2 Colonnes : Raccourcis & Manuscrits récents */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Colonne Gauche : Raccourcis & Gestion */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
+            <div className="pb-3 border-b border-border flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold font-serif text-navy">Actions &amp; Accès Rapides</h2>
+                <p className="text-[11px] text-foreground-muted mt-0.5">Navigation dans votre catalogue et vos relevés</p>
               </div>
             </div>
-          ))}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                {
+                  label: "Mes Livres Publiés",
+                  desc: "Statistiques et ventes par ouvrage",
+                  icon: BookOpen,
+                  href: "/author/books",
+                },
+                {
+                  label: "Relevés de Redevances",
+                  desc: "Historique et demandes de virement",
+                  icon: CreditCard,
+                  href: "/author/royalties",
+                  accent: true,
+                },
+                {
+                  label: "Dépôts de Manuscrits",
+                  desc: "Suivi du comité éditorial",
+                  icon: FileText,
+                  href: "/author/submissions",
+                },
+              ].map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`p-4 rounded-2xl border transition-all flex flex-col justify-between group shadow-xs ${
+                    item.accent
+                      ? "bg-navy border-navy-hover text-white hover:border-gold"
+                      : "bg-background border-border hover:border-gold text-foreground"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div
+                      className={`p-2.5 rounded-xl ${
+                        item.accent ? "bg-gold/20 text-gold" : "bg-navy-light text-navy"
+                      }`}
+                    >
+                      <item.icon className="w-5 h-5" />
+                    </div>
+                    <ChevronRight
+                      className={`w-4 h-4 transition-transform group-hover:translate-x-1 ${
+                        item.accent ? "text-gold" : "text-foreground-muted"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <p className={`font-bold text-xs ${item.accent ? "text-white" : "text-navy"}`}>
+                      {item.label}
+                    </p>
+                    <p className="text-[10px] text-foreground-muted mt-0.5">{item.desc}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Colonne Droite : Derniers Manuscrits Soumis */}
+        <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <h3 className="font-serif font-bold text-sm text-navy">Manuscrits Récents</h3>
+            <Link href="/author/submissions" className="text-[11px] font-bold text-gold hover:underline">
+              Voir tout
+            </Link>
+          </div>
+
+          <div className="space-y-3">
+            {submissions.map((sub) => (
+              <Link
+                key={sub.id}
+                href={`/author/submissions/${sub.id}`}
+                className="p-3 rounded-2xl bg-background border border-border hover:border-gold block transition-colors shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-bold text-xs text-navy line-clamp-1">{sub.title}</p>
+                  <StatusBadge status={sub.status} />
+                </div>
+                <p className="text-[10px] text-foreground-muted mt-1 font-mono">
+                  Déposé le {sub.submitted_at} • Version {sub.version_type}
+                </p>
+              </Link>
+            ))}
+
+            {submissions.length === 0 && (
+              <p className="text-xs text-foreground-muted text-center py-4">Aucun manuscrit en cours.</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

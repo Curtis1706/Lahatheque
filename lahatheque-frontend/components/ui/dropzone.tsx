@@ -9,7 +9,7 @@ interface DropzoneProps {
   maxSizeMB?: number;
 }
 
-export function Dropzone({ onFileSelect, acceptTypes = [".pdf", ".epub"], maxSizeMB = 20 }: DropzoneProps) {
+export function Dropzone({ onFileSelect, acceptTypes = [".pdf", ".epub"], maxSizeMB = 800 }: DropzoneProps) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState("");

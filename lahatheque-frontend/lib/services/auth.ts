@@ -22,7 +22,12 @@ export interface UserProfileData {
   active_roles: string[];
   avatar_url?: string | null;
   pen_name?: string;
+  university_affiliation?: string;
   bio?: string;
+  bank_name?: string;
+  iban?: string;
+  swift?: string;
+  momo_number?: string;
   institution_id?: string | null;
   institution_name?: string | null;
   is_suspended?: boolean;
@@ -86,5 +91,28 @@ export async function updateProfile(formData: FormData): Promise<{ success: bool
     return { success: true, data: data.data, message: data.message };
   } catch {
     return { success: false, error: 'Impossible de mettre à jour le profil.' };
+  }
+}
+
+export async function changePassword(payload: {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    const res = await fetch('/api/bff/auth/change-password/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || 'Erreur lors de la modification du mot de passe.' };
+    }
+
+    return { success: true, message: data.message || 'Mot de passe modifié avec succès.' };
+  } catch {
+    return { success: false, error: 'Impossible de joindre le serveur pour modifier le mot de passe.' };
   }
 }

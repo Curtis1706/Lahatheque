@@ -34,7 +34,6 @@ export function AuthorTeamAccessCard({
       setShowInviteModal(false);
       setName("");
       setEmail("");
-      alert(`Invitation d'accès envoyée avec succès à ${email} !`);
     } finally {
       setSubmitting(false);
     }

@@ -29,9 +29,19 @@ class User(AbstractUser):
     role = models.CharField(max_length=30, choices=ROLE_CHOICES, default='student')
     active_roles = models.JSONField(default=list, blank=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
-    pen_name = models.CharField(max_length=255, blank=True, default='')
+    
+    # Identité d'Auteur & Affiliation
+    pen_name = models.CharField(max_length=255, blank=True, default='') # Facultatif
+    university_affiliation = models.CharField(max_length=255, blank=True, default='')
     bio = models.TextField(blank=True, default='')
     institution = models.ForeignKey('partners.Institution', null=True, blank=True, on_delete=models.SET_NULL, related_name='members')
+    
+    # Coordonnées Financières & Versement (Droits d'Auteur / Editeur)
+    bank_name = models.CharField(max_length=100, blank=True, default='')
+    iban = models.CharField(max_length=50, blank=True, default='')
+    swift = models.CharField(max_length=20, blank=True, default='')
+    momo_number = models.CharField(max_length=30, blank=True, default='')
+    
     is_suspended = models.BooleanField(default=False)
     suspension_reason = models.TextField(blank=True, default='')
     is_verified = models.BooleanField(default=False)

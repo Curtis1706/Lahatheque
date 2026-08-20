@@ -7,7 +7,7 @@ export type LayoutDepositStatus =
   | "revision_requested" // Correction demandée par le Chef Maquettiste
   | "published";         // Validé et publié sur la vitrine publique
 
-export type ClassificationSource = "ai_suggested" | "manual_override";
+export type ClassificationSource = "ai_suggested" | "manual_override" | "manual";
 
 export type DRMProtectionStatus = "applied" | "pending" | "none";
 
@@ -66,11 +66,22 @@ export interface LayoutDeposit {
   admin_price?: number;
 }
 
+export interface SparklinePoint {
+  date: string;
+  value: number;
+}
+
 export interface MaquettisteKpi {
   draftCount: number;
   pendingValidationCount: number;
   revisionRequestedCount: number;
   publishedCount: number;
+  timelines?: {
+    pending: SparklinePoint[];
+    published: SparklinePoint[];
+    drafts: SparklinePoint[];
+    rejected: SparklinePoint[];
+  };
 }
 
 export interface ChefMaquettisteKpi {
@@ -78,6 +89,11 @@ export interface ChefMaquettisteKpi {
   validatedThisMonth: number;
   revisionRequestedThisMonth: number;
   averageProcessingTimeHours: number;
+  timelines?: {
+    pending: SparklinePoint[];
+    published: SparklinePoint[];
+    rejected: SparklinePoint[];
+  };
 }
 
 export type DepositFilterStatus = "all" | "draft" | "pending_validation" | "revision_requested" | "published";

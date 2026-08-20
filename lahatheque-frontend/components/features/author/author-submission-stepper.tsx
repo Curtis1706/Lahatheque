@@ -25,7 +25,7 @@ export function AuthorSubmissionStepper({ submission, className }: AuthorSubmiss
     <div className={`p-6 rounded-3xl bg-background border border-border space-y-6 shadow-xs ${className}`}>
       <div className="flex items-center justify-between border-b border-border pb-3">
         <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider">
-          Suivi des 2 Étapes du Dépôt (Section 4.1 Cahier v3.2)
+          Suivi du Circuit Éditorial en 2 Étapes
         </h3>
         <span className="text-[10px] text-foreground-muted font-mono uppercase font-bold">
           {submission.version_type}
@@ -38,11 +38,11 @@ export function AuthorSubmissionStepper({ submission, className }: AuthorSubmiss
         <div
           className={`p-4 rounded-2xl border transition-all space-y-2 ${
             isStage1Done
-              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-900"
+              ? "bg-success/10 border-success/30 text-success"
               : isRejected
-              ? "bg-rose-500/10 border-rose-500/30 text-rose-900"
+              ? "bg-error/10 border-error/30 text-error"
               : isCorrectionRequested
-              ? "bg-amber-500/10 border-amber-500/30 text-amber-900"
+              ? "bg-warning/10 border-warning/30 text-warning"
               : "bg-navy/5 border-navy/20 text-navy"
           }`}
         >
@@ -51,9 +51,9 @@ export function AuthorSubmissionStepper({ submission, className }: AuthorSubmiss
               Étape 1 — Évaluation Éditoriale
             </span>
             {isStage1Done ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <CheckCircle2 className="w-4 h-4 text-success" />
             ) : (
-              <Clock className="w-4 h-4 text-amber-600" />
+              <Clock className="w-4 h-4 text-warning" />
             )}
           </div>
           <h4 className="font-serif font-bold text-sm">Examen par l&apos;Équipe LAHA Éditions</h4>
@@ -72,7 +72,7 @@ export function AuthorSubmissionStepper({ submission, className }: AuthorSubmiss
         <div
           className={`p-4 rounded-2xl border transition-all space-y-2 ${
             isPublished
-              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-900"
+              ? "bg-success/10 border-success/30 text-success"
               : isStage1Done
               ? "bg-navy/5 border-navy/20 text-navy"
               : "bg-background-secondary border-border text-foreground-muted opacity-60"
@@ -93,20 +93,20 @@ export function AuthorSubmissionStepper({ submission, className }: AuthorSubmiss
             {isPublished
               ? "Ouvrage publié ! Disponible à la vente et visible dans Mes Livres."
               : isStage1Done
-              ? "Prise en charge par le Maquettiste (mise en forme, métadonnées, DRM LCP)."
+              ? "Prise en charge par le Maquettiste (mise en forme, métadonnées, DRM & Tatouage Numérique)."
               : "En attente de validation de l'Étape 1."}
           </p>
         </div>
       </div>
 
-      {/* Commentaires ou Notes de l'Équipe Éditoriale */}
+      {/* Note de Suivi si présente */}
       {submission.review_notes && (
-        <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-1 text-xs">
-          <span className="font-bold text-navy block flex items-center gap-1.5">
-            <FileText className="w-4 h-4 text-gold" />
-            Commentaires de l&apos;Équipe Éditoriale :
+        <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 text-xs text-navy space-y-1">
+          <span className="font-bold flex items-center gap-1.5 uppercase text-[10px] tracking-wider">
+            <AlertCircle className="w-3.5 h-3.5 text-gold" />
+            Remarques du Comité Éditorial :
           </span>
-          <p className="text-foreground-muted leading-relaxed italic">{submission.review_notes}</p>
+          <p className="italic text-foreground-muted leading-relaxed">« {submission.review_notes} »</p>
         </div>
       )}
     </div>

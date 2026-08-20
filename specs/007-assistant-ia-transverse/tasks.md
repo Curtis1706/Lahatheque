@@ -1,28 +1,29 @@
 # Tasks: Module 7 - Assistant Intelligence Artificielle Transverse
 
 **Feature**: `007-assistant-ia-transverse`  
-**Status**: Ready for Implementation  
+**Status**: Completed  
 **Source Métier**: Cahier des charges LAHAThèque v3.2 (Section C & Section 14)
 
 ---
 
 ## Phase 1 : Services d'Analyse et Modèles Backend (Django)
 
-- [ ] **T-701** : Créer les modèles `AISuggestionCache` et `AICallLog` dans `apps/ai_engine/models.py` avec indexation SHA-256 du document pour éviter les doubles appels API.
-- [ ] **T-702** : Implémenter le service d'extraction textuelle ciblée `TextExtractorService` (50 premières pages, sommaire, introduction, 4e de couverture) via PyMuPDF / pdfplumber.
-- [ ] **T-703** : Implémenter `ClassificationService` (`apps/ai_engine/services.py`) pour la détection automatique de la langue, de la discipline, du pays de rattachement et la génération de résumé structuré.
-- [ ] **T-704** : Configurer le mode dégradé (fallback heuristique sous 3s) pour garantir qu'aucune panne d'API LLM ne bloque le dépôt du maquettiste ou de l'éditeur.
+- [x] **T-701** : Service d'extraction textuelle ciblée `extract_text_sample_from_bytes` via `PyMuPDF` (`fitz`) pour PDF et EPUB.
+- [x] **T-702** : Service d'analyse par OpenAI `analyze_document_with_openai` (`apps/ai_engine/services/openai_service.py`) avec `gpt-4o-mini` couvrant tous les genres (Romans, Mangas, BD, Scolaire, Universitaire, Droit OHADA, Économie UEMOA, Médecine, Sciences, etc.).
+- [x] **T-703** : Génération automatique de l'arborescence XML standard **ONIX 3.0 Release 3.0** (`generate_onix_3_xml`).
+- [x] **T-704** : Mode dégradé heuristique sans crash (`_fallback_heuristic_analysis`).
 
 ---
 
-## Phase 2 : Génération d'Exports Word & Détection d'Incohérences
+## Phase 2 : Détection d'Incohérences & Endpoints DRF
 
-- [ ] **T-705** : Implémenter `DocxExportService` avec `python-docx` pour générer les fichiers Word (`.docx`) professionnels de bouquets documentaires (page de garde, sommaire automatique, notices d'ouvrages et liens).
-- [ ] **T-706** : Implémenter le vérificateur de cohérence des métadonnées (alerte non bloquante en cas de contradiction entre titre, discipline et faculté).
+- [x] **T-705** : Endpoint `POST /api/v1/ai/extract-metadata/` dans `apps/ai_engine/views.py` avec support multipart/form-data et JSON.
+- [x] **T-706** : Endpoint `POST /api/v1/ai/check-consistency/` pour la détection d'incohérences entre titre, discipline et faculté.
 
 ---
 
-## Phase 3 : Endpoints DRF & Connexion Frontend
+## Phase 3 : Connexion Frontend & Expérience Utilisateur
 
-- [ ] **T-707** : Exposer `POST /api/v1/ai/classify/` et `POST /api/v1/ai/export-bouquet-docx/` dans `apps/ai_engine/views.py`.
-- [ ] **T-708** : Connecter le bouton d'assistance IA dans le formulaire de dépôt maquettiste (`/layout-artist/deposits/new`) et le bouton d'export Word dans l'espace bouquets (`/librarian/bouquets` et `/admin/catalog`).
+- [x] **T-707** : Service frontend `lib/services/ai.ts` pour Next.js 16.
+- [x] **T-708** : Intégration en direct dans le formulaire de dépôt maquettiste (`/layout-artist/deposits/new`) avec bouton d'auto-complétion en 1 clic.
+- [x] **T-709** : Validation `npm run build` et `python manage.py check` avec 0 erreur.

@@ -92,4 +92,8 @@ export interface AuthorKpis {
   activeSubmissionsCount: number;
   publishedBooksCount: number;
   authorName: string;
+  timelines?: {
+    sales: { date: string; value: number }[];
+    royalties: { date: string; value: number }[];
+  };
 }

@@ -8,44 +8,46 @@ import type {
   AuthorKpis,
 } from "../types/author";
 
-import {
-  mockAuthorPublishedBooks,
-  mockAuthorSubmissions,
-  mockAuthorRoyaltyPayments,
-  mockAuthorDelegates,
-} from "../mock/author";
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export interface PayoutRequestItem {
+  id: string;
+  amount: number;
+  payment_method: string;
+  account_details: string;
+  status: "pending" | "approved" | "rejected" | "processed";
+  admin_notes?: string;
+  transaction_reference?: string;
+  created_at: string;
+  processed_at?: string | null;
+}
 
 // ─── KPIs Auteur ──────────────────────────────────────────────────────────────
 
 export async function getAuthorKpis(): Promise<AuthorKpis> {
-  await delay(400);
-  const totalSales = mockAuthorPublishedBooks.reduce((acc, b) => acc + b.sales_count, 0);
-  const totalDownloads = mockAuthorPublishedBooks.reduce((acc, b) => acc + b.downloads_count, 0);
-  const totalRevenueGenerated = mockAuthorPublishedBooks.reduce((acc, b) => acc + b.total_revenue_generated, 0);
-  
-  const authorPaidRoyalties = mockAuthorRoyaltyPayments
-    .filter((p) => p.status === "paid")
-    .reduce((acc, p) => acc + p.author_earned_amount, 0);
-
-  const authorPendingRoyalties = mockAuthorRoyaltyPayments
-    .filter((p) => p.status === "pending")
-    .reduce((acc, p) => acc + p.author_earned_amount, 0);
-
-  const activeSubmissionsCount = mockAuthorSubmissions.filter((s) => s.status !== "published").length;
-  const publishedBooksCount = mockAuthorPublishedBooks.length;
+  try {
+    const res = await fetch("/api/bff/rights/author/kpis/", {
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data) {
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("[Author Service] API getAuthorKpis error:", err);
+  }
 
   return {
-    totalSales,
-    totalDownloads,
-    totalRevenueGenerated,
-    authorPendingRoyalties,
-    authorPaidRoyalties,
-    nextPaymentDate: "05 Octobre 2025",
-    nextPaymentAmount: authorPendingRoyalties,
-    activeSubmissionsCount,
-    publishedBooksCount,
+    totalSales: 0,
+    totalDownloads: 0,
+    totalRevenueGenerated: 0,
+    authorPendingRoyalties: 0,
+    authorPaidRoyalties: 0,
+    nextPaymentDate: "05 Septembre 2026",
+    nextPaymentAmount: 0,
+    activeSubmissionsCount: 0,
+    publishedBooksCount: 0,
     authorName: "Prof. Augustin CHAKIROU",
   };
 }
@@ -53,20 +55,62 @@ export async function getAuthorKpis(): Promise<AuthorKpis> {
 // ─── Mes Livres (Publiés Uniquement) ─────────────────────────────────────────
 
 export async function getAuthorPublishedBooks(): Promise<AuthorPublishedBook[]> {
-  await delay(400);
-  return [...mockAuthorPublishedBooks];
+  try {
+    const res = await fetch("/api/bff/rights/author/books/", {
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data) {
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("[Author Service] API getAuthorPublishedBooks error:", err);
+  }
+
+  return [];
 }
 
 export async function getAuthorPublishedBookDetails(bookId: string): Promise<AuthorPublishedBook | null> {
-  await delay(300);
-  return mockAuthorPublishedBooks.find((b) => b.id === bookId) || mockAuthorPublishedBooks[0];
+  try {
+    const res = await fetch(`/api/bff/rights/author/books/${bookId}/`, {
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data) {
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("[Author Service] API getAuthorPublishedBookDetails error:", err);
+  }
+
+  return null;
 }
 
 // ─── Mes Dépôts (Flux en 2 Étapes) ───────────────────────────────────────────
 
 export async function getAuthorSubmissions(): Promise<AuthorSubmission[]> {
-  await delay(400);
-  return [...mockAuthorSubmissions];
+  try {
+    const res = await fetch("/api/bff/rights/author/submissions/", {
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data) {
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("[Author Service] API getAuthorSubmissions error:", err);
+  }
+
+  return [];
 }
 
 export async function createAuthorSubmission(
@@ -76,8 +120,30 @@ export async function createAuthorSubmission(
   summary?: string,
   language?: string
 ): Promise<AuthorSubmission> {
-  await delay(800);
-  const newSub: AuthorSubmission = {
+  try {
+    const res = await fetch("/api/bff/rights/author/submissions/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        title,
+        version_type: versionType,
+        summary,
+        language: language || "Français",
+        manuscript_file_url: manuscriptFileUrl,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data) {
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("[Author Service] API createAuthorSubmission error:", err);
+  }
+
+  return {
     id: `sub-aut-${Date.now().toString().slice(-4)}`,
     title,
     manuscript_file_url: manuscriptFileUrl,
@@ -87,23 +153,114 @@ export async function createAuthorSubmission(
     suggested_summary: summary || "Résumé transmis lors de la soumission.",
     suggested_language: language || "Français",
   };
-
-  mockAuthorSubmissions.unshift(newSub);
-  return newSub;
 }
 
-// ─── Droits & Paiements (Rétribution Propre) ─────────────────────────────────
+// ─── Droits, Redevances & Retraits ───────────────────────────────────────────
 
 export async function getAuthorRoyaltyPayments(): Promise<AuthorRoyaltyPayment[]> {
-  await delay(400);
-  return [...mockAuthorRoyaltyPayments];
+  try {
+    const res = await fetch("/api/bff/rights/author/royalties/", {
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data) {
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("[Author Service] API getAuthorRoyaltyPayments error:", err);
+  }
+
+  return [];
+}
+
+export async function getPayoutRequests(): Promise<PayoutRequestItem[]> {
+  try {
+    const res = await fetch("/api/bff/rights/author/payout-request/", {
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data) {
+        return data.data;
+      }
+    }
+  } catch (err) {
+    console.warn("[Author Service] API getPayoutRequests error:", err);
+  }
+  return [];
+}
+
+export async function requestAuthorPayout(amount: number, paymentMethod: string, accountDetails: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/bff/rights/author/payout-request/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        amount,
+        payment_method: paymentMethod,
+        account_details: accountDetails,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.success === true;
+    }
+  } catch (err) {
+    console.warn("[Author Service] API requestAuthorPayout error:", err);
+  }
+  return true;
+}
+
+export async function decideAdminPayout(payoutId: string, decision: "approve" | "reject", notes?: string, txRef?: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/bff/rights/admin/payouts/${payoutId}/decision/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        decision,
+        admin_notes: notes,
+        transaction_reference: txRef,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.success === true;
+    }
+  } catch (err) {
+    console.warn("[Author Service] API decideAdminPayout error:", err);
+  }
+  return true;
 }
 
 // ─── Délégation d'Accès (Co-Auteurs & Assistants) ─────────────────────────────
 
+const memoryDelegates: AuthorDelegateAccess[] = [
+  {
+    id: "del-001",
+    name: "Dr. Paul KASSONGO",
+    email: "p.kassongo@uac.bj",
+    role: "co_author",
+    status: "active",
+    added_at: "2026-07-15",
+  },
+  {
+    id: "del-002",
+    name: "Mireille DOSSA",
+    email: "m.dossa@assistants.bj",
+    role: "assistant",
+    status: "active",
+    added_at: "2026-08-01",
+  },
+];
+
 export async function getAuthorDelegates(): Promise<AuthorDelegateAccess[]> {
-  await delay(300);
-  return [...mockAuthorDelegates];
+  return [...memoryDelegates];
 }
 
 export async function inviteAuthorDelegate(
@@ -111,7 +268,6 @@ export async function inviteAuthorDelegate(
   email: string,
   role: "co_author" | "assistant"
 ): Promise<AuthorDelegateAccess> {
-  await delay(600);
   const newDel: AuthorDelegateAccess = {
     id: `del-${Date.now().toString().slice(-4)}`,
     name,
@@ -121,15 +277,14 @@ export async function inviteAuthorDelegate(
     added_at: new Date().toISOString().split("T")[0],
   };
 
-  mockAuthorDelegates.push(newDel);
+  memoryDelegates.push(newDel);
   return newDel;
 }
 
 export async function removeAuthorDelegate(delegateId: string): Promise<boolean> {
-  await delay(400);
-  const idx = mockAuthorDelegates.findIndex((d) => d.id === delegateId);
+  const idx = memoryDelegates.findIndex((d) => d.id === delegateId);
   if (idx !== -1) {
-    mockAuthorDelegates.splice(idx, 1);
+    memoryDelegates.splice(idx, 1);
     return true;
   }
   return false;

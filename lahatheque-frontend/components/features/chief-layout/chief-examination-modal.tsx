@@ -168,13 +168,13 @@ export function ChiefExaminationModal({
                 </p>
               </div>
 
-              {/* DRM & Audio */}
+              {/* DRM & Filigrane */}
               <div className="p-3.5 rounded-2xl bg-background-secondary border border-border flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-gold" />
-                  <span className="font-semibold text-navy">Sécurité DRM &amp; Protections Audio</span>
+                  <span className="font-semibold text-navy">Sécurité &amp; Filigrane Numérique DRM</span>
                 </div>
-                <StatusBadge status="approved" leftLabel="Protection LCP Active ✓" />
+                <StatusBadge status="approved" leftLabel="Filigrane &amp; DRM Actifs" />
               </div>
 
               {/* Actions de Décision */}

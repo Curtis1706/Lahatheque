@@ -68,8 +68,18 @@ class ProfileView(APIView):
             user.country = data.get('country', 'BJ')
         if 'pen_name' in data:
             user.pen_name = data.get('pen_name', '').strip()
+        if 'university_affiliation' in data:
+            user.university_affiliation = data.get('university_affiliation', '').strip()
         if 'bio' in data:
             user.bio = data.get('bio', '').strip()
+        if 'bank_name' in data:
+            user.bank_name = data.get('bank_name', '').strip()
+        if 'iban' in data:
+            user.iban = data.get('iban', '').strip()
+        if 'swift' in data:
+            user.swift = data.get('swift', '').strip()
+        if 'momo_number' in data:
+            user.momo_number = data.get('momo_number', '').strip()
 
         # Gestion de l'upload de photo de profil
         if 'avatar' in request.FILES:
@@ -78,6 +88,32 @@ class ProfileView(APIView):
         user.save()
         payload = _build_user_payload(user)
         return Response({"success": True, "data": payload, "message": "Profil mis à jour avec succès."}, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        current_password = request.data.get("current_password", "")
+        new_password = request.data.get("new_password", "")
+        confirm_password = request.data.get("confirm_password", "")
+
+        if not current_password or not new_password:
+            return Response({"success": False, "error": "Veuillez renseigner le mot de passe actuel et le nouveau mot de passe."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.check_password(current_password):
+            return Response({"success": False, "error": "Le mot de passe actuel est incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_password != confirm_password:
+            return Response({"success": False, "error": "Le nouveau mot de passe et sa confirmation ne correspondent pas."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(new_password) < 8:
+            return Response({"success": False, "error": "Le mot de passe doit comporter au moins 8 caractères."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({"success": True, "message": "Votre mot de passe a été modifié avec succès."}, status=status.HTTP_200_OK)
 
 
 class LogoutView(APIView):

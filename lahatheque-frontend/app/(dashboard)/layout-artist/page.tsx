@@ -18,6 +18,21 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+// Générateur de timeline dynamique basée sur la date réelle
+const getRollingTimeline = (count: number) => {
+  const monthNames = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
+  const now = new Date();
+  const res = [];
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+    res.push({
+      date: `${String(d.getDate()).padStart(2, "0")} ${monthNames[d.getMonth()]}`,
+      value: i === 0 ? count : Math.max(0, count - i),
+    });
+  }
+  return res;
+};
+
 export default function MaquettisteOverviewPage() {
   const { user } = useAuth();
   const [kpis, setKpis] = useState<MaquettisteKpi | null>(null);
@@ -39,7 +54,7 @@ export default function MaquettisteOverviewPage() {
   }, []);
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8 animate-in fade-in duration-300">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
         <div>
@@ -48,7 +63,7 @@ export default function MaquettisteOverviewPage() {
             Espace Maquettiste • Création du Catalogue
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
-            Bonjour, {user?.first_name || "Maquettiste"} 👋
+            Bonjour, {user?.first_name || "Maquettiste"}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
             Déposez les ouvrages, classifiez-les avec l&apos;aide de l&apos;IA et préparez les publications.
@@ -64,77 +79,57 @@ export default function MaquettisteOverviewPage() {
         </Link>
       </div>
 
-      {/* 4 KPI Cards */}
+      {/* 4 KPI Cards Connectées au Backend */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link href="/layout-artist/deposits?status=draft" className="block">
           <ProgressMetricCard
             title="Dépôts en Brouillon"
-            total={`${kpis?.draftCount || 1} ouvrage${(kpis?.draftCount || 1) > 1 ? "s" : ""}`}
+            total={`${kpis?.draftCount ?? 0} ouvrage${(kpis?.draftCount ?? 0) > 1 ? "s" : ""}`}
             percent="En cours"
             trend="up"
             accent="neutral"
-            delta="+1 cette semaine"
-            deltaLabel="à finaliser"
-            data={[
-              { value: 0, date: "01 Juil" },
-              { value: 1, date: "08 Juil" },
-              { value: 1, date: "15 Juil" },
-              { value: 1, date: "22 Juil" },
-            ]}
+            delta="À finaliser"
+            deltaLabel="cette semaine"
+            data={kpis?.timelines?.drafts || getRollingTimeline(kpis?.draftCount ?? 0)}
           />
         </Link>
 
         <Link href="/layout-artist/deposits?status=pending_validation" className="block">
           <ProgressMetricCard
             title="En Attente de Validation"
-            total={`${kpis?.pendingValidationCount || 1} dépôt${(kpis?.pendingValidationCount || 1) > 1 ? "s" : ""}`}
+            total={`${kpis?.pendingValidationCount ?? 0} dépôt${(kpis?.pendingValidationCount ?? 0) > 1 ? "s" : ""}`}
             percent="Transmis"
             trend="up"
             accent="gold"
             delta="Chef Maquettiste"
             deltaLabel="en étude"
-            data={[
-              { value: 0, date: "01 Juil" },
-              { value: 0, date: "08 Juil" },
-              { value: 1, date: "15 Juil" },
-              { value: 1, date: "22 Juil" },
-            ]}
+            data={kpis?.timelines?.pending || getRollingTimeline(kpis?.pendingValidationCount ?? 0)}
           />
         </Link>
 
         <Link href="/layout-artist/deposits?status=revision_requested" className="block">
           <ProgressMetricCard
             title="Corrections Demandées"
-            total={`${kpis?.revisionRequestedCount || 1} dossier${(kpis?.revisionRequestedCount || 1) > 1 ? "s" : ""}`}
+            total={`${kpis?.revisionRequestedCount ?? 0} dossier${(kpis?.revisionRequestedCount ?? 0) > 1 ? "s" : ""}`}
             percent="Action requise"
             trend="down"
             accent="rose"
             delta="Commentaire chef"
             deltaLabel="à traiter"
-            data={[
-              { value: 0, date: "01 Juil" },
-              { value: 1, date: "08 Juil" },
-              { value: 1, date: "15 Juil" },
-              { value: 1, date: "22 Juil" },
-            ]}
+            data={kpis?.timelines?.rejected || getRollingTimeline(kpis?.revisionRequestedCount ?? 0)}
           />
         </Link>
 
         <Link href="/layout-artist/deposits?status=published" className="block">
           <ProgressMetricCard
             title="Publiés sur la Vitrine"
-            total={`${kpis?.publishedCount || 1} livre${(kpis?.publishedCount || 1) > 1 ? "s" : ""}`}
+            total={`${kpis?.publishedCount ?? 0} livre${(kpis?.publishedCount ?? 0) > 1 ? "s" : ""}`}
             percent="En ligne"
             trend="up"
             accent="emerald"
-            delta="+1 ce mois"
-            deltaLabel="validé"
-            data={[
-              { value: 0, date: "01 Juil" },
-              { value: 0, date: "08 Juil" },
-              { value: 1, date: "15 Juil" },
-              { value: 1, date: "22 Juil" },
-            ]}
+            delta="Validé"
+            deltaLabel="en vitrine"
+            data={kpis?.timelines?.published || getRollingTimeline(kpis?.publishedCount ?? 0)}
           />
         </Link>
       </div>
@@ -143,8 +138,8 @@ export default function MaquettisteOverviewPage() {
       <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
         <div className="pb-3 border-b border-border flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold font-serif text-navy">Actions Rapides &amp; Raccourcis</h2>
-            <p className="text-[11px] text-foreground-muted mt-0.5">Accès direct à la gestion du catalogue</p>
+            <h2 className="text-base font-bold font-serif text-navy">Actions Rapides &amp; Outils</h2>
+            <p className="text-[11px] text-foreground-muted mt-0.5">Accès direct aux tâches fréquentes</p>
           </div>
           <Link
             href="/layout-artist/deposits"
@@ -170,7 +165,7 @@ export default function MaquettisteOverviewPage() {
               href: "/layout-artist/deposits",
             },
             {
-              label: "Corrections URGENTES",
+              label: "Corrections Demandées",
               desc: "Voir les demandes de retouche du Chef Maquettiste",
               icon: AlertCircle,
               href: "/layout-artist/deposits?status=revision_requested",

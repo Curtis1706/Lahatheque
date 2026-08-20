@@ -3,12 +3,61 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Sparkles, Save, Send, Plus, CheckCircle2, ShieldCheck } from "lucide-react";
+import { 
+  ArrowLeft, 
+  Sparkles, 
+  Save, 
+  Send, 
+  Plus, 
+  CheckCircle2, 
+  ShieldCheck,
+  BookOpen,
+  FileCode,
+  AlertCircle,
+  Wand2,
+  Layers,
+  GraduationCap,
+  Tag,
+  Check
+} from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper, DEPOSIT_STEPS } from "@/components/features/layout-artist/deposit-wizard-stepper";
-import { createDeposit, simulateAiDetection } from "@/lib/services/layout-artist";
+import { createDeposit } from "@/lib/services/layout-artist";
+import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/ai";
 import type { ClassificationSource } from "@/lib/types/layout-artist";
+import { toast } from "sonner";
+
+// Catégories universelles de la bibliothèque
+const GENRE_CATEGORIES = [
+  { label: "Romans, Nouvelles & Récits", dewey: "840", faculty: null },
+  { label: "Mangas, Bandes Dessinées & Comics", dewey: "741.5", faculty: null },
+  { label: "Littérature Africaine & Conte", dewey: "800", faculty: "Faculté des Lettres, Langues, Arts et Communication (FLLAC)" },
+  { label: "Jeunesse & Éveil", dewey: "808", faculty: null },
+  { label: "Manuels Scolaires (Primaire / Collège / Lycée)", dewey: "370", faculty: null },
+  { label: "Droit Privé, Droit des Affaires OHADA & Sciences Politiques", dewey: "340", faculty: "Faculté de Droit et de Science Politique (FADESP)" },
+  { label: "Sciences Économiques, Gestion & Finances UEMOA", dewey: "330", faculty: "Faculté des Sciences Économiques et de Gestion (FASEG)" },
+  { label: "Médecine, Pharmacopée & Santé Publique Tropicale", dewey: "610", faculty: "Faculté des Sciences de la Santé (FSS)" },
+  { label: "Sciences Exactes, Informatique & Technologies", dewey: "500", faculty: "Faculté des Sciences et Techniques (FAST)" },
+  { label: "Agronomie Tropicale & Développement Rural", dewey: "630", faculty: "Faculté des Sciences Agronomiques (FSA)" },
+  { label: "Histoire, Civilisations & Patrimoine Africain", dewey: "960", faculty: "Faculté des Lettres, Langues, Arts et Communication (FLLAC)" },
+  { label: "Philosophie, Psychologie & Sciences Humaines", dewey: "100", faculty: "Faculté des Sciences Humaines et Sociales (FASHS)" },
+  { label: "Développement Personnel, Essais & Société", dewey: "150", faculty: null },
+  { label: "Arts, Culture, Cuisine & Musique", dewey: "700", faculty: null },
+];
+
+const AFRICAN_UNIVERSITIES = [
+  "Non affilié (Grand Public / Fiction / Scolaire)",
+  "Université d'Abomey-Calavi (UAC - Bénin)",
+  "Université de Parakou (UP - Bénin)",
+  "Université Cheikh Anta Diop (UCAD - Sénégal)",
+  "Université Félix Houphouët-Boigny (UFHB - Côte d'Ivoire)",
+  "Université de Lomé (UL - Togo)",
+  "Université Abdou Moumouni (UAM - Niger)",
+  "Université de Yaoundé I (Cameroun)",
+  "Université Joseph Ki-Zerbo (Burkina Faso)",
+  "Université de Kinshasa (UNIKIN - RDC)",
+];
 
 export default function NewDepositPage() {
   const router = useRouter();
@@ -19,48 +68,97 @@ export default function NewDepositPage() {
   const [bookFile, setBookFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | undefined>(undefined);
-  const [audioFile, setAudioFile] = useState<File | null>(null);
 
   // Metadata State
   const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
   const [authorsStr, setAuthorsStr] = useState("");
   const [year, setYear] = useState(2026);
   const [language, setLanguage] = useState("Français");
-  const [languageSource, setLanguageSource] = useState<ClassificationSource>("ai_suggested");
   const [summary, setSummary] = useState("");
-  const [summarySource, setSummarySource] = useState<ClassificationSource>("ai_suggested");
   const [isbn, setIsbn] = useState("");
 
   // Classification State
+  const [genreCategory, setGenreCategory] = useState("Littérature Africaine & Conte");
+  const [deweyCode, setDeweyCode] = useState("800");
   const [country, setCountry] = useState("BJ");
-  const [university, setUniversity] = useState("Université d'Abomey-Calavi (UAC)");
-  const [faculty, setFaculty] = useState("Faculté de Droit et de Science Politique (FADESP)");
-  const [discipline, setDiscipline] = useState("Droit & Sciences Politiques");
-  const [classificationSource, setClassificationSource] = useState<ClassificationSource>("ai_suggested");
+  const [university, setUniversity] = useState("Université d'Abomey-Calavi (UAC - Bénin)");
+  const [faculty, setFaculty] = useState("Faculté des Lettres, Langues, Arts et Communication (FLLAC)");
+  const [targetAudience, setTargetAudience] = useState("Grand Public & Universitaire");
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [onixXml, setOnixXml] = useState<string>("");
 
-  // IA Loading State
+  // IA State
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<AiBookAnalysisResult | null>(null);
 
   const handleBookFileSelect = async (file: File) => {
     setBookFile(file);
     if (!title) {
-      // Pré-remplir le titre à partir du nom de fichier sans extension
-      const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+      const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ").replace(/-/g, " ");
       setTitle(cleanName);
     }
-    // Déclencher la détection IA
+
+    // Déclencher l'analyse IA automatique
     setAiLoading(true);
-    const aiData = await simulateAiDetection(file.name);
-    setLanguage(aiData.language);
-    setDiscipline(aiData.discipline);
-    setFaculty(aiData.faculty);
-    if (!summary) setSummary(aiData.summary);
+    toast.info("Analyse IA du document en cours (OpenAI & PyMuPDF)...");
+    
+    const res = await extractBookMetadataWithAi(file, file.name);
     setAiLoading(false);
+
+    if (res.success && res.data) {
+      setAiResult(res.data);
+      toast.success("Suggestions IA générées ! Vous pouvez tout appliquer ou choisir champ par champ.");
+      
+      // Auto-application initiale intelligente si les champs sont encore vides
+      if (!title || title === file.name.replace(/\.[^/.]+$/, "")) setTitle(res.data.title);
+      if (!subtitle && res.data.subtitle) setSubtitle(res.data.subtitle);
+      if (!authorsStr) setAuthorsStr(res.data.authors.join(", "));
+      if (!summary) setSummary(res.data.summary);
+      if (res.data.isbn) setIsbn(res.data.isbn);
+      if (res.data.dewey_code) setDeweyCode(res.data.dewey_code);
+      if (res.data.genre_category) setGenreCategory(res.data.genre_category);
+      if (res.data.language) setLanguage(res.data.language);
+      if (res.data.country) setCountry(res.data.country);
+      if (res.data.institution_suggestion) setUniversity(res.data.institution_suggestion);
+      if (res.data.faculty_suggestion) setFaculty(res.data.faculty_suggestion);
+      if (res.data.keywords) setKeywords(res.data.keywords);
+      if (res.data.onix_3_xml) setOnixXml(res.data.onix_3_xml);
+    }
+  };
+
+  const handleApplyAllAiData = () => {
+    if (!aiResult) return;
+    setTitle(aiResult.title);
+    if (aiResult.subtitle) setSubtitle(aiResult.subtitle);
+    setAuthorsStr(aiResult.authors.join(", "));
+    setSummary(aiResult.summary);
+    setIsbn(aiResult.isbn);
+    setDeweyCode(aiResult.dewey_code);
+    setGenreCategory(aiResult.genre_category);
+    setLanguage(aiResult.language);
+    setCountry(aiResult.country);
+    if (aiResult.institution_suggestion) setUniversity(aiResult.institution_suggestion);
+    if (aiResult.faculty_suggestion) setFaculty(aiResult.faculty_suggestion);
+    if (aiResult.keywords) setKeywords(aiResult.keywords);
+    if (aiResult.onix_3_xml) setOnixXml(aiResult.onix_3_xml);
+    toast.success("Toutes les suggestions IA ont été appliquées !");
   };
 
   const handleCoverSelect = (file: File) => {
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const handleGenreChange = (newGenre: string) => {
+    setGenreCategory(newGenre);
+    const found = GENRE_CATEGORIES.find((g) => g.label === newGenre);
+    if (found) {
+      setDeweyCode(found.dewey);
+      if (found.faculty) {
+        setFaculty(found.faculty);
+      }
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -71,17 +169,17 @@ export default function NewDepositPage() {
         authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur"],
         publication_year: year,
         language,
-        language_source: languageSource,
+        language_source: aiResult ? "ai_suggested" : "manual",
         summary,
-        summary_source: summarySource,
+        summary_source: aiResult ? "ai_suggested" : "manual",
         isbn,
       },
       classification: {
         country,
         university,
         faculty,
-        discipline,
-        source: classificationSource,
+        discipline: genreCategory,
+        source: aiResult ? "ai_suggested" : "manual",
       },
       files: {
         format: bookFile?.name.endsWith(".epub") ? "EPUB" : "PDF",
@@ -91,28 +189,34 @@ export default function NewDepositPage() {
       status: "draft",
     });
     setSaving(false);
+    toast.success("Brouillon sauvegardé avec succès.");
     router.push(`/layout-artist/deposits/${dep.id}`);
   };
 
   const handleSubmitValidation = async () => {
+    if (!title || !bookFile) {
+      toast.error("Veuillez sélectionner le fichier du livre et renseigner au minimum le titre.");
+      return;
+    }
+
     setSaving(true);
     const dep = await createDeposit({
       metadata: {
-        title: title || "Nouveau Dépôt",
+        title: title,
         authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur"],
         publication_year: year,
         language,
-        language_source: languageSource,
+        language_source: aiResult ? "ai_suggested" : "manual",
         summary,
-        summary_source: summarySource,
+        summary_source: aiResult ? "ai_suggested" : "manual",
         isbn,
       },
       classification: {
         country,
         university,
         faculty,
-        discipline,
-        source: classificationSource,
+        discipline: genreCategory,
+        source: aiResult ? "ai_suggested" : "manual",
       },
       files: {
         format: bookFile?.name.endsWith(".epub") ? "EPUB" : "PDF",
@@ -121,365 +225,615 @@ export default function NewDepositPage() {
       },
       status: "pending_validation",
     });
+
     setSaving(false);
+    toast.success("Maquette soumise au Chef Maquettiste avec succès !");
     router.push("/layout-artist/deposits");
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
-        <Link href="/layout-artist" className="hover:text-navy">Vue d&apos;ensemble</Link>
+        <Link href="/layout-artist" className="hover:text-navy">Espace Maquettiste</Link>
         <span>/</span>
-        <Link href="/layout-artist/deposits" className="hover:text-navy">Mes Dépôts</Link>
+        <Link href="/layout-artist/deposits" className="hover:text-navy">Dépôts</Link>
         <span>/</span>
         <span className="text-navy font-semibold">Nouveau Dépôt</span>
       </div>
 
       {/* Header */}
-      <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <Link href="/layout-artist/deposits" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Retour à mes dépôts
+            Retour à la liste des dépôts
           </Link>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Nouveau Dépôt d&apos;Ouvrage
+            Déposer une Nouvelle Maquette
           </h1>
-          <p className="text-xs text-foreground-muted mt-1">
-            Déposez le livre papier ou numérique, saisissez les métadonnées et profitez des suggestions de l&apos;IA.
+          <p className="text-xs text-foreground-muted mt-0.5">
+            Téléversez votre épreuve PDF ou EPUB et personnalisez les suggestions extraites par l&apos;IA.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            type="button"
             onClick={handleSaveDraft}
-            disabled={saving}
-            className="px-4 py-2.5 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy text-xs font-bold transition-colors flex items-center gap-2 min-h-[44px]"
+            disabled={saving || !bookFile}
+            className="px-4 py-2.5 rounded-xl border border-border bg-background hover:bg-background-secondary text-xs font-bold text-navy flex items-center gap-1.5 shadow-xs transition-colors min-h-[44px] cursor-pointer"
           >
-            <Save className="w-4 h-4 text-gold" />
-            Enregistrer brouillon
+            <Save className="w-4 h-4 text-foreground-muted" />
+            Sauvegarder Brouillon
+          </button>
+
+          <button
+            onClick={handleSubmitValidation}
+            disabled={saving || !bookFile}
+            className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors min-h-[44px] cursor-pointer"
+          >
+            <Send className="w-4 h-4 text-gold" />
+            Soumettre pour Validation
           </button>
         </div>
       </div>
 
-      {/* Stepper Multi-étapes 21st.dev */}
-      <DepositWizardStepper
-        currentStep={currentStep}
-        onStepClick={(s) => setCurrentStep(s)}
-      />
+      {/* Stepper Navigation */}
+      <DepositWizardStepper currentStep={currentStep} onStepClick={(s) => setCurrentStep(s)} />
 
-      {/* Contenu Étape 1 : Fichiers */}
-      {currentStep === 1 && (
-        <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-6 shadow-xs">
-          <h3 className="text-sm font-bold text-navy flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-gold" />
-            Étape 1 — Téléversement des Fichiers principaux
-          </h3>
+      {/* ─── BANDEAU ASSISTANT IA SI ANALYSE DISPONIBLE ──────────────────────── */}
+      {aiResult && (
+        <div className="p-5 rounded-3xl bg-navy text-white border border-navy-hover space-y-3 shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-gold/20 text-gold shrink-0">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-serif font-bold text-sm text-gold">
+                  Assistant IA • Notice ONIX 3.0 &amp; Classification Disponibles
+                </h3>
+                <p className="text-[11px] text-white/80">
+                  Document analysé : « {aiResult.title} » ({aiResult.genre_category} • Dewey {aiResult.dewey_code})
+                </p>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FileDropzone
-              label="1. Fichier Livre (PDF ou EPUB) *"
-              acceptTypes={[".pdf", ".epub"]}
-              maxSizeMB={150}
-              onFileSelect={handleBookFileSelect}
-              onFileRemove={() => setBookFile(null)}
-              selectedFileName={bookFile?.name}
-              selectedFileSize={bookFile?.size}
-            />
-
-            <FileDropzone
-              label="2. Visuel de Couverture (JPG/PNG) *"
-              acceptTypes={["image/jpeg", "image/png", "image/webp"]}
-              maxSizeMB={20}
-              onFileSelect={handleCoverSelect}
-              onFileRemove={() => { setCoverFile(null); setCoverPreview(undefined); }}
-              selectedFileName={coverFile?.name}
-              selectedFileSize={coverFile?.size}
-              previewUrl={coverPreview}
-            />
+            <button
+              onClick={handleApplyAllAiData}
+              className="px-4 py-2 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] cursor-pointer"
+            >
+              <Wand2 className="w-3.5 h-3.5" />
+              Tout Appliquer en 1 Clic
+            </button>
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-border">
+          {aiResult.keywords && aiResult.keywords.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[10px] uppercase font-bold text-gold">Mots-clés :</span>
+              {aiResult.keywords.map((tag, i) => (
+                <span key={i} className="px-2 py-0.5 rounded-md bg-white/10 text-white text-[10px]">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── ÉTAPE 1 : FICHIERS SOURCES (PDF/EPUB & COUVERTURE) ──────────────── */}
+      {currentStep === 1 && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Dropzone Fichier Livre */}
+            <div className="space-y-2">
+              <FileDropzone
+                label="1. Fichier de l'Ouvrage (PDF ou EPUB) *"
+                acceptTypes={[".pdf", ".epub"]}
+                maxSizeMB={800}
+                onFileSelect={handleBookFileSelect}
+                selectedFileName={bookFile?.name}
+                selectedFileSize={bookFile?.size}
+                onFileRemove={() => {
+                  setBookFile(null);
+                  setAiResult(null);
+                }}
+              />
+              <p className="text-[11px] text-foreground-muted">
+                La liseuse supporte nativement le PDF et l&apos;EPUB avec synthèse vocale TTS intégrée.
+              </p>
+            </div>
+
+            {/* Dropzone Couverture */}
+            <div className="space-y-2">
+              <FileDropzone
+                label="2. Image de Couverture (Haute Résolution) *"
+                acceptTypes={["image/jpeg", "image/png", "image/webp"]}
+                maxSizeMB={15}
+                onFileSelect={handleCoverSelect}
+                selectedFileName={coverFile?.name}
+                selectedFileSize={coverFile?.size}
+                previewUrl={coverPreview}
+                onFileRemove={() => {
+                  setCoverFile(null);
+                  setCoverPreview(undefined);
+                }}
+              />
+              <p className="text-[11px] text-foreground-muted">
+                Format portrait recommandé (rapport 1:1.5 ou 1:1.6, min. 1200x1800 px).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4">
             <button
-              type="button"
               onClick={() => setCurrentStep(2)}
               disabled={!bookFile}
-              className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors disabled:opacity-40 min-h-[44px]"
+              className="px-6 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs flex items-center gap-2 disabled:opacity-50 min-h-[44px] cursor-pointer"
             >
-              Étape suivante : Métadonnées →
+              Étape suivante : Métadonnées Éditoriales →
             </button>
           </div>
         </div>
       )}
 
-      {/* Contenu Étape 2 : Métadonnées & Langue */}
+      {/* ─── ÉTAPE 2 : MÉTADONNÉES & RÉSUMÉ ───────────────────────────────────── */}
       {currentStep === 2 && (
-        <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-6 shadow-xs">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-navy">
-              Étape 2 — Métadonnées de base &amp; Langue de l&apos;ouvrage
+        <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
+            <h3 className="font-serif font-bold text-navy text-base flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-gold" />
+              Métadonnées de la Notice Éditoriale
             </h3>
-            {aiLoading && (
-              <span className="text-xs text-gold font-bold flex items-center gap-1.5 animate-pulse">
-                <Sparkles className="w-4 h-4" /> Détection IA en cours...
+            {aiResult && (
+              <span className="text-xs text-foreground-muted">
+                💡 Vous pouvez insérer les suggestions IA individuellement ou les éditer librement.
               </span>
             )}
           </div>
 
           <div className="space-y-4">
-            <div>
-              <label htmlFor="dep-title" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                Titre de l&apos;ouvrage *
-              </label>
+            {/* Titre */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Titre de l&apos;Ouvrage *</label>
+                {aiResult?.title && aiResult.title !== title && (
+                  <button
+                    type="button"
+                    onClick={() => setTitle(aiResult.title)}
+                    className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    Insérer suggestion IA : « {aiResult.title.slice(0, 30)}... »
+                  </button>
+                )}
+              </div>
               <input
-                id="dep-title"
                 type="text"
+                required
+                placeholder="Ex: Les Fondements du Droit Commercial Africain"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Droit Constitutionnel Béninois — Tome 1"
-                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-border bg-background focus:outline-none focus:border-gold text-foreground min-h-[44px]"
+                className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="dep-authors" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                  Auteur(s) (séparés par une virgule) *
-                </label>
+            {/* Sous-titre */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Sous-titre (Optionnel)</label>
+                {aiResult?.subtitle && aiResult.subtitle !== subtitle && (
+                  <button
+                    type="button"
+                    onClick={() => setSubtitle(aiResult.subtitle || "")}
+                    className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    Insérer sous-titre IA
+                  </button>
+                )}
+              </div>
+              <input
+                type="text"
+                placeholder="Ex: Traité théorique et pratique à l'usage des universités"
+                value={subtitle}
+                onChange={(e) => setSubtitle(e.target.value)}
+                className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+              />
+            </div>
+
+            {/* Auteurs, ISBN, Année */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Auteur(s) *</label>
+                  {aiResult?.authors && (
+                    <button
+                      type="button"
+                      onClick={() => setAuthorsStr(aiResult.authors.join(", "))}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA
+                    </button>
+                  )}
+                </div>
                 <input
-                  id="dep-authors"
                   type="text"
+                  required
+                  placeholder="Pr. Jean KOUADIO, Dr. Aminata SOW"
                   value={authorsStr}
                   onChange={(e) => setAuthorsStr(e.target.value)}
-                  placeholder="Ex: Prof. Théodore HOLO, Dr. A. SOSSA"
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-border bg-background focus:outline-none focus:border-gold text-foreground min-h-[44px]"
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 />
               </div>
 
-              <div>
-                <label htmlFor="dep-year" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                  Année de publication *
-                </label>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">ISBN-13</label>
+                  {aiResult?.isbn && (
+                    <button
+                      type="button"
+                      onClick={() => setIsbn(aiResult.isbn)}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA
+                    </button>
+                  )}
+                </div>
                 <input
-                  id="dep-year"
+                  type="text"
+                  placeholder="978-99919-X-XXX-X"
+                  value={isbn}
+                  onChange={(e) => setIsbn(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Année de Publication</label>
+                <input
                   type="number"
                   value={year}
                   onChange={(e) => setYear(parseInt(e.target.value) || 2026)}
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-border bg-background focus:outline-none focus:border-gold text-foreground font-mono min-h-[44px]"
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 />
               </div>
             </div>
 
-            {/* Langue obligatoire avec suggestion IA */}
-            <div className="p-4 rounded-2xl bg-background border border-border space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="dep-lang" className="block text-xs font-bold text-navy uppercase tracking-wider">
-                  Langue de l&apos;ouvrage * (Obligatoire)
-                </label>
-                <AISuggestionBadge source={languageSource} />
-              </div>
-              <select
-                id="dep-lang"
-                value={language}
-                onChange={(e) => {
-                  setLanguage(e.target.value);
-                  setLanguageSource("manual_override");
-                }}
-                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-foreground min-h-[44px]"
-              >
-                <option value="Français">Français</option>
-                <option value="Anglais">Anglais</option>
-                <option value="Fon">Fon</option>
-                <option value="Yoruba">Yoruba</option>
-                <option value="Arabe">Arabe</option>
-              </select>
-            </div>
-
             {/* Résumé */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="dep-summary" className="block text-xs font-bold text-navy uppercase tracking-wider">
-                  Résumé / Présentation de l&apos;ouvrage
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                  Résumé Exécutif / 4e de Couverture *
                 </label>
-                <AISuggestionBadge source={summarySource} />
+                {aiResult?.summary && (
+                  <button
+                    type="button"
+                    onClick={() => setSummary(aiResult.summary)}
+                    className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    Remplacer par le résumé IA
+                  </button>
+                )}
               </div>
               <textarea
-                id="dep-summary"
-                value={summary}
-                onChange={(e) => {
-                  setSummary(e.target.value);
-                  setSummarySource("manual_override");
-                }}
                 rows={4}
-                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-border bg-background focus:outline-none focus:border-gold text-foreground resize-none"
-                placeholder="Présentation synthétique de l'ouvrage..."
+                required
+                placeholder="Rédigez la présentation de l'ouvrage qui apparaîtra sur la vitrine et dans la liseuse..."
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-border">
+          <div className="flex justify-between items-center pt-4 border-t border-border">
             <button
-              type="button"
               onClick={() => setCurrentStep(1)}
-              className="px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy min-h-[44px]"
+              className="px-5 py-2.5 rounded-xl border border-border text-xs font-bold text-navy hover:bg-background-secondary min-h-[44px] cursor-pointer"
             >
-              ← Précédent
+              ← Retour aux Fichiers
             </button>
             <button
-              type="button"
               onClick={() => setCurrentStep(3)}
-              disabled={!title || !authorsStr}
-              className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors disabled:opacity-40 min-h-[44px]"
+              className="px-6 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[44px] cursor-pointer"
             >
-              Étape suivante : Classification →
+              Étape suivante : Classification &amp; Dewey →
             </button>
           </div>
         </div>
       )}
 
-      {/* Contenu Étape 3 : Classification */}
+      {/* ─── ÉTAPE 3 : CLASSIFICATION & DEWEY ─────────────────────────────────── */}
       {currentStep === 3 && (
-        <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-6 shadow-xs">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-navy">
-              Étape 3 — Classification &amp; Rattachement Académique
+        <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
+            <h3 className="font-serif font-bold text-navy text-base flex items-center gap-2">
+              <Layers className="w-5 h-5 text-gold" />
+              Classification Universelle &amp; Rattachement Institutionnel
             </h3>
-            <AISuggestionBadge source={classificationSource} />
+            {aiResult && (
+              <span className="text-xs text-foreground-muted">
+                💡 Sélectionnez parmi les référentiels ou modifiez directement les champs.
+              </span>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                Pays
-              </label>
-              <select
-                value={country}
-                onChange={(e) => { setCountry(e.target.value); setClassificationSource("manual_override"); }}
-                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-border bg-background focus:outline-none focus:border-gold text-foreground min-h-[44px]"
-              >
-                <option value="BJ">Bénin (BJ)</option>
-                <option value="SN">Sénégal (SN)</option>
-                <option value="CI">Côte d&apos;Ivoire (CI)</option>
-                <option value="TG">Togo (TG)</option>
-                <option value="NE">Niger (NE)</option>
-              </select>
+          <div className="space-y-4">
+            {/* Genre & Dewey */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Genre / Discipline *</label>
+                  {aiResult?.genre_category && (
+                    <button
+                      type="button"
+                      onClick={() => handleGenreChange(aiResult.genre_category)}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.genre_category}
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={genreCategory}
+                  onChange={(e) => handleGenreChange(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                >
+                  {GENRE_CATEGORIES.map((g, i) => (
+                    <option key={i} value={g.label}>
+                      {g.label} ({g.dewey})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Code Dewey *</label>
+                  {aiResult?.dewey_code && (
+                    <button
+                      type="button"
+                      onClick={() => setDeweyCode(aiResult.dewey_code)}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.dewey_code}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={deweyCode}
+                  onChange={(e) => setDeweyCode(e.target.value)}
+                  placeholder="Ex: 340, 840, 741.5"
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                Discipline *
-              </label>
-              <select
-                value={discipline}
-                onChange={(e) => { setDiscipline(e.target.value); setClassificationSource("manual_override"); }}
-                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-border bg-background focus:outline-none focus:border-gold text-foreground min-h-[44px]"
-              >
-                <option value="Droit & Sciences Politiques">Droit &amp; Sciences Politiques</option>
-                <option value="Médecine & Santé">Médecine &amp; Santé</option>
-                <option value="Économie & Gestion">Économie &amp; Gestion</option>
-                <option value="Sciences Exactes">Sciences Exactes</option>
-                <option value="Sciences Humaines">Sciences Humaines</option>
-              </select>
+            {/* Université & Faculté */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Établissement (Si académique)</label>
+                  {aiResult?.institution_suggestion && (
+                    <button
+                      type="button"
+                      onClick={() => setUniversity(aiResult.institution_suggestion || "")}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.institution_suggestion.slice(0, 20)}...
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={university}
+                  onChange={(e) => setUniversity(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                >
+                  {AFRICAN_UNIVERSITIES.map((u, i) => (
+                    <option key={i} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Faculté de Rattachement</label>
+                  {aiResult?.faculty_suggestion && (
+                    <button
+                      type="button"
+                      onClick={() => setFaculty(aiResult.faculty_suggestion || "")}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.faculty_suggestion.slice(0, 20)}...
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={faculty}
+                  onChange={(e) => setFaculty(e.target.value)}
+                  placeholder="Ex: Faculté de Droit (FADESP) ou vide si roman/manga"
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
             </div>
 
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                Université &amp; Faculté / Institut
-              </label>
-              <input
-                type="text"
-                value={faculty}
-                onChange={(e) => { setFaculty(e.target.value); setClassificationSource("manual_override"); }}
-                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-border bg-background focus:outline-none focus:border-gold text-foreground min-h-[44px]"
-              />
+            {/* Langue, Pays, Public Cible */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Langue</label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                >
+                  <option value="Français">Français</option>
+                  <option value="Anglais">Anglais</option>
+                  <option value="Fon">Fon</option>
+                  <option value="Yoruba">Yoruba</option>
+                  <option value="Wolof">Wolof</option>
+                  <option value="Arabe">Arabe</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays d&apos;Ancrage</label>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                >
+                  <option value="BJ">Bénin (BJ)</option>
+                  <option value="SN">Sénégal (SN)</option>
+                  <option value="CI">Côte d&apos;Ivoire (CI)</option>
+                  <option value="TG">Togo (TG)</option>
+                  <option value="NE">Niger (NE)</option>
+                  <option value="CD">RDC (CD)</option>
+                  <option value="CM">Cameroun (CM)</option>
+                  <option value="GLOBAL">International / Global</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Public Cible</label>
+                  {aiResult?.target_audience && (
+                    <button
+                      type="button"
+                      onClick={() => setTargetAudience(aiResult.target_audience)}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={targetAudience}
+                  onChange={(e) => setTargetAudience(e.target.value)}
+                  placeholder="Grand Public, Étudiants, etc."
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-border">
+          <div className="flex justify-between items-center pt-4 border-t border-border">
             <button
-              type="button"
               onClick={() => setCurrentStep(2)}
-              className="px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy min-h-[44px]"
+              className="px-5 py-2.5 rounded-xl border border-border text-xs font-bold text-navy hover:bg-background-secondary min-h-[44px] cursor-pointer"
             >
-              ← Précédent
+              ← Retour aux Métadonnées
             </button>
             <button
-              type="button"
               onClick={() => setCurrentStep(4)}
-              className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px]"
+              className="px-6 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[44px] cursor-pointer"
             >
-              Étape suivante : Version Audio &amp; Validation →
+              Étape suivante : Récapitulatif &amp; Validation →
             </button>
           </div>
         </div>
       )}
 
-      {/* Contenu Étape 4 : Version Audio & Soumission */}
+      {/* ─── ÉTAPE 4 : RÉCAPITULATIF & SOUMISSION ─────────────────────────────── */}
       {currentStep === 4 && (
-        <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-6 shadow-xs">
-          <h3 className="text-sm font-bold text-navy">
-            Étape 4 — Version Audio (facultative) &amp; DRM Automatique
-          </h3>
+        <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <h3 className="font-serif font-bold text-navy text-base flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-gold" />
+              Récapitulatif Avant Soumission au Chef Maquettiste
+            </h3>
+            <span className="px-3 py-1 rounded-full bg-navy/10 text-navy text-xs font-bold uppercase tracking-wider border border-navy/20">
+              Format {bookFile?.name.endsWith(".epub") ? "EPUB" : "PDF"}
+            </span>
+          </div>
 
-          <div className="p-4 rounded-2xl bg-gold/5 border border-gold/20 flex items-start gap-3 text-xs">
-            <ShieldCheck className="w-5 h-5 text-gold shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold text-navy">Protection DRM/LCP et Chiffrement Audio Automatique</p>
-              <p className="text-foreground-muted text-[11px] mt-0.5">
-                Dès le téléversement d&apos;un fichier audio (MP3/M4B), le système applique automatiquement le chiffrement LCP et le filigrane audio invisible. Aucune configuration manuelle n&apos;est requise.
-              </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start">
+            {/* Aperçu Couverture */}
+            <div className="w-full h-56 rounded-2xl bg-navy overflow-hidden border border-border relative flex items-center justify-center shadow-md">
+              {coverPreview ? (
+                <img src={coverPreview} alt="Couverture" className="w-full h-full object-cover" />
+              ) : (
+                <div className="text-center p-4 space-y-1">
+                  <BookOpen className="w-10 h-10 text-gold mx-auto" />
+                  <p className="text-xs text-white/60">Couverture par défaut</p>
+                </div>
+              )}
+            </div>
+
+            {/* Fiche Technique */}
+            <div className="sm:col-span-2 space-y-3 text-xs">
+              <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-serif font-bold text-navy text-base">{title}</h4>
+                    {subtitle && <p className="text-foreground-muted">{subtitle}</p>}
+                  </div>
+                  <span className="text-[10px] font-bold text-gold uppercase px-2 py-0.5 rounded bg-gold/10">
+                    Dewey {deweyCode}
+                  </span>
+                </div>
+                <p className="text-foreground font-semibold">Auteur(s) : {authorsStr || "Auteur LAHA"}</p>
+                <p className="text-foreground-muted">Genre : {genreCategory}</p>
+                {university && university !== "Non affilié (Grand Public / Fiction / Scolaire)" && (
+                  <p className="text-navy font-bold flex items-center gap-1">
+                    <GraduationCap className="w-3.5 h-3.5 text-gold" />
+                    {university} {faculty ? `• ${faculty}` : ""}
+                  </p>
+                )}
+                <p className="text-foreground-muted leading-relaxed line-clamp-3 pt-1 border-t border-border">
+                  {summary || "Aucun résumé fourni."}
+                </p>
+              </div>
+
+              {/* Aperçu ONIX 3.0 XML */}
+              {onixXml && (
+                <div className="p-3 rounded-xl bg-navy/5 border border-border space-y-1">
+                  <div className="flex items-center gap-1.5 text-navy font-bold text-[11px]">
+                    <FileCode className="w-3.5 h-3.5 text-gold" />
+                    Notice XML ONIX 3.0 générée prête pour l&apos;export
+                  </div>
+                  <pre className="text-[10px] text-foreground-muted max-h-24 overflow-y-auto font-mono bg-background p-2 rounded border border-border">
+                    {onixXml}
+                  </pre>
+                </div>
+              )}
             </div>
           </div>
 
-          <FileDropzone
-            label="Ajouter un fichier livre audio (Facultatif)"
-            acceptTypes={[".mp3", ".m4b", ".wav"]}
-            maxSizeMB={300}
-            onFileSelect={(f) => setAudioFile(f)}
-            onFileRemove={() => setAudioFile(null)}
-            selectedFileName={audioFile?.name}
-            selectedFileSize={audioFile?.size}
-          />
-
-          <div className="flex items-center justify-between pt-6 border-t border-border">
+          <div className="flex justify-between items-center pt-4 border-t border-border">
             <button
-              type="button"
               onClick={() => setCurrentStep(3)}
-              className="px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy min-h-[44px]"
+              className="px-5 py-2.5 rounded-xl border border-border text-xs font-bold text-navy hover:bg-background-secondary min-h-[44px] cursor-pointer"
             >
-              ← Précédent
+              ← Modifier la Classification
             </button>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleSaveDraft}
-                disabled={saving}
-                className="px-4 py-2.5 rounded-xl border border-border bg-background text-navy text-xs font-bold hover:bg-background-secondary min-h-[44px]"
-              >
-                Enregistrer brouillon
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmitValidation}
-                disabled={saving || !title || !authorsStr}
-                className="px-6 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center gap-2 min-h-[44px] shadow-sm"
-              >
-                {saving ? (
-                  <span className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Soumettre pour Validation
-                  </>
-                )}
-              </button>
-            </div>
+            <button
+              onClick={handleSubmitValidation}
+              disabled={saving}
+              className="px-6 py-3 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-md transition-colors min-h-[44px] cursor-pointer"
+            >
+              <Send className="w-4 h-4 text-gold" />
+              {saving ? "Transmission en cours..." : "Confirmer et Envoyer au Chef Maquettiste"}
+            </button>
           </div>
         </div>
       )}
+
     </div>
   );
 }

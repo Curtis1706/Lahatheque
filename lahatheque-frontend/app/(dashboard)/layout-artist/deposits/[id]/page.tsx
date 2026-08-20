@@ -226,24 +226,27 @@ export default function DepositDetailPage() {
           </div>
         </div>
 
-        {/* Bloc 3 : Version Audio & DRM */}
+        {/* Bloc 3 : Format Numérique & DRM */}
         <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-3">
-          <h3 className="text-sm font-bold text-navy flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-gold" />
-            3. Version Audio &amp; Protection DRM/LCP
-          </h3>
-          {deposit.files.audio_files && deposit.files.audio_files.length > 0 ? (
-            <div className="p-3.5 rounded-2xl bg-background border border-border space-y-2 text-xs">
-              {deposit.files.audio_files.map((aud) => (
-                <div key={aud.id} className="flex items-center justify-between">
-                  <span className="font-semibold text-navy">{aud.name}</span>
-                  <StatusBadge status="approved" leftLabel="Protection LCP appliquée ✓" />
-                </div>
-              ))}
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-navy flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-gold" />
+              3. Format Numérique &amp; Protection Filigrane DRM
+            </h3>
+            <Link
+              href={`/read/${deposit.id}`}
+              className="text-xs font-bold text-gold hover:underline flex items-center gap-1"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Feuilleter mon épreuve
+            </Link>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-background border border-border space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-navy">Format : {deposit.files.format}</span>
+              <StatusBadge status="approved" leftLabel="Tatouage &amp; DRM Sécurisé" />
             </div>
-          ) : (
-            <p className="text-xs text-foreground-muted">Aucune version audio associée à cet ouvrage.</p>
-          )}
+          </div>
         </div>
       </div>
 

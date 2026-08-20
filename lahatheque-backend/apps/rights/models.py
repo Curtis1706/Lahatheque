@@ -1,4 +1,4 @@
-"""Modèles de droits d'auteur et calcul de redevances."""
+"""Modèles de droits d'auteur, calcul de redevances et demandes de versement."""
 import uuid
 from django.db import models
 from django.conf import settings
@@ -40,3 +40,39 @@ class RoyaltyPayoutLine(models.Model):
     author_right = models.ForeignKey(AuthorRight, on_delete=models.PROTECT)
     payout_amount = models.DecimalField(max_digits=12, decimal_places=2)
     is_settled = models.BooleanField(default=False)
+
+class PayoutRequest(models.Model):
+    """Demande de versement / retrait des droits d'auteur."""
+    PAYMENT_METHODS = [
+        ('momo', 'MTN Mobile Money'),
+        ('moov', 'Moov Money'),
+        ('orange', 'Orange Money / Wave'),
+        ('bank', 'Virement Bancaire (RIB/IBAN)'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('approved', 'Approuvé'),
+        ('rejected', 'Rejeté'),
+        ('processed', 'Traité / Viré'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payout_requests')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='momo')
+    account_details = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    admin_notes = models.TextField(blank=True)
+    transaction_reference = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    processed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        null=True, 
+        blank=True, 
+        on_delete=models.SET_NULL, 
+        related_name='processed_payouts'
+    )
+
+    class Meta:
+        ordering = ['-created_at']

@@ -373,11 +373,23 @@ export function DashboardSidebar() {
           {/* User Profile Card Unique en haut (21st.dev Profile Card) */}
           {open && user && (
             <div className="p-3 my-4 rounded-xl bg-navy/60 border border-navy-hover flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-navy-dark text-gold font-serif font-bold flex items-center justify-center text-xs border border-gold/30 shrink-0">
-                {user.first_name?.[0] || "L"}
-              </div>
+              <Link href="/profile" className="shrink-0 group" title="Voir mon profil">
+                {(user as any).avatar_url ? (
+                  <img
+                    src={(user as any).avatar_url}
+                    alt={userDisplayName}
+                    className="w-9 h-9 rounded-full object-cover border border-gold/40 group-hover:border-gold transition-colors"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-navy-dark text-gold font-serif font-bold flex items-center justify-center text-xs border border-gold/30 group-hover:border-gold transition-colors">
+                    {user.first_name?.[0] || "L"}
+                  </div>
+                )}
+              </Link>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-xs text-white truncate">{userDisplayName}</p>
+                <Link href="/profile" className="hover:underline block truncate">
+                  <p className="font-semibold text-xs text-white truncate">{userDisplayName}</p>
+                </Link>
                 <p className="text-[10px] text-gold truncate">
                   {user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "publisher" ? "Éditeur Tiers • Partenaire" : user.role === "super_client" ? "Grossiste • Partenaire Revente" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : user.role === "legal_reviewer" ? "Juriste • Gestion Légale & Droits" : user.role === "chief_layout" ? "Chef Maquettiste • Validateur" : user.role === "layout_artist" ? "Maquettiste • Création Catalogue" : "Lecteur • LAHAThèque"}
                 </p>

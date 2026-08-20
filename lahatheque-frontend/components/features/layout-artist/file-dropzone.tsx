@@ -20,7 +20,7 @@ interface FileDropzoneProps {
 export function FileDropzone({
   label,
   acceptTypes,
-  maxSizeMB = 100,
+  maxSizeMB = 800,
   onFileSelect,
   onFileRemove,
   selectedFileName,

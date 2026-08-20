@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { useAuth } from "@/hooks/use-auth";
-import { getProfile, updateProfile, UserProfileData } from "@/lib/services/auth";
+import { getProfile, updateProfile, changePassword, UserProfileData } from "@/lib/services/auth";
 import { 
   User, 
   Mail, 
@@ -123,7 +123,7 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSavePassword = (e: React.FormEvent) => {
+  const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
       toast.error("Le nouveau mot de passe et sa confirmation ne correspondent pas.");
@@ -135,13 +135,26 @@ export default function ProfilePage() {
     }
 
     setSavingPassword(true);
-    setTimeout(() => {
+    try {
+      const res = await changePassword({
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+
+      if (res.success) {
+        toast.success(res.message || "Votre mot de passe a été modifié avec succès !");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        toast.error(res.error || "Erreur lors de la modification du mot de passe.");
+      }
+    } catch {
+      toast.error("Impossible de contacter le serveur.");
+    } finally {
       setSavingPassword(false);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      toast.success("Votre mot de passe a été modifié avec succès !");
-    }, 800);
+    }
   };
 
   const displayAvatar = previewUrl || avatarUrl;

@@ -18,6 +18,21 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+// Générateur de timeline dynamique basée sur la date réelle
+const getRollingTimeline = (count: number) => {
+  const monthNames = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
+  const now = new Date();
+  const res = [];
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+    res.push({
+      date: `${String(d.getDate()).padStart(2, "0")} ${monthNames[d.getMonth()]}`,
+      value: i === 0 ? count : Math.max(0, count - i),
+    });
+  }
+  return res;
+};
+
 export default function ChefMaquettisteOverviewPage() {
   const { user } = useAuth();
   const [kpis, setKpis] = useState<ChefMaquettisteKpi | null>(null);
@@ -39,7 +54,7 @@ export default function ChefMaquettisteOverviewPage() {
   }, []);
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8 animate-in fade-in duration-300">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
         <div>
@@ -69,71 +84,51 @@ export default function ChefMaquettisteOverviewPage() {
         <Link href="/chief-layout/validation" className="block">
           <ProgressMetricCard
             title="Dépôts à Valider"
-            total={`${kpis?.pendingValidationCount || 2} dossier${(kpis?.pendingValidationCount || 2) > 1 ? "s" : ""}`}
+            total={`${kpis?.pendingValidationCount ?? 0} dossier${(kpis?.pendingValidationCount ?? 0) > 1 ? "s" : ""}`}
             percent="Action requise"
             trend="up"
             accent="gold"
-            delta="+2 cette semaine"
-            deltaLabel="à examiner"
-            data={[
-              { value: 1, date: "01 Juil" },
-              { value: 1, date: "08 Juil" },
-              { value: 2, date: "15 Juil" },
-              { value: 2, date: "22 Juil" },
-            ]}
+            delta="À examiner"
+            deltaLabel="cette semaine"
+            data={kpis?.timelines?.pending || getRollingTimeline(kpis?.pendingValidationCount ?? 0)}
           />
         </Link>
 
         <Link href="/chief-layout/history" className="block">
           <ProgressMetricCard
             title="Validés ce Mois"
-            total={`${kpis?.validatedThisMonth || 1} livre${(kpis?.validatedThisMonth || 1) > 1 ? "s" : ""}`}
+            total={`${kpis?.validatedThisMonth ?? 0} livre${(kpis?.validatedThisMonth ?? 0) > 1 ? "s" : ""}`}
             percent="Mis en ligne"
             trend="up"
             accent="emerald"
-            delta="+1 ce mois"
-            deltaLabel="publié"
-            data={[
-              { value: 0, date: "01 Juil" },
-              { value: 0, date: "08 Juil" },
-              { value: 1, date: "15 Juil" },
-              { value: 1, date: "22 Juil" },
-            ]}
+            delta="Publié"
+            deltaLabel="ce mois"
+            data={kpis?.timelines?.published || getRollingTimeline(kpis?.validatedThisMonth ?? 0)}
           />
         </Link>
 
         <Link href="/chief-layout/history" className="block">
           <ProgressMetricCard
             title="Renvoyés en Correction"
-            total={`${kpis?.revisionRequestedThisMonth || 1} dossier${(kpis?.revisionRequestedThisMonth || 1) > 1 ? "s" : ""}`}
+            total={`${kpis?.revisionRequestedThisMonth ?? 0} dossier${(kpis?.revisionRequestedThisMonth ?? 0) > 1 ? "s" : ""}`}
             percent="En retouche"
             trend="down"
             accent="rose"
             delta="Suivi maquettiste"
             deltaLabel="ce mois"
-            data={[
-              { value: 0, date: "01 Juil" },
-              { value: 1, date: "08 Juil" },
-              { value: 1, date: "15 Juil" },
-              { value: 1, date: "22 Juil" },
-            ]}
+            data={kpis?.timelines?.rejected || getRollingTimeline(kpis?.revisionRequestedThisMonth ?? 0)}
           />
         </Link>
 
         <ProgressMetricCard
           title="Délai Moyen de Traitement"
-          total={`${kpis?.averageProcessingTimeHours || 18.5} h`}
+          total={`${kpis?.averageProcessingTimeHours ?? 4.5} h`}
           percent="-2h"
           trend="up"
           accent="emerald"
           delta="Dépôt → Décision"
           deltaLabel="réactivité"
-          data={[
-            { value: 24, date: "01 Juil" },
-            { value: 22, date: "08 Juil" },
-            { value: 19, date: "15 Juil" },
-            { value: 18.5, date: "22 Juil" },
-          ]}
+          data={getRollingTimeline(Math.round(kpis?.averageProcessingTimeHours ?? 4.5))}
         />
       </div>
 
@@ -148,41 +143,45 @@ export default function ChefMaquettisteOverviewPage() {
             href="/chief-layout/validation"
             className="text-xs font-bold text-gold hover:text-gold-dark flex items-center gap-1"
           >
-            Examiner la file d&apos;attente <ArrowRight className="w-3.5 h-3.5" />
+            Examiner la file <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Link
             href="/chief-layout/validation"
-            className="p-5 rounded-2xl bg-navy border border-navy-hover text-white hover:border-gold transition-all flex items-center justify-between group shadow-xs"
+            className="p-5 rounded-2xl bg-navy border border-navy-hover text-white hover:border-gold transition-all flex items-center justify-between group shadow-sm"
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-3 rounded-xl bg-gold/20 text-gold shrink-0">
-                <CheckSquare className="w-6 h-6" />
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-gold/20 text-gold">
+                <CheckSquare className="w-5 h-5" />
               </div>
-              <div className="min-w-0">
-                <p className="font-bold text-sm text-white truncate">Dépôts en Attente de Validation</p>
-                <p className="text-xs text-navy-light truncate">Examiner et publier sur la vitrine</p>
+              <div>
+                <p className="font-bold text-sm text-white">File de Validation des Épreuves</p>
+                <p className="text-xs text-white/70 mt-0.5">
+                  Examiner les PDF/EPUB, vérifier la classification et valider la publication
+                </p>
               </div>
             </div>
-            <ChevronRight className="w-5 h-5 text-gold shrink-0 group-hover:translate-x-1 transition-transform" />
+            <ChevronRight className="w-5 h-5 text-gold group-hover:translate-x-1 transition-transform" />
           </Link>
 
           <Link
             href="/chief-layout/history"
             className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all flex items-center justify-between group shadow-xs"
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-3 rounded-xl bg-navy-light text-navy shrink-0">
-                <History className="w-6 h-6 text-gold" />
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-navy-light text-navy">
+                <History className="w-5 h-5" />
               </div>
-              <div className="min-w-0">
-                <p className="font-bold text-sm text-navy truncate">Historique des Validations</p>
-                <p className="text-xs text-foreground-muted truncate">Consulter les décisions antérieures</p>
+              <div>
+                <p className="font-bold text-sm text-navy">Historique des Validations</p>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Consulter tous les ouvrages validés et les demandes de retouche
+                </p>
               </div>
             </div>
-            <ChevronRight className="w-5 h-5 text-foreground-muted group-hover:text-gold shrink-0 group-hover:translate-x-1 transition-transform" />
+            <ChevronRight className="w-5 h-5 text-foreground-muted group-hover:text-gold group-hover:translate-x-1 transition-all" />
           </Link>
         </div>
       </div>

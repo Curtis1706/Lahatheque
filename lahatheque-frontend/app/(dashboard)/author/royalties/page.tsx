@@ -2,23 +2,45 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { DollarSign, ArrowLeft, Download, ShieldCheck, Sparkles, FileText } from "lucide-react";
+import { 
+  CreditCard, 
+  ArrowLeft, 
+  Download, 
+  FileText, 
+  CheckCircle2, 
+  Clock, 
+  History,
+  AlertCircle
+} from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getAuthorRoyaltyPayments } from "@/lib/services/author";
+import { AuthorPayoutModal } from "@/components/features/author/author-payout-modal";
+import { 
+  getAuthorRoyaltyPayments, 
+  getPayoutRequests,
+  type PayoutRequestItem
+} from "@/lib/services/author";
 import type { AuthorRoyaltyPayment } from "@/lib/types/author";
 
 export default function AuthorRoyaltiesPage() {
+  const [activeTab, setActiveTab] = useState<"statements" | "requests">("statements");
   const [payments, setPayments] = useState<AuthorRoyaltyPayment[]>([]);
+  const [payoutRequests, setPayoutRequests] = useState<PayoutRequestItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+
+  const loadData = async () => {
+    setLoading(true);
+    const [stmts, reqs] = await Promise.all([
+      getAuthorRoyaltyPayments(),
+      getPayoutRequests(),
+    ]);
+    setPayments(stmts);
+    setPayoutRequests(reqs);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      const data = await getAuthorRoyaltyPayments();
-      setPayments(data);
-      setLoading(false);
-    }
     loadData();
   }, []);
 
@@ -30,7 +52,7 @@ export default function AuthorRoyaltiesPage() {
     .filter((p) => p.status === "pending")
     .reduce((acc, p) => acc + p.author_earned_amount, 0);
 
-  const columns: DataTableColumn<AuthorRoyaltyPayment>[] = [
+  const statementColumns: DataTableColumn<AuthorRoyaltyPayment>[] = [
     {
       key: "period",
       header: "Période Concernée",
@@ -81,7 +103,7 @@ export default function AuthorRoyaltiesPage() {
           href={row.receipt_url}
           target="_blank"
           rel="noreferrer"
-          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1"
+          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1 cursor-pointer"
         >
           <Download className="w-3.5 h-3.5 text-gold" />
           Relevé PDF
@@ -90,8 +112,75 @@ export default function AuthorRoyaltiesPage() {
     },
   ];
 
+  const requestColumns: DataTableColumn<PayoutRequestItem>[] = [
+    {
+      key: "created_at",
+      header: "Date de la Demande",
+      cell: (row) => (
+        <div>
+          <p className="font-mono text-xs text-navy font-bold">{row.created_at.slice(0, 10)}</p>
+          <span className="text-[10px] text-foreground-muted font-mono">Réf: {row.id.slice(0, 8)}</span>
+        </div>
+      ),
+    },
+    {
+      key: "amount",
+      header: "Montant Demandé",
+      cell: (row) => (
+        <span className="font-mono font-bold text-gold text-xs">
+          {row.amount.toLocaleString("fr-FR")} XOF
+        </span>
+      ),
+    },
+    {
+      key: "payment_method",
+      header: "Mode de Règlement",
+      cell: (row) => (
+        <div>
+          <span className="font-bold text-xs text-navy uppercase">{row.payment_method}</span>
+          <p className="text-[10px] text-foreground-muted font-mono truncate max-w-[150px]">{row.account_details}</p>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Statut Traitement",
+      cell: (row) => {
+        const mapping: Record<string, { label: string; cls: string }> = {
+          pending: { label: "En attente", cls: "bg-warning/10 text-warning border-warning/30" },
+          processed: { label: "Traité / Viré", cls: "bg-success/10 text-success border-success/30" },
+          approved: { label: "Approuvé", cls: "bg-success/10 text-success border-success/30" },
+          rejected: { label: "Rejeté", cls: "bg-error/10 text-error border-error/30" },
+        };
+        const current = mapping[row.status] || { label: row.status, cls: "bg-navy/10 text-navy" };
+        return (
+          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${current.cls}`}>
+            {current.label}
+          </span>
+        );
+      },
+    },
+    {
+      key: "transaction_reference",
+      header: "Référence Transaction / Note",
+      cell: (row) => (
+        <div className="space-y-0.5">
+          {row.transaction_reference && (
+            <p className="font-mono text-[10px] text-navy font-bold">{row.transaction_reference}</p>
+          )}
+          {row.admin_notes && (
+            <p className="text-[10px] text-foreground-muted italic">{row.admin_notes}</p>
+          )}
+          {!row.transaction_reference && !row.admin_notes && (
+            <span className="text-[10px] text-foreground-muted font-mono">-</span>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto animate-in fade-in duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/author" className="hover:text-navy">Vue d&apos;ensemble</Link>
@@ -106,58 +195,130 @@ export default function AuthorRoyaltiesPage() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Vue d&apos;ensemble
           </Link>
-          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
-            <DollarSign className="w-4 h-4 text-gold" />
-            Suivi Autonome des Droits d&apos;Auteur (Section 12 Cahier v3.2)
-          </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Droits d&apos;Auteur &amp; Paiements Rétribués
+            Relevés de Redevances &amp; Droits d&apos;Auteur
           </h1>
-          <p className="text-xs text-foreground-muted mt-1">
-            Consultez le cumul de vos droits d&apos;auteur rétribués, vos versements effectués et téléchargez vos relevés officiels.
+          <p className="text-xs text-foreground-muted mt-0.5">
+            Suivi des ventes, ventilation des quotes-parts et gestion des demandes de versement direct.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setPayoutModalOpen(true)}
+          className="px-5 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 shadow-sm min-h-[44px] cursor-pointer"
+        >
+          <CreditCard className="w-4 h-4" />
+          Demander un Versement
+        </button>
+      </div>
+
+      {/* 2 Cartes de Synthèse Financière */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="p-5 rounded-3xl bg-background-secondary border border-border space-y-2 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-foreground-muted uppercase tracking-wider">
+              Solde en Attente de Versement
+            </span>
+            <Clock className="w-4 h-4 text-gold" />
+          </div>
+          <p className="font-mono text-2xl sm:text-3xl font-bold text-navy">
+            {totalPending.toLocaleString("fr-FR")} XOF
+          </p>
+          <p className="text-[11px] text-foreground-muted">
+            Prochain règlement automatique programmé le 05 du mois
+          </p>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-background-secondary border border-border space-y-2 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-foreground-muted uppercase tracking-wider">
+              Total Rétribué à ce Jour
+            </span>
+            <CheckCircle2 className="w-4 h-4 text-success" />
+          </div>
+          <p className="font-mono text-2xl sm:text-3xl font-bold text-success">
+            {totalPaid.toLocaleString("fr-FR")} XOF
+          </p>
+          <p className="text-[11px] text-foreground-muted">
+            Relevés certifiés et justifiés par les ventes de la plateforme
           </p>
         </div>
       </div>
 
-      {/* Règle d'Étanchéité des Droits en Co-Auteur */}
-      <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 text-xs text-navy space-y-1">
-        <p className="font-bold flex items-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-gold" />
-          Règle d&apos;Étanchéité des Droits Individuels :
-        </p>
-        <p className="text-foreground-muted leading-relaxed">
-          Pour les ouvrages écrits en co-paternité, ce tableau de bord affiche **strictement votre part propre de droits** d&apos;auteur rétribués selon les pourcentages enregistrés au contrat. Les montants des co-auteurs ne sont pas exposés.
-        </p>
+      {/* Onglets Relevés Périodiques vs Demandes de Retrait */}
+      <div className="flex items-center gap-2 border-b border-border">
+        <button
+          type="button"
+          onClick={() => setActiveTab("statements")}
+          className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+            activeTab === "statements"
+              ? "border-gold text-navy font-bold"
+              : "border-transparent text-foreground-muted hover:text-navy"
+          }`}
+        >
+          <FileText className="w-4 h-4 text-gold" />
+          Relevés Périodiques ({payments.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("requests")}
+          className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+            activeTab === "requests"
+              ? "border-gold text-navy font-bold"
+              : "border-transparent text-foreground-muted hover:text-navy"
+          }`}
+        >
+          <History className="w-4 h-4 text-gold" />
+          Demandes de Retrait &amp; Virement ({payoutRequests.length})
+        </button>
       </div>
 
-      {/* Cartes Kpi de Solde */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="p-6 rounded-3xl bg-navy text-white border border-navy-hover shadow-xs space-y-1">
-          <span className="text-[10px] text-gold uppercase font-bold tracking-wider block">Total Versé (Rétribution Perçue)</span>
-          <p className="font-mono font-bold text-2xl text-white">{totalPaid.toLocaleString("fr-FR")} XOF</p>
+      {/* Contenu de l'onglet actif */}
+      {activeTab === "statements" ? (
+        <div className="rounded-3xl bg-background border border-border shadow-xs overflow-hidden">
+          <DataTable
+            rowKey="id"
+            columns={statementColumns}
+            data={payments}
+            loading={loading}
+            emptyState={
+              <div className="p-12 text-center space-y-2">
+                <FileText className="w-8 h-8 text-foreground-muted mx-auto" />
+                <p className="text-sm font-bold text-navy">Aucun relevé disponible</p>
+                <p className="text-xs text-foreground-muted">
+                  Vos relevés de droits d&apos;auteur apparaîtront dès la première période de publication.
+                </p>
+              </div>
+            }
+          />
         </div>
-
-        <div className="p-6 rounded-3xl bg-background border border-border shadow-xs space-y-1">
-          <span className="text-[10px] text-foreground-muted uppercase font-bold tracking-wider block">Prochain Versement (En cours Q3)</span>
-          <p className="font-mono font-bold text-2xl text-gold">{totalPending.toLocaleString("fr-FR")} XOF</p>
+      ) : (
+        <div className="rounded-3xl bg-background border border-border shadow-xs overflow-hidden">
+          <DataTable
+            rowKey="id"
+            columns={requestColumns}
+            data={payoutRequests}
+            loading={loading}
+            emptyState={
+              <div className="p-12 text-center space-y-2">
+                <History className="w-8 h-8 text-foreground-muted mx-auto" />
+                <p className="text-sm font-bold text-navy">Aucune demande de retrait émise</p>
+                <p className="text-xs text-foreground-muted">
+                  Cliquez sur &ldquo;Demander un Versement&rdquo; pour initier un retrait vers votre compte MoMo ou Banque.
+                </p>
+              </div>
+            }
+          />
         </div>
-      </div>
+      )}
 
-      {/* Tableau des Versements */}
-      <div className="space-y-4">
-        <h3 className="font-serif font-bold text-navy text-base">
-          Historique des Relevés de Droits &amp; Versements ({payments.length})
-        </h3>
-
-        <DataTable
-          data={payments}
-          columns={columns}
-          rowKey="id"
-          loading={loading}
-          emptyMessage="Aucun versement de droits enregistré pour le moment."
-          pageSize={10}
-        />
-      </div>
+      {/* 21st.dev Component AuthorPayoutModal */}
+      <AuthorPayoutModal
+        isOpen={payoutModalOpen}
+        onClose={() => setPayoutModalOpen(false)}
+        maxAmount={totalPending}
+        onSuccess={loadData}
+      />
     </div>
   );
 }
