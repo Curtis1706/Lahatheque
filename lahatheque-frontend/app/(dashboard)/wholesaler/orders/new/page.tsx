@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ShoppingCart, CheckCircle2, ShieldCheck, Building2, MapPin, Phone, Send } from "lucide-react";
 import { createWholesalerOrder } from "@/lib/services/wholesaler";
 import { mockWholesalerBooks } from "@/lib/mock/wholesaler";
+import { toast } from "sonner";
 
 export default function NewWholesalerOrderPage() {
   const router = useRouter();
@@ -41,20 +42,25 @@ export default function NewWholesalerOrderPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!deliveryAddress || !contactPhone) return;
+    if (!deliveryAddress || !contactPhone) {
+      toast.error("Veuillez renseigner l'adresse de livraison et le téléphone.");
+      return;
+    }
 
     setSubmitting(true);
     try {
       const newOrder = await createWholesalerOrder(cartItems, deliveryAddress, contactPhone);
-      alert(`Commande groupée ${newOrder.reference} transmise avec succès ! Elle entre en validation administrateur.`);
+      toast.success(`Commande groupée ${newOrder.reference} transmise avec succès !`);
       router.push(`/wholesaler/orders/${newOrder.id}`);
+    } catch {
+      toast.error("Une erreur est survenue lors de la transmission de la commande.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-4xl mx-auto animate-in fade-in duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/wholesaler" className="hover:text-navy">Vue d&apos;ensemble</Link>
@@ -168,7 +174,7 @@ export default function NewWholesalerOrderPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-xs disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-xs disabled:opacity-50 cursor-pointer"
             >
               {submitting ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

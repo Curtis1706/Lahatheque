@@ -202,3 +202,189 @@ class MouvementStock(models.Model):
         ordering = ["-created_at"]
 
 
+# ─── Modèles Grossiste & Commandes Groupées B2B ───────────────────────────────
+
+class WholesaleDiscountTier(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=128, verbose_name="Nom du Palier (ex: Grand Compte)")
+    min_quantity = models.PositiveIntegerField(default=20, verbose_name="Quantité Minimale Requise")
+    digital_discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=25.00, verbose_name="Remise Licences Numériques (%)")
+    print_discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=30.00, verbose_name="Remise Exemplaires Papier (%)")
+    description = models.TextField(blank=True, default="")
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "commerce_wholesale_discount_tier"
+        verbose_name = "Palier de Remise Grossiste"
+        verbose_name_plural = "Paliers de Remises Grossistes"
+
+    def __str__(self) -> str:
+        return f"{self.name} (Min: {self.min_quantity} ex.)"
+
+
+class WholesaleProfile(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="wholesale_profile"
+    )
+    company_name = models.CharField(max_length=255, verbose_name="Raison Sociale")
+    trade_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Nom Commercial / Enseigne")
+    nif_number = models.CharField(max_length=64, blank=True, default="", verbose_name="Numéro NIF / IFU")
+    rccm_number = models.CharField(max_length=64, blank=True, default="", verbose_name="Numéro RCCM")
+    contact_person = models.CharField(max_length=128, verbose_name="Responsable Achats / Contact")
+    contact_email = models.EmailField(verbose_name="Email Réception Factures")
+    contact_phone = models.CharField(max_length=32, verbose_name="Téléphone d'Astreinte")
+    country = models.CharField(max_length=10, default="BJ", verbose_name="Pays")
+    city = models.CharField(max_length=128, default="Cotonou", verbose_name="Ville")
+    headquarters_address = models.TextField(verbose_name="Adresse Siège Social")
+    warehouse_address = models.TextField(verbose_name="Adresse Entrepôt de Réception")
+    tier = models.ForeignKey(
+        WholesaleDiscountTier,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="profiles",
+        verbose_name="Palier Tarifaire Assigné"
+    )
+    payment_terms = models.CharField(
+        max_length=255,
+        default="Virement bancaire / Mobile Money à validation de facture proforma"
+    )
+    verified_partner = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "commerce_wholesale_profile"
+        verbose_name = "Profil Grossiste"
+        verbose_name_plural = "Profils Grossistes"
+
+    def __str__(self) -> str:
+        return f"{self.company_name} ({self.country})"
+
+
+class WholesaleOrderStatus(models.TextChoices):
+    PENDING = "pending", "En attente de validation"
+    VALIDATED = "validated", "Validée (Proforma émise)"
+    PROCESSING = "processing", "En préparation / Expédition"
+    DELIVERED = "delivered", "Livrée & Licences activées"
+    CANCELLED = "cancelled", "Annulée"
+
+
+class WholesaleOrder(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    reference = models.CharField(max_length=64, unique=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="wholesale_orders"
+    )
+    profile = models.ForeignKey(
+        WholesaleProfile,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="orders"
+    )
+    company_name = models.CharField(max_length=255)
+    delivery_address = models.TextField()
+    contact_phone = models.CharField(max_length=32)
+    
+    total_digital_licenses = models.PositiveIntegerField(default=0)
+    total_print_copies = models.PositiveIntegerField(default=0)
+    total_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0.00)
+    currency = models.CharField(max_length=10, default="XOF")
+    status = models.CharField(
+        max_length=32,
+        choices=WholesaleOrderStatus.choices,
+        default=WholesaleOrderStatus.PENDING,
+        db_index=True
+    )
+    
+    carrier_name = models.CharField(max_length=128, blank=True, default="")
+    tracking_number = models.CharField(max_length=128, blank=True, default="")
+    invoice_url = models.CharField(max_length=500, blank=True, default="")
+    cancel_reason = models.TextField(blank=True, default="")
+    cancel_requested = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "commerce_wholesale_order"
+        ordering = ["-created_at"]
+        verbose_name = "Commande Grossiste"
+        verbose_name_plural = "Commandes Grossistes"
+
+    def __str__(self) -> str:
+        return f"{self.reference} - {self.company_name} ({self.get_status_display()})"
+
+
+class WholesaleOrderItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order = models.ForeignKey(
+        WholesaleOrder,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+    book = models.ForeignKey(
+        'catalog.Ouvrage',
+        on_delete=models.PROTECT,
+        related_name="wholesale_order_items"
+    )
+    title = models.CharField(max_length=255)
+    authors = models.JSONField(default=list)
+    isbn = models.CharField(max_length=64, blank=True, default="")
+    
+    digital_licenses_qty = models.PositiveIntegerField(default=0)
+    digital_unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    
+    print_copies_qty = models.PositiveIntegerField(default=0)
+    print_unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=0.00)
+
+    class Meta:
+        db_table = "commerce_wholesale_order_item"
+        verbose_name = "Ligne Commande Grossiste"
+        verbose_name_plural = "Lignes Commandes Grossistes"
+
+
+class WholesaleNotification(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="wholesale_notifications"
+    )
+    TYPE_CHOICES = [
+        ("nouveaute", "Nouveauté éditoriale"),
+        ("meilleure_vente", "Meilleure vente"),
+        ("reassort", "Réassort de stock"),
+        ("expedition", "Expédition transporteur"),
+    ]
+    notification_type = models.CharField(max_length=32, choices=TYPE_CHOICES, default="nouveaute")
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    book = models.ForeignKey(
+        'catalog.Ouvrage',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="wholesale_notifications"
+    )
+    wholesale_price = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "commerce_wholesale_notification"
+        ordering = ["-created_at"]
+
+
+

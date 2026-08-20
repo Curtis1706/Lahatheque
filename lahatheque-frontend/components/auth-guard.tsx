@@ -7,7 +7,7 @@ import type { User } from '@/hooks/use-auth'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type AppRole = 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client' | 'publisher' | 'librarian' | 'legal_reviewer' | 'layout_artist' | 'chief_layout' | 'manager'
+type AppRole = 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client' | 'wholesaler' | 'publisher' | 'librarian' | 'legal_reviewer' | 'layout_artist' | 'chief_layout' | 'manager'
 
 interface AuthGuardProps {
   children: React.ReactNode
@@ -25,8 +25,11 @@ function resolveAuthorization(
 ): boolean {
   if (allowedRoles.length === 0) return true
   if (allowedRoles.includes(effectiveRole as AppRole)) return true
+  // Cas spécial : grossiste (wholesaler <-> super_client)
+  if (allowedRoles.includes('wholesaler') && effectiveRole === 'super_client') return true
+  if (allowedRoles.includes('super_client') && effectiveRole === 'wholesaler') return true
   // Cas spécial : super_client autorisé à voir toutes les ressources de l'élève (vidéothèque, examens, devoirs)
-  if (allowedRoles.includes('student') && effectiveRole === 'super_client') {
+  if (allowedRoles.includes('student') && (effectiveRole === 'super_client' || effectiveRole === 'wholesaler')) {
     return true
   }
   // Cas spécial : auteur certifié autorisé à voir les outils enseignant

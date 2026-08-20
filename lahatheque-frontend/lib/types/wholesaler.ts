@@ -90,3 +90,30 @@ export interface WholesalerKpis {
   totalSpentAmount: number;
   unreadNotificationsCount: number;
 }
+
+export interface WholesaleDiscountTier {
+  id: string;
+  name: string;
+  min_quantity: number;
+  digital_discount_percent: number;
+  print_discount_percent: number;
+  description: string;
+}
+
+export interface WholesaleCompanyProfile {
+  company_name: string;
+  trade_name?: string;
+  nif_number: string;
+  rccm_number: string;
+  contact_person: string;
+  contact_email: string;
+  contact_phone: string;
+  country: string;
+  city: string;
+  headquarters_address: string;
+  warehouse_address: string;
+  tier: WholesaleDiscountTier;
+  payment_terms: string;
+  verified_partner: boolean;
+}
+

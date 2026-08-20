@@ -1,44 +1,44 @@
-# Tasks: Module 4 - Editeurs Tiers et ONIX (Publishers)
+# Tasks: Module 4 - Espace Éditeur Tiers & Synchronisation ONIX
 
-**Branch**: `004-depot-editeurs-tiers-onix` | **Spec**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md)
-
----
-
-## Phase 1: Setup & Modeles
-
-- [ ] T001 [P] Creer le module `apps/publishers/` et enregistrer l'application dans `config/settings/base.py`
-- [ ] T002 [P] Implementer les modeles `CompteEditeurTiers`, `DepotEditeurTiers`, `ImportBatchLog`
-- [ ] T003 Creer et appliquer les migrations (`makemigrations publishers` et `migrate`)
+**Feature Branch**: `004-depot-editeurs-tiers-onix`  
+**Created**: 2026-08-20  
+**Status**: Ready for Execution  
 
 ---
 
-## Phase 2: User Story 1 - Parseur et Import ONIX 3.0 (Priorite: P1 - MVP)
+## Liste des Tâches Ordonnées
 
-- [ ] T004 [P] [US1] Rediger les tests Pytest de parsing ONIX dans `tests/publishers/test_onix_parser.py`
-- [ ] T005 [US1] Implementer `OnixParserService` (`lxml`) validant les balises `Product`, `DescriptiveDetail`, `Price`
-- [ ] T006 [US1] Implementer la tache Celery d'import asynchrone `process_onix_import_task`
-- [ ] T007 [US1] Implementer la vue `OnixImportUploadView` (`POST /api/v1/publishers/imports/onix/`)
+### Phase 1 : Types, Services & Backend Django
+- [ ] **Task 1.1** : Compléter `lib/types/publisher.ts` avec toutes les structures de données (Ouvrages, ONIX, Clés API, Redevances, Logs DRM, Profil Maison d'Édition).
+- [ ] **Task 1.2** : Implémenter les modèles Django dans `lahatheque-backend/apps/publishers_portal/models.py` (`PublisherProfile`, `PublisherBookDeposit`, `PublisherBatchImportLog`, `PublisherApiKey`, `PublisherRoyaltyPayment`, `PublisherAuditLog`).
+- [ ] **Task 1.3** : Créer les vues Django dans `lahatheque-backend/apps/publishers_portal/publisher_views.py` et les enregistrer dans `urls.py`.
+- [ ] **Task 1.4** : Mettre à jour `lib/services/publisher.ts` avec les fonctions `bffGet`, `bffPost`, `bffPatch`, `bffDelete` connectées à `/api/bff/publishers/*` avec fallbacks résilients.
 
----
+### Phase 2 : Protection de Rôle & Navigation
+- [ ] **Task 2.1** : Créer `app/(dashboard)/publisher/layout.tsx` avec `<AuthGuard requiredRoles={["publisher", "admin", "super_admin"]}>`.
+- [ ] **Task 2.2** : Mettre à jour `components/dashboard-sidebar.tsx` et `components/ui/dashboard-header.tsx` pour l'ensemble des 8 routes éditeur.
 
-## Phase 3: User Story 2 - API REST Editeur Tiers (Priorite: P1 - MVP)
+### Phase 3 : Composants Features Éditeur (`components/features/publisher/`)
+- [ ] **Task 3.1** : `validation-timeline.tsx` : Stepper animé 5 étapes (Dépôt -> Auto Check -> Examen LAHA -> Notification -> Publication) avec dates et descriptions.
+- [ ] **Task 3.2** : `file-dropzone.tsx` : Glisser-déposer de manuscrits/archives avec barre de progression animée et vérification de formats.
+- [ ] **Task 3.3** : `onix-report-viewer.tsx` : Tableau de diagnostic syntaxique ONIX 3.0 avec compteurs de succès/erreurs.
+- [ ] **Task 3.4** : `api-key-modal.tsx` : Modale de génération de clé API avec copie automatique dans le presse-papier et toasts.
+- [ ] **Task 3.5** : `revoke-api-key-modal.tsx` : Modale de confirmation avant révocation de clé API.
 
-- [ ] T008 [P] [US2] Configurer l'authentification OAuth2 Client Credentials
-- [ ] T009 [US2] Ecrire `PublisherDepotSerializer` avec validation des prix par devise
-- [ ] T010 [US2] Implementer `PublisherDepotCreateView` (`POST /api/v1/publishers/depots/`)
+### Phase 4 : Pages & Écrans du Dashboard Éditeur (`app/(dashboard)/publisher/`)
+- [ ] **Task 4.1** : `page.tsx` : Vue d'ensemble avec 4 KPI Cards réactives, parutions récentes et raccourcis d'action.
+- [ ] **Task 4.2** : `catalog/page.tsx` : Catalogue éditeur avec `BookCover3D`, filtres thématiques, recherche instantanée et skeletons de chargement.
+- [ ] **Task 4.3** : `catalog/[id]/page.tsx` : Fiche détaillée de l'ouvrage avec métadonnées, timeline de validation, configuration DRM et statistiques.
+- [ ] **Task 4.4** : `catalog/new/page.tsx` : Formulaire multi-étapes de dépôt unitaire avec spinners d'attente sur boutons et validation inline.
+- [ ] **Task 4.5** : `catalog/batch/page.tsx` : Téléversement de lot ONIX 3.0 / ZIP avec barre de progression et visualiseur de rapport.
+- [ ] **Task 4.6** : `submissions/page.tsx` : Tableau des dépôts en cours de validation avec filtres de statut et motifs de correction.
+- [ ] **Task 4.7** : `royalties/page.tsx` : Suivi des ventes, taux contractuel (22%), relevés mensuels PDF et bouton de demande de virement avec feedback.
+- [ ] **Task 4.8** : `stats/page.tsx` : Graphiques de consultation, téléchargements et répartition géographique du lectorat.
+- [ ] **Task 4.9** : `api/page.tsx` : Gestion des clés API REST, rotation de secret, documentation des endpoints.
+- [ ] **Task 4.10** : `logs/page.tsx` : Journal de traçabilité DRM (tatouage, appareils, détection d'anomalies).
+- [ ] **Task 4.11** : `profile/page.tsx` : Profil complet de la maison d'édition (NIF, RCCM, mandataire, IBAN/Momo, sécurité).
 
----
-
-## Phase 4: User Story 3 - Validation et Publication par l'equipe LAHA (Priorite: P1 - MVP)
-
-- [ ] T011 [P] [US3] Rediger les tests Pytest du workflow de validation dans `tests/publishers/test_laha_validation.py`
-- [ ] T012 [US3] Implementer `PublisherValidationService.valider_et_publier()` avec transaction atomique
-- [ ] T013 [US3] Implementer `LahaValidationView` (`POST /api/v1/publishers/depots/{id}/valider/` et `.../demande-correction/`)
-
----
-
-## Phase 5: Verification & Conformite
-
-- [ ] T014 Verifier l'absence de requete N+1 avec `select_related("editeur", "ouvrage_publie")`
-- [ ] T015 Executer la suite de tests Pytest (`pytest tests/publishers/`)
-- [ ] T016 Verifier la stricte conformite du format `{ "success": boolean, "data": {}, "error": null }`
+### Phase 5 : Contrôle Qualité & Validation
+- [ ] **Task 5.1** : Vérification TypeScript (`npx tsc --noEmit --skipLibCheck`) avec 0 erreur.
+- [ ] **Task 5.2** : Audit zéro code hexadécimal en dur et zéro emoji.
+- [ ] **Task 5.3** : Validation de la responsivité mobile (< 400px).

@@ -14,6 +14,16 @@ from .manager_views import (
     EntrepotsListView,
     StockEscalateView,
 )
+from .wholesaler_views import (
+    WholesalerKpisView,
+    WholesalerCatalogListView,
+    WholesalerCatalogDetailView,
+    WholesalerOrdersListView,
+    WholesalerOrderDetailView,
+    WholesalerOrderCancelView,
+    WholesalerProfileView,
+    WholesalerNotificationsListView,
+)
 
 app_name = 'commerce'
 
@@ -37,6 +47,16 @@ urlpatterns = [
     path('manager/stock/escalate/', StockEscalateView.as_view(), name='manager-stock-escalate'),
     path('manager/deliveries/', DeliveriesListView.as_view(), name='manager-deliveries-list'),
     path('manager/deliveries/<uuid:pk>/', DeliveryDetailView.as_view(), name='manager-delivery-detail'),
+
+    # ─── Grossiste (B2B) ────────────────────────────────────────────────────────
+    path('wholesaler/kpis/', WholesalerKpisView.as_view(), name='wholesaler-kpis'),
+    path('wholesaler/catalog/', WholesalerCatalogListView.as_view(), name='wholesaler-catalog-list'),
+    path('wholesaler/catalog/<uuid:pk>/', WholesalerCatalogDetailView.as_view(), name='wholesaler-catalog-detail'),
+    path('wholesaler/orders/', WholesalerOrdersListView.as_view(), name='wholesaler-orders-list'),
+    path('wholesaler/orders/<str:pk>/', WholesalerOrderDetailView.as_view(), name='wholesaler-order-detail'),
+    path('wholesaler/orders/<str:pk>/cancel/', WholesalerOrderCancelView.as_view(), name='wholesaler-order-cancel'),
+    path('wholesaler/profile/', WholesalerProfileView.as_view(), name='wholesaler-profile'),
+    path('wholesaler/notifications/', WholesalerNotificationsListView.as_view(), name='wholesaler-notifications'),
 ]
 
 

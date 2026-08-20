@@ -8,6 +8,7 @@ import { OrderTimeline } from "@/components/features/wholesaler/order-timeline";
 import { CancelOrderModal } from "@/components/features/wholesaler/cancel-order-modal";
 import { getWholesalerOrderDetail, requestOrderCancellation } from "@/lib/services/wholesaler";
 import type { WholesalerOrder } from "@/lib/types/wholesaler";
+import { toast } from "sonner";
 
 export default function WholesalerOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -18,9 +19,14 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await getWholesalerOrderDetail(resolvedParams.id);
-      setOrder(data);
-      setLoading(false);
+      try {
+        const data = await getWholesalerOrderDetail(resolvedParams.id);
+        setOrder(data);
+      } catch (err) {
+        console.error("Erreur de chargement du détail de la commande", err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, [resolvedParams.id]);
@@ -31,7 +37,9 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
       setOrder((prev) =>
         prev ? { ...prev, status: "cancelled", cancel_requested: true, cancel_reason: reason } : prev
       );
-      alert("La demande d'annulation de la commande a été enregistrée.");
+      toast.success("La demande d'annulation de la commande a été enregistrée avec succès.");
+    } else {
+      toast.error("Impossible d'annuler cette commande.");
     }
   };
 
@@ -56,7 +64,7 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
   }
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-6xl mx-auto animate-in fade-in duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/wholesaler" className="hover:text-navy">Vue d&apos;ensemble</Link>
@@ -94,7 +102,7 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
               className="px-3.5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
             >
               <Download className="w-4 h-4 text-gold" />
-              Télécharger Facture PDF
+              Télécharger Facture Proforma PDF
             </a>
           )}
 
@@ -102,7 +110,7 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
             <button
               type="button"
               onClick={() => setCancelModalOpen(true)}
-              className="px-3.5 py-2.5 rounded-xl bg-background-secondary border border-rose-500/30 text-rose-600 text-xs font-bold hover:bg-rose-500/10 transition-colors inline-flex items-center gap-2 min-h-[44px]"
+              className="px-3.5 py-2.5 rounded-xl bg-background-secondary border border-rose-500/30 text-rose-600 text-xs font-bold hover:bg-rose-500/10 transition-colors inline-flex items-center gap-2 min-h-[44px] cursor-pointer"
             >
               <XCircle className="w-4 h-4" />
               Demander l&apos;Annulation

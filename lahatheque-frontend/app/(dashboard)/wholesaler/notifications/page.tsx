@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BellRing, ArrowLeft, Sparkles, TrendingUp, BookOpen, ShoppingCart, CheckCircle2 } from "lucide-react";
 import { getWholesalerNotifications, markNotificationAsRead } from "@/lib/services/wholesaler";
 import type { WholesalerNotification } from "@/lib/types/wholesaler";
+import { toast } from "sonner";
 
 export default function WholesalerNotificationsPage() {
   const [notifications, setNotifications] = useState<WholesalerNotification[]>([]);
@@ -13,9 +14,14 @@ export default function WholesalerNotificationsPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await getWholesalerNotifications();
-      setNotifications(data);
-      setLoading(false);
+      try {
+        const data = await getWholesalerNotifications();
+        setNotifications(data);
+      } catch (err) {
+        console.error("Erreur de chargement des notifications", err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);
@@ -26,6 +32,7 @@ export default function WholesalerNotificationsPage() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );
+      toast.success("Notification marquée comme lue.");
     }
   };
 
@@ -33,7 +40,7 @@ export default function WholesalerNotificationsPage() {
   const meilleuresVentes = notifications.filter((n) => n.type === "meilleure_vente");
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-6xl mx-auto animate-in fade-in duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/wholesaler" className="hover:text-navy">Vue d&apos;ensemble</Link>
@@ -50,7 +57,7 @@ export default function WholesalerNotificationsPage() {
           </Link>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
             <BellRing className="w-4 h-4 text-gold" />
-            Alertes Automatiques du Catalogue (Section 4.1)
+            Alertes Commerciales &amp; Tendances d&apos;Édition
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
             Nouveautés &amp; Meilleures Ventes
@@ -103,7 +110,7 @@ export default function WholesalerNotificationsPage() {
                   <button
                     type="button"
                     onClick={() => handleMarkRead(n.id)}
-                    className="p-2 rounded-xl bg-background-secondary border border-border hover:border-gold transition-colors text-foreground-muted text-xs font-bold"
+                    className="p-2 rounded-xl bg-background-secondary border border-border hover:border-gold transition-colors text-foreground-muted text-xs font-bold cursor-pointer"
                     title="Marquer comme lu"
                   >
                     <CheckCircle2 className="w-4 h-4" />

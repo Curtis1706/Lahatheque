@@ -2,14 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PackageCheck, PlusCircle, ArrowLeft, Eye, Download, AlertTriangle, FileText, XCircle } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CancelOrderModal } from "@/components/features/wholesaler/cancel-order-modal";
 import { getWholesalerOrders, requestOrderCancellation } from "@/lib/services/wholesaler";
 import type { WholesalerOrder } from "@/lib/types/wholesaler";
+import { toast } from "sonner";
 
 export default function WholesalerOrdersListPage() {
+  const router = useRouter();
   const [orders, setOrders] = useState<WholesalerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelOrder, setCancelOrder] = useState<WholesalerOrder | null>(null);
@@ -17,9 +20,14 @@ export default function WholesalerOrdersListPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await getWholesalerOrders();
-      setOrders(data);
-      setLoading(false);
+      try {
+        const data = await getWholesalerOrders();
+        setOrders(data);
+      } catch (err) {
+        console.error("Erreur de chargement des commandes", err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);
@@ -32,7 +40,9 @@ export default function WholesalerOrdersListPage() {
           o.id === orderId ? { ...o, status: "cancelled", cancel_requested: true, cancel_reason: reason } : o
         )
       );
-      alert("La demande d'annulation de la commande a été enregistrée.");
+      toast.success("La demande d'annulation de la commande a été enregistrée avec succès.");
+    } else {
+      toast.error("Impossible d'annuler cette commande.");
     }
   };
 
@@ -92,7 +102,7 @@ export default function WholesalerOrdersListPage() {
             <button
               type="button"
               onClick={() => setCancelOrder(row)}
-              className="p-2 rounded-xl bg-background-secondary border border-rose-500/30 hover:bg-rose-500/10 transition-colors text-rose-600 min-h-[36px] inline-flex items-center"
+              className="p-2 rounded-xl bg-background-secondary border border-rose-500/30 hover:bg-rose-500/10 transition-colors text-rose-600 min-h-[36px] inline-flex items-center cursor-pointer"
               title="Demander l'annulation"
             >
               <XCircle className="w-4 h-4" />
@@ -104,7 +114,7 @@ export default function WholesalerOrdersListPage() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto animate-in fade-in duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/wholesaler" className="hover:text-navy">Vue d&apos;ensemble</Link>
@@ -124,10 +134,10 @@ export default function WholesalerOrdersListPage() {
             Historique &amp; Suivi des Achats en Gros
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Commandes Groupées
+            Commandes Groupées B2B
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Consultez le statut de vos commandes groupées, téléchargez vos factures et suivez la livraison.
+            Consultez le statut de vos commandes groupées, téléchargez vos factures proforma et suivez la livraison des cartons.
           </p>
         </div>
 
@@ -147,7 +157,7 @@ export default function WholesalerOrdersListPage() {
         rowKey="id"
         loading={loading}
         emptyMessage="Aucune commande groupée passée pour le moment."
-        onRowClick={(row) => { window.location.href = `/wholesaler/orders/${row.id}`; }}
+        onRowClick={(row) => { router.push(`/wholesaler/orders/${row.id}`); }}
         pageSize={10}
       />
 

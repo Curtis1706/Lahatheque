@@ -114,7 +114,7 @@ export function DashboardHeader() {
     if (path.startsWith("/wholesaler/catalog")) return { section: "Espace Grossiste", title: "Catalogue & Achat Gros" };
     if (path.startsWith("/wholesaler/orders")) return { section: "Espace Grossiste", title: "Commandes Groupées" };
     if (path.startsWith("/wholesaler/notifications")) return { section: "Espace Grossiste", title: "Nouveautés & Ventes" };
-    if (path.startsWith("/wholesaler/profile")) return { section: "Espace Grossiste", title: "Profil Grossiste" };
+    if (path.startsWith("/wholesaler/profile")) return { section: "Espace Grossiste", title: "Profil & Facturation B2B" };
     if (path === "/wholesaler") return { section: "Espace Grossiste", title: "Vue d'ensemble Grossiste" };
 
     if (path.startsWith("/layout-artist/deposits")) return { section: "Espace Maquettiste", title: "Mes Dépôts & Maquettes" };
