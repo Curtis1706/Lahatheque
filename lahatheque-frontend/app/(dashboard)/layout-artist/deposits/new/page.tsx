@@ -23,6 +23,7 @@ import {
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper, DEPOSIT_STEPS } from "@/components/features/layout-artist/deposit-wizard-stepper";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { createDeposit } from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/ai";
 import type { ClassificationSource } from "@/lib/types/layout-artist";
@@ -388,7 +389,7 @@ export default function NewDepositPage() {
             </h3>
             {aiResult && (
               <span className="text-xs text-foreground-muted">
-                💡 Vous pouvez insérer les suggestions IA individuellement ou les éditer librement.
+                Vous pouvez insérer les suggestions IA individuellement ou les éditer librement.
               </span>
             )}
           </div>
@@ -558,7 +559,7 @@ export default function NewDepositPage() {
             </h3>
             {aiResult && (
               <span className="text-xs text-foreground-muted">
-                💡 Sélectionnez parmi les référentiels ou modifiez directement les champs.
+                Sélectionnez parmi les référentiels ou modifiez directement les champs.
               </span>
             )}
           </div>
@@ -762,16 +763,19 @@ export default function NewDepositPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start">
-            {/* Aperçu Couverture */}
-            <div className="w-full h-56 rounded-2xl bg-navy overflow-hidden border border-border relative flex items-center justify-center shadow-md">
-              {coverPreview ? (
-                <img src={coverPreview} alt="Couverture" className="w-full h-full object-cover" />
-              ) : (
-                <div className="text-center p-4 space-y-1">
-                  <BookOpen className="w-10 h-10 text-gold mx-auto" />
-                  <p className="text-xs text-white/60">Couverture par défaut</p>
-                </div>
-              )}
+            {/* Aperçu Couverture 3D */}
+            <div className="w-full flex flex-col items-center justify-center p-4 rounded-2xl bg-navy/5 border border-border shadow-xs">
+              <BookCover3D
+                title={title || "Titre de l'ouvrage"}
+                authors={authorsStr || "Auteur LAHA"}
+                discipline={faculty || genreCategory}
+                coverUrl={coverPreview}
+                size="md"
+              />
+              <span className="text-[10px] text-navy font-bold uppercase tracking-wider mt-2 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-gold" />
+                Rendu Vitrine 3D
+              </span>
             </div>
 
             {/* Fiche Technique */}

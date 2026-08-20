@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { Book } from "@/components/ui/book";
-import { Sparkles, Eye, ShieldCheck, Tag } from "lucide-react";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { Eye, Tag, Sparkles } from "lucide-react";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 
 interface VitrinePreviewCardProps {
@@ -29,22 +29,17 @@ export function VitrinePreviewCard({ deposit, className }: VitrinePreviewCardPro
       {/* Carte Vitrine 3D */}
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
         {/* Couverture 3D Book */}
-        <div className="shrink-0">
-          {deposit.files.cover_url ? (
-            <div className="w-32 h-44 rounded-2xl overflow-hidden border-2 border-gold/40 shadow-md bg-navy-dark shrink-0">
-              <img
-                src={deposit.files.cover_url}
-                alt={deposit.metadata.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ) : (
-            <Book
-              title={deposit.metadata.title}
-              width={140}
-              variant="stripe"
-            />
-          )}
+        <div className="shrink-0 flex flex-col items-center">
+          <BookCover3D
+            title={deposit.metadata.title}
+            authors={deposit.metadata.authors}
+            discipline={deposit.classification.discipline}
+            coverUrl={deposit.files.cover_url}
+            size="lg"
+          />
+          <span className="text-[10px] text-gold/80 mt-2 font-mono flex items-center gap-1">
+            <Sparkles className="w-3 h-3" /> Relief 3D simulé
+          </span>
         </div>
 
         {/* Détails publics */}
@@ -89,3 +84,5 @@ export function VitrinePreviewCard({ deposit, className }: VitrinePreviewCardPro
     </div>
   );
 }
+
+export default VitrinePreviewCard;

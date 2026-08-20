@@ -92,7 +92,7 @@ export function FileDropzone({
             <div className="min-w-0">
               <p className="font-semibold text-xs text-navy truncate">{selectedFileName}</p>
               <p className="text-[10px] text-foreground-muted">
-                {formatFileSize(selectedFileSize)} • <span className="text-success font-medium">Prêt à téléverser ✓</span>
+                {formatFileSize(selectedFileSize)} • <span className="text-success font-medium">Prêt à téléverser</span>
               </p>
             </div>
           </div>

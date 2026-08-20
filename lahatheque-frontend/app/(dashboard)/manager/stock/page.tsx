@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Warehouse, Search, ArrowLeft, Filter } from "lucide-react";
+import { Warehouse, Search, ArrowLeft, Filter, Plus, PackageCheck, AlertTriangle } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getStockItems } from "@/lib/services/manager";
 import type { StockItem, StockFilterStatus } from "@/lib/types/manager";
 
@@ -13,6 +14,7 @@ export default function StockGlobalPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StockFilterStatus>("all");
+  const [warehouseFilter, setWarehouseFilter] = useState<string>("all");
 
   useEffect(() => {
     async function loadData() {
@@ -24,25 +26,56 @@ export default function StockGlobalPage() {
     loadData();
   }, []);
 
+  const warehouses = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((it) => {
+      if (it.warehouse) set.add(it.warehouse);
+    });
+    return Array.from(set);
+  }, [items]);
+
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       if (statusFilter !== "all" && item.status !== statusFilter) return false;
+      if (warehouseFilter !== "all" && item.warehouse !== warehouseFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        if (!item.title.toLowerCase().includes(q) && !item.isbn.toLowerCase().includes(q)) return false;
+        if (
+          !item.title.toLowerCase().includes(q) &&
+          !item.isbn.toLowerCase().includes(q) &&
+          !(item.discipline || "").toLowerCase().includes(q)
+        ) {
+          return false;
+        }
       }
       return true;
     });
-  }, [items, searchQuery, statusFilter]);
+  }, [items, searchQuery, statusFilter, warehouseFilter]);
 
   const columns: DataTableColumn<StockItem>[] = [
     {
       key: "title",
-      header: "Ouvrage",
+      header: "Ouvrage & Couverture",
       cell: (row) => (
-        <Link href={`/manager/stock/${row.id}`} className="hover:text-navy transition-colors">
-          <p className="font-semibold text-xs text-navy truncate max-w-[200px]">{row.title}</p>
-          <p className="text-[10px] text-foreground-muted font-mono">{row.isbn}</p>
+        <Link
+          href={`/manager/stock/${row.id}`}
+          className="flex items-center gap-3 group py-1"
+        >
+          <BookCover3D
+            title={row.title}
+            authors={row.authors}
+            discipline={row.discipline}
+            coverUrl={(row as any).cover_url}
+            size="xs"
+          />
+          <div className="min-w-0">
+            <p className="font-semibold text-xs text-navy group-hover:text-gold transition-colors truncate max-w-[220px]">
+              {row.title}
+            </p>
+            <p className="text-[10px] text-foreground-muted font-mono mt-0.5">
+              ISBN : {row.isbn}
+            </p>
+          </div>
         </Link>
       ),
     },
@@ -50,31 +83,57 @@ export default function StockGlobalPage() {
       key: "discipline",
       header: "Discipline",
       hideOnMobile: true,
-      cell: (row) => <span className="text-xs text-foreground-muted">{row.discipline}</span>,
+      cell: (row) => (
+        <span className="text-xs text-foreground-muted">{row.discipline || "—"}</span>
+      ),
     },
     {
       key: "warehouse",
-      header: "Entrepôt",
-      hideOnMobile: true,
+      header: "Entrepôt & Pays",
       cell: (row) => (
-        <span className="text-xs text-foreground">
-          {row.warehouse} <span className="text-foreground-muted">({row.country})</span>
-        </span>
+        <div className="text-xs">
+          <p className="font-semibold text-foreground flex items-center gap-1">
+            <Warehouse className="w-3.5 h-3.5 text-gold shrink-0" />
+            {(row as any).warehouse_nom || row.warehouse}
+          </p>
+          <p className="text-[10px] text-foreground-muted">
+            {(row as any).ville ? `${(row as any).ville}, ` : ""}{row.country}
+          </p>
+        </div>
       ),
     },
     {
       key: "quantity",
-      header: "Quantité",
+      header: "Stock Dispo",
       cell: (row) => (
-        <span className="font-mono font-bold text-xs text-foreground">{row.quantity}</span>
+        <div className="font-mono text-xs">
+          <span
+            className={`font-bold ${
+              row.quantity === 0
+                ? "text-error"
+                : row.quantity <= row.alert_threshold
+                ? "text-gold"
+                : "text-navy"
+            }`}
+          >
+            {row.quantity} ex.
+          </span>
+          {(row as any).quantite_reservee > 0 && (
+            <p className="text-[10px] text-foreground-muted">
+              ({(row as any).quantite_reservee} réservé{(row as any).quantite_reservee > 1 ? "s" : ""})
+            </p>
+          )}
+        </div>
       ),
     },
     {
       key: "alert_threshold",
-      header: "Seuil",
+      header: "Seuil Alerte",
       hideOnMobile: true,
       cell: (row) => (
-        <span className="font-mono text-xs text-foreground-muted">{row.alert_threshold}</span>
+        <span className="font-mono text-xs text-foreground-muted">
+          {row.alert_threshold} ex.
+        </span>
       ),
     },
     {
@@ -89,43 +148,110 @@ export default function StockGlobalPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
-          <Link href="/manager" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
+          <Link
+            href="/manager"
+            className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1"
+          >
             <ArrowLeft className="w-3.5 h-3.5" />
             Vue d&apos;ensemble
           </Link>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
             <Warehouse className="w-4 h-4 text-gold" />
-            Gestion du Stock
+            Gestion du Stock Papier
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
             Vue Globale du Stock
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Quantités disponibles pour les livres papier, par entrepôt et par pays.
+            Quantités réelles, réservées et disponibles par entrepôt et par pays en Afrique de l&apos;Ouest &amp; Centrale.
           </p>
         </div>
 
-        <Link
-          href="/manager/stock/movements"
-          className="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-xs min-h-[44px]"
-        >
-          Enregistrer un mouvement
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/manager/stock/alerts"
+            className="inline-flex items-center justify-center gap-2 bg-background-secondary hover:bg-background border border-border text-navy text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-xs min-h-[44px]"
+          >
+            <AlertTriangle className="w-4 h-4 text-gold" />
+            Alertes
+          </Link>
+          <Link
+            href="/manager/stock/movements"
+            className="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-xs min-h-[44px]"
+          >
+            <Plus className="w-4 h-4 text-gold" />
+            Enregistrer Mouvement
+          </Link>
+        </div>
       </div>
 
-      {/* Filtres */}
+      {/* KPI Band */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted mb-1">
+            Total Références
+          </p>
+          <p className="text-2xl font-bold font-mono text-navy">{items.length}</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted mb-1">
+            En Stock Normal
+          </p>
+          <p className="text-2xl font-bold font-mono text-success">
+            {items.filter((i) => i.status === "normal").length}
+          </p>
+        </div>
+        <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted mb-1">
+            Seuil Bas
+          </p>
+          <p className="text-2xl font-bold font-mono text-gold">
+            {items.filter((i) => i.status === "low_stock").length}
+          </p>
+        </div>
+        <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted mb-1">
+            Ruptures
+          </p>
+          <p className="text-2xl font-bold font-mono text-error">
+            {items.filter((i) => i.status === "out_of_stock").length}
+          </p>
+        </div>
+      </div>
+
+      {/* Filtres & Recherche */}
       <div className="bg-background border border-border p-4 rounded-2xl space-y-3 shadow-xs">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Rechercher par titre ou ISBN..."
+              placeholder="Rechercher par titre, ISBN ou discipline..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-foreground placeholder:text-foreground-muted min-h-[40px]"
             />
           </div>
+
+          {warehouses.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider shrink-0">
+                Entrepôt :
+              </span>
+              <select
+                value={warehouseFilter}
+                onChange={(e) => setWarehouseFilter(e.target.value)}
+                className="px-3 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-foreground min-h-[40px]"
+              >
+                <option value="all">Tous les entrepôts</option>
+                {warehouses.map((w) => (
+                  <option key={w} value={w}>
+                    {w}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 pt-2 border-t border-border overflow-x-auto">
@@ -135,17 +261,17 @@ export default function StockGlobalPage() {
           </span>
           {[
             { id: "all" as StockFilterStatus, label: "Tous" },
-            { id: "normal" as StockFilterStatus, label: "Normal" },
-            { id: "low_stock" as StockFilterStatus, label: "Seuil bas" },
-            { id: "out_of_stock" as StockFilterStatus, label: "Rupture" },
+            { id: "normal" as StockFilterStatus, label: "Stock Normal" },
+            { id: "low_stock" as StockFilterStatus, label: "Seuil Bas" },
+            { id: "out_of_stock" as StockFilterStatus, label: "En Rupture" },
           ].map((st) => (
             <button
               key={st.id}
               onClick={() => setStatusFilter(st.id)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
                 statusFilter === st.id
-                  ? "bg-navy/10 text-navy border border-navy/30 font-bold"
-                  : "text-foreground-muted hover:text-navy"
+                  ? "bg-navy text-white"
+                  : "bg-background-secondary text-foreground-muted hover:text-navy border border-border"
               }`}
             >
               {st.label}
@@ -160,8 +286,10 @@ export default function StockGlobalPage() {
         columns={columns}
         rowKey="id"
         loading={loading}
-        emptyMessage="Aucun ouvrage en stock ne correspond à vos critères."
-        onRowClick={(row) => { window.location.href = `/manager/stock/${row.id}`; }}
+        emptyMessage="Aucun ouvrage en stock ne correspond à vos critères de recherche."
+        onRowClick={(row) => {
+          window.location.href = `/manager/stock/${row.id}`;
+        }}
         pageSize={10}
       />
     </div>

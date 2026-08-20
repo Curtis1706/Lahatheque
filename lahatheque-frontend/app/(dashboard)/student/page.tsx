@@ -50,8 +50,8 @@ export default function StudentOverviewPage() {
             <Sparkles className="w-3.5 h-3.5" />
             Mon Espace Client &amp; Lecteur
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
-            Bienvenue sur LAHAThèque, {user?.first_name || "Cher Lecteur"} 👋
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold font-serif tracking-tight">
+            Bienvenue sur LAHAThèque, {user?.first_name || "Cher Lecteur"}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
             Reprenez votre lecture en ligne, écoutez vos livres audio et explorez le catalogue numérique.

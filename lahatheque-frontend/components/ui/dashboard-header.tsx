@@ -135,6 +135,7 @@ export function DashboardHeader() {
     if (path.startsWith("/manager/delivery")) return { section: "Espace Gestionnaire", title: "Suivi des Expéditions" };
     if (path.startsWith("/manager/coordination")) return { section: "Espace Gestionnaire", title: "Coordination Admin" };
     if (path.startsWith("/manager/reports")) return { section: "Espace Gestionnaire", title: "Rapports Logistiques" };
+    if (path.startsWith("/manager/profile")) return { section: "Espace Gestionnaire", title: "Profil & Paramètres Logistiques" };
     if (path === "/manager") return { section: "Espace Gestionnaire", title: "Vue d'ensemble Gestionnaire" };
 
     if (path === "/profile") return { section: "Compte", title: "Mon Profil & Préférences" };

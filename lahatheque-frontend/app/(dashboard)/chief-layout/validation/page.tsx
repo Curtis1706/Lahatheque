@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckSquare, Search, Filter, ArrowLeft, User, Eye, CheckCircle2, AlertCircle } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { ChiefExaminationModal } from "@/components/features/chief-layout/chief-examination-modal";
 import { getPendingDeposits, validateDeposit, requestRevision } from "@/lib/services/layout-artist";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
@@ -56,17 +57,26 @@ export default function ChefValidationPage() {
   const columns: DataTableColumn<LayoutDeposit>[] = [
     {
       key: "metadata.title",
-      header: "Ouvrage",
+      header: "Ouvrage & Couverture",
       cell: (row) => (
         <button
           type="button"
           onClick={() => setSelectedDeposit(row)}
-          className="text-left hover:text-navy transition-colors group"
+          className="flex items-center gap-3 text-left hover:text-navy transition-colors group py-1"
         >
-          <p className="font-bold text-xs text-navy group-hover:underline truncate max-w-[220px]">
-            {row.metadata.title}
-          </p>
-          <p className="text-[10px] text-foreground-muted">{row.metadata.authors.join(", ")}</p>
+          <BookCover3D
+            title={row.metadata.title}
+            authors={row.metadata.authors}
+            discipline={row.classification.discipline}
+            coverUrl={row.files.cover_url}
+            size="xs"
+          />
+          <div className="min-w-0">
+            <p className="font-bold text-xs text-navy group-hover:underline truncate max-w-[200px]">
+              {row.metadata.title}
+            </p>
+            <p className="text-[10px] text-foreground-muted font-mono mt-0.5">{row.metadata.authors.join(", ")}</p>
+          </div>
         </button>
       ),
     },

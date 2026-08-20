@@ -95,7 +95,7 @@ export default function LegalPreEditionsPage() {
           {row.status === "depot_lie" ? (
             <>
               <CheckCircle2 className="w-3 h-3" />
-              Dépôt effectif lié ✓
+              Dépôt effectif lié
             </>
           ) : (
             <>

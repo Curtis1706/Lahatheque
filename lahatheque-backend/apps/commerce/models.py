@@ -108,3 +108,97 @@ class PhysicalDelivery(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+
+class Entrepot(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nom = models.CharField(max_length=128, db_index=True)
+    code = models.CharField(max_length=32, unique=True, db_index=True) # ex: "WAR-CTN-01"
+    pays = models.CharField(max_length=64, db_index=True) # Bénin, Sénégal, Côte d'Ivoire...
+    ville = models.CharField(max_length=128)
+    adresse = models.TextField()
+    responsable_nom = models.CharField(max_length=128, blank=True, default='')
+    telephone = models.CharField(max_length=32, blank=True, default='')
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "commerce_entrepot"
+        ordering = ["pays", "nom"]
+
+    def __str__(self) -> str:
+        return f"{self.nom} ({self.pays})"
+
+
+class StockOuvrage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ouvrage = models.ForeignKey(
+        'catalog.Ouvrage',
+        on_delete=models.CASCADE,
+        related_name="stocks_entrepots"
+    )
+    entrepot = models.ForeignKey(
+        Entrepot,
+        on_delete=models.CASCADE,
+        related_name="stocks_ouvrages"
+    )
+    quantite_reelle = models.IntegerField(default=0)
+    quantite_reservee = models.IntegerField(default=0)
+    seuil_alerte = models.IntegerField(default=10)
+    last_restock_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "commerce_stock_ouvrage"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["ouvrage", "entrepot"],
+                name="unique_stock_ouvrage_par_entrepot"
+            ),
+        ]
+
+    @property
+    def quantite_disponible(self) -> int:
+        return max(0, self.quantite_reelle - self.quantite_reservee)
+
+    @property
+    def statut(self) -> str:
+        if self.quantite_disponible == 0:
+            return "out_of_stock"
+        if self.quantite_disponible <= self.seuil_alerte:
+            return "low_stock"
+        return "in_stock"
+
+
+class MouvementStock(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    stock = models.ForeignKey(
+        StockOuvrage,
+        on_delete=models.CASCADE,
+        related_name="mouvements"
+    )
+    TYPE_CHOICES = [
+        ("restock", "Réassort fournisseur"),
+        ("sale", "Sortie vente commande"),
+        ("return", "Retour client / Annulation"),
+        ("adjustment", "Ajustement inventaire / Avarie"),
+        ("manual_exit", "Sortie manuelle"),
+    ]
+    type_mouvement = models.CharField(max_length=32, choices=TYPE_CHOICES, db_index=True)
+    quantite = models.IntegerField()
+    reference_document = models.CharField(max_length=64, blank=True, default='')
+    motif = models.TextField(blank=True, default='')
+    auteur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="mouvements_stock_effectues"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "commerce_mouvement_stock"
+        ordering = ["-created_at"]
+
+

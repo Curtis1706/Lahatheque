@@ -50,7 +50,7 @@ export default function UniversityOverviewPage() {
             {kpis?.institutionName || "Université d'Abomey-Calavi (UAC)"}
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
-            Espace Université — Tableau de Bord Institutionnel 🎓
+            Espace Université — Tableau de Bord Institutionnel
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
             Suivez les ventes et l&apos;utilisation des ressources par faculté, gérez les bouquets et votre redevance de 15%.

@@ -41,10 +41,17 @@ class Ouvrage(models.Model):
     protection_type = models.CharField(max_length=30, default='lcp')
     price_digital = models.DecimalField(max_digits=10, decimal_places=2, default=5000.00)
     price_paper = models.DecimalField(max_digits=10, decimal_places=2, default=7500.00)
+    cover_image = models.ImageField(upload_to='covers/', null=True, blank=True)
 
     @property
     def price(self):
         return self.price_digital
+
+    @property
+    def cover_url(self) -> str:
+        if self.cover_image and hasattr(self.cover_image, 'url'):
+            return self.cover_image.url
+        return ""
 
 
 class MetadataONIX(models.Model):

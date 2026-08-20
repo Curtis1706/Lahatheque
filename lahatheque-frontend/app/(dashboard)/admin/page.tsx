@@ -133,7 +133,7 @@ export default function AdminOverviewDashboard() {
             Espace Super Administration
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
-            Bonjour, {user?.first_name || "Administrateur"} 👋
+            Bonjour, {user?.first_name || "Administrateur"}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
             Supervision globale de LAHAThèque : utilisateurs, ventes B2C/B2B, redevances et sécurité.

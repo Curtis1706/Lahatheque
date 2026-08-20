@@ -51,7 +51,7 @@ export default function PublisherOverviewPage() {
             Espace Éditeur Tiers Partenaire
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
-            Bienvenue, {user?.first_name || "Éditions Partner"} 👋
+            Bienvenue, {user?.first_name || "Éditions Partner"}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
             Gérez votre catalogue numérique, vos dépôts unitaire ou ONIX 3.0 et suivez vos redevances.

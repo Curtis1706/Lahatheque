@@ -244,6 +244,7 @@ export function DashboardSidebar() {
           },
           { label: "Coordination Admin", href: "/manager/coordination", icon: <ArrowUpCircle className="w-5 h-5" /> },
           { label: "Rapports & Export", href: "/manager/reports", icon: <FileBarChart className="w-5 h-5" /> },
+          { label: "Profil & Paramètres", href: "/manager/profile", icon: <UserIcon className="w-5 h-5" /> },
         ];
       case "publisher":
         return [

@@ -24,6 +24,7 @@ import {
   BookOpen,
   FileText,
   Layers,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -803,9 +804,10 @@ export default function AdminApiKeysPage() {
               </h2>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
-                className="text-foreground-muted hover:text-foreground text-sm font-bold cursor-pointer"
+                className="text-foreground-muted hover:text-foreground p-1 rounded-lg transition-colors cursor-pointer"
+                title="Fermer"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 

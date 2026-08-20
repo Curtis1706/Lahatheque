@@ -234,7 +234,7 @@ export default function WholesalerCatalogPage() {
                   }`}
                 >
                   <ShoppingCart className="w-3.5 h-3.5 text-gold" />
-                  {isInCart ? "Dans le Panier Groupé ✓" : "Ajouter à la Commande"}
+                  {isInCart ? "Dans le Panier Groupé" : "Ajouter à la Commande"}
                 </button>
               </div>
             </div>

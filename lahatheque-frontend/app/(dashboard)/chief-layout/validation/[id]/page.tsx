@@ -231,7 +231,7 @@ export default function ChefValidationDetailPage() {
             </div>
             <div className="flex items-center justify-between p-3 rounded-2xl bg-background border border-border">
               <span className="font-semibold text-navy">Synthèse Vocale Audio (TTS)</span>
-              <span className="text-success font-bold">Compatible Lecteur ✓</span>
+              <span className="text-success font-bold">Compatible Lecteur</span>
             </div>
           </div>
         </div>

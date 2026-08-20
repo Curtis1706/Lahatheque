@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ShoppingBag, ArrowLeft, Download, Play, BookOpen } from "lucide-react";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getClientLibraryBooks, getClientOrders } from "@/lib/services/student";
 import type { ClientBookAccess, ClientOrder } from "@/lib/types/student";
 
@@ -68,14 +69,14 @@ export default function AuthorPurchasesPage() {
               className="p-4 rounded-3xl bg-background border border-border space-y-3 flex flex-col justify-between shadow-xs"
             >
               <div className="space-y-3">
-                <div className="w-full h-44 rounded-2xl bg-navy overflow-hidden border border-border relative">
-                  {book.cover_url ? (
-                    <img src={book.cover_url} alt={book.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white font-serif font-bold text-xl">
-                      {book.title.slice(0, 1)}
-                    </div>
-                  )}
+                <div className="w-full flex justify-center py-2 bg-navy/5 rounded-2xl border border-border relative">
+                  <BookCover3D
+                    title={book.title}
+                    authors={book.author}
+                    discipline={book.discipline}
+                    coverUrl={book.cover_url}
+                    size="md"
+                  />
                   <span className="absolute top-2 right-2 px-2 py-0.5 rounded bg-gold/20 text-gold text-[10px] font-mono font-bold">
                     Acheté
                   </span>

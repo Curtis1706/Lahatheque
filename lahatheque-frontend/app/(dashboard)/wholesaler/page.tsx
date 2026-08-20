@@ -49,7 +49,7 @@ export default function WholesalerOverviewPage() {
             Espace Grossiste &amp; Achat en Gros
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
-            Bienvenue, {user?.first_name || "Librairie Internationale"} 👋
+            Bienvenue, {user?.first_name || "Librairie Internationale"}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
             Passez vos commandes groupées de licences numériques et d&apos;exemplaires papier à tarif grossiste préférentiel.

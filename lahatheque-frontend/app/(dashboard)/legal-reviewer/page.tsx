@@ -126,7 +126,7 @@ export default function LegalReviewerOverviewPage() {
             Espace Juriste • Direction des Affaires Juridiques
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
-            Bonjour, {user?.first_name ? `Me. ${user.first_name}` : "Me. François KÉRÉKOU"} 👋
+            Bonjour, {user?.first_name ? `Me. ${user.first_name}` : "Me. François KÉRÉKOU"}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
             Gérez la base contractuelle, validez les droits d&apos;auteur et pilotez le suivi des redevances et relances d&apos;impayés.

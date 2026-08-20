@@ -154,6 +154,7 @@ Exigences :
 ---
 
 ### RÈGLES CORE
+- Zéro emoji, jamais : ni dans les réponses, ni dans le code, ni sur les dashboards. Utiliser exclusivement les icônes Lucide React.
 - Si tu peux enlever un truc, enlève-le
 - Mobile-first n'est jamais un "nice to have" — c'est la base de départ
 - Le copywriting persuasif est un opt-in, pas un défaut

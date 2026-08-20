@@ -109,7 +109,7 @@ export default function LegalRoyaltiesPage() {
               : "bg-navy-light text-navy border-navy/20"
           }`}
         >
-          {row.source === "ai_suggested" ? "Suggéré par l'IA ✨" : "Déclaré par le Juriste ✍️"}
+          {row.source === "ai_suggested" ? "Suggéré par l'IA" : "Déclaré par le Juriste"}
         </span>
       ),
     },

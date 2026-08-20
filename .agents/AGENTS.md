@@ -39,6 +39,7 @@ Ces règles sont TOUJOURS actives, sur tout écran/composant/page construit pour
 - Les statuts de workflow (`pending`, `approved`, `rejected`, `in_review`…) mappent vers des tokens sémantiques existants (succès/attention/erreur/neutre), jamais vers des couleurs Tailwind par défaut.
 
 ## ✨ Sobriété Visuelle & Finitions Chic (Règle Absolue)
+- **Interdiction Totale des Emojis (Règle Absolue)** : Aucun emoji n'est toléré, ni dans le chat, ni dans le code, ni sur les dashboards, ni dans les modales, ni dans les libellés. Utiliser **exclusivement des icônes vectorielles Lucide React** (`lucide-react`) ou de la typographie textuelle soignée.
 - **Interdiction des bordures blanches ou des dégradés artificiels par-ci par-là** (ex: `border-white/10`, `bg-gradient-to-r` improvisés sur les cartes et bannières).
 - **Interdiction des bordures verticales à gauche dans la Sidebar** (pas de `border-l-4 border-gold`, pas de `border-l border-gold/30`). La mise en surbrillance d'un élément actif ou d'une section dépliée se fait uniquement via la couleur d'icône/texte dorée (`text-gold font-bold`) et un fond subtil arrondis (`bg-gold/10`).
 - Le design doit rester extrêmement **chic, sobre et élégant** : utiliser des fonds sémantiques purs (`bg-navy`, `bg-background`, `bg-background-secondary`), des bordures subtiles uniques (`border-border`), et réserver les touches de `gold` pour les accents d'emphase nobles.

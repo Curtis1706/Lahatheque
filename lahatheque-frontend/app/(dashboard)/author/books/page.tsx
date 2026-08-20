@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { BookOpen, ArrowLeft, Eye, Download, DollarSign, ChevronRight, BarChart3 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getAuthorPublishedBooks } from "@/lib/services/author";
 import type { AuthorPublishedBook } from "@/lib/types/author";
 
@@ -26,19 +27,15 @@ export default function AuthorBooksPage() {
       key: "title",
       header: "Titre de l'Ouvrage Publié",
       cell: (row) => (
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-12 bg-navy rounded overflow-hidden shrink-0 border border-border">
-            {row.cover_url ? (
-              <img src={row.cover_url} alt={row.title} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-white font-bold text-xs">
-                {row.title.slice(0, 1)}
-              </div>
-            )}
-          </div>
-          <div>
+        <div className="flex items-center gap-3 py-1">
+          <BookCover3D
+            title={row.title}
+            coverUrl={row.cover_url}
+            size="xs"
+          />
+          <div className="min-w-0">
             <p className="font-serif font-bold text-xs text-navy leading-snug">{row.title}</p>
-            <p className="text-[10px] text-foreground-muted font-mono">Publié le {row.published_at}</p>
+            <p className="text-[10px] text-foreground-muted font-mono mt-0.5">Publié le {row.published_at}</p>
           </div>
         </div>
       ),

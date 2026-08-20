@@ -7,6 +7,7 @@ import { BookOpen, Search, Filter, PlusCircle, ArrowLeft } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getMyDeposits } from "@/lib/services/layout-artist";
 import type { LayoutDeposit, DepositFilterStatus } from "@/lib/types/layout-artist";
 
@@ -45,11 +46,24 @@ export default function MaquettisteDepositsPage() {
   const columns: DataTableColumn<LayoutDeposit>[] = [
     {
       key: "metadata.title",
-      header: "Ouvrage",
+      header: "Ouvrage & Couverture",
       cell: (row) => (
-        <Link href={`/layout-artist/deposits/${row.id}`} className="hover:text-navy transition-colors">
-          <p className="font-bold text-xs text-navy truncate max-w-[220px]">{row.metadata.title}</p>
-          <p className="text-[10px] text-foreground-muted">{row.metadata.authors.join(", ")} • {row.metadata.publication_year}</p>
+        <Link href={`/layout-artist/deposits/${row.id}`} className="flex items-center gap-3 group py-1">
+          <BookCover3D
+            title={row.metadata.title}
+            authors={row.metadata.authors}
+            discipline={row.classification.discipline}
+            coverUrl={row.files.cover_url}
+            size="xs"
+          />
+          <div className="min-w-0">
+            <p className="font-bold text-xs text-navy group-hover:text-gold transition-colors truncate max-w-[220px]">
+              {row.metadata.title}
+            </p>
+            <p className="text-[10px] text-foreground-muted font-mono mt-0.5">
+              {row.metadata.authors.join(", ")} • {row.metadata.publication_year}
+            </p>
+          </div>
         </Link>
       ),
     },
