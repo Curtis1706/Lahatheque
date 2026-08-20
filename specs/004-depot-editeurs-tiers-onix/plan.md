@@ -1,4 +1,4 @@
-# Technical Plan: Module 4 - Espace Éditeur Tiers & Synchronisation ONIX
+# Technical Plan: Module 4 - Espace Éditeur Tiers, Assistance IA & Synchronisation ONIX
 
 **Feature Branch**: `004-depot-editeurs-tiers-onix`  
 **Created**: 2026-08-20  
@@ -18,7 +18,7 @@ app/(dashboard)/publisher/
 │   ├── [id]/
 │   │   └── page.tsx               # Détail d'un ouvrage : métadonnées, timeline 5 étapes, stats de lecture
 │   ├── new/
-│   │   └── page.tsx               # Formulaire multi-étapes de dépôt unitaire (fichiers, métadonnées, DRM)
+│   │   └── page.tsx               # Formulaire multi-étapes avec bouton d'assistance IA (résumé, discipline, langue, pays)
 │   └── batch/
 │       └── page.tsx               # Import de catalogue en masse (ONIX 3.0 / CSV / ZIP) avec rapport syntaxique
 ├── submissions/
@@ -32,7 +32,7 @@ app/(dashboard)/publisher/
 ├── logs/
 │   └── page.tsx                   # Traçabilité & Audit DRM : logs d'accès, watermarking, géolocalisation
 └── profile/
-    └── page.tsx                   # Profil Maison d'Édition, Mandat, Coordonnées Bancaires & Sécurité
+    └── page.tsx                   # Profil Éditeur Tiers : bascule Maison d'édition / Particulier, NIF, RCCM/CNI, IBAN/Momo
 ```
 
 ---
@@ -41,8 +41,9 @@ app/(dashboard)/publisher/
 
 | Composant | Rôle & Interaction | Source / Inspiration |
 | :--- | :--- | :--- |
+| `AiMetadataAssistant` | Bouton d'analyse IA avec état de calcul animé et remplissage automatique des champs | `lucide-react` `Sparkles`, `Bot` |
 | `ValidationTimeline` | Stepper 5 étapes (Dépôt -> Auto Check -> Examen LAHA -> Notification -> Publication) | 21st.dev `[id: 7710]` *Order History* |
-| `FileDropzone` | Zone de glisser-déposer avec barre de progression simulée et vérification d'extension | 21st.dev `[id: 1042]` *Dropzone Upload* |
+| `FileDropzone` | Zone de glisser-déposer avec barre de progression animée et vérification d'extension | 21st.dev `[id: 1042]` *Dropzone Upload* |
 | `OnixReportViewer` | Carte détaillée de diagnostic ONIX avec badges vert/rouge ligne par ligne | 21st.dev `[id: 1109]` *Diagnostic Table* |
 | `ApiKeyGeneratorModal` | Modale de génération de clé avec bouton copier dans presse-papier et avertissement | 21st.dev `[id: 8840]` *API Key Modal* |
 | `RevokeApiKeyModal` | Modale de confirmation explicite avant révocation définitive d'une clé API | Composant Modal système |
@@ -58,10 +59,10 @@ Pour garantir une expérience produit de haut niveau, **aucun clic ne doit reste
 1. **États de Chargement (Loading)** :
    - Toute page ou vue de données affiche un **Skeleton** épousant fidèlement les proportions du tableau ou de la grille finale.
    - Jamais de spinner générique centré qui déforme le layout.
-2. **Actions Asynchrones sur Boutons (Submitting / Saving)** :
+2. **Actions Asynchrones sur Boutons (Submitting / Saving / AI Analysis)** :
    - Le bouton déclencheur passe immédiatement en état `disabled={loading}`.
    - Affichage d'un spinner vectoriel rotatif Lucide (`w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin`).
-   - Le libellé change si pertinent (ex: *Enregistrement en cours...*).
+   - Le libellé change si pertinent (ex: *Analyse IA en cours...*, *Enregistrement...*).
 3. **Notifications Toasts (Sonner)** :
    - Succès : `toast.success("Message explicite et clair")`.
    - Erreur : `toast.error("Explication du problème + action corrective")`.
@@ -79,6 +80,7 @@ Pour garantir une expérience produit de haut niveau, **aucun clic ne doit reste
 | `GET` | `/api/bff/publishers/kpis/` | `/api/v1/publishers/kpis/` | KPIs globaux (ouvrages, validations, revenus, redevances) |
 | `GET` | `/api/bff/publishers/catalog/` | `/api/v1/publishers/catalog/` | Liste filtrée des ouvrages de l'éditeur |
 | `GET` | `/api/bff/publishers/catalog/<pk>/` | `/api/v1/publishers/catalog/<pk>/` | Fiche détaillée d'un ouvrage et de sa timeline |
+| `POST` | `/api/bff/publishers/ai/extract-metadata/` | `/api/v1/publishers/ai/extract-metadata/` | **Extraction IA de métadonnées, résumé, discipline, langue, pays** |
 | `POST` | `/api/bff/publishers/deposits/` | `/api/v1/publishers/deposits/` | Dépôt unitaire d'un nouvel ouvrage |
 | `POST` | `/api/bff/publishers/deposits/batch/` | `/api/v1/publishers/deposits/batch/` | Téléversement d'un lot ONIX 3.0 / ZIP / CSV |
 | `GET` | `/api/bff/publishers/royalties/` | `/api/v1/publishers/royalties/` | Relevés de redevances et bordereaux de règlement |
@@ -87,8 +89,8 @@ Pour garantir une expérience produit de haut niveau, **aucun clic ne doit reste
 | `POST` | `/api/bff/publishers/api-keys/` | `/api/v1/publishers/api-keys/` | Création d'une clé API |
 | `DELETE` | `/api/bff/publishers/api-keys/<pk>/` | `/api/v1/publishers/api-keys/<pk>/` | Révocation d'une clé API |
 | `GET` | `/api/bff/publishers/audit-logs/` | `/api/v1/publishers/audit-logs/` | Journal des accès et traces DRM |
-| `GET` | `/api/bff/publishers/profile/` | `/api/v1/publishers/profile/` | Profil entreprise, NIF, RCCM, banque, mandat |
-| `PATCH` | `/api/bff/publishers/profile/` | `/api/v1/publishers/profile/` | Mise à jour des coordonnées entreprise |
+| `GET` | `/api/bff/publishers/profile/` | `/api/v1/publishers/profile/` | Profil (Société ou Particulier), NIF, RCCM/CNI, banque, mandat |
+| `PATCH` | `/api/bff/publishers/profile/` | `/api/v1/publishers/profile/` | Mise à jour des coordonnées et identifiants |
 
 ---
 

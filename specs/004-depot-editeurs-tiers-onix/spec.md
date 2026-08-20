@@ -1,130 +1,141 @@
-# Feature Specification: Module 4 - Espace Éditeur Tiers, Dépôt de Catalogue & Synchronisation ONIX
+# Feature Specification: Module 4 - Espace Éditeur Tiers, Dépôt Assisté par IA & Synchronisation ONIX
 
 **Feature Branch**: `004-depot-editeurs-tiers-onix`  
 **Created**: 2026-08-20  
 **Status**: Ready for Implementation  
-**Source Métier**: Cahier des charges LAHAThèque v3.2 - Section 5 (Éditeurs Tiers : Espace Dédié, Dépôt Unitaire/Masse ONIX 3.0, API REST, Validation 5 Étapes, Redevances & Sécurité)  
+**Source Métier**: Cahier des charges LAHAThèque v3.2 - Section 4.1.7, 4.1.C, Section 5 (Éditeurs Tiers, Dépôt Assisté par IA, ONIX 3.0, API REST, Validation en 5 étapes, Redevances & Sécurité)  
 **Règles de Design & Intuitivité**: `.agents/AGENTS.md` (Zéro emoji, Lucide React exclusif, tokens sémantiques `bg-navy`, `bg-gold`, feedback visuel permanent par toasts, skeletons et spinners d'attente sur boutons).
 
 ---
 
-## 1. Résumé Exécutif & Objectif Produit
+## 1. Résumé Exécutif & Périmètre Métier Conforme au Cahier des Charges
 
-L'**Espace Éditeur Tiers** permet aux maisons d'édition partenaires académiques et professionnelles de valoriser et commercialiser leur catalogue sur la vitrine LAHAThèque tout en conservant une traçabilité totale et une protection DRM étanche.
+L'**Espace Éditeur Tiers** est le portail dédié aux partenaires éditoriaux de LAHAThèque. Il s'adresse indifféremment à deux types d'acteurs :
+1. **Les Maisons d'Édition Partenaires** (personnes morales : raison sociale, RCCM, NIF, représentant légal, compte bancaire).
+2. **Les Éditeurs Indépendants & Auto-Éditeurs** (personnes physiques : nom, prénom, NIF/IFU individuel ou pièce d'identité, compte bancaire ou Mobile Money).
 
-### Objectifs Principaux :
-1. **Dépôt Unitaire & Formulaire Assisté** : Téléversement d'épreuves numériques (PDF, EPUB, Audio) avec qualification rigoureuse des métadonnées (titres, sous-titres, ISBNs, DOI, auteurs & ORCID, classification thématique, territoires autorisés, dates d'embargo).
-2. **Import de Catalogue en Masse (ONIX 3.0, CSV, ZIP)** : Téléversement et ingestion automatisée avec parsing conforme aux spécifications EDItEUR ONIX 3.0 et génération d'un rapport de validation détaillé ligne par ligne.
-3. **Synchronisation Programmatique (API REST & Webhooks)** : Gestion autonome des clés d'API (Client ID / Client Secret), révocation instantanée et monitoring des requêtes automatisées.
-4. **Suivi du Workflow de Validation en 5 Étapes** :
-   - *Étape 1* : Dépôt effectué
-   - *Étape 2* : Contrôle technique automatisé (antivirus, intégrité PDF/EPUB, complétude des métadonnées)
-   - *Étape 3* : Examen éditorial par le comité de lecture LAHA Éditions
-   - *Étape 4* : Notification d'approbation ou de demande de correction motivée
-   - *Étape 5* : Publication effective sur la vitrine et monétisation
-5. **Relevés Financiers & Redevances Contractuelles** : Suivi des ventes et consultations, application automatique du taux de redevance contractuel (fixé au contrat de mandat), téléchargement des états de paiement certifiés.
-6. **Protection & Traçabilité DRM** : Configuration du tatouage visible/invisible personnalisé, DRM Readium LCP, limitation des appareils et monitoring des logs d'accès.
-7. **Profil Entreprise & Facturation** : Gestion de la raison sociale, RCCM, NIF, coordonnées bancaires pour reversement, téléphone d'astreinte et sécurité du compte.
+### Fonctionnalités Clés du Cahier des Charges :
+1. **Assistance par Intelligence Artificielle (Section 5.3 & 4.1.C)** :
+   - Analyse du fichier d'épreuve (PDF/EPUB) ou du titre pour suggérer automatiquement :
+     - Le résumé / 4e de couverture.
+     - La discipline académique (ex. Droit Public, Sciences Éco, Médecine, Agronomie).
+     - La langue du livre (détection automatique, modifiable manuellement).
+     - Le ou les pays de rattachement / diffusion (Bénin, Sénégal, Niger, Togo, Côte d'Ivoire, Gabon, RDC, etc.).
+     - Les mots-clés thématiques et le classement universitaire.
+     - La détection d'incohérences dans les métadonnées (ISBN manquant, format corrompu).
+2. **Trois Modalités de Dépôt (Section 5.2)** :
+   - *Formulaire Web Unitaire & Lot ZIP* avec assistant IA de pré-remplissage.
+   - *Import de Catalogue en Masse* : upload de fichiers ONIX 3.0 (XML EDItEUR), CSV ou JSON avec rapport d'erreurs ligne par ligne.
+   - *API REST Sécurisée* : téléversement programmatique avec authentification par clés d'API (Client ID / Client Secret révocables) ou OAuth 2.0.
+3. **Flux de Validation en 5 Étapes (Section 5.5)** :
+   - *Étape 1* : Dépôt par l'éditeur (web ou API).
+   - *Étape 2* : Contrôle technique automatique (format des fichiers, complétude des métadonnées, antivirus).
+   - *Étape 3* : Examen par l'équipe LAHA Éditions (conformité éditoriale et vérification des droits).
+   - *Étape 4* : Notification à l'éditeur (approbation ou demande de correction avec commentaires détaillés).
+   - *Étape 5* : Publication sur la vitrine LAHAThèque et mise en ligne catalogue.
+4. **Protection Anti-Piratage & Sécurité (Section 6)** :
+   - Filigrane visible configurable (position, opacité).
+   - Tatouage invisible par utilisateur authentifié.
+   - DRM Readium LCP (appareils max, durée de prêt).
+   - Blocage copier-coller et impression.
+   - Traçabilité complète (ID, IP, appareil, code fichier).
+5. **Suivi des Ventes, Redevances & Mandat (Section 4.1.7, 4.3 & 5.1)** :
+   - Taux de redevance contractuel appliqué automatiquement (affiché en lecture seule selon le contrat signé).
+   - Statistiques de consultation et de téléchargements en temps réel.
+   - Relevés financiers PDF certifiés téléchargeables et demande de virement (IBAN / Momo).
+6. **Profil Personnalisé (Personne Morale vs Personne Physique)** :
+   - Bascule de type d'entité (*Maison d'édition* ou *Éditeur indépendant*).
+   - Coordonnées de contact, d'astreinte et informations de paiement.
 
 ---
 
 ## 2. User Scenarios & Critères d'Acceptation (Gherkin)
 
-### User Story 1 — Dépôt Unitaire d'Ouvrage avec Métadonnées et Protection (Priorité: P1)
-**En tant que** responsable éditorial d'une maison d'édition partenaire,  
-**Je veux** soumettre un nouvel ouvrage via un formulaire structuré en étapes avec fichier numérique et couverture,  
-**Afin de** le soumettre au circuit de validation officiel de LAHA Éditions.
+### User Story 1 — Dépôt Unitaire d'Ouvrage avec Pré-remplissage par Assistant IA (Priorité: P1)
+**En tant qu'** éditeur tiers (maison d'édition ou éditeur indépendant),  
+**Je veux** téléverser mon fichier d'ouvrage (PDF/EPUB) et utiliser l'assistant IA pour générer instantanément le résumé, la discipline, la langue et les mots-clés,  
+**Afin de** soumettre rapidement mon ouvrage au comité de lecture LAHA sans saisie rébarbative.
 
 #### Critères d'Acceptation :
-- **Given** un éditeur tiers connecté à son espace,
-- **When** il téléverse le fichier PDF/EPUB et la couverture haute définition, puis renseigne les ISBN (papier et numérique), auteurs, discipline, prix et territoires autorisés,
-- **And** clique sur "Soumettre au comité éditorial",
-- **Then** un indicateur d'attente animé (spinner) s'affiche sur le bouton d'action qui est désactivé pendant le transfert,
-- **And** un toast de succès confirme le dépôt,
-- **And** le statut de l'ouvrage passe à `pending` avec l'étape 1 validée sur la timeline.
+- **Given** un éditeur sur la page `/publisher/catalog/new`,
+- **When** il téléverse le fichier et clique sur "Analyser et Compléter par IA",
+- **Then** un indicateur d'analyse IA avec spinner s'anime,
+- **And** les champs Résumé, Discipline, Langue, Pays de diffusion et Mots-clés sont pré-remplis automatiquement,
+- **And** un toast confirme les suggestions de l'IA avec possibilité de correction manuelle,
+- **And** lors de la soumission finale, le bouton affiche un spinner, se désactive et affiche un toast de confirmation.
 
 ---
 
-### User Story 2 — Import de Catalogue en Masse via Flux ONIX 3.0 / ZIP (Priorité: P1)
-**En tant que** gestionnaire de catalogue d'un grand éditeur partenaire,  
-**Je veux** déposer un fichier XML standardisé ONIX 3.0 ou une archive ZIP,  
-**Afin de** synchroniser des dizaines d'ouvrages simultanément sans saisie manuelle unitaire.
+### User Story 2 — Import de Catalogue en Masse ONIX 3.0 / CSV (Priorité: P1)
+**En tant que** responsable de catalogue d'un éditeur partenaire,  
+**Je veux** téléverser un fichier ONIX 3.0 XML ou un tableur CSV,  
+**Afin d'**ingérer des dizaines d'ouvrages avec validation syntaxique automatique.
 
 #### Critères d'Acceptation :
-- **Given** un fichier XML conforme à la norme ONIX 3.0 Release 3.0.8,
-- **When** l'utilisateur glisse-dépose le fichier dans la zone d'importation,
-- **Then** une barre de progression simule l'analyse syntaxique en temps réel,
-- **And** un rapport structuré affiche le nombre de notices validées et le détail des anomalies éventuelles (ISBN manquant, balise invalide, prix absent),
-- **And** un toast de notification informe de la fin du traitement.
+- **Given** un fichier XML ONIX 3.0,
+- **When** l'éditeur le glisse dans la zone d'importation,
+- **Then** une barre de progression indique l'avancement de l'analyse,
+- **And** un tableau de rapport détaille le nombre d'ouvrages acceptés et les erreurs ligne par ligne (ISBN manquant, format non supporté),
+- **And** un toast informe de la complétion du traitement.
 
 ---
 
-### User Story 3 — Gestion des Clés API et Synchronisation Programmatique (Priorité: P2)
-**En tant que** développeur technique d'un éditeur partenaire,  
-**Je veux** générer et révoquer des identifiants API (Client ID et Client Secret),  
-**Afin d'**intégrer notre progiciel ERP/GED directement avec l'API REST de LAHAThèque.
+### User Story 3 — Gestion des Clés API REST pour Synchronisation ERP (Priorité: P2)
+**En tant que** développeur d'une maison d'édition,  
+**Je veux** créer et révoquer des identifiants API (Client ID / Client Secret),  
+**Afin d'**automatiser le dépôt de nos parutions depuis notre système informatique.
 
 #### Critères d'Acceptation :
-- **Given** un éditeur souhaitant automatiser ses dépôts,
-- **When** il clique sur "Générer une nouvelle clé API",
-- **Then** une modale affiche le Client Secret en clair une seule fois avec bouton de copie dans le presse-papier et feedback par toast,
-- **And** toute action de révocation exige une confirmation explicite dans une modale modale sécurisée avant désactivation.
+- **Given** la page `/publisher/api`,
+- **When** l'utilisateur génère une clé,
+- **Then** une modale affiche le Client Secret avec bouton de copie et notification toast,
+- **And** toute action de révocation ouvre une modale de confirmation explicite avec bouton rouge d'action irréversible.
 
 ---
 
-### User Story 4 — Suivi des Redevances et Relevés Financiers (Priorité: P1)
-**En tant que** directeur financier d'un éditeur partenaire,  
-**Je veux** consulter les ventes générées par mes ouvrages et le montant de mes redevances nettes,  
-**Afin de** vérifier mes reversements mensuels et télécharger les relevés de compte certifiés.
+### User Story 4 — Suivi des Redevances, Relevés Financiers & Demande de Virement (Priorité: P1)
+**En tant qu'** éditeur partenaire,  
+**Je veux** visualiser mes revenus générés, mon taux contractuel (ex: 22%) et demander un virement bancaire ou Mobile Money,  
+**Afin de** percevoir mes gains sur les ventes et abonnements.
 
 #### Critères d'Acceptation :
-- **Given** des ventes enregistrées sur la période,
-- **When** l'éditeur consulte l'onglet "Droits & Redevances",
-- **Then** le taux contractuel négocié (ex: 22%) est affiché en lecture seule avec le calcul exact de la part éditeur,
-- **And** un tableau liste les règlements passés avec lien de téléchargement du bordereau PDF,
-- **And** un bouton permet de demander un virement si le seuil minimum de reversement (50 000 XOF) est atteint.
+- **Given** la page `/publisher/royalties`,
+- **When** le solde disponible dépasse le seuil minimum (50 000 XOF),
+- **Then** le bouton "Demander un Virement" devient actif,
+- **And** au clic, un spinner d'attente s'affiche sur le bouton, une demande est transmise à la comptabilité et un toast confirme l'opération.
 
 ---
 
-### User Story 5 — Profil Maison d'Édition, Mandat & Coordonnées Bancaires (Priorité: P1)
-**En tant que** gérant de la maison d'édition,  
-**Je veux** actualiser nos coordonnées d'entreprise (NIF, RCCM, IBAN, contact d'astreinte),  
-**Afin de** garantir la conformité juridique de nos contrats et la réception des paiements.
+### User Story 5 — Profil Modulaire : Maison d'Édition ou Éditeur Indépendant (Priorité: P1)
+**En tant qu'** éditeur,  
+**Je veux** configurer mon profil en choisissant entre "Maison d'édition (Personne morale)" ou "Éditeur indépendant (Personne physique)",  
+**Afin de** renseigner les identifiants fiscaux et coordonnées de paiement adaptés.
 
 #### Critères d'Acceptation :
 - **Given** la page `/publisher/profile`,
-- **When** l'éditeur met à jour ses identifiants fiscaux et coordonnées bancaires et valide le formulaire,
-- **Then** un spinner s'affiche sur le bouton de sauvegarde,
-- **And** un toast de confirmation s'affiche dès la persistance des données.
+- **When** l'utilisateur bascule entre les types d'entités,
+- **Then** les champs s'adaptent (Raison sociale + RCCM pour société, Nom/Prénom + NIF/CNI pour indépendant),
+- **And** l'enregistrement déclenche un spinner et un toast de succès.
 
 ---
 
-## 3. Traque des Non-Dits et Cas Limites (Clarify)
+## 3. Exigences Fonctionnelles (FR)
 
-1. **Doublons d'ISBN Trans-Éditeurs** : Si un ISBN existe déjà pour un autre éditeur dans la base LAHAThèque, l'import est immédiatement bloqué avec message explicite renvoyant vers le support légal.
-2. **Gestion des Embargos Temporels** : Un ouvrage validé ayant une date de disponibilité future reste masqué au public jusqu'à la date convenu, avec badge informatif *En embargo jusqu'au JJ/MM/AAAA*.
-3. **Multi-Devises et Territoires** : Si un territoire est exclu, le système applique un géoblocage strict sur la vitrine et le lecteur DRM.
-4. **Intuitivité & Zéro Clic Silencieux** : Toute requête réseau asynchrone (soumission, filtre, génération de clé, export CSV/PDF) affiche un feedback immédiat (spinner sur bouton, skeleton sur table, toast d'information).
-
----
-
-## 4. Exigences Fonctionnelles (FR)
-
-- **FR-PUB-01** : Protection de l'espace par `AuthGuard` sur le rôle `publisher`.
-- **FR-PUB-02** : Vue d'ensemble avec 4 KPI cards (Titres catalogue, Validations en cours, Ventes/Consultations, Redevances cumulées).
-- **FR-PUB-03** : Catalogue avec recherche multicritère, filtres par statut et discipline, et fiches détaillées avec visualiseur 3D.
-- **FR-PUB-04** : Formulaire multi-étapes de dépôt unitaire avec glisser-déposer de fichiers et indicateurs de complétude.
-- **FR-PUB-05** : Interface d'import par lots (ONIX 3.0 / CSV / ZIP) avec rapport syntaxique d'erreurs.
-- **FR-PUB-06** : Gestion des clés API REST (génération sécurisée, copie presse-papier, révocation avec modale).
-- **FR-PUB-07** : Journal d'audit et de traçabilité DRM (accès, appareils, consultations).
-- **FR-PUB-08** : Relevés de redevances certifiés et demande de virement.
-- **FR-PUB-09** : Profil complet d'entreprise avec NIF, RCCM, coordonnées bancaires et changement de mot de passe.
+- **FR-PUB-01** : Protection d'accès par rôle `publisher`.
+- **FR-PUB-02** : Tableau de bord avec 4 KPI cards (Titres, Validations, Ventes, Redevances).
+- **FR-PUB-03** : Module d'assistance IA pour l'extraction de métadonnées, classification, résumés et pays.
+- **FR-PUB-04** : Formulaire de dépôt unitaire multi-étapes avec configuration des DRM et du filigrane.
+- **FR-PUB-05** : Parseur de lots ONIX 3.0 / CSV avec rapport d'erreurs détaillé.
+- **FR-PUB-06** : Gestion des clés d'API REST avec révocation sécurisée.
+- **FR-PUB-07** : Suivi du workflow de validation en 5 étapes avec motifs de correction.
+- **FR-PUB-08** : Relevés financiers avec taux contractuel en lecture seule et demande de paiement.
+- **FR-PUB-09** : Journal d'audit et de traçabilité DRM.
+- **FR-PUB-10** : Profil modulaire (Société / Particulier) avec NIF, RCCM, IBAN/Momo et sécurité.
 
 ---
 
-## 5. Critères de Succès Mesurables (SC)
+## 4. Critères de Succès Mesurables (SC)
 
-- **SC-001** : 100% des flux d'action disposent d'un feedback visuel (spinner d'attente ou skeleton de chargement).
-- **SC-002** : Zéro code couleur hexadécimal en dur dans les composants.
-- **SC-003** : Zéro emoji sur l'ensemble des pages et modales.
-- **SC-004** : Ergonomie mobile validée pour toutes largeurs d'écran dès 360px.
+- **SC-001** : 100% des actions asynchrones ont un feedback immédiat (spinner sur bouton désactivé, skeleton ou toast).
+- **SC-002** : Zéro code couleur hexadécimal en dur et zéro emoji sur toutes les pages.
+- **SC-003** : Conformité mobile-first garantie pour les écrans < 400px.

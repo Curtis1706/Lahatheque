@@ -1,60 +1,76 @@
-# Data Model: Module 4 - Espace Éditeur Tiers & Synchronisation ONIX
+# Data Model: Module 4 - Espace Éditeur Tiers, Assistance IA & Synchronisation ONIX
 
 **Feature Branch**: `004-depot-editeurs-tiers-onix`  
 **Created**: 2026-08-20  
-**Stack**: Django 5.x ORM & TypeScript Stricte
+**Stack**: Django 5.x ORM & TypeScript Strict
 
 ---
 
-## 1. Modèles Django Backend (`apps/publishers_portal/models.py` / `apps/partners/models.py`)
+## 1. Modèles Django Backend (`apps/publishers_portal/models.py`)
 
 ```python
 import uuid
 from django.db import models
 from django.conf import settings
 
-# ─── 1. Profil Maison d'Édition Partenaire ───────────────────────────────────
+# ─── 1. Profil Éditeur Tiers (Maison d'Édition ou Éditeur Indépendant) ───────
+
+class PublisherEntityType(models.TextChoices):
+    COMPANY = "company", "Maison d'Édition / Personne Morale"
+    INDIVIDUAL = "individual", "Éditeur Indépendant / Auto-Éditeur (Personne Physique)"
+
 
 class PublisherProfile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="publisher_company_profile"
+        related_name="publisher_profile"
     )
-    company_name = models.CharField(max_length=255, verbose_name="Raison Sociale / Maison d'Édition")
-    trade_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Nom Commercial / Marque")
-    nif_number = models.CharField(max_length=64, blank=True, default="", verbose_name="Numéro NIF / IFU")
-    rccm_number = models.CharField(max_length=64, blank=True, default="", verbose_name="Numéro RCCM")
-    country = models.CharField(max_length=10, default="BJ", verbose_name="Pays du Siège")
-    city = models.CharField(max_length=128, default="Cotonou", verbose_name="Ville")
-    headquarters_address = models.TextField(verbose_name="Adresse du Siège Social")
-    contact_person = models.CharField(max_length=128, verbose_name="Responsable Partenariats / Contact")
-    contact_email = models.EmailField(verbose_name="E-mail Administratif & Factures")
-    contact_phone = models.CharField(max_length=32, verbose_name="Téléphone d'Astreinte")
+    entity_type = models.CharField(
+        max_length=20,
+        choices=PublisherEntityType.choices,
+        default=PublisherEntityType.COMPANY,
+        verbose_name="Type d'Entité"
+    )
     
-    # Données Bancaires & Règlements
-    bank_name = models.CharField(max_length=128, blank=True, default="", verbose_name="Nom de la Banque")
-    bank_iban = models.CharField(max_length=128, blank=True, default="", verbose_name="IBAN / Numéro de Compte")
+    # Identification Légale
+    company_name = models.CharField(max_length=255, verbose_name="Raison Sociale ou Nom d'Auteur/Éditeur")
+    trade_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Nom Commercial / Enseigne")
+    nif_number = models.CharField(max_length=64, blank=True, default="", verbose_name="Numéro NIF / IFU")
+    rccm_number = models.CharField(max_length=64, blank=True, default="", verbose_name="Numéro RCCM (si société)")
+    identity_card_number = models.CharField(max_length=64, blank=True, default="", verbose_name="Numéro CNI / Passeport (si particulier)")
+    
+    # Localisation & Contact
+    country = models.CharField(max_length=10, default="BJ", verbose_name="Pays du Siège / Résidence")
+    city = models.CharField(max_length=128, default="Cotonou", verbose_name="Ville")
+    headquarters_address = models.TextField(verbose_name="Adresse Postale / Siège")
+    contact_person = models.CharField(max_length=128, verbose_name="Responsable / Nom du Contact")
+    contact_email = models.EmailField(verbose_name="E-mail de Facturation & Notifications")
+    contact_phone = models.CharField(max_length=32, verbose_name="Téléphone Direct / Astreinte")
+    
+    # Coordonnées Bancaires pour Reversement des Redevances
+    bank_name = models.CharField(max_length=128, blank=True, default="", verbose_name="Banque de Domiciliation")
+    bank_iban = models.CharField(max_length=128, blank=True, default="", verbose_name="Numéro IBAN / Compte Bancaire")
     bank_swift = models.CharField(max_length=32, blank=True, default="", verbose_name="Code BIC / SWIFT")
-    momo_number = models.CharField(max_length=32, blank=True, default="", verbose_name="Numéro Mobile Money")
+    momo_number = models.CharField(max_length=32, blank=True, default="", verbose_name="Compte Mobile Money (MTN/Moov/Orange/Wave)")
     
     # Conditions Contractuelles & Mandat
-    contract_reference = models.CharField(max_length=64, default="CTR-PUB-2025-01", verbose_name="Référence Contrat de Mandat")
+    contract_reference = models.CharField(max_length=64, default="CTR-PUB-2025-01", verbose_name="Réf. Contrat de Mandat")
     contractual_royalty_rate = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=22.00,
         verbose_name="Taux Contractuel de Redevance (%)"
     )
-    is_verified = models.BooleanField(default=True, verbose_name="Éditeur Agréé & Certifié")
+    is_verified = models.BooleanField(default=True, verbose_name="Partenaire Certifié & Validé")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "publishers_profile"
-        verbose_name = "Profil Maison d'Édition"
-        verbose_name_plural = "Profils Maisons d'Édition"
+        verbose_name = "Profil Éditeur Tiers"
+        verbose_name_plural = "Profils Éditeurs Tiers"
 
 
 # ─── 2. Dépôt d'Ouvrage & Circuit de Validation ──────────────────────────────
@@ -84,25 +100,27 @@ class PublisherBookDeposit(models.Model):
     )
     title = models.CharField(max_length=255, verbose_name="Titre Principal")
     subtitle = models.CharField(max_length=255, blank=True, default="", verbose_name="Sous-Titre")
-    isbn_digital = models.CharField(max_length=64, db_index=True, verbose_name="ISBN Format Numérique (EPUB/PDF)")
-    isbn_print = models.CharField(max_length=64, blank=True, default="", verbose_name="ISBN Format Papier")
+    isbn_digital = models.CharField(max_length=64, db_index=True, verbose_name="ISBN Numérique (EPUB/PDF)")
+    isbn_print = models.CharField(max_length=64, blank=True, default="", verbose_name="ISBN Papier")
     doi = models.CharField(max_length=128, blank=True, default="", verbose_name="Identifiant DOI")
     
-    authors = models.JSONField(default=list, verbose_name="Liste des Auteurs Principaux")
-    discipline = models.CharField(max_length=128, db_index=True, verbose_name="Discipline / Domaine")
-    keywords = models.JSONField(default=list, blank=True, verbose_name="Mots-Clés")
+    authors = models.JSONField(default=list, verbose_name="Auteurs Principaux")
+    contributors = models.JSONField(default=list, blank=True, verbose_name="Contributeurs (Traducteurs, Préfaciers)")
+    discipline = models.CharField(max_length=128, db_index=True, verbose_name="Discipline Académique")
+    language = models.CharField(max_length=10, default="fr", verbose_name="Langue de l'ouvrage")
+    keywords = models.JSONField(default=list, blank=True, verbose_name="Mots-Clés Thématiques")
     target_audience = models.CharField(max_length=64, default="universitaire", verbose_name="Public Cible")
     
     price = models.DecimalField(max_digits=10, decimal_places=2, default=5000.00, verbose_name="Prix Public Unitaire")
     currency = models.CharField(max_length=10, default="XOF", verbose_name="Devise")
     sales_model = models.CharField(max_length=32, default="purchase", verbose_name="Modèle Commercial")
-    allowed_territories = models.JSONField(default=list, verbose_name="Territoires d'Exploitation Autorisés")
+    allowed_territories = models.JSONField(default=list, verbose_name="Territoires d'Exploitation")
     embargo_date = models.DateField(null=True, blank=True, verbose_name="Date Fin d'Embargo")
     
-    summary = models.TextField(verbose_name="Résumé / Quatrième de couverture")
-    authors_bio = models.TextField(blank=True, default="", verbose_name="Notice Biographique Auteurs")
+    summary = models.TextField(verbose_name="Résumé / 4e de couverture")
+    authors_bio = models.TextField(blank=True, default="", verbose_name="Biographie Auteurs")
     cover_url = models.CharField(max_length=500, blank=True, default="", verbose_name="URL Couverture")
-    file_url = models.CharField(max_length=500, blank=True, default="", verbose_name="URL Fichier Maquette")
+    file_url = models.CharField(max_length=500, blank=True, default="", verbose_name="URL Fichier")
     file_format = models.CharField(max_length=10, default="pdf", choices=[("pdf", "PDF"), ("epub", "EPUB"), ("audio", "Audio")])
     licence_type = models.CharField(max_length=64, default="tous_droits_reserves")
     
@@ -228,6 +246,8 @@ class PublisherAuditLog(models.Model):
 ## 2. Types TypeScript (`lib/types/publisher.ts`)
 
 ```typescript
+export type PublisherEntityType = "company" | "individual";
+
 export type ValidationStep =
   | "step_1_deposited"
   | "step_2_auto_check"
@@ -274,6 +294,7 @@ export interface PublisherBook {
     orcid?: string;
   }[];
   discipline: string;
+  language: string;
   keywords: string[];
   target_audience: "universitaire" | "professionnel" | "grand_public";
   price: number;
@@ -299,12 +320,24 @@ export interface PublisherBook {
   protection_config: ProtectionConfig;
 }
 
+export interface PublisherAiMetadataSuggestion {
+  summary: string;
+  discipline: string;
+  language: string;
+  country: string;
+  suggested_keywords: string[];
+  target_audience: "universitaire" | "professionnel" | "grand_public";
+  confidence_score: number;
+}
+
 export interface PublisherProfileData {
   id: string;
+  entity_type: PublisherEntityType;
   company_name: string;
   trade_name?: string;
   nif_number: string;
-  rccm_number: string;
+  rccm_number?: string;
+  identity_card_number?: string;
   country: string;
   city: string;
   headquarters_address: string;

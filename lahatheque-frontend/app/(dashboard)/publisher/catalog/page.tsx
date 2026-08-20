@@ -85,6 +85,13 @@ export default function PublisherCatalogPage() {
       cell: (row) => (
         <div className="flex items-center gap-2">
           <Link
+            href={`/catalog/reader/${row.id}`}
+            className="p-2 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 transition-colors text-navy min-h-[36px] inline-flex items-center"
+            title="Prévisualiser dans la Liseuse LAHA"
+          >
+            <BookOpen className="w-4 h-4 text-gold" />
+          </Link>
+          <Link
             href={`/publisher/catalog/${row.id}`}
             className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1"
           >

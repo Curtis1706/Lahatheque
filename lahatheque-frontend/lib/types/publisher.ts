@@ -1,5 +1,7 @@
 // ─── Types Espace Éditeur Tiers (publisher) ──────────────────────────────────
-// Alignés sur le plan de specs techniques Django — Section 5 (Dépôt Éditeurs Tiers), 6, 9, 10.3 & 12
+// Alignés sur le plan de specs techniques Django — Section 4.1.7, 4.1.C, 5, 6, 9, 10.3 & 12
+
+export type PublisherEntityType = "company" | "individual";
 
 export type ValidationStep =
   | "step_1_deposited"          // 1. Dépôt effectué
@@ -42,6 +44,7 @@ export interface PublisherBook {
     orcid?: string;
   }[];
   discipline: string;
+  language?: string;
   keywords: string[];
   target_audience: "universitaire" | "professionnel" | "grand_public";
   price: number;
@@ -67,6 +70,39 @@ export interface PublisherBook {
   protection_config: ProtectionConfig;
 }
 
+export interface PublisherAiMetadataSuggestion {
+  summary: string;
+  discipline: string;
+  language: string;
+  country: string;
+  suggested_keywords: string[];
+  target_audience: "universitaire" | "professionnel" | "grand_public";
+  confidence_score: number;
+}
+
+export interface PublisherProfileData {
+  id: string;
+  entity_type: PublisherEntityType;
+  company_name: string;
+  trade_name?: string;
+  nif_number: string;
+  rccm_number?: string;
+  identity_card_number?: string;
+  country: string;
+  city: string;
+  headquarters_address: string;
+  contact_person: string;
+  contact_email: string;
+  contact_phone: string;
+  bank_name?: string;
+  bank_iban?: string;
+  bank_swift?: string;
+  momo_number?: string;
+  contract_reference: string;
+  contractual_royalty_rate: number;
+  is_verified: boolean;
+}
+
 export interface BatchImportReport {
   batch_id: string;
   file_name: string;
@@ -88,6 +124,7 @@ export interface ApiKey {
   name: string;
   client_id: string;
   client_secret_masked: string;
+  client_secret?: string; // Présent uniquement à la création
   permissions: string[];
   created_at: string;
   last_used_at?: string;
@@ -104,17 +141,24 @@ export interface PublisherAuditLog {
   country: string;
   device: string;
   watermark_trace_code: string;
+  is_suspicious?: boolean;
 }
 
 export interface PublisherRoyaltyPayment {
   id: string;
+  reference?: string;
   amount: number;
   currency: string;
   period: string;
-  status: "paid" | "processing";
-  payment_date: string;
-  payment_method: string;
+  status: "paid" | "processing" | "pending" | "failed";
+  payment_date?: string;
+  paid_at?: string;
+  payment_method?: string;
   invoice_url?: string;
+  pdf_statement_url?: string;
+  total_sales_amount?: number;
+  royalty_rate?: number;
+  net_royalty_amount?: number;
 }
 
 export interface PublisherKpis {

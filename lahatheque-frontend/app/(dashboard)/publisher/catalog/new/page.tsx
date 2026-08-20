@@ -3,10 +3,25 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, BookOpen, PlusCircle, Sparkles, Upload, Save, CheckCircle2, ShieldCheck, DollarSign, Tag, Info } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  PlusCircle,
+  Sparkles,
+  Upload,
+  Save,
+  CheckCircle2,
+  ShieldCheck,
+  DollarSign,
+  Tag,
+  Info,
+  Building2,
+  Bot,
+} from "lucide-react";
+import { toast } from "sonner";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
-import { createPublisherBook } from "@/lib/services/publisher";
-import type { SalesModel } from "@/lib/types/publisher";
+import { createPublisherBook, extractBookMetadataWithAi } from "@/lib/services/publisher";
+import type { SalesModel, PublisherAiMetadataSuggestion } from "@/lib/types/publisher";
 
 export default function NewPublisherBookPage() {
   const router = useRouter();
@@ -18,17 +33,17 @@ export default function NewPublisherBookPage() {
   const [isbnDigital, setIsbnDigital] = useState("");
   const [isbnPrint, setIsbnPrint] = useState("");
   const [doi, setDoi] = useState("");
-  const [language, setLanguage] = useState("Français");
+  const [language, setLanguage] = useState("fr");
 
   // Bloc 2: Contributeurs
   const [authors, setAuthors] = useState("");
   const [coAuthors, setCoAuthors] = useState("");
 
-  // Bloc 3: Classification
+  // Bloc 3: Classification & IA
   const [discipline, setDiscipline] = useState("Droit Public & Administration");
   const [keywords, setKeywords] = useState("droit, afrique, uac");
   const [targetAudience, setTargetAudience] = useState<"universitaire" | "professionnel" | "grand_public">("universitaire");
-  const [aiClassifying, setAiClassifying] = useState(false);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
 
   // Bloc 4: Commercial
   const [price, setPrice] = useState(12000);
@@ -39,56 +54,85 @@ export default function NewPublisherBookPage() {
   // Bloc 5: Description & Visuels
   const [summary, setSummary] = useState("");
   const [authorsBio, setAuthorsBio] = useState("");
-  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [manuscriptFile, setManuscriptFile] = useState<File | null>(null);
 
   // Bloc 6: Droits & Licences
   const [licenceType, setLicenceType] = useState<"tous_droits_reserves" | "creative_commons">("tous_droits_reserves");
+  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Simulation suggestion IA classification & résumé
-  const handleAiSuggest = () => {
-    setAiClassifying(true);
-    setTimeout(() => {
-      setDiscipline("Droit Public & Administration");
-      setKeywords("droit administratif, jurisprudence, uac, afrique de l'ouest");
-      if (!summary) {
-        setSummary(
-          "Analyse doctrinale approfondie des grands principes du droit administratif comparé en Afrique francophone."
-        );
+  // Analyse et complétion par IA
+  const handleAiSuggest = async () => {
+    if (!title.trim() && !manuscriptFile) {
+      toast.info("Veuillez d'abord saisir le titre ou sélectionner le fichier manuscrit.");
+      return;
+    }
+    setAiAnalyzing(true);
+    try {
+      const res = await extractBookMetadataWithAi({
+        title: title.trim(),
+        filename: manuscriptFile?.name,
+      });
+      setDiscipline(res.discipline);
+      setLanguage(res.language);
+      setKeywords(res.suggested_keywords.join(", "));
+      if (!summary.trim()) {
+        setSummary(res.summary);
       }
-      setAiClassifying(false);
-    }, 800);
+      toast.success("Classification thématique et métadonnées suggérées par l'IA.");
+    } catch {
+      toast.error("Erreur lors de l'analyse IA. Les champs par défaut sont conservés.");
+    } finally {
+      setAiAnalyzing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !isbnDigital || !authors) return;
+    if (!title || !isbnDigital || !authors) {
+      toast.error("Veuillez renseigner les champs obligatoires (Titre, ISBN et Auteurs).");
+      return;
+    }
 
     setSubmitting(true);
     try {
       await createPublisherBook({
         title,
-        subtitle,
+        subtitle: subtitle || undefined,
         isbn_digital: isbnDigital,
         isbn_print: isbnPrint || undefined,
         doi: doi || undefined,
         authors: authors.split(",").map((a) => a.trim()).filter(Boolean),
         discipline,
+        language,
         keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
         target_audience: targetAudience,
         price,
         currency,
         sales_model: salesModel,
         allowed_territories: territories.split(",").map((t) => t.trim()).filter(Boolean),
-        summary,
+        summary: summary || "Ouvrage déposé pour examen éditorial.",
         authors_bio: authorsBio,
         licence_type: licenceType,
+        protection_config: {
+          watermark_enabled: watermarkEnabled,
+          watermark_position: "bottom-right",
+          watermark_opacity: 30,
+          user_watermarking: true,
+          lcp_drm_enabled: true,
+          max_allowed_devices: 3,
+          max_loan_days: 14,
+          disable_copy_paste: true,
+          disable_print: false,
+          audio_encryption_auto: true,
+          access_tracing_auto: true,
+        },
       });
 
-      alert("L'ouvrage a été transmis avec succès ! Il entre désormais dans le flux de validation en 5 étapes.");
+      toast.success("L'ouvrage a été transmis avec succès au comité de validation.");
       router.push("/publisher/catalog");
-    } catch (err) {
-      alert("Erreur lors du dépôt.");
+    } catch {
+      toast.error("Erreur lors du dépôt de l'ouvrage. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
     }
@@ -99,455 +143,464 @@ export default function NewPublisherBookPage() {
     "2. Contributeurs",
     "3. Classification (IA)",
     "4. Commercial",
-    "5. Description & Visuels",
-    "6. Droits & Licences",
+    "5. Fichiers & Résumé",
+    "6. Droits & Protection",
   ];
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-4xl mx-auto">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-foreground-muted">
-        <Link href="/publisher" className="hover:text-navy">Vue d&apos;ensemble</Link>
-        <span>/</span>
-        <Link href="/publisher/catalog" className="hover:text-navy">Catalogue</Link>
-        <span>/</span>
-        <span className="text-navy font-semibold">Nouveau Dépôt Web</span>
-      </div>
-
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="border-b border-border pb-4">
-        <Link href="/publisher/catalog" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-2">
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Retour au Catalogue
-        </Link>
-        <h1 className="font-serif text-2xl font-bold text-navy">
-          Nouveau Dépôt d&apos;Ouvrage (Formulaire 6 Blocs)
-        </h1>
-        <p className="text-xs text-foreground-muted mt-1">
-          Remplissez les métadonnées de l&apos;œuvre selon les normes de la section 5.3 du Cahier des charges v3.2.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <Link
+            href="/publisher/catalog"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-navy hover:text-gold transition-colors mb-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Retour au Catalogue
+          </Link>
+          <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy tracking-tight">
+            Nouveau Dépôt d&apos;Ouvrage Partenaire
+          </h1>
+          <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">
+            Renseignez les métadonnées et téléversez votre fichier d&apos;épreuve pour soumission au comité LAHA.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleAiSuggest}
+          disabled={aiAnalyzing}
+          className="px-4 py-2.5 rounded-xl bg-gold/15 text-gold border border-gold/30 hover:bg-gold/25 font-bold text-xs transition-colors flex items-center gap-2 shadow-xs shrink-0 min-h-[44px] disabled:opacity-50"
+        >
+          {aiAnalyzing ? (
+            <span className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+          ) : (
+            <Bot className="w-4 h-4 text-gold" />
+          )}
+          <span>{aiAnalyzing ? "Analyse IA en cours..." : "Pré-remplir par Assistant IA"}</span>
+        </button>
       </div>
 
-      {/* Stepper Navigation 6 Blocs */}
-      <div className="flex items-center gap-1 border-b border-border pb-3 overflow-x-auto">
+      {/* Stepper Navigation */}
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 p-2 rounded-2xl bg-background-secondary border border-border">
         {stepLabels.map((lbl, idx) => {
           const stepNum = idx + 1;
           const isActive = currentStep === stepNum;
+          const isPassed = currentStep > stepNum;
           return (
             <button
               key={lbl}
               type="button"
               onClick={() => setCurrentStep(stepNum)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors border ${
+              className={`p-2.5 rounded-xl text-xs font-bold transition-all text-left flex items-center justify-between min-h-[44px] ${
                 isActive
-                  ? "bg-navy text-white border-navy"
-                  : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
+                  ? "bg-navy text-white shadow-xs"
+                  : isPassed
+                  ? "bg-background text-emerald-700 border border-emerald-500/30"
+                  : "text-foreground-muted hover:bg-background"
               }`}
             >
-              {lbl}
+              <span className="truncate">{lbl}</span>
+              {isPassed && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
             </button>
           );
         })}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Bloc 1: Identification */}
+      {/* Formulaire Multi-Étapes */}
+      <form onSubmit={handleSubmit} className="p-6 rounded-3xl bg-background border border-border space-y-6 shadow-xs">
+        {/* Étape 1: Identification */}
         {currentStep === 1 && (
-          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-gold" />
-              Bloc 1 : Identification de l&apos;Œuvre
-            </h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <BookOpen className="w-5 h-5 text-gold" />
+              <h2 className="font-serif font-bold text-navy text-base">Identification Bibliographique</h2>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <label htmlFor="title" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Titre Principal *</label>
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  Titre Principal de l&apos;Ouvrage <span className="text-rose-500">*</span>
+                </label>
                 <input
-                  id="title"
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="ex. Traité de Droit Administratif Comparé"
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
+                  placeholder="ex. Traité Général de Droit International et Africain"
                   required
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 />
               </div>
 
-              <div className="sm:col-span-2">
-                <label htmlFor="subtitle" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Sous-titre (Optionnel)</label>
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Sous-Titre (Optionnel)</label>
                 <input
-                  id="subtitle"
                   type="text"
                   value={subtitle}
                   onChange={(e) => setSubtitle(e.target.value)}
-                  placeholder="ex. Théorie générale et jurisprudence"
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy min-h-[44px]"
+                  placeholder="ex. Principes, Traités et Jurisprudence OHADA"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 />
               </div>
 
-              <div>
-                <label htmlFor="isbn-digital" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">ISBN Numérique *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  ISBN Numérique (EPUB/PDF) <span className="text-rose-500">*</span>
+                </label>
                 <input
-                  id="isbn-digital"
                   type="text"
                   value={isbnDigital}
                   onChange={(e) => setIsbnDigital(e.target.value)}
                   placeholder="978-2-01-398010-4"
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl font-mono text-navy font-bold focus:outline-none focus:border-gold min-h-[44px]"
                   required
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-mono min-h-[44px]"
                 />
               </div>
 
-              <div>
-                <label htmlFor="isbn-print" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">ISBN Papier (Optionnel)</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">ISBN Format Papier</label>
                 <input
-                  id="isbn-print"
                   type="text"
                   value={isbnPrint}
                   onChange={(e) => setIsbnPrint(e.target.value)}
                   placeholder="978-2-01-398011-1"
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl font-mono text-navy min-h-[44px]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-mono min-h-[44px]"
                 />
               </div>
-            </div>
 
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(2)}
-                className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors"
-              >
-                Étape Suivante →
-              </button>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Identifiant DOI</label>
+                <input
+                  type="text"
+                  value={doi}
+                  onChange={(e) => setDoi(e.target.value)}
+                  placeholder="10.1016/j.afadmin.2025.01"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-mono min-h-[44px]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Langue de l&apos;Ouvrage</label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
+                >
+                  <option value="fr">Français</option>
+                  <option value="en">Anglais</option>
+                  <option value="es">Espagnol</option>
+                  <option value="pt">Portugais</option>
+                  <option value="ar">Arabe</option>
+                </select>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Bloc 2: Contributeurs */}
+        {/* Étape 2: Contributeurs */}
         {currentStep === 2 && (
-          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
-              <Tag className="w-4 h-4 text-gold" />
-              Bloc 2 : Auteurs &amp; Contributeurs
-            </h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <BookOpen className="w-5 h-5 text-gold" />
+              <h2 className="font-serif font-bold text-navy text-base">Contributeurs &amp; Auteurs</h2>
+            </div>
 
             <div className="space-y-4">
-              <div>
-                <label htmlFor="authors" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Auteur(s) Principal(aux) (séparés par des virgules) *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  Auteur(s) Principal(aux) <span className="text-rose-500">*</span>
+                </label>
                 <input
-                  id="authors"
                   type="text"
                   value={authors}
                   onChange={(e) => setAuthors(e.target.value)}
                   placeholder="ex. Prof. Augustin CHAKIROU, Dr. Honoré ZINSOU"
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
                   required
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 />
+                <p className="text-[11px] text-foreground-muted">Séparez les noms d&apos;auteurs par une virgule.</p>
               </div>
 
-              <div>
-                <label htmlFor="co-authors" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Co-auteurs, Traducteurs, Préfaciers (Optionnel)</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  Co-auteurs, Traducteurs ou Préfaciers
+                </label>
                 <input
-                  id="co-authors"
                   type="text"
                   value={coAuthors}
                   onChange={(e) => setCoAuthors(e.target.value)}
-                  placeholder="ex. Dr. Honoré ZINSOU (Traducteur)"
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy min-h-[44px]"
+                  placeholder="ex. Dr. Fatou DIOP (Préfacier)"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 />
               </div>
-            </div>
-
-            <div className="flex justify-between pt-2">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(1)}
-                className="px-5 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted"
-              >
-                ← Précédent
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(3)}
-                className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors"
-              >
-                Étape Suivante →
-              </button>
             </div>
           </div>
         )}
 
-        {/* Bloc 3: Classification & IA */}
+        {/* Étape 3: Classification (IA) */}
         {currentStep === 3 && (
-          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-gold" />
-                Bloc 3 : Classification Thématique &amp; Assistance IA
-              </h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-gold" />
+                <h2 className="font-serif font-bold text-navy text-base">Classification Thématique &amp; Académique</h2>
+              </div>
               <button
                 type="button"
                 onClick={handleAiSuggest}
-                disabled={aiClassifying}
-                className="px-3 py-1.5 rounded-xl bg-gold/15 text-gold border border-gold/30 text-xs font-bold hover:bg-gold/25 transition-colors flex items-center gap-1.5"
+                disabled={aiAnalyzing}
+                className="text-xs font-bold text-gold hover:underline inline-flex items-center gap-1.5 disabled:opacity-50"
               >
-                {aiClassifying ? (
-                  <span className="w-3.5 h-3.5 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+                {aiAnalyzing ? (
+                  <span className="w-3.5 h-3.5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
                 ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-gold" />
+                  <Bot className="w-3.5 h-3.5" />
                 )}
-                Suggérer par l&apos;IA
+                <span>Auto-classification IA</span>
               </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="discipline" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Discipline Académique *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Discipline</label>
                 <select
-                  id="discipline"
                   value={discipline}
                   onChange={(e) => setDiscipline(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold min-h-[44px]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 >
                   <option value="Droit Public & Administration">Droit Public &amp; Administration</option>
-                  <option value="Sciences Économiques">Sciences Économiques</option>
-                  <option value="Médecine & Santé">Médecine &amp; Santé</option>
+                  <option value="Sciences Économiques & Gestion">Sciences Économiques &amp; Gestion</option>
+                  <option value="Médecine & Santé Publique">Médecine &amp; Santé Publique</option>
                   <option value="Agronomie & Environnement">Agronomie &amp; Environnement</option>
+                  <option value="Sciences & Technologies">Sciences &amp; Technologies</option>
+                  <option value="Lettres & Sciences Humaines">Lettres &amp; Sciences Humaines</option>
                 </select>
               </div>
 
-              <div>
-                <label htmlFor="target-audience" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Public Cible *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Public Cible</label>
                 <select
-                  id="target-audience"
                   value={targetAudience}
                   onChange={(e) => setTargetAudience(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold min-h-[44px]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 >
-                  <option value="universitaire">Universitaire &amp; Chercheurs</option>
-                  <option value="professionnel">Professionnel &amp; Praticiens</option>
-                  <option value="grand_public">Grand Public</option>
+                  <option value="universitaire">Niveau Universitaire (Licence/Master/Doctorat)</option>
+                  <option value="professionnel">Professionnels &amp; Praticiens</option>
+                  <option value="grand_public">Grand Public &amp; Culture Générale</option>
                 </select>
               </div>
 
-              <div className="sm:col-span-2">
-                <label htmlFor="keywords" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Mots-Clés Libres (séparés par des virgules)</label>
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Mots-Clés Thématiques</label>
                 <input
-                  id="keywords"
                   type="text"
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy min-h-[44px]"
+                  placeholder="ex. droit public, afrique de l'ouest, uac, contentieux"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 />
               </div>
-            </div>
-
-            <div className="flex justify-between pt-2">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(2)}
-                className="px-5 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted"
-              >
-                ← Précédent
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(4)}
-                className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors"
-              >
-                Étape Suivante →
-              </button>
             </div>
           </div>
         )}
 
-        {/* Bloc 4: Commercial */}
+        {/* Étape 4: Commercial */}
         {currentStep === 4 && (
-          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-gold" />
-              Bloc 4 : Informations Commerciales &amp; Prix
-            </h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <DollarSign className="w-5 h-5 text-gold" />
+              <h2 className="font-serif font-bold text-navy text-base">Modèle Commercial &amp; Territoires</h2>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="price" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Prix Unitaire *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Prix Public Unitaire</label>
                 <div className="relative">
                   <input
-                    id="price"
                     type="number"
-                    min="0"
-                    step="500"
                     value={price}
-                    onChange={(e) => setPrice(parseInt(e.target.value) || 0)}
-                    className="w-full px-3.5 py-2.5 text-xs font-mono font-bold bg-background-secondary border border-border rounded-xl text-navy min-h-[44px]"
-                    required
+                    onChange={(e) => setPrice(Number(e.target.value))}
+                    min={0}
+                    className="w-full pl-3.5 pr-16 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-bold min-h-[44px]"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono font-bold text-gold text-xs">{currency}</span>
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-foreground-muted">
+                    {currency}
+                  </span>
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="sales-model" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Modèle de Vente *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Modèle de Distribution</label>
                 <select
-                  id="sales-model"
                   value={salesModel}
-                  onChange={(e) => setSalesModel(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold min-h-[44px]"
+                  onChange={(e) => setSalesModel(e.target.value as SalesModel)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 >
-                  <option value="purchase">Vente Unitaire</option>
-                  <option value="subscription">Bouquet &amp; Abonnement</option>
-                  <option value="free">Accès Libre / Open Access</option>
+                  <option value="purchase">Vente à l&apos;unité uniquement</option>
+                  <option value="subscription">Inclus dans les abonnements</option>
+                  <option value="bundle">Intégrable aux bouquets institutionnels</option>
+                  <option value="free">Accès Libre (Open Access)</option>
                 </select>
               </div>
 
-              <div className="sm:col-span-2">
-                <label htmlFor="territories" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Territoires Autorisés</label>
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  Territoires d&apos;Exploitation Autorisés
+                </label>
                 <input
-                  id="territories"
                   type="text"
                   value={territories}
                   onChange={(e) => setTerritories(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy min-h-[44px]"
+                  placeholder="ex. Bénin, Togo, Côte d'Ivoire, Sénégal, France, Monde"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 />
               </div>
-            </div>
-
-            <div className="flex justify-between pt-2">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(3)}
-                className="px-5 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted"
-              >
-                ← Précédent
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(5)}
-                className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors"
-              >
-                Étape Suivante →
-              </button>
             </div>
           </div>
         )}
 
-        {/* Bloc 5: Description & Visuels */}
+        {/* Étape 5: Fichiers & Résumé */}
         {currentStep === 5 && (
-          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
-              <Upload className="w-4 h-4 text-gold" />
-              Bloc 5 : Description &amp; Couverture Haute Résolution
-            </h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <Upload className="w-5 h-5 text-gold" />
+              <h2 className="font-serif font-bold text-navy text-base">Fichiers Numériques &amp; Quatrième de Couverture</h2>
+            </div>
 
             <div className="space-y-4">
-              <div>
-                <label htmlFor="summary" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Résumé / 4ème de Couverture *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  Fichier d&apos;Épreuve Numérique (PDF ou EPUB)
+                </label>
+                <FileDropzone
+                  label="Téléverser le Manuscrit Numérique (.pdf, .epub)"
+                  acceptTypes={[".pdf", ".epub"]}
+                  selectedFileName={manuscriptFile?.name}
+                  selectedFileSize={manuscriptFile?.size}
+                  onFileSelect={(f) => {
+                    setManuscriptFile(f);
+                    toast.success(`Fichier ${f.name} prêt pour l'envoi.`);
+                  }}
+                  onFileRemove={() => setManuscriptFile(null)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  Résumé / Quatrième de Couverture
+                </label>
                 <textarea
-                  id="summary"
+                  rows={4}
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
-                  rows={4}
-                  placeholder="Résumé synthétique présent sur la fiche publique de l'ouvrage..."
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy min-h-[100px]"
-                  required
+                  placeholder="Présentation synthétique du contenu de l'ouvrage..."
+                  className="w-full p-3.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium leading-relaxed"
                 />
               </div>
 
-              <div>
-                <FileDropzone
-                  acceptTypes={["image/jpeg", "image/png"]}
-                  label="Couverture Haute Résolution (JPEG / PNG, min 1500x2000px) *"
-                  onFileSelect={(f) => setCoverFile(f)}
-                  onFileRemove={() => setCoverFile(null)}
-                  selectedFileName={coverFile?.name}
-                  selectedFileSize={coverFile?.size}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Biographie de l&apos;Auteur</label>
+                <textarea
+                  rows={2}
+                  value={authorsBio}
+                  onChange={(e) => setAuthorsBio(e.target.value)}
+                  placeholder="Notice biographique et affiliations universitaires..."
+                  className="w-full p-3.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium leading-relaxed"
                 />
               </div>
-            </div>
-
-            <div className="flex justify-between pt-2">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(4)}
-                className="px-5 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted"
-              >
-                ← Précédent
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(6)}
-                className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors"
-              >
-                Étape Suivante →
-              </button>
             </div>
           </div>
         )}
 
-        {/* Bloc 6: Droits & Licences */}
+        {/* Étape 6: Droits & Protection */}
         {currentStep === 6 && (
-          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-gold" />
-              Bloc 6 : Droits &amp; Licences Applicables
-            </h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <ShieldCheck className="w-5 h-5 text-gold" />
+              <h2 className="font-serif font-bold text-navy text-base">Droits, Licences &amp; Tatouage Numérique</h2>
+            </div>
 
             <div className="space-y-4">
-              <div>
-                <label htmlFor="licence-type" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Licence Applicable *</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Type de Licence</label>
                 <select
-                  id="licence-type"
                   value={licenceType}
                   onChange={(e) => setLicenceType(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold min-h-[44px]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 >
-                  <option value="tous_droits_reserves">Tous Droits Réservés (Exclusive Partner)</option>
+                  <option value="tous_droits_reserves">Tous Droits Réservés (Convention LAHA)</option>
                   <option value="creative_commons">Creative Commons (CC-BY-NC)</option>
                 </select>
               </div>
 
-              {/* Taux de redevance convenu en lecture seule (Section 5.3) */}
-              <div className="p-4 rounded-2xl bg-navy/5 border border-navy/20 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <Info className="w-4 h-4 text-gold" />
-                  <div>
-                    <span className="font-bold text-navy block">Taux de Redevance Contractuel Convenu</span>
-                    <span className="text-[10px] text-foreground-muted">Réf Contrat : CTR-PUB-2025-08 (Fixé par avenant légal)</span>
-                  </div>
+              <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-navy">Activer le Tatouage Visible Personnalisé</span>
+                  <button
+                    type="button"
+                    onClick={() => setWatermarkEnabled(!watermarkEnabled)}
+                    className={`w-11 h-6 rounded-full transition-colors relative p-0.5 ${
+                      watermarkEnabled ? "bg-gold" : "bg-border"
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                        watermarkEnabled ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
                 </div>
-                <span className="font-mono font-bold text-gold text-base px-3 py-1 bg-background rounded-xl border border-border">
-                  22%
-                </span>
+                <p className="text-[11px] text-foreground-muted">
+                  Applique dynamiquement le nom du lecteur, la date et le numéro de licence sur chaque page.
+                </p>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-border">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(5)}
-                className="px-5 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted"
-              >
-                ← Précédent
-              </button>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-xs"
-              >
-                {submitting ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 text-gold" />
-                    Transmettre le Dépôt pour Validation
-                  </>
-                )}
-              </button>
             </div>
           </div>
         )}
+
+        {/* Boutons de Navigation Suivant / Précédent */}
+        <div className="flex items-center justify-between pt-4 border-t border-border">
+          {currentStep > 1 ? (
+            <button
+              type="button"
+              onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
+              className="px-5 py-2.5 rounded-xl bg-background-secondary border border-border text-xs font-bold text-navy hover:bg-background transition-colors min-h-[44px]"
+            >
+              Étape Précédente
+            </button>
+          ) : (
+            <div />
+          )}
+
+          {currentStep < 6 ? (
+            <button
+              type="button"
+              onClick={() => setCurrentStep((s) => Math.min(6, s + 1))}
+              className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px] shadow-xs"
+            >
+              Étape Suivante
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-6 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 min-h-[44px] shadow-sm disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
+                  <span>Envoi en cours...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Soumettre au Comité LAHA</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </form>
     </div>
   );

@@ -39,7 +39,9 @@ import {
   CheckSquare,
   History,
   Percent,
-  UploadCloud
+  UploadCloud,
+  Clock,
+  Building2
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -255,14 +257,16 @@ export function DashboardSidebar() {
             icon: <BookOpen className="w-5 h-5" />,
             sublinks: [
               { label: "Tous mes Ouvrages", href: "/publisher/catalog", icon: <BookOpen className="w-4 h-4 text-gold" /> },
-              { label: "Nouveau Dépôt Web", href: "/publisher/catalog/new", icon: <PlusCircle className="w-4 h-4 text-gold" /> },
+              { label: "Nouveau Dépôt Assisté IA", href: "/publisher/catalog/new", icon: <PlusCircle className="w-4 h-4 text-gold" /> },
               { label: "Dépôt en Lot ONIX 3.0", href: "/publisher/catalog/batch", icon: <UploadCloud className="w-4 h-4 text-gold" /> },
             ],
           },
-          { label: "Statistiques", href: "/publisher/stats", icon: <FileBarChart className="w-5 h-5" /> },
-          { label: "Redevances & Contrat", href: "/publisher/royalties", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Suivi des Dépôts", href: "/publisher/submissions", icon: <Clock className="w-5 h-5" /> },
+          { label: "Statistiques & Lectorat", href: "/publisher/stats", icon: <FileBarChart className="w-5 h-5" /> },
+          { label: "Redevances & Ventes", href: "/publisher/royalties", icon: <DollarSign className="w-5 h-5" /> },
           { label: "Clés API & Intégration", href: "/publisher/api", icon: <ShieldCheck className="w-5 h-5" /> },
-          { label: "Journaux de Traçabilité", href: "/publisher/logs", icon: <History className="w-5 h-5" /> },
+          { label: "Journaux & Traçabilité", href: "/publisher/logs", icon: <History className="w-5 h-5" /> },
+          { label: "Profil & Mandat", href: "/publisher/profile", icon: <Building2 className="w-5 h-5" /> },
         ];
       case "author":
         return [
