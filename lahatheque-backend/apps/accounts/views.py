@@ -84,6 +84,8 @@ class ProfileView(APIView):
         # Gestion de l'upload de photo de profil
         if 'avatar' in request.FILES:
             user.avatar = request.FILES['avatar']
+        elif 'avatar' in data and not data.get('avatar'):
+            user.avatar = None
 
         user.save()
         payload = _build_user_payload(user)

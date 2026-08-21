@@ -10,7 +10,7 @@ export interface User {
   email: string
   first_name: string
   last_name: string
-  role: 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client' | 'publisher' | 'librarian' | 'legal_reviewer' | 'layout_artist' | 'chief_layout' | 'manager'
+  role: 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client' | 'publisher' | 'university' | 'legal_reviewer' | 'layout_artist' | 'chief_layout' | 'manager'
   active_roles: string[]  // Source de vérité Phase 8 — lire ceci plutôt que role
   phone?: string
   is_verified: boolean
@@ -21,6 +21,7 @@ export interface User {
   badges: any[]
   profile_photo: string | null
   avatar?: string
+  avatar_url?: string
   profile_id?: string | null
   is_new_user?: boolean
   is_guest?: boolean
@@ -118,7 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         teacher_profile: (user as any).teacher_profile || null,
         author_profile: (user as any).author_profile || null,
         is_verified: user.is_verified,
-        profile_photo: user.profile_photo || null,
+        avatar: user.avatar || user.avatar_url || (user as any).profile_photo || null,
+        avatar_url: user.avatar_url || user.avatar || (user as any).profile_photo || null,
+        profile_photo: user.profile_photo || user.avatar_url || user.avatar || null,
         has_active_family_subscription: !!(user as any).has_active_family_subscription,
       }))
       document.cookie = `user_session_client=${sessionData}; path=/; max-age=${12 * 60 * 60}; SameSite=Lax`
@@ -432,6 +435,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else if (role === 'layout_artist') router.push('/layout-artist')
     else if (role === 'chief_layout') router.push('/chief-layout')
     else if (role === 'manager') router.push('/manager')
+    else if (role === 'university') router.push('/university')
+    else if (role === 'publisher') router.push('/publisher')
+    else if (role === 'wholesaler') router.push('/wholesaler')
   }
 
   const value = React.useMemo(() => ({

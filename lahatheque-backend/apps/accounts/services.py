@@ -219,13 +219,21 @@ def _build_user_payload(user: 'User') -> dict:
         pass
 
     avatar_url = None
-    if getattr(user, 'avatar', None):
-        avatar_str = str(user.avatar)
+    if getattr(user, 'avatar', None) and bool(getattr(user.avatar, 'name', None)):
+        avatar_str = str(user.avatar.name)
         if avatar_str.startswith('http'):
             avatar_url = avatar_str
         else:
-            public_url = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
-            avatar_url = f"{public_url.rstrip('/')}/{avatar_str.lstrip('/')}"
+            try:
+                avatar_url = user.avatar.url
+            except Exception:
+                public_url = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', '') or getattr(settings, 'CLOUDFLARE_R2_PUBLIC_DOMAIN', '')
+                if public_url:
+                    if not public_url.startswith('http'):
+                        public_url = f"https://{public_url}"
+                    avatar_url = f"{public_url.rstrip('/')}/{avatar_str.lstrip('/')}"
+                else:
+                    avatar_url = f"/media/{avatar_str.lstrip('/')}"
 
     institution_name = user.institution.name if getattr(user, 'institution', None) else None
     institution_id = str(user.institution.id) if getattr(user, 'institution', None) else None

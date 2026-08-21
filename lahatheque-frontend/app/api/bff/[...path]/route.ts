@@ -37,7 +37,11 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   let body: any = undefined
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     try {
-      body = await request.text()
+      if (contentType && contentType.includes('multipart/form-data')) {
+        body = await request.arrayBuffer()
+      } else {
+        body = await request.text()
+      }
     } catch {
       body = undefined
     }

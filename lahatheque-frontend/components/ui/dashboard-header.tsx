@@ -35,7 +35,7 @@ export function DashboardHeader() {
       case "student": return "Client Lecteur / Étudiant";
       case "teacher": return "Enseignant";
       case "author": return "Auteur • LAHA Éditions";
-      case "librarian": return "Université / Bibliothécaire";
+      case "university": return "Université • Établissement Partenaire";
       case "layout_artist": return "Maquettiste • Création";
       case "chief_layout": return "Chef Maquettiste • Validateur";
       case "manager": return "Gestionnaire • Stock & Livraison";
@@ -54,7 +54,7 @@ export function DashboardHeader() {
       case "student": return "/student";
       case "teacher": return "/student";
       case "author": return "/author";
-      case "librarian": return "/librarian";
+      case "university": return "/university";
       case "layout_artist": return "/layout-artist";
       case "chief_layout": return "/chief-layout";
       case "manager": return "/manager";
@@ -97,19 +97,21 @@ export function DashboardHeader() {
     if (path.startsWith("/publisher/profile")) return { section: "Espace Éditeur", title: "Profil & Mandat d'Édition" };
     if (path === "/publisher") return { section: "Espace Éditeur", title: "Vue d'ensemble Éditeur Tiers" };
 
-    if (path.startsWith("/librarian/stats")) return { section: "Espace Université", title: "Statistiques & Usage" };
-    if (path.startsWith("/librarian/catalog")) return { section: "Espace Université", title: "Catalogue Établissement" };
-    if (path.startsWith("/librarian/bouquets")) return { section: "Espace Université", title: "Bouquets Documentaires" };
-    if (path.startsWith("/librarian/purchases")) return { section: "Espace Université", title: "Achats Livres Papier" };
-    if (path.startsWith("/librarian/redevances")) return { section: "Espace Université", title: "Redevances 15%" };
-    if (path.startsWith("/librarian/profile")) return { section: "Espace Université", title: "Profil Établissement" };
-    if (path === "/librarian") return { section: "Espace Université", title: "Vue d'ensemble Université" };
+    if (path.startsWith("/university/stats")) return { section: "Espace Université", title: "Statistiques & Usage" };
+    if (path.startsWith("/university/catalog")) return { section: "Espace Université", title: "Catalogue Universitaire" };
+    if (path.startsWith("/university/bouquets")) return { section: "Espace Université", title: "Bouquets Documentaires" };
+    if (path.startsWith("/university/affiliations")) return { section: "Espace Université", title: "Affiliations Étudiants" };
+    if (path.startsWith("/university/purchases")) return { section: "Espace Université", title: "Achats Livres Papier Campus" };
+    if (path.startsWith("/university/royalties")) return { section: "Espace Université", title: "Redevances 15%" };
+    if (path.startsWith("/university/profile")) return { section: "Espace Université", title: "Profil Établissement" };
+    if (path === "/university") return { section: "Espace Université", title: "Vue d'ensemble Université" };
 
     if (path.startsWith("/student/catalog")) return { section: "Espace Lecteur", title: "Catalogue & Découverte" };
     if (path.startsWith("/student/books")) return { section: "Espace Lecteur", title: "Ma Bibliothèque" };
     if (path.startsWith("/student/orders")) return { section: "Espace Lecteur", title: "Achats & Commandes Papier" };
-    if (path.startsWith("/student/subscriptions")) return { section: "Espace Lecteur", title: "Abonnements & Pass" };
-    if (path.startsWith("/student/profile")) return { section: "Espace Lecteur", title: "Profil & Affiliation" };
+    if (path.startsWith("/student/history")) return { section: "Espace Lecteur", title: "Historique & Statistiques d'Étude" };
+    if (path.startsWith("/student/subscriptions")) return { section: "Espace Lecteur", title: "Accès & Formules" };
+    if (path.startsWith("/student/profile")) return { section: "Espace Lecteur", title: "Mon Profil" };
     if (path.startsWith("/student/university")) return { section: "Espace Lecteur", title: "Mon Université" };
     if (path === "/student") return { section: "Espace Lecteur", title: "Mon Espace Lecteur" };
 

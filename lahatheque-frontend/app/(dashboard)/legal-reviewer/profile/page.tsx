@@ -1,41 +1,31 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { 
   User, 
   ArrowLeft, 
   Save, 
-  ShieldCheck, 
-  Lock, 
   Building2,
-  CheckCircle2, 
-  Camera, 
   Scale
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { getProfile, updateProfile, changePassword } from "@/lib/services/auth";
+import { getProfile, updateProfile } from "@/lib/services/auth";
 import { toast } from "sonner";
+import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
+import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
 
 export default function LegalReviewerProfilePage() {
-  const { user } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user, refreshUser } = useAuth();
 
   const [firstName, setFirstName] = useState(user?.first_name || "Maitre Patrice");
   const [lastName, setLastName] = useState(user?.last_name || "HOUNKPONOU");
   const [affiliation, setAffiliation] = useState("Direction des Affaires Juridiques & Propriété Intellectuelle — LAHA Éditions");
   const [email, setEmail] = useState(user?.email || "juridique@lahatheque.bj");
   const [phone, setPhone] = useState("+229 97 22 33 44");
-  const [avatarPreview, setAvatarPreview] = useState<string | null>((user as any)?.avatar_url || null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>((user as any)?.avatar_url || null);
 
   const [saving, setSaving] = useState(false);
-
-  // Mot de passe
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -47,19 +37,11 @@ export default function LegalReviewerProfilePage() {
         if (u.email) setEmail(u.email);
         if (u.phone) setPhone(u.phone);
         if (u.university_affiliation) setAffiliation(u.university_affiliation);
-        if (u.avatar_url) setAvatarPreview(u.avatar_url);
+        if (u.avatar_url) setAvatarUrl(u.avatar_url);
       }
     }
     loadData();
   }, []);
-
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const f = e.target.files[0];
-      setAvatarFile(f);
-      setAvatarPreview(URL.createObjectURL(f));
-    }
-  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,46 +52,15 @@ export default function LegalReviewerProfilePage() {
     fd.append("last_name", lastName);
     fd.append("university_affiliation", affiliation);
     fd.append("phone", phone);
-    if (avatarFile) {
-      fd.append("avatar", avatarFile);
-    }
 
     const res = await updateProfile(fd);
     setSaving(false);
 
     if (res.success) {
       toast.success("Profil juridique mis à jour avec succès.");
+      refreshUser?.();
     } else {
       toast.error(res.error || "Erreur lors de la mise à jour du profil.");
-    }
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      toast.error("Les deux nouveaux mots de passe ne correspondent pas.");
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error("Le nouveau mot de passe doit comporter au moins 8 caractères.");
-      return;
-    }
-
-    setChangingPassword(true);
-    const res = await changePassword({
-      current_password: oldPassword,
-      new_password: newPassword,
-      confirm_password: confirmPassword
-    });
-    setChangingPassword(false);
-
-    if (res.success) {
-      toast.success("Mot de passe modifié avec succès.");
-      setOldPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } else {
-      toast.error(res.error || "Erreur lors du changement de mot de passe.");
     }
   };
 
@@ -142,6 +93,14 @@ export default function LegalReviewerProfilePage() {
         </div>
       </div>
 
+      {/* Photo de Profil */}
+      <ProfileAvatarCard
+        currentAvatarUrl={avatarUrl}
+        userFullName={`${firstName} ${lastName}`.trim() || "Juriste"}
+        userRole="legal_reviewer"
+        onAvatarUpdated={(newUrl) => setAvatarUrl(newUrl)}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Colonne Principale : Informations Officielles */}
         <div className="lg:col-span-2 space-y-6">
@@ -149,39 +108,6 @@ export default function LegalReviewerProfilePage() {
             <div className="flex items-center gap-2 border-b border-border pb-4">
               <User className="w-4 h-4 text-gold" />
               <h2 className="font-serif font-bold text-navy text-base">Identité &amp; Titre Professionnel</h2>
-            </div>
-
-            {/* Photo / Avatar */}
-            <div className="flex items-center gap-4">
-              <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                <div className="w-20 h-20 rounded-2xl bg-navy/10 border-2 border-gold/40 flex items-center justify-center overflow-hidden text-navy font-serif font-bold text-xl">
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <span>{firstName.charAt(0)}{lastName.charAt(0)}</span>
-                  )}
-                </div>
-                <div className="absolute inset-0 bg-navy/50 text-white rounded-2xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                  <Camera className="w-5 h-5" />
-                </div>
-              </div>
-              <input 
-                ref={fileInputRef} 
-                type="file" 
-                accept="image/png,image/jpeg,image/webp" 
-                onChange={handleAvatarChange} 
-                className="hidden" 
-              />
-              <div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-xl border border-border text-navy text-xs font-bold hover:bg-background-secondary transition-colors cursor-pointer"
-                >
-                  Changer le portrait officiel
-                </button>
-                <p className="text-[11px] text-foreground-muted mt-1">PNG, JPG ou WEBP (Max 5 Mo)</p>
-              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -206,33 +132,39 @@ export default function LegalReviewerProfilePage() {
                   required
                 />
               </div>
+            </div>
 
-              <div className="sm:col-span-2">
-                <label className="block font-bold text-navy mb-1.5">Affiliation &amp; Titre Juridique</label>
+            <div className="text-xs">
+              <label className="block font-bold text-navy mb-1.5">Rattachement Institutionnel / Organisme *</label>
+              <div className="relative">
+                <Building2 className="w-4 h-4 absolute left-3 top-3.5 text-foreground-muted" />
                 <input
                   type="text"
                   value={affiliation}
                   onChange={(e) => setAffiliation(e.target.value)}
-                  placeholder="Ex: Direction des Affaires Juridiques — LAHA Éditions / Barreau de Cotonou"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                  required
                 />
               </div>
+              <p className="text-[11px] text-foreground-muted mt-1">Utilisé dans la signature des contrats et cessions de droits d&apos;auteur.</p>
+            </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
-                <label className="block font-bold text-navy mb-1.5">E-mail Professionnel *</label>
+                <label className="block font-bold text-navy mb-1.5">Adresse Email Professionnelle *</label>
                 <input
                   type="email"
                   value={email}
                   disabled
                   className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background-secondary text-foreground-muted min-h-[44px] cursor-not-allowed"
                 />
-                <p className="text-[10px] text-foreground-muted mt-1">Géré par l&apos;administrateur système.</p>
+                <p className="text-[10px] text-foreground-muted mt-1">Pour changer d&apos;email, contactez l&apos;administrateur système.</p>
               </div>
 
               <div>
-                <label className="block font-bold text-navy mb-1.5">Téléphone / Contact Direct</label>
+                <label className="block font-bold text-navy mb-1.5">Téléphone d&apos;Astreinte / WhatsApp</label>
                 <input
-                  type="tel"
+                  type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
@@ -240,11 +172,11 @@ export default function LegalReviewerProfilePage() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-border">
+            <div className="pt-4 border-t border-border flex justify-end">
               <button
                 type="submit"
                 disabled={saving}
-                className="px-6 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 shadow-sm min-h-[44px] cursor-pointer"
+                className="px-6 py-3 rounded-xl bg-gold text-navy font-bold hover:bg-gold-light transition-colors min-h-[44px] flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 text-xs"
               >
                 {saving ? (
                   <span className="w-4 h-4 border-2 border-navy border-t-transparent rounded-full animate-spin" />
@@ -261,63 +193,7 @@ export default function LegalReviewerProfilePage() {
 
         {/* Colonne Latérale : Sécurité & Mot de Passe */}
         <div className="space-y-6">
-          <form onSubmit={handleChangePassword} className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-            <div className="flex items-center gap-2 border-b border-border pb-3">
-              <Lock className="w-4 h-4 text-gold" />
-              <h2 className="font-serif font-bold text-navy text-sm">Changer de Mot de Passe</h2>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-navy mb-1">Mot de passe actuel *</label>
-                <input
-                  type="password"
-                  value={oldPassword}
-                  onChange={(e) => setOldPassword(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-navy mb-1">Nouveau mot de passe *</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Min. 8 caractères"
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-navy mb-1">Confirmer le mot de passe *</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={changingPassword || !oldPassword || !newPassword}
-              className="w-full mt-2 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-            >
-              {changingPassword ? (
-                <span className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <ShieldCheck className="w-4 h-4 text-gold" />
-                  Mettre à jour le mot de passe
-                </>
-              )}
-            </button>
-          </form>
+          <ChangePasswordCard />
 
           {/* Badge Rôle & Conformité */}
           <div className="p-5 rounded-3xl bg-background-secondary border border-border space-y-2 text-xs">

@@ -3,7 +3,7 @@ export type AdminRole =
   | "super_admin"
   | "student"
   | "teacher"
-  | "librarian"
+  | "university"
   | "publisher"
   | "author"
   | "legal_reviewer"

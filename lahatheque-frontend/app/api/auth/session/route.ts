@@ -93,6 +93,7 @@ function setTokenCookies(
  */
 function setUiCookie(response: NextResponse, userData: any, accessToken?: string) {
   const accessExpiresAt = accessToken ? (parseJwt(accessToken)?.exp ?? null) : null
+  const avatarUrl = userData.avatar_url || userData.avatar || userData.profile_photo || null
   const uiPayload = {
     id: userData.id,
     email: userData.email,
@@ -102,7 +103,9 @@ function setUiCookie(response: NextResponse, userData: any, accessToken?: string
     active_roles: userData.active_roles || [],
     is_verified: userData.is_verified,
     is_active: userData.is_active,
-    profile_photo: userData.profile_photo || null,
+    avatar: avatarUrl,
+    avatar_url: avatarUrl,
+    profile_photo: avatarUrl,
     teacher_profile: userData.teacher_profile || null,
     author_profile: userData.author_profile || null,
     has_active_family_subscription: !!userData.has_active_family_subscription,

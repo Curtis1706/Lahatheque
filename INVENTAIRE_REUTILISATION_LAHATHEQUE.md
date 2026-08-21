@@ -29,7 +29,7 @@
 - **Fichier** : `frontend/hooks/use-auth.ts`
 - **Type** : Hook React / Contexte TSX
 - **Description** : Gestionnaire d'état d'authentification React centralisé. Synchronise le profil utilisateur en mémoire avec le cookie UI `user_session_client`, expose les méthodes de login, logout et rafraîchissement silencieux de session via l'API BFF.
-- **Réutilisation pour LAHAThèque** : Adaptation nécessaire (adapter la structure du profil utilisateur aux rôles LAHAThèque : juriste, éditeur, bibliothécaire).
+- **Réutilisation pour LAHAThèque** : Adaptation nécessaire (adapter la structure du profil utilisateur aux rôles LAHAThèque : juriste, éditeur, université).
 - **App/module cible LAHAThèque** : `frontend/hooks/use-auth.ts`
 - **Dépendances** : `react`, `axios` / `fetch`
 - **Effort estimé** : Faible
@@ -56,7 +56,7 @@
 - **Fichier** : `backend/core/models.py`
 - **Type** : Modèle Django (`User`)
 - **Description** : Modèle `User` héritant de `AbstractUser` avec UUID comme clé primaire, gestion multi-rôles, statut de vérification, champ `last_active_at` pour la présence, et un champ `session_version` pour l'invalidation globale multi-appareils.
-- **Réutilisation pour LAHAThèque** : Adaptation nécessaire (adapter la constante `ROLE_CHOICES` aux rôles LAHAThèque : `student`, `teacher`, `librarian`, `publisher`, `legal_reviewer`, `admin`).
+- **Réutilisation pour LAHAThèque** : Adaptation nécessaire (adapter la constante `ROLE_CHOICES` aux rôles LAHAThèque : `student`, `teacher`, `university`, `publisher`, `legal_reviewer`, `admin`).
 - **App/module cible LAHAThèque** : `accounts/models.py`
 - **Dépendances** : `django.contrib.auth.models`, `django_countries`, `phonenumber_field`
 - **Effort estimé** : Faible

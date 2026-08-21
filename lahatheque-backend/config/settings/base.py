@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'apps.audio',
     'apps.reporting',
     'apps.reader',
+    'apps.student',
 ]
 
 MIDDLEWARE = [
@@ -213,14 +214,34 @@ CORS_EXPOSE_HEADERS = ['Authorization']
 
 # LCP Server & External API Configurations
 LCP_SERVER_URL = config('LCP_SERVER_URL', default='http://localhost:8989')
-CLOUDFLARE_R2_BUCKET_NAME = config('CLOUDFLARE_R2_BUCKET_NAME', default='lahatheque-media')
+
+# Cloudflare R2 Storage (S3-compatible)
+CLOUDFLARE_R2_BUCKET_NAME = config('CLOUDFLARE_R2_BUCKET_NAME', default='lahatheque')
 CLOUDFLARE_R2_ENDPOINT = config('CLOUDFLARE_R2_ENDPOINT', default='')
 CLOUDFLARE_R2_PUBLIC_DOMAIN = config('CLOUDFLARE_R2_PUBLIC_DOMAIN', default='')
+CLOUDFLARE_R2_ACCESS_KEY_ID = config('CLOUDFLARE_R2_ACCESS_KEY_ID', default='')
+CLOUDFLARE_R2_SECRET_ACCESS_KEY = config('CLOUDFLARE_R2_SECRET_ACCESS_KEY', default='')
+CLOUDFLARE_R2_PUBLIC_URL = config('CLOUDFLARE_R2_PUBLIC_URL', default='')
 
 # Static & Media
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Si Cloudflare R2 est configuré, activer le stockage distant R2
+if CLOUDFLARE_R2_ENDPOINT and CLOUDFLARE_R2_ACCESS_KEY_ID:
+    DEFAULT_FILE_STORAGE = 'apps.catalog.storage.R2MediaStorage'
+    STORAGES = {
+        "default": {
+            "BACKEND": "apps.catalog.storage.R2MediaStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
 # ── Uploads & Files Size Limit (800 Mo) ───────────────────────────────────────
 DATA_UPLOAD_MAX_MEMORY_SIZE = 838860800  # 800 Mo

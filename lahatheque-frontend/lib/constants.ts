@@ -1,9 +1,10 @@
 export const ROLES = {
   STUDENT: 'student',
   TEACHER: 'teacher',
-  LIBRARIAN: 'librarian',
+  UNIVERSITY: 'university',
   PUBLISHER: 'publisher',
   AUTHOR: 'author',
+  WHOLESALER: 'wholesaler',
   LEGAL_REVIEWER: 'legal_reviewer',
   LAYOUT_ARTIST: 'layout_artist',
   CHIEF_LAYOUT: 'chief_layout',

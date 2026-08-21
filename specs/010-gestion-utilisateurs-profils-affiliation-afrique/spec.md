@@ -153,7 +153,7 @@ En tant que Chef Maquettiste, si une maquette comporte des anomalies (ex: texte 
 - **FR-AFFIL-002** : Le système permet au Bibliothécaire d'importer un fichier CSV de matricules étudiants par année académique.
 - **FR-AFFIL-003** : Si le matricule saisi par l'étudiant correspond à un matricule de la base de son université, l'affiliation passe instantanément au statut `affilie` sans intervention humaine.
 - **FR-AFFIL-004** : Si l'étudiant ne dispose pas de matricule pré-chargé, il peut téléverser la photo de sa carte d'étudiant ou de son attestation de scolarité. L'affiliation passe au statut `en_attente_validation`.
-- **FR-AFFIL-005** : Le tableau de bord Bibliothécaire (`/librarian/affiliations`) affiche la liste des demandes en attente avec visualisation de la carte d'étudiant et boutons d'approbation / rejet avec motif.
+- **FR-AFFIL-005** : Le tableau de bord Université (`/university/affiliations`) affiche la liste des demandes en attente avec visualisation de la carte d'étudiant et boutons d'approbation / rejet avec motif.
 - **FR-AFFIL-006** : Le système supporte la saisie de "Codes Coupons Bouquets" permettant à tout étudiant de débloquer instantanément les droits de lecture d'une collection universitaire.
 - **FR-AFFIL-007** : Le middleware de consultation vérifie les plages d'adresses IP campus configurées pour l'université pour accorder l'accès libre aux postes du campus.
 

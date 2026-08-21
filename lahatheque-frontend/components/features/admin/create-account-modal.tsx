@@ -18,7 +18,7 @@ const ROLE_OPTIONS: { role: AdminRole; label: string; desc: string }[] = [
   { role: "student", label: "Client Lecteur / Étudiant", desc: "Accès à la liseuse LCP DRM, abonnements et achats" },
   { role: "author", label: "Auteur", desc: "Consultation des droits propres, redevances et dépôts manuscrit" },
   { role: "publisher", label: "Éditeur Tiers", desc: "Portail éditeur, dépôts ONIX 3.0 et suivi financier" },
-  { role: "librarian", label: "Université / Bibliothécaire", desc: "Gestion des bouquets institutionnels et statistiques" },
+  { role: "university", label: "Université Partenaire", desc: "Gestion des bouquets institutionnels, affiliations et redevances 15%" },
   { role: "layout_artist", label: "Maquettiste", desc: "Dépôt des épreuves PDF/EPUB et classification catalogue" },
   { role: "chief_layout", label: "Chef Maquettiste", desc: "Validation des épreuves et publication officielle" },
   { role: "manager", label: "Gestionnaire Stock & Livraison", desc: "Stock papier physique et suivi des livraisons" },
@@ -242,7 +242,7 @@ export function CreateAccountModal({
               </div>
             </div>
 
-            {(selectedRole === "partner_api" || selectedRole === "librarian") && (
+            {(selectedRole === "partner_api" || selectedRole === "university") && (
               <div>
                 <label className="text-xs font-medium text-foreground">Nom de l'Université / Institution</label>
                 <input

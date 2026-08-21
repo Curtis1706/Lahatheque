@@ -16,7 +16,7 @@
 - [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable and verifiable
-- [x] All acceptance scenarios are defined for Student, Author, Librarian and Chef Maquettiste
+- [x] All acceptance scenarios are defined for Student, Author, University and Chef Maquettiste
 - [x] African context edge cases (no .edu emails, mobile money verification, student card upload, matricules) covered
 - [x] Scope is clearly bounded
 

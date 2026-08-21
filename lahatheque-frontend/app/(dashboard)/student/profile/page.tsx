@@ -2,277 +2,394 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { User, ArrowLeft, Save, Building2, ShieldCheck, Upload, FileText, CheckCircle2 } from "lucide-react";
+import {
+  User,
+  ArrowLeft,
+  Save,
+  Building2,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Mail,
+  Phone,
+  Globe,
+  Sparkles,
+} from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { getClientUniversityAffiliation, submitUniversityAffiliation } from "@/lib/services/student";
-import type { ClientUniversityAffiliation } from "@/lib/types/student";
+import {
+  getStudentProfile,
+  updateStudentProfile,
+  type StudentProfileAPI,
+  type AffiliationAPI,
+} from "@/lib/services/student";
+import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
+import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
+
+// ─── Badge Statut Affiliation ─────────────────────────────────────────────────
+
+function AffiliationStatusBadge({
+  status,
+  display,
+}: {
+  status: AffiliationAPI["status"];
+  display: string;
+}) {
+  const map: Record<string, string> = {
+    approved: "bg-success/15 text-success border-success/30",
+    pending: "bg-warning/15 text-warning border-warning/30",
+    rejected: "bg-error/15 text-error border-error/30",
+    suspended: "bg-error/15 text-error border-error/30",
+    expired: "bg-foreground-muted/15 text-foreground-muted border-border",
+  };
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${map[status] || "border-border text-foreground-muted"}`}
+    >
+      {status === "approved" && <CheckCircle2 className="w-3 h-3" />}
+      {status === "pending" && <Loader2 className="w-3 h-3 animate-spin" />}
+      {display}
+    </span>
+  );
+}
+
+// ─── Carte Affiliation ─────────────────────────────────────────────────────────
+
+function AffiliationCard({ aff }: { aff: AffiliationAPI }) {
+  return (
+    <div className="p-5 rounded-3xl bg-background-secondary border border-border space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-serif font-bold text-navy text-sm truncate">
+            {aff.institution_detail?.name || "Établissement inconnu"}
+          </p>
+          <p className="text-[11px] text-foreground-muted">
+            {aff.institution_detail?.city}, {aff.institution_detail?.country}
+          </p>
+        </div>
+        <AffiliationStatusBadge
+          status={aff.status}
+          display={aff.status_display}
+        />
+      </div>
+
+      {aff.student_card_number && (
+        <p className="text-[11px] font-mono text-navy">
+          Matricule : <span className="font-bold">{aff.student_card_number}</span>
+        </p>
+      )}
+
+      {aff.level && (
+        <p className="text-[11px] text-foreground-muted">
+          Niveau : {aff.level}
+        </p>
+      )}
+
+      {aff.status === "rejected" && aff.motif_rejet && (
+        <div className="flex items-start gap-2 p-3 rounded-2xl bg-error/10 border border-error/20">
+          <AlertCircle className="w-3.5 h-3.5 text-error shrink-0 mt-0.5" />
+          <p className="text-[11px] text-error">{aff.motif_rejet}</p>
+        </div>
+      )}
+
+      {aff.status === "approved" && aff.bouquets?.length > 0 && (
+        <div className="pt-2 border-t border-border">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted mb-1.5 flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-gold" />
+            Bouquets documentaires campus actifs
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {aff.bouquets.map((bq) => (
+              <span
+                key={bq.id}
+                className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-gold/15 text-gold border border-gold/30"
+              >
+                {bq.title} ({bq.books_count} manuels)
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Page Principale ──────────────────────────────────────────────────────────
 
 export default function StudentProfilePage() {
   const { user } = useAuth();
-  const [firstName, setFirstName] = useState(user?.first_name || "Jean-Luc");
-  const [lastName, setLastName] = useState(user?.last_name || "KOUASSI");
-  const [email, setEmail] = useState(user?.email || "jeanluc.kouassi@gmail.com");
-  const [phone, setPhone] = useState("+229 97 12 34 56");
-  const [address, setAddress] = useState("Quartier Zogbo, Cotonou, Bénin");
+  const [profile, setProfile] = useState<StudentProfileAPI | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // State d'affiliation optionnelle (Validation Client Point 1)
-  const [affiliation, setAffiliation] = useState<ClientUniversityAffiliation | null>(null);
-  const [selectedUniv, setSelectedUniv] = useState("Université d'Abomey-Calavi (UAC)");
-  const [faculty, setFaculty] = useState("Faculté de Droit (FADESP)");
-  const [cardNumber, setCardNumber] = useState("ETU-2024-88912");
-  const [proofFileName, setProofFileName] = useState("carte-etudiant-uac.pdf");
+  // Form fields
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [country, setCountry] = useState("");
+
   const [saving, setSaving] = useState(false);
-  const [submittingAffiliation, setSubmittingAffiliation] = useState(false);
 
   useEffect(() => {
-    async function loadAffiliation() {
-      const data = await getClientUniversityAffiliation();
-      setAffiliation(data);
+    async function loadProfile() {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getStudentProfile();
+        setProfile(data);
+        setFirstName(data.first_name || "");
+        setLastName(data.last_name || "");
+        setPhone(data.phone || "");
+        setCountry(data.country || "");
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error ? err.message : "Erreur de chargement du profil"
+        );
+      } finally {
+        setLoading(false);
+      }
     }
-    loadAffiliation();
+    loadProfile();
   }, []);
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      alert("Vos informations personnelles et adresse de livraison ont été mises à jour !");
-    }, 500);
-  };
-
-  const handleSubmitAffiliationForm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmittingAffiliation(true);
     try {
-      const updatedAff = await submitUniversityAffiliation(
-        selectedUniv,
-        faculty,
-        cardNumber,
-        `/docs/${proofFileName}`
+      const updated = await updateStudentProfile({
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        country,
+      });
+      setProfile((prev) => (prev ? { ...prev, ...updated } : prev));
+      toast.success("Vos informations de profil ont été enregistrées avec succès.");
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Erreur lors de la sauvegarde du profil."
       );
-      setAffiliation(updatedAff);
-      alert("Votre demande d'affiliation universitaire et votre pièce justificative ont été soumises pour validation !");
     } finally {
-      setSubmittingAffiliation(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-3xl mx-auto">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
-        <Link href="/student" className="hover:text-navy">Mon Espace</Link>
+        <Link href="/student" className="hover:text-navy">
+          Mon Espace
+        </Link>
         <span>/</span>
-        <span className="text-navy font-semibold">Profil &amp; Paramètres</span>
+        <span className="text-navy font-semibold">Profil</span>
       </div>
 
       {/* Header */}
-      <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <Link href="/student" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Mon Espace
-          </Link>
-          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
-            <User className="w-4 h-4 text-gold" />
-            Paramètres du Compte Lecteur (Section 3.6)
-          </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Profil &amp; Affiliation Universitaire Optionnelle
-          </h1>
-          <p className="text-xs text-foreground-muted mt-1">
-            Gérez vos informations personnelles, votre adresse de livraison papier et votre rattachement universitaire facultatif.
-          </p>
+      <div className="border-b border-border pb-5">
+        <Link
+          href="/student"
+          className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Retour
+        </Link>
+        <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+          <User className="w-4 h-4 text-gold" />
+          Compte Client &amp; Lecteur
         </div>
+        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+          Profil &amp; Préférences
+        </h1>
+        <p className="text-xs text-foreground-muted mt-1">
+          Gérez vos coordonnées personnelles, votre pays de résidence et votre rattachement universitaire.
+        </p>
       </div>
 
-      {/* Formulaire 1: Informations Personnelles */}
-      <form onSubmit={handleSaveProfile} className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-        <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider border-b border-border pb-2">
-          Informations Personnelles &amp; Livraison
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div>
-            <label htmlFor="first-name" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Prénom *</label>
-            <input
-              id="first-name"
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="last-name" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Nom *</label>
-            <input
-              id="last-name"
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="email-addr" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Adresse E-mail *</label>
-            <input
-              id="email-addr"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl font-mono text-navy font-bold focus:outline-none focus:border-gold min-h-[44px]"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="phone-num" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Téléphone *</label>
-            <input
-              id="phone-num"
-              type="text"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl font-mono text-navy font-bold focus:outline-none focus:border-gold min-h-[44px]"
-              required
-            />
-          </div>
-
-          <div className="sm:col-span-2">
-            <label htmlFor="user-addr" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Adresse de Livraison Par Défaut (Livres Papier) *</label>
-            <input
-              id="user-addr"
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
-              required
-            />
-          </div>
+      {/* ── Erreur ────────────────────────────────────────────────────── */}
+      {error && (
+        <div className="p-4 rounded-2xl border border-error/30 bg-error/10 text-error text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
         </div>
+      )}
 
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
-          >
-            {saving ? (
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                <Save className="w-4 h-4 text-gold" />
-                Enregistrer le Profil
-              </>
-            )}
-          </button>
+      {/* ── Skeleton ──────────────────────────────────────────────────── */}
+      {loading && (
+        <div className="space-y-4">
+          <div className="h-14 rounded-2xl bg-navy/10 animate-pulse" />
+          <div className="h-28 rounded-3xl bg-navy/10 animate-pulse" />
+          <div className="h-14 rounded-2xl bg-navy/10 animate-pulse" />
         </div>
-      </form>
+      )}
 
-      {/* Formulaire 2: Affiliation Universitaire Optionnelle (Validation Client Point 1) */}
-      <form onSubmit={handleSubmitAffiliationForm} className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-        <div className="border-b border-border pb-3 flex items-center justify-between">
-          <div>
-            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-gold" />
-              Affiliation Universitaire (Champ Facultatif / Optionnel)
+      {/* ── Formulaire Infos ──────────────────────────────────────────── */}
+      {!loading && profile && (
+        <>
+          {/* Photo de Profil */}
+          <ProfileAvatarCard
+            currentAvatarUrl={profile.avatar}
+            userFullName={`${firstName || profile.first_name || ""} ${lastName || profile.last_name || ""}`.trim() || user?.first_name || "Lecteur"}
+            userRole="student"
+            onAvatarUpdated={(newUrl) => {
+              setProfile((prev) => (prev ? { ...prev, avatar: newUrl } : prev));
+            }}
+          />
+
+          {/* Identité du compte */}
+          <div className="p-5 rounded-3xl bg-background-secondary border border-border space-y-2">
+            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider">
+              Identifiant de Connexion
             </h3>
-            <p className="text-[11px] text-foreground-muted mt-0.5">
-              Si vous êtes étudiant ou enseignant, rattachez votre établissement pour débloquer l&apos;accès au bouquet institutionnel.
-            </p>
-          </div>
-          {affiliation?.status === "approved" && (
-            <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 text-xs font-bold inline-flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Affilié &amp; Validé
-            </span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div>
-            <label htmlFor="univ-select" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Choix de l&apos;Université en Base de Données *</label>
-            <select
-              id="univ-select"
-              value={selectedUniv}
-              onChange={(e) => setSelectedUniv(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
-            >
-              <option value="Université d'Abomey-Calavi (UAC)">Université d&apos;Abomey-Calavi (UAC - Bénin)</option>
-              <option value="Université Nationale d'Agriculture (UNA)">Université Nationale d&apos;Agriculture (UNA - Bénin)</option>
-              <option value="Université de Parakou (UP)">Université de Parakou (UP - Bénin)</option>
-              <option value="Université Cheikh Anta Diop (UCAD)">Université Cheikh Anta Diop (UCAD - Sénégal)</option>
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="fac-name" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Faculté ou École *</label>
-            <input
-              id="fac-name"
-              type="text"
-              value={faculty}
-              onChange={(e) => setFaculty(e.target.value)}
-              placeholder="ex. Faculté de Droit (FADESP)"
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="card-num" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">Numéro de Carte Étudiant ou Matricule Enseignant *</label>
-            <input
-              id="card-num"
-              type="text"
-              value={cardNumber}
-              onChange={(e) => setCardNumber(e.target.value)}
-              placeholder="ex. ETU-2024-88912"
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl font-mono text-navy font-bold focus:outline-none focus:border-gold min-h-[44px]"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="proof-file" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-              Pièce Justificative (Carte Étudiant / Attestation PDF) *
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                id="proof-file"
-                type="file"
-                onChange={(e) => setProofFileName(e.target.files?.[0]?.name || "justificatif.pdf")}
-                className="hidden"
-              />
-              <label
-                htmlFor="proof-file"
-                className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold flex items-center justify-between cursor-pointer hover:border-gold min-h-[44px]"
-              >
-                <span className="truncate">{proofFileName}</span>
-                <Upload className="w-4 h-4 text-gold shrink-0 ml-2" />
-              </label>
+            <div className="flex items-center gap-2 text-xs">
+              <Mail className="w-4 h-4 text-gold shrink-0" />
+              <span className="font-mono text-navy font-bold">
+                {profile.email}
+              </span>
+              <span className="text-foreground-muted">(adresse email sécurisée)</span>
             </div>
           </div>
-        </div>
 
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            disabled={submittingAffiliation}
-            className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] disabled:opacity-50"
+          {/* Formulaire modifiable */}
+          <form
+            onSubmit={handleSave}
+            className="p-6 rounded-3xl bg-background border border-border shadow-xs space-y-5"
           >
-            {submittingAffiliation ? (
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
+            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider border-b border-border pb-2">
+              Coordonnées Personnelles
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label
+                  htmlFor="first-name"
+                  className="block text-[10px] font-bold text-navy uppercase tracking-wider"
+                >
+                  Prénom *
+                </label>
+                <input
+                  id="first-name"
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="last-name"
+                  className="block text-[10px] font-bold text-navy uppercase tracking-wider"
+                >
+                  Nom de Famille *
+                </label>
+                <input
+                  id="last-name"
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="phone"
+                  className="block text-[10px] font-bold text-navy uppercase tracking-wider"
+                >
+                  Numéro de Téléphone (Mobile Money / WhatsApp)
+                </label>
+                <div className="relative">
+                  <Phone className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    id="phone"
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+229 97 12 34 56"
+                    className="w-full pl-9 pr-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl font-mono text-navy focus:outline-none focus:border-gold min-h-[44px]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="country"
+                  className="block text-[10px] font-bold text-navy uppercase tracking-wider"
+                >
+                  Pays de Résidence
+                </label>
+                <div className="relative">
+                  <Globe className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    id="country"
+                    type="text"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    placeholder="Bénin (BJ)"
+                    className="w-full pl-9 pr-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] disabled:opacity-60 cursor-pointer"
+              >
+                {saving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 text-gold" />
+                )}
+                {saving ? "Enregistrement..." : "Enregistrer les modifications"}
+              </button>
+            </div>
+          </form>
+
+          {/* Sécurité & Mot de passe */}
+          <ChangePasswordCard />
+
+          {/* ── Affiliation Universitaire ──────────────────────────────── */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-serif font-bold text-navy text-sm flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-gold" />
-                Soumettre ma Demande d&apos;Affiliation
-              </>
+                Rattachement Universitaire
+              </h3>
+              <Link
+                href="/student/university"
+                className="text-xs font-bold text-navy hover:text-gold transition-colors"
+              >
+                Gérer l&apos;affiliation &rarr;
+              </Link>
+            </div>
+
+            {profile.affiliation ? (
+              <AffiliationCard aff={profile.affiliation} />
+            ) : (
+              <div className="p-6 rounded-3xl bg-background-secondary border border-dashed border-border text-center space-y-2">
+                <Building2 className="w-8 h-8 text-foreground-muted mx-auto opacity-40" />
+                <p className="text-sm font-semibold text-navy">
+                  Aucun établissement partenaire rattaché
+                </p>
+                <p className="text-xs text-foreground-muted max-w-sm mx-auto">
+                  Rattachez votre université par matricule pour débloquer automatiquement les bouquets documentaires de votre faculté.
+                </p>
+                <Link
+                  href="/student/university"
+                  className="inline-flex mt-2 items-center gap-2 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px]"
+                >
+                  Demander mon affiliation campus
+                </Link>
+              </div>
             )}
-          </button>
-        </div>
-      </form>
+          </div>
+        </>
+      )}
     </div>
   );
 }

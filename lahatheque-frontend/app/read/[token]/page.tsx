@@ -166,47 +166,24 @@ export default function HostedReaderPage() {
     if (!session) return;
     let isCancelled = false;
 
-    let targetUrl = session.book?.file_url;
-    if (
-      !targetUrl ||
-      targetUrl.includes("PromptBreeder_Original_Paper") ||
-      (targetUrl.endsWith(".pdf") && !targetUrl.includes("/api/pdf") && !targetUrl.startsWith("http"))
-    ) {
-      targetUrl = "/api/pdf?file=PromptBreeder_Original_Paper-2309.16797v1.pdf";
-    }
+    const targetUrl = session.book?.file_url || (session.book?.id ? `/api/bff/catalog/books/${session.book.id}/stream/` : "");
+    if (!targetUrl) return;
 
     const loadBlob = async () => {
       try {
-        let streamRes = await fetch(targetUrl, {
+        const streamRes = await fetch(targetUrl, {
           headers: { Accept: "application/pdf" },
+          credentials: "include",
         });
-        let blob = streamRes.ok ? await streamRes.blob() : null;
-
-        // Si le blob est vide (< 1000 octets), basculer immédiatement sur /api/pdf
-        if (!blob || blob.size < 1000) {
-          streamRes = await fetch("/api/pdf?file=PromptBreeder_Original_Paper-2309.16797v1.pdf");
-          if (streamRes.ok) {
-            blob = await streamRes.blob();
+        if (streamRes.ok) {
+          const blob = await streamRes.blob();
+          if (blob && blob.size > 100 && !isCancelled) {
+            const blobUrl = URL.createObjectURL(blob);
+            setRawPdfData(blobUrl);
           }
-        }
-
-        if (blob && blob.size > 1000 && !isCancelled) {
-          const blobUrl = URL.createObjectURL(blob);
-          setRawPdfData(blobUrl);
         }
       } catch (err) {
-        console.warn("[HostedReader] Erreur fetch initial, tentative /api/pdf:", err);
-        try {
-          const fb = await fetch("/api/pdf?file=PromptBreeder_Original_Paper-2309.16797v1.pdf");
-          if (fb.ok && !isCancelled) {
-            const fbBlob = await fb.blob();
-            if (fbBlob.size > 1000) {
-              setRawPdfData(URL.createObjectURL(fbBlob));
-            }
-          }
-        } catch {
-          // Ignore
-        }
+        console.warn("[HostedReader] Erreur lors du chargement du flux PDF:", err);
       }
     };
 

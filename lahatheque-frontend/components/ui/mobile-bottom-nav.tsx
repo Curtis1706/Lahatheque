@@ -82,16 +82,16 @@ export function MobileBottomNav() {
             { label: "Profil", href: "/wholesaler/profile", icon: <UserIcon className="w-5 h-5" /> },
           ]
         };
-      case "librarian":
+      case "university":
         return {
           leftItems: [
-            { label: "Aperçu", href: "/librarian", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Stats", href: "/librarian/stats", icon: <FileCheck className="w-5 h-5" /> },
+            { label: "Aperçu", href: "/university", icon: <LayoutDashboard className="w-5 h-5" /> },
+            { label: "Stats", href: "/university/stats", icon: <FileCheck className="w-5 h-5" /> },
           ],
-          centerCta: { label: "Bouquets", href: "/librarian/bouquets", icon: <Sparkles className="w-6 h-6" /> },
+          centerCta: { label: "Bouquets", href: "/university/bouquets", icon: <Sparkles className="w-6 h-6" /> },
           rightItems: [
-            { label: "Redevances", href: "/librarian/redevances", icon: <DollarSign className="w-5 h-5" /> },
-            { label: "Profil", href: "/librarian/profile", icon: <UserIcon className="w-5 h-5" /> },
+            { label: "Redevances", href: "/university/royalties", icon: <DollarSign className="w-5 h-5" /> },
+            { label: "Profil", href: "/university/profile", icon: <UserIcon className="w-5 h-5" /> },
           ]
         };
       case "publisher":
@@ -174,7 +174,7 @@ export function MobileBottomNav() {
           centerCta: { label: "Catalogue", href: "/student/catalog", icon: <Briefcase className="w-6 h-6" /> },
           rightItems: [
             { label: "Commandes", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
-            { label: "Pass", href: "/student/subscriptions", icon: <Sparkles className="w-5 h-5" /> },
+            { label: "Stats", href: "/student/history", icon: <History className="w-5 h-5" /> },
           ]
         };
     }
@@ -262,15 +262,16 @@ export function MobileBottomNav() {
           { label: "Rapports Logistiques", href: "/manager/reports", icon: <FileSpreadsheet className="w-4 h-4" /> },
           { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
-      case "librarian":
+      case "university":
         return [
-          { label: "Espace Université", href: "/librarian", icon: <LayoutDashboard className="w-4 h-4" /> },
-          { label: "Statistiques d'Usage", href: "/librarian/stats", icon: <FileCheck className="w-4 h-4" /> },
-          { label: "Catalogue Établissement", href: "/librarian/catalog", icon: <BookOpen className="w-4 h-4" /> },
-          { label: "Bouquets Documentaires", href: "/librarian/bouquets", icon: <Sparkles className="w-4 h-4" /> },
-          { label: "Achats Livres Papier", href: "/librarian/purchases", icon: <ShoppingBag className="w-4 h-4" /> },
-          { label: "Redevances 15%", href: "/librarian/redevances", icon: <DollarSign className="w-4 h-4" /> },
-          { label: "Profil Établissement", href: "/librarian/profile", icon: <UserIcon className="w-4 h-4" /> },
+          { label: "Espace Université", href: "/university", icon: <LayoutDashboard className="w-4 h-4" /> },
+          { label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="w-4 h-4" /> },
+          { label: "Catalogue Universitaire", href: "/university/catalog", icon: <BookOpen className="w-4 h-4" /> },
+          { label: "Statistiques d'Usage", href: "/university/stats", icon: <FileCheck className="w-4 h-4" /> },
+          { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="w-4 h-4" /> },
+          { label: "Achats Livres Papier", href: "/university/purchases", icon: <ShoppingBag className="w-4 h-4" /> },
+          { label: "Redevances 15%", href: "/university/royalties", icon: <DollarSign className="w-4 h-4" /> },
+          { label: "Profil Établissement", href: "/university/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
       default:
         // Student / Client Lecteur
@@ -279,9 +280,9 @@ export function MobileBottomNav() {
           { label: "Catalogue & Découverte", href: "/student/catalog", icon: <Briefcase className="w-4 h-4" /> },
           { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="w-4 h-4" /> },
           { label: "Achats & Livraisons", href: "/student/orders", icon: <PackageCheck className="w-4 h-4" /> },
-          { label: "Abonnements & Pass", href: "/student/subscriptions", icon: <Sparkles className="w-4 h-4" /> },
-          { label: "Profil & Affiliation", href: "/student/profile", icon: <UserIcon className="w-4 h-4" /> },
+          { label: "Historique & Stats", href: "/student/history", icon: <History className="w-4 h-4" /> },
           { label: "Mon Université", href: "/student/university", icon: <GraduationCap className="w-4 h-4" /> },
+          { label: "Mon Profil", href: "/student/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
     }
   };
@@ -304,8 +305,8 @@ export function MobileBottomNav() {
         return "CHEF MAQUETTISTE • VALIDEUR";
       case "legal_reviewer":
         return "RELECTEUR JURIDIQUE";
-      case "librarian":
-        return "BIBLIOTHÉCAIRE RÉFÉRENT";
+      case "university":
+        return "UNIVERSITÉ PARTENAIRE";
       case "manager":
         return "GESTIONNAIRE LOGISTIQUE";
       case "super_client":

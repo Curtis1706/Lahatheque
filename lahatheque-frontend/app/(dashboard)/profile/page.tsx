@@ -3,7 +3,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { useAuth } from "@/hooks/use-auth";
-import { getProfile, updateProfile, changePassword, UserProfileData } from "@/lib/services/auth";
+import { getProfile, updateProfile, UserProfileData } from "@/lib/services/auth";
+import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
+import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
 import { 
   User, 
   Mail, 
@@ -41,19 +43,12 @@ export default function ProfilePage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Passwords
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
   // Preference notifications
   const [emailNotif, setEmailNotif] = useState(true);
   const [smsNotif, setSmsNotif] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -81,14 +76,6 @@ export default function ProfilePage() {
     loadData();
   }, [user]);
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
-  };
-
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
@@ -101,10 +88,6 @@ export default function ProfilePage() {
       formData.append("country", country);
       formData.append("pen_name", penName);
       formData.append("bio", bio);
-
-      if (selectedFile) {
-        formData.append("avatar", selectedFile);
-      }
 
       const res = await updateProfile(formData);
       if (res.success) {
@@ -123,42 +106,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSavePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      toast.error("Le nouveau mot de passe et sa confirmation ne correspondent pas.");
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error("Le mot de passe doit comporter au moins 8 caractères.");
-      return;
-    }
-
-    setSavingPassword(true);
-    try {
-      const res = await changePassword({
-        current_password: currentPassword,
-        new_password: newPassword,
-        confirm_password: confirmPassword,
-      });
-
-      if (res.success) {
-        toast.success(res.message || "Votre mot de passe a été modifié avec succès !");
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-      } else {
-        toast.error(res.error || "Erreur lors de la modification du mot de passe.");
-      }
-    } catch {
-      toast.error("Impossible de contacter le serveur.");
-    } finally {
-      setSavingPassword(false);
-    }
-  };
-
-  const displayAvatar = previewUrl || avatarUrl;
-
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
       {/* Header */}
@@ -176,60 +123,18 @@ export default function ProfilePage() {
         {/* Colonne Principale : Formulaire de Profil */}
         <div className="md:col-span-8 space-y-6">
           
+          {/* Photo de Profil */}
+          <ProfileAvatarCard
+            currentAvatarUrl={previewUrl || avatarUrl}
+            userFullName={`${firstName} ${lastName}`.trim() || user?.first_name || "Utilisateur"}
+            userRole={user?.role}
+            onAvatarUpdated={(newUrl) => {
+              setAvatarUrl(newUrl);
+            }}
+          />
+
           {/* Carte Profil */}
           <form onSubmit={handleSaveProfile} className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
-            
-            {/* Section Photo de Profil */}
-            <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-border">
-              <div className="relative group">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gold/40 bg-navy/5 flex items-center justify-center shadow-md">
-                  {displayAvatar ? (
-                    <img 
-                      src={displayAvatar} 
-                      alt="Avatar" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-3xl font-serif font-bold text-navy">
-                      {(firstName[0] || "U").toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-0 right-0 p-2 rounded-full bg-navy text-white hover:bg-navy-hover shadow-md transition-transform hover:scale-105 cursor-pointer"
-                  title="Changer la photo"
-                >
-                  <Camera className="w-4 h-4 text-gold" />
-                </button>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleAvatarChange} 
-                  accept="image/jpeg,image/png,image/webp" 
-                  className="hidden" 
-                />
-              </div>
-
-              <div className="space-y-1 text-center sm:text-left">
-                <h3 className="font-serif font-bold text-navy text-lg">
-                  {firstName} {lastName || ""}
-                </h3>
-                <p className="text-xs text-foreground-muted">{email}</p>
-                <div className="flex flex-wrap items-center gap-2 pt-1 justify-center sm:justify-start">
-                  <span className="px-2.5 py-0.5 rounded-full bg-navy/10 text-navy text-[11px] font-bold uppercase tracking-wider border border-navy/20">
-                    {user?.role ? user.role.replace('_', ' ').toUpperCase() : "LECTEUR"}
-                  </span>
-                  {institutionName && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-gold/15 text-gold text-[11px] font-bold flex items-center gap-1 border border-gold/30">
-                      <GraduationCap className="w-3.5 h-3.5" />
-                      {institutionName}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
 
             {/* Champs d'Informations Personnelles */}
             <div className="space-y-4">
@@ -329,64 +234,8 @@ export default function ProfilePage() {
             </div>
           </form>
 
-          {/* Formulaire Mot de Passe */}
-          <form onSubmit={handleSavePassword} className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
-            <h3 className="font-serif font-bold text-navy text-base flex items-center gap-1.5 border-b border-border pb-3">
-              <Lock className="w-5 h-5 text-gold" />
-              Sécurité & Mot de passe
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5 relative">
-                <label className="text-xs font-bold text-navy">Mot de passe actuel</label>
-                <input 
-                  type={showPassword ? "text" : "password"}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-navy min-h-[44px]"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy">Nouveau mot de passe</label>
-                <input 
-                  type={showPassword ? "text" : "password"}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-navy min-h-[44px]"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy">Confirmer</label>
-                <input 
-                  type={showPassword ? "text" : "password"}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-navy min-h-[44px]"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-xs text-foreground-muted hover:text-navy font-bold flex items-center gap-1.5 cursor-pointer"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                {showPassword ? "Masquer les caractères" : "Afficher les caractères"}
-              </button>
-
-              <button
-                type="submit"
-                disabled={savingPassword || !newPassword}
-                className="inline-flex items-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs sm:text-sm font-bold px-6 py-3 rounded-xl shadow-xs disabled:opacity-50 transition-colors min-h-[44px] cursor-pointer"
-              >
-                <Lock className="w-4 h-4 text-gold" />
-                {savingPassword ? "Modification..." : "Changer mon mot de passe"}
-              </button>
-            </div>
-          </form>
-
+          {/* Sécurité & Mot de Passe */}
+          <ChangePasswordCard />
         </div>
 
         {/* Colonne Latérale : Préférences & Notifications */}

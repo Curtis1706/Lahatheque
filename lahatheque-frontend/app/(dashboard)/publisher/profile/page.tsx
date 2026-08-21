@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getPublisherProfile, updatePublisherProfile } from "@/lib/services/publisher";
+import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
+import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
 import type { PublisherProfileData, PublisherEntityType } from "@/lib/types/publisher";
 
 export default function PublisherProfilePage() {
@@ -205,6 +207,16 @@ export default function PublisherProfilePage() {
           </span>
         </div>
       </div>
+
+      {/* Logo & Photo de l'Éditeur */}
+      <ProfileAvatarCard
+        currentAvatarUrl={profile?.logo_url}
+        userFullName={companyName || tradeName || "Maison d'Édition"}
+        userRole="publisher"
+        onAvatarUpdated={(newUrl) => {
+          setProfile((prev) => (prev ? { ...prev, logo_url: newUrl || undefined } : prev));
+        }}
+      />
 
       {/* Formulaire Principal */}
       <form onSubmit={handleSaveProfile} className="space-y-6">
@@ -509,64 +521,7 @@ export default function PublisherProfilePage() {
       </form>
 
       {/* Section Sécurité & Mot de Passe */}
-      <form onSubmit={handleChangePassword} className="p-6 rounded-3xl bg-background border border-border shadow-xs space-y-4">
-        <h3 className="font-serif font-bold text-navy text-base flex items-center gap-2">
-          <Lock className="w-5 h-5 text-gold" />
-          5. Sécurité &amp; Mot de Passe du Compte
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-navy uppercase tracking-wider">Mot de Passe Actuel</label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-navy uppercase tracking-wider">Nouveau Mot de Passe</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-navy uppercase tracking-wider">Confirmer le Mot de Passe</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            disabled={changingPassword || !newPassword}
-            className="px-5 py-2.5 rounded-xl bg-background-secondary border border-border text-xs font-bold text-navy hover:bg-background transition-colors flex items-center gap-2 min-h-[44px] disabled:opacity-50"
-          >
-            {changingPassword ? (
-              <>
-                <span className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
-                <span>Modification...</span>
-              </>
-            ) : (
-              <span>Modifier le Mot de Passe</span>
-            )}
-          </button>
-        </div>
-      </form>
+      <ChangePasswordCard />
     </div>
   );
 }

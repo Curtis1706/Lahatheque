@@ -59,21 +59,68 @@ const mockBookDetails: Record<string, BookDetail> = {
 
 export const libraryApi = {
   async getBook(id: string): Promise<BookDetail> {
-    await new Promise((r) => setTimeout(r, 300));
-    if (mockBookDetails[id]) {
-      return mockBookDetails[id];
+    try {
+      const res = await fetch(`/api/bff/student/books/${id}/`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          const { ouvrage, access, reading_progress } = json.data;
+          return {
+            id: ouvrage.id,
+            title: ouvrage.title,
+            author: ouvrage.authors?.map((a: any) => a.full_name || `${a.first_name || ""} ${a.last_name || ""}`).join(", ") || "Auteur académique",
+            file: access?.stream_url || `/api/bff/catalog/books/${id}/stream/`,
+            total_pages: ouvrage.page_count || 100,
+            category: ouvrage.discipline_name || "Ouvrage Académique",
+            subject: ouvrage.collection_name || ouvrage.discipline_name || "Général",
+            description: ouvrage.summary || "Ouvrage certifié LAHAThèque.",
+            progress: reading_progress ? { last_page: reading_progress.current_page || 0 } : { last_page: 0 },
+          };
+        }
+      }
+    } catch {
+      // Fallback vers endpoint catalogue si student/books non accessible
     }
+
+    try {
+      const catRes = await fetch(`/api/bff/catalog/books/${id}/`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (catRes.ok) {
+        const catJson = await catRes.json();
+        if (catJson.success && catJson.data) {
+          const book = catJson.data;
+          return {
+            id: book.id,
+            title: book.title,
+            author: book.authors?.map((a: any) => a.full_name || `${a.first_name || ""} ${a.last_name || ""}`).join(", ") || "Auteur académique",
+            file: `/api/bff/catalog/books/${id}/stream/`,
+            total_pages: book.page_count || 100,
+            category: book.discipline_name || "Ouvrage Académique",
+            subject: book.collection_name || book.discipline_name || "Général",
+            description: book.summary || "Ouvrage certifié LAHAThèque.",
+            progress: { last_page: 0 },
+          };
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
     return {
       id,
-      title: `PromptBreeder: Self-Referential Self-Improvement via Prompt Evolution`,
+      title: "Document Numérique LAHAThèque",
       author: "Éditions LAHAThèque",
-      file: "/api/pdf?file=PromptBreeder_Original_Paper-2309.16797v1.pdf",
-      total_pages: 28,
-      category: "Recherche",
+      file: `/api/bff/catalog/books/${id}/stream/`,
+      total_pages: 50,
+      category: "Académique",
       description: "Ouvrage et document numérique certifié LAHAThèque.",
       progress: { last_page: 0 },
     };
-
   },
 
   async syncProgress(arg1: any, arg2?: number, arg3?: number): Promise<boolean> {

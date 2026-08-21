@@ -24,7 +24,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { getProfile, updateProfile, changePassword } from "@/lib/services/auth";
+import { getProfile, updateProfile } from "@/lib/services/auth";
+import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
+import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
 import {
   getWholesaleCompanyProfile,
   updateWholesaleCompanyProfile,
@@ -55,22 +57,13 @@ export default function WholesalerProfilePage() {
   const [notifyStockRestock, setNotifyStockRestock] = useState(true);
   const [notifyCarrierDispatch, setNotifyCarrierDispatch] = useState(true);
 
-  // Mot de passe
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
   // Avatar / Logo
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Loading
   const [loading, setLoading] = useState(true);
   const [savingCompany, setSavingCompany] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -110,14 +103,6 @@ export default function WholesalerProfilePage() {
     loadData();
   }, []);
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
-  };
-
   const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingCompany(true);
@@ -138,17 +123,13 @@ export default function WholesalerProfilePage() {
         country,
       });
 
-      // 2. Mise à jour auth & logo si fourni
+      // 2. Mise à jour auth contact
       const formData = new FormData();
       formData.append("first_name", contactPerson.split(" ")[0] || "Grossiste");
       formData.append("last_name", contactPerson.split(" ").slice(1).join(" ") || "");
       formData.append("email", contactEmail);
       formData.append("phone", contactPhone);
       formData.append("country", country);
-
-      if (selectedFile) {
-        formData.append("avatar", selectedFile);
-      }
 
       await updateProfile(formData);
       setProfile(updated);
@@ -161,39 +142,7 @@ export default function WholesalerProfilePage() {
     }
   };
 
-  const handleSavePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      toast.error("Le nouveau mot de passe et sa confirmation ne correspondent pas.");
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error("Le mot de passe doit comporter au moins 8 caractères.");
-      return;
-    }
 
-    setSavingPassword(true);
-    try {
-      const res = await changePassword({
-        current_password: currentPassword,
-        new_password: newPassword,
-        confirm_password: confirmPassword,
-      });
-
-      if (res.success) {
-        toast.success(res.message || "Votre mot de passe a été modifié avec succès !");
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-      } else {
-        toast.error(res.error || "Erreur lors du changement de mot de passe.");
-      }
-    } catch {
-      toast.error("Impossible de contacter le serveur.");
-    } finally {
-      setSavingPassword(false);
-    }
-  };
 
   const displayAvatar = previewUrl || avatarUrl;
 
@@ -223,64 +172,21 @@ export default function WholesalerProfilePage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Colonne Principale (8 cols) : Formulaire Entreprise & Mot de passe */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Carte Coordonnées Entreprise */}
+          {/* Logo & Photo de l'Entreprise */}
+          <ProfileAvatarCard
+            currentAvatarUrl={previewUrl || avatarUrl}
+            userFullName={companyName || tradeName || "Grossiste"}
+            userRole="wholesaler"
+            onAvatarUpdated={(newUrl) => {
+              setAvatarUrl(newUrl);
+            }}
+          />
+
+          {/* Formulaire Principal des Informations */}
           <form
             onSubmit={handleSaveCompany}
             className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6"
           >
-            {/* Logo / Photo & Badge de Statut */}
-            <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-border">
-              <div className="relative group">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gold/40 bg-navy/5 flex items-center justify-center shadow-md">
-                  {displayAvatar ? (
-                    <img
-                      src={displayAvatar}
-                      alt="Logo Entreprise"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-3xl font-serif font-bold text-navy">
-                      {(companyName[0] || "L").toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-0 right-0 p-2 rounded-full bg-navy text-white hover:bg-navy-hover shadow-md transition-transform hover:scale-105 cursor-pointer"
-                  title="Modifier le logo"
-                >
-                  <Camera className="w-4 h-4 text-gold" />
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleAvatarChange}
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                />
-              </div>
-
-              <div className="space-y-1 text-center sm:text-left min-w-0">
-                <h3 className="font-serif font-bold text-navy text-lg truncate">
-                  {companyName || "Librairie Partenaire"}
-                </h3>
-                <p className="text-xs text-foreground-muted truncate">
-                  Contact principal : {contactPerson} ({contactEmail})
-                </p>
-                <div className="flex flex-wrap items-center gap-2 pt-1 justify-center sm:justify-start">
-                  <span className="px-2.5 py-0.5 rounded-full bg-navy/10 text-navy text-[11px] font-bold uppercase tracking-wider border border-navy/20 flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-gold" />
-                    Distributeur Agréé LAHA
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 text-[11px] font-bold flex items-center gap-1 border border-emerald-500/20">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Compte Vérifié &amp; Actif
-                  </span>
-                </div>
-              </div>
-            </div>
-
             {/* Bloc 1 : Identification Fiscale & Juridique */}
             <div className="space-y-4">
               <h4 className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
@@ -511,89 +417,7 @@ export default function WholesalerProfilePage() {
           </div>
 
           {/* Modification du Mot de Passe */}
-          <form
-            onSubmit={handleSavePassword}
-            className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6"
-          >
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="font-serif font-bold text-navy text-base flex items-center gap-2">
-                <Lock className="w-4 h-4 text-gold" />
-                Sécurité du Compte &amp; Mot de Passe
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-xs text-gold hover:text-gold-dark font-medium flex items-center gap-1 cursor-pointer"
-              >
-                {showPassword ? (
-                  <>
-                    <EyeOff className="w-3.5 h-3.5" /> Masquer
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-3.5 h-3.5" /> Afficher
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy">Mot de passe actuel *</label>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  placeholder="••••••••"
-                  className="w-full bg-background-secondary border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:outline-none focus:border-gold min-h-[44px]"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-navy">Nouveau mot de passe *</label>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    placeholder="Min. 8 caractères"
-                    className="w-full bg-background-secondary border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:outline-none focus:border-gold min-h-[44px]"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-navy">Confirmer le mot de passe *</label>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    placeholder="••••••••"
-                    className="w-full bg-background-secondary border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:outline-none focus:border-gold min-h-[44px]"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={savingPassword || !newPassword || !currentPassword}
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 shadow-sm min-h-[44px] disabled:opacity-50"
-              >
-                {savingPassword ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4 text-gold" />
-                    Changer le mot de passe
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+          <ChangePasswordCard />
         </div>
 
         {/* Colonne Latérale (4 cols) : Palier Tarifaire & Conditions Commerciales */}

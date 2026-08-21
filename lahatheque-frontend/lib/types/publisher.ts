@@ -85,6 +85,7 @@ export interface PublisherProfileData {
   entity_type: PublisherEntityType;
   company_name: string;
   trade_name?: string;
+  logo_url?: string;
   nif_number: string;
   rccm_number?: string;
   identity_card_number?: string;

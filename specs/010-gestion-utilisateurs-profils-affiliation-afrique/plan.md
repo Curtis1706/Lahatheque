@@ -34,7 +34,7 @@
 ## 2. Conception de la Base de Données
 
 ### 2.1. Extension du Modèle `User` (`apps/accounts/models.py`)
-- `role` : Choix parmi les 10 rôles (`student`, `author`, `publisher`, `librarian`, `maquettiste`, `chef_maquettiste`, `juriste`, `manager`, `wholesaler`, `admin`).
+- `role` : Choix parmi les 10 rôles (`student`, `author`, `publisher`, `university`, `maquettiste`, `chef_maquettiste`, `juriste`, `manager`, `wholesaler`, `admin`).
 - `phone_number` : `CharField(max_length=30, blank=True)` (ex: `+229 97 00 00 00`).
 - `country_code` : `CharField(max_length=2, default='BJ')` (Code ISO 3166-1 alpha-2).
 - `avatar` : `ImageField(upload_to='avatars/', null=True, blank=True)`.
@@ -98,6 +98,6 @@
 1. **`/register`** : Formulaire à deux onglets épurés ("Compte Lecteur / Étudiant" et "Compte Auteur") avec sélecteur d'indicatif pays africain.
 2. **`/profile`** : Espace profil universel avec changement d'avatar, mise à jour des coordonnées et badge de rôle.
 3. **`/student/university`** : Espace d'activation optionnel de l'affiliation universitaire pour les étudiants.
-4. **`/librarian/affiliations`** : Tableau de bord du Bibliothécaire pour valider les cartes d'étudiants et importer les listes CSV.
+4. **`/university/affiliations`** : Tableau de bord de l'Université pour valider les cartes d'étudiants et importer les listes CSV.
 5. **`/chief-layout` & `/chief-layout/validation/[id]`** : Espace de travail du Chef Maquettiste pour examiner les épreuves et publier en un clic.
 6. **`/admin/users`** : Tableau de bord d'administration des utilisateurs avec modale de création et actions rapides.

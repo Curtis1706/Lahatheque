@@ -5,7 +5,7 @@ export interface RegisterPayload {
   last_name: string;
   phone?: string;
   country: string;
-  role: "student" | "author" | "publisher" | "librarian" | "teacher";
+  role: "student" | "author" | "publisher" | "university" | "teacher" | "wholesaler";
   pen_name?: string;
   bio?: string;
 }

@@ -47,7 +47,7 @@ DEMO_ACCOUNTS = [
     },
     {
         "email": "universite@lahatheque.com",
-        "role": "librarian",
+        "role": "university",
         "first_name": "Prof. Honoré",
         "last_name": "ADAM (Université UAC)",
         "phone": "+2290199556677",

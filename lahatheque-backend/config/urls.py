@@ -1,6 +1,8 @@
 """URL Routing Racine pour LAHAThèque v3.2 API."""
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -17,4 +19,9 @@ urlpatterns = [
     path('api/v1/audio/', include('apps.audio.urls')),
     path('api/v1/reporting/', include('apps.reporting.urls')),
     path('api/v1/reader/', include('apps.reader.urls')),
+    path('api/v1/student/', include('apps.student.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

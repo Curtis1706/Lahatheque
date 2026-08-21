@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -190,10 +191,10 @@ export function DashboardSidebar() {
           { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-5 h-5" /> },
           { label: "Catalogue & Découverte", href: "/student/catalog", icon: <Search className="w-5 h-5" /> },
           { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="w-5 h-5" /> },
-          { label: "Achats & Commandes Papier", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
-          { label: "Abonnements & Pass", href: "/student/subscriptions", icon: <Sparkles className="w-5 h-5" /> },
+          { label: "Achats & Commandes", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
+          { label: "Historique & Stats", href: "/student/history", icon: <History className="w-5 h-5" /> },
+          { label: "Mon Université", href: "/student/university", icon: <GraduationCap className="w-5 h-5" /> },
           { label: "Profil & Paramètres", href: "/student/profile", icon: <UserIcon className="w-5 h-5" /> },
-          { label: "Mon Université (Bouquet)", href: "/student/university", icon: <GraduationCap className="w-5 h-5" /> },
         ];
       case "super_client":
         return [
@@ -211,15 +212,16 @@ export function DashboardSidebar() {
           { label: "Nouveautés & Ventes", href: "/wholesaler/notifications", icon: <BellRing className="w-5 h-5" /> },
           { label: "Profil & Facturation", href: "/wholesaler/profile", icon: <UserIcon className="w-5 h-5" /> },
         ];
-      case "librarian":
+      case "university":
         return [
-          { label: "Vue d'ensemble", href: "/librarian", icon: <LayoutDashboard className="w-5 h-5" /> },
-          { label: "Statistiques & Usage", href: "/librarian/stats", icon: <FileBarChart className="w-5 h-5" /> },
-          { label: "Mon Catalogue Établissement", href: "/librarian/catalog", icon: <BookOpen className="w-5 h-5" /> },
-          { label: "Bouquets Documentaires", href: "/librarian/bouquets", icon: <Sparkles className="w-5 h-5" /> },
-          { label: "Achats Livres Papier", href: "/librarian/purchases", icon: <PackageCheck className="w-5 h-5" /> },
-          { label: "Redevances 15% & Relevés", href: "/librarian/redevances", icon: <DollarSign className="w-5 h-5" /> },
-          { label: "Profil & Paramètres", href: "/librarian/profile", icon: <GraduationCap className="w-5 h-5" /> },
+          { label: "Vue d'ensemble", href: "/university", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="w-5 h-5" /> },
+          { label: "Catalogue Universitaire", href: "/university/catalog", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Statistiques & Usage", href: "/university/stats", icon: <FileBarChart className="w-5 h-5" /> },
+          { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="w-5 h-5" /> },
+          { label: "Commandes Papier Campus", href: "/university/purchases", icon: <PackageCheck className="w-5 h-5" /> },
+          { label: "Redevances (15%)", href: "/university/royalties", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Profil & Paramètres", href: "/university/profile", icon: <Building2 className="w-5 h-5" /> },
         ];
       case "manager":
         return [
@@ -379,17 +381,12 @@ export function DashboardSidebar() {
           {open && user && (
             <div className="p-3 my-4 rounded-xl bg-navy/60 border border-navy-hover flex items-center gap-3">
               <Link href="/profile" className="shrink-0 group" title="Voir mon profil">
-                {(user as any).avatar_url ? (
-                  <img
-                    src={(user as any).avatar_url}
-                    alt={userDisplayName}
-                    className="w-9 h-9 rounded-full object-cover border border-gold/40 group-hover:border-gold transition-colors"
-                  />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-navy-dark text-gold font-serif font-bold flex items-center justify-center text-xs border border-gold/30 group-hover:border-gold transition-colors">
-                    {user.first_name?.[0] || "L"}
-                  </div>
-                )}
+                <UserAvatar
+                  src={(user as any).avatar_url || user.avatar || user.profile_photo}
+                  name={userDisplayName}
+                  size="md"
+                  className="border-gold/40 group-hover:border-gold transition-colors"
+                />
               </Link>
               <div className="min-w-0 flex-1">
                 <Link href="/profile" className="hover:underline block truncate">

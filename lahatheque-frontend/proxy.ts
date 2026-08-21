@@ -56,8 +56,8 @@ export default function proxy(request: NextRequest) {
         return '/student'
       case 'author':
         return '/author'
-      case 'librarian':
-        return '/librarian'
+      case 'university':
+        return '/university'
       case 'publisher':
         return '/publisher'
       case 'wholesaler':

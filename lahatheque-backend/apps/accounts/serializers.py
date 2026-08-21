@@ -18,12 +18,19 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'username', 'is_staff', 'is_superuser', 'date_joined']
 
     def get_avatar_url(self, obj) -> str | None:
-        if obj.avatar:
-            # Si déjà une URL absolue
-            if str(obj.avatar).startswith('http'):
-                return str(obj.avatar)
-            public_url = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
-            return f"{public_url.rstrip('/')}/{str(obj.avatar).lstrip('/')}"
+        if obj.avatar and bool(getattr(obj.avatar, 'name', None)):
+            avatar_str = str(obj.avatar.name)
+            if avatar_str.startswith('http'):
+                return avatar_str
+            try:
+                return obj.avatar.url
+            except Exception:
+                public_url = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', '') or getattr(settings, 'CLOUDFLARE_R2_PUBLIC_DOMAIN', '')
+                if public_url:
+                    if not public_url.startswith('http'):
+                        public_url = f"https://{public_url}"
+                    return f"{public_url.rstrip('/')}/{avatar_str.lstrip('/')}"
+                return f"/media/{avatar_str.lstrip('/')}"
         return None
 
     def get_institution_name(self, obj) -> str | None:
@@ -62,7 +69,7 @@ class AdminUserCreateSerializer(serializers.Serializer):
     phone = serializers.CharField(required=False, allow_blank=True, default='')
     country = serializers.CharField(required=False, default='BJ')
     role = serializers.ChoiceField(choices=[
-        'student', 'teacher', 'author', 'librarian', 'publisher', 
+        'student', 'teacher', 'author', 'university', 'publisher', 
         'layout_artist', 'chief_layout', 'legal_reviewer', 'manager', 
         'wholesaler', 'partner_api', 'admin', 'super_admin'
     ])

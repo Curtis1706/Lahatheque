@@ -26,7 +26,7 @@ Application Next.js App Router (TypeScript, Tailwind CSS) :
 - **Pages Publiques (SSR/ISR)** : `/`, `/catalog`, `/catalog/[id]`
 - **Authentification & BFF** : `/login`, `/register`, `/api/auth/session/route.ts` (JWT HttpOnly)
 - **Middleware Global** : `lahatheque-frontend/proxy.ts` (Proxy Router Next.js 16)
-- **Dashboards par rôle** : `/student`, `/teacher`, `/librarian`, `/publisher`, `/author`, `/legal-reviewer`, `/layout-artist`, `/admin`, `/super-admin`
+- **Dashboards par rôle** : `/student`, `/teacher`, `/university`, `/publisher`, `/author`, `/legal-reviewer`, `/layout-artist`, `/admin`, `/super-admin`
 - **Lecteur protégé** : `/catalog/reader/[id]` avec `usePdfReaderSecurity` et `useAnnotations`
 - **Composants UI** : `GuideViewer`, `TiptapEditor`, `AuthGuard`
 

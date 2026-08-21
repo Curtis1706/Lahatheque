@@ -19,7 +19,9 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { AuthorTeamAccessCard } from "@/components/features/author/author-team-access-card";
 import { getAuthorDelegates, inviteAuthorDelegate, removeAuthorDelegate } from "@/lib/services/author";
-import { getProfile, updateProfile, changePassword } from "@/lib/services/auth";
+import { getProfile, updateProfile } from "@/lib/services/auth";
+import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
+import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
 import type { AuthorDelegateAccess } from "@/lib/types/author";
 import { toast } from "sonner";
 
@@ -45,12 +47,6 @@ export default function AuthorProfilePage() {
   // Délégation d'accès (Co-auteurs & Assistants)
   const [delegates, setDelegates] = useState<AuthorDelegateAccess[]>([]);
   const [saving, setSaving] = useState(false);
-
-  // Mot de passe
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -114,37 +110,7 @@ export default function AuthorProfilePage() {
     }
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!oldPassword || !newPassword) {
-      toast.error("Veuillez remplir tous les champs du mot de passe.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      toast.error("Les deux mots de passe ne correspondent pas.");
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error("Le nouveau mot de passe doit comporter au moins 8 caractères.");
-      return;
-    }
 
-    setChangingPassword(true);
-    const res = await changePassword({
-      current_password: oldPassword,
-      new_password: newPassword,
-      confirm_password: confirmPassword,
-    });
-    setChangingPassword(false);
-    if (res.success) {
-      toast.success("Votre mot de passe a été modifié avec succès !");
-      setOldPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } else {
-      toast.error(res.error || "Échec de la modification du mot de passe.");
-    }
-  };
 
   const handleInviteDelegate = async (name: string, email: string, role: "co_author" | "assistant") => {
     const newDel = await inviteAuthorDelegate(name, email, role);
@@ -196,44 +162,20 @@ export default function AuthorProfilePage() {
         onRemoveDelegate={handleRemoveDelegate}
       />
 
+      {/* Photo de Profil */}
+      <ProfileAvatarCard
+        currentAvatarUrl={avatarPreview}
+        userFullName={`${firstName} ${lastName}`}
+        userRole="author"
+        onAvatarUpdated={(newUrl) => setAvatarPreview(newUrl)}
+      />
+
       {/* Formulaire 1 : Informations Personnelles & Coordonnées Bancaires */}
       <form onSubmit={handleSaveProfile} className="p-6 sm:p-8 rounded-3xl bg-background border border-border space-y-6 shadow-xs">
         <div className="space-y-4">
           <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider border-b border-border pb-2">
             Identité Officielle de l&apos;Auteur
           </h3>
-
-          {/* Photo de Profil */}
-          <div className="flex items-center gap-4 pb-2">
-            <div className="relative group">
-              <div className="w-16 h-16 rounded-full bg-navy text-gold font-serif font-bold text-xl flex items-center justify-center overflow-hidden border-2 border-gold/40">
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  `${firstName.slice(0, 1)}${lastName.slice(0, 1)}`
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute inset-0 bg-navy/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
-                title="Changer la photo"
-              >
-                <Camera className="w-5 h-5 text-gold" />
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                className="hidden"
-              />
-            </div>
-            <div>
-              <p className="font-bold text-xs text-navy">Photo de profil / Portrait Auteur</p>
-              <p className="text-[11px] text-foreground-muted">PNG, JPG ou WEBP (Max 5 Mo)</p>
-            </div>
-          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
@@ -373,54 +315,8 @@ export default function AuthorProfilePage() {
         </div>
       </form>
 
-      {/* Formulaire 2 : Changement de Mot de Passe */}
-      <form onSubmit={handleChangePassword} className="p-6 sm:p-8 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-        <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider border-b border-border pb-2 flex items-center gap-2">
-          <Lock className="w-4 h-4 text-gold" />
-          Sécurité &amp; Modification du Mot de Passe
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div>
-            <label className="block font-bold text-navy mb-1.5">Mot de passe actuel</label>
-            <input
-              type="password"
-              value={oldPassword}
-              onChange={(e) => setOldPassword(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-            />
-          </div>
-          <div>
-            <label className="block font-bold text-navy mb-1.5">Nouveau mot de passe</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Min. 8 caractères"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-            />
-          </div>
-          <div>
-            <label className="block font-bold text-navy mb-1.5">Confirmer le nouveau mot de passe</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end pt-3">
-          <button
-            type="submit"
-            disabled={changingPassword || !oldPassword || !newPassword}
-            className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px] shadow-sm disabled:opacity-50 cursor-pointer"
-          >
-            {changingPassword ? "Mise à jour..." : "Mettre à jour le mot de passe"}
-          </button>
-        </div>
-      </form>
+      {/* Sécurité & Mot de passe */}
+      <ChangePasswordCard />
     </div>
   );
 }

@@ -68,8 +68,8 @@ function LoginContent() {
           router.push("/author");
         } else if (role === "publisher") {
           router.push("/publisher");
-        } else if (role === "librarian") {
-          router.push("/librarian");
+        } else if (role === "university") {
+          router.push("/university");
         } else if (role === "layout_artist") {
           router.push("/layout-artist");
         } else if (role === "chief_layout") {

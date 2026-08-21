@@ -74,7 +74,7 @@ export default function AdminUsersGlobalPage() {
     { value: "teacher", label: "Enseignants" },
     { value: "author", label: "Auteurs" },
     { value: "publisher", label: "Éditeurs Tiers" },
-    { value: "librarian", label: "Bibliothécaires" },
+    { value: "university", label: "Universités Partenaires" },
     { value: "layout_artist", label: "Maquettistes" },
     { value: "legal_reviewer", label: "Juristes" },
     { value: "partner_api", label: "Partenaires API / Univ." },

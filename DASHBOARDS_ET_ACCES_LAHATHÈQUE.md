@@ -17,7 +17,7 @@ Tous les comptes démo ci-dessous sont enregistrés en base de données avec le 
 | **4. Gestionnaire Stock** | `gestionnaire@lahatheque.com`    | `123456`      | `+229 01 93 44 55 66` | [`/manager`](file:///e:/Lahatheque/lahatheque-frontend/app/%28dashboard%29/manager)               |
 | **5. Juriste**            | `juriste@lahatheque.com`         | `123456`      | `+229 01 94 55 66 77` | [`/legal-reviewer`](file:///e:/Lahatheque/lahatheque-frontend/app/%28dashboard%29/legal-reviewer) |
 | **6. Auteur**             | `auteur@lahatheque.com`          | `123456`      | `+229 01 97 00 11 22` | [`/author`](file:///e:/Lahatheque/lahatheque-frontend/app/%28dashboard%29/author)                 |
-| **7. Université**        | `universite@lahatheque.com`      | `123456`      | `+229 01 99 55 66 77` | [`/librarian`](file:///e:/Lahatheque/lahatheque-frontend/app/%28dashboard%29/librarian)           |
+| **7. Université**        | `universite@lahatheque.com`      | `123456`      | `+229 01 99 55 66 77` | [`/university`](file:///e:/Lahatheque/lahatheque-frontend/app/%28dashboard%29/university)         |
 | **8. Éditeur Tiers**     | `editeur@lahatheque.com`         | `123456`      | `+229 01 98 33 44 55` | [`/publisher`](file:///e:/Lahatheque/lahatheque-frontend/app/%28dashboard%29/publisher)           |
 | **9. Client (Lecteur)**   | `client@lahatheque.com`          | `123456`      | `+229 01 96 12 34 56` | [`/student`](file:///e:/Lahatheque/lahatheque-frontend/app/%28dashboard%29/student)               |
 | **10. Grossiste**         | `grossiste@lahatheque.com`       | `123456`      | `+229 01 95 56 78 90` | [`/wholesaler`](file:///e:/Lahatheque/lahatheque-frontend/app/%28dashboard%29/wholesaler)         |
@@ -92,14 +92,15 @@ Tous les comptes démo ci-dessous sont enregistrés en base de données avec le 
 
 ---
 
-### 7. Dashboard Université (`/librarian`) — *Rôle Externes / Partenaires*
+### 7. Dashboard Université (`/university`) — *Rôle Externes / Partenaires*
 
-**Accès** : `universite@lahatheque.com` | **MDP** : `123456`**Périmètre** : Pilotage du catalogue universitaire et suivi des bouquets institutionnels.
+**Accès** : `universite@lahatheque.com` | **MDP** : `123456`**Périmètre** : Pilotage du catalogue universitaire, souscription aux bouquets et suivi des redevances 15%.
 
-- **Statistiques d'Utilisation** : Consultations numériques et écoutes audio par faculté (`/librarian/stats`).
-- **Gestion des Bouquets** : Souscription aux bouquets documentaires et part d'usage (`/librarian/bouquets`).
-- **Redevances Établissement** : Suivi des versements 15% et RIB de paiement (`/librarian/redevances`).
-- **Achats Papier** : Commandes d'exemplaires papier physiques pour les bibliothèques (`/librarian/purchases`).
+- **Statistiques d'Utilisation** : Consultations numériques et écoutes audio par faculté (`/university/stats`).
+- **Gestion des Bouquets** : Souscription aux bouquets documentaires et part d'usage (`/university/bouquets`).
+- **Redevances Établissement** : Suivi des versements 15% et RIB de paiement (`/university/royalties`).
+- **Achats Papier Campus** : Commandes d'exemplaires papier physiques pour les bibliothèques (`/university/purchases`).
+- **Affiliations Étudiants** : Validation par matricule académique et carte de scolarité (`/university/affiliations`).
 
 ---
 

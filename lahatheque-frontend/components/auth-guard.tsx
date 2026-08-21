@@ -7,7 +7,7 @@ import type { User } from '@/hooks/use-auth'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type AppRole = 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client' | 'wholesaler' | 'publisher' | 'librarian' | 'legal_reviewer' | 'layout_artist' | 'chief_layout' | 'manager'
+type AppRole = 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client' | 'wholesaler' | 'publisher' | 'university' | 'legal_reviewer' | 'layout_artist' | 'chief_layout' | 'manager'
 
 interface AuthGuardProps {
   children: React.ReactNode

@@ -8,7 +8,7 @@ from django.utils import timezone
 ROLE_CHOICES = (
     ('student', 'Étudiant / Client Lecteur'),
     ('teacher', 'Enseignant'),
-    ('librarian', 'Bibliothécaire / Université'),
+    ('university', 'Université (Établissement Partenaire)'),
     ('publisher', 'Éditeur Tiers'),
     ('author', 'Auteur'),
     ('legal_reviewer', 'Relecteur Juridique / Juriste'),

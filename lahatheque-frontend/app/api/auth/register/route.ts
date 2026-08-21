@@ -89,7 +89,7 @@ const registerSchema = z.object({
   last_name: z.string().optional().default(''),
   phone: z.string().optional().default(''),
   country: z.string().optional().default('BJ'),
-  role: z.enum(['student', 'teacher', 'author', 'publisher', 'librarian']).default('student'),
+  role: z.enum(['student', 'teacher', 'author', 'publisher', 'university']).default('student'),
 })
 
 export async function POST(request: NextRequest) {
