@@ -31,32 +31,6 @@ export interface QuizData {
   questions: QuizQuestion[];
 }
 
-const mockBookDetails: Record<string, BookDetail> = {
-  "book-001": {
-    id: "book-001",
-    title: "PromptBreeder: Self-Referential Self-Improvement via Prompt Evolution",
-    author: "DeepMind / LAHAThèque Research",
-    file: "/api/pdf?file=PromptBreeder_Original_Paper-2309.16797v1.pdf",
-    audio_file: "/mock/audio/narration-sample.mp3",
-    total_pages: 28,
-    category: "Recherche & Technologie",
-    subject: "Intelligence Artificielle",
-    description: "Document de référence scientifique sur la génération et l'évolution autonome d'instructions IA.",
-    progress: { last_page: 0 },
-  },
-  "ctr-2026-001": {
-    id: "ctr-2026-001",
-    title: "Convention Cadre d'Édition et Diffusion Universitaire — UAC",
-    author: "Université d'Abomey-Calavi (UAC)",
-    file: "/api/pdf?file=PromptBreeder_Original_Paper-2309.16797v1.pdf",
-    total_pages: 28,
-    category: "Convention Légale",
-    subject: "Droit des Contrats",
-    description: "Convention institutionnelle régissant la publication des travaux de recherche à l'UAC.",
-    progress: { last_page: 0 },
-  },
-};
-
 export const libraryApi = {
   async getBook(id: string): Promise<BookDetail> {
     try {
@@ -123,60 +97,46 @@ export const libraryApi = {
     };
   },
 
-  async syncProgress(arg1: any, arg2?: number, arg3?: number): Promise<boolean> {
-    await new Promise((r) => setTimeout(r, 100));
-    return true;
+  async syncProgress(bookId: string, currentPage?: number, totalPages?: number): Promise<boolean> {
+    try {
+      const res = await fetch("/api/bff/student/reading-progress/", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          book_id: bookId,
+          current_page: currentPage || 0,
+          total_pages: totalPages || 0,
+        }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
   },
 
   async getAnnotations(bookId: string): Promise<Annotation[]> {
-    await new Promise((r) => setTimeout(r, 200));
+    // TODO: Endpoint backend /api/v1/reader/annotations/ à créer
     return [];
   },
 
   async saveAnnotation(payload: { book: string; content: string; data: any }): Promise<{ id: string }> {
-    await new Promise((r) => setTimeout(r, 200));
+    // TODO: Endpoint backend /api/v1/reader/annotations/ à créer
     return { id: `ann-${Date.now()}` };
   },
 
   async deleteAnnotation(id: string): Promise<boolean> {
-    await new Promise((r) => setTimeout(r, 100));
+    // TODO: Endpoint backend /api/v1/reader/annotations/ à créer
     return true;
   },
 
   async getQuizzes(bookId: string): Promise<QuizData | null> {
-    await new Promise((r) => setTimeout(r, 200));
-    return {
-      id: `quiz-${bookId}`,
-      title: "Évaluation de fin de lecture — PromptBreeder",
-      questions: [
-        {
-          id: "q1",
-          question: "Quel est l'objectif principal de PromptBreeder ?",
-          options: [
-            "Générer des images 3D",
-            "Faire évoluer de manière autonome des prompts pour optimiser les performances des LLM",
-            "Traduire des textes en latin",
-            "Compresser les fichiers PDF"
-          ],
-          correct_index: 1,
-        },
-        {
-          id: "q2",
-          question: "Quel mécanisme d'évolution est utilisé par PromptBreeder ?",
-          options: [
-            "Des algorithmes génétiques auto-référentiels",
-            "Une recherche linéaire manuelle",
-            "Le hasard simple",
-            "La suppression de texte"
-          ],
-          correct_index: 0,
-        },
-      ],
-    };
+    // TODO: Endpoint backend /api/v1/reader/quizzes/ à créer
+    return null;
   },
 
   async submitQuiz(quizId: string, answers: Record<string, number>): Promise<{ score: number; total: number; passed: boolean }> {
-    await new Promise((r) => setTimeout(r, 300));
-    return { score: 2, total: 2, passed: true };
+    // TODO: Endpoint backend /api/v1/reader/quizzes/submit/ à créer
+    return { score: 0, total: 0, passed: true };
   },
 };

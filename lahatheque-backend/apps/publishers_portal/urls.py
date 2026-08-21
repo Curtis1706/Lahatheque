@@ -14,6 +14,7 @@ from .publisher_views import (
     PublisherApiKeyRevokeView,
     PublisherAuditLogsView,
     PublisherProfileView,
+    PublisherBookProtectionView,
 )
 
 app_name = 'publishers_portal'
@@ -26,6 +27,7 @@ urlpatterns = [
     path('kpis/', PublisherKpisView.as_view(), name='publisher-kpis'),
     path('catalog/', PublisherCatalogListView.as_view(), name='publisher-catalog-list'),
     path('catalog/<str:pk>/', PublisherCatalogDetailView.as_view(), name='publisher-catalog-detail'),
+    path('catalog/<str:pk>/protection/', PublisherBookProtectionView.as_view(), name='publisher-book-protection'),
     path('ai/extract-metadata/', PublisherAiMetadataExtractView.as_view(), name='publisher-ai-metadata'),
     path('deposits/', PublisherDepositsView.as_view(), name='publisher-deposits'),
     path('deposits/batch/', PublisherBatchImportView.as_view(), name='publisher-deposits-batch'),

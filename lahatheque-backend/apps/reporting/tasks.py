@@ -237,3 +237,68 @@ def run_all_automated_reminders() -> dict:
         "total_processed": dep_res.get("processed", 0) + unpaid_res.get("processed", 0) + exp_res.get("processed", 0),
         "total_errors": dep_res.get("errors", 0) + unpaid_res.get("errors", 0) + exp_res.get("errors", 0),
     }
+
+
+@shared_task
+def task_calculate_monthly_royalties():
+    """
+    Calcul mensuel automatique des redevances pour tous les ouvrages vendus.
+    Exécuté le 1er de chaque mois par Celery Beat.
+    """
+    from decimal import Decimal
+    from django.db.models import Sum, Count
+    from apps.catalog.models import Ouvrage
+    from apps.commerce.models import LigneCommande
+    from apps.rights.models import RoyaltyCalculation
+
+    now = timezone.now()
+    period = now.strftime("%Y-%m")
+    last_month_start = (now.replace(day=1) - timedelta(days=1)).replace(day=1)
+    last_month_end = now.replace(day=1) - timedelta(days=1)
+
+    created_count = 0
+
+    lignes = LigneCommande.objects.filter(
+        commande__created_at__gte=last_month_start,
+        commande__created_at__lte=last_month_end,
+        commande__status__in=['paid', 'completed', 'delivered'],
+    ).values('ouvrage').annotate(
+        total_sales=Sum('prix_total'),
+        units_sold=Count('id'),
+    )
+
+    for ligne in lignes:
+        ouvrage = Ouvrage.objects.filter(id=ligne['ouvrage']).select_related('institution', 'publisher').first()
+        if not ouvrage:
+            continue
+
+        total_sales = float(ligne['total_sales'] or 0)
+
+        # Redevance universitaire (15% par défaut)
+        univ_rate = 0.15
+        if ouvrage.institution and hasattr(ouvrage.institution, 'royalty_rate'):
+            univ_rate = float(ouvrage.institution.royalty_rate) / 100.0
+        university_royalty = total_sales * univ_rate if ouvrage.institution else 0
+
+        # Redevance éditeur tiers (taux contractuel)
+        publisher_royalty = 0
+        if ouvrage.publisher and hasattr(ouvrage.publisher, 'contractual_royalty_rate'):
+            pub_rate = float(ouvrage.publisher.contractual_royalty_rate) / 100.0
+            publisher_royalty = total_sales * pub_rate
+
+        # Droits d'auteur (le reste après université et éditeur)
+        author_royalty = max(0.0, total_sales - university_royalty - publisher_royalty)
+
+        RoyaltyCalculation.objects.update_or_create(
+            ouvrage=ouvrage,
+            period=period,
+            defaults={
+                'total_sales': Decimal(str(round(total_sales, 2))),
+                'author_royalty': Decimal(str(round(author_royalty, 2))),
+                'university_royalty': Decimal(str(round(university_royalty, 2))),
+                'publisher_royalty': Decimal(str(round(publisher_royalty, 2))),
+            }
+        )
+        created_count += 1
+
+    return {"period": period, "calculations_created": created_count}

@@ -587,3 +587,45 @@ class PublisherProfileView(APIView):
 
         prof.save()
         return self.get(request)
+
+
+class PublisherBookProtectionView(APIView):
+    """PATCH /api/v1/publishers/catalog/{pk}/protection/ - Configurer le DRM d'un dépôt éditeur."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        profile = get_or_create_publisher_profile(request.user)
+        try:
+            deposit = PublisherBookDeposit.objects.get(id=pk, publisher=profile)
+        except PublisherBookDeposit.DoesNotExist:
+            return Response({"success": False, "error": "Dépôt introuvable."}, status=404)
+
+        config = request.data.get("protection_config", {})
+
+        if "watermark_enabled" in config:
+            deposit.watermark_enabled = config["watermark_enabled"]
+        if "watermark_position" in config:
+            deposit.watermark_position = config["watermark_position"]
+        if "watermark_opacity" in config:
+            deposit.watermark_opacity = int(config["watermark_opacity"])
+        if "lcp_drm_enabled" in config:
+            deposit.lcp_drm_enabled = config["lcp_drm_enabled"]
+        if "disable_copy_paste" in config:
+            deposit.disable_copy_paste = config["disable_copy_paste"]
+        if "disable_print" in config:
+            deposit.disable_print = config["disable_print"]
+
+        deposit.save()
+
+        return Response({
+            "success": True,
+            "message": "Configuration DRM mise à jour.",
+            "data": {
+                "watermark_enabled": deposit.watermark_enabled,
+                "watermark_position": deposit.watermark_position,
+                "watermark_opacity": deposit.watermark_opacity,
+                "lcp_drm_enabled": deposit.lcp_drm_enabled,
+                "disable_copy_paste": deposit.disable_copy_paste,
+                "disable_print": deposit.disable_print,
+            }
+        })
