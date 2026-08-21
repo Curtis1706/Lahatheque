@@ -324,7 +324,18 @@ export async function resetBookPricing(bookId: string): Promise<{ success: boole
 // =========================================================================
 
 export async function getAdminSales(): Promise<AdminSale[]> {
-  await new Promise((res) => setTimeout(res, 250));
+  try {
+    const res = await fetch('/api/bff/admin/sales', { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data)) {
+        return json.data;
+      }
+    }
+    console.error(`[Admin Service] Réponse HTTP ${res.status} sur getAdminSales — repli sur données de démonstration.`);
+  } catch (err) {
+    console.error('[Admin Service] Erreur réseau sur getAdminSales — repli sur données de démonstration.', err);
+  }
   return MOCK_ADMIN_SALES;
 }
 
@@ -869,7 +880,7 @@ export async function getAdminStockMovements(): Promise<AdminStockMovement[]> {
     const res = await fetch('/api/bff/admin/stock/movements/', { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
-      if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+      if (json && json.success && Array.isArray(json.data)) {
         return json.data;
       }
     }

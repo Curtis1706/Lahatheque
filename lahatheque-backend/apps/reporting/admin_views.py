@@ -952,3 +952,46 @@ class AdminReportExportAPIView(APIView):
         return response
 
 
+class AdminSalesListAPIView(APIView):
+    """
+    GET /api/v1/admin/sales/
+    Liste des ventes réelles (commandes payées), tous canaux confondus.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        lignes = (
+            LigneCommande.objects
+            .select_related('commande', 'commande__user', 'ouvrage')
+            .order_by('-commande__created_at')[:200]
+        )
+        results = []
+        for l in lignes:
+            buyer = l.commande.user
+            buyer_name = f"{buyer.first_name} {buyer.last_name}".strip() if buyer else "Client Inconnu"
+            if not buyer_name:
+                buyer_name = buyer.email if buyer else "Client Inconnu"
+
+            results.append({
+                "id": str(l.id),
+                "order_number": getattr(l.commande, 'reference', str(l.commande.id)[:8].upper()),
+                "user_email": buyer.email if buyer else "N/A",
+                "user_name": buyer_name,
+                "buyer_name": buyer_name,
+                "buyer_email": buyer.email if buyer else "N/A",
+                "buyer_type": getattr(buyer, 'role', 'individual'),
+                "item_type": "book",
+                "item_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
+                "book_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
+                "amount": float(l.unit_price) * l.quantity,
+                "currency": "XOF",
+                "payment_method": "mobile_money",
+                "payment_status": l.commande.statut_paiement if l.commande.statut_paiement in ['paid', 'pending', 'failed', 'refunded'] else 'paid',
+                "order_status": "completed" if l.commande.statut_commande == 'completed' else "pending",
+                "created_at": l.commande.created_at.isoformat() if l.commande.created_at else None,
+                "country": getattr(buyer, 'country', 'BJ') if buyer else 'BJ',
+            })
+        return Response({"success": True, "data": results, "error": None})
+
+
+

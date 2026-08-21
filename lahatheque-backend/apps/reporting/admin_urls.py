@@ -9,6 +9,7 @@ from apps.reporting.admin_views import (
     AdminPanoramicStatsAPIView,
     AdminGlobalSettingsAPIView,
     AdminReportExportAPIView,
+    AdminSalesListAPIView,
     AdminCatalogPricingViewSet,
     AdminRoyaltiesPayoutViewSet,
     AdminRemindersViewSet,
@@ -33,5 +34,6 @@ urlpatterns = [
     path('stats/panoramic/', AdminPanoramicStatsAPIView.as_view(), name='admin-panoramic-stats'),
     path('settings/global/', AdminGlobalSettingsAPIView.as_view(), name='admin-global-settings'),
     path('reports/export/', AdminReportExportAPIView.as_view(), name='admin-report-export'),
+    path('sales/', AdminSalesListAPIView.as_view(), name='admin-sales-list'),
     path('', include(router.urls)),
 ]

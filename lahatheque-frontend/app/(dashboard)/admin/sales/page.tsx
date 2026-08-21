@@ -32,7 +32,7 @@ export default function AdminSalesPage() {
     {
       key: "id",
       header: "N° Commande",
-      cell: (row) => <span className="font-mono text-xs font-bold text-foreground">{row.id}</span>,
+      cell: (row) => <span className="font-mono text-xs font-bold text-navy">{row.order_number || row.id}</span>,
     },
     {
       key: "user_name",
