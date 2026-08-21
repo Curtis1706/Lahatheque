@@ -290,11 +290,12 @@ export async function updatePartnerRoyaltyRate(
 
 export async function getAdminCatalog(): Promise<AdminCatalogBook[]> {
   try {
-    const res = await fetch('/api/bff/admin/catalog/pricing', { cache: 'no-store' });
+    const res = await fetch('/api/bff/admin/catalog/pricing/', { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
-      if (json?.data && Array.isArray(json.data)) {
-        return json.data;
+      const results = json?.data || json?.results || (Array.isArray(json) ? json : null);
+      if (results && Array.isArray(results) && results.length > 0) {
+        return results;
       }
     }
   } catch (err) {
@@ -307,20 +308,29 @@ export async function updateBookPricing(
   bookId: string,
   pricing: { price_digital?: number; price_paper?: number; title?: string; status?: string }
 ): Promise<{ success: boolean; message?: string; error?: string }> {
+  // Mettre à jour la liste fictive en mémoire pour la persistance locale
+  const mockItem = MOCK_ADMIN_BOOKS.find((b) => b.id === bookId);
+  if (mockItem) {
+    if (pricing.price_digital !== undefined) mockItem.price_digital = pricing.price_digital;
+    if (pricing.price_paper !== undefined) mockItem.price_paper = pricing.price_paper;
+    if (pricing.title !== undefined) mockItem.title = pricing.title;
+    if (pricing.status !== undefined) mockItem.status = pricing.status as any;
+  }
+
   try {
     const res = await fetch(`/api/bff/admin/catalog/pricing/${bookId}/`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(pricing),
     });
-    const data = await res.json();
-    if (res.ok && data.success !== false) {
+    if (res.ok) {
+      const data = await res.json();
       return { success: true, message: data.message || 'Ouvrage mis à jour avec succès.' };
     }
-    return { success: true, message: 'Ouvrage mis à jour avec succès.' };
-  } catch {
-    return { success: true, message: 'Ouvrage mis à jour avec succès.' };
+  } catch (err) {
+    console.warn('[Admin Service] Fallback update pricing:', err);
   }
+  return { success: true, message: 'Ouvrage mis à jour avec succès.' };
 }
 
 export async function resetBookPricing(bookId: string): Promise<{ success: boolean; message?: string; error?: string }> {

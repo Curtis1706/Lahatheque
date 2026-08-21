@@ -389,19 +389,20 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             if 'price_paper' in data and data['price_paper'] is not None:
                 book.price_paper = Decimal(str(data['price_paper']))
             if 'title' in data and data['title']:
-                book.titre = str(data['title'])
+                book.title = str(data['title'])
             if 'status' in data and data['status']:
                 book.status = str(data['status'])
             book.save()
 
-            JournalAuditAdmin.objects.create(
-                administrateur=request.user,
-                action="UPDATE_BOOK_SPECIFIC_PRICING",
-                ressource_type="Ouvrage",
-                ressource_id=str(book.id),
-                details=data
-            )
-            return Response({"success": True, "message": f"Ouvrage '{book.titre}' mis à jour avec succès.", "error": None})
+            if request.user and request.user.is_authenticated:
+                JournalAuditAdmin.objects.create(
+                    administrateur=request.user,
+                    action="UPDATE_BOOK_SPECIFIC_PRICING",
+                    ressource_type="Ouvrage",
+                    ressource_id=str(book.id),
+                    details=data
+                )
+            return Response({"success": True, "message": f"Ouvrage '{book.title}' mis à jour avec succès.", "error": None})
         except Ouvrage.DoesNotExist:
             return Response({"success": False, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
