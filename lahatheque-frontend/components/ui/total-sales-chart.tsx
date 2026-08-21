@@ -18,13 +18,18 @@ export interface TotalSalesChartProps {
   totalAmountText?: string;
   growthBadgeText?: string;
   channels?: SalesChannel[];
+  curvePoints?: number[];
   className?: string;
   onReportClick?: () => void;
 }
 
 type Period = "1d" | "1w" | "1m" | "3m" | "1y";
 
-function generatePoints(period: Period): number[] {
+function generatePoints(period: Period, customPoints?: number[]): number[] {
+  if (customPoints && customPoints.length >= 2) {
+    const max = Math.max(...customPoints, 1);
+    return customPoints.map((v) => Math.round((v / max) * 100));
+  }
   const seeds: Record<Period, number[]> = {
     "1d": [35, 42, 38, 55, 62, 58, 70, 75, 82, 80, 95, 88],
     "1w": [45, 52, 60, 58, 72, 85, 92],
@@ -62,13 +67,14 @@ export function TotalSalesChart({
     { name: "Abonnements Lecteur & Pass", amount: 4250000, change: "+8.5%", isPositive: true },
     { name: "Livres physiques (papier)", amount: 2000000, change: "-3.1%", isPositive: false },
   ],
+  curvePoints,
   className,
   onReportClick,
 }: TotalSalesChartProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<Period>("1m");
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
 
-  const points = useMemo(() => generatePoints(selectedPeriod), [selectedPeriod]);
+  const points = useMemo(() => generatePoints(selectedPeriod, curvePoints), [selectedPeriod, curvePoints]);
   const width = 360;
   const height = 140;
 

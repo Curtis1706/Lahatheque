@@ -30,6 +30,13 @@ export default function AdminCatalogPage() {
     loadCatalog();
   }, []);
 
+  const formatAuthors = (authors?: string[] | string, fallbackName?: string): string => {
+    if (Array.isArray(authors) && authors.length > 0) return authors.join(", ");
+    if (typeof authors === "string" && authors.trim().length > 0) return authors;
+    if (fallbackName && fallbackName.trim().length > 0) return fallbackName;
+    return "Auteur non renseigné";
+  };
+
   const columns: DataTableColumn<AdminCatalogBook>[] = [
     {
       key: "title",
@@ -46,7 +53,7 @@ export default function AdminCatalogPage() {
       header: "Auteur(s) & Éditeur",
       cell: (row) => (
         <div>
-          <p className="text-xs font-medium text-foreground">{row.authors.join(", ")}</p>
+          <p className="text-xs font-medium text-foreground">{formatAuthors(row.authors, row.author_name)}</p>
           <p className="text-[11px] text-gold font-medium">{row.publisher_name}</p>
         </div>
       ),
@@ -165,7 +172,7 @@ export default function AdminCatalogPage() {
                   <StatusBadge status={book.status} />
                 </div>
                 <h3 className="font-serif font-bold text-sm text-foreground line-clamp-2">{book.title}</h3>
-                <p className="text-xs text-foreground-muted truncate">Par {book.authors.join(", ")}</p>
+                <p className="text-xs text-foreground-muted truncate">Par {formatAuthors(book.authors, book.author_name)}</p>
                 <p className="text-xs text-gold font-medium">{book.publisher_name}</p>
               </div>
 

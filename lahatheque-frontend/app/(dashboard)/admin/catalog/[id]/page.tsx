@@ -41,7 +41,9 @@ export default function AdminBookDetailPage() {
               ISBN: {book.isbn}
             </span>
             <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy mt-0.5">{book.title}</h1>
-            <p className="text-xs text-foreground-muted">Par {book.authors.join(", ")} • Éditeur : {book.publisher_name}</p>
+            <p className="text-xs text-foreground-muted">
+              Par {Array.isArray(book.authors) && book.authors.length > 0 ? book.authors.join(", ") : (book.author_name || "Auteur non renseigné")} • Éditeur : {book.publisher_name}
+            </p>
           </div>
           <StatusBadge status={book.status} />
         </div>

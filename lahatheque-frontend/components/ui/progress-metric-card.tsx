@@ -182,31 +182,20 @@ export function ProgressMetricCard({
     );
   }
 
-  if (!hasData) {
-    return (
-      <div className={shell}>
-        <div className={`flex flex-1 flex-col ${sz.pad}`}>
-          <h3 className={`${sz.title}`}>{title}</h3>
-          <div className="flex flex-1 flex-col items-center justify-center gap-1 py-6 text-center">
-            <p className="text-xs font-semibold text-foreground-muted">Données en cours de synchronisation</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={shell}>
-      {/* Zone du graphique en arrière-plan (vue bâtonnets par défaut) */}
-      <div className="absolute inset-y-0 right-0 z-0" style={{ width: `${REGION_W}%` }}>
-        <MetricChart
-          series={chartSeries}
-          view={view}
-          defaultIndex={fallback}
-          valueFormatter={fmtFull}
-          dateFormatter={fmtDate}
-        />
-      </div>
+      {/* Zone du graphique en arrière-plan (rendu uniquement si au moins 2 points de données) */}
+      {hasData && (
+        <div className="absolute inset-y-0 right-0 z-0" style={{ width: `${REGION_W}%` }}>
+          <MetricChart
+            series={chartSeries}
+            view={view}
+            defaultIndex={fallback}
+            valueFormatter={fmtFull}
+            dateFormatter={fmtDate}
+          />
+        </div>
+      )}
 
       {/* Contenu principal */}
       <div className="relative z-10 flex flex-1 flex-col p-4 sm:p-5 justify-between pointer-events-none">
@@ -214,20 +203,14 @@ export function ProgressMetricCard({
           <div className="flex items-center gap-1.5 min-w-0">
             <h3 className={`${sz.title} truncate`}>{title}</h3>
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-bold shrink-0">
-            <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full border bg-background text-[11px]" style={{ color: color.text }}>
-              <TrendIcon className="w-3 h-3" />
-              {displayPercent}
-            </span>
-            <div className="hidden xl:block">
-              <PeriodSelect
-                value={selectedLabel}
-                options={periods}
-                onChange={handlePeriodChange}
-                accentText={color.text}
-              />
+          {percent && (
+            <div className="flex items-center gap-1.5 text-xs font-bold shrink-0">
+              <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full border bg-background text-[11px]" style={{ color: color.text }}>
+                <TrendIcon className="w-3 h-3" />
+                {percent}
+              </span>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="mt-4 font-serif font-bold text-2xl sm:text-3xl text-navy tracking-tight tabular-nums">
@@ -235,19 +218,21 @@ export function ProgressMetricCard({
         </div>
 
         {/* Footer info compact */}
-        <div className="pt-2 mt-2 border-t border-border/50 flex items-center justify-between text-xs text-foreground-muted">
-          <div>
-            <span className="font-semibold text-foreground">{displayDelta}</span>{" "}
-            <span>{deltaLabel}</span>
-          </div>
-          {showStats && (
-            <div className="flex items-center gap-2 text-[11px] font-mono">
-              <span>Peak: <strong className="text-foreground">{fmtCompact(stats.peak)}</strong></span>
-              <span>·</span>
-              <span>Avg: <strong className="text-foreground">{fmtCompact(Math.round(stats.avg))}</strong></span>
+        {(delta || deltaLabel || (showStats && hasData)) && (
+          <div className="pt-2 mt-2 border-t border-border/50 flex items-center justify-between text-xs text-foreground-muted">
+            <div>
+              {delta && <span className="font-semibold text-foreground">{delta}</span>}{" "}
+              {deltaLabel && <span>{deltaLabel}</span>}
             </div>
-          )}
-        </div>
+            {showStats && hasData && (
+              <div className="flex items-center gap-2 text-[11px] font-mono">
+                <span>Peak: <strong className="text-foreground">{fmtCompact(stats.peak)}</strong></span>
+                <span>·</span>
+                <span>Avg: <strong className="text-foreground">{fmtCompact(Math.round(stats.avg))}</strong></span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -42,7 +42,10 @@ export async function getAdminKpis(): Promise<AdminKpi> {
     if (res.ok) {
       const json = await res.json();
       if (json?.data?.kpi) {
-        return json.data.kpi;
+        return {
+          ...json.data.kpi,
+          salesCurve: json.data.salesCurve || [],
+        };
       }
     }
   } catch (err) {

@@ -12,12 +12,14 @@ import {
   getRoleDistribution,
   getAdminSales,
   getAdminReminders,
+  getRevenueCategoryBreakdown,
 } from "@/lib/services/admin";
 import {
   AdminKpi,
   RoleDistribution,
   AdminSale,
   AdminReminder,
+  RevenueCategoryBreakdown,
 } from "@/lib/types/admin";
 import {
   DollarSign,
@@ -40,6 +42,7 @@ export default function AdminOverviewDashboard() {
   const { user } = useAuth();
   const [kpis, setKpis] = useState<AdminKpi | null>(null);
   const [rolesDist, setRolesDist] = useState<RoleDistribution[]>([]);
+  const [revenueBreakdown, setRevenueBreakdown] = useState<RevenueCategoryBreakdown[]>([]);
   const [recentSales, setRecentSales] = useState<AdminSale[]>([]);
   const [reminders, setReminders] = useState<AdminReminder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,16 +51,18 @@ export default function AdminOverviewDashboard() {
     async function loadData() {
       try {
         setLoading(true);
-        const [kpiData, rolesData, salesData, remindersData] = await Promise.all([
+        const [kpiData, rolesData, salesData, remindersData, revenueBreakdownData] = await Promise.all([
           getAdminKpis(),
           getRoleDistribution(),
           getAdminSales(),
           getAdminReminders(),
+          getRevenueCategoryBreakdown(),
         ]);
         setKpis(kpiData);
         setRolesDist(rolesData);
         setRecentSales(salesData);
         setReminders(remindersData);
+        setRevenueBreakdown(revenueBreakdownData);
       } catch (err) {
         console.error("Erreur de chargement du dashboard admin", err);
       } finally {
@@ -155,96 +160,54 @@ export default function AdminOverviewDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <ProgressMetricCard
           title="Chiffre d'Affaires Cumulé"
-          total={`${(kpis?.totalRevenue || 28450000).toLocaleString("fr-FR")} FCFA`}
-          percent={`+${kpis?.revenueTrend || 14.5}%`}
-          trend="up"
+          total={`${(kpis?.totalRevenue ?? 0).toLocaleString("fr-FR")} FCFA`}
+          percent={`${(kpis?.revenueTrend ?? 0) >= 0 ? "+" : ""}${kpis?.revenueTrend ?? 0}%`}
+          trend={(kpis?.revenueTrend ?? 0) >= 0 ? "up" : "down"}
           accent="gold"
-          delta="+3.4M FCFA"
-          deltaLabel="ce mois"
-          data={[
-            { value: 18000000, date: "01 Mar" },
-            { value: 21500000, date: "08 Mar" },
-            { value: 24800000, date: "15 Mar" },
-            { value: 28450000, date: "22 Mar" }
-          ]}
+          data={
+            (kpis?.salesCurve ?? []).map((point) => ({
+              value: point.total,
+              date: point.month,
+            }))
+          }
         />
         <ProgressMetricCard
           title="Ventes Totales"
-          total={`${(kpis?.totalSales || 1420).toLocaleString("fr-FR")} transactions`}
-          percent={`+${kpis?.salesTrend || 8.2}%`}
-          trend="up"
+          total={`${(kpis?.totalSales ?? 0).toLocaleString("fr-FR")} transactions`}
+          percent={`${(kpis?.salesTrend ?? 0) >= 0 ? "+" : ""}${kpis?.salesTrend ?? 0}%`}
+          trend={(kpis?.salesTrend ?? 0) >= 0 ? "up" : "down"}
           accent="navy"
-          delta="+142 transactions"
-          deltaLabel="ce mois"
-          data={[
-            { value: 1100, date: "01 Mar" },
-            { value: 1240, date: "08 Mar" },
-            { value: 1350, date: "15 Mar" },
-            { value: 1420, date: "22 Mar" }
-          ]}
         />
         <ProgressMetricCard
           title="Consultations d'Ouvrages"
-          total={`${(kpis?.totalConsultations || 48920).toLocaleString("fr-FR")} lectures`}
-          percent="+10.4%"
+          total={`${(kpis?.totalConsultations ?? 0).toLocaleString("fr-FR")} lectures`}
+          percent="+0.0%"
           trend="up"
           accent="emerald"
-          delta="+4.8k lectures"
-          deltaLabel="ce mois"
-          data={[
-            { value: 38000, date: "01 Mar" },
-            { value: 42000, date: "08 Mar" },
-            { value: 45500, date: "15 Mar" },
-            { value: 48920, date: "22 Mar" }
-          ]}
         />
         <ProgressMetricCard
           title="Utilisateurs Actifs"
-          total={`${(kpis?.activeUsers || 3240).toLocaleString("fr-FR")} inscrits`}
-          percent={`+${kpis?.usersTrend || 12.0}%`}
-          trend="up"
+          total={`${(kpis?.activeUsers ?? 0).toLocaleString("fr-FR")} inscrits`}
+          percent={`${(kpis?.usersTrend ?? 0) >= 0 ? "+" : ""}${kpis?.usersTrend ?? 0}%`}
+          trend={(kpis?.usersTrend ?? 0) >= 0 ? "up" : "down"}
           accent="gold"
-          delta="+380 comptes"
-          deltaLabel="ce mois"
-          data={[
-            { value: 2800, date: "01 Mar" },
-            { value: 2950, date: "08 Mar" },
-            { value: 3100, date: "15 Mar" },
-            { value: 3240, date: "22 Mar" }
-          ]}
         />
         <Link href="/admin/reminders" className="block">
           <ProgressMetricCard
             title="Dépôts & Maquettes en Attente"
-            total={`${kpis?.pendingSubmissions || 14} dossiers`}
+            total={`${kpis?.pendingSubmissions ?? 0} dossiers`}
             percent="Action"
             trend="down"
             accent="rose"
-            delta="-4 dossiers"
-            deltaLabel="traités"
-            data={[
-              { value: 24, date: "01 Mar" },
-              { value: 20, date: "08 Mar" },
-              { value: 17, date: "15 Mar" },
-              { value: 14, date: "22 Mar" }
-            ]}
           />
         </Link>
         <Link href="/admin/reminders" className="block">
           <ProgressMetricCard
             title="Factures & Impayés en Retard"
-            total={`${kpis?.pendingUnpaidInvoices || 8} relances`}
+            total={`${kpis?.pendingUnpaidInvoices ?? 0} relances`}
             percent="Urgent"
             trend="down"
             accent="rose"
-            delta="-3 relances"
-            deltaLabel="réglées"
-            data={[
-              { value: 16, date: "01 Mar" },
-              { value: 13, date: "08 Mar" },
-              { value: 11, date: "15 Mar" },
-              { value: 8, date: "22 Mar" }
-            ]}
           />
         </Link>
       </div>
@@ -298,7 +261,18 @@ export default function AdminOverviewDashboard() {
 
             {/* Revenue Progress Chart */}
             <div className="lg:col-span-7">
-              <TotalSalesChart onReportClick={() => (window.location.href = "/admin/reports")} />
+              <TotalSalesChart
+                totalAmountText={`${(kpis?.totalRevenue ?? 0).toLocaleString("fr-FR")} FCFA`}
+                growthBadgeText={`${(kpis?.revenueTrend ?? 0) >= 0 ? "+" : ""}${kpis?.revenueTrend ?? 0}%`}
+                channels={revenueBreakdown.map((c) => ({
+                  name: c.label,
+                  amount: c.amount,
+                  change: `${c.percentage >= 0 ? "+" : ""}${c.percentage}%`,
+                  isPositive: c.percentage >= 0,
+                }))}
+                curvePoints={(kpis?.salesCurve ?? []).map((p) => p.total)}
+                onReportClick={() => (window.location.href = "/admin/reports")}
+              />
             </div>
           </div>
         </div>

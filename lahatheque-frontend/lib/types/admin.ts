@@ -45,6 +45,7 @@ export interface AdminKpi {
   revenueTrend: number;
   salesTrend: number;
   usersTrend: number;
+  salesCurve?: { month: string; total: number; online?: number; wholesalers?: number; subscriptions?: number }[];
 }
 
 export interface RoleDistribution {

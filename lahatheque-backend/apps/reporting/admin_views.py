@@ -342,25 +342,40 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
         def_num = float(config.prix_defaut_numerique_xof) if config else 3000.0
         def_pap = float(config.prix_defaut_papier_xof) if config else 5000.0
 
-        books = Ouvrage.objects.all().order_by('-created_at')[:100]
+        books = (
+            Ouvrage.objects
+            .select_related('publisher', 'discipline')
+            .prefetch_related('authors')
+            .all()
+            .order_by('-publication_date', '-id')[:100]
+        )
         results = []
         for b in books:
-            price_num = float(b.prix_numerique_xof) if getattr(b, 'prix_numerique_xof', None) is not None else def_num
-            price_pap = float(b.prix_papier_xof) if getattr(b, 'prix_papier_xof', None) is not None else def_pap
-            has_custom = getattr(b, 'a_prix_specifique', False)
+            price_num = float(b.price_digital) if b.price_digital is not None else def_num
+            price_pap = float(b.price_paper) if b.price_paper is not None else def_pap
+            has_custom = (
+                b.price_digital is not None and float(b.price_digital) != def_num
+            ) or (
+                b.price_paper is not None and float(b.price_paper) != def_pap
+            )
+            pub_name = "Éditions LAHA"
+            if b.publisher:
+                pub_name = b.publisher.company_name or b.publisher.name or "Éditions LAHA"
+
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]
 
             results.append({
                 "id": str(b.id),
-                "isbn": getattr(b, 'isbn', '978-2-84129-001-1'),
+                "isbn": b.isbn or "",
                 "title": b.titre,
-                "publisher_name": getattr(b, 'editeur_nom', 'Éditions LAHA'),
-                "discipline": getattr(b, 'discipline', 'Droit'),
+                "authors": authors_list,
+                "author_name": ", ".join(authors_list) if authors_list else "Auteur non renseigné",
+                "publisher_name": pub_name,
+                "discipline": b.discipline.name if b.discipline else "Non classé",
                 "price_digital": price_num,
                 "price_paper": price_pap,
                 "uses_default_pricing": not has_custom,
-                "status": getattr(b, 'statut', 'published'),
-                "sales_count": 48,
-                "consultation_count": 520,
+                "status": b.status,
             })
 
         return Response({"success": True, "data": results, "error": None})
@@ -370,11 +385,9 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             book = Ouvrage.objects.get(id=pk)
             data = request.data
             if 'price_digital' in data:
-                book.prix_numerique_xof = Decimal(str(data['price_digital']))
+                book.price_digital = Decimal(str(data['price_digital']))
             if 'price_paper' in data:
-                book.prix_papier_xof = Decimal(str(data['price_paper']))
-            if hasattr(book, 'a_prix_specifique'):
-                book.a_prix_specifique = True
+                book.price_paper = Decimal(str(data['price_paper']))
             book.save()
 
             JournalAuditAdmin.objects.create(
@@ -394,11 +407,9 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             book = Ouvrage.objects.get(id=pk)
             config = ConfigurationPlateformeGlobale.objects.first()
             if config:
-                book.prix_numerique_xof = config.prix_defaut_numerique_xof
-                book.prix_papier_xof = config.prix_defaut_papier_xof
-            if hasattr(book, 'a_prix_specifique'):
-                book.a_prix_specifique = False
-            book.save()
+                book.price_digital = config.prix_defaut_numerique_xof
+                book.price_paper = config.prix_defaut_papier_xof
+                book.save()
 
             JournalAuditAdmin.objects.create(
                 administrateur=request.user,
