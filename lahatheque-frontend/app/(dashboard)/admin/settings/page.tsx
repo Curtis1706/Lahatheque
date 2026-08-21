@@ -1,19 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   Settings, Save, ShieldCheck, Mail, Lock, Globe, 
   Bell, Database, Coins, Clock, ChevronRight, RefreshCw, 
   Sliders, UserCheck, Smartphone, AlertTriangle, CheckCircle2,
-  Server, HardDrive
+  Server, HardDrive, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import { getPlatformGlobalSettings, updatePlatformGlobalSettings, PlatformGlobalSettings } from "@/lib/services/admin";
 
 type SettingsTab = "general" | "drm" | "access" | "notifications" | "storage";
 
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [loading, setLoading] = useState(true);
 
   // Général & Identité
   const [siteName, setSiteName] = useState("LAHAThèque — Bibliothèque Numérique Africaine");
@@ -21,6 +23,15 @@ export default function AdminSettingsPage() {
   const [supportEmail, setSupportEmail] = useState("contact@lahatheque.com");
   const [defaultCurrency, setDefaultCurrency] = useState("XOF");
   const [timezone, setTimezone] = useState("Africa/Porto-Novo");
+
+  // Tarifs & Relances Backend
+  const [prixNumXof, setPrixNumXof] = useState(3000);
+  const [prixPapierXof, setPrixPapierXof] = useState(5000);
+  const [prixAudioXof, setPrixAudioXof] = useState(2500);
+  const [prixPassMensuelXof, setPrixPassMensuelXof] = useState(5000);
+  const [prixPassAnnuelXof, setPrixPassAnnuelXof] = useState(45000);
+  const [delaiDepotsJours, setDelaiDepotsJours] = useState(7);
+  const [delaiImpayesJours, setDelaiImpayesJours] = useState(7);
 
   // Inscriptions & Accès
   const [allowPublicRegistrations, setAllowPublicRegistrations] = useState(true);
@@ -40,13 +51,48 @@ export default function AdminSettingsPage() {
 
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  useEffect(() => {
+    async function loadSettings() {
+      setLoading(true);
+      const data = await getPlatformGlobalSettings();
+      if (data) {
+        if (data.devise_defaut) setDefaultCurrency(data.devise_defaut);
+        if (data.duree_session_lecture_minutes) setSessionTimeoutMinutes(data.duree_session_lecture_minutes);
+        if (data.prix_defaut_numerique_xof !== undefined) setPrixNumXof(Number(data.prix_defaut_numerique_xof));
+        if (data.prix_defaut_papier_xof !== undefined) setPrixPapierXof(Number(data.prix_defaut_papier_xof));
+        if (data.prix_defaut_audio_xof !== undefined) setPrixAudioXof(Number(data.prix_defaut_audio_xof));
+        if (data.prix_pass_mensuel_xof !== undefined) setPrixPassMensuelXof(Number(data.prix_pass_mensuel_xof));
+        if (data.prix_pass_annuel_xof !== undefined) setPrixPassAnnuelXof(Number(data.prix_pass_annuel_xof));
+        if (data.delai_relance_depots_jours !== undefined) setDelaiDepotsJours(Number(data.delai_relance_depots_jours));
+        if (data.delai_relance_impayes_jours !== undefined) setDelaiImpayesJours(Number(data.delai_relance_impayes_jours));
+      }
+      setLoading(false);
+    }
+    loadSettings();
+  }, []);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      toast.success("Paramètres de la plateforme enregistrés avec succès.");
-    }, 450);
+    const payload: Partial<PlatformGlobalSettings> = {
+      devise_defaut: defaultCurrency,
+      duree_session_lecture_minutes: sessionTimeoutMinutes,
+      prix_defaut_numerique_xof: prixNumXof,
+      prix_defaut_papier_xof: prixPapierXof,
+      prix_defaut_audio_xof: prixAudioXof,
+      prix_pass_mensuel_xof: prixPassMensuelXof,
+      prix_pass_annuel_xof: prixPassAnnuelXof,
+      delai_relance_depots_jours: delaiDepotsJours,
+      delai_relance_impayes_jours: delaiImpayesJours,
+    };
+
+    const result = await updatePlatformGlobalSettings(payload);
+    setIsSaving(false);
+    if (result.success) {
+      toast.success("Paramètres de la plateforme enregistrés avec succès en base de données.");
+    } else {
+      toast.error(result.error || "Échec de l'enregistrement des paramètres.");
+    }
   };
 
   return (

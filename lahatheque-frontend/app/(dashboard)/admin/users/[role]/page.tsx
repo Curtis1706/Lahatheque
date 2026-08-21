@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
 import { CreateAccountModal } from "@/components/features/admin/create-account-modal";
 import { SendEmailModal } from "@/components/features/admin/send-email-modal";
-import { getAdminUsers } from "@/lib/services/admin";
+import { getAdminUsers, toggleAdminUserStatus } from "@/lib/services/admin";
 import { AdminUser, AdminRole } from "@/lib/types/admin";
 import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock } from "lucide-react";
 import Link from "next/link";
@@ -37,21 +37,21 @@ export default function AdminRoleUsersPage() {
       const roleMap: Record<string, AdminRole> = {
         "layout-artists": "layout_artist",
         maquettistes: "layout_artist",
-        "chief-layout": "layout_artist",
-        "chef-maquettiste": "layout_artist",
-        managers: "admin",
-        gestionnaires: "admin",
+        "chief-layout": "chief_layout",
+        "chef-maquettiste": "chief_layout",
+        managers: "manager",
+        gestionnaires: "manager",
         legal: "legal_reviewer",
         juristes: "legal_reviewer",
         authors: "author",
         auteurs: "author",
-        universities: "partner_api",
-        universites: "partner_api",
+        universities: "university",
+        universites: "university",
         publishers: "publisher",
         editeurs: "publisher",
         clients: "student",
-        wholesalers: "partner_api",
-        grossistes: "partner_api",
+        wholesalers: "wholesaler",
+        grossistes: "wholesaler",
       };
       const backendRole = roleMap[roleSlug] || "student";
       const data = await getAdminUsers(backendRole);
@@ -67,11 +67,18 @@ export default function AdminRoleUsersPage() {
     loadRoleUsers();
   }, [roleSlug]);
 
-  const handleToggleActive = (userItem: AdminUser) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userItem.id ? { ...u, is_active: !u.is_active } : u))
-    );
-    toast.success(`Statut du compte ${userItem.email} mis à jour.`);
+  const handleToggleActive = async (userItem: AdminUser) => {
+    const result = await toggleAdminUserStatus(userItem.id);
+    if (result.success) {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userItem.id ? { ...u, is_active: !result.is_suspended, status: result.is_suspended ? 'suspended' : 'active' } : u
+        )
+      );
+      toast.success(`Statut du compte ${userItem.email} mis à jour avec succès.`);
+    } else {
+      toast.error(result.error || "Échec de la mise à jour du statut.");
+    }
   };
 
   // Helper actions communes
@@ -157,12 +164,12 @@ export default function AdminRoleUsersPage() {
           {
             key: "deposited",
             header: "Ouvrages Déposés",
-            cell: (row) => <span className="font-mono text-xs font-bold text-navy">12 fichiers</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-navy">{row.extra_info?.deposited_count !== undefined ? `${row.extra_info.deposited_count} fichiers` : "0 fichier"}</span>,
           },
           {
             key: "pending",
             header: "En Attente",
-            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 font-semibold">2 maquettes</span>,
+            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 font-semibold">{row.extra_info?.pending_count !== undefined ? `${row.extra_info.pending_count} maquettes` : "0 maquette"}</span>,
           },
           {
             key: "recent_activity",
@@ -181,17 +188,17 @@ export default function AdminRoleUsersPage() {
           {
             key: "validations",
             header: "Validations Effectuées",
-            cell: (row) => <span className="font-mono text-xs font-bold text-emerald-600">48 maquettes</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-emerald-600">{row.extra_info?.validations_count !== undefined ? `${row.extra_info.validations_count} maquettes` : "0 maquette"}</span>,
           },
           {
             key: "pending_val",
             header: "En Attente Validation",
-            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-navy-light text-navy font-semibold">4 en cours</span>,
+            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-navy-light text-navy font-semibold">{row.extra_info?.pending_validation_count !== undefined ? `${row.extra_info.pending_validation_count} en cours` : "0 en cours"}</span>,
           },
           {
             key: "avg_delay",
             header: "Délai Moyen",
-            cell: (row) => <span className="text-xs font-mono text-foreground">1.8 jours</span>,
+            cell: (row) => <span className="text-xs font-mono text-foreground">{row.extra_info?.avg_delay_days ? `${row.extra_info.avg_delay_days} jours` : "N/A"}</span>,
           },
           countryColumn,
           statusColumn,
@@ -205,12 +212,12 @@ export default function AdminRoleUsersPage() {
           {
             key: "zone",
             header: "Zone Rattachement",
-            cell: (row) => <span className="text-xs font-semibold text-gold">Zone UEMOA (Cotonou / Abidjan)</span>,
+            cell: (row) => <span className="text-xs font-semibold text-gold">{row.extra_info?.zone || row.country || "Non assigné"}</span>,
           },
           {
             key: "active_orders",
             header: "Commandes en Cours",
-            cell: (row) => <span className="font-mono text-xs font-bold text-navy">15 commandes</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-navy">{row.extra_info?.active_orders_count !== undefined ? `${row.extra_info.active_orders_count} commandes` : "0 commande"}</span>,
           },
           countryColumn,
           statusColumn,
@@ -224,12 +231,12 @@ export default function AdminRoleUsersPage() {
           {
             key: "contracts",
             header: "Contrats Gérés",
-            cell: (row) => <span className="font-mono text-xs font-bold text-navy">28 contrats d'édition</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-navy">{row.extra_info?.contracts_count !== undefined ? `${row.extra_info.contracts_count} contrats` : "0 contrat"}</span>,
           },
           {
             key: "unpaid_reminders",
             header: "Relances Impayés",
-            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 font-semibold">3 relances</span>,
+            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 font-semibold">{row.extra_info?.unpaid_reminders_count !== undefined ? `${row.extra_info.unpaid_reminders_count} relances` : "0 relance"}</span>,
           },
           countryColumn,
           statusColumn,
@@ -243,22 +250,22 @@ export default function AdminRoleUsersPage() {
           {
             key: "books_count",
             header: "Ouvrages",
-            cell: (row) => <span className="font-mono text-xs font-bold text-navy">{row.extra_info?.books_count || 2} titres</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-navy">{row.extra_info?.books_count || 0} titres</span>,
           },
           {
             key: "total_sales",
             header: "Ventes Cumulées",
-            cell: (row) => <span className="font-mono text-xs font-bold text-foreground">{(row.extra_info?.total_sales_amount || 840000).toLocaleString("fr-FR")} FCFA</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-foreground">{(row.extra_info?.total_sales_amount || 0).toLocaleString("fr-FR")} FCFA</span>,
           },
           {
             key: "rights",
             header: "Droits Acquis",
-            cell: (row) => <span className="font-mono text-xs font-bold text-emerald-600">{(row.extra_info?.pending_royalties || 168000).toLocaleString("fr-FR")} FCFA</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-emerald-600">{(row.extra_info?.pending_royalties || 0).toLocaleString("fr-FR")} FCFA</span>,
           },
           {
             key: "last_deposit",
             header: "Statut Dernier Dépôt",
-            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-semibold">Validé & Publié</span>,
+            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-semibold">{row.extra_info?.last_deposit_status || (row.is_active ? "Validé & Publié" : "En attente")}</span>,
           },
           countryColumn,
           statusColumn,
@@ -281,17 +288,17 @@ export default function AdminRoleUsersPage() {
           {
             key: "bouquets",
             header: "Bouquets Actifs",
-            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-navy-light text-navy font-bold">2 Bouquets B2B</span>,
+            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-navy-light text-navy font-bold">{row.extra_info?.active_bouquets || 0} Bouquets B2B</span>,
           },
           {
             key: "royalties_due",
             header: "Redevances Dues",
-            cell: (row) => <span className="font-mono text-xs font-bold text-amber-600">1 450 000 FCFA</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-amber-600">{(row.extra_info?.royalties_due || 0).toLocaleString("fr-FR")} FCFA</span>,
           },
           {
             key: "balance",
             header: "Solde Compte",
-            cell: (row) => <span className="font-mono text-xs font-bold text-emerald-600">À jour (0 FCFA)</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-emerald-600">{row.extra_info?.balance ? `${row.extra_info.balance.toLocaleString("fr-FR")} FCFA` : "À jour (0 FCFA)"}</span>,
           },
           countryColumn,
           statusColumn,
@@ -314,17 +321,17 @@ export default function AdminRoleUsersPage() {
           {
             key: "books",
             header: "Ouvrages Déposés",
-            cell: (row) => <span className="font-mono text-xs font-bold text-navy">{row.extra_info?.books_count || 42} titres</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-navy">{row.extra_info?.books_count || 0} titres</span>,
           },
           {
             key: "validation_status",
             header: "Validation",
-            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-semibold">Catalogue Conforme</span>,
+            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-semibold">{row.extra_info?.compliance_status || (row.is_active ? "Catalogue Conforme" : "En cours d'audit")}</span>,
           },
           {
             key: "royalties",
             header: "Redevances",
-            cell: (row) => <span className="font-mono text-xs font-bold text-foreground">{(row.extra_info?.pending_royalties || 1250000).toLocaleString("fr-FR")} FCFA</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-foreground">{(row.extra_info?.pending_royalties || 0).toLocaleString("fr-FR")} FCFA</span>,
           },
           countryColumn,
           statusColumn,
@@ -337,12 +344,12 @@ export default function AdminRoleUsersPage() {
           {
             key: "subscription",
             header: "Abonnement en Cours",
-            cell: (row) => <span className="text-xs font-semibold text-navy">{row.extra_info?.subscription_plan || "Pass Annuel Étudiant"}</span>,
+            cell: (row) => <span className="text-xs font-semibold text-navy">{row.extra_info?.subscription_plan || (row.is_active ? "Pass Étudiant" : "Aucun abonnement")}</span>,
           },
           {
             key: "payment_status",
             header: "Statut Paiement",
-            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-semibold">Payé (Mobile Money)</span>,
+            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-semibold">{row.extra_info?.last_payment_status || (row.is_active ? "Payé" : "En attente")}</span>,
           },
           countryColumn,
           statusColumn,
@@ -356,12 +363,12 @@ export default function AdminRoleUsersPage() {
           {
             key: "volume",
             header: "Volume Commandes",
-            cell: (row) => <span className="font-mono text-xs font-bold text-navy">1 200 ex. papier</span>,
+            cell: (row) => <span className="font-mono text-xs font-bold text-navy">{row.extra_info?.paper_volume ? `${row.extra_info.paper_volume.toLocaleString("fr-FR")} ex. papier` : "0 ex. papier"}</span>,
           },
           {
             key: "last_order",
             header: "Statut Dernière Commande",
-            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 font-semibold">Expédiée / Livrée</span>,
+            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 font-semibold">{row.extra_info?.last_order_status || "Aucune commande"}</span>,
           },
           countryColumn,
           statusColumn,

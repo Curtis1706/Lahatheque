@@ -8,6 +8,7 @@ from rest_framework.routers import DefaultRouter
 from apps.reporting.admin_views import (
     AdminPanoramicStatsAPIView,
     AdminGlobalSettingsAPIView,
+    AdminReportExportAPIView,
     AdminCatalogPricingViewSet,
     AdminRoyaltiesPayoutViewSet,
     AdminRemindersViewSet,
@@ -31,5 +32,6 @@ router.register(r'stock', AdminStockViewSet, basename='admin-stock')
 urlpatterns = [
     path('stats/panoramic/', AdminPanoramicStatsAPIView.as_view(), name='admin-panoramic-stats'),
     path('settings/global/', AdminGlobalSettingsAPIView.as_view(), name='admin-global-settings'),
+    path('reports/export/', AdminReportExportAPIView.as_view(), name='admin-report-export'),
     path('', include(router.urls)),
 ]

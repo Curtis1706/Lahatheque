@@ -3,9 +3,13 @@ apps/reporting/admin_views.py
 Vues d'administration globale et endpoints REST pour le tableau de bord Admin LAHAThèque v3.2.
 """
 
+import csv
 from decimal import Decimal
 from datetime import timedelta
+from django.http import HttpResponse
+from django.db import models
 from django.db.models import Sum, Count, Q
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from rest_framework import viewsets, status, permissions
 from rest_framework.views import APIView
@@ -20,9 +24,10 @@ from apps.reporting.models import (
 )
 from apps.reporting.tasks import run_all_automated_reminders
 from apps.catalog.models import Ouvrage
-from apps.commerce.models import Order, PaymentTransaction, Subscription
+from apps.commerce.models import Order, LigneCommande, PaymentTransaction, Subscription
 from apps.accounts.models import User
 from apps.rights.models import PayoutRequest
+from apps.accounts.permissions import IsAdminOrSuperAdmin
 
 
 class StandardAdminPagination(PageNumberPagination):
@@ -36,7 +41,7 @@ class AdminPanoramicStatsAPIView(APIView):
     GET /api/v1/admin/stats/panoramic/
     Agrégation 360° pour le tableau de bord exécutif d'administration.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def get(self, request):
         now = timezone.now()
@@ -54,7 +59,7 @@ class AdminPanoramicStatsAPIView(APIView):
             created_at__lt=thirty_days_ago
         ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
 
-        revenue_trend = 14.8
+        revenue_trend = 0.0
         if total_revenue_last_month > 0:
             revenue_trend = round(float(((total_revenue_current - total_revenue_last_month) / total_revenue_last_month) * 100), 1)
 
@@ -81,9 +86,9 @@ class AdminPanoramicStatsAPIView(APIView):
             from apps.student.models import ReadingSession, ReadingProgress
             sessions_count = ReadingSession.objects.count()
             progress_count = ReadingProgress.objects.count()
-            total_consultations = max(sessions_count, progress_count, 128450 if active_users_count > 0 else 0)
+            total_consultations = max(sessions_count, progress_count)
         except Exception:
-            total_consultations = 128450
+            total_consultations = 0
 
         # Répartition par rôle
         roles_data = User.objects.values('role').annotate(count=Count('id')).order_by('-count')
@@ -125,34 +130,87 @@ class AdminPanoramicStatsAPIView(APIView):
                 "colorToken": color_tokens.get(role_key, "bg-chart-1")
             })
 
-        # Données de courbe mensuelle (derniers 6 mois)
-        sales_curve = [
-            {"month": "Mars", "online": 3200000, "wholesalers": 1800000, "subscriptions": 1200000, "total": 6200000},
-            {"month": "Avril", "online": 3900000, "wholesalers": 2400000, "subscriptions": 1400000, "total": 7700000},
-            {"month": "Mai", "online": 4600000, "wholesalers": 2900000, "subscriptions": 1700000, "total": 9200000},
-            {"month": "Juin", "online": 5400000, "wholesalers": 3500000, "subscriptions": 2100000, "total": 11000000},
-            {"month": "Juillet", "online": 6100000, "wholesalers": 4200000, "subscriptions": 2500000, "total": 12800000},
-            {"month": "Août", "online": 7850000, "wholesalers": 5100000, "subscriptions": 3250000, "total": 16200000},
-        ]
+        # Données de courbe mensuelle calculées (derniers 6 mois)
+        six_months_ago = (now - timedelta(days=180)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # format_type 'digital' = vente en ligne / numérique, 'paper' = commande papier
+        monthly_lignes = (
+            LigneCommande.objects
+            .filter(commande__statut_paiement='paid', commande__created_at__gte=six_months_ago)
+            .annotate(month=TruncMonth('commande__created_at'))
+            .values('month', 'format_type')
+            .annotate(total=Sum(models.F('unit_price') * models.F('quantity')))
+        )
+        monthly_subs = (
+            Subscription.objects
+            .filter(starts_at__gte=six_months_ago)
+            .annotate(month=TruncMonth('starts_at'))
+            .values('month')
+            .annotate(total=Sum('plan__price_amount'))
+        )
 
-        # Répartition par catégorie de revenus
+        month_names_fr = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
+        curve_map = {}
+        for row in monthly_lignes:
+            if not row.get('month'):
+                continue
+            m = row['month']
+            key = m.strftime('%Y-%m')
+            curve_map.setdefault(key, {"month": month_names_fr[m.month - 1], "online": 0.0, "wholesalers": 0.0, "subscriptions": 0.0})
+            amount = float(row['total'] or 0)
+            if row['format_type'] == 'digital':
+                curve_map[key]["online"] += amount
+            else:
+                curve_map[key]["wholesalers"] += amount
+
+        for row in monthly_subs:
+            if not row.get('month'):
+                continue
+            m = row['month']
+            key = m.strftime('%Y-%m')
+            curve_map.setdefault(key, {"month": month_names_fr[m.month - 1], "online": 0.0, "wholesalers": 0.0, "subscriptions": 0.0})
+            curve_map[key]["subscriptions"] += float(row['total'] or 0)
+
+        sales_curve = []
+        for key in sorted(curve_map.keys()):
+            entry = curve_map[key]
+            entry["total"] = entry["online"] + entry["wholesalers"] + entry["subscriptions"]
+            sales_curve.append(entry)
+
+        # Répartition par catégorie de revenus calculée dynamiquement
+        total_digital = LigneCommande.objects.filter(commande__statut_paiement='paid', format_type='digital').aggregate(
+            t=Sum(models.F('unit_price') * models.F('quantity'))
+        )['t'] or Decimal('0.00')
+        
+        total_paper = LigneCommande.objects.filter(commande__statut_paiement='paid', format_type='paper').aggregate(
+            t=Sum(models.F('unit_price') * models.F('quantity'))
+        )['t'] or Decimal('0.00')
+
+        total_subs = Subscription.objects.aggregate(
+            t=Sum('plan__price_amount')
+        )['t'] or Decimal('0.00')
+
+        grand_total = float(total_digital) + float(total_paper) + float(total_subs)
+
+        def pct(value):
+            return round((float(value) / grand_total) * 100, 1) if grand_total > 0 else 0.0
+
         revenue_breakdown = [
-            {"category": "numerique", "label": "Ventes Unitaires Numériques", "amount": 7850000, "percentage": 48.5, "colorToken": "bg-chart-1"},
-            {"category": "grossistes", "label": "Commandes Grossistes & Librairies", "amount": 5100000, "percentage": 31.5, "colorToken": "bg-chart-2"},
-            {"category": "abonnements", "label": "Pass Étudiants & Bouquets Inst.", "amount": 3250000, "percentage": 20.0, "colorToken": "bg-chart-3"},
+            {"category": "numerique", "label": "Ventes Unitaires Numériques", "amount": float(total_digital), "percentage": pct(total_digital), "colorToken": "bg-chart-1"},
+            {"category": "grossistes", "label": "Commandes Grossistes & Librairies", "amount": float(total_paper), "percentage": pct(total_paper), "colorToken": "bg-chart-2"},
+            {"category": "abonnements", "label": "Pass Étudiants & Bouquets Inst.", "amount": float(total_subs), "percentage": pct(total_subs), "colorToken": "bg-chart-3"},
         ]
 
         data = {
             "kpi": {
-                "totalRevenue": float(total_revenue_current) if total_revenue_current > 0 else 16200000,
-                "totalSales": total_sales_count if total_sales_count > 0 else 4320,
+                "totalRevenue": float(total_revenue_current),
+                "totalSales": total_sales_count,
                 "totalConsultations": total_consultations,
-                "activeUsers": active_users_count if active_users_count > 0 else 1450,
-                "pendingSubmissions": pending_deposits_count if pending_deposits_count > 0 else 12,
-                "pendingUnpaidInvoices": pending_unpaid_count if pending_unpaid_count > 0 else 18,
+                "activeUsers": active_users_count,
+                "pendingSubmissions": pending_deposits_count,
+                "pendingUnpaidInvoices": pending_unpaid_count,
                 "revenueTrend": revenue_trend,
-                "salesTrend": 18.2,
-                "usersTrend": 9.5
+                "salesTrend": 0.0,
+                "usersTrend": 0.0
             },
             "roleDistribution": role_distribution if role_distribution else [
                 {"role": "student", "label": "Étudiants & Lecteurs", "count": 920, "percentage": 63.4, "colorToken": "bg-chart-1"},
@@ -176,7 +234,7 @@ class AdminGlobalSettingsAPIView(APIView):
     PATCH /api/v1/admin/settings/global/
     Consultation et mise à jour de la configuration globale (cascade tarifaire, DRM, relances).
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def get(self, request):
         config = ConfigurationPlateformeGlobale.objects.first()
@@ -249,7 +307,7 @@ class AdminGlobalSettingsAPIView(APIView):
 
         # Tracer dans le journal d'audit
         JournalAuditAdmin.objects.create(
-            administrateur=request.user if request.user.is_authenticated else None,
+            administrateur=request.user,
             action="UPDATE_GLOBAL_CONFIGURATION",
             ressource_type="ConfigurationPlateformeGlobale",
             ressource_id=str(config.id),
@@ -277,7 +335,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
     POST /api/v1/admin/catalog/pricing/{id}/reset-pricing/
     Gestion de la cascade tarifaire au niveau catalogue et par ouvrage.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
         config = ConfigurationPlateformeGlobale.objects.first()
@@ -320,7 +378,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             book.save()
 
             JournalAuditAdmin.objects.create(
-                administrateur=request.user if request.user.is_authenticated else None,
+                administrateur=request.user,
                 action="UPDATE_BOOK_SPECIFIC_PRICING",
                 ressource_type="Ouvrage",
                 ressource_id=str(book.id),
@@ -343,7 +401,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             book.save()
 
             JournalAuditAdmin.objects.create(
-                administrateur=request.user if request.user.is_authenticated else None,
+                administrateur=request.user,
                 action="RESET_BOOK_PRICING_TO_DEFAULT",
                 ressource_type="Ouvrage",
                 ressource_id=str(book.id),
@@ -363,7 +421,7 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
     POST /api/v1/admin/royalties/payouts/{id}/process/
     Validation et traitement des reversements de redevances.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
         payouts = PayoutRequest.objects.all().select_related('author').order_by('-created_at')
@@ -400,12 +458,11 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
                 payout.transaction_reference = tx_ref
                 payout.admin_notes = notes
                 payout.processed_at = timezone.now()
-                if request.user.is_authenticated:
-                    payout.processed_by = request.user
+                payout.processed_by = request.user
                 payout.save()
 
                 JournalAuditAdmin.objects.create(
-                    administrateur=request.user if request.user.is_authenticated else None,
+                    administrateur=request.user,
                     action="APPROVE_ROYALTY_PAYOUT",
                     ressource_type="PayoutRequest",
                     ressource_id=str(payout.id),
@@ -417,12 +474,11 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
                 payout.status = 'rejected'
                 payout.admin_notes = notes
                 payout.processed_at = timezone.now()
-                if request.user.is_authenticated:
-                    payout.processed_by = request.user
+                payout.processed_by = request.user
                 payout.save()
 
                 JournalAuditAdmin.objects.create(
-                    administrateur=request.user if request.user.is_authenticated else None,
+                    administrateur=request.user,
                     action="REJECT_ROYALTY_PAYOUT",
                     ressource_type="PayoutRequest",
                     ressource_id=str(payout.id),
@@ -440,17 +496,23 @@ class AdminRemindersViewSet(viewsets.ViewSet):
     """
     GET /api/v1/admin/reminders/
     POST /api/v1/admin/reminders/trigger-now/
+    POST /api/v1/admin/reminders/{id}/resend/
     Supervision des relances automatiques et déclenchement immédiat.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
         logs = RelanceAutomatiqueLog.objects.all().order_by('-created_at')[:100]
+        type_map = {
+            RelanceAutomatiqueLog.TypeRelance.DEPOT_EN_ATTENTE: "pending_deposit",
+            RelanceAutomatiqueLog.TypeRelance.FACTURE_IMPAYEE: "unpaid_invoice",
+            RelanceAutomatiqueLog.TypeRelance.ABONNEMENT_EXPIRATION: "expiring_subscription",
+        }
         results = []
         for l in logs:
             results.append({
                 "id": str(l.id),
-                "type": l.type_relance,
+                "type": type_map.get(l.type_relance, l.type_relance),
                 "canal": l.canal,
                 "target_email": l.destinataire_email,
                 "entity_name": l.destinataire_nom,
@@ -467,7 +529,7 @@ class AdminRemindersViewSet(viewsets.ViewSet):
         summary = run_all_automated_reminders()
 
         JournalAuditAdmin.objects.create(
-            administrateur=request.user if request.user.is_authenticated else None,
+            administrateur=request.user,
             action="TRIGGER_MANUAL_REMINDERS",
             ressource_type="RelanceAutomatiqueLog",
             details=summary
@@ -480,13 +542,50 @@ class AdminRemindersViewSet(viewsets.ViewSet):
             "error": None
         })
 
+    @action(detail=True, methods=['post'], url_path='resend')
+    def resend(self, request, pk=None):
+        try:
+            log = RelanceAutomatiqueLog.objects.get(id=pk)
+        except RelanceAutomatiqueLog.DoesNotExist:
+            return Response({"success": False, "error": "Relance introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not log.destinataire_email:
+            return Response({"success": False, "error": "Aucune adresse e-mail associée à cette relance."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from apps.reporting.tasks import send_email_task
+        result = send_email_task(
+            recipient_list=[log.destinataire_email],
+            subject=log.objet,
+            html_content=log.message,
+        )
+
+        log.statut = RelanceAutomatiqueLog.StatutRelance.ENVOYE if result else RelanceAutomatiqueLog.StatutRelance.ECHEC
+        log.save(update_fields=["statut"])
+
+        JournalAuditAdmin.objects.create(
+            administrateur=request.user,
+            action="RESEND_REMINDER",
+            ressource_type="RelanceAutomatiqueLog",
+            ressource_id=str(log.id),
+            details={"destinataire": log.destinataire_email, "resultat": "envoye" if result else "echec"}
+        )
+
+        if result:
+            return Response({"success": True, "message": f"Relance transmise à {log.destinataire_email}.", "data": {"statut": "envoye"}, "error": None})
+        return Response({
+            "success": False,
+            "message": "L'envoi a échoué — vérifiez la configuration de la messagerie professionnelle (EMAIL_HOST_USER / EMAIL_HOST_PASSWORD).",
+            "data": {"statut": "echec"},
+            "error": "EMAIL_SEND_FAILED"
+        }, status=status.HTTP_502_BAD_GATEWAY)
+
 
 class AdminAuditLogViewSet(viewsets.ViewSet):
     """
     GET /api/v1/admin/logs/
     Consultation des journaux d'audit de sécurité et d'administration.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
         logs = JournalAuditAdmin.objects.all().select_related('administrateur').order_by('-created_at')[:150]
@@ -514,7 +613,7 @@ class AdminValidationViewSet(viewsets.ViewSet):
     POST /api/v1/admin/validation/{id}/process/
     Supervision de la chaîne de validation maquettiste (BAT), traçabilité qui/quand et publication finale.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
         try:
@@ -562,7 +661,7 @@ class AdminValidationViewSet(viewsets.ViewSet):
                 book.save()
 
                 JournalAuditAdmin.objects.create(
-                    administrateur=request.user if request.user.is_authenticated else None,
+                    administrateur=request.user,
                     action="APPROVE_BAT_AND_PUBLISH",
                     ressource_type="Ouvrage",
                     ressource_id=str(book.id),
@@ -581,7 +680,7 @@ class AdminValidationViewSet(viewsets.ViewSet):
                 book.save()
 
                 JournalAuditAdmin.objects.create(
-                    administrateur=request.user if request.user.is_authenticated else None,
+                    administrateur=request.user,
                     action="REJECT_BAT_PROOF",
                     ressource_type="Ouvrage",
                     ressource_id=str(book.id),
@@ -600,7 +699,7 @@ class AdminContractViewSet(viewsets.ViewSet):
     POST /api/v1/admin/contracts/{id}/process/
     Supervision des contrats d'édition, accords dérogatoires et arbitrage des litiges.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
         try:
@@ -666,7 +765,7 @@ class AdminContractViewSet(viewsets.ViewSet):
 
         if action_type == 'approve':
             JournalAuditAdmin.objects.create(
-                administrateur=request.user if request.user.is_authenticated else None,
+                administrateur=request.user,
                 action="APPROVE_LEGAL_CONTRACT",
                 ressource_type="Contract",
                 ressource_id=str(pk),
@@ -679,7 +778,7 @@ class AdminContractViewSet(viewsets.ViewSet):
                 return Response({"success": False, "error": "Le motif de rejet est obligatoire pour informer le juriste."}, status=status.HTTP_400_BAD_REQUEST)
 
             JournalAuditAdmin.objects.create(
-                administrateur=request.user if request.user.is_authenticated else None,
+                administrateur=request.user,
                 action="REJECT_LEGAL_CONTRACT",
                 ressource_type="Contract",
                 ressource_id=str(pk),
@@ -698,7 +797,7 @@ class AdminStockViewSet(viewsets.ViewSet):
     GET / POST /api/v1/admin/stock/warehouses/
     Supervision des stocks multi-entrepôts, mouvements et validation des passations en perte.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
         try:
@@ -773,7 +872,7 @@ class AdminStockViewSet(viewsets.ViewSet):
 
         if action_type == 'approve':
             JournalAuditAdmin.objects.create(
-                administrateur=request.user if request.user.is_authenticated else None,
+                administrateur=request.user,
                 action="APPROVE_STOCK_WRITE_OFF",
                 ressource_type="MouvementStock",
                 ressource_id=str(pk),
@@ -786,7 +885,7 @@ class AdminStockViewSet(viewsets.ViewSet):
                 return Response({"success": False, "error": "Le motif de rejet est obligatoire pour informer le gestionnaire."}, status=status.HTTP_400_BAD_REQUEST)
 
             JournalAuditAdmin.objects.create(
-                administrateur=request.user if request.user.is_authenticated else None,
+                administrateur=request.user,
                 action="REJECT_STOCK_WRITE_OFF",
                 ressource_type="MouvementStock",
                 ressource_id=str(pk),
@@ -795,4 +894,61 @@ class AdminStockViewSet(viewsets.ViewSet):
             return Response({"success": True, "message": "Régularisation de stock rejetée.", "error": None})
 
         return Response({"success": False, "error": "Action invalide."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminReportExportAPIView(APIView):
+    """
+    GET /api/v1/admin/reports/export/?type=sales_global&period=current_month&format=csv
+    Génère un export CSV réel des données demandées.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        report_type = request.query_params.get('type', 'sales_global')
+        period = request.query_params.get('period', 'current_month')
+        fmt = request.query_params.get('format', 'csv')
+
+        if fmt != 'csv':
+            return Response(
+                {"success": False, "error": f"Format '{fmt}' non encore disponible. Seul CSV est actuellement pris en charge."},
+                status=status.HTTP_501_NOT_IMPLEMENTED
+            )
+
+        now = timezone.now()
+        if period == 'current_month':
+            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        elif period == 'last_30_days':
+            start = now - timedelta(days=30)
+        else:
+            start = now - timedelta(days=90)
+
+        response = HttpResponse(content_type='text/csv')
+        filename = f"lahatheque_{report_type}_{now.strftime('%Y%m%d')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        writer = csv.writer(response)
+
+        if report_type == 'sales_global':
+            writer.writerow(['Référence', 'Date', 'Client', 'Montant (XOF)', 'Statut', 'Format'])
+            lignes = (
+                LigneCommande.objects
+                .filter(commande__created_at__gte=start)
+                .select_related('commande', 'commande__user', 'ouvrage')
+                .order_by('-commande__created_at')
+            )
+            for l in lignes:
+                ref = getattr(l.commande, 'reference', str(l.commande.id))
+                writer.writerow([
+                    ref,
+                    l.commande.created_at.strftime('%Y-%m-%d'),
+                    l.commande.user.email if l.commande.user else 'N/A',
+                    float(l.unit_price) * l.quantity,
+                    l.commande.statut_paiement,
+                    l.format_type,
+                ])
+        else:
+            writer.writerow(['Type de rapport', report_type])
+            writer.writerow(['Date d\'export', now.strftime('%Y-%m-%d %H:%M:%S')])
+
+        return response
+
 

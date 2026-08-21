@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, BellRing, Send } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
-import { getAdminReminders } from "@/lib/services/admin";
+import { getAdminReminders, resendReminder } from "@/lib/services/admin";
 import { AdminReminder } from "@/lib/types/admin";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { toast } from "sonner";
@@ -18,9 +18,14 @@ export default function AdminDepositRemindersPage() {
     );
   }, []);
 
-  const handleSend = (id: string, email: string) => {
-    setData((prev) => prev.map((r) => (r.id === id ? { ...r, status: "sent" } : r)));
-    toast.success(`Relance e-mail envoyée à ${email}`);
+  const handleSend = async (id: string, email: string) => {
+    const result = await resendReminder(id);
+    if (result.success) {
+      setData((prev) => prev.map((r) => (r.id === id ? { ...r, status: "sent" } : r)));
+      toast.success(result.message || `Relance e-mail transmise à ${email}`);
+    } else {
+      toast.error(result.error || `Échec de l'envoi à ${email}.`);
+    }
   };
 
   const columns: DataTableColumn<AdminReminder>[] = [

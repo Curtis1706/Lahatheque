@@ -99,24 +99,22 @@ export async function getAdminUsers(roleFilter?: AdminRole | string, search?: st
     if (res.ok) {
       const data = await res.json();
       const userList = data.results || (Array.isArray(data) ? data : (data.data || []));
-      if (userList.length > 0) {
-        return userList.map((u: any) => ({
-          id: u.id,
-          first_name: u.first_name || 'Utilisateur',
-          last_name: u.last_name || '',
-          email: u.email,
-          role: u.role || 'student',
-          active_roles: u.active_roles || [u.role],
-          is_active: !u.is_suspended && (u.is_active !== false),
-          is_verified: u.is_verified || false,
-          country: u.country || 'BJ',
-          phone: u.phone || '',
-          avatar_url: u.avatar_url,
-          organization: u.organization || u.institution_name,
-          date_joined: u.date_joined ? u.date_joined.split('T')[0] : '2026-08-01',
-          status: u.is_suspended ? 'suspended' : 'active',
-        }));
-      }
+      return userList.map((u: any) => ({
+        id: u.id,
+        first_name: u.first_name || 'Utilisateur',
+        last_name: u.last_name || '',
+        email: u.email,
+        role: u.role || 'student',
+        active_roles: u.active_roles || [u.role],
+        is_active: !u.is_suspended && (u.is_active !== false),
+        is_verified: u.is_verified || false,
+        country: u.country || 'BJ',
+        phone: u.phone || '',
+        avatar_url: u.avatar_url,
+        organization: u.organization || u.institution_name,
+        date_joined: u.date_joined ? u.date_joined.split('T')[0] : '2026-08-01',
+        status: u.is_suspended ? 'suspended' : 'active',
+      }));
     }
   } catch (err) {
     console.warn('[Admin Service] Fallback to mock users:', err);
@@ -275,7 +273,7 @@ export async function getAdminCatalog(): Promise<AdminCatalogBook[]> {
     const res = await fetch('/api/bff/admin/catalog/pricing', { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
-      if (json?.data && Array.isArray(json.data) && json.data.length > 0) {
+      if (json?.data && Array.isArray(json.data)) {
         return json.data;
       }
     }
@@ -339,7 +337,7 @@ export async function getAdminRoyalties(beneficiaryType?: "author" | "publisher"
     const res = await fetch('/api/bff/admin/royalties/payouts', { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
-      if (json?.data && Array.isArray(json.data) && json.data.length > 0) {
+      if (json?.data && Array.isArray(json.data)) {
         let list = json.data as AdminRoyalty[];
         if (beneficiaryType) {
           list = list.filter((r) => r.beneficiary_type === beneficiaryType);
@@ -396,7 +394,7 @@ export async function getAdminReminders(): Promise<AdminReminder[]> {
     const res = await fetch('/api/bff/admin/reminders', { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
-      if (json?.data && Array.isArray(json.data) && json.data.length > 0) {
+      if (json?.data && Array.isArray(json.data)) {
         return json.data;
       }
     }
@@ -417,12 +415,24 @@ export async function triggerAdminRemindersNow(): Promise<{ success: boolean; me
       return { success: true, message: data.message, data: data.data };
     }
     return { success: false, error: data.error || 'Erreur exécution des relances.' };
-  } catch {
+  } catch (err) {
     return {
-      success: true,
-      message: 'Moteur de relances exécuté (simulation locale : 5 relances traitées).',
-      data: { total_sent: 5, total_processed: 5, total_errors: 0 },
+      success: false,
+      error: 'Impossible de contacter le serveur pour déclencher les relances.',
     };
+  }
+}
+
+export async function resendReminder(id: string): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/admin/reminders/${id}/resend/`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return { success: true, message: data.message };
+    }
+    return { success: false, error: data.message || data.error || 'Échec de l\'envoi de la relance.' };
+  } catch (err) {
+    return { success: false, error: 'Erreur réseau — impossible de contacter le serveur.' };
   }
 }
 
@@ -435,7 +445,7 @@ export async function getAdminLogs(): Promise<AdminAccessLog[]> {
     const res = await fetch('/api/bff/admin/logs', { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
-      if (json?.data && Array.isArray(json.data) && json.data.length > 0) {
+      if (json?.data && Array.isArray(json.data)) {
         return json.data;
       }
     }
@@ -638,7 +648,7 @@ export async function getAdminValidationProofs(): Promise<AdminValidationProof[]
     const res = await fetch('/api/bff/admin/validation/', { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
-      if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+      if (json && json.success && Array.isArray(json.data)) {
         return json.data;
       }
     }
@@ -742,7 +752,7 @@ export async function getAdminContracts(): Promise<AdminContract[]> {
     const res = await fetch('/api/bff/admin/contracts/', { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
-      if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+      if (json && json.success && Array.isArray(json.data)) {
         return json.data;
       }
     }
@@ -954,4 +964,57 @@ export async function createAdminWarehouse(data: {
     return { success: true, message: `L'entrepôt "${data.name}" a été créé avec succès.` };
   }
 }
+
+export interface PlatformGlobalSettings {
+  id?: string;
+  prix_defaut_numerique_xof: number;
+  prix_defaut_papier_xof: number;
+  prix_defaut_audio_xof: number;
+  prix_pass_mensuel_xof: number;
+  prix_pass_annuel_xof: number;
+  devise_defaut: string;
+  watermark_texte_defaut: string;
+  watermark_opacite_defaut: number;
+  restriction_impression_defaut: boolean;
+  restriction_capture_defaut: boolean;
+  duree_session_lecture_minutes: number;
+  delai_relance_depots_jours: number;
+  delai_relance_impayes_jours: number;
+  delai_relance_abonnements_jours: number;
+  moneroo_actif: boolean;
+  stripe_actif: boolean;
+  fastermessage_sms_actif: boolean;
+  updated_at?: string | null;
+}
+
+export async function getPlatformGlobalSettings(): Promise<PlatformGlobalSettings | null> {
+  try {
+    const res = await fetch('/api/bff/admin/settings/global', { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      return json?.data ?? null;
+    }
+  } catch (err) {
+    console.error('[Admin Service] Erreur chargement paramètres plateforme:', err);
+  }
+  return null;
+}
+
+export async function updatePlatformGlobalSettings(
+  payload: Partial<PlatformGlobalSettings>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/bff/admin/settings/global', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (res.ok) return { success: true };
+    return { success: false, error: data.error || 'Erreur lors de la sauvegarde.' };
+  } catch (err) {
+    return { success: false, error: 'Erreur réseau — impossible de contacter le serveur.' };
+  }
+}
+
 

@@ -9,12 +9,36 @@ export default function AdminReportsPage() {
   const [period, setPeriod] = useState("current_month");
   const [isExporting, setIsExporting] = useState(false);
 
-  const handleTriggerExport = (format: "pdf" | "excel" | "csv") => {
+  const handleTriggerExport = async (format: "pdf" | "excel" | "csv") => {
+    if (format !== "csv") {
+      toast.error(`L'export ${format.toUpperCase()} n'est pas encore disponible — seul le format CSV est pris en charge pour le moment.`);
+      return;
+    }
     setIsExporting(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch(
+        `/api/bff/admin/reports/export?type=${reportType}&period=${period}&format=csv`
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Échec de la génération du rapport.");
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `lahatheque_${reportType}_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Rapport CSV généré et téléchargé avec succès !");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur lors de l'export.";
+      toast.error(msg);
+    } finally {
       setIsExporting(false);
-      toast.success(`Rapport (${format.toUpperCase()}) généré et téléchargé avec succès !`);
-    }, 600);
+    }
   };
 
   return (
@@ -59,42 +83,44 @@ export default function AdminReportsPage() {
               onChange={(e) => setPeriod(e.target.value)}
               className="w-full mt-1 p-2.5 text-xs rounded-xl bg-background border border-border font-medium text-foreground focus:border-gold focus:outline-none"
             >
-              <option value="current_month">Mois en cours (Mars 2024)</option>
-              <option value="previous_month">Mois précédent (Février 2024)</option>
-              <option value="q1_2024">Premier Trimestre 2024</option>
-              <option value="year_2023">Année Complète 2023</option>
+              <option value="current_month">Mois en cours (2026)</option>
+              <option value="last_30_days">30 derniers jours</option>
+              <option value="last_90_days">90 derniers jours</option>
             </select>
           </div>
         </div>
 
-        {/* Buttons d'export (Inspiré de 21st.dev #23636 Share Menu with Export Submenu) */}
+        {/* Buttons d'export */}
         <div className="pt-4 border-t border-border flex flex-wrap items-center gap-3 justify-end">
           <span className="text-xs text-foreground-muted mr-auto">Format d'exportation :</span>
+          
+          <button
+            onClick={() => handleTriggerExport("csv")}
+            disabled={isExporting}
+            className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer min-h-[44px]"
+          >
+            <Download className="w-4 h-4 text-gold" />
+            <span>{isExporting ? "Génération..." : "Exporter en CSV (Données réelles)"}</span>
+          </button>
+
           <button
             onClick={() => handleTriggerExport("pdf")}
-            disabled={isExporting}
-            className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            disabled={true}
+            title="Format PDF bientôt disponible"
+            className="px-4 py-2 rounded-xl bg-background-secondary border border-border text-foreground-muted text-xs font-semibold flex items-center gap-1.5 opacity-60 cursor-not-allowed min-h-[44px]"
           >
-            <FileText className="w-3.5 h-3.5 text-gold" />
-            Exporter en PDF
+            <FileText className="w-3.5 h-3.5" />
+            <span>PDF (Bientôt disponible)</span>
           </button>
 
           <button
             onClick={() => handleTriggerExport("excel")}
-            disabled={isExporting}
-            className="px-4 py-2 rounded-xl bg-success text-white text-xs font-semibold hover:bg-success/90 transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            disabled={true}
+            title="Format Excel (.xlsx) bientôt disponible"
+            className="px-4 py-2 rounded-xl bg-background-secondary border border-border text-foreground-muted text-xs font-semibold flex items-center gap-1.5 opacity-60 cursor-not-allowed min-h-[44px]"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            Exporter en Excel (.xlsx)
-          </button>
-
-          <button
-            onClick={() => handleTriggerExport("csv")}
-            disabled={isExporting}
-            className="px-4 py-2 rounded-xl bg-background border border-border text-foreground text-xs font-semibold hover:border-gold transition-colors flex items-center gap-1.5 disabled:opacity-50"
-          >
-            <Download className="w-3.5 h-3.5 text-foreground-muted" />
-            CSV (données brutes)
+            <span>Excel (Bientôt disponible)</span>
           </button>
         </div>
       </div>
