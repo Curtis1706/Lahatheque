@@ -460,10 +460,10 @@ class StockEscalateView(APIView):
         except StockOuvrage.DoesNotExist:
             return Response({"success": False, "data": None, "error": "Stock introuvable."}, status=404)
 
-        # Crée un mouvement de type "escalade" pour traçabilité
+        # Crée un mouvement de type "adjustment" pour traçabilité
         MouvementStock.objects.create(
             stock=s,
-            type_mouvement="correction",
+            type_mouvement="adjustment",
             quantite=0,
             motif=f"[ESCALADE ADMIN] {impact_description}",
             auteur=request.user,
@@ -478,4 +478,102 @@ class StockEscalateView(APIView):
             "impact_description": impact_description,
         }
         return Response({"success": True, "data": data, "error": None})
+
+
+class ManagerReportExportView(APIView):
+    """
+    GET /api/v1/commerce/manager/reports/export/?type=<report_id>&format=csv&period=<period>
+    Génère un export CSV réel des rapports stock/livraison du Gestionnaire (sans données financières).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def perform_content_negotiation(self, request, force=False):
+        from rest_framework import renderers
+        return (renderers.JSONRenderer(), renderers.JSONRenderer.media_type)
+
+    def get(self, request):
+        try:
+            if not _is_manager_or_admin(request.user):
+                return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
+
+            report_type = request.query_params.get("type", "stock-quantities")
+            fmt = request.query_params.get("format", "csv")
+
+            if fmt != "csv":
+                return Response(
+                    {"success": False, "error": f"Format '{fmt}' non encore disponible. Seul CSV est actuellement pris en charge."},
+                    status=status.HTTP_501_NOT_IMPLEMENTED
+                )
+
+            import csv
+            from django.http import HttpResponse
+
+            response = HttpResponse(content_type="text/csv; charset=utf-8")
+            filename = f"lahatheque_{report_type}_{timezone.now().strftime('%Y%m%d')}.csv"
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            writer = csv.writer(response)
+
+            if report_type == "stock-quantities":
+                writer.writerow(["ISBN", "Titre", "Entrepôt", "Pays", "Quantité Réelle", "Quantité Réservée", "Seuil Alerte", "Statut"])
+                stocks = StockOuvrage.objects.select_related("ouvrage", "entrepot").all()
+                for s in stocks:
+                    writer.writerow([
+                        s.ouvrage.isbn, s.ouvrage.title, s.entrepot.nom, s.entrepot.pays,
+                        s.quantite_reelle, s.quantite_reservee, s.seuil_alerte, s.statut
+                    ])
+
+            elif report_type == "stock-movements":
+                writer.writerow(["Date", "Ouvrage", "Entrepôt", "Type", "Quantité", "Motif", "Initié par"])
+                mouvements = MouvementStock.objects.select_related("stock__ouvrage", "stock__entrepot", "auteur").order_by("-created_at")[:500]
+                for m in mouvements:
+                    auteur_nom = f"{m.auteur.first_name} {m.auteur.last_name}".strip() if m.auteur else "Système"
+                    writer.writerow([
+                        m.created_at.strftime("%Y-%m-%d %H:%M"), m.stock.ouvrage.title if m.stock and m.stock.ouvrage else "N/A",
+                        m.stock.entrepot.nom if m.stock and m.stock.entrepot else "N/A",
+                        m.type_mouvement, m.quantite, m.motif or m.reference_document or "", auteur_nom
+                    ])
+
+            elif report_type == "stock-alerts":
+                writer.writerow(["ISBN", "Titre", "Entrepôt", "Quantité Disponible", "Seuil Alerte", "Statut"])
+                stocks = StockOuvrage.objects.select_related("ouvrage", "entrepot").all()
+                for s in stocks:
+                    if s.statut in ("out_of_stock", "low_stock"):
+                        writer.writerow([
+                            s.ouvrage.isbn, s.ouvrage.title, s.entrepot.nom,
+                            s.quantite_disponible, s.seuil_alerte, s.statut
+                        ])
+
+            elif report_type == "delivery-by-status":
+                writer.writerow(["Référence Commande", "Client", "Statut", "Ville", "Pays", "Créée le"])
+                deliveries = PhysicalDelivery.objects.select_related("commande__user").all().order_by("-created_at")[:500]
+                for d in deliveries:
+                    client = f"{d.commande.user.first_name} {d.commande.user.last_name}".strip() if d.commande and d.commande.user else "—"
+                    writer.writerow([str(d.commande_id), client, d.statut, d.city, d.country, d.created_at.strftime("%Y-%m-%d")])
+
+            elif report_type == "delivery-by-carrier":
+                writer.writerow(["Transporteur", "Nombre de Commandes", "Statut"])
+                from django.db.models import Count
+                carriers = PhysicalDelivery.objects.exclude(carrier_name="").values("carrier_name", "statut").annotate(count=Count("id"))
+                for c in carriers:
+                    writer.writerow([c["carrier_name"], c["count"], c["statut"]])
+
+            elif report_type == "delivery-delays":
+                writer.writerow(["Référence Commande", "Créée le", "Mise à jour le", "Délai (jours)"])
+                deliveries = PhysicalDelivery.objects.filter(statut="livre").order_by("-updated_at")[:500]
+                for d in deliveries:
+                    delay_days = (d.updated_at - d.created_at).days
+                    writer.writerow([
+                        str(d.commande_id), d.created_at.strftime("%Y-%m-%d"),
+                        d.updated_at.strftime("%Y-%m-%d"), delay_days
+                    ])
+
+            else:
+                writer.writerow(["Type de rapport non reconnu", report_type])
+
+            return response
+        except Exception as exc:
+            import traceback
+            print("EXCEPTION IN EXPORT GET:", type(exc), exc)
+            traceback.print_exc()
+            raise exc
 

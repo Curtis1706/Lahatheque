@@ -13,6 +13,7 @@ from .manager_views import (
     DeliveryDetailView,
     EntrepotsListView,
     StockEscalateView,
+    ManagerReportExportView,
 )
 from .wholesaler_views import (
     WholesalerKpisView,
@@ -37,14 +38,15 @@ urlpatterns = [
 
     # ─── Manager : Stock & Livraison ───────────────────────────────────────────
     path('manager/kpis/', ManagerKpisView.as_view(), name='manager-kpis'),
+    path('manager/reports/export/', ManagerReportExportView.as_view(), name='manager-reports-export'),
     path('manager/entrepots/', EntrepotsListView.as_view(), name='manager-entrepots'),
     path('manager/stock/', StockListView.as_view(), name='manager-stock-list'),
-    path('manager/stock/<uuid:pk>/', StockDetailView.as_view(), name='manager-stock-detail'),
     path('manager/stock/restock/', StockRestockView.as_view(), name='manager-stock-restock'),
     path('manager/stock/exit/', StockManualExitView.as_view(), name='manager-stock-exit'),
     path('manager/stock/movements/', StockMovementsView.as_view(), name='manager-stock-movements'),
     path('manager/stock/alerts/', StockAlertsView.as_view(), name='manager-stock-alerts'),
     path('manager/stock/escalate/', StockEscalateView.as_view(), name='manager-stock-escalate'),
+    path('manager/stock/<uuid:pk>/', StockDetailView.as_view(), name='manager-stock-detail'),
     path('manager/deliveries/', DeliveriesListView.as_view(), name='manager-deliveries-list'),
     path('manager/deliveries/<uuid:pk>/', DeliveryDetailView.as_view(), name='manager-delivery-detail'),
 

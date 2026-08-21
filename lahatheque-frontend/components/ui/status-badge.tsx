@@ -60,6 +60,7 @@ const statusConfig: Record<string, { style: string; defaultLabel: string; defaul
   transfert_inter_hub: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Transfert Inter-Hub", defaultIcon: Package },
   return: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Retour", defaultIcon: Package },
   damage: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Endommagé", defaultIcon: XCircle },
+  adjustment: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Ajustement", defaultIcon: AlertTriangle },
   destruction_perte: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Passation en Perte", defaultIcon: AlertTriangle },
   manual_exit: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Sortie Manuelle", defaultIcon: AlertTriangle },
   correction: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Correction", defaultIcon: FileText },
