@@ -497,3 +497,142 @@ class UniversityProfileView(APIView):
         }
         return Response({"success": True, "data": profile, "error": None})
 
+
+from django.http import HttpResponse
+
+class ExportBouquetWordView(APIView):
+    """GET /api/v1/partners/university/bouquets/<id>/export-word/ — Génère un .docx du bouquet."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        from docx import Document
+        from docx.shared import Inches, Pt, Cm, RGBColor
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.table import WD_TABLE_ALIGNMENT
+        from apps.catalog.models import Ouvrage
+
+        inst = get_user_institution(request.user)
+        try:
+            bouquet = UniversityBouquetSubscription.objects.get(id=pk)
+        except UniversityBouquetSubscription.DoesNotExist:
+            return Response({"success": False, "error": "Bouquet introuvable."}, status=404)
+
+        # Récupérer les ouvrages correspondants au bouquet
+        ouvrages_qs = Ouvrage.objects.filter(
+            status='published'
+        ).select_related('discipline', 'institution').prefetch_related('authors')
+
+        if bouquet.bouquet_type == 'discipline' and bouquet.discipline:
+            ouvrages_qs = ouvrages_qs.filter(discipline__name__icontains=bouquet.discipline)
+        elif bouquet.bouquet_type == 'faculty' and bouquet.faculty_code:
+            ouvrages_qs = ouvrages_qs.filter(faculty__icontains=bouquet.faculty_code)
+        
+        if inst:
+            ouvrages_qs = ouvrages_qs.filter(institution=inst)
+
+        ouvrages = list(ouvrages_qs.order_by('discipline__name', 'title'))
+
+        # Générer le document Word
+        doc = Document()
+
+        # Style de base
+        style = doc.styles['Normal']
+        font = style.font
+        font.name = 'Calibri'
+        font.size = Pt(10)
+
+        # En-tête
+        header_para = doc.add_paragraph()
+        header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = header_para.add_run('LAHAThèque')
+        run.bold = True
+        run.font.size = Pt(22)
+        run.font.color.rgb = RGBColor(0x1B, 0x2A, 0x4E)  # Navy
+
+        subtitle_para = doc.add_paragraph()
+        subtitle_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = subtitle_para.add_run('Bibliothèque Numérique Universitaire')
+        run.font.size = Pt(11)
+        run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+
+        doc.add_paragraph()  # Espace
+
+        # Titre du bouquet
+        title_para = doc.add_paragraph()
+        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = title_para.add_run(f'Catalogue du Bouquet : {bouquet.title}')
+        run.bold = True
+        run.font.size = Pt(16)
+        run.font.color.rgb = RGBColor(0x1B, 0x2A, 0x4E)
+
+        # Informations du bouquet
+        info_para = doc.add_paragraph()
+        info_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        inst_name = inst.name if inst else 'Toutes universités'
+        start_str = bouquet.start_date.strftime("%d/%m/%Y") if hasattr(bouquet.start_date, 'strftime') else str(bouquet.start_date)
+        end_str = bouquet.end_date.strftime("%d/%m/%Y") if hasattr(bouquet.end_date, 'strftime') else str(bouquet.end_date)
+        run = info_para.add_run(
+            f'Université : {inst_name}  |  '
+            f'Type : {bouquet.get_bouquet_type_display()}  |  '
+            f'Période : {start_str} — {end_str}  |  '
+            f'{len(ouvrages)} ouvrage(s)'
+        )
+        run.font.size = Pt(9)
+        run.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+
+        doc.add_paragraph()  # Espace
+
+        # Tableau des ouvrages
+        if ouvrages:
+            table = doc.add_table(rows=1, cols=6)
+            table.style = 'Light Grid Accent 1'
+            table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+            # En-têtes
+            headers = ['N.', 'Titre', 'Auteur(s)', 'ISBN', 'Discipline / Faculté', 'Résumé']
+            for i, h in enumerate(headers):
+                cell = table.rows[0].cells[i]
+                cell.text = h
+                for p in cell.paragraphs:
+                    for r in p.runs:
+                        r.bold = True
+                        r.font.size = Pt(9)
+
+            # Lignes
+            for idx, ouvrage in enumerate(ouvrages, 1):
+                row = table.add_row()
+                row.cells[0].text = str(idx)
+                row.cells[1].text = ouvrage.title
+                row.cells[2].text = ouvrage.auteur or ''
+                row.cells[3].text = ouvrage.isbn or 'N/A'
+                disc = ouvrage.discipline.name if ouvrage.discipline else ''
+                fac = ouvrage.faculty or ''
+                row.cells[4].text = f'{disc}\n{fac}'.strip()
+                row.cells[5].text = (ouvrage.summary or '')[:150] + ('...' if len(ouvrage.summary or '') > 150 else '')
+
+                for cell in row.cells:
+                    for p in cell.paragraphs:
+                        for r in p.runs:
+                            r.font.size = Pt(8)
+        else:
+            doc.add_paragraph('Aucun ouvrage trouvé pour ce bouquet.').alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        # Pied de page
+        doc.add_paragraph()
+        from datetime import datetime
+        footer = doc.add_paragraph()
+        footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = footer.add_run(f'Document généré par LAHAThèque le {datetime.now().strftime("%d/%m/%Y à %H:%M")}')
+        run.font.size = Pt(8)
+        run.font.color.rgb = RGBColor(0xAA, 0xAA, 0xAA)
+        run.italic = True
+
+        # Réponse HTTP
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        safe_title = bouquet.title.replace(' ', '_').replace('/', '-')[:50]
+        response['Content-Disposition'] = f'attachment; filename="Bouquet_{safe_title}.docx"'
+        doc.save(response)
+        return response
+

@@ -190,9 +190,19 @@ export async function updateUniversityProfile(
   return bffPatch<UniversityProfileData>("/profile/", updates);
 }
 
-// ─── Export Word bouquets (stub — à implémenter backend) ─────────────────────
+export async function exportBouquetCatalogWord(bouquet: UniversityBouquet): Promise<void> {
+  const res = await fetch(`${BFF}/bouquets/${bouquet.id}/export-word/`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Erreur lors de la génération du document Word.");
 
-export function exportBouquetCatalogWord(bouquet: UniversityBouquet): void {
-  console.warn("[University] Export Word non implémenté côté backend");
-  alert("L'export Word des bouquets sera disponible dans une prochaine mise à jour.");
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Bouquet_${bouquet.title.replace(/\s+/g, "_").slice(0, 50)}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
 }

@@ -88,21 +88,43 @@ class MonerooWebhookView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        # 1. Vérification de la signature HMAC Moneroo
+        signature = request.headers.get('Moneroo-Signature') or request.headers.get('X-Moneroo-Signature', '')
+        if signature:
+            from .moneroo_client import client as moneroo_client
+            raw_body = request.body
+            if not moneroo_client.verify_webhook_signature(raw_body, signature):
+                logger.warning("[Webhook] Signature Moneroo invalide. Requête rejetée.")
+                return Response(
+                    {"error": "Signature invalide."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        else:
+            # En production, refuser les webhooks sans signature
+            from django.conf import settings
+            if not settings.DEBUG:
+                logger.warning("[Webhook] Aucune signature Moneroo fournie. Requête rejetée.")
+                return Response(
+                    {"error": "Signature manquante."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            else:
+                logger.warning("[Webhook] Aucune signature Moneroo (mode DEBUG, accepté).")
+
+        # 2. Extraction des données
         event_id = request.data.get('event_id') or request.data.get('id')
         event_type = request.data.get('event_type') or request.data.get('event')
         if not event_id or not event_type:
-            return Response({"error": "Paramètres de webhook invalides"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"error": "Paramètres de webhook invalides"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 3. Traitement
         try:
             webhook = process_moneroo_webhook(event_id, event_type, request.data)
             return Response({"status": webhook.status}, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(f"[Webhook] Erreur traitement: {e}", exc_info=True)
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-class StripeWebhookView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        # Stub webhook Stripe
-        return Response({"status": "received"}, status=status.HTTP_200_OK)
 

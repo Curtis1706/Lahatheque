@@ -116,27 +116,104 @@ export const libraryApi = {
   },
 
   async getAnnotations(bookId: string): Promise<Annotation[]> {
-    // TODO: Endpoint backend /api/v1/reader/annotations/ à créer
-    return [];
+    try {
+      const res = await fetch(`/api/bff/protection/annotations/?ouvrage=${bookId}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) return [];
+      const json = await res.json();
+      const results = Array.isArray(json) ? json : json.results || json.data || [];
+      return results.map((a: any) => ({
+        id: a.id,
+        page: a.position_data?.page ?? 0,
+        type: a.type || "highlight",
+        rect: a.position_data?.rect || { x: 0, y: 0, w: 0, h: 0 },
+        color: a.color || "rgba(212,175,55,0.45)",
+        content: a.note_content || a.selected_text || "",
+        created_at: a.created_at,
+      }));
+    } catch {
+      return [];
+    }
   },
 
-  async saveAnnotation(payload: { book: string; content: string; data: any }): Promise<{ id: string }> {
-    // TODO: Endpoint backend /api/v1/reader/annotations/ à créer
-    return { id: `ann-${Date.now()}` };
+  async saveAnnotation(payload: {
+    book: string;
+    content: string;
+    data: any;
+  }): Promise<{ id: string }> {
+    const body = {
+      ouvrage: payload.book,
+      type: payload.data?.type || "highlight",
+      position_data: {
+        page: payload.data?.page ?? 0,
+        rect: payload.data?.rect || { x: 0, y: 0, w: 0, h: 0 },
+      },
+      selected_text: payload.data?.selectedText || "",
+      note_content: payload.content || "",
+      color: payload.data?.color || "rgba(212,175,55,0.45)",
+    };
+
+    const res = await fetch("/api/bff/protection/annotations/", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error("Erreur lors de la sauvegarde de l'annotation.");
+    const json = await res.json();
+    return { id: json.id || json.data?.id || `ann-${Date.now()}` };
   },
 
   async deleteAnnotation(id: string): Promise<boolean> {
-    // TODO: Endpoint backend /api/v1/reader/annotations/ à créer
-    return true;
+    const res = await fetch(`/api/bff/protection/annotations/${id}/`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    return res.ok || res.status === 204;
   },
 
   async getQuizzes(bookId: string): Promise<QuizData | null> {
-    // TODO: Endpoint backend /api/v1/reader/quizzes/ à créer
-    return null;
+    try {
+      const res = await fetch(`/api/bff/reader/quizzes/?book_id=${bookId}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      if (!json.success || !json.data) return null;
+      return {
+        id: json.data.id,
+        title: json.data.title,
+        questions: (json.data.questions || []).map((q: any) => ({
+          id: q.id,
+          question: q.question,
+          options: q.options,
+          correct_index: q.correct_index,
+        })),
+      };
+    } catch {
+      return null;
+    }
   },
 
-  async submitQuiz(quizId: string, answers: Record<string, number>): Promise<{ score: number; total: number; passed: boolean }> {
-    // TODO: Endpoint backend /api/v1/reader/quizzes/submit/ à créer
-    return { score: 0, total: 0, passed: true };
+  async submitQuiz(
+    quizId: string,
+    answers: Record<string, number>
+  ): Promise<{ score: number; total: number; passed: boolean }> {
+    const res = await fetch(`/api/bff/reader/quizzes/${quizId}/submit/`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers }),
+    });
+    if (!res.ok) throw new Error("Erreur lors de la soumission du quiz.");
+    const json = await res.json();
+    return {
+      score: json.data?.score ?? 0,
+      total: json.data?.total ?? 0,
+      passed: json.data?.passed ?? false,
+    };
   },
 };

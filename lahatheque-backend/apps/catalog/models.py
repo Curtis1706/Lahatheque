@@ -84,6 +84,43 @@ class Ouvrage(models.Model):
 
 
 
+class Quiz(models.Model):
+    """Quiz d'auto-évaluation associé à un ouvrage."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ouvrage = models.ForeignKey(Ouvrage, on_delete=models.CASCADE, related_name='quizzes')
+    title = models.CharField(max_length=255, default='Évaluation de lecture')
+    description = models.TextField(blank=True, default='')
+    is_ai_generated = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='quizzes_created'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Quiz: {self.title} ({self.ouvrage.title})"
+
+
+class QuizQuestion(models.Model):
+    """Question individuelle d'un quiz (QCM)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
+    question_text = models.TextField()
+    options = models.JSONField(default=list, help_text='Liste des choix : ["Option A", "Option B", ...]')
+    correct_index = models.IntegerField(default=0, help_text='Index (0-based) de la bonne réponse')
+    explanation = models.TextField(blank=True, default='', help_text='Explication affichée après correction')
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"Q{self.order}: {self.question_text[:60]}"
+
+
 class MetadataONIX(models.Model):
     ouvrage = models.OneToOneField(Ouvrage, on_delete=models.CASCADE, related_name='onix_metadata')
     onix_xml = models.TextField()

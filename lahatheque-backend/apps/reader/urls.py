@@ -9,6 +9,8 @@ from .views import (
     ReaderQuizSubmitView,
     ReaderSessionViewSet,
     ReaderValidateTokenView,
+    QuizRetrieveOrGenerateView,
+    QuizSubmitAnswersView,
 )
 
 app_name = "reader"
@@ -31,4 +33,8 @@ urlpatterns = [
     
     # Soumission et notation de quiz interactif
     path('sessions/quiz-submit/', ReaderQuizSubmitView.as_view(), name='session-quiz-submit'),
+
+    # Endpoints Quiz Ouvrage (IA & Soumission)
+    path('quizzes/', QuizRetrieveOrGenerateView.as_view(), name='quiz-retrieve-or-generate'),
+    path('quizzes/<str:quiz_id>/submit/', QuizSubmitAnswersView.as_view(), name='quiz-submit-answers'),
 ]

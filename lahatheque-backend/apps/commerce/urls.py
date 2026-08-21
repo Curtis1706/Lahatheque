@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import CreateOrderView, OrderListView, OrderDetailView, SubscriptionPlanListView
-from .webhooks import MonerooWebhookView, StripeWebhookView
+from .webhooks import MonerooWebhookView
 from .manager_views import (
     ManagerKpisView,
     StockListView,
@@ -34,7 +34,6 @@ urlpatterns = [
     path('orders/<uuid:order_id>/', OrderDetailView.as_view(), name='commerce-orders-detail'),
     path('subscriptions/plans/', SubscriptionPlanListView.as_view(), name='commerce-subscriptions-plans'),
     path('webhooks/moneroo/', MonerooWebhookView.as_view(), name='webhook-moneroo'),
-    path('webhooks/stripe/', StripeWebhookView.as_view(), name='webhook-stripe'),
 
     # ─── Manager : Stock & Livraison ───────────────────────────────────────────
     path('manager/kpis/', ManagerKpisView.as_view(), name='manager-kpis'),
