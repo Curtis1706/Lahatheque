@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
 import { CreateAccountModal } from "@/components/features/admin/create-account-modal";
 import { SendEmailModal } from "@/components/features/admin/send-email-modal";
-import { getAdminUsers, toggleAdminUserStatus } from "@/lib/services/admin";
+import { getAdminUsers, toggleAdminUserStatus, deleteAdminUser } from "@/lib/services/admin";
 import { AdminUser, AdminRole } from "@/lib/types/admin";
 import {
   Users,
@@ -61,11 +61,23 @@ export default function AdminUsersGlobalPage() {
     }
   };
 
-  const handleDeleteUser = () => {
+  const handleDeleteUser = async () => {
     if (!deleteConfirmUser) return;
-    setUsers((prev) => prev.filter((u) => u.id !== deleteConfirmUser.id));
-    toast.success(`Le compte de ${deleteConfirmUser.first_name} ${deleteConfirmUser.last_name} a été supprimé définitivement.`);
+    const target = deleteConfirmUser;
+    setUsers((prev) => prev.filter((u) => u.id !== target.id));
     setDeleteConfirmUser(null);
+    try {
+      const res = await deleteAdminUser(target.id);
+      if (res.success) {
+        toast.success(`Le compte de ${target.first_name} ${target.last_name} (${target.email}) a été supprimé.`);
+      } else {
+        toast.error(res.error || "Erreur lors de la suppression du compte.");
+        loadUsers();
+      }
+    } catch {
+      toast.error("Erreur serveur.");
+      loadUsers();
+    }
   };
 
   const roleFilterOptions = [
@@ -314,6 +326,7 @@ export default function AdminUsersGlobalPage() {
           onClose={() => setEmailUser(null)}
           recipientEmail={emailUser.email}
           recipientName={`${emailUser.first_name} ${emailUser.last_name}`}
+          userId={emailUser.id}
         />
       )}
     </div>

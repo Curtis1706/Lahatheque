@@ -72,6 +72,9 @@ export function DashboardHeader() {
   const getPageMeta = (path: string) => {
     if (path.startsWith("/admin/users")) return { section: "Administration", title: "Gestion des Utilisateurs" };
     if (path.startsWith("/admin/catalog")) return { section: "Administration", title: "Catalogue & Prix" };
+    if (path.startsWith("/admin/validation")) return { section: "Administration", title: "Validation BAT & Maquettisme" };
+    if (path.startsWith("/admin/contracts")) return { section: "Administration", title: "Contrats & Droits d'Auteur" };
+    if (path.startsWith("/admin/stock")) return { section: "Administration", title: "Stock Physique & Entrepôts" };
     if (path.startsWith("/admin/sales")) return { section: "Administration", title: "Ventes & Revenus" };
     if (path.startsWith("/admin/royalties")) return { section: "Administration", title: "Redevances & Relevés" };
     if (path.startsWith("/admin/reminders")) return { section: "Administration", title: "Relances & Impayés" };

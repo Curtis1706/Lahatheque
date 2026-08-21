@@ -173,7 +173,7 @@ export default function AdminAuthorRoyaltiesPage() {
       header: "Auteur Bénéficiaire",
       cell: (row) => (
         <div>
-          <p className="font-semibold text-xs text-navy font-bold">{row.beneficiary_name}</p>
+          <p className="font-bold text-xs text-navy">{row.beneficiary_name}</p>
           <p className="text-[11px] text-foreground-muted">{row.book_title}</p>
         </div>
       ),

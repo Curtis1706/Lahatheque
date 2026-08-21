@@ -1,18 +1,18 @@
-# LAHATheque Constitution
+# LAHAThèque Constitution
 
 ## Core Principles
 
-### I. Cadrage Metier et Consultation de Documentation (NON-NEGOCIABLE)
-Toute conception technique ou developpement doit commencer par la lecture approfondie du cahier des charges (`cahier_des_charges.txt`) et la consultation des documentations officielles en ligne des technologies employees. Aucune hypothese non verifiee ne doit etre introduite.
+### I. Cadrage Métier et Consultation de Documentation (NON-NÉGOCIABLE)
+Toute conception technique ou développement doit commencer par la lecture approfondie du cahier des charges (`cahier_des_charges.txt`) et la consultation des documentations officielles des technologies employées. Aucune hypothèse non vérifiée ne doit être introduite.
 
-### II. Traque des Non-Dits, Matrice Decisionnelle et Scalabilite
-Chaque fonctionnalite doit faire l'objet d'une analyse rigoureuse des non-dits, cas limites, points de friction et scenarios d'echec. Etablir systematiquement une matrice : Inconvenients vs Avantages vs Solution Recommandee, avec une strategie de scalabilite eprouvee (caching, indexes, partitionnement, montee en charge).
+### II. Traque des Non-Dits, Matrice Décisionnelle et Scalabilité
+Chaque fonctionnalité doit faire l'objet d'une analyse rigoureuse des non-dits, cas limites, points de friction et scénarios d'échec. Établir systématiquement une matrice : Inconvénients vs Avantages vs Solution Recommandée, avec une stratégie de scalabilité éprouvée (caching, index, partitionnement, montée en charge).
 
 ### III. Rigueur Backend Python et Typage Statique Strict
-Le backend repose sur Python 3.12+ et Django REST Framework. Respect absolu de PEP 8 et declaration systematique de Type Hints sur tous les arguments et valeurs de retour de fonctions, methodes, managers, serializers et vues.
+Le backend repose sur Python 3.10+ et Django REST Framework. Respect absolu de PEP 8 et déclaration systématique de Type Hints sur tous les arguments et valeurs de retour de fonctions, méthodes, managers, serializers et vues.
 
-### IV. Format de Reponse API Unifie
-Toutes les reponses JSON de l'API doivent strictement respecter la structure unifiee :
+### IV. Format de Réponse API Unifié
+Toutes les réponses JSON de l'API doivent strictement respecter la structure unifiée :
 ```json
 {
   "success": true,
@@ -20,54 +20,45 @@ Toutes les reponses JSON de l'API doivent strictement respecter la structure uni
   "error": null
 }
 ```
-En cas d'echec (`success: false`), `data` est vide (`{}` ou `[]`) et `error` fournit un message textuel explicite et exploitable.
+En cas d'échec (`success: false`), `data` est vide (`{}` ou `[]`) et `error` fournit un message textuel explicite et exploitable.
 
-### V. Performance ORM et Eradication des Requetes N+1
-- Cles primaires sous format UUIDv4 (`id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)`).
-- Indexation explicite `db_index=True` et contraintes d'integrite `Meta.constraints` (`UniqueConstraint`, `CheckConstraint`).
-- Eradication absolue des requetes N+1 via l'usage obligatoire de `select_related()` pour les relations directes et `prefetch_related()` pour les relations inverses et multiples.
-- Encadrement de toute mutation complexe ou financiere dans des transactions atomiques `@transaction.atomic`.
+### V. Performance ORM et Éradication des Requêtes N+1
+- Clés primaires sous format UUIDv4 (`id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)`).
+- Indexation explicite `db_index=True` et contraintes d'intégrité `Meta.constraints` (`UniqueConstraint`, `CheckConstraint`).
+- Éradication absolue des requêtes N+1 via l'usage obligatoire de `select_related()` pour les relations directes et `prefetch_related()` pour les relations inverses et multiples.
+- Encadrement de toute mutation complexe ou financière dans des transactions atomiques `@transaction.atomic`.
 
-### VI. Securite Reseau, Cookies HttpOnly et Authentification
-- Tokens JWT stockes exclusivement dans des cookies `HttpOnly`, `Secure` (en production), avec `SameSite='Lax'`. Aucun token d'acces web ne doit transiter dans le corps JSON.
-- Configuration stricte : `CORS_ALLOW_CREDENTIALS = True`, `CORS_ALLOWED_ORIGINS` et `CSRF_TRUSTED_ORIGINS` verrouilles.
+### VI. Sécurité Réseau, Cookies HttpOnly et Authentification
+- Tokens JWT stockés exclusivement dans des cookies `HttpOnly`, `Secure` (en production), avec `SameSite='Lax'`. Aucun token d'accès web ne doit transiter dans le corps JSON.
+- Configuration stricte : `CORS_ALLOW_CREDENTIALS = True`, `CORS_ALLOWED_ORIGINS` et `CSRF_TRUSTED_ORIGINS` verrouillés.
 - Authentification partenaire machine-to-machine via OAuth2 Client Credentials (`django-oauth-toolkit`).
 
-### VII. Protection DRM, Streaming et Audit TraceAcces
-- Fichiers PDF, EPUB et Audio stockes de maniere privee sur Cloudflare R2 (`querystring_auth=True`). Aucune URL R2 brute n'est exposee au client.
-- Streaming fragmenté exclusivement par proxy Django Range Requests (`HTTP_RANGE` retournant `206 Partial Content`).
-- Telechargement et impression strictement interdits sur tous les documents proteges.
-- Journalisation legale immuable de chaque consultation dans `TraceAcces`.
+### VII. Protection DRM, Streaming et Stockage Cloudflare R2
+- Fichiers PDF, EPUB et Audio stockés sur Cloudflare R2 compatible S3 via `R2MediaStorage`.
+- Streaming fragmenté par proxy Django Range Requests (`HTTP_RANGE` retournant `206 Partial Content`).
+- Téléchargement et impression strictement interdits sur tous les documents protégés.
+- Journalisation légale immuable de chaque consultation et tentative d'accès.
 
-### VIII. Webhooks Asynchrones Signes et Idempotence
-- Emission asynchrone des evenements via Celery avec politique de retry exponentiel (5 tentatives).
-- En-tetes obligatoires : `X-Lahatheque-Event`, `X-Lahatheque-Delivery` (UUID `event_id` pour l'idempotence), et `X-Lahatheque-Signature` (HMAC-SHA256).
-- Journalisation complete des livraisons dans `WebhookLog`.
+### VIII. Intégration Frontend, Tokens Sémantiques et 21st.dev
+- Zéro couleur hexadécimale en dur (`bg-[#...]`) : utilisation exclusive des variables CSS sémantiques de `globals.css` (`bg-navy`, `bg-navy-dark`, `bg-gold`, `bg-background`, `border-border`).
+- Recherche systématique de composants UI sur `21st.dev` via les 8 instances MCP configurées avant tout codage générique.
+- Approche Mobile-First obligatoire sur chaque composant et chaque écran (de 375px à desktop).
+- Gestion des états complets : default, hover, focus, loading (skeleton adapté), empty avec action, error.
 
-### IX. Code Exhaustivement Commente et Documente
-Tout le code source produit doit etre richement commente, avec des docstrings detaillees sur chaque module, classe et methode, ainsi que des commentaires explicatifs sur les logiques metier non evidentes.
+### IX. Code Exhaustivement Commenté et Documenté
+Tout le code source produit doit être richement commenté, avec des docstrings détaillées sur chaque module, classe et méthode, ainsi que des commentaires explicatifs sur les logiques métier non évidentes.
 
-### X. Interdiction Absolue de Tout Emoji
-Aucun emoji ne doit etre present dans le code source, les commentaires, les docstrings, les fichiers de regles, les reponses d'API, les logs ou la documentation technique.
+### X. Interdiction Absolue de Tout Émoji
+Aucun émoji n'est toléré dans le code source, les commentaires, les docstrings, les fichiers de règles, les réponses d'API, les tableaux de bord, les modales ou la documentation technique. Utiliser exclusivement les icônes vectorielles Lucide React.
 
 ## Constraints & Security Requirements
 
-- Base de donnees : PostgreSQL avec contraintes d'integrite strictes et indexation ciblee.
-- Stockage de fichiers : Cloudflare R2 securise sans exposition publique.
+- Base de données : PostgreSQL (Neon) avec contraintes d'intégrité strictes et indexation ciblée.
+- Stockage de fichiers : Cloudflare R2 sécurisé avec URLs publiques et gestion résiliente des permissions.
 - DRM et Lecteur : Moteur de lecture 3D FlipBook et mode normal vertical avec protection anti-capture et filigrane dynamique.
-
-## Development Workflow & Quality Gates
-
-1. Etape 0 : Analyse prealable (Cahier des charges, documentations, non-dits, scalabilite).
-2. Etape 1 : Specification et contrat JSON `{ success, data, error }`.
-3. Etape 2 : Modelisation des donnees et migrations.
-4. Etape 3 : Serializers DRF avec validation croisee.
-5. Etape 4 : Vues API, permissions et gestion des exceptions.
-6. Etape 5 : Optimisation ORM (select_related / prefetch_related).
-7. Etape 6 : Tests Pytest (`pytest-django`) couvrant cas nominaux, erreurs et securite.
 
 ## Governance
 
-Cette Constitution fait foi sur l'ensemble du projet LAHATheque et prime sur toute decision locale. Tout code produit doit etre audite et valide conformement a ces 10 principes.
+Cette Constitution fait foi sur l'ensemble du projet LAHAThèque et prime sur toute décision locale. Tout code produit doit être audité et validé conformément à ces 10 principes.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-18 | **Last Amended**: 2026-08-18
+**Version**: 1.1.0 | **Ratified**: 2026-08-18 | **Last Amended**: 2026-08-21

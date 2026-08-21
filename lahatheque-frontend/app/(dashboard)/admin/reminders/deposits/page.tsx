@@ -44,7 +44,7 @@ export default function AdminDepositRemindersPage() {
       header: "Jours de Retard",
       cell: (row) => (
         <span className="font-mono text-xs font-bold text-error px-2 py-0.5 rounded bg-error/15">
-          {row.days_overdue} jours
+          {row.days_overdue ?? 0} jours
         </span>
       ),
     },

@@ -1,0 +1,13 @@
+# Configuration Nixpacks pour le Frontend LAHAThèque sur Coolify
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "pnpm-9_x"]
+
+[phases.install]
+cmds = ["pnpm install --frozen-lockfile"]
+
+[phases.build]
+cmds = ["pnpm build"]
+
+[start]
+cmd = "pnpm start -p ${PORT:-3000}"

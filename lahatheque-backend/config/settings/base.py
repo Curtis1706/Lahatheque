@@ -255,5 +255,16 @@ DRM_DERIVED_CACHE_TTL_HOURS = config('DRM_DERIVED_CACHE_TTL_HOURS', default=24, 
 DRM_WATERMARK_DEFAULT_OPACITY = 0.20
 DRM_MAX_REMOTE_FILE_SIZE_MB = 800
 
+# ── Configuration Email (Hostinger SMTP) ─────────────────────────────────────
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.hostinger.com')
+EMAIL_PORT = config('EMAIL_PORT', default=465, cast=int)
+EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=True, cast=bool)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=False, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='contact@lahacademia.com')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = f"LAHATHEQUE <{EMAIL_HOST_USER}>"
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 

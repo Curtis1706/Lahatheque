@@ -1,41 +1,104 @@
-# Docker Compose pour le backend LAHAThèque v3.2
-# Note: Le frontend Next.js et le serveur externe EDRLab LCP sont déployés sur des instances séparées.
-# La base de données PostgreSQL est managée par Neon (serverless).
-version: '3.8'
+# ==============================================================================
+# Docker Compose Production — LAHAThèque Backend v3.2
+# Déploiement Stack Complète sur VPS Coolify (Zéro Conflit de Port)
+# ==============================================================================
 
 services:
+  # ─── Redis (Broker Celery & Cache — Interne uniquement) ───
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-  backend:
-    build: .
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000
+    container_name: lahatheque_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
     volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
+      - redis_data:/data
+    networks:
+      - lahatheque_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend API (Django + Gunicorn + WhiteNoise) ───
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lahatheque_api
+    restart: unless-stopped
+    command: gunicorn
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.dev
+      - PORT=8000
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+    env_file:
+      - .env
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    # Dans Coolify, Traefik route le domaine https://api.lahatheque.com directement vers le port 8000 interne
+    # Pas besoin de binder le port 8000 sur l'hôte VPS (évite tout conflit de port avec d'autres apps)
+    expose:
+      - "8000"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    networks:
+      - lahatheque_net
 
+  # ─── Celery Worker (Envoi d'e-mails, Traitements Asynchrones) ───
   celery_worker:
-    build: .
-    command: celery -A config worker -l info
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lahatheque_celery_worker
+    restart: unless-stopped
+    command: celery -A config worker -l info --concurrency=2
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+    env_file:
+      - .env
     volumes:
-      - .:/app
+      - media_data:/app/media
     depends_on:
-      - backend
-      - redis
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    networks:
+      - lahatheque_net
 
+  # ─── Celery Beat (Planificateur des Relances Automatiques) ───
   celery_beat:
-    build: .
-    command: celery -A config beat -l info
-    volumes:
-      - .:/app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lahatheque_celery_beat
+    restart: unless-stopped
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+    env_file:
+      - .env
     depends_on:
-      - backend
-      - redis
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    networks:
+      - lahatheque_net
 
+volumes:
+  redis_data:
+  media_data:
+  static_data:
+
+networks:
+  lahatheque_net:
+    driver: bridge
