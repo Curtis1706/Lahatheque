@@ -20,20 +20,27 @@ class Domain(models.Model):
     name = models.CharField(max_length=255)
 
 class Ouvrage(models.Model):
+    FORMAT_CHOICES = [
+        ('pdf', 'PDF'),
+        ('epub', 'EPUB'),
+        ('audio', 'Audio'),
+        ('papier', 'Livre Papier'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    isbn = models.CharField(max_length=17, unique=True)
+    isbn = models.CharField(max_length=17, blank=True, default='')
     title = models.CharField(max_length=255)
     subtitle = models.CharField(max_length=255, blank=True)
-    publisher = models.ForeignKey('publishers_portal.Publisher', on_delete=models.PROTECT, related_name='ouvrages')
+    publisher = models.ForeignKey('publishers_portal.Publisher', on_delete=models.PROTECT, related_name='ouvrages', null=True, blank=True)
     authors = models.ManyToManyField(BookAuthor, related_name='ouvrages', blank=True)
     discipline = models.ForeignKey(Discipline, null=True, blank=True, on_delete=models.SET_NULL, related_name='ouvrages')
     institution = models.ForeignKey('partners.Institution', null=True, blank=True, on_delete=models.SET_NULL, related_name='ouvrages')
     country = models.CharField(max_length=2, default='BJ')
-    format_type = models.CharField(max_length=20, choices=[('pdf', 'PDF'), ('epub', 'EPUB'), ('audio', 'Audio')])
-    file = models.FileField(upload_to='books/')
+    format_type = models.CharField(max_length=20, choices=FORMAT_CHOICES, default='pdf')
+    file = models.FileField(upload_to='books/', blank=True, null=True)
     file_size_bytes = models.BigIntegerField(default=0)
     page_count = models.IntegerField(default=0)
-    publication_date = models.DateField()
+    publication_date = models.DateField(null=True, blank=True)
     language = models.CharField(max_length=10, default='fr')
     summary = models.TextField(blank=True)
     table_of_contents = models.JSONField(default=dict, blank=True)
@@ -42,6 +49,18 @@ class Ouvrage(models.Model):
     price_digital = models.DecimalField(max_digits=10, decimal_places=2, default=5000.00)
     price_paper = models.DecimalField(max_digits=10, decimal_places=2, default=7500.00)
     cover_image = models.ImageField(upload_to='covers/', null=True, blank=True)
+
+    # Traçabilité & dates
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='ouvrages_created')
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Classification & formulaire Maquettiste
+    faculty = models.CharField(max_length=255, blank=True, default='')
+    department = models.CharField(max_length=255, blank=True, default='')
+    keywords = models.JSONField(default=list, blank=True)
+    target_audience = models.CharField(max_length=128, blank=True, default='')
+    dewey_code = models.CharField(max_length=20, blank=True, default='')
 
     @property
     def price(self):

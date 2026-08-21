@@ -24,7 +24,7 @@ import { FileDropzone } from "@/components/features/layout-artist/file-dropzone"
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper, DEPOSIT_STEPS } from "@/components/features/layout-artist/deposit-wizard-stepper";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
-import { createDeposit } from "@/lib/services/layout-artist";
+import { createDeposit, createDepositWithFiles } from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/ai";
 import type { ClassificationSource } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
@@ -78,6 +78,8 @@ export default function NewDepositPage() {
   const [language, setLanguage] = useState("Français");
   const [summary, setSummary] = useState("");
   const [isbn, setIsbn] = useState("");
+  const [priceDigital, setPriceDigital] = useState(5000);
+  const [pricePaper, setPricePaper] = useState(7500);
 
   // Classification State
   const [genreCategory, setGenreCategory] = useState("Littérature Africaine & Conte");
@@ -164,34 +166,44 @@ export default function NewDepositPage() {
 
   const handleSaveDraft = async () => {
     setSaving(true);
-    const dep = await createDeposit({
-      metadata: {
-        title: title || "Nouveau Dépôt",
-        authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur"],
-        publication_year: year,
-        language,
-        language_source: aiResult ? "ai_suggested" : "manual",
-        summary,
-        summary_source: aiResult ? "ai_suggested" : "manual",
-        isbn,
-      },
-      classification: {
-        country,
-        university,
-        faculty,
-        discipline: genreCategory,
-        source: aiResult ? "ai_suggested" : "manual",
-      },
-      files: {
-        format: bookFile?.name.endsWith(".epub") ? "EPUB" : "PDF",
-        book_file_name: bookFile?.name,
-        cover_url: coverPreview,
-      },
-      status: "draft",
-    });
-    setSaving(false);
-    toast.success("Brouillon sauvegardé avec succès.");
-    router.push(`/layout-artist/deposits/${dep.id}`);
+    try {
+      const dep = await createDepositWithFiles(
+        {
+          metadata: {
+            title: title || "Nouveau Dépôt",
+            authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur"],
+            publication_year: year,
+            language,
+            language_source: aiResult ? "ai_suggested" : "manual",
+            summary,
+            summary_source: aiResult ? "ai_suggested" : "manual",
+            isbn,
+          },
+          classification: {
+            country,
+            university,
+            faculty,
+            discipline: genreCategory,
+            source: aiResult ? "ai_suggested" : "manual",
+          },
+          files: {
+            format: bookFile?.name.endsWith(".epub") ? "EPUB" : "PDF",
+            book_file_name: bookFile?.name,
+            cover_url: coverPreview,
+          },
+          status: "draft",
+          default_price: 5000,
+        },
+        bookFile,
+        coverFile
+      );
+      toast.success("Brouillon sauvegardé avec succès.");
+      router.push(`/layout-artist/deposits/${dep.id}`);
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la sauvegarde du brouillon.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSubmitValidation = async () => {
@@ -201,35 +213,44 @@ export default function NewDepositPage() {
     }
 
     setSaving(true);
-    const dep = await createDeposit({
-      metadata: {
-        title: title,
-        authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur"],
-        publication_year: year,
-        language,
-        language_source: aiResult ? "ai_suggested" : "manual",
-        summary,
-        summary_source: aiResult ? "ai_suggested" : "manual",
-        isbn,
-      },
-      classification: {
-        country,
-        university,
-        faculty,
-        discipline: genreCategory,
-        source: aiResult ? "ai_suggested" : "manual",
-      },
-      files: {
-        format: bookFile?.name.endsWith(".epub") ? "EPUB" : "PDF",
-        book_file_name: bookFile?.name,
-        cover_url: coverPreview,
-      },
-      status: "pending_validation",
-    });
-
-    setSaving(false);
-    toast.success("Maquette soumise au Chef Maquettiste avec succès !");
-    router.push("/layout-artist/deposits");
+    try {
+      await createDepositWithFiles(
+        {
+          metadata: {
+            title,
+            authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur"],
+            publication_year: year,
+            language,
+            language_source: aiResult ? "ai_suggested" : "manual",
+            summary,
+            summary_source: aiResult ? "ai_suggested" : "manual",
+            isbn,
+          },
+          classification: {
+            country,
+            university,
+            faculty,
+            discipline: genreCategory,
+            source: aiResult ? "ai_suggested" : "manual",
+          },
+          files: {
+            format: bookFile.name.endsWith(".epub") ? "EPUB" : "PDF",
+            book_file_name: bookFile.name,
+            cover_url: coverPreview,
+          },
+          status: "pending_validation",
+          default_price: 5000,
+        },
+        bookFile,
+        coverFile
+      );
+      toast.success("Maquette soumise au Chef Maquettiste avec succès !");
+      router.push("/layout-artist/deposits");
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la soumission de la maquette.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -499,6 +520,28 @@ export default function NewDepositPage() {
                   type="number"
                   value={year}
                   onChange={(e) => setYear(parseInt(e.target.value) || 2026)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Prix Numérique (FCFA)</label>
+                <input
+                  type="number"
+                  step="500"
+                  value={priceDigital}
+                  onChange={(e) => setPriceDigital(parseFloat(e.target.value) || 0)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Prix Papier (FCFA)</label>
+                <input
+                  type="number"
+                  step="500"
+                  value={pricePaper}
+                  onChange={(e) => setPricePaper(parseFloat(e.target.value) || 0)}
                   className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 />
               </div>

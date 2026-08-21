@@ -1,5 +1,5 @@
 // ─── Services Maquettiste & Chef Maquettiste ──────────────────────────────────
-// Connecté au backend Django via BFF Proxy (/api/bff/catalog/deposits/...)
+// Connecté au backend Django via BFF Proxy
 
 import type {
   LayoutDeposit,
@@ -8,455 +8,330 @@ import type {
   DepositFilterStatus,
 } from "../types/layout-artist";
 
-import {
-  mockDeposits,
-  mockMaquettisteKpis,
-  mockChefMaquettisteKpis,
-  mockMaquettisteUser,
-} from "../mock/layout-artist";
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function mapBackendToDeposit(b: any, fallbackUserId?: string): LayoutDeposit {
+  return {
+    id: String(b.id),
+    maquettiste_id: b.created_by?.id || fallbackUserId || "",
+    maquettiste_name: b.created_by
+      ? `${b.created_by.first_name || ""} ${b.created_by.last_name || ""}`.trim()
+      : b.authors_names || "Maquettiste",
+    metadata: {
+      title: b.title || "Sans titre",
+      authors: b.authors_names
+        ? b.authors_names.split(",").map((a: string) => a.trim())
+        : [],
+      publication_year: b.publication_date
+        ? new Date(b.publication_date).getFullYear()
+        : new Date().getFullYear(),
+      language: b.language || "fr",
+      language_source: "manual_override",
+      summary: b.summary || "",
+      summary_source: "manual_override",
+      isbn: b.isbn || "",
+    },
+    classification: {
+      country: b.country || "BJ",
+      university: b.institution_name || "",
+      faculty: b.faculty_name || b.faculty || "",
+      discipline: b.discipline_detail?.name || b.discipline_name || "",
+      source: "manual_override",
+    },
+    files: {
+      format: (b.format_type || "pdf").toUpperCase() as "PDF" | "EPUB" | "AUDIO" | "PAPIER",
+      book_file_name: b.file ? b.file.split("/").pop() : b.title,
+      cover_url: b.cover_image || b.cover_url || undefined,
+    },
+    status:
+      b.status === "published"
+        ? "published"
+        : b.status === "rejected"
+          ? "revision_requested"
+          : b.status === "draft"
+            ? "draft"
+            : "pending_validation",
+    created_at: b.created_at || new Date().toISOString(),
+    default_price: Number(b.price_digital) || 5000,
+  };
+}
 
 // ─── Service Maquettiste ──────────────────────────────────────────────────────
 
-export async function getMaquettisteKpis(maquettisteId: string = mockMaquettisteUser.id): Promise<MaquettisteKpi> {
-  try {
-    const res = await fetch("/api/bff/catalog/deposits/kpis/", {
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.data) {
-        return {
-          draftCount: data.data.draftCount ?? 0,
-          pendingValidationCount: data.data.pendingValidationCount ?? 0,
-          revisionRequestedCount: data.data.revisionRequestedCount ?? 0,
-          publishedCount: data.data.validatedCount ?? 0,
-          timelines: data.data.timelines,
-        };
-      }
-    }
-  } catch (err) {
-    console.warn("[Layout Service] API getMaquettisteKpis fallback:", err);
-  }
+export async function getMaquettisteKpis(): Promise<MaquettisteKpi> {
+  const res = await fetch("/api/bff/catalog/my-deposits/kpis/", {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`KPIs error: ${res.status}`);
 
-  const myDeps = mockDeposits.filter((d) => d.maquettiste_id === maquettisteId);
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || "Erreur KPIs");
+
   return {
-    draftCount: myDeps.filter((d) => d.status === "draft").length,
-    pendingValidationCount: myDeps.filter((d) => d.status === "pending_validation").length,
-    revisionRequestedCount: myDeps.filter((d) => d.status === "revision_requested").length,
-    publishedCount: myDeps.filter((d) => d.status === "published").length,
+    draftCount: data.data.draftCount ?? 0,
+    pendingValidationCount: data.data.pendingValidationCount ?? 0,
+    revisionRequestedCount: data.data.revisionRequestedCount ?? 0,
+    publishedCount: data.data.validatedCount ?? 0,
+    timelines: data.data.timelines,
   };
 }
 
 export async function getMyDeposits(
-  maquettisteId: string = mockMaquettisteUser.id,
+  _maquettisteId?: string,
   filters?: { status?: DepositFilterStatus; search?: string; discipline?: string }
 ): Promise<LayoutDeposit[]> {
-  try {
-    const params = new URLSearchParams();
-    if (filters?.status && filters.status !== "all") {
-      params.append("status", filters.status === "pending_validation" ? "submitted" : filters.status);
-    }
-    if (filters?.discipline) {
-      params.append("discipline", filters.discipline);
-    }
-    const res = await fetch(`/api/bff/catalog/deposits/?${params.toString()}`, {
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const results = Array.isArray(data) ? data : data.results || data.data;
-      if (Array.isArray(results) && results.length > 0) {
-        return results.map((b: any) => ({
-          id: String(b.id),
-          maquettiste_id: maquettisteId,
-          maquettiste_name: b.authors_names || "Maquettiste",
-          metadata: {
-            title: b.title || "Sans titre",
-            authors: b.authors_names ? b.authors_names.split(",") : ["Auteur LAHA"],
-            publication_year: b.publication_date ? new Date(b.publication_date).getFullYear() : 2026,
-            language: b.language || "Français",
-            language_source: "manual_override",
-            summary: b.summary || "",
-            summary_source: "manual_override",
-            isbn: b.isbn || "",
-          },
-          classification: {
-            country: "BJ",
-            university: b.institution_name || "Université d'Abomey-Calavi (UAC)",
-            faculty: b.faculty_name || "",
-            discipline: b.discipline_name || "Général",
-            source: "manual_override",
-          },
-          files: {
-            format: (b.format_type || "pdf").toUpperCase() as "PDF" | "EPUB",
-            book_file_name: b.title,
-            cover_url: b.cover_image,
-          },
-          status: b.status === "published" ? "published" : b.status === "rejected" ? "revision_requested" : "pending_validation",
-          created_at: b.created_at || new Date().toISOString(),
-          default_price: Number(b.price_raw) || 5000,
-        }));
-      }
-    }
-  } catch (err) {
-    console.warn("[Layout Service] API getMyDeposits fallback:", err);
-  }
-
-  let list = mockDeposits.filter((d) => d.maquettiste_id === maquettisteId);
-
+  const params = new URLSearchParams();
   if (filters?.status && filters.status !== "all") {
-    list = list.filter((d) => d.status === filters.status);
+    params.append("status", filters.status);
   }
   if (filters?.discipline) {
-    list = list.filter((d) => d.classification.discipline === filters.discipline);
+    params.append("discipline", filters.discipline);
   }
-  if (filters?.search) {
+
+  const res = await fetch(`/api/bff/catalog/my-deposits/?${params.toString()}`, {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Deposits list error: ${res.status}`);
+
+  const data = await res.json();
+  const results = Array.isArray(data) ? data : data.results || data.data || [];
+
+  if (filters?.search && results.length > 0) {
     const q = filters.search.toLowerCase();
-    list = list.filter(
-      (d) =>
-        d.metadata.title.toLowerCase().includes(q) ||
-        d.metadata.authors.some((a) => a.toLowerCase().includes(q))
-    );
+    return results
+      .map((b: any) => mapBackendToDeposit(b))
+      .filter(
+        (d: LayoutDeposit) =>
+          d.metadata.title.toLowerCase().includes(q) ||
+          d.metadata.authors.some((a: string) => a.toLowerCase().includes(q))
+      );
   }
-  return list;
+
+  return results.map((b: any) => mapBackendToDeposit(b));
 }
 
 export async function getDepositDetail(id: string): Promise<LayoutDeposit | null> {
-  try {
-    const res = await fetch(`/api/bff/catalog/deposits/${id}/`, {
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-    if (res.ok) {
-      const b = await res.json();
-      if (b && b.id) {
-        return {
-          id: String(b.id),
-          maquettiste_id: mockMaquettisteUser.id,
-          maquettiste_name: b.authors_names || "Maquettiste",
-          metadata: {
-            title: b.title || "Sans titre",
-            authors: b.authors_names ? b.authors_names.split(",") : ["Auteur LAHA"],
-            publication_year: b.publication_date ? new Date(b.publication_date).getFullYear() : 2026,
-            language: b.language || "Français",
-            language_source: "manual_override",
-            summary: b.summary || "",
-            summary_source: "manual_override",
-            isbn: b.isbn || "",
-          },
-          classification: {
-            country: "BJ",
-            university: b.institution_name || "Université d'Abomey-Calavi (UAC)",
-            faculty: b.faculty_name || "",
-            discipline: b.discipline_name || "Général",
-            source: "manual_override",
-          },
-          files: {
-            format: (b.format_type || "pdf").toUpperCase() as "PDF" | "EPUB",
-            book_file_name: b.title,
-            cover_url: b.cover_image,
-          },
-          status: b.status === "published" ? "published" : b.status === "rejected" ? "revision_requested" : "pending_validation",
-          created_at: b.created_at || new Date().toISOString(),
-          default_price: Number(b.price_raw) || 5000,
-        };
-      }
-    }
-  } catch (err) {
-    console.warn("[Layout Service] API getDepositDetail fallback:", err);
-  }
+  const res = await fetch(`/api/bff/catalog/my-deposits/${id}/`, {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!res.ok) return null;
 
-  const found = mockDeposits.find((d) => d.id === id);
-  if (!found) return null;
-  return JSON.parse(JSON.stringify(found));
+  const data = await res.json();
+  const b = data.data || data;
+  if (!b || !b.id) return null;
+
+  return mapBackendToDeposit(b);
 }
 
 export async function createDeposit(data: Partial<LayoutDeposit>): Promise<LayoutDeposit> {
-  try {
-    const res = await fetch("/api/bff/catalog/deposits/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: data.metadata?.title || "Nouveau Titre",
-        authors_names: data.metadata?.authors ? data.metadata.authors.join(", ") : "Auteur LAHA",
-        isbn: data.metadata?.isbn || "",
-        summary: data.metadata?.summary || "",
-        language: data.metadata?.language || "Français",
-        format_type: (data.files?.format || "pdf").toLowerCase(),
-        price_raw: data.default_price || 5000,
-      }),
-    });
-    if (res.ok) {
-      const respData = await res.json();
-      if (respData.data) {
-        return {
-          id: String(respData.data.id),
-          maquettiste_id: mockMaquettisteUser.id,
-          maquettiste_name: mockMaquettisteUser.name,
-          metadata: data.metadata as any,
-          classification: data.classification as any,
-          files: data.files as any,
-          status: "pending_validation",
-          created_at: new Date().toISOString(),
-          default_price: data.default_price || 5000,
-        };
-      }
+  const formData = new FormData();
+
+  // Métadonnées texte
+  formData.append("title", data.metadata?.title || "Nouveau Titre");
+  formData.append("subtitle", data.metadata?.title ? "" : "");
+  formData.append("authors_names", data.metadata?.authors?.join(", ") || "");
+  formData.append("isbn", data.metadata?.isbn || "");
+  formData.append("summary", data.metadata?.summary || "");
+  formData.append("language", data.metadata?.language || "fr");
+  formData.append("format_type", (data.files?.format || "pdf").toLowerCase());
+  formData.append("price_digital", String(data.default_price || 5000));
+  formData.append("status", data.status || "draft");
+
+  // Classification
+  if (data.classification) {
+    formData.append("country", data.classification.country || "BJ");
+    formData.append("institution_name", data.classification.university || "");
+    formData.append("faculty", data.classification.faculty || "");
+    formData.append("discipline_name", data.classification.discipline || "");
+    formData.append("department", data.classification.department || "");
+    if (data.classification.source) {
+      formData.append("classification_source", data.classification.source);
     }
-  } catch (err) {
-    console.warn("[Layout Service] API createDeposit fallback:", err);
   }
 
-  const newDep: LayoutDeposit = {
-    id: `dep-2026-${String(mockDeposits.length + 1).padStart(3, "0")}`,
-    maquettiste_id: mockMaquettisteUser.id,
-    maquettiste_name: mockMaquettisteUser.name,
-    metadata: {
-      title: data.metadata?.title || "Nouveau titre",
-      authors: data.metadata?.authors || ["Auteur"],
-      publication_year: data.metadata?.publication_year || 2026,
-      language: data.metadata?.language || "Français",
-      language_source: data.metadata?.language_source || "ai_suggested",
-      summary: data.metadata?.summary || "",
-      summary_source: data.metadata?.summary_source || "ai_suggested",
-      isbn: data.metadata?.isbn,
-    },
-    classification: {
-      country: data.classification?.country || "BJ",
-      university: data.classification?.university || "Université d'Abomey-Calavi (UAC)",
-      faculty: data.classification?.faculty || "Faculté de Droit",
-      discipline: data.classification?.discipline || "Droit & Sciences Politiques",
-      source: data.classification?.source || "ai_suggested",
-    },
-    files: {
-      format: data.files?.format || "PDF",
-      book_file_name: data.files?.book_file_name,
-      cover_url: data.files?.cover_url,
-      audio_files: data.files?.audio_files || [],
-    },
-    status: data.status || "draft",
-    created_at: new Date().toISOString(),
-    default_price: data.default_price || 12000,
-  };
+  const res = await fetch("/api/bff/catalog/my-deposits/", {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
 
-  mockDeposits.unshift(newDep);
-  return newDep;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Erreur création: ${res.status}`);
+  }
+
+  const respData = await res.json();
+  if (!respData.success) throw new Error(respData.error || "Erreur création");
+
+  return mapBackendToDeposit(respData.data);
+}
+
+export async function createDepositWithFiles(
+  data: Partial<LayoutDeposit>,
+  bookFile?: File | null,
+  coverFile?: File | null
+): Promise<LayoutDeposit> {
+  const formData = new FormData();
+
+  formData.append("title", data.metadata?.title || "Nouveau Titre");
+  formData.append("authors_names", data.metadata?.authors?.join(", ") || "");
+  formData.append("isbn", data.metadata?.isbn || "");
+  formData.append("summary", data.metadata?.summary || "");
+  formData.append("language", data.metadata?.language || "fr");
+  formData.append("format_type", (data.files?.format || "pdf").toLowerCase());
+  formData.append("price_digital", String(data.default_price || 5000));
+  formData.append("status", data.status || "draft");
+
+  if (data.classification) {
+    formData.append("country", data.classification.country || "BJ");
+    formData.append("institution_name", data.classification.university || "");
+    formData.append("faculty", data.classification.faculty || "");
+    formData.append("discipline_name", data.classification.discipline || "");
+  }
+
+  if (bookFile) formData.append("book_file", bookFile);
+  if (coverFile) formData.append("cover_image", coverFile);
+
+  const res = await fetch("/api/bff/catalog/my-deposits/", {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Erreur création: ${res.status}`);
+  }
+
+  const respData = await res.json();
+  if (!respData.success) throw new Error(respData.error || "Erreur création");
+
+  return mapBackendToDeposit(respData.data);
 }
 
 export async function updateDeposit(id: string, updates: Partial<LayoutDeposit>): Promise<LayoutDeposit | null> {
-  const idx = mockDeposits.findIndex((d) => d.id === id);
-  if (idx === -1) return null;
+  const payload: Record<string, any> = {};
 
-  mockDeposits[idx] = {
-    ...mockDeposits[idx],
-    ...updates,
-    metadata: { ...mockDeposits[idx].metadata, ...updates.metadata },
-    classification: { ...mockDeposits[idx].classification, ...updates.classification },
-    files: { ...mockDeposits[idx].files, ...updates.files },
-  };
+  if (updates.metadata) {
+    if (updates.metadata.title) payload.title = updates.metadata.title;
+    if (updates.metadata.authors) payload.authors_names = updates.metadata.authors.join(", ");
+    if (updates.metadata.summary !== undefined) payload.summary = updates.metadata.summary;
+    if (updates.metadata.language) payload.language = updates.metadata.language;
+    if (updates.metadata.isbn !== undefined) payload.isbn = updates.metadata.isbn;
+  }
+  if (updates.classification) {
+    if (updates.classification.discipline) payload.discipline_name = updates.classification.discipline;
+    if (updates.classification.country) payload.country = updates.classification.country;
+    if (updates.classification.faculty) payload.faculty = updates.classification.faculty;
+  }
 
-  return mockDeposits[idx];
+  const res = await fetch(`/api/bff/catalog/my-deposits/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) return null;
+  const data = await res.json();
+  return mapBackendToDeposit(data.data || data);
 }
 
 export async function submitDepositForValidation(id: string): Promise<boolean> {
-  const dep = mockDeposits.find((d) => d.id === id);
-  if (dep) {
-    dep.status = "pending_validation";
-    dep.submitted_at = new Date().toISOString();
-    return true;
-  }
-  return false;
+  const res = await fetch(`/api/bff/catalog/my-deposits/${id}/submit/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  return res.ok;
 }
 
 // ─── Service Chef Maquettiste ─────────────────────────────────────────────────
 
 export async function getChefKpis(): Promise<ChefMaquettisteKpi> {
-  try {
-    const res = await fetch("/api/bff/catalog/deposits/chef-kpis/", {
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.data) {
-        return {
-          pendingValidationCount: data.data.pendingValidationCount ?? 0,
-          validatedThisMonth: data.data.totalPublished ?? 0,
-          revisionRequestedThisMonth: data.data.rejectedCount ?? 0,
-          averageProcessingTimeHours: Number(data.data.averageValidationHours) || 4.5,
-          timelines: data.data.timelines,
-        };
-      }
-    }
-  } catch (err) {
-    console.warn("[Layout Service] API getChefKpis fallback:", err);
-  }
+  const res = await fetch("/api/bff/catalog/deposits/chef-kpis/", {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Chef KPIs error: ${res.status}`);
 
-  const pendingCount = mockDeposits.filter((d) => d.status === "pending_validation").length;
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || "Erreur Chef KPIs");
+
   return {
-    ...mockChefMaquettisteKpis,
-    pendingValidationCount: pendingCount,
+    pendingValidationCount: data.data.pendingValidationCount ?? 0,
+    validatedThisMonth: data.data.totalPublished ?? 0,
+    revisionRequestedThisMonth: data.data.rejectedCount ?? 0,
+    averageProcessingTimeHours: Number(data.data.averageValidationHours) || 4.5,
+    timelines: data.data.timelines,
   };
 }
 
-export async function getPendingDeposits(filters?: { search?: string; discipline?: string }): Promise<LayoutDeposit[]> {
-  try {
-    const res = await fetch("/api/bff/catalog/deposits/?status=submitted", {
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const results = Array.isArray(data) ? data : data.results || data.data;
-      if (Array.isArray(results) && results.length > 0) {
-        return results.map((b: any) => ({
-          id: String(b.id),
-          maquettiste_id: mockMaquettisteUser.id,
-          maquettiste_name: b.authors_names || "Maquettiste",
-          metadata: {
-            title: b.title || "Sans titre",
-            authors: b.authors_names ? b.authors_names.split(",") : ["Auteur LAHA"],
-            publication_year: b.publication_date ? new Date(b.publication_date).getFullYear() : 2026,
-            language: b.language || "Français",
-            language_source: "manual_override",
-            summary: b.summary || "",
-            summary_source: "manual_override",
-            isbn: b.isbn || "",
-          },
-          classification: {
-            country: "BJ",
-            university: b.institution_name || "Université d'Abomey-Calavi (UAC)",
-            faculty: b.faculty_name || "",
-            discipline: b.discipline_name || "Général",
-            source: "manual_override",
-          },
-          files: {
-            format: (b.format_type || "pdf").toUpperCase() as "PDF" | "EPUB",
-            book_file_name: b.title,
-            cover_url: b.cover_image,
-          },
-          status: "pending_validation",
-          created_at: b.created_at || new Date().toISOString(),
-          default_price: Number(b.price_raw) || 5000,
-        }));
-      }
-    }
-  } catch (err) {
-    console.warn("[Layout Service] API getPendingDeposits fallback:", err);
-  }
+export async function getPendingDeposits(
+  filters?: { search?: string; discipline?: string }
+): Promise<LayoutDeposit[]> {
+  const res = await fetch("/api/bff/catalog/deposits/?status=submitted", {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Pending deposits error: ${res.status}`);
 
-  let list = mockDeposits.filter((d) => d.status === "pending_validation");
+  const data = await res.json();
+  const results = Array.isArray(data) ? data : data.results || data.data || [];
+  let deposits = results.map((b: any) => mapBackendToDeposit(b));
+
   if (filters?.discipline) {
-    list = list.filter((d) => d.classification.discipline === filters.discipline);
+    deposits = deposits.filter((d: LayoutDeposit) => d.classification.discipline === filters.discipline);
   }
   if (filters?.search) {
     const q = filters.search.toLowerCase();
-    list = list.filter(
-      (d) =>
+    deposits = deposits.filter(
+      (d: LayoutDeposit) =>
         d.metadata.title.toLowerCase().includes(q) ||
         d.maquettiste_name.toLowerCase().includes(q)
     );
   }
-  return list;
+  return deposits;
 }
 
 export async function getValidationHistory(): Promise<LayoutDeposit[]> {
-  try {
-    const res = await fetch("/api/bff/catalog/deposits/", {
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const results = Array.isArray(data) ? data : data.results || data.data;
-      if (Array.isArray(results) && results.length > 0) {
-        return results
-          .filter((b: any) => b.status === "published" || b.status === "rejected")
-          .map((b: any) => ({
-            id: String(b.id),
-            maquettiste_id: mockMaquettisteUser.id,
-            maquettiste_name: b.authors_names || "Maquettiste",
-            metadata: {
-              title: b.title || "Sans titre",
-              authors: b.authors_names ? b.authors_names.split(",") : ["Auteur LAHA"],
-              publication_year: b.publication_date ? new Date(b.publication_date).getFullYear() : 2026,
-              language: b.language || "Français",
-              language_source: "manual_override",
-              summary: b.summary || "",
-              summary_source: "manual_override",
-              isbn: b.isbn || "",
-            },
-            classification: {
-              country: "BJ",
-              university: b.institution_name || "Université d'Abomey-Calavi (UAC)",
-              faculty: b.faculty_name || "",
-              discipline: b.discipline_name || "Général",
-              source: "manual_override",
-            },
-            files: {
-              format: (b.format_type || "pdf").toUpperCase() as "PDF" | "EPUB",
-              book_file_name: b.title,
-              cover_url: b.cover_image,
-            },
-            status: b.status === "published" ? "published" : "revision_requested",
-            created_at: b.created_at || new Date().toISOString(),
-            default_price: Number(b.price_raw) || 5000,
-          }));
-      }
-    }
-  } catch (err) {
-    console.warn("[Layout Service] API getValidationHistory fallback:", err);
-  }
+  const res = await fetch("/api/bff/catalog/deposits/", {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!res.ok) return [];
 
-  return mockDeposits.filter(
-    (d) => d.status === "published" || d.status === "revision_requested"
-  );
+  const data = await res.json();
+  const results = Array.isArray(data) ? data : data.results || data.data || [];
+  return results
+    .filter((b: any) => b.status === "published" || b.status === "rejected")
+    .map((b: any) => mapBackendToDeposit(b));
 }
 
-export async function validateDeposit(id: string, comment?: string): Promise<boolean> {
-  try {
-    const res = await fetch(`/api/bff/catalog/deposits/${id}/validate/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ comment }),
-    });
-    if (res.ok) {
-      return true;
-    }
-  } catch (err) {
-    console.warn("[Layout Service] API validate fallback to mock:", err);
-  }
-
-  const dep = mockDeposits.find((d) => d.id === id);
-  if (dep) {
-    dep.status = "published";
-    dep.validated_at = new Date().toISOString();
-    if (comment) dep.chef_comment = comment;
-    return true;
-  }
-  return true;
+export async function validateDeposit(
+  id: string,
+  comment?: string,
+  price_digital?: number,
+  price_paper?: number
+): Promise<boolean> {
+  const res = await fetch(`/api/bff/catalog/deposits/${id}/validate/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ comment, price_digital, price_paper }),
+  });
+  return res.ok;
 }
 
 export async function requestRevision(id: string, comment: string): Promise<boolean> {
-  try {
-    const res = await fetch(`/api/bff/catalog/deposits/${id}/reject/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ motif_rejet: comment }),
-    });
-    if (res.ok) {
-      return true;
-    }
-  } catch (err) {
-    console.warn("[Layout Service] API reject fallback to mock:", err);
-  }
-
-  const dep = mockDeposits.find((d) => d.id === id);
-  if (dep) {
-    dep.status = "revision_requested";
-    dep.chef_comment = comment;
-    return true;
-  }
-  return true;
+  const res = await fetch(`/api/bff/catalog/deposits/${id}/reject/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ motif_rejet: comment }),
+  });
+  return res.ok;
 }

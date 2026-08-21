@@ -36,12 +36,17 @@ export default function ChefValidationDetailPage() {
   const [validating, setValidating] = useState(false);
   const [revisionModalOpen, setRevisionModalOpen] = useState(false);
   const [showXmlNotice, setShowXmlNotice] = useState(false);
+  const [priceDigital, setPriceDigital] = useState<number>(5000);
+  const [pricePaper, setPricePaper] = useState<number>(7500);
 
   useEffect(() => {
     async function loadData() {
       setLoading(true);
       const data = await getDepositDetail(id);
       setDeposit(data);
+      if (data) {
+        if (data.default_price) setPriceDigital(data.default_price);
+      }
       setLoading(false);
     }
     loadData();
@@ -50,10 +55,10 @@ export default function ChefValidationDetailPage() {
   const handleValidate = async () => {
     if (!deposit) return;
     setValidating(true);
-    const success = await validateDeposit(deposit.id);
+    const success = await validateDeposit(deposit.id, undefined, priceDigital, pricePaper);
     setValidating(false);
     if (success) {
-      toast.success("Ouvrage validé avec succès et publié immédiatement sur la vitrine publique !");
+      toast.success(`Ouvrage validé et publié avec succès au tarif de ${priceDigital.toLocaleString("fr-FR")} FCFA !`);
       router.push("/chief-layout/validation");
     }
   };
@@ -244,10 +249,28 @@ export default function ChefValidationDetailPage() {
             <Sparkles className="w-5 h-5 text-gold" />
             <h3 className="text-sm font-bold text-navy">Décision de validation éditoriale</h3>
           </div>
-          <p className="text-xs text-foreground-muted">
-            La validation déclenchera immédiatement la mise en ligne automatique de l&apos;ouvrage sur la vitrine publique. 
-            En cas d&apos;anomalie, renvoyez le dossier en correction avec des instructions claires.
-          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-background-secondary border border-border">
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-navy uppercase tracking-wider">Prix Numérique (FCFA)</label>
+              <input
+                type="number"
+                step="500"
+                value={priceDigital}
+                onChange={(e) => setPriceDigital(parseFloat(e.target.value) || 0)}
+                className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground font-bold focus:ring-2 focus:ring-navy min-h-[40px]"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-navy uppercase tracking-wider">Prix Papier (FCFA)</label>
+              <input
+                type="number"
+                step="500"
+                value={pricePaper}
+                onChange={(e) => setPricePaper(parseFloat(e.target.value) || 0)}
+                className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground font-bold focus:ring-2 focus:ring-navy min-h-[40px]"
+              />
+            </div>
+          </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
             <button

@@ -384,10 +384,14 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
         try:
             book = Ouvrage.objects.get(id=pk)
             data = request.data
-            if 'price_digital' in data:
+            if 'price_digital' in data and data['price_digital'] is not None:
                 book.price_digital = Decimal(str(data['price_digital']))
-            if 'price_paper' in data:
+            if 'price_paper' in data and data['price_paper'] is not None:
                 book.price_paper = Decimal(str(data['price_paper']))
+            if 'title' in data and data['title']:
+                book.titre = str(data['title'])
+            if 'status' in data and data['status']:
+                book.status = str(data['status'])
             book.save()
 
             JournalAuditAdmin.objects.create(
@@ -397,7 +401,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 ressource_id=str(book.id),
                 details=data
             )
-            return Response({"success": True, "message": f"Tarifs de l'ouvrage '{book.titre}' mis à jour.", "error": None})
+            return Response({"success": True, "message": f"Ouvrage '{book.titre}' mis à jour avec succès.", "error": None})
         except Ouvrage.DoesNotExist:
             return Response({"success": False, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
 

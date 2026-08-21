@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { getDepositDetail, updateDeposit, submitDepositForValidation } from "@/lib/services/layout-artist";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
+import { toast } from "sonner";
 
 export default function DepositDetailPage() {
   const params = useParams();
@@ -29,17 +30,22 @@ export default function DepositDetailPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await getDepositDetail(id);
-      setDeposit(data);
-      if (data) {
-        setTitle(data.metadata.title);
-        setAuthorsStr(data.metadata.authors.join(", "));
-        setYear(data.metadata.publication_year);
-        setLanguage(data.metadata.language);
-        setSummary(data.metadata.summary);
-        setDiscipline(data.classification.discipline);
+      try {
+        const data = await getDepositDetail(id);
+        setDeposit(data);
+        if (data) {
+          setTitle(data.metadata.title);
+          setAuthorsStr(data.metadata.authors.join(", "));
+          setYear(data.metadata.publication_year);
+          setLanguage(data.metadata.language);
+          setSummary(data.metadata.summary);
+          setDiscipline(data.classification.discipline);
+        }
+      } catch (err) {
+        toast.error("Impossible de charger le dépôt.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     loadData();
   }, [id]);
@@ -49,31 +55,66 @@ export default function DepositDetailPage() {
   const handleSave = async () => {
     if (!deposit) return;
     setSaving(true);
-    const updated = await updateDeposit(deposit.id, {
-      metadata: {
-        ...deposit.metadata,
-        title,
-        authors: authorsStr.split(",").map((a) => a.trim()),
-        publication_year: year,
-        language,
-        summary,
-      },
-      classification: {
-        ...deposit.classification,
-        discipline,
-      },
-    });
-    if (updated) setDeposit(updated);
-    setSaving(false);
+    try {
+      const updated = await updateDeposit(deposit.id, {
+        metadata: {
+          ...deposit.metadata,
+          title,
+          authors: authorsStr.split(",").map((a) => a.trim()),
+          publication_year: year,
+          language,
+          summary,
+        },
+        classification: {
+          ...deposit.classification,
+          discipline,
+        },
+      });
+      if (updated) {
+        setDeposit(updated);
+        toast.success("Modifications enregistrées avec succès.");
+      } else {
+        toast.error("Erreur lors de la sauvegarde. Veuillez réessayer.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la sauvegarde.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleResubmit = async () => {
     if (!deposit) return;
     setSaving(true);
-    await handleSave();
-    await submitDepositForValidation(deposit.id);
-    setSaving(false);
-    router.push("/layout-artist/deposits");
+    try {
+      const updated = await updateDeposit(deposit.id, {
+        metadata: {
+          ...deposit.metadata,
+          title,
+          authors: authorsStr.split(",").map((a) => a.trim()),
+          publication_year: year,
+          language,
+          summary,
+        },
+        classification: {
+          ...deposit.classification,
+          discipline,
+        },
+      });
+      if (updated) {
+        const submitted = await submitDepositForValidation(deposit.id);
+        if (submitted) {
+          toast.success("Corrections soumises au Chef Maquettiste avec succès !");
+          router.push("/layout-artist/deposits");
+          return;
+        }
+      }
+      toast.error("Erreur lors de la resoumission. Veuillez réessayer.");
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la resoumission.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {

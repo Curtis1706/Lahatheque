@@ -1,6 +1,12 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
-from .views import OuvrageViewSet, DisciplineViewSet, ChiefLayoutDepositViewSet, ONIXImportView
+from .views import (
+    OuvrageViewSet,
+    DisciplineViewSet,
+    MaquettisteDepositViewSet,
+    ChiefLayoutValidationViewSet,
+    ONIXImportView,
+)
 from .stream_views import BookStreamView
 
 app_name = 'catalog'
@@ -8,12 +14,14 @@ app_name = 'catalog'
 router = DefaultRouter()
 router.register(r'books', OuvrageViewSet, basename='ouvrage')
 router.register(r'disciplines', DisciplineViewSet, basename='discipline')
-router.register(r'deposits', ChiefLayoutDepositViewSet, basename='deposits')
+
+# Espace Maquettiste : CRUD sur ses propres dépôts
+router.register(r'my-deposits', MaquettisteDepositViewSet, basename='my-deposits')
+
+# Espace Chef Maquettiste : validation des dépôts soumis
+router.register(r'deposits', ChiefLayoutValidationViewSet, basename='deposits')
 
 urlpatterns = [
     path('onix/import/', ONIXImportView.as_view(), name='onix-import'),
     path('books/<str:book_id>/stream/', BookStreamView.as_view(), name='book-stream'),
 ] + router.urls
-
-
-
