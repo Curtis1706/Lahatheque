@@ -627,33 +627,40 @@ class AdminValidationViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
         try:
             from apps.catalog.models import Ouvrage
-            books = Ouvrage.objects.all().order_by('-created_at')[:50]
+            books = (
+                Ouvrage.objects
+                .select_related('publisher', 'discipline')
+                .prefetch_related('authors')
+                .all()
+                .order_by('-publication_date', '-id')[:50]
+            )
             results = []
             for b in books:
-                reviewer_name = "Kossi Dossou (Chef Maquettiste)" if getattr(b, 'statut', '') in ['published', 'approved'] else "Non assigné"
+                file_url = b.file.url if b.file and hasattr(b.file, 'url') else None
                 results.append({
                     "id": str(b.id),
                     "title": b.titre,
-                    "author_name": getattr(b, 'auteur_nom', 'Éditions LAHA'),
-                    "publisher_name": getattr(b, 'editeur_nom', 'Éditions LAHA'),
-                    "discipline": getattr(b, 'discipline', 'Général'),
-                    "version": "v1.2 — BAT Final",
-                    "format": "EPUB & PDF Fixe",
-                    "status": getattr(b, 'statut', 'pending_admin_approval'),
-                    "submitted_by": "Akouavi Mensah (Maquettiste)",
-                    "submitted_at": b.created_at.isoformat() if hasattr(b, 'created_at') and b.created_at else timezone.now().isoformat(),
-                    "reviewed_by": reviewer_name,
-                    "reviewed_at": b.updated_at.isoformat() if hasattr(b, 'updated_at') and b.updated_at else timezone.now().isoformat(),
-                    "rejection_reason": getattr(b, 'motif_rejet', None),
-                    "file_url": getattr(b, 'fichier_numerique', None) and getattr(b.fichier_numerique, 'url', None) or "/mock/epreuve.pdf",
-                    "page_count": 284,
-                    "lcp_compliant": True
+                    "author_name": b.auteur or "Auteur non renseigné",
+                    "publisher_name": b.publisher.company_name or b.publisher.name if b.publisher else "N/A",
+                    "discipline": b.discipline.name if b.discipline else "Non classé",
+                    "format": b.get_format_type_display() if hasattr(b, 'get_format_type_display') else b.format_type,
+                    "status": b.status,
+                    "submitted_at": b.publication_date.isoformat() if b.publication_date else None,
+                    "file_url": file_url,
+                    "page_count": b.page_count,
+                    "lcp_compliant": b.protection_type == 'lcp',
                 })
             return Response({"success": True, "data": results, "error": None})
         except Exception as e:
-            return Response({"success": True, "data": [], "error": str(e)})
+            logger.error(f"[AdminValidationViewSet.list] Erreur : {e}", exc_info=True)
+            return Response(
+                {"success": False, "data": [], "error": "Erreur lors du chargement de la file de validation. Consultez les logs serveur."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=['post'], url_path='process')
     def process_validation(self, request, pk=None):
@@ -665,10 +672,7 @@ class AdminValidationViewSet(viewsets.ViewSet):
             notes = request.data.get('notes', '').strip()
 
             if action_type == 'approve':
-                if hasattr(book, 'statut'):
-                    book.statut = 'published'
-                if hasattr(book, 'motif_rejet'):
-                    book.motif_rejet = None
+                book.status = 'published'
                 book.save()
 
                 JournalAuditAdmin.objects.create(
@@ -684,10 +688,7 @@ class AdminValidationViewSet(viewsets.ViewSet):
                 if not rejection_reason:
                     return Response({"success": False, "error": "Le motif de rejet est obligatoire pour informer le chef maquettiste et l'auteur."}, status=status.HTTP_400_BAD_REQUEST)
                 
-                if hasattr(book, 'statut'):
-                    book.statut = 'rejected'
-                if hasattr(book, 'motif_rejet'):
-                    book.motif_rejet = rejection_reason
+                book.status = 'rejected'
                 book.save()
 
                 JournalAuditAdmin.objects.create(
@@ -700,8 +701,11 @@ class AdminValidationViewSet(viewsets.ViewSet):
                 return Response({"success": True, "message": f"L'épreuve de l'ouvrage '{book.titre}' a été rejetée avec le motif spécifié.", "error": None})
 
             return Response({"success": False, "error": "Action invalide. Utilisez 'approve' ou 'reject'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Ouvrage.DoesNotExist:
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"success": False, "error": f"Erreur lors de la validation : {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"success": False, "error": f"Erreur lors de la validation : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AdminContractViewSet(viewsets.ViewSet):
@@ -713,91 +717,76 @@ class AdminContractViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
         try:
-            from apps.rights.models import Contract
-            contracts = Contract.objects.all().select_related('author').order_by('-created_at')[:50]
+            from apps.rights.models import ContratLegal
+            contracts = ContratLegal.objects.all().order_by('-created_at')[:50]
             results = []
             for c in contracts:
-                partner_name = f"{c.author.first_name} {c.author.last_name}" if c.author else "Auteur Partenaire"
                 results.append({
                     "id": str(c.id),
-                    "contract_number": getattr(c, 'contract_number', f"CTR-{str(c.id)[:8].upper()}"),
-                    "title": getattr(c, 'title', 'Contrat d\'Édition Numérique & Papier'),
-                    "partner_name": partner_name,
-                    "partner_type": "author",
-                    "partner_email": c.author.email if c.author else "",
-                    "royalty_rate": float(getattr(c, 'royalty_rate', 70.0)),
-                    "is_derogatory": float(getattr(c, 'royalty_rate', 70.0)) != 70.0,
-                    "status": getattr(c, 'status', 'pending_admin_approval'),
-                    "created_at": c.created_at.isoformat() if hasattr(c, 'created_at') and c.created_at else timezone.now().isoformat(),
-                    "reviewed_by_juriste": "Me. Tatiana HOUNDEGNON (Juriste)",
-                    "rejection_reason": getattr(c, 'rejection_reason', None),
+                    "contract_number": c.numero_contrat,
+                    "type": c.type_contrat,
+                    "title": c.titre,
+                    "partner_name": c.contracting_party or "Non renseigné",
+                    "parties": c.parties_prenantes,
+                    "status": c.status,
+                    "date_signature": c.date_signature.isoformat() if c.date_signature else None,
+                    "date_expiration": c.date_expiration.isoformat() if c.date_expiration else None,
+                    "file_url": c.fichier_contrat_path or None,
+                    "notes": c.notes,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
                 })
             return Response({"success": True, "data": results, "error": None})
-        except Exception:
-            # Données de repli réalistes
-            sample_contracts = [
-                {
-                    "id": "ctr-001",
-                    "contract_number": "CTR-2026-088",
-                    "title": "Cession de Droits Numériques — Droit International Public",
-                    "partner_name": "Prof. Jean HOUNWANOU",
-                    "partner_type": "author",
-                    "partner_email": "jean.hounwanou@uac.bj",
-                    "royalty_rate": 75.0,
-                    "is_derogatory": True,
-                    "status": "pending_admin_approval",
-                    "created_at": "2026-08-20T10:15:00Z",
-                    "reviewed_by_juriste": "Me. Tatiana HOUNDEGNON (Juriste)",
-                    "rejection_reason": None
-                },
-                {
-                    "id": "ctr-002",
-                    "contract_number": "CTR-2026-079",
-                    "title": "Accord de Diffusion Partenaire — Éditions Ruisseau d'Afrique",
-                    "partner_name": "Éditions Ruisseau d'Afrique",
-                    "partner_type": "publisher",
-                    "partner_email": "direction@ruisseauafrique.bj",
-                    "royalty_rate": 22.0,
-                    "is_derogatory": False,
-                    "status": "en_vigueur",
-                    "created_at": "2026-08-18T14:20:00Z",
-                    "reviewed_by_juriste": "Me. Tatiana HOUNDEGNON (Juriste)",
-                    "rejection_reason": None
-                }
-            ]
-            return Response({"success": True, "data": sample_contracts, "error": None})
+        except Exception as e:
+            logger.error(f"[AdminContractViewSet.list] Erreur : {e}", exc_info=True)
+            return Response(
+                {"success": False, "data": [], "error": "Erreur lors du chargement des contrats. Consultez les logs serveur."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=['post'], url_path='process')
     def process_contract(self, request, pk=None):
-        action_type = request.data.get('action') # 'approve' ou 'reject'
-        rejection_reason = request.data.get('rejection_reason', '').strip()
-        approved_rate = request.data.get('approved_rate')
+        try:
+            from apps.rights.models import ContratLegal
+            contract = ContratLegal.objects.get(id=pk)
+            action_type = request.data.get('action') # 'approve' ou 'reject'
+            rejection_reason = request.data.get('rejection_reason', '').strip()
+            notes = request.data.get('notes', '').strip()
 
-        if action_type == 'approve':
-            JournalAuditAdmin.objects.create(
-                administrateur=request.user,
-                action="APPROVE_LEGAL_CONTRACT",
-                ressource_type="Contract",
-                ressource_id=str(pk),
-                details={"approved_rate": approved_rate}
-            )
-            return Response({"success": True, "message": "Contrat approuvé et mis en vigueur avec succès.", "error": None})
+            if action_type == 'approve':
+                contract.status = 'active'
+                contract.save()
+                JournalAuditAdmin.objects.create(
+                    administrateur=request.user,
+                    action="APPROVE_LEGAL_CONTRACT",
+                    ressource_type="ContratLegal",
+                    ressource_id=str(contract.id),
+                    details={"notes": notes}
+                )
+                return Response({"success": True, "message": "Contrat approuvé et mis en vigueur avec succès.", "error": None})
 
-        elif action_type == 'reject':
-            if not rejection_reason:
-                return Response({"success": False, "error": "Le motif de rejet est obligatoire pour informer le juriste."}, status=status.HTTP_400_BAD_REQUEST)
+            elif action_type == 'reject':
+                if not rejection_reason:
+                    return Response({"success": False, "error": "Le motif de rejet est obligatoire pour informer le juriste."}, status=status.HTTP_400_BAD_REQUEST)
 
-            JournalAuditAdmin.objects.create(
-                administrateur=request.user,
-                action="REJECT_LEGAL_CONTRACT",
-                ressource_type="Contract",
-                ressource_id=str(pk),
-                details={"reason": rejection_reason}
-            )
-            return Response({"success": True, "message": "Contrat rejeté avec le motif spécifié.", "error": None})
+                contract.status = 'terminated'
+                contract.save()
+                JournalAuditAdmin.objects.create(
+                    administrateur=request.user,
+                    action="REJECT_LEGAL_CONTRACT",
+                    ressource_type="ContratLegal",
+                    ressource_id=str(contract.id),
+                    details={"reason": rejection_reason, "notes": notes}
+                )
+                return Response({"success": True, "message": "Contrat rejeté avec le motif spécifié.", "error": None})
 
-        return Response({"success": False, "error": "Action invalide."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"success": False, "error": "Action invalide."}, status=status.HTTP_400_BAD_REQUEST)
+        except ContratLegal.DoesNotExist:
+            return Response({"success": False, "error": "Contrat introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"success": False, "error": f"Erreur lors du traitement : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AdminStockViewSet(viewsets.ViewSet):
@@ -811,9 +800,19 @@ class AdminStockViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
         try:
-            from apps.commerce.models import Entrepot
-            warehouses = Entrepot.objects.all()
+            from apps.commerce.models import Entrepot, StockOuvrage
+            from django.db.models import Sum, Count, F, Q, ExpressionWrapper, DecimalField
+
+            warehouses = Entrepot.objects.filter(is_active=True).annotate(
+                total_items=Sum('stocks_ouvrages__quantite_reelle'),
+                critical_alerts=Count(
+                    'stocks_ouvrages',
+                    filter=Q(stocks_ouvrages__quantite_reelle__lte=F('stocks_ouvrages__seuil_alerte'))
+                ),
+            )
             wh_results = []
             for w in warehouses:
                 wh_results.append({
@@ -822,31 +821,39 @@ class AdminStockViewSet(viewsets.ViewSet):
                     "code": w.code,
                     "country": w.pays,
                     "city": w.ville,
-                    "manager_name": w.responsable_nom or "Gestionnaire",
-                    "total_items": 4250,
-                    "critical_alerts": 2
+                    "manager_name": w.responsable_nom or "Non assigné",
+                    "total_items": w.total_items or 0,
+                    "critical_alerts": w.critical_alerts or 0,
                 })
-            
-            if not wh_results:
-                wh_results = [
-                    {"id": "wh-01", "name": "Entrepôt Central Cotonou", "code": "WAR-CTN-01", "country": "Bénin", "city": "Cotonou", "manager_name": "Gaston Sossou", "total_items": 14200, "critical_alerts": 3},
-                    {"id": "wh-02", "name": "Hub Régional Dakar", "code": "WAR-DKR-01", "country": "Sénégal", "city": "Dakar", "manager_name": "Moussa Ndiaye", "total_items": 8600, "critical_alerts": 1},
-                    {"id": "wh-03", "name": "Entrepôt Abidjan Sud", "code": "WAR-ABJ-01", "country": "Côte d'Ivoire", "city": "Abidjan", "manager_name": "Kouamé Konan", "total_items": 11300, "critical_alerts": 0},
-                ]
+
+            global_totals = StockOuvrage.objects.aggregate(
+                total_physical=Sum('quantite_reelle'),
+                stock_val=Sum(ExpressionWrapper(F('quantite_reelle') * F('ouvrage__price_paper'), output_field=DecimalField()))
+            )
+            total_physical_stock = global_totals['total_physical'] or 0
+            stock_value = float(global_totals['stock_val'] or 0.0)
+
+            pending_loss_adjustments = StockOuvrage.objects.filter(
+                quantite_reelle__lte=F('seuil_alerte')
+            ).count()
 
             return Response({
                 "success": True,
                 "data": {
-                    "totalPhysicalStock": 34100,
-                    "totalStockValueXof": 170500000.0,
+                    "totalPhysicalStock": total_physical_stock,
+                    "totalStockValueXof": stock_value,
                     "totalWarehouses": len(wh_results),
-                    "pendingLossAdjustments": 2,
-                    "warehouses": wh_results
+                    "pendingLossAdjustments": pending_loss_adjustments,
+                    "warehouses": wh_results,
                 },
-                "error": None
+                "error": None,
             })
         except Exception as e:
-            return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f"[AdminStockViewSet.list] Erreur : {e}", exc_info=True)
+            return Response(
+                {"success": False, "data": {}, "error": "Erreur lors de la récupération des données de stock."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=['get'], url_path='movements')
     def movements(self, request):
@@ -1001,6 +1008,89 @@ class AdminSalesListAPIView(APIView):
                 "order_status": "completed" if l.commande.statut_commande == 'completed' else "pending",
                 "created_at": l.commande.created_at.isoformat() if l.commande.created_at else None,
                 "country": getattr(buyer, 'country', 'BJ') if buyer else 'BJ',
+            })
+        return Response({"success": True, "data": results, "error": None})
+
+
+class AdminSalesByCountryAPIView(APIView):
+    """
+    GET /api/v1/admin/sales/by-country/
+    Ventilation géographique des ventes réelles (commandes payées).
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from apps.commerce.models import LigneCommande
+        from django.db.models import Sum, Count, F
+
+        rows = (
+            LigneCommande.objects
+            .filter(commande__statut_paiement='paid')
+            .values('commande__user__country')
+            .annotate(
+                sales_count=Count('id'),
+                total_revenue=Sum(F('unit_price') * F('quantity')),
+            )
+            .order_by('-total_revenue')
+        )
+
+        country_names = {
+            'BJ': "Bénin (BJ)", 'CI': "Côte d'Ivoire (CI)", 'SN': "Sénégal (SN)",
+            'NE': "Niger (NE)", 'TG': "Togo (TG)", 'GA': "Gabon (GA)", 'CD': "RDC (CD)",
+        }
+        results = [
+            {
+                "country": country_names.get(r['commande__user__country'], r['commande__user__country'] or "Non renseigné"),
+                "code": r['commande__user__country'] or "N/A",
+                "salesCount": r['sales_count'],
+                "totalRevenue": float(r['total_revenue'] or 0),
+            }
+            for r in rows
+        ]
+        return Response({"success": True, "data": results, "error": None})
+
+
+class AdminSubscriptionsListAPIView(APIView):
+    """
+    GET /api/v1/admin/subscriptions/
+    Liste des abonnements et bouquets institutionnels actifs/expirés.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from apps.commerce.models import Subscription
+        from django.utils import timezone
+
+        subs = Subscription.objects.select_related('user', 'institution', 'plan').order_by('-starts_at')[:100]
+        now = timezone.now()
+        results = []
+        for s in subs:
+            if s.institution:
+                holder = s.institution.name or s.institution.short_name or str(s.institution)
+                sub_type = "institution_bouquet"
+            elif s.user:
+                holder = f"{s.user.first_name} {s.user.last_name}".strip() or s.user.email
+                sub_type = "individuel"
+            else:
+                holder = "N/A"
+                sub_type = "individuel"
+
+            if not s.is_active or (s.expires_at and s.expires_at < now):
+                computed_status = "expired"
+            elif s.expires_at and (s.expires_at - now).days <= 30:
+                computed_status = "expiring_soon"
+            else:
+                computed_status = "active"
+
+            results.append({
+                "id": str(s.id),
+                "name": s.plan.name if s.plan else "N/A",
+                "type": sub_type,
+                "holder": holder,
+                "activeUsers": s.plan.max_concurrent_users if s.plan else 1,
+                "expiresAt": s.expires_at.isoformat() if s.expires_at else None,
+                "amount": float(s.plan.price_amount) if s.plan else 0.0,
+                "status": computed_status,
             })
         return Response({"success": True, "data": results, "error": None})
 

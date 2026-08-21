@@ -1,46 +1,32 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Sparkles, Building2, User, CheckCircle2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
-
-interface SubscriptionRow {
-  id: string;
-  name: string;
-  type: "individuel" | "institution_bouquet";
-  holder: string;
-  activeUsers: number;
-  expiresAt: string;
-  amount: number;
-  status: "active" | "expiring_soon" | "expired";
-}
-
-const MOCK_SUBSCRIPTIONS: SubscriptionRow[] = [
-  {
-    id: "sub-201",
-    name: "Bouquet Droit & Économie UAC",
-    type: "institution_bouquet",
-    holder: "Université d'Abomey-Calavi (UAC)",
-    activeUsers: 1200,
-    expiresAt: "2024-12-31",
-    amount: 4500000,
-    status: "active",
-  },
-  {
-    id: "sub-202",
-    name: "Pass Lecteur Étudiant Annuel",
-    type: "individuel",
-    holder: "Kossi Adambounou",
-    activeUsers: 1,
-    expiresAt: "2024-03-25",
-    amount: 15000,
-    status: "expiring_soon",
-  },
-];
+import { getAdminSubscriptions } from "@/lib/services/admin";
+import { AdminSubscriptionItem } from "@/lib/types/admin";
 
 export default function AdminSubscriptionsPage() {
-  const columns: DataTableColumn<SubscriptionRow>[] = [
+  const [subscriptions, setSubscriptions] = useState<AdminSubscriptionItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const data = await getAdminSubscriptions();
+        setSubscriptions(data);
+      } catch (err) {
+        console.error("Erreur de chargement des souscriptions admin", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const columns: DataTableColumn<AdminSubscriptionItem>[] = [
     {
       key: "name",
       header: "Intitulé de la Souscription",
@@ -62,7 +48,7 @@ export default function AdminSubscriptionsPage() {
     },
     {
       key: "activeUsers",
-      header: "Accès Simultanes",
+      header: "Accès Simultanés",
       cell: (row) => (
         <span className="font-mono text-xs font-semibold text-foreground">
           {row.activeUsers.toLocaleString()} utilisateurs
@@ -81,7 +67,11 @@ export default function AdminSubscriptionsPage() {
     {
       key: "expiresAt",
       header: "Date d'Expiration",
-      cell: (row) => <span className="font-mono text-xs text-foreground-muted">{row.expiresAt}</span>,
+      cell: (row) => (
+        <span className="font-mono text-xs text-foreground-muted">
+          {row.expiresAt ? new Date(row.expiresAt).toLocaleDateString("fr-FR") : "N/A"}
+        </span>
+      ),
     },
   ];
 
@@ -105,9 +95,11 @@ export default function AdminSubscriptionsPage() {
       </div>
 
       <DataTable
-        data={MOCK_SUBSCRIPTIONS}
+        data={subscriptions}
         columns={columns}
         rowKey="id"
+        loading={loading}
+        emptyMessage="Aucune souscription ou bouquet actif enregistré pour le moment."
         searchPlaceholder="Rechercher par titulaire ou bouquet..."
       />
     </div>

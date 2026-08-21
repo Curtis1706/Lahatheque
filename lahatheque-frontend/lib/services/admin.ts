@@ -17,6 +17,8 @@ import {
   AdminStockOverview,
   AdminStockMovement,
   AdminWarehouse,
+  CountrySales,
+  AdminSubscriptionItem,
 } from "@/lib/types/admin";
 import {
   MOCK_ADMIN_KPI,
@@ -1029,6 +1031,34 @@ export async function updatePlatformGlobalSettings(
   } catch (err) {
     return { success: false, error: 'Erreur réseau — impossible de contacter le serveur.' };
   }
+}
+
+export async function getAdminSalesByCountry(): Promise<CountrySales[]> {
+  try {
+    const res = await fetch('/api/bff/admin/sales/by-country', { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data)) return json.data;
+    }
+    console.error(`[Admin Service] Réponse HTTP ${res.status} sur getAdminSalesByCountry.`);
+  } catch (err) {
+    console.error('[Admin Service] Erreur réseau sur getAdminSalesByCountry.', err);
+  }
+  return [];
+}
+
+export async function getAdminSubscriptions(): Promise<AdminSubscriptionItem[]> {
+  try {
+    const res = await fetch('/api/bff/admin/subscriptions', { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data)) return json.data;
+    }
+    console.error(`[Admin Service] Réponse HTTP ${res.status} sur getAdminSubscriptions.`);
+  } catch (err) {
+    console.error('[Admin Service] Erreur réseau sur getAdminSubscriptions.', err);
+  }
+  return [];
 }
 
 

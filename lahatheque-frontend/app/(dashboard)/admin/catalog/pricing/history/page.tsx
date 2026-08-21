@@ -2,32 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, History, Tag } from "lucide-react";
-
-const PRICE_HISTORY_LOGS = [
-  {
-    id: "log-p1",
-    bookTitle: "Droit Constitutionnel Béninois et Droit Comparé",
-    oldPriceDigital: 5000,
-    newPriceDigital: 6500,
-    oldPricePaper: 8500,
-    newPricePaper: 9500,
-    changedBy: "Admin Principal (admin.principal@laha.bj)",
-    reason: "Mise à jour annuelle grille édition augmentée",
-    date: "2024-02-15 11:30",
-  },
-  {
-    id: "log-p2",
-    bookTitle: "Précis d'Économie Agricole Africaine",
-    oldPriceDigital: 5000,
-    newPriceDigital: 4000,
-    oldPricePaper: 7500,
-    newPricePaper: 6500,
-    changedBy: "Claire Houessou (Éditeur)",
-    reason: "Offre facultés deuxième semestre",
-    date: "2024-01-10 09:15",
-  },
-];
+import { ArrowLeft, History } from "lucide-react";
 
 export default function AdminPricingHistoryPage() {
   return (
@@ -49,33 +24,23 @@ export default function AdminPricingHistoryPage() {
         </div>
       </div>
 
-      <div className="space-y-3">
-        {PRICE_HISTORY_LOGS.map((log) => (
-          <div key={log.id} className="p-4 rounded-xl bg-background-secondary border border-border space-y-2">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h3 className="font-semibold text-xs text-foreground">{log.bookTitle}</h3>
-              <span className="font-mono text-[11px] text-foreground-muted">{log.date}</span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4 text-xs font-mono pt-1">
-              <div>
-                <span className="text-foreground-muted">Numérique: </span>
-                <span className="line-through text-error mr-1">{log.oldPriceDigital.toLocaleString()} FCFA</span>
-                <span className="font-bold text-success">{log.newPriceDigital.toLocaleString()} FCFA</span>
-              </div>
-              <div>
-                <span className="text-foreground-muted">Papier: </span>
-                <span className="line-through text-error mr-1">{log.oldPricePaper.toLocaleString()} FCFA</span>
-                <span className="font-bold text-success">{log.newPricePaper.toLocaleString()} FCFA</span>
-              </div>
-            </div>
-
-            <div className="pt-2 text-[11px] text-foreground-muted border-t border-border flex justify-between">
-              <span>Modifié par: <strong className="text-foreground">{log.changedBy}</strong></span>
-              <span>Motif: <em>{log.reason}</em></span>
-            </div>
-          </div>
-        ))}
+      <div className="p-8 rounded-2xl bg-background-secondary border border-border text-center space-y-3">
+        <History className="w-10 h-10 text-gold mx-auto" />
+        <h2 className="text-sm font-bold text-foreground">
+          Fonctionnalité en cours de construction
+        </h2>
+        <p className="text-xs text-foreground-muted max-w-md mx-auto">
+          La traçabilité détaillée des changements de prix sera disponible après l'implémentation du modèle d'historique dédié côté backend.
+        </p>
+        <div className="pt-2">
+          <Link
+            href="/admin/catalog/pricing"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-gold" />
+            Retour à la gestion des tarifs
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -302,3 +302,21 @@ export interface AdminStockOverview {
   warehouses: AdminWarehouse[];
 }
 
+export interface CountrySales {
+  country: string;
+  code: string;
+  salesCount: number;
+  totalRevenue: number;
+}
+
+export interface AdminSubscriptionItem {
+  id: string;
+  name: string;
+  type: string;
+  holder: string;
+  activeUsers: number;
+  expiresAt: string | null;
+  amount: number;
+  status: "active" | "expiring_soon" | "expired";
+}
+
