@@ -99,12 +99,16 @@ export const libraryApi = {
 
   async syncProgress(bookId: string, currentPage?: number, totalPages?: number): Promise<boolean> {
     try {
-      const res = await fetch("/api/bff/student/reading-progress/", {
+      const progressPercent = (totalPages && currentPage)
+        ? Math.min(100, Math.round((currentPage / totalPages) * 100))
+        : 0;
+      const res = await fetch("/api/bff/student/reading/progress/", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          book_id: bookId,
+          ouvrage_id: bookId,
+          progress_percent: progressPercent,
           current_page: currentPage || 0,
           total_pages: totalPages || 0,
         }),

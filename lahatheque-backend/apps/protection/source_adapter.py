@@ -68,17 +68,23 @@ class DocumentSourceAdapter:
         """Récupère le fichier d'un ouvrage du catalogue interne LAHAThèque."""
         from apps.catalog.models import Ouvrage
 
+        ouvrage = None
         try:
             ouvrage = Ouvrage.objects.get(id=book_id)
-        except Ouvrage.DoesNotExist:
+        except (Ouvrage.DoesNotExist, Exception):
+            # Fallback sur slug si book_id n'est pas un UUID valide
+            ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
+
+        if not ouvrage:
             raise DocumentSourceError(f"Ouvrage introuvable dans le catalogue: {book_id}")
 
-        if ouvrage.fichier_numerique:
+        # Le champ fichier est 'file' sur le modèle Ouvrage
+        if ouvrage.file:
             try:
-                with ouvrage.fichier_numerique.open("rb") as f:
+                with ouvrage.file.open("rb") as f:
                     return f.read()
             except Exception as e:
-                logger.error(f"Erreur lecture fichier numerique ouvrage {book_id}: {e}")
+                logger.error(f"Erreur lecture fichier ouvrage {book_id}: {e}")
 
         # Fallback fichier physique de test
         fallback_path = os.path.join(settings.BASE_DIR, "media", f"{book_id}.pdf")
@@ -87,6 +93,7 @@ class DocumentSourceAdapter:
                 return f.read()
 
         raise DocumentSourceError(f"Aucun fichier disponible pour l'ouvrage {book_id}")
+
 
     @classmethod
     def _validate_ssrf_and_whitelist(cls, url: str, options: Dict[str, Any]) -> None:

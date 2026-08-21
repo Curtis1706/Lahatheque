@@ -107,10 +107,10 @@ class CreateOrderView(APIView):
 
             # Si le provider est mock et immédiat, valider le paiement tout de suite
             if payment_res.get('status') == 'success':
-                commande.statut_paiement = 'paid'
-                commande.statut_commande = 'completed'
-
-            commande.save()
+                from .services import handle_payment_success
+                handle_payment_success(tx)
+            else:
+                commande.save()
 
         return Response({
             'order_id': str(commande.id),

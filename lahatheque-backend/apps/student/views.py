@@ -414,8 +414,15 @@ class StudentOrdersView(APIView):
         total_amount = (unit_price * quantity) + shipping_fee
 
         with transaction.atomic():
+            tx = PaymentTransaction.objects.create(
+                user=user,
+                amount=total_amount,
+                currency=currency,
+                status='success',
+            )
             commande = Order.objects.create(
                 user=user,
+                payment_transaction=tx,
                 total_amount=total_amount,
                 currency=currency,
                 statut_paiement='paid',  # Paiement validé pour la démo

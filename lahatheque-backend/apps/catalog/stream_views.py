@@ -44,8 +44,8 @@ class BookStreamView(APIView):
         try:
             ouvrage = Ouvrage.objects.filter(id=book_id).first()
         except Exception:
-            # Si book_id n'est pas un UUID valide (ex: slug ou ID numérique), tenter recherche par slug ou premier ouvrage
-            ouvrage = Ouvrage.objects.filter(slug=book_id).first() or Ouvrage.objects.first()
+            # Si book_id n'est pas un UUID valide (ex: slug ou ISBN), tenter une recherche par ISBN
+            ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
 
         if not ouvrage:
             return JsonResponse({

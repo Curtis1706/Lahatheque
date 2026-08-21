@@ -141,11 +141,10 @@ class AnnotationViewSet(ModelViewSet):
 class GlobalDrmConfigView(APIView):
     """
     Vue singleton pour la configuration DRM globale du catalogue.
-    GET  → retourne la configuration globale (ou la crée avec les valeurs par défaut).
-    PATCH → met à jour partiellement et incrémente config_version pour invalider les dérivés.
-    Accessible aux administrateurs et membres du staff.
+    GET  → retourne la configuration globale (tout utilisateur authentifié — nécessaire pour le lecteur).
+    PATCH → met à jour partiellement et incrémente config_version pour invalider les dérivés (Admin/Staff).
     """
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         cfg = GlobalDrmConfig.get_singleton()
@@ -157,6 +156,12 @@ class GlobalDrmConfigView(APIView):
         })
 
     def patch(self, request):
+        # Le PATCH reste réservé aux admins/staff
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response(
+                {"success": False, "data": {}, "error": "Accès réservé aux administrateurs."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         cfg = GlobalDrmConfig.get_singleton()
         serializer = GlobalDrmConfigSerializer(cfg, data=request.data, partial=True)
         if not serializer.is_valid():
