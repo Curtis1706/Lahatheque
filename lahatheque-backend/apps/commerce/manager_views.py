@@ -194,16 +194,15 @@ class StockRestockView(APIView):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
 
         stock_id = request.data.get("stock_id")
+        ouvrage_id = request.data.get("ouvrage_id")
         quantite = request.data.get("quantite")
         reference = request.data.get("reference_document", "")
 
-        if not stock_id or not quantite:
-            return Response({"success": False, "data": None, "error": "stock_id et quantite sont requis."}, status=400)
+        if not quantite:
+            return Response({"success": False, "data": None, "error": "quantite est requis."}, status=400)
 
-        try:
-            s = StockOuvrage.objects.select_for_update().get(pk=stock_id)
-        except StockOuvrage.DoesNotExist:
-            return Response({"success": False, "data": None, "error": "Stock introuvable."}, status=404)
+        if not stock_id and not ouvrage_id:
+            return Response({"success": False, "data": None, "error": "stock_id ou ouvrage_id est requis."}, status=400)
 
         try:
             qty = int(quantite)
@@ -211,6 +210,42 @@ class StockRestockView(APIView):
                 raise ValueError
         except (ValueError, TypeError):
             return Response({"success": False, "data": None, "error": "Quantité invalide."}, status=400)
+
+        # Résolution du StockOuvrage
+        s = None
+        if stock_id:
+            try:
+                s = StockOuvrage.objects.select_for_update().get(pk=stock_id)
+            except StockOuvrage.DoesNotExist:
+                return Response({"success": False, "data": None, "error": "Stock introuvable."}, status=404)
+        elif ouvrage_id:
+            # Création automatique du StockOuvrage si inexistant
+            from apps.catalog.models import Ouvrage
+            try:
+                ouvrage = Ouvrage.objects.get(id=ouvrage_id)
+            except Ouvrage.DoesNotExist:
+                return Response({"success": False, "data": None, "error": "Ouvrage introuvable."}, status=404)
+
+            entrepot = Entrepot.objects.filter(is_active=True).first()
+            if not entrepot:
+                entrepot = Entrepot.objects.create(
+                    nom="Entrepôt Principal LAHA Cotonou",
+                    code="WAR-CTN-01",
+                    pays="Bénin",
+                    ville="Cotonou",
+                    adresse="Siège LAHA Éditions, Cotonou",
+                    is_active=True
+                )
+
+            s, created = StockOuvrage.objects.select_for_update().get_or_create(
+                ouvrage=ouvrage,
+                entrepot=entrepot,
+                defaults={
+                    'quantite_reelle': 0,
+                    'quantite_reservee': 0,
+                    'seuil_alerte': 10
+                }
+            )
 
         s.quantite_reelle = F("quantite_reelle") + qty
         s.last_restock_at = timezone.now()
@@ -576,4 +611,64 @@ class ManagerReportExportView(APIView):
             print("EXCEPTION IN EXPORT GET:", type(exc), exc)
             traceback.print_exc()
             raise exc
+
+
+class AvailableBooksForStockView(APIView):
+    """
+    GET /api/v1/commerce/manager/stock/available-books/
+    Retourne tous les ouvrages publiés avec leur stock actuel par entrepôt.
+    Si un ouvrage n'a pas de StockOuvrage, il est marqué comme "nouveau" (stock 0).
+    Permet au gestionnaire de réassortir n'importe quel livre publié.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not _is_manager_or_admin(request.user):
+            return Response({"success": False, "error": "Accès refusé."}, status=403)
+
+        from apps.catalog.models import Ouvrage
+
+        search = request.query_params.get("search", "").strip()
+        ouvrages = Ouvrage.objects.filter(status='published').select_related(
+            'discipline', 'institution'
+        ).prefetch_related('authors').order_by('title')
+
+        if search:
+            ouvrages = ouvrages.filter(title__icontains=search)
+
+        entrepot = Entrepot.objects.filter(is_active=True).first()
+        if not entrepot:
+            entrepot = Entrepot.objects.first()
+
+        result = []
+        for ouvrage in ouvrages:
+            stock = StockOuvrage.objects.filter(ouvrage=ouvrage, entrepot=entrepot).first() if entrepot else None
+
+            authors_str = ""
+            if ouvrage.pk:
+                try:
+                    authors_str = ", ".join(
+                        [f"{a.first_name} {a.last_name}".strip() for a in ouvrage.authors.all()]
+                    )
+                except Exception:
+                    pass
+
+            result.append({
+                "ouvrage_id": str(ouvrage.id),
+                "stock_id": str(stock.id) if stock else None,
+                "title": ouvrage.title,
+                "isbn": ouvrage.isbn or "",
+                "authors": authors_str,
+                "cover_url": ouvrage.cover_url,
+                "discipline": ouvrage.discipline.name if ouvrage.discipline else "",
+                "format_type": ouvrage.format_type,
+                "warehouse": entrepot.code if entrepot else "",
+                "warehouse_nom": entrepot.nom if entrepot else "",
+                "quantite_reelle": stock.quantite_reelle if stock else 0,
+                "quantite_disponible": stock.quantite_disponible if stock else 0,
+                "seuil_alerte": stock.seuil_alerte if stock else 10,
+                "is_new_stock": stock is None,
+            })
+
+        return Response({"success": True, "data": result})
 

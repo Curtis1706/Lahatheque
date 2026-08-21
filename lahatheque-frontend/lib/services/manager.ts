@@ -118,8 +118,9 @@ export async function getStockItems(filters?: {
   if (filters?.country) params.set("country", filters.country);
   if (filters?.search) params.set("search", filters.search);
   try {
-    const raw = await bffGet<any[]>(`/stock/?${params.toString()}`);
-    return raw.map((s) => ({
+    const raw = await bffGet<any>(`/stock/?${params.toString()}`);
+    const list = Array.isArray(raw) ? raw : (raw as any)?.results || (raw as any)?.data || [];
+    return list.map((s: any) => ({
       id: s.id,
       isbn: s.isbn ?? "",
       title: s.title ?? "",
@@ -187,10 +188,41 @@ export async function updateStockAlertThreshold(id: string, seuil_alerte: number
   await bffPatch(`/stock/${id}/`, { seuil_alerte });
 }
 
+// ─── Ouvrages disponibles pour le stock ───────────────────────────────────────
+
+export interface AvailableBookForStock {
+  ouvrage_id: string;
+  stock_id: string | null;
+  title: string;
+  isbn: string;
+  authors: string;
+  cover_url: string;
+  discipline: string;
+  format_type: string;
+  warehouse: string;
+  warehouse_nom: string;
+  quantite_reelle: number;
+  quantite_disponible: number;
+  seuil_alerte: number;
+  is_new_stock: boolean;
+}
+
+export async function getAvailableBooksForStock(search?: string): Promise<AvailableBookForStock[]> {
+  try {
+    const params = search ? `?search=${encodeURIComponent(search)}` : "";
+    const raw = await bffGet<any>(`/stock/available-books/${params}`);
+    const list = Array.isArray(raw) ? raw : (raw as any)?.results || (raw as any)?.data || [];
+    return list as AvailableBookForStock[];
+  } catch {
+    return [];
+  }
+}
+
 // ─── Réassort ─────────────────────────────────────────────────────────────────
 
 export interface RestockPayload {
-  stock_id: string;
+  stock_id?: string;
+  ouvrage_id?: string;
   quantite: number;
   reference_document?: string;
 }
@@ -217,8 +249,9 @@ export async function createManualExit(payload: ManualExitPayload): Promise<void
 export async function getStockMovements(stockId?: string): Promise<StockMovement[]> {
   const params = stockId ? `?stock_id=${stockId}` : "";
   try {
-    const raw = await bffGet<any[]>(`/stock/movements/${params}`);
-    return raw.map((m) => ({
+    const raw = await bffGet<any>(`/stock/movements/${params}`);
+    const list = Array.isArray(raw) ? raw : (raw as any)?.results || (raw as any)?.data || [];
+    return list.map((m: any) => ({
       id: m.id,
       book_id: m.stock_id ?? m.book_id ?? m.id,
       book_title: m.title ?? m.book_title ?? "",
@@ -240,8 +273,9 @@ export async function getStockMovements(stockId?: string): Promise<StockMovement
 
 export async function getStockAlerts(): Promise<StockAlert[]> {
   try {
-    const raw = await bffGet<any[]>("/stock/alerts/");
-    return raw.map((a) => ({
+    const raw = await bffGet<any>("/stock/alerts/");
+    const list = Array.isArray(raw) ? raw : (raw as any)?.results || (raw as any)?.data || [];
+    return list.map((a: any) => ({
       id: a.id,
       book_id: a.id,
       book_title: a.title ?? "",

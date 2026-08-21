@@ -1,4 +1,4 @@
-"""URL Routing Racine pour LAHAThèque v3.2 API."""
+"""URL Routing Racine pour LAHAThèque v3.2 API (reloaded)."""
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings

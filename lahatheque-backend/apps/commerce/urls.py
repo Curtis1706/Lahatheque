@@ -14,7 +14,9 @@ from .manager_views import (
     EntrepotsListView,
     StockEscalateView,
     ManagerReportExportView,
+    AvailableBooksForStockView,
 )
+
 from .wholesaler_views import (
     WholesalerKpisView,
     WholesalerCatalogListView,
@@ -40,6 +42,7 @@ urlpatterns = [
     path('manager/reports/export/', ManagerReportExportView.as_view(), name='manager-reports-export'),
     path('manager/entrepots/', EntrepotsListView.as_view(), name='manager-entrepots'),
     path('manager/stock/', StockListView.as_view(), name='manager-stock-list'),
+    path('manager/stock/available-books/', AvailableBooksForStockView.as_view(), name='manager-stock-available-books'),
     path('manager/stock/restock/', StockRestockView.as_view(), name='manager-stock-restock'),
     path('manager/stock/exit/', StockManualExitView.as_view(), name='manager-stock-exit'),
     path('manager/stock/movements/', StockMovementsView.as_view(), name='manager-stock-movements'),
