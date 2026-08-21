@@ -42,7 +42,11 @@ import {
   Percent,
   UploadCloud,
   Clock,
-  Building2
+  Building2,
+  Scale,
+  FileCheck2,
+  Boxes,
+  TrendingDown
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -328,7 +332,19 @@ export function DashboardSidebar() {
               { label: "Grossistes", href: "/admin/users/wholesalers", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
             ]
           },
-          { label: "Catalogue & Prix", href: "/admin/catalog", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Catalogue Global", href: "/admin/catalog", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Validation BAT & Maquettes", href: "/admin/validation", icon: <FileCheck2 className="w-5 h-5" /> },
+          { label: "Contrats & Droits d'Auteur", href: "/admin/contracts", icon: <Scale className="w-5 h-5" /> },
+          { 
+            label: "Stock Physique & Hubs", 
+            href: "/admin/stock", 
+            icon: <Boxes className="w-5 h-5" />,
+            sublinks: [
+              { label: "Vue Stock & Hubs", href: "/admin/stock", icon: <Boxes className="w-4 h-4 text-gold" /> },
+              { label: "Flux & Passation en Perte", href: "/admin/stock/movements", icon: <TrendingDown className="w-4 h-4 text-gold" /> },
+              { label: "Entrepôts Régionaux", href: "/admin/stock/warehouses", icon: <Building2 className="w-4 h-4 text-gold" /> },
+            ]
+          },
           { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="w-5 h-5" /> },
           { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="w-5 h-5" /> },
           { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="w-5 h-5" /> },

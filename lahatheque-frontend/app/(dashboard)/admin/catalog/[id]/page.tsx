@@ -118,6 +118,37 @@ export default function AdminBookDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Barre d'Actions Administrateur & Lecteur Souverain */}
+      <div className="p-6 rounded-2xl bg-background-secondary border border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div>
+          <h4 className="text-sm font-bold text-navy flex items-center gap-2">
+            <Eye className="w-4 h-4 text-gold" />
+            Lecture Souveraine Administrateur
+          </h4>
+          <p className="text-xs text-foreground-muted mt-0.5">
+            Accès intégral sans restriction au lecteur universel sécurisé avec filigrane de supervision.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          <Link
+            href={`/catalog/reader/${book.id}`}
+            className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy/90 transition-colors flex items-center justify-center gap-2 shadow-xs"
+          >
+            <BookOpen className="w-4 h-4 text-gold" />
+            <span>Lire l'Ouvrage (Lecteur LAHA)</span>
+          </Link>
+
+          <Link
+            href="/admin/catalog/pricing"
+            className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-xs font-semibold hover:border-gold transition-colors flex items-center justify-center gap-1.5"
+          >
+            <Tag className="w-3.5 h-3.5 text-gold" />
+            <span>Ajuster Prix</span>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

@@ -449,6 +449,7 @@ export default function AdminRoleUsersPage() {
           onClose={() => setEmailUser(null)}
           recipientEmail={emailUser.email}
           recipientName={`${emailUser.first_name} ${emailUser.last_name}`}
+          userId={emailUser.id}
         />
       )}
 

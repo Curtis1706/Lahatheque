@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { AdminRole } from "@/lib/types/admin";
 import { createAdminUser } from "@/lib/services/admin";
-import { User, Shield, Mail, Phone, Globe, Lock, CheckCircle2, Copy } from "lucide-react";
+import { Shield, Mail, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export interface CreateAccountModalProps {
@@ -42,7 +42,6 @@ export function CreateAccountModal({
     country: "BJ",
     institutionName: "",
   });
-  const [generatedPassword, setGeneratedPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleNextStep1 = () => {
@@ -68,7 +67,6 @@ export function CreateAccountModal({
       });
 
       if (res.success) {
-        setGeneratedPassword(res.temporary_password || "Laha-" + Math.random().toString(36).substring(2, 8).toUpperCase() + "!");
         setStep(3);
         toast.success("Compte utilisateur créé avec succès !");
         onSuccess?.();
@@ -82,15 +80,9 @@ export function CreateAccountModal({
     }
   };
 
-  const copyPasswordToClipboard = () => {
-    navigator.clipboard.writeText(generatedPassword);
-    toast.success("Mot de passe copié dans le presse-papier !");
-  };
-
   const handleResetAndClose = () => {
     setStep(1);
     setFormData({ firstName: "", lastName: "", email: "", phone: "", country: "BJ", institutionName: "" });
-    setGeneratedPassword("");
     onClose();
   };
 
@@ -274,7 +266,7 @@ export function CreateAccountModal({
           </form>
         )}
 
-        {/* Étape 3 : Confirmation & Mot de passe généré */}
+        {/* Étape 3 : Confirmation de création et envoi d'accès sécurisés */}
         {step === 3 && (
           <div className="space-y-5 text-center py-2">
             <div className="w-12 h-12 rounded-full bg-success/15 text-success mx-auto flex items-center justify-center">
@@ -284,41 +276,35 @@ export function CreateAccountModal({
             <div>
               <h3 className="text-base font-bold text-foreground">Compte Créé avec Succès !</h3>
               <p className="text-xs text-foreground-muted mt-1">
-                Le rôle <span className="font-semibold text-navy">{selectedRole}</span> a été assigné à{" "}
-                <span className="font-semibold">{formData.email}</span>.
+                Le rôle <span className="font-semibold text-navy">{ROLE_OPTIONS.find(r => r.role === selectedRole)?.label || selectedRole}</span> a été assigné à{" "}
+                <span className="font-semibold text-foreground">{formData.firstName} {formData.lastName}</span>.
               </p>
             </div>
 
-            {/* Mot de Passe Généré Box */}
-            <div className="p-4 rounded-xl bg-background-secondary border border-border text-left space-y-2">
-              <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wider">
-                Mot de passe temporaire généré :
-              </p>
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border">
-                <span className="font-mono text-sm font-bold text-gold tracking-wider">
-                  {generatedPassword}
-                </span>
-                <button
-                  type="button"
-                  onClick={copyPasswordToClipboard}
-                  className="p-1.5 rounded-md hover:bg-background-secondary text-foreground-muted hover:text-foreground transition-colors"
-                  title="Copier le mot de passe"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
+            {/* Notification de Sécurité & Transmission Email */}
+            <div className="p-4 rounded-xl bg-background-secondary border border-border text-left space-y-2.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-navy">
+                <Mail className="w-4 h-4 text-gold" />
+                <span>Identifiants transmis par e-mail</span>
               </div>
-              <p className="text-[10px] text-foreground-muted">
-                Un e-mail de bienvenue contenant ses identifiants d'accès a été transmis à l'utilisateur.
+              <p className="text-xs text-foreground leading-relaxed">
+                Un e-mail de bienvenue officiel contenant l'adresse de connexion et le mot de passe temporaire chiffré a été transmis directement à <strong className="font-mono text-navy">{formData.email}</strong>.
               </p>
+              <div className="p-2.5 rounded-lg bg-navy/5 border border-navy/10 text-[11px] text-foreground-muted flex items-start gap-2">
+                <Shield className="w-4 h-4 text-navy shrink-0 mt-0.5" />
+                <span>
+                  Conformément aux normes de sécurité et de confidentialité des données, le mot de passe temporaire n'est pas affiché sur l'écran d'administration et reste strictement réservé au titulaire du compte.
+                </span>
+              </div>
             </div>
 
             <div className="pt-2">
               <button
                 type="button"
                 onClick={handleResetAndClose}
-                className="w-full py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors"
+                className="w-full py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors shadow-sm"
               >
-                Fermer
+                Terminer & Fermer
               </button>
             </div>
           </div>

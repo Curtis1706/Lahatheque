@@ -44,7 +44,7 @@ export default function AdminUnpaidRemindersPage() {
       header: "Jours d'Échéance",
       cell: (row) => (
         <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-warning/15 text-gold-dark">
-          {row.days_overdue > 0 ? `${row.days_overdue} jours` : "À l'échéance"}
+          {(row.days_overdue ?? 0) > 0 ? `${row.days_overdue} jours` : "À l'échéance"}
         </span>
       ),
     },

@@ -34,7 +34,10 @@ import {
   CheckSquare,
   History,
   Percent,
-  UploadCloud
+  UploadCloud,
+  FileCheck2,
+  Scale,
+  Boxes
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -188,7 +191,10 @@ export function MobileBottomNav() {
         return [
           { label: "Vue d'ensemble", href: "/admin", icon: <LayoutDashboard className="w-4 h-4" /> },
           { label: "Tous les Utilisateurs", href: "/admin/users", icon: <Users className="w-4 h-4" /> },
-          { label: "Catalogue & Prix", href: "/admin/catalog", icon: <BookOpen className="w-4 h-4" /> },
+          { label: "Catalogue Global", href: "/admin/catalog", icon: <BookOpen className="w-4 h-4" /> },
+          { label: "Validation BAT & Maquettes", href: "/admin/validation", icon: <FileCheck2 className="w-4 h-4" /> },
+          { label: "Contrats & Droits d'Auteur", href: "/admin/contracts", icon: <Scale className="w-4 h-4" /> },
+          { label: "Stock Physique & Hubs", href: "/admin/stock", icon: <Boxes className="w-4 h-4" /> },
           { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="w-4 h-4" /> },
           { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="w-4 h-4" /> },
           { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="w-4 h-4" /> },
