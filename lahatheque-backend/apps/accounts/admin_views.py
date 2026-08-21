@@ -12,6 +12,8 @@ from rest_framework.pagination import PageNumberPagination
 
 from .models import User
 from .serializers import UserSerializer, AdminUserCreateSerializer
+from .permissions import IsAdminOrSuperAdmin
+from apps.partners.models import Institution
 
 logger = logging.getLogger(__name__)
 
@@ -234,7 +236,7 @@ def send_custom_notification_email(recipient_email: str, recipient_name: str, su
       </td>
     </tr>
   </table>
-</body>
+ </body>
 </html>
 """
     try:
@@ -263,7 +265,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
     """
     Gestion complète des utilisateurs par l'Administrateur (/admin/users).
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
     pagination_class = StandardResultsSetPagination
 
     def list(self, request):
@@ -337,7 +339,6 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
         institution = None
         if institution_id:
             try:
-                from apps.partners.models import Institution
                 institution = Institution.objects.get(id=institution_id)
             except Exception:
                 pass
@@ -380,7 +381,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
     def destroy(self, request, pk=None):
         """
         DELETE /api/v1/admin/users/<id>/
-        Suppression définitive d'un compte utilisateur.
+        Suppression définitive d'un compte utilisateur. Accessible aux rôles admin et super_admin.
         """
         try:
             user = User.objects.get(id=pk)

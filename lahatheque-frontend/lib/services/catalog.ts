@@ -1,7 +1,4 @@
 import { Book } from "../types/catalog";
-import { mockBooks } from "../mock/catalog";
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface SearchFilters {
   q?: string;
@@ -13,48 +10,39 @@ export interface SearchFilters {
 }
 
 export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
-  await delay(800); // simulation de délai réseau
-  
-  let results = [...mockBooks];
+  try {
+    const params = new URLSearchParams();
+    if (filters.q) params.set("q", filters.q);
+    if (filters.discipline) params.set("discipline", filters.discipline);
+    if (filters.institution) params.set("institution", filters.institution);
+    if (filters.language) params.set("language", filters.language);
+    if (filters.country) params.set("country", filters.country);
+    if (filters.format) params.set("format", filters.format);
 
-  if (filters.q) {
-    const query = filters.q.toLowerCase();
-    results = results.filter(book => 
-      book.title.toLowerCase().includes(query) ||
-      book.subtitle?.toLowerCase().includes(query) ||
-      book.authors_details.some(author => 
-        (author.first_name + " " + author.last_name).toLowerCase().includes(query)
-      ) ||
-      book.summary.toLowerCase().includes(query)
-    );
+    const queryStr = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(`/api/bff/catalog/books/${queryStr}`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Erreur de recherche catalogue");
+    const json = await res.json();
+    return Array.isArray(json) ? json : (json.results || []);
+  } catch (err) {
+    console.error("searchBooks error:", err);
+    return [];
   }
-
-  if (filters.discipline) {
-    results = results.filter(book => book.discipline_detail.name === filters.discipline);
-  }
-
-  if (filters.institution) {
-    const inst = filters.institution;
-    results = results.filter(book => book.institution_name.includes(inst));
-  }
-
-  if (filters.language) {
-    results = results.filter(book => book.language === filters.language);
-  }
-
-  if (filters.country) {
-    results = results.filter(book => book.country === filters.country);
-  }
-
-  if (filters.format) {
-    results = results.filter(book => book.format_type === filters.format);
-  }
-
-  return results;
 }
 
 export async function getBookById(id: string): Promise<Book | null> {
-  await delay(600);
-  const book = mockBooks.find(b => b.id === id);
-  return book ? { ...book } : null;
+  try {
+    const res = await fetch(`/api/bff/catalog/books/${id}/`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error("getBookById error:", err);
+    return null;
+  }
 }

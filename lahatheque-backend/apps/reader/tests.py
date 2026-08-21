@@ -8,7 +8,8 @@ import json
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
-from apps.catalog.models import Ouvrage, Editeur
+from apps.catalog.models import Ouvrage
+from apps.publishers_portal.models import Publisher
 from .models import PartnerApp, PartnerEndUser, ReaderSession, ResultatQuizSession, WebhookLog
 from .tokens import ReaderTokenService, ReaderTokenError
 
@@ -20,16 +21,17 @@ class ReaderAPITestCase(TestCase):
         self.client = APIClient()
 
         # 1. Création d'un éditeur et d'un ouvrage pour le test de catalogue
-        self.editeur = Editeur.objects.create(
-            nom="Éditions du Savoir",
-            email="contact@editions.bj"
+        self.editeur = Publisher.objects.create(
+            name="Éditions du Savoir",
+            contact_email="contact@editions.bj"
         )
         self.ouvrage = Ouvrage.objects.create(
-            titre="Manuel d'Intelligence Artificielle",
-            auteur="Dr. Koffi Mensah",
-            editeur=self.editeur,
-            nombre_pages=48,
-            statut="publie"
+            isbn="978-2-84299-999-9",
+            title="Manuel d'Intelligence Artificielle",
+            publisher=self.editeur,
+            page_count=48,
+            publication_date="2026-01-01",
+            status="published"
         )
 
         # 2. Création d'un partenaire avec origines autorisées

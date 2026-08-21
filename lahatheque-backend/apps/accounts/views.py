@@ -124,10 +124,12 @@ class LogoutView(APIView):
         return Response({"detail": "Déconnexion réussie"}, status=status.HTTP_200_OK)
 
 class MFASetupView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
     def post(self, request):
         return Response({"detail": "MFA setup stub"})
 
 class MFAVerifyView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
     def post(self, request):
         return Response({"detail": "MFA verify stub"})
 
@@ -140,4 +142,5 @@ class OTPVerifyView(APIView):
     permission_classes = [permissions.AllowAny]
     def post(self, request):
         return Response({"detail": "OTP verify stub"})
+
 

@@ -1,0 +1,16 @@
+{
+  "include": [
+    "lahatheque-backend"
+  ],
+  "extraPaths": [
+    "lahatheque-backend"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "lahatheque-backend",
+      "extraPaths": [
+        "lahatheque-backend"
+      ]
+    }
+  ]
+}

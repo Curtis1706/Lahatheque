@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, Send, GraduationCap, Building2, FileText, ArrowRight } from "lucide-react";
-import { Book } from "@/lib/types/catalog";
-import { mockBooks } from "@/lib/mock/catalog";
+import React, { useState, useEffect } from "react";
+import { Search, Send, GraduationCap, Building2, FileText, ArrowRight, Loader2 } from "lucide-react";
 
 export interface ActionItem {
   id: string;
@@ -23,8 +21,8 @@ export function ActionSearchBar({ onSearch, onSelectAction }: ActionSearchBarPro
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [actions, setActions] = useState<ActionItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Actions de suggestions dynamiques (inspirées de Raycast/21st.dev)
   const defaultActions: ActionItem[] = [
     {
       id: "act-1",
@@ -50,26 +48,64 @@ export function ActionSearchBar({ onSearch, onSelectAction }: ActionSearchBarPro
       category: "institution",
       value: "UAC"
     },
-    // Ajouter les livres populaires
-    ...mockBooks.slice(0, 2).map((book, idx) => ({
-      id: `book-${idx}`,
-      label: book.title,
-      icon: <FileText className="w-4 h-4 text-gold/80" />,
-      description: "Consulter la fiche",
-      category: "book" as const,
-      value: book.id
-    }))
   ];
 
   useEffect(() => {
-    if (!query) {
+    if (!query.trim()) {
       setActions(defaultActions);
+      setLoading(false);
       return;
     }
-    const filtered = defaultActions.filter(action =>
-      action.label.toLowerCase().includes(query.toLowerCase())
-    );
-    setActions(filtered);
+
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/bff/catalog/books/?q=${encodeURIComponent(query.trim())}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        const filteredDefault = defaultActions.filter(action =>
+          action.label.toLowerCase().includes(query.toLowerCase())
+        );
+
+        if (!res.ok) {
+          setActions(filteredDefault);
+          setLoading(false);
+          return;
+        }
+
+        const json = await res.json();
+        const booksList = Array.isArray(json) ? json : (json.results || []);
+
+        const bookActions: ActionItem[] = booksList.slice(0, 5).map((book: { id: string; title: string; publisher_name?: string; discipline_detail?: { name?: string }; authors_details?: { first_name?: string; last_name?: string }[] }, idx: number) => {
+          const authorNames = Array.isArray(book.authors_details)
+            ? book.authors_details.map((a) => `${a.first_name || ""} ${a.last_name || ""}`.trim()).filter(Boolean).join(", ")
+            : "";
+
+          return {
+            id: `book-${book.id || idx}`,
+            label: book.title,
+            icon: <FileText className="w-4 h-4 text-gold/80" />,
+            description: authorNames || book.publisher_name || book.discipline_detail?.name || "Consulter la fiche",
+            category: "book" as const,
+            value: book.id,
+          };
+        });
+
+        setActions([...filteredDefault, ...bookActions]);
+      } catch (err) {
+        console.error("Erreur de recherche d'actions:", err);
+        const filteredDefault = defaultActions.filter(action =>
+          action.label.toLowerCase().includes(query.toLowerCase())
+        );
+        setActions(filteredDefault);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [query]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,21 +127,24 @@ export function ActionSearchBar({ onSearch, onSelectAction }: ActionSearchBarPro
           placeholder="Rechercher par titre, auteur, établissement (Action Search Bar)..."
           className="w-full pl-12 pr-10 py-3.5 rounded-xl border border-border bg-background-secondary text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-navy transition-all shadow-sm text-sm sm:text-base"
         />
-        {query.length > 0 && (
+        {loading ? (
+          <Loader2 className="absolute right-4 w-4 h-4 text-gold animate-spin" />
+        ) : query.length > 0 ? (
           <button 
             onClick={() => { setQuery(""); onSearch(""); }}
-            className="absolute right-4 text-foreground-muted hover:text-navy"
+            className="absolute right-4 text-foreground-muted hover:text-navy cursor-pointer"
           >
             <Send className="w-4 h-4" />
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* Dropdown de suggestions interactif Raycast */}
       {isFocused && actions.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
-          <div className="p-2 border-b border-border bg-background-secondary">
+          <div className="p-2 border-b border-border bg-background-secondary flex justify-between items-center">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted px-2">Suggestions et Filtres rapides</span>
+            {loading && <span className="text-[10px] text-gold font-bold animate-pulse px-2">Recherche en cours...</span>}
           </div>
           <ul className="max-h-60 overflow-y-auto divide-y divide-border/40">
             {actions.map(action => (
@@ -113,7 +152,6 @@ export function ActionSearchBar({ onSearch, onSelectAction }: ActionSearchBarPro
                 key={action.id}
                 onMouseDown={() => {
                   if (action.category === "book") {
-                    // Aller à la notice
                     window.location.href = `/catalog/${action.value}`;
                   } else {
                     onSelectAction(action.category, action.value);

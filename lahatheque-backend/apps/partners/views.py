@@ -9,12 +9,13 @@ import json
 import logging
 import uuid
 from django.utils import timezone
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from apps.accounts.permissions import IsAdminOrSuperAdmin
 from apps.reader.models import PartnerApp, ReaderSession, WebhookLog
 from apps.protection.models import TraceAcces
 from .models import Institution, StudentAffiliation, EtudiantInscrit
@@ -39,13 +40,13 @@ def standard_response(data: Any = None, error: Any = None, status_code: int = st
 class InstitutionViewSet(viewsets.ModelViewSet):
     queryset = Institution.objects.all()
     serializer_class = InstitutionSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
 
 class StudentAffiliationViewSet(viewsets.ModelViewSet):
     queryset = StudentAffiliation.objects.all().order_by('-created_at')
     serializer_class = StudentAffiliationSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -63,16 +64,7 @@ class StudentAffiliationViewSet(viewsets.ModelViewSet):
         POST /api/v1/partners/affiliations/claim/
         L'étudiant soumet son matricule et/ou sa carte d'étudiant.
         """
-        user = request.user if request.user.is_authenticated else None
-        if not user:
-            # Fallback pour mode développement
-            user_id = request.data.get('user_id')
-            if user_id:
-                from apps.accounts.models import User
-                user = User.objects.filter(id=user_id).first()
-
-        if not user:
-            return Response({"success": False, "error": "Utilisateur non authentifié."}, status=status.HTTP_401_UNAUTHORIZED)
+        user = request.user
 
         institution_id = request.data.get('institution_id')
         matricule = (request.data.get('matricule') or '').strip()
@@ -246,7 +238,7 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
     Gestion administrative des applications partenaires et des clés API.
     Utilisé par le tableau de bord administrateur /admin/api.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request: Request) -> Response:
         """GET /api/v1/partners/apps/ - Liste toutes les applications partenaires."""
@@ -431,7 +423,7 @@ class PartnerSessionSupervisionViewSet(viewsets.ViewSet):
     Supervision en temps réel des sessions de lecture hébergées.
     Utilisé par la page /admin/api/sessions.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request: Request) -> Response:
         """GET /api/v1/partners/sessions/ - Liste toutes les sessions de lecture."""
@@ -494,7 +486,7 @@ class PartnerLogAdminViewSet(viewsets.ViewSet):
     Journaux des requêtes et des livraisons de webhooks API.
     Utilisé par la page /admin/api/logs.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request: Request) -> Response:
         """GET /api/v1/partners/logs/ - Liste les journaux d'audit API."""

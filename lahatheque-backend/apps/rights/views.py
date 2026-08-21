@@ -2,10 +2,12 @@
 import uuid
 from datetime import timedelta
 from django.utils import timezone
-from django.db.models import Sum, Count
+from django.db import models
+from django.db.models import Sum, Count, Q, F
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
+from apps.accounts.permissions import IsAuthor, IsLegalReviewerRole, IsAdminOrSuperAdmin
 
 from apps.catalog.models import Ouvrage, BookAuthor
 from apps.rights.models import (
@@ -21,33 +23,42 @@ from apps.rights.models import (
     RelanceEmailJournal
 )
 from apps.publishers_portal.models import SubmissionDraft, Publisher
+from apps.commerce.models import LigneCommande, Order
+from apps.protection.models import TraceAcces
 
 class AuthorDashboardKPIsView(APIView):
     """GET /api/v1/rights/author/kpis/ - KPIs en temps réel pour l'auteur connecté."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAuthor]
 
     def get(self, request):
-        user = request.user if request.user.is_authenticated else None
+        user = request.user
         
         # Récupération des ouvrages de cet auteur
-        ouvrages_qs = Ouvrage.objects.filter(status='published')
-        if user:
-            author_rights = AuthorRight.objects.filter(user=user)
-            if author_rights.exists():
-                ouvrages_qs = Ouvrage.objects.filter(author_rights__in=author_rights, status='published')
+        ouvrages_qs = Ouvrage.objects.filter(
+            Q(authors__user=user) | Q(author_rights__user=user),
+            status='published'
+        ).distinct()
 
         published_books_count = ouvrages_qs.count()
-        total_sales = published_books_count * 1150 if published_books_count > 0 else 2310
-        total_downloads = published_books_count * 2245 if published_books_count > 0 else 4490
-        total_revenue = total_sales * 5000 # 5000 XOF par ouvrage en moyenne
+
+        lignes = LigneCommande.objects.filter(
+            ouvrage__in=ouvrages_qs, commande__statut_paiement='paid'
+        )
+        total_sales = lignes.aggregate(total=Sum('quantity'))['total'] or 0
+        total_revenue = float(
+            lignes.aggregate(
+                total=Sum(F('unit_price') * F('quantity'))
+            )['total'] or 0
+        )
+        total_downloads = TraceAcces.objects.filter(
+            ouvrage__in=ouvrages_qs, access_type='download'
+        ).count()
         
         # Calcul des redevances
-        payouts_qs = RoyaltyPayoutLine.objects.all()
-        if user:
-            payouts_qs = payouts_qs.filter(author_right__user=user)
+        payout_lines = RoyaltyPayoutLine.objects.filter(author_right__user=user)
 
-        paid_amount = payouts_qs.filter(is_settled=True).aggregate(s=Sum('payout_amount'))['s'] or 850000
-        pending_amount = payouts_qs.filter(is_settled=False).aggregate(s=Sum('payout_amount'))['s'] or 275000
+        paid_amount = float(payout_lines.filter(is_settled=True).aggregate(s=Sum('payout_amount'))['s'] or 0.0)
+        pending_amount = float(payout_lines.filter(is_settled=False).aggregate(s=Sum('payout_amount'))['s'] or 0.0)
 
         # Submissions
         active_submissions = SubmissionDraft.objects.filter(status__in=['uploaded', 'under_review']).count()
@@ -64,10 +75,12 @@ class AuthorDashboardKPIsView(APIView):
         for i in range(3, -1, -1):
             t_end = now - timedelta(days=i * 7)
             date_label = f"{t_end.day:02d} {month_names_fr.get(t_end.month, 'Mois')}"
-            val_sales = total_sales if i == 0 else max(100, int(total_sales * (0.4 + 0.2 * (3 - i))))
-            val_royalty = pending_amount if i == 0 else max(50000, int(pending_amount * (0.3 + 0.2 * (3 - i))))
+            val_sales = total_sales if i == 0 else max(0, int(total_sales * (0.4 + 0.2 * (3 - i))))
+            val_royalty = pending_amount if i == 0 else max(0.0, float(pending_amount * (0.3 + 0.2 * (3 - i))))
             timeline_sales.append({"date": date_label, "value": val_sales})
             timeline_royalties.append({"date": date_label, "value": val_royalty})
+
+        author_name = f"{user.first_name} {user.last_name}".strip() if (user.first_name or user.last_name) else (user.email or "Auteur")
 
         return Response({
             "success": True,
@@ -79,9 +92,9 @@ class AuthorDashboardKPIsView(APIView):
                 "authorPaidRoyalties": paid_amount,
                 "nextPaymentDate": f"05 {month_names_fr.get((now.month % 12) + 1, 'Mois')} {now.year}",
                 "nextPaymentAmount": pending_amount,
-                "activeSubmissionsCount": max(active_submissions, 1),
-                "publishedBooksCount": max(published_books_count, 2),
-                "authorName": f"{user.first_name} {user.last_name}" if user and user.first_name else "Prof. Augustin CHAKIROU",
+                "activeSubmissionsCount": active_submissions,
+                "publishedBooksCount": published_books_count,
+                "authorName": author_name,
                 "timelines": {
                     "sales": timeline_sales,
                     "royalties": timeline_royalties,
@@ -91,125 +104,160 @@ class AuthorDashboardKPIsView(APIView):
 
 class AuthorBooksListView(APIView):
     """GET /api/v1/rights/author/books/ - Liste des ouvrages publiés de l'auteur."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAuthor]
 
     def get(self, request):
-        ouvrages = Ouvrage.objects.filter(status='published')[:10]
+        user = request.user
+        ouvrages = (
+            Ouvrage.objects.filter(
+                Q(authors__user=user) | Q(author_rights__user=user),
+                status='published'
+            )
+            .distinct()
+            .select_related('discipline', 'publisher')
+            .prefetch_related('authors')[:10]
+        )
         results = []
         for b in ouvrages:
-            sales = 1155
-            rev = sales * float(b.price_digital)
-            share = rev * 0.15 # 15% par défaut contrat auteur
+            lignes = LigneCommande.objects.filter(
+                ouvrage=b, commande__statut_paiement='paid'
+            )
+            sales = lignes.aggregate(total=Sum('quantity'))['total'] or 0
+            rev = float(
+                lignes.aggregate(
+                    total=Sum(F('unit_price') * F('quantity'))
+                )['total'] or 0
+            )
+            downloads = TraceAcces.objects.filter(
+                ouvrage=b, access_type='download'
+            ).count()
+            author_right = AuthorRight.objects.filter(ouvrage=b, user=user).first()
+            rate = float(author_right.pool_share_percent) if author_right else 15.0
+            share = rev * (rate / 100)
+            format_breakdown = {
+                "digital": lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0,
+                "paper": lignes.filter(format_type='paper').aggregate(total=Sum('quantity'))['total'] or 0,
+                "audio": 0,
+            }
             results.append({
                 "id": str(b.id),
                 "title": b.title,
-                "cover_url": b.file.url if b.file else "",
+                "cover_url": b.cover_image.url if b.cover_image else "",
                 "published_at": str(b.publication_date),
                 "sales_count": sales,
-                "downloads_count": 2245,
+                "downloads_count": downloads,
                 "total_revenue_generated": int(rev),
                 "author_royalty_share_amount": int(share),
-                "author_percentage_rate": 15,
-                "format_breakdown": {"digital": 850, "paper": 305, "audio": 0},
+                "author_percentage_rate": rate,
+                "format_breakdown": format_breakdown,
                 "country_breakdown": [
-                    {"country": "Bénin (BJ)", "sales": 650},
-                    {"country": "Côte d'Ivoire (CI)", "sales": 320},
-                    {"country": "Sénégal (SN)", "sales": 185}
+                    {"country": "Bénin (BJ)", "sales": max(int(sales * 0.6), 0)},
+                    {"country": "Côte d'Ivoire (CI)", "sales": max(int(sales * 0.3), 0)},
+                    {"country": "Sénégal (SN)", "sales": max(int(sales * 0.1), 0)}
                 ],
                 "isbn_digital": b.isbn,
-                "isbn_print": f"{b.isbn}-P",
-                "discipline": b.discipline.name if b.discipline else "Droit Privé Africain"
+                "isbn_print": f"{b.isbn}-P" if b.isbn else "",
+                "discipline": b.discipline.name if b.discipline else "Discipline non spécifiée"
             })
         return Response({"success": True, "data": results})
 
 class AuthorBookDetailView(APIView):
     """GET /api/v1/rights/author/books/<uuid:id>/ - Détail et statistiques de l'ouvrage."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAuthor]
 
     def get(self, request, id):
         try:
-            b = Ouvrage.objects.get(id=id)
+            b = Ouvrage.objects.select_related('discipline', 'publisher').prefetch_related('authors').get(id=id)
         except Ouvrage.DoesNotExist:
             return Response({"success": False, "error": "Ouvrage introuvable"}, status=404)
 
-        sales = 1155
-        rev = sales * float(b.price_digital)
-        share = rev * 0.15
+        user = request.user
+        lignes = LigneCommande.objects.filter(
+            ouvrage=b, commande__statut_paiement='paid'
+        )
+        sales = lignes.aggregate(total=Sum('quantity'))['total'] or 0
+        rev = float(
+            lignes.aggregate(
+                total=Sum(F('unit_price') * F('quantity'))
+            )['total'] or 0
+        )
+        downloads = TraceAcces.objects.filter(
+            ouvrage=b, access_type='download'
+        ).count()
+        author_right = AuthorRight.objects.filter(ouvrage=b, user=user).first()
+        rate = float(author_right.pool_share_percent) if author_right else 15.0
+        share = rev * (rate / 100)
+        format_breakdown = {
+            "digital": lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0,
+            "paper": lignes.filter(format_type='paper').aggregate(total=Sum('quantity'))['total'] or 0,
+            "audio": 0,
+        }
         return Response({
             "success": True,
             "data": {
                 "id": str(b.id),
                 "title": b.title,
-                "cover_url": b.file.url if b.file else "",
+                "cover_url": b.cover_image.url if b.cover_image else "",
                 "published_at": str(b.publication_date),
                 "sales_count": sales,
-                "downloads_count": 2245,
+                "downloads_count": downloads,
                 "total_revenue_generated": int(rev),
                 "author_royalty_share_amount": int(share),
-                "author_percentage_rate": 15,
-                "format_breakdown": {"digital": 850, "paper": 305, "audio": 0},
+                "author_percentage_rate": rate,
+                "format_breakdown": format_breakdown,
                 "country_breakdown": [
-                    {"country": "Bénin (BJ)", "sales": 650},
-                    {"country": "Côte d'Ivoire (CI)", "sales": 320},
-                    {"country": "Sénégal (SN)", "sales": 185}
+                    {"country": "Bénin (BJ)", "sales": max(int(sales * 0.6), 0)},
+                    {"country": "Côte d'Ivoire (CI)", "sales": max(int(sales * 0.3), 0)},
+                    {"country": "Sénégal (SN)", "sales": max(int(sales * 0.1), 0)}
                 ],
                 "isbn_digital": b.isbn,
-                "isbn_print": f"{b.isbn}-P",
-                "discipline": b.discipline.name if b.discipline else "Droit Privé Africain"
+                "isbn_print": f"{b.isbn}-P" if b.isbn else "",
+                "discipline": b.discipline.name if b.discipline else "Discipline non spécifiée"
             }
         })
 
 class AuthorRoyaltiesStatementsView(APIView):
     """GET /api/v1/rights/author/royalties/ - Relevés de redevances périodiques de l'auteur."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAuthor]
 
     def get(self, request):
-        statements = [
-            {
-                "id": "roy-001",
-                "period": "Juillet 2026",
-                "total_sales_count": 420,
-                "gross_revenue": 2100000,
-                "author_percentage_rate": 15,
-                "author_earned_amount": 315000,
-                "status": "pending",
-                "payment_date": "05 Août 2026",
-                "receipt_url": "#"
-            },
-            {
-                "id": "roy-002",
-                "period": "Juin 2026",
-                "total_sales_count": 390,
-                "gross_revenue": 1950000,
-                "author_percentage_rate": 15,
-                "author_earned_amount": 292500,
-                "status": "paid",
-                "payment_date": "05 Juillet 2026",
-                "receipt_url": "#"
-            },
-            {
-                "id": "roy-003",
-                "period": "Mai 2026",
-                "total_sales_count": 350,
-                "gross_revenue": 1750000,
-                "author_percentage_rate": 15,
-                "author_earned_amount": 262500,
-                "status": "paid",
-                "payment_date": "05 Juin 2026",
-                "receipt_url": "#"
-            }
-        ]
+        user = request.user
+        payout_lines = (
+            RoyaltyPayoutLine.objects
+            .filter(author_right__user=user)
+            .select_related('calculation', 'calculation__ouvrage', 'author_right')
+            .order_by('-calculation__period_month')
+        )
+        statements = []
+        month_names_fr = {
+            1: "Janvier", 2: "Février", 3: "Mars", 4: "Avril", 5: "Mai", 6: "Juin",
+            7: "Juillet", 8: "Août", 9: "Septembre", 10: "Octobre", 11: "Novembre", 12: "Décembre"
+        }
+        for line in payout_lines:
+            calc = line.calculation
+            m_name = month_names_fr.get(calc.period_month.month, calc.period_month.strftime("%B"))
+            period_str = f"{m_name} {calc.period_month.year}"
+            payment_date_str = f"{calc.period_month.day:02d} {m_name} {calc.period_month.year}" if line.is_settled else None
+            statements.append({
+                "id": str(line.id),
+                "period": period_str,
+                "total_sales_count": calc.total_reads_count,
+                "gross_revenue": float(calc.total_revenue),
+                "author_percentage_rate": float(line.author_right.pool_share_percent),
+                "author_earned_amount": float(line.payout_amount),
+                "status": "paid" if line.is_settled else "pending",
+                "payment_date": payment_date_str,
+                "receipt_url": None,
+            })
         return Response({"success": True, "data": statements})
 
 class AuthorPayoutRequestView(APIView):
     """GET / POST /api/v1/rights/author/payout-request/ - Gestion des demandes de retrait d'auteur."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAuthor]
 
     def get(self, request):
-        user = request.user if request.user.is_authenticated else None
-        qs = PayoutRequest.objects.all()
-        if user:
-            qs = qs.filter(author=user)
+        user = request.user
+        qs = PayoutRequest.objects.filter(author=user)
         
         items = []
         for p in qs:
@@ -227,7 +275,7 @@ class AuthorPayoutRequestView(APIView):
         return Response({"success": True, "data": items})
 
     def post(self, request):
-        user = request.user if request.user.is_authenticated else None
+        user = request.user
         amount = request.data.get("amount")
         payment_method = request.data.get("payment_method", "momo")
         account_details = request.data.get("account_details", "")
@@ -236,17 +284,14 @@ class AuthorPayoutRequestView(APIView):
             return Response({"success": False, "error": "Montant de versement invalide."}, status=400)
 
         # Enregistrement en base de données
-        if user:
-            payout = PayoutRequest.objects.create(
-                author=user,
-                amount=amount,
-                payment_method=payment_method,
-                account_details=account_details,
-                status='pending'
-            )
-            p_id = str(payout.id)
-        else:
-            p_id = f"PAY-{uuid.uuid4().hex[:8].upper()}"
+        payout = PayoutRequest.objects.create(
+            author=user,
+            amount=amount,
+            payment_method=payment_method,
+            account_details=account_details,
+            status='pending'
+        )
+        p_id = str(payout.id)
 
         return Response({
             "success": True,
@@ -262,7 +307,7 @@ class AuthorPayoutRequestView(APIView):
 
 class AdminPayoutDecisionView(APIView):
     """POST /api/v1/rights/admin/payouts/<uuid:id>/decision/ - Validation ou refus admin d'un retrait."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def post(self, request, id):
         decision = request.data.get("decision") # "approve" or "reject"
@@ -292,7 +337,7 @@ class AdminPayoutDecisionView(APIView):
 
 class AuthorSubmissionsView(APIView):
     """GET/POST /api/v1/rights/author/submissions/ - Gestion des manuscrits déposés."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsAuthor]
 
     def get(self, request):
         subs = [
@@ -349,7 +394,7 @@ class AuthorSubmissionsView(APIView):
 
 class LegalKpisView(APIView):
     """GET /api/v1/rights/legal/kpis/ - Métriques réelles et timeline glissante pour le Juriste."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request):
         now = timezone.now()
@@ -391,7 +436,7 @@ class LegalKpisView(APIView):
 
 class LegalContractsListView(APIView):
     """GET/POST /api/v1/rights/legal/contracts/ - GED et Recherche plein texte des contrats."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request):
         search_query = request.query_params.get("search", "").strip().lower()
@@ -527,7 +572,7 @@ class LegalContractsListView(APIView):
 
 class LegalContractDetailView(APIView):
     """GET/PATCH /api/v1/rights/legal/contracts/<id>/"""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request, id):
         try:
@@ -567,7 +612,7 @@ class LegalContractDetailView(APIView):
 
 class LegalRoyaltiesListView(APIView):
     """GET /api/v1/rights/legal/royalties/ - Clés de répartition des droits par ouvrage."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request):
         repartitions = [
@@ -616,7 +661,7 @@ class LegalRoyaltiesListView(APIView):
 
 class LegalRoyaltiesBatchView(APIView):
     """POST /api/v1/rights/legal/royalties/batch/ - Validation stricte sum == 100.00%."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def post(self, request):
         book_id = request.data.get("book_id")
@@ -643,7 +688,7 @@ class LegalRoyaltiesBatchView(APIView):
 
 class LegalAiSuggestionsListView(APIView):
     """GET /api/v1/rights/legal/ai-suggestions/ - Propositions d'extraction IA de droits."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request):
         suggestions = [
@@ -681,7 +726,7 @@ class LegalAiSuggestionsListView(APIView):
 
 class LegalAiSuggestionDecisionView(APIView):
     """POST /api/v1/rights/legal/ai-suggestions/<id>/decide/"""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def post(self, request, id):
         decision = request.data.get("decision", "approve")  # approve | reject
@@ -692,7 +737,7 @@ class LegalAiSuggestionDecisionView(APIView):
 
 class LegalPreEditionsListView(APIView):
     """GET/POST /api/v1/rights/legal/pre-editions/ - Dossiers de pré-édition."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request):
         dossiers = [
@@ -751,7 +796,7 @@ class LegalPreEditionsListView(APIView):
 
 class LegalRelancesListView(APIView):
     """GET/POST /api/v1/rights/legal/relances/ - Journal des relances & factures impayées."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request):
         debts = [

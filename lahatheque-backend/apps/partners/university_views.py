@@ -1,8 +1,12 @@
 """Vues API REST complètes pour l'Espace Université (Portail Établissement Partenaire)."""
+import uuid
+from datetime import timedelta
+from django.db.models import Sum, Count
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.utils import timezone
+from apps.accounts.permissions import IsUniversityStaff
 from .models import (
     Institution,
     Faculty,
@@ -11,37 +15,91 @@ from .models import (
     UniversityPaperOrder,
     UniversityRoyaltyStatement,
 )
+from apps.protection.models import TraceAcces
+
+
+def get_user_institution(user):
+    """Récupère l'établissement rattaché à l'utilisateur connecté."""
+    if hasattr(user, 'university_profile') and user.university_profile:
+        return user.university_profile
+    return Institution.objects.filter(user=user).first() or Institution.objects.first()
 
 
 class UniversityKpisView(APIView):
     """GET /api/v1/partners/university/kpis/ - KPIs exclusifs de l'université connectée."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
+        user = request.user
+        inst = get_user_institution(user)
+        if not inst:
+            return Response({
+                "success": True,
+                "data": {
+                    "affiliated_students_count": 0,
+                    "active_bouquets_count": 0,
+                    "monthly_consultations_count": 0,
+                    "total_royalties_available": 0.0,
+                    "total_royalties_paid": 0.0,
+                    "currency": "XOF",
+                    "consultations_trend_percent": 0.0,
+                    "top_disciplines": [],
+                    "faculty_distribution": [],
+                },
+                "error": None
+            })
+
+        affiliations_count = StudentAffiliation.objects.filter(
+            institution=inst, 
+            status__in=['approved', 'active', 'validated']
+        ).count()
+        bouquets_count = UniversityBouquetSubscription.objects.filter(
+            institution=inst, 
+            status='active'
+        ).count()
+        monthly_consultations = TraceAcces.objects.filter(
+            ouvrage__institution=inst, 
+            timestamp__gte=timezone.now() - timedelta(days=30)
+        ).count()
+
+        statements = UniversityRoyaltyStatement.objects.filter(institution=inst)
+        avail_royalty = float(statements.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+        paid_royalty = float(statements.filter(status='paid').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+
+        faculties = Faculty.objects.filter(institution=inst)
+        colors = ["var(--navy)", "var(--gold)", "var(--navy-hover)", "var(--gold-dark)", "var(--navy-light)"]
+        faculty_distrib = []
+        top_disc = []
+        for i, f in enumerate(faculties):
+            c_count = TraceAcces.objects.filter(
+                ouvrage__institution=inst, 
+                ouvrage__discipline__name__icontains=f.code
+            ).count()
+            faculty_distrib.append({
+                "code": f.code,
+                "name": f.name,
+                "consultations": c_count,
+                "percent": 0,
+                "color": colors[i % len(colors)]
+            })
+            top_disc.append({
+                "discipline": f.name,
+                "consultations": c_count,
+                "percent": 0
+            })
+
         return Response({
             "success": True,
             "data": {
-                "affiliated_students_count": 14850,
-                "active_bouquets_count": 6,
-                "monthly_consultations_count": 42180,
-                "total_royalties_available": 1250000,
-                "total_royalties_paid": 3800000,
+                "affiliated_students_count": affiliations_count,
+                "active_bouquets_count": bouquets_count,
+                "monthly_consultations_count": monthly_consultations,
+                "total_royalties_available": avail_royalty,
+                "total_royalties_paid": paid_royalty,
                 "currency": "XOF",
                 "consultations_trend_percent": 14.2,
-                "top_disciplines": [
-                    {"discipline": "Sciences Juridiques & Droit Privé", "consultations": 16028, "percent": 38},
-                    {"discipline": "Sciences de la Santé & Médecine", "consultations": 10966, "percent": 26},
-                    {"discipline": "Sciences Économiques & Gestion", "consultations": 7592, "percent": 18},
-                    {"discipline": "Sciences Fondamentales & Ingénierie", "consultations": 5061, "percent": 12},
-                    {"discipline": "Lettres, Langues & Sciences Humaines", "consultations": 2533, "percent": 6},
-                ],
-                "faculty_distribution": [
-                    {"code": "FADESP", "name": "Droit & Science Politique", "consultations": 16028, "percent": 38, "color": "var(--navy)"},
-                    {"code": "FSS", "name": "Sciences de la Santé", "consultations": 10966, "percent": 26, "color": "var(--gold)"},
-                    {"code": "FASEG", "name": "Économie & Gestion", "consultations": 7592, "percent": 18, "color": "var(--navy-hover)"},
-                    {"code": "FAST", "name": "Sciences & Techniques", "consultations": 5061, "percent": 12, "color": "var(--gold-dark)"},
-                    {"code": "FLASH", "name": "Lettres & Sciences Humaines", "consultations": 2533, "percent": 6, "color": "var(--navy-light)"},
-                ],
+                "top_disciplines": top_disc,
+                "faculty_distribution": faculty_distrib,
             },
             "error": None
         })
@@ -49,152 +107,114 @@ class UniversityKpisView(APIView):
 
 class UniversityFacultiesView(APIView):
     """GET / POST /api/v1/partners/university/faculties/ - Gestion des facultés de l'établissement."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
-        faculties = [
-            {
-                "id": "fac-1",
-                "name": "Faculté de Droit et de Science Politique",
-                "code": "FADESP",
-                "disciplines": ["Droit Privé", "Droit Public", "Sciences Politiques", "Droit des Affaires OHADA"],
-                "student_count": 5200,
-                "dean_name": "Prof. Roch GNAHOUI",
-            },
-            {
-                "id": "fac-2",
-                "name": "Faculté des Sciences de la Santé",
-                "code": "FSS",
-                "disciplines": ["Médecine Générale", "Pharmacie", "Santé Publique", "Pédiatrie Tropicale"],
-                "student_count": 3400,
-                "dean_name": "Prof. Josiane KPATENON",
-            },
-            {
-                "id": "fac-3",
-                "name": "Faculté des Sciences Économiques et de Gestion",
-                "code": "FASEG",
-                "disciplines": ["Économie de Développement", "Finance d'Entreprise", "Audit & Contrôle de Gestion"],
-                "student_count": 3100,
-                "dean_name": "Prof. Denis ACKLASSATO",
-            },
-            {
-                "id": "fac-4",
-                "name": "Faculté des Sciences et Techniques",
-                "code": "FAST",
-                "disciplines": ["Mathématiques Appliquées", "Physique-Chimie", "Informatique & Réseaux"],
-                "student_count": 2150,
-                "dean_name": "Prof. Valentin WANKPO",
-            },
-            {
-                "id": "fac-5",
-                "name": "Faculté des Lettres, Arts et Sciences Humaines",
-                "code": "FLASH",
-                "disciplines": ["Histoire & Archéologie", "Sociologie Africaine", "Géographie & Aménagement"],
-                "student_count": 1000,
-                "dean_name": "Prof. Clarisse TOSSOU",
-            },
-        ]
-        return Response({"success": True, "data": faculties, "error": None})
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": True, "data": [], "error": None})
+
+        faculties_qs = Faculty.objects.filter(institution=inst)
+        data = []
+        for f in faculties_qs:
+            data.append({
+                "id": str(f.id),
+                "name": f.name,
+                "code": f.code,
+                "disciplines": f.disciplines if isinstance(f.disciplines, list) else [],
+                "student_count": f.student_count,
+                "dean_name": f.dean_name,
+            })
+        return Response({"success": True, "data": data, "error": None})
 
     def post(self, request):
-        data = request.data
-        new_fac = {
-            "id": f"fac-{int(timezone.now().timestamp())}",
-            "name": data.get("name", "Nouvelle Faculté"),
-            "code": data.get("code", "UFR"),
-            "disciplines": data.get("disciplines", []),
-            "student_count": data.get("student_count", 0),
-            "dean_name": data.get("dean_name", ""),
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": False, "error": "Université non associée à l'utilisateur connecté"}, status=400)
+
+        d = request.data
+        fac = Faculty.objects.create(
+            institution=inst,
+            name=d.get("name", "Nouvelle Faculté"),
+            code=d.get("code", "UFR"),
+            disciplines=d.get("disciplines", []),
+            student_count=d.get("student_count", 0),
+            dean_name=d.get("dean_name", "")
+        )
+        res = {
+            "id": str(fac.id),
+            "name": fac.name,
+            "code": fac.code,
+            "disciplines": fac.disciplines,
+            "student_count": fac.student_count,
+            "dean_name": fac.dean_name,
         }
-        return Response({"success": True, "data": new_fac, "error": None}, status=status.HTTP_201_CREATED)
+        return Response({"success": True, "data": res, "error": None}, status=status.HTTP_201_CREATED)
 
 
 class UniversityBouquetsView(APIView):
     """GET /api/v1/partners/university/bouquets/ - Bouquets documentaires disponibles et souscrits."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
-        bouquets = [
-            {
-                "id": "bq-droit-2026",
-                "title": "Bouquet Droit des Affaires & Espace OHADA",
-                "bouquet_type": "faculty",
-                "faculty_code": "FADESP",
-                "discipline": "Droit Privé",
-                "books_count": 145,
-                "annual_price": 1200000,
-                "currency": "XOF",
-                "status": "active",
-                "start_date": "2026-01-01",
-                "end_date": "2026-12-31",
-                "description": "Ensemble complet des traités juridiques, précis de jurisprudence et codes annotés de l'espace OHADA.",
-                "sample_books": [
-                    {"id": "b-1", "title": "Traité de Droit Commercial Général OHADA", "author": "Prof. Dorothé SOSSA", "cover_url": "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=400&q=80"},
-                    {"id": "b-2", "title": "Précis de Droit Administratif Béninois", "author": "Prof. Victor TOPANOU", "cover_url": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=400&q=80"},
-                ]
-            },
-            {
-                "id": "bq-medecine-2026",
-                "title": "Bouquet Médecine Tropicale & Santé Publique",
-                "bouquet_type": "faculty",
-                "faculty_code": "FSS",
-                "discipline": "Médecine Générale",
-                "books_count": 98,
-                "annual_price": 1500000,
-                "currency": "XOF",
-                "status": "active",
-                "start_date": "2026-01-01",
-                "end_date": "2026-12-31",
-                "description": "Manuel de pathologie infectieuse, chirurgie tropicale et épidémiologie en Afrique subsaharienne.",
-                "sample_books": [
-                    {"id": "b-3", "title": "Cardiologie Tropicale Clinique", "author": "Prof. Martin HOUENASSI", "cover_url": "https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?auto=format&fit=crop&w=400&q=80"},
-                ]
-            },
-            {
-                "id": "bq-eco-2026",
-                "title": "Bouquet Économie Africaine & Gestion Publique",
-                "bouquet_type": "faculty",
-                "faculty_code": "FASEG",
-                "discipline": "Économie de Développement",
-                "books_count": 112,
-                "annual_price": 950000,
-                "currency": "XOF",
-                "status": "available",
-                "description": "Politiques macroéconomiques UEMOA/CEMAC, gestion budgétaire et microfinance rurale.",
-                "sample_books": [
-                    {"id": "b-4", "title": "Finances Publiques en Afrique Noire Francophone", "author": "Prof. Félix ADISSO", "cover_url": "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80"},
-                ]
-            },
-            {
-                "id": "bq-sciences-2026",
-                "title": "Bouquet Mathématiques & Informatique Décisionnelle",
-                "bouquet_type": "discipline",
-                "discipline": "Mathématiques Appliquées",
-                "books_count": 85,
-                "annual_price": 800000,
-                "currency": "XOF",
-                "status": "available",
-                "description": "Algèbre linéaire avancée, probabilités, intelligence artificielle et structures de données.",
-                "sample_books": [
-                    {"id": "b-5", "title": "Optimisation et Recherche Opérationnelle", "author": "Prof. Mahouton NORBERT", "cover_url": "https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=400&q=80"},
-                ]
-            }
-        ]
-        return Response({"success": True, "data": bouquets, "error": None})
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": True, "data": [], "error": None})
+
+        qs = UniversityBouquetSubscription.objects.filter(institution=inst)
+        data = []
+        for b in qs:
+            data.append({
+                "id": str(b.id),
+                "title": b.title,
+                "bouquet_type": b.bouquet_type,
+                "faculty_code": b.faculty_code,
+                "discipline": b.discipline,
+                "books_count": b.books_count,
+                "annual_price": float(b.annual_price),
+                "currency": b.currency,
+                "status": b.status,
+                "start_date": str(b.start_date),
+                "end_date": str(b.end_date),
+            })
+        return Response({"success": True, "data": data, "error": None})
 
 
 class UniversityBouquetSubscribeView(APIView):
     """POST /api/v1/partners/university/bouquets/<pk>/subscribe/ - Souscription à un bouquet."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def post(self, request, pk):
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": False, "error": "Université introuvable"}, status=400)
+
+        start = timezone.now().date()
+        end = start + timedelta(days=365)
+        sub_id = pk if len(str(pk)) == 36 else uuid.uuid4()
+        sub, _ = UniversityBouquetSubscription.objects.get_or_create(
+            id=sub_id,
+            defaults={
+                "institution": inst,
+                "title": f"Bouquet Souscrit {pk}",
+                "annual_price": 1000000.00,
+                "status": "active",
+                "start_date": start,
+                "end_date": end,
+            }
+        )
+        sub.status = "active"
+        sub.start_date = start
+        sub.end_date = end
+        sub.save()
+
         return Response({
             "success": True,
             "data": {
-                "bouquet_id": pk,
+                "bouquet_id": str(sub.id),
                 "status": "active",
-                "start_date": timezone.now().strftime("%Y-%m-%d"),
-                "end_date": (timezone.now() + timezone.timedelta(days=365)).strftime("%Y-%m-%d"),
+                "start_date": str(sub.start_date),
+                "end_date": str(sub.end_date),
                 "message": "Souscription validée avec succès pour l'ensemble des étudiants de l'établissement."
             },
             "error": None
@@ -203,79 +223,53 @@ class UniversityBouquetSubscribeView(APIView):
 
 class UniversityAffiliationsView(APIView):
     """GET /api/v1/partners/university/affiliations/ - Liste des étudiants et demandes de rattachement."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
-        affiliations = [
-            {
-                "id": "aff-101",
-                "student_name": "Koffi MENSAH",
-                "student_email": "koffimensah98@gmail.com",
-                "student_phone": "+229 97 12 34 56",
-                "matricule": "2024-UAC-10492",
-                "faculty_code": "FADESP",
-                "faculty_name": "Faculté de Droit et de Science Politique",
-                "level": "Licence 3 Droit Privé",
-                "student_card_url": "/justificatifs/carte-mensah.jpg",
-                "status": "pending",
-                "created_at": "2026-08-19T10:15:00Z"
-            },
-            {
-                "id": "aff-102",
-                "student_name": "Amina DIOP",
-                "student_email": "aminadiop.senegal@yahoo.fr",
-                "student_phone": "+221 77 654 32 10",
-                "matricule": "2023-UAC-08114",
-                "faculty_code": "FSS",
-                "faculty_name": "Faculté des Sciences de la Santé",
-                "level": "Master 1 Pharmacie",
-                "student_card_url": "/justificatifs/carte-diop.jpg",
-                "status": "active",
-                "verified_at": "2026-08-10T14:30:00Z",
-                "created_at": "2026-08-09T09:00:00Z"
-            },
-            {
-                "id": "aff-103",
-                "student_name": "Boris TCHIBINDA",
-                "student_email": "boris.tchibinda@gmail.com",
-                "student_phone": "+229 95 88 77 66",
-                "matricule": "2024-UAC-12903",
-                "faculty_code": "FASEG",
-                "faculty_name": "Faculté des Sciences Économiques",
-                "level": "Licence 2 Gestion",
-                "student_card_url": "/justificatifs/carte-tchibinda.jpg",
-                "status": "active",
-                "verified_at": "2026-08-15T11:20:00Z",
-                "created_at": "2026-08-14T16:45:00Z"
-            },
-            {
-                "id": "aff-104",
-                "student_name": "Chantal AGBOHOUN",
-                "student_email": "chantalagbohoun@gmail.com",
-                "student_phone": "+229 96 00 11 22",
-                "matricule": "2025-UAC-14002",
-                "faculty_code": "FAST",
-                "faculty_name": "Faculté des Sciences et Techniques",
-                "level": "Licence 1 Mathématiques",
-                "student_card_url": "/justificatifs/carte-agbohoun.jpg",
-                "status": "pending",
-                "created_at": "2026-08-20T08:00:00Z"
-            }
-        ]
-        return Response({"success": True, "data": affiliations, "error": None})
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": True, "data": [], "error": None})
+
+        qs = StudentAffiliation.objects.filter(institution=inst).select_related('faculty', 'student')
+        data = []
+        for aff in qs:
+            data.append({
+                "id": str(aff.id),
+                "student_name": aff.student_name or (f"{aff.student.first_name} {aff.student.last_name}".strip() if aff.student else "Étudiant"),
+                "student_email": aff.student_email or (aff.student.email if aff.student else ""),
+                "student_phone": aff.student_phone,
+                "matricule": aff.student_card_number,
+                "faculty_code": aff.faculty.code if aff.faculty else "",
+                "faculty_name": aff.faculty.name if aff.faculty else "",
+                "level": aff.level,
+                "student_card_url": aff.carte_etudiant_image or "",
+                "status": aff.status,
+                "created_at": aff.created_at.isoformat() if aff.created_at else str(timezone.now())
+            })
+        return Response({"success": True, "data": data, "error": None})
 
 
 class UniversityAffiliationActionView(APIView):
     """PATCH /api/v1/partners/university/affiliations/<pk>/ - Action d'approbation ou suspension."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def patch(self, request, pk):
         action = request.data.get("action", "approve")
-        new_status = "active" if action == "approve" else "suspended"
+        new_status = "approved" if action == "approve" else "suspended"
+        try:
+            aff = StudentAffiliation.objects.get(id=pk)
+            aff.status = new_status
+            aff.is_validated = (action == "approve")
+            aff.reviewed_by = request.user
+            aff.reviewed_at = timezone.now()
+            aff.save()
+        except (StudentAffiliation.DoesNotExist, ValueError):
+            pass
+
         return Response({
             "success": True,
             "data": {
-                "id": pk,
+                "id": str(pk),
                 "status": new_status,
                 "verified_at": timezone.now().isoformat(),
                 "message": f"Statut étudiant mis à jour ({new_status})."
@@ -286,115 +280,113 @@ class UniversityAffiliationActionView(APIView):
 
 class UniversityPaperOrdersView(APIView):
     """GET / POST /api/v1/partners/university/paper-orders/ - Commandes de livres papier institutionnelles."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
-        orders = [
-            {
-                "id": "ord-univ-01",
-                "order_number": "CMD-UNIV-2026-089",
-                "delivery_campus": "Bibliothèque Centrale — Campus Universitaire d'Abomey-Calavi",
-                "contact_person": "M. SOSSOU Théophile (Conservateur en Chef)",
-                "contact_phone": "+229 97 33 44 55",
-                "items": [
-                    {"book_id": "b-1", "title": "Traité de Droit Commercial Général OHADA", "quantity": 40, "unit_price": 12000},
-                    {"book_id": "b-2", "title": "Précis de Droit Administratif Béninois", "quantity": 30, "unit_price": 9500},
-                ],
-                "total_amount": 765000,
-                "currency": "XOF",
-                "status": "in_transit",
-                "tracking_number": "TRK-BEN-2026-0042",
-                "pdf_order_url": "/documents/bon-commande-089.pdf",
-                "created_at": "2026-08-16T09:00:00Z"
-            },
-            {
-                "id": "ord-univ-02",
-                "order_number": "CMD-UNIV-2026-074",
-                "delivery_campus": "Faculté des Sciences de la Santé (FSS) — Campus Cotonou Champ de Foire",
-                "contact_person": "Dr. EHOUN Constant",
-                "contact_phone": "+229 95 11 22 33",
-                "items": [
-                    {"book_id": "b-3", "title": "Cardiologie Tropicale Clinique", "quantity": 25, "unit_price": 15000},
-                ],
-                "total_amount": 375000,
-                "currency": "XOF",
-                "status": "delivered",
-                "tracking_number": "TRK-BEN-2026-0019",
-                "pdf_order_url": "/documents/bon-commande-074.pdf",
-                "created_at": "2026-08-01T14:30:00Z"
-            }
-        ]
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": True, "data": [], "error": None})
+
+        qs = UniversityPaperOrder.objects.filter(institution=inst)
+        orders = []
+        for o in qs:
+            orders.append({
+                "id": str(o.id),
+                "order_number": o.order_number,
+                "delivery_campus": o.delivery_campus,
+                "contact_person": o.contact_person,
+                "contact_phone": o.contact_phone,
+                "items": o.items if isinstance(o.items, list) else [],
+                "total_amount": float(o.total_amount),
+                "currency": o.currency,
+                "status": o.status,
+                "tracking_number": o.tracking_number,
+                "pdf_order_url": f"/documents/bon-{o.order_number}.pdf",
+                "created_at": o.created_at.isoformat() if o.created_at else str(timezone.now())
+            })
         return Response({"success": True, "data": orders, "error": None})
 
     def post(self, request):
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": False, "error": "Université introuvable"}, status=400)
+
         data = request.data
         order_number = f"CMD-UNIV-2026-{int(timezone.now().timestamp()) % 1000:03d}"
-        new_order = {
-            "id": f"ord-univ-{int(timezone.now().timestamp())}",
-            "order_number": order_number,
-            "delivery_campus": data.get("delivery_campus", "Campus Universitaire"),
-            "contact_person": data.get("contact_person", "Responsable Réception"),
-            "contact_phone": data.get("contact_phone", ""),
-            "items": data.get("items", []),
-            "total_amount": data.get("total_amount", 0),
-            "currency": data.get("currency", "XOF"),
-            "status": "processing",
-            "tracking_number": f"TRK-BEN-2026-{int(timezone.now().timestamp()) % 10000:04d}",
-            "pdf_order_url": f"/documents/bon-{order_number}.pdf",
-            "created_at": timezone.now().isoformat(),
+        order = UniversityPaperOrder.objects.create(
+            institution=inst,
+            order_number=order_number,
+            delivery_campus=data.get("delivery_campus", "Campus Universitaire"),
+            contact_person=data.get("contact_person", "Responsable Réception"),
+            contact_phone=data.get("contact_phone", ""),
+            items=data.get("items", []),
+            total_amount=data.get("total_amount", 0),
+            currency=data.get("currency", "XOF"),
+            status="pending",
+            tracking_number=f"TRK-BEN-2026-{int(timezone.now().timestamp()) % 10000:04d}"
+        )
+        res = {
+            "id": str(order.id),
+            "order_number": order.order_number,
+            "delivery_campus": order.delivery_campus,
+            "contact_person": order.contact_person,
+            "contact_phone": order.contact_phone,
+            "items": order.items,
+            "total_amount": float(order.total_amount),
+            "currency": order.currency,
+            "status": order.status,
+            "tracking_number": order.tracking_number,
+            "pdf_order_url": f"/documents/bon-{order.order_number}.pdf",
+            "created_at": order.created_at.isoformat()
         }
-        return Response({"success": True, "data": new_order, "error": None}, status=status.HTTP_201_CREATED)
+        return Response({"success": True, "data": res, "error": None}, status=status.HTTP_201_CREATED)
 
 
 class UniversityRoyaltiesView(APIView):
     """GET /api/v1/partners/university/royalties/ - Suivi des redevances 15% et versements."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
-        statements = [
-            {
-                "id": "roy-01",
-                "reference": "REL-ROY-UNIV-2026-T2",
-                "period": "2e Trimestre 2026 (Avril - Juin)",
-                "total_sales_catalog": 8333333,
-                "royalty_rate": 15.00,
-                "net_royalty_amount": 1250000,
-                "currency": "XOF",
-                "status": "available",
-                "pdf_statement_url": "/documents/bordereau-redevance-t2.pdf",
-                "created_at": "2026-07-05T10:00:00Z"
-            },
-            {
-                "id": "roy-02",
-                "reference": "REL-ROY-UNIV-2026-T1",
-                "period": "1er Trimestre 2026 (Janvier - Mars)",
-                "total_sales_catalog": 12000000,
-                "royalty_rate": 15.00,
-                "net_royalty_amount": 1800000,
-                "currency": "XOF",
-                "status": "paid",
-                "pdf_statement_url": "/documents/bordereau-redevance-t1.pdf",
-                "created_at": "2026-04-05T10:00:00Z"
-            },
-            {
-                "id": "roy-03",
-                "reference": "REL-ROY-UNIV-2025-T4",
-                "period": "4e Trimestre 2025 (Octobre - Décembre)",
-                "total_sales_catalog": 13333333,
-                "royalty_rate": 15.00,
-                "net_royalty_amount": 2000000,
-                "currency": "XOF",
-                "status": "paid",
-                "pdf_statement_url": "/documents/bordereau-redevance-t4.pdf",
-                "created_at": "2026-01-05T10:00:00Z"
-            }
-        ]
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({
+                "success": True,
+                "data": {
+                    "available_balance": 0.0,
+                    "total_paid": 0.0,
+                    "contractual_rate": 15.00,
+                    "currency": "XOF",
+                    "min_withdrawal_threshold": 100000,
+                    "statements": []
+                },
+                "error": None
+            })
+
+        qs = UniversityRoyaltyStatement.objects.filter(institution=inst)
+        statements = []
+        for r in qs:
+            statements.append({
+                "id": str(r.id),
+                "reference": r.reference,
+                "period": r.period,
+                "total_sales_catalog": float(r.total_sales_catalog),
+                "royalty_rate": float(r.royalty_rate),
+                "net_royalty_amount": float(r.net_royalty_amount),
+                "currency": r.currency,
+                "status": r.status,
+                "pdf_statement_url": r.pdf_statement_url or f"/documents/bordereau-{r.reference}.pdf",
+                "created_at": r.created_at.isoformat() if r.created_at else str(timezone.now())
+            })
+        avail_bal = float(qs.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+        total_paid = float(qs.filter(status='paid').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+        rate = float(inst.royalty_rate) if inst and inst.royalty_rate else 15.00
+
         return Response({
             "success": True,
             "data": {
-                "available_balance": 1250000,
-                "total_paid": 3800000,
-                "contractual_rate": 15.00,
+                "available_balance": avail_bal,
+                "total_paid": total_paid,
+                "contractual_rate": rate,
                 "currency": "XOF",
                 "min_withdrawal_threshold": 100000,
                 "statements": statements
@@ -405,14 +397,28 @@ class UniversityRoyaltiesView(APIView):
 
 class UniversityRoyaltyWithdrawView(APIView):
     """POST /api/v1/partners/university/royalties/withdraw/ - Demande de versement des redevances."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def post(self, request):
-        amount = request.data.get("amount", 1250000)
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": False, "error": "Université introuvable"}, status=400)
+
+        amount = request.data.get("amount", 0)
+        ref = f"REQ-ROY-UNIV-2026-{int(timezone.now().timestamp()) % 1000:03d}"
+        
+        UniversityRoyaltyStatement.objects.create(
+            institution=inst,
+            reference=ref,
+            period=f"Demande de retrait - {timezone.now().strftime('%B %Y')}",
+            net_royalty_amount=amount,
+            status="pending"
+        )
+
         return Response({
             "success": True,
             "data": {
-                "request_reference": f"REQ-ROY-UNIV-2026-{int(timezone.now().timestamp()) % 1000:03d}",
+                "request_reference": ref,
                 "amount": amount,
                 "currency": "XOF",
                 "status": "processing",
@@ -424,33 +430,70 @@ class UniversityRoyaltyWithdrawView(APIView):
 
 class UniversityProfileView(APIView):
     """GET / PATCH /api/v1/partners/university/profile/ - Profil et identité de l'établissement."""
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": False, "error": "Profil d'établissement non trouvé"}, status=404)
+
         profile = {
-            "id": "univ-uac",
-            "name": "Université d'Abomey-Calavi",
-            "short_name": "UAC",
-            "country": "BJ",
-            "city": "Abomey-Calavi / Cotonou",
-            "address": "Campus Universitaire d'Abomey-Calavi, BP 526, Bénin",
-            "rector_name": "Prof. Félicien AVLESSI",
-            "academic_director_name": "Prof. Patrick HOUESSOU",
-            "contact_email": "rectorat@uac.bj",
-            "contact_phone": "+229 21 36 00 74",
-            "bank_name": "Trésor Public du Bénin / Ecobank Bénin",
-            "bank_iban": "BJ0610100100198765432100",
-            "bank_swift": "ECOBBJBJ",
-            "momo_number": "+229 97 00 00 01",
-            "contract_reference": "CONV-UAC-LAHA-2025-01",
-            "royalty_rate": 15.00,
-            "is_active": True,
+            "id": str(inst.id),
+            "name": inst.name,
+            "short_name": inst.short_name or inst.code,
+            "country": inst.country,
+            "city": inst.city,
+            "address": inst.address,
+            "rector_name": inst.rector_name,
+            "academic_director_name": inst.academic_director_name,
+            "contact_email": inst.contact_email,
+            "contact_phone": inst.contact_phone,
+            "bank_name": inst.bank_name,
+            "bank_iban": inst.bank_iban,
+            "bank_swift": inst.bank_swift,
+            "momo_number": inst.momo_number,
+            "contract_reference": inst.contract_reference,
+            "royalty_rate": float(inst.royalty_rate) if inst.royalty_rate else 15.00,
+            "is_active": inst.is_active,
         }
         return Response({"success": True, "data": profile, "error": None})
 
     def patch(self, request):
-        return Response({
-            "success": True,
-            "data": {**request.data, "updated_at": timezone.now().isoformat()},
-            "error": None
-        })
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": False, "error": "Profil d'établissement non trouvé"}, status=404)
+
+        d = request.data
+        for field in [
+            "name", "short_name", "country", "city", "address",
+            "rector_name", "academic_director_name", "contact_email", "contact_phone",
+            "bank_name", "bank_iban", "bank_swift", "momo_number", "contract_reference"
+        ]:
+            if field in d:
+                setattr(inst, field, d[field])
+        if "royalty_rate" in d:
+            inst.royalty_rate = d["royalty_rate"]
+        inst.save()
+
+        profile = {
+            "id": str(inst.id),
+            "name": inst.name,
+            "short_name": inst.short_name or inst.code,
+            "country": inst.country,
+            "city": inst.city,
+            "address": inst.address,
+            "rector_name": inst.rector_name,
+            "academic_director_name": inst.academic_director_name,
+            "contact_email": inst.contact_email,
+            "contact_phone": inst.contact_phone,
+            "bank_name": inst.bank_name,
+            "bank_iban": inst.bank_iban,
+            "bank_swift": inst.bank_swift,
+            "momo_number": inst.momo_number,
+            "contract_reference": inst.contract_reference,
+            "royalty_rate": float(inst.royalty_rate) if inst.royalty_rate else 15.00,
+            "is_active": inst.is_active,
+            "updated_at": inst.updated_at.isoformat() if hasattr(inst, 'updated_at') else timezone.now().isoformat()
+        }
+        return Response({"success": True, "data": profile, "error": None})
+
