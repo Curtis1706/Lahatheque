@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 from .models import Ouvrage, Discipline
 from .serializers import OuvrageSerializer, DisciplineSerializer
+from .permissions import IsChiefLayoutOrAdmin
 
 class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Ouvrage.objects.all().select_related('publisher', 'discipline', 'institution').prefetch_related('authors')
@@ -58,7 +59,7 @@ class ChiefLayoutDepositViewSet(viewsets.ModelViewSet):
     """
     queryset = Ouvrage.objects.all().order_by('-publication_date')
     serializer_class = OuvrageSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, IsChiefLayoutOrAdmin]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -247,6 +248,8 @@ class ChiefLayoutDepositViewSet(viewsets.ModelViewSet):
 
 
 class ONIXImportView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
     def post(self, request):
         return Response({"detail": "ONIX import stub"})
+
 

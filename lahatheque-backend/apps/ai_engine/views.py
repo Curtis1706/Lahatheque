@@ -23,7 +23,7 @@ class ExtractBookMetadataAIView(APIView):
     Analyse un fichier PDF/EPUB téléversé ou un nom de fichier pour extraire
     les métadonnées, le résumé, la classification Dewey, la faculté et générer le document ONIX 3.0.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request, *args, **kwargs):
@@ -74,7 +74,7 @@ class CheckMetadataConsistencyAIView(APIView):
     POST /api/v1/ai/check-consistency/
     Contrôle qualité des métadonnées (détection d'incohérences entre titre, discipline, faculté).
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         title = request.data.get("title", "")

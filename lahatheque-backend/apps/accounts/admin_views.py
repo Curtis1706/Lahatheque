@@ -9,6 +9,7 @@ from rest_framework.pagination import PageNumberPagination
 
 from .models import User
 from .serializers import UserSerializer, AdminUserCreateSerializer
+from .permissions import IsAdminOrSuperAdmin
 from apps.partners.models import Institution
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -21,7 +22,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
     """
     Gestion complète des utilisateurs par l'Administrateur (/admin/users).
     """
-    permission_classes = [permissions.AllowAny] # Sera restreint par middleware/IsAdminUser en prod
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
     pagination_class = StandardResultsSetPagination
 
     def list(self, request):

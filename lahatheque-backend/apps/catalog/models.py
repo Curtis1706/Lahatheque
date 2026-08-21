@@ -53,6 +53,17 @@ class Ouvrage(models.Model):
             return self.cover_image.url
         return ""
 
+    @property
+    def titre(self) -> str:
+        return self.title
+
+    @property
+    def auteur(self) -> str:
+        if self.pk and self.authors.exists():
+            return ", ".join([f"{a.first_name} {a.last_name}".strip() for a in self.authors.all()])
+        return ""
+
+
 
 class MetadataONIX(models.Model):
     ouvrage = models.OneToOneField(Ouvrage, on_delete=models.CASCADE, related_name='onix_metadata')
