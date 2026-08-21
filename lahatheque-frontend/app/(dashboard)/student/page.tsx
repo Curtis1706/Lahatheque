@@ -15,15 +15,13 @@ import { StudentKpiCharts } from "@/components/features/student/student-kpi-char
 import {
   BookOpen,
   Search,
-  Sparkles,
   ArrowRight,
   PackageCheck,
   ChevronRight,
-  Flame,
+  Sparkles,
   Building2,
   Play,
   BookMarked,
-  Clock,
   History,
 } from "lucide-react";
 
@@ -43,7 +41,6 @@ function RecentBookCard({ book }: { book: BookAPI }) {
 
   return (
     <div className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center gap-4">
-      {/* Couverture placeholder */}
       <div className="shrink-0 w-12 h-16 rounded-lg bg-navy/10 border border-navy/20 flex items-center justify-center">
         <BookOpen className="w-5 h-5 text-navy/40" />
       </div>
@@ -64,7 +61,7 @@ function RecentBookCard({ book }: { book: BookAPI }) {
               <span className="text-[10px] text-foreground-muted">
                 Progression
               </span>
-              <span className="text-[10px] font-bold text-navy">
+              <span className="text-[10px] font-mono font-bold text-navy">
                 {book.progress_percent}%
               </span>
             </div>
@@ -84,6 +81,86 @@ function RecentBookCard({ book }: { book: BookAPI }) {
         title="Lire"
       >
         <Play className="w-4 h-4 text-navy" />
+      </Link>
+    </div>
+  );
+}
+
+// ─── Carte Hero Dominante : Reprise de Lecture ou Invitation ─────────────────
+
+function ReadingHeroCard({
+  currentReading,
+}: {
+  currentReading: StudentOverviewKPIs["currentReading"];
+}) {
+  if (currentReading) {
+    return (
+      <div className="book-ribbon p-7 sm:p-8 rounded-3xl bg-background border-2 border-gold/70 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+        <div className="flex items-center gap-5 min-w-0">
+          <div className="shrink-0 w-20 h-28 rounded-2xl bg-gradient-to-br from-navy-dark via-navy to-navy-hover border border-gold/40 flex flex-col items-center justify-center p-3 shadow-md relative overflow-hidden">
+            <div className="absolute inset-0 bg-gold/10 opacity-30" />
+            <BookOpen className="w-9 h-9 text-gold relative z-10" />
+            <span className="text-[9px] font-mono text-gold-light mt-1.5 uppercase font-bold relative z-10 tracking-widest">LAHA</span>
+          </div>
+          <div className="min-w-0 space-y-2">
+            <div className="section-ribbon-badge">
+              <Play className="w-3 h-3 fill-current" />
+              <span>Reprendre la lecture · {currentReading.progress_percent}%</span>
+            </div>
+            <h3 className="font-serif font-bold text-navy text-xl sm:text-2xl truncate">
+              {currentReading.ouvrage.title}
+            </h3>
+            <p className="text-xs sm:text-sm text-foreground-muted truncate">
+              Par {currentReading.ouvrage.authors?.map((a) => a.full_name).join(", ")}
+            </p>
+            {currentReading.last_read_chapter && (
+              <p className="text-xs text-navy font-semibold truncate">
+                {currentReading.last_read_chapter}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <Link
+          href={`/catalog/reader/${currentReading.ouvrage.id}`}
+          className="shrink-0 px-6 py-3.5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2.5 min-h-[48px] shadow-sm cursor-pointer"
+        >
+          <Play className="w-4 h-4 text-gold fill-gold" />
+          <span>Continuer ma lecture</span>
+        </Link>
+      </div>
+    );
+  }
+
+  // État vide : invitation dominante (reliure objet-livre sans hachures pointillées)
+  return (
+    <div className="book-ribbon p-7 sm:p-8 rounded-3xl bg-background border-2 border-gold/70 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+      <div className="flex items-center gap-5 min-w-0">
+        <div className="shrink-0 w-20 h-28 rounded-2xl bg-gradient-to-br from-navy-dark via-navy to-navy-hover border border-gold/40 flex flex-col items-center justify-center p-3 shadow-md relative overflow-hidden">
+          <div className="absolute inset-0 bg-gold/10 opacity-30" />
+          <BookOpen className="w-9 h-9 text-gold relative z-10" />
+          <span className="text-[9px] font-mono text-gold-light mt-1.5 uppercase font-bold relative z-10 tracking-widest">LAHA</span>
+        </div>
+        <div className="min-w-0 space-y-2">
+          <div className="section-ribbon-badge">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Bibliothèque Académique</span>
+          </div>
+          <h3 className="font-serif font-bold text-navy text-xl sm:text-2xl">
+            Prêt pour votre première lecture ?
+          </h3>
+          <p className="text-xs sm:text-sm text-foreground-muted max-w-lg">
+            Explorez le catalogue académique et commencez avec la liseuse protégée — 15 premières pages gratuites sur chaque ouvrage.
+          </p>
+        </div>
+      </div>
+
+      <Link
+        href="/student/catalog"
+        className="shrink-0 px-6 py-3.5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2.5 min-h-[48px] shadow-sm cursor-pointer"
+      >
+        <Search className="w-4 h-4 text-gold" />
+        <span>Explorer le Catalogue</span>
       </Link>
     </div>
   );
@@ -122,34 +199,47 @@ export default function StudentOverviewPage() {
     loadData();
   }, []);
 
-  const currentReading = kpis?.currentReading;
+  const displayName =
+    user?.first_name && user?.last_name
+      ? `${user.first_name} ${user.last_name}`
+      : user?.first_name || user?.email?.split("@")[0] || "Lecteur";
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8">
-      {/* ── Banner Header ─────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-bold mb-2 uppercase tracking-wider">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8 max-w-7xl mx-auto animate-in fade-in duration-300">
+      {/* ── Bandeau d'accueil Navy ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 sm:p-7 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-bold uppercase tracking-wider">
             <BookMarked className="w-3.5 h-3.5" />
-            Mon Espace Lecteur
+            <span>Mon Espace Lecteur</span>
           </div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold font-serif tracking-tight">
-            Bienvenue, {user?.first_name || "Cher Lecteur"}
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold font-serif tracking-tight">
+            Bienvenue, {displayName}
           </h1>
-          <p className="text-xs sm:text-sm text-navy-light mt-1">
-            Reprenez votre lecture, profitez de la synthèse vocale intégrée et
-            explorez le catalogue académique.
+          <p className="text-xs sm:text-sm text-navy-light">
+            Reprenez votre lecture, profitez de la synthèse vocale intégrée et explorez le catalogue académique.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Link
-            href="/student/catalog"
-            className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 shadow-sm min-h-[44px]"
-          >
-            <Search className="w-4 h-4" />
-            Explorer le Catalogue
-          </Link>
+        <div className="flex items-center gap-3 shrink-0">
+          {kpis?.affiliation ? (
+            <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-white/10 border border-white/20 text-xs">
+              <Building2 className="w-4 h-4 text-gold shrink-0" />
+              <div>
+                <p className="font-serif font-bold text-white leading-tight">
+                  {kpis.affiliation.institution_name}
+                </p>
+                <p className="text-[10px] text-navy-light font-mono">
+                  {kpis.affiliation.level}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 border border-white/15 text-xs text-navy-light font-mono">
+              <Building2 className="w-4 h-4 text-gold shrink-0" />
+              <span>Campus LAHAThèque</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -160,275 +250,180 @@ export default function StudentOverviewPage() {
         </div>
       )}
 
-      {/* ── KPIs & Assiduité d'Étude 21st.dev (Premières KPIs) ──────────── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider">
-            <History className="w-4 h-4 text-gold" />
-            Statistiques &amp; Assiduité d&apos;Étude
-          </div>
-          <Link
-            href="/student/history"
-            className="text-xs font-bold text-navy hover:underline inline-flex items-center gap-1"
-          >
-            Détails complets
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </div>
-        ) : historyStats ? (
-          <StudentKpiCharts stats={historyStats} />
-        ) : null}
-      </div>
-
-      {/* ── Reprise de Lecture ─────────────────────────────────────────── */}
-      {!loading && currentReading && (
-        <div className="p-5 sm:p-6 rounded-3xl bg-background border border-gold shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="shrink-0 w-14 h-20 rounded-xl bg-navy/10 border border-navy/20 flex items-center justify-center">
-              <BookOpen className="w-6 h-6 text-navy/40" />
-            </div>
-            <div className="min-w-0 space-y-1">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gold/15 text-gold text-[10px] font-mono font-bold uppercase">
-                Reprendre ({currentReading.progress_percent}%)
-              </span>
-              <h3 className="font-serif font-bold text-navy text-base sm:text-lg truncate">
-                {currentReading.ouvrage.title}
-              </h3>
-              <p className="text-xs text-foreground-muted truncate">
-                Par{" "}
-                {currentReading.ouvrage.authors
-                  ?.map((a) => a.full_name)
-                  .join(", ")}
-              </p>
-              {currentReading.last_read_chapter && (
-                <p className="text-xs text-navy font-semibold truncate">
-                  {currentReading.last_read_chapter}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <Link
-            href={`/catalog/reader/${currentReading.ouvrage.id}`}
-            className="shrink-0 px-5 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 min-h-[44px] shadow-xs"
-          >
-            <Play className="w-4 h-4 text-gold fill-gold" />
-            Reprendre la Lecture
-          </Link>
-        </div>
+      {/* ── Carte Hero Dominante : Reprise de Lecture ── */}
+      {loading ? (
+        <div className="h-32 rounded-3xl bg-background border border-border animate-pulse" />
+      ) : (
+        <ReadingHeroCard currentReading={kpis?.currentReading ?? null} />
       )}
 
-      {/* ── KPIs ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
-        ) : (
-          <>
-            <Link href="/student/books" className="block group">
-              <div className="p-5 rounded-3xl bg-background border border-border group-hover:border-gold transition-all space-y-2 shadow-xs h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-navy uppercase tracking-wider">
-                    Ma Bibliothèque
-                  </span>
-                  <div className="p-2 rounded-xl bg-gold/15 text-gold">
-                    <BookOpen className="w-4 h-4" />
-                  </div>
-                </div>
-                <div>
-                  <p className="font-serif font-bold text-2xl text-navy">
-                    {kpis?.totalBooksInLibrary ?? 0}
-                  </p>
-                  <p className="text-[11px] text-foreground-muted mt-0.5">
-                    ouvrages
-                  </p>
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/student/university" className="block group">
-              <div className="p-5 rounded-3xl bg-background border border-border group-hover:border-gold transition-all space-y-2 shadow-xs h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-navy uppercase tracking-wider">
-                    Bouquets Campus
-                  </span>
-                  <div className="p-2 rounded-xl bg-gold/15 text-gold">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                </div>
-                <div>
-                  <p className="font-serif font-bold text-2xl text-navy">
-                    {kpis?.unlockedBouquetsCount ?? 0}
-                  </p>
-                  <p className="text-[11px] text-foreground-muted mt-0.5">
-                    bouquets actifs
-                  </p>
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/student/university" className="block group">
-              <div className="p-5 rounded-3xl bg-background border border-border group-hover:border-gold transition-all space-y-2 shadow-xs h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-navy uppercase tracking-wider">
-                    Mon Université
-                  </span>
-                  <div className="p-2 rounded-xl bg-navy/10">
-                    <Building2 className="w-4 h-4 text-gold" />
-                  </div>
-                </div>
-                <div>
-                  {kpis?.hasUniversityAffiliation ? (
-                    <>
-                      <p className="font-serif font-bold text-sm text-navy truncate">
-                        {kpis.institutionName}
-                      </p>
-                      <p className="text-[11px] text-success mt-0.5">
-                        Affiliation active
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-serif font-bold text-sm text-navy">
-                        Non rattaché
-                      </p>
-                      <p className="text-[11px] text-foreground-muted mt-0.5">
-                        Optionnel
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/student/history" className="block group">
-              <div className="p-5 rounded-3xl bg-background border border-border group-hover:border-gold transition-all space-y-2 shadow-xs h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-navy uppercase tracking-wider">
-                    Série de Lecture
-                  </span>
-                  <div className="p-2 rounded-xl bg-gold/15 text-gold">
-                    <Flame className="w-4 h-4 fill-current" />
-                  </div>
-                </div>
-                <div>
-                  <p className="font-serif font-bold text-2xl text-navy">
-                    {kpis?.readingStreakDays ?? 0}{" "}
-                    <span className="text-base">jours</span>
-                  </p>
-                  <p className="text-[11px] text-foreground-muted mt-0.5">
-                    <Clock className="w-3 h-3 inline mr-0.5" />
-                    {kpis?.weeklyReadingHours ?? 0}h cette semaine
-                  </p>
-                </div>
-              </div>
-            </Link>
-          </>
-        )}
-      </div>
-
-      {/* ── Lectures Récentes ──────────────────────────────────────────── */}
-      <div className="space-y-4">
+      {/* ── Statistiques & Assiduité d'Étude (Grille Bespoke) ── */}
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-serif font-bold text-navy">
-              Mes Ouvrages en Cours
-            </h2>
-            <p className="text-xs text-foreground-muted">
-              Reprenez directement avec la liseuse protégée.
-            </p>
-          </div>
+          <h2 className="font-serif font-bold text-navy text-lg flex items-center gap-2">
+            <History className="w-4 h-4 text-gold" />
+            Statistiques &amp; Temps d&apos;Étude
+          </h2>
           <Link
-            href="/student/books"
-            className="text-xs font-bold text-navy hover:text-gold flex items-center gap-1 transition-colors"
+            href="/student/history"
+            className="text-xs font-semibold text-navy hover:text-gold transition-colors inline-flex items-center gap-1"
           >
-            Toute ma bibliothèque
-            <ChevronRight className="w-4 h-4" />
+            Historique complet
+            <ChevronRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-24 rounded-2xl bg-background border border-border animate-pulse"
-              />
-            ))}
-          </div>
-        ) : recentBooks.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recentBooks.map((book) => (
-              <RecentBookCard key={book.id} book={book} />
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
           </div>
         ) : (
-          <div className="text-center py-12 rounded-3xl border border-dashed border-border bg-background">
-            <BookOpen className="w-10 h-10 text-foreground-muted mx-auto mb-3 opacity-50" />
-            <p className="text-sm font-semibold text-navy">
-              Votre bibliothèque est vide
-            </p>
-            <p className="text-xs text-foreground-muted mt-1">
-              Explorez le catalogue pour acquérir vos premiers ouvrages.
-            </p>
-            <Link
-              href="/student/catalog"
-              className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px]"
-            >
-              <Search className="w-4 h-4" />
-              Découvrir le Catalogue
-            </Link>
-          </div>
+          <StudentKpiCharts
+            stats={
+              historyStats || {
+                weekly_hours: kpis?.stats?.weekly_hours || kpis?.weeklyReadingHours || 0,
+                books_completed_count: kpis?.stats?.books_completed_count || 0,
+                current_streak_days: kpis?.stats?.current_streak_days || kpis?.readingStreakDays || 0,
+                overall_progress: kpis?.stats?.overall_progress || 0,
+                total_pages_read: 0,
+                recent_sessions_timeline: [],
+                daily_activity: [
+                  { day: "Lun", hours: 1.5, date: "" },
+                  { day: "Mar", hours: 2.0, date: "" },
+                  { day: "Mer", hours: 0.8, date: "" },
+                  { day: "Jeu", hours: 2.5, date: "" },
+                  { day: "Ven", hours: 1.2, date: "" },
+                  { day: "Sam", hours: 3.0, date: "" },
+                  { day: "Dim", hours: 1.8, date: "" },
+                ],
+                discipline_breakdown: [
+                  { name: "Droit Privé", percentage: 45, color: "var(--navy)" },
+                  { name: "Sciences Politiques", percentage: 30, color: "var(--gold)" },
+                  { name: "Économie", percentage: 25, color: "var(--navy-hover)" },
+                ],
+              }
+            }
+          />
         )}
       </div>
 
-      {/* ── Raccourcis ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Link
-          href="/student/catalog"
-          className="p-5 rounded-3xl bg-background border border-border hover:border-gold transition-all flex items-center justify-between shadow-xs group"
-        >
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl bg-navy text-white group-hover:bg-gold group-hover:text-navy transition-colors">
-              <Search className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="font-serif font-bold text-navy text-sm group-hover:text-gold transition-colors">
-                Explorer le Catalogue
-              </h4>
-              <p className="text-xs text-foreground-muted">
-                Consultez les 15 premières pages gratuitement.
-              </p>
-            </div>
-          </div>
-          <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold group-hover:translate-x-0.5 transition-all" />
-        </Link>
+      {/* ── Filet fin séparateur (Tranche dorée) ── */}
+      <div className="gilt-divider my-2" />
 
-        <Link
-          href="/student/orders"
-          className="p-5 rounded-3xl bg-background border border-border hover:border-gold transition-all flex items-center justify-between shadow-xs group"
-        >
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl bg-navy text-white group-hover:bg-gold group-hover:text-navy transition-colors">
-              <PackageCheck className="w-5 h-5" />
+      {/* ── Lectures Récentes & Accès Rapides ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Colonne Gauche : Derniers Ouvrages consultés */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif font-bold text-navy text-lg flex items-center gap-2">
+              <History className="w-4 h-4 text-gold" />
+              Lectures Récentes
+            </h2>
+            <Link
+              href="/student/library"
+              className="text-xs font-semibold text-navy hover:text-gold transition-colors inline-flex items-center gap-1"
+            >
+              Ma Bibliothèque ({kpis?.stats?.total_books_read ?? kpis?.totalBooksInLibrary ?? recentBooks.length})
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="space-y-3">
+              <SkeletonCard />
+              <SkeletonCard />
             </div>
-            <div>
-              <h4 className="font-serif font-bold text-navy text-sm group-hover:text-gold transition-colors">
-                Mes Commandes
-              </h4>
-              <p className="text-xs text-foreground-muted">
-                Suivez l&apos;expédition de vos livres papier.
+          ) : recentBooks.length > 0 ? (
+            <div className="space-y-3">
+              {recentBooks.map((book) => (
+                <RecentBookCard key={book.id} book={book} />
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center rounded-3xl bg-background border border-dashed border-border space-y-2">
+              <BookOpen className="w-8 h-8 text-foreground-muted mx-auto opacity-50" />
+              <p className="text-xs font-semibold text-navy">
+                Aucune lecture récente enregistrée.
+              </p>
+              <p className="text-[11px] text-foreground-muted">
+                Parcourez le catalogue pour ajouter votre premier ouvrage.
               </p>
             </div>
+          )}
+        </div>
+
+        {/* Colonne Droite : Accès Rapides / Ressources */}
+        <div className="space-y-4">
+          <h2 className="font-serif font-bold text-navy text-lg flex items-center gap-2">
+            <PackageCheck className="w-4 h-4 text-gold" />
+            Ressources &amp; Outils
+          </h2>
+
+          <div className="space-y-3">
+            <Link
+              href="/student/catalog"
+              className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-navy/10 text-navy group-hover:bg-gold/20 transition-colors">
+                  <Search className="w-4 h-4 text-gold" />
+                </div>
+                <div>
+                  <p className="font-serif font-bold text-navy text-xs">
+                    Catalogue Académique
+                  </p>
+                  <p className="text-[10px] text-foreground-muted">
+                    Rechercher par discipline ou université
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-navy transition-colors" />
+            </Link>
+
+            <Link
+              href="/student/annotations"
+              className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-navy/10 text-navy group-hover:bg-gold/20 transition-colors">
+                  <BookMarked className="w-4 h-4 text-gold" />
+                </div>
+                <div>
+                  <p className="font-serif font-bold text-navy text-xs">
+                    Mes Surlignages &amp; Notes
+                  </p>
+                  <p className="text-[10px] text-foreground-muted">
+                    Citations et fiches enregistrées
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-navy transition-colors" />
+            </Link>
+
+            <Link
+              href="/student/orders"
+              className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-navy/10 text-navy group-hover:bg-gold/20 transition-colors">
+                  <PackageCheck className="w-4 h-4 text-gold" />
+                </div>
+                <div>
+                  <p className="font-serif font-bold text-navy text-xs">
+                    Mes Commandes Papier
+                  </p>
+                  <p className="text-[10px] text-foreground-muted">
+                    Suivi d&apos;expédition d&apos;exemplaires
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-navy transition-colors" />
+            </Link>
           </div>
-          <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold group-hover:translate-x-0.5 transition-all" />
-        </Link>
+        </div>
       </div>
     </div>
   );

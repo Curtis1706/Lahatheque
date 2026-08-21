@@ -98,7 +98,7 @@
 
 /* ─────────────────────────────────────────────────────────────────────────
    ESPACE LECTEUR (/student) — typographie et signature visuelle dédiées.
-   Portée strictly limitée à .student-scope : n'affecte aucun autre
+   Portée strictement limitée à .student-scope : n'affecte aucun autre
    dashboard (admin, auteur, université, etc.) qui continuent d'utiliser
    la pile de polices par défaut de Tailwind.
    ───────────────────────────────────────────────────────────────────────── */
@@ -125,40 +125,21 @@
 .student-scope .book-ribbon::before {
   content: "";
   position: absolute;
-  top: -2px;
-  right: 36px;
-  width: 26px;
-  height: 64px;
-  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 60%, var(--gold-dark) 100%);
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
-  filter: drop-shadow(0 4px 10px rgba(15, 26, 51, 0.4));
+  top: 0;
+  right: 28px;
+  width: 14px;
+  height: 36px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%);
+  filter: drop-shadow(0 2px 3px rgba(15, 26, 51, 0.25));
   pointer-events: none;
-  z-index: 20;
 }
 
 /* Filet fin doré — remplace les bordures grises par défaut entre sections,
    évoque la tranche dorée d'un livre relié. */
 .student-scope .gilt-divider {
-  position: relative;
   height: 1px;
   width: 100%;
   background: linear-gradient(90deg, transparent, var(--gold) 15%, var(--gold) 85%, transparent);
-  opacity: 0.55;
-}
-
-/* Puce/marque-page d'en-tête de section */
-.student-scope .section-ribbon-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  background: rgba(176, 141, 66, 0.12);
-  border: 1px solid rgba(176, 141, 66, 0.25);
-  color: var(--gold);
-  font-family: var(--student-mono);
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  opacity: 0.45;
 }

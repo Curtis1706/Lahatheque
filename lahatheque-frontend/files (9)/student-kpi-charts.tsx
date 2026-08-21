@@ -14,9 +14,7 @@ interface StudentKpiChartsProps {
 // dashboards — ici on construit un rendu dédié, sans dépendance croisée.)
 
 function WeeklyHoursCard({ stats }: { stats: StudentKpiChartsProps["stats"] }) {
-  const totalHours = stats.weekly_hours || stats.daily_activity.reduce((acc, d) => acc + d.hours, 0);
   const maxHours = Math.max(1, ...stats.daily_activity.map((d) => d.hours));
-  const hasActivity = totalHours > 0;
 
   return (
     <div className="bg-background border border-border rounded-3xl p-5 space-y-4 shadow-xs flex flex-col justify-between h-full">
@@ -25,49 +23,38 @@ function WeeklyHoursCard({ stats }: { stats: StudentKpiChartsProps["stats"] }) {
           <span className="text-[10px] font-bold text-foreground-muted uppercase tracking-wider">
             Temps d&apos;Étude
           </span>
-          <div className="font-mono text-2xl font-semibold text-navy flex items-baseline gap-1.5">
-            <span>{totalHours}h</span>
-            <span className="text-xs text-foreground-muted font-normal">cette semaine</span>
+          <div className="font-mono text-2xl font-semibold text-navy">
+            {stats.weekly_hours}
+            <span className="text-sm text-foreground-muted">h cette semaine</span>
           </div>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <div className="relative flex items-end justify-between gap-1.5 h-16 pt-2">
-          {/* Subtle baseline indicator */}
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-border" />
-          
-          {stats.daily_activity.map((d, idx) => {
-            const isToday = idx === stats.daily_activity.length - 1;
-            const heightPct = d.hours > 0 ? Math.max(12, (d.hours / maxHours) * 100) : (hasActivity ? 6 : 10);
-            const barBg = d.hours > 0 ? (isToday ? "bg-gold" : "bg-navy/35") : (isToday ? "bg-gold/30" : "bg-border/80");
-
-            return (
-              <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 z-10">
-                <div className="w-full h-16 flex items-end rounded-md bg-background-secondary/60 overflow-hidden p-0.5">
-                  <div
-                    className={`w-full rounded-t-sm transition-all ${barBg}`}
-                    style={{ height: `${heightPct}%` }}
-                    title={`${d.day} : ${d.hours}h`}
-                  />
-                </div>
-                <span
-                  className={`text-[9px] font-mono uppercase ${
-                    isToday ? "text-gold font-bold" : "text-foreground-muted"
+      <div className="flex items-end justify-between gap-1.5 h-16 pt-2">
+        {stats.daily_activity.map((d, idx) => {
+          const heightPct = Math.max(6, (d.hours / maxHours) * 100);
+          const isToday = idx === stats.daily_activity.length - 1;
+          return (
+            <div key={idx} className="flex-1 flex flex-col items-center gap-1.5">
+              <div className="w-full h-16 flex items-end rounded-md bg-background-secondary overflow-hidden">
+                <div
+                  className={`w-full rounded-t-sm transition-all ${
+                    isToday ? "bg-gold" : "bg-navy/25"
                   }`}
-                >
-                  {d.day.slice(0, 3)}
-                </span>
+                  style={{ height: `${heightPct}%` }}
+                  title={`${d.day} : ${d.hours}h`}
+                />
               </div>
-            );
-          })}
-        </div>
-
-        {!hasActivity && (
-          <p className="text-[10px] text-foreground-muted font-mono text-center pt-0.5">
-            Aucune session enregistrée cette semaine
-          </p>
-        )}
+              <span
+                className={`text-[9px] font-mono uppercase ${
+                  isToday ? "text-gold font-bold" : "text-foreground-muted"
+                }`}
+              >
+                {d.day.slice(0, 3)}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

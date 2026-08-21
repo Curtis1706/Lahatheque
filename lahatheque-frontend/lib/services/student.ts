@@ -99,6 +99,18 @@ export interface StudentOverviewKPIs {
   institutionName: string | null;
   weeklyReadingHours: number;
   readingStreakDays: number;
+  affiliation?: {
+    institution_name: string;
+    faculty_name: string;
+    level: string;
+  } | null;
+  stats?: {
+    weekly_hours: number;
+    books_completed_count: number;
+    current_streak_days: number;
+    overall_progress: number;
+    total_books_read?: number;
+  };
 }
 
 export interface DeliveryAPI {
