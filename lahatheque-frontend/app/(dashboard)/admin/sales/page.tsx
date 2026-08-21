@@ -4,21 +4,37 @@ import React, { useEffect, useState } from "react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TotalSalesChart } from "@/components/ui/total-sales-chart";
-import { getAdminSales } from "@/lib/services/admin";
-import { AdminSale } from "@/lib/types/admin";
-import { ShoppingBag, Download, DollarSign, Filter } from "lucide-react";
+import {
+  getAdminSales,
+  getAdminKpis,
+  getRevenueCategoryBreakdown,
+} from "@/lib/services/admin";
+import {
+  AdminSale,
+  AdminKpi,
+  RevenueCategoryBreakdown,
+} from "@/lib/types/admin";
+import { Download } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminSalesPage() {
   const [sales, setSales] = useState<AdminSale[]>([]);
+  const [kpis, setKpis] = useState<AdminKpi | null>(null);
+  const [revenueBreakdown, setRevenueBreakdown] = useState<RevenueCategoryBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadSalesData() {
       try {
         setLoading(true);
-        const data = await getAdminSales();
-        setSales(data);
+        const [salesData, kpisData, breakdownData] = await Promise.all([
+          getAdminSales(),
+          getAdminKpis(),
+          getRevenueCategoryBreakdown(),
+        ]);
+        setSales(salesData);
+        setKpis(kpisData);
+        setRevenueBreakdown(breakdownData);
       } catch (err) {
         toast.error("Erreur de chargement des ventes.");
       } finally {
@@ -85,7 +101,11 @@ export default function AdminSalesPage() {
     {
       key: "created_at",
       header: "Date",
-      cell: (row) => <span className="font-mono text-xs text-foreground-muted">{row.created_at}</span>,
+      cell: (row) => (
+        <span className="font-mono text-xs text-foreground-muted">
+          {row.created_at ? new Date(row.created_at).toLocaleDateString("fr-FR") : "N/A"}
+        </span>
+      ),
     },
   ];
 
@@ -112,7 +132,17 @@ export default function AdminSalesPage() {
       </div>
 
       {/* Chart */}
-      <TotalSalesChart />
+      <TotalSalesChart
+        totalAmountText={`${(kpis?.totalRevenue ?? 0).toLocaleString("fr-FR")} FCFA`}
+        growthBadgeText={`${(kpis?.revenueTrend ?? 0) >= 0 ? "+" : ""}${kpis?.revenueTrend ?? 0}%`}
+        channels={revenueBreakdown.map((c) => ({
+          name: c.label,
+          amount: c.amount,
+          change: `${c.percentage >= 0 ? "+" : ""}${c.percentage}%`,
+          isPositive: c.percentage >= 0,
+        }))}
+        curvePoints={(kpis?.salesCurve ?? []).map((p) => p.total)}
+      />
 
       {/* Sales Table */}
       <DataTable

@@ -285,7 +285,7 @@ export interface AdminStockMovement {
   id: string;
   book_title: string;
   warehouse_name: string;
-  movement_type: "destruction_perte" | "reassort_imprimerie" | "transfert_inter_hub" | "vente_physique";
+  movement_type: "destruction_perte" | "reassort_imprimerie" | "transfert_inter_hub" | "vente_physique" | "restock" | "manual_exit";
   quantity: number;
   reason: string;
   initiated_by: string;

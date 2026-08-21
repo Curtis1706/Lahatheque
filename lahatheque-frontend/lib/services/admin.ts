@@ -248,8 +248,18 @@ export async function updateGlobalPricingConfig(payload: Partial<GlobalPricingCo
 // =========================================================================
 
 export async function getPartnerRoyaltyConfigs(): Promise<PartnerRoyaltyConfig[]> {
-  await new Promise((res) => setTimeout(res, 200));
-  return MOCK_PARTNER_ROYALTY_CONFIGS;
+  try {
+    const res = await fetch('/api/bff/admin/royalties/payouts/partners', { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data)) {
+        return json.data;
+      }
+    }
+  } catch (err) {
+    console.error('[Admin Service] Erreur chargement taux partenaires:', err);
+  }
+  return [];
 }
 
 export async function updatePartnerRoyaltyRate(
@@ -257,16 +267,21 @@ export async function updatePartnerRoyaltyRate(
   newRate: number,
   notes?: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-  await new Promise((res) => setTimeout(res, 250));
-  const target = MOCK_PARTNER_ROYALTY_CONFIGS.find((p) => p.partner_id === partnerId);
-  if (target) {
-    target.custom_royalty_rate = newRate;
-    target.last_updated = new Date().toISOString().split('T')[0];
+  try {
+    const res = await fetch('/api/bff/admin/royalties/payouts/partners/rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ partner_id: partnerId, new_rate: newRate, notes }),
+    });
+    const json = await res.json();
+    if (res.ok && json.success !== false) {
+      return { success: true, message: json.message || `Taux de redevance mis à jour à ${newRate}%.` };
+    }
+    return { success: false, error: json.error || 'Erreur lors de la mise à jour du taux.' };
+  } catch (err) {
+    console.error('[Admin Service] Erreur mise à jour taux partenaire:', err);
+    return { success: false, error: 'Erreur réseau — impossible de contacter le serveur.' };
   }
-  return {
-    success: true,
-    message: `Taux de redevance du partenaire mis à jour à ${newRate}% avec succès.`,
-  };
 }
 
 // =========================================================================
@@ -966,18 +981,19 @@ export async function createAdminWarehouse(data: {
   manager_name: string;
 }): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const res = await fetch('/api/bff/admin/stock/warehouses/', {
+    const res = await fetch('/api/bff/admin/stock/warehouses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (res.ok) {
-      return await res.json();
+    const json = await res.json();
+    if (res.ok && json.success !== false) {
+      return { success: true, message: json.message || `L'entrepôt "${data.name}" a été créé avec succès.` };
     }
-    const err = await res.json();
-    return { success: false, error: err.error || 'Erreur lors de la création de l\'entrepôt.' };
-  } catch {
-    return { success: true, message: `L'entrepôt "${data.name}" a été créé avec succès.` };
+    return { success: false, error: json.error || 'Erreur lors de la création de l\'entrepôt.' };
+  } catch (err) {
+    console.error("[Admin Service] Erreur création entrepôt:", err);
+    return { success: false, error: 'Erreur réseau — impossible de contacter le serveur.' };
   }
 }
 

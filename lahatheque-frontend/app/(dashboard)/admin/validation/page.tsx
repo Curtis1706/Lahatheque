@@ -63,8 +63,7 @@ export default function AdminValidationPage() {
     const matchesSearch =
       p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.author_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.publisher_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.reviewed_by.toLowerCase().includes(searchQuery.toLowerCase());
+      p.publisher_name.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus =
       filterStatus === "all" ||
@@ -149,7 +148,7 @@ export default function AdminValidationPage() {
       header: "Version & Format",
       cell: (row) => (
         <div className="space-y-1">
-          <span className="font-mono text-xs font-bold text-navy">{row.version}</span>
+          <span className="font-mono text-xs font-bold text-navy">{row.version || "v1.0"}</span>
           <p className="text-[11px] text-foreground-muted">{row.format}</p>
           {row.lcp_compliant && (
             <div className="flex items-center gap-1 text-[10px] text-success font-medium">
@@ -161,29 +160,22 @@ export default function AdminValidationPage() {
       ),
     },
     {
-      key: "audit",
-      header: "Traçabilité (Qui & Quand)",
+      key: "submitted_at",
+      header: "Date de Publication / Soumission",
       cell: (row) => (
         <div className="space-y-1 text-[11px]">
-          <div className="flex items-center gap-1.5 text-foreground">
-            <UserCheck className="w-3.5 h-3.5 text-gold shrink-0" />
-            <span className="font-medium">{row.reviewed_by}</span>
-          </div>
           <div className="flex items-center gap-1.5 text-foreground-muted">
-            <Clock className="w-3 h-3 shrink-0" />
-            <span>
-              {new Date(row.reviewed_at).toLocaleDateString("fr-FR", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+            <Clock className="w-3.5 h-3.5 text-gold shrink-0" />
+            <span className="font-mono text-xs text-foreground font-medium">
+              {row.submitted_at
+                ? new Date(row.submitted_at).toLocaleDateString("fr-FR", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "Date non renseignée"}
             </span>
           </div>
-          <p className="text-[10px] text-foreground-muted">
-            Dépôt : {row.submitted_by}
-          </p>
         </div>
       ),
     },

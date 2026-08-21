@@ -66,3 +66,53 @@ class StockViewSetTestCase(TestCase):
         wh = next(w for w in warehouses if w["id"] == str(self.entrepot.id))
         self.assertEqual(wh["name"], "Entrepôt Test Cotonou")
         self.assertEqual(wh["total_items"], 150)
+
+    def test_create_warehouse_success(self):
+        """
+        Vérifie la création d'un nouvel entrepôt via POST /api/v1/admin/stock/warehouses/.
+        """
+        payload = {
+            "name": "Entrepôt Libreville Hub Sud",
+            "code": "WAR-LBV-01",
+            "country": "Gabon",
+            "city": "Libreville",
+            "manager_name": "Patrick Mba"
+        }
+        response = self.client.post('/api/v1/admin/stock/warehouses/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.json()
+        self.assertTrue(data.get("success"))
+        wh = data.get("data", {})
+        self.assertEqual(wh["name"], "Entrepôt Libreville Hub Sud")
+        self.assertEqual(wh["code"], "WAR-LBV-01")
+        self.assertTrue(Entrepot.objects.filter(code="WAR-LBV-01").exists())
+
+    def test_stock_movements_returns_real_mouvement_stock(self):
+        """
+        Vérifie que GET /api/v1/admin/stock/movements/ retourne les vrais mouvements MouvementStock
+        et plus les 2 mouvements statiques fictifs.
+        """
+        from apps.commerce.models import MouvementStock
+        mouvement = MouvementStock.objects.create(
+            stock=self.stock,
+            type_mouvement="manual_exit",
+            quantite=-15,
+            motif="Exemplaires abîmés transport",
+            auteur=self.admin
+        )
+
+        response = self.client.get('/api/v1/admin/stock/movements/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.json()
+        self.assertTrue(data.get("success"))
+        movements = data.get("data", [])
+        self.assertGreaterEqual(len(movements), 1)
+
+        m = next(item for item in movements if item["id"] == str(mouvement.id))
+        self.assertEqual(m["book_title"], "Droit Commercial Général")
+        self.assertEqual(m["warehouse_name"], "Entrepôt Test Cotonou")
+        self.assertEqual(m["quantity"], -15)
+        self.assertEqual(m["reason"], "Exemplaires abîmés transport")
+

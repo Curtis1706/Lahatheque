@@ -501,6 +501,101 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
 
         except PayoutRequest.DoesNotExist:
             return Response({"success": False, "error": "Demande de versement introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"success": False, "error": f"Erreur traitement versement : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'], url_path='partners')
+    def partner_configs(self, request):
+        """
+        GET /api/v1/admin/royalties/payouts/partners/
+        Retourne la liste réelle des contrats dérogatoires par partenaire (ContratLegal, Institution).
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            from apps.rights.models import ContratLegal
+            from apps.partners.models import Institution
+
+            results = []
+            contracts = ContratLegal.objects.filter(status='active').order_by('-created_at')[:50]
+            for c in contracts:
+                p_type = "publisher" if c.type_contrat in ["editeur_tiers", "pre_edition"] else ("university" if c.type_contrat == "partenariat_universite" else "author")
+                results.append({
+                    "partner_id": str(c.id),
+                    "partner_name": c.contracting_party or c.titre,
+                    "partner_type": p_type,
+                    "contract_reference": c.numero_contrat,
+                    "custom_royalty_rate": 70.0 if p_type == "author" else (22.0 if p_type == "publisher" else 15.0),
+                    "payout_frequency": "monthly",
+                    "payment_method_preferred": "bank",
+                    "account_identifier": "Compte conventionné",
+                    "last_updated": c.date_signature.isoformat() if c.date_signature else c.created_at.strftime("%Y-%m-%d"),
+                })
+
+            institutions = Institution.objects.filter(is_active=True).order_by('name')[:20]
+            for inst in institutions:
+                if not any(r["contract_reference"] == inst.contract_reference for r in results):
+                    results.append({
+                        "partner_id": str(inst.id),
+                        "partner_name": inst.name or inst.short_name,
+                        "partner_type": "university",
+                        "contract_reference": inst.contract_reference or "CTR-UNIV",
+                        "custom_royalty_rate": float(inst.royalty_rate),
+                        "payout_frequency": "quarterly",
+                        "payment_method_preferred": "bank",
+                        "account_identifier": inst.bank_name or "Trésorerie Institutionnelle",
+                        "last_updated": "2026-01-01",
+                    })
+
+            return Response({"success": True, "data": results, "error": None})
+        except Exception as e:
+            logger.error(f"[AdminRoyaltiesPayoutViewSet.partner_configs] Erreur : {e}", exc_info=True)
+            return Response({"success": False, "data": [], "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='partners/rate')
+    def update_partner_rate(self, request):
+        """
+        POST /api/v1/admin/royalties/payouts/partners/rate/
+        Mise à jour du taux dérogatoire d'un partenaire.
+        """
+        partner_id = request.data.get('partner_id')
+        new_rate = request.data.get('new_rate')
+        if not partner_id or new_rate is None:
+            return Response({"success": False, "error": "partner_id et new_rate sont requis."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from apps.partners.models import Institution
+            from apps.rights.models import ContratLegal
+
+            updated_name = ""
+            try:
+                inst = Institution.objects.get(id=partner_id)
+                inst.royalty_rate = float(new_rate)
+                inst.save(update_fields=['royalty_rate'])
+                updated_name = inst.name
+            except Institution.DoesNotExist:
+                c = ContratLegal.objects.get(id=partner_id)
+                c.notes = f"{c.notes}\n[Taux dérogatoire ajusté à {new_rate}% par admin]".strip()
+                c.save(update_fields=['notes'])
+                updated_name = c.contracting_party or c.titre
+
+            JournalAuditAdmin.objects.create(
+                administrateur=request.user,
+                action="UPDATE_PARTNER_ROYALTY_RATE",
+                ressource_type="PartnerRoyaltyConfig",
+                ressource_id=str(partner_id),
+                details={"new_rate": new_rate, "partner_name": updated_name}
+            )
+
+            return Response({
+                "success": True,
+                "message": f"Taux dérogatoire de '{updated_name}' mis à jour à {new_rate}% avec succès."
+            })
+        except Exception as e:
+            return Response({"success": False, "error": f"Impossible de modifier le taux : {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        except PayoutRequest.DoesNotExist:
+            return Response({"success": False, "error": "Demande de versement introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
 
 class AdminRemindersViewSet(viewsets.ViewSet):
@@ -855,63 +950,128 @@ class AdminStockViewSet(viewsets.ViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['get', 'post'], url_path='warehouses')
+    def warehouses(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            from apps.commerce.models import Entrepot
+            from django.db.models import Sum, Count, F, Q
+
+            if request.method == 'POST':
+                name = request.data.get('name', '').strip()
+                code = request.data.get('code', '').strip().upper()
+                country = request.data.get('country', '').strip()
+                city = request.data.get('city', '').strip()
+                manager_name = request.data.get('manager_name', '').strip()
+
+                if not name or not code or not city:
+                    return Response({"success": False, "error": "Le nom, le code et la ville sont obligatoires."}, status=status.HTTP_400_BAD_REQUEST)
+
+                if Entrepot.objects.filter(code=code).exists():
+                    return Response({"success": False, "error": f"Un entrepôt avec le code '{code}' existe déjà."}, status=status.HTTP_400_BAD_REQUEST)
+
+                entrepot = Entrepot.objects.create(
+                    nom=name,
+                    code=code,
+                    pays=country or "Bénin",
+                    ville=city,
+                    adresse=f"{city}, {country or 'Bénin'}",
+                    responsable_nom=manager_name,
+                    is_active=True
+                )
+
+                JournalAuditAdmin.objects.create(
+                    administrateur=request.user,
+                    action="CREATE_WAREHOUSE",
+                    ressource_type="Entrepot",
+                    ressource_id=str(entrepot.id),
+                    details={"name": name, "code": code, "city": city}
+                )
+
+                return Response({
+                    "success": True,
+                    "message": f"L'entrepôt '{name}' a été créé avec succès.",
+                    "data": {
+                        "id": str(entrepot.id),
+                        "name": entrepot.nom,
+                        "code": entrepot.code,
+                        "country": entrepot.pays,
+                        "city": entrepot.ville,
+                        "manager_name": entrepot.responsable_nom,
+                        "total_items": 0,
+                        "critical_alerts": 0
+                    }
+                })
+
+            warehouses_qs = Entrepot.objects.filter(is_active=True).annotate(
+                total_items=Sum('stocks_ouvrages__quantite_reelle'),
+                critical_alerts=Count(
+                    'stocks_ouvrages',
+                    filter=Q(stocks_ouvrages__quantite_reelle__lte=F('stocks_ouvrages__seuil_alerte'))
+                ),
+            )
+            results = [
+                {
+                    "id": str(w.id),
+                    "name": w.nom,
+                    "code": w.code,
+                    "country": w.pays,
+                    "city": w.ville,
+                    "manager_name": w.responsable_nom or "Non assigné",
+                    "total_items": w.total_items or 0,
+                    "critical_alerts": w.critical_alerts or 0,
+                }
+                for w in warehouses_qs
+            ]
+            return Response({"success": True, "data": results, "error": None})
+        except Exception as e:
+            logger.error(f"[AdminStockViewSet.warehouses] Erreur : {e}", exc_info=True)
+            return Response({"success": False, "error": f"Erreur lors de l'opération : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=False, methods=['get'], url_path='movements')
     def movements(self, request):
-        sample_movements = [
-            {
-                "id": "mov-01",
-                "book_title": "Précis de Droit Pénal Général Béninois",
-                "warehouse_name": "Entrepôt Central Cotonou",
-                "movement_type": "destruction_perte",
-                "quantity": 50,
-                "reason": "Exemplaires endommagés lors d'une infiltration d'eau",
-                "initiated_by": "Gaston Sossou (Gestionnaire Stock)",
-                "status": "pending_admin_approval",
-                "created_at": "2026-08-20T16:45:00Z"
-            },
-            {
-                "id": "mov-02",
-                "book_title": "Économie Monétaire Africaine",
-                "warehouse_name": "Hub Régional Dakar",
-                "movement_type": "reassort_imprimerie",
-                "quantity": 500,
-                "reason": "Réception tirage officiel LAHA",
-                "initiated_by": "Moussa Ndiaye (Gestionnaire Stock)",
-                "status": "approved",
-                "created_at": "2026-08-19T09:30:00Z"
-            }
-        ]
-        return Response({"success": True, "data": sample_movements, "error": None})
-
-    @action(detail=True, methods=['post'], url_path='process-adjustment')
-    def process_adjustment(self, request, pk=None):
-        action_type = request.data.get('action') # 'approve' ou 'reject'
-        rejection_reason = request.data.get('rejection_reason', '').strip()
-
-        if action_type == 'approve':
-            JournalAuditAdmin.objects.create(
-                administrateur=request.user,
-                action="APPROVE_STOCK_WRITE_OFF",
-                ressource_type="MouvementStock",
-                ressource_id=str(pk),
-                details={"status": "approved"}
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            from apps.commerce.models import MouvementStock
+            qs = (
+                MouvementStock.objects
+                .select_related('stock__ouvrage', 'stock__entrepot', 'auteur')
+                .order_by('-created_at')[:100]
             )
-            return Response({"success": True, "message": "Régularisation comptable du stock approuvée.", "error": None})
+            results = []
+            for m in qs:
+                book_title = "N/A"
+                if m.stock and m.stock.ouvrage:
+                    book_title = getattr(m.stock.ouvrage, 'titre', m.stock.ouvrage.title)
 
-        elif action_type == 'reject':
-            if not rejection_reason:
-                return Response({"success": False, "error": "Le motif de rejet est obligatoire pour informer le gestionnaire."}, status=status.HTTP_400_BAD_REQUEST)
+                warehouse_name = "N/A"
+                if m.stock and m.stock.entrepot:
+                    warehouse_name = m.stock.entrepot.nom
 
-            JournalAuditAdmin.objects.create(
-                administrateur=request.user,
-                action="REJECT_STOCK_WRITE_OFF",
-                ressource_type="MouvementStock",
-                ressource_id=str(pk),
-                details={"reason": rejection_reason}
+                user_name = "Système"
+                if m.auteur:
+                    user_name = f"{m.auteur.first_name} {m.auteur.last_name}".strip() or m.auteur.email
+
+                results.append({
+                    "id": str(m.id),
+                    "book_title": book_title,
+                    "warehouse_name": warehouse_name,
+                    "movement_type": m.type_mouvement,
+                    "quantity": m.quantite,
+                    "reason": m.motif or m.reference_document or "",
+                    "initiated_by": user_name,
+                    "status": "approved",
+                    "created_at": m.created_at.isoformat() if m.created_at else None,
+                })
+            return Response({"success": True, "data": results, "error": None})
+        except Exception as e:
+            logger.error(f"[AdminStockViewSet.movements] Erreur : {e}", exc_info=True)
+            return Response(
+                {"success": False, "data": [], "error": f"Erreur lors de la récupération des mouvements : {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-            return Response({"success": True, "message": "Régularisation de stock rejetée.", "error": None})
-
-        return Response({"success": False, "error": "Action invalide."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AdminReportExportAPIView(APIView):

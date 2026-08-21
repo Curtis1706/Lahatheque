@@ -445,38 +445,44 @@ export default function AdminRoyaltiesManagementPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {partnerConfigs.map((p) => (
-            <div
-              key={p.partner_id}
-              className="p-4 rounded-xl bg-background border border-border hover:border-gold/60 transition-all flex flex-col justify-between gap-3 shadow-xs"
-            >
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-foreground truncate">{p.partner_name}</span>
-                  <span className="text-xs font-mono font-bold text-navy px-2 py-0.5 rounded-full bg-navy-light">
-                    {p.custom_royalty_rate}%
-                  </span>
+        {partnerConfigs.length === 0 ? (
+          <div className="p-6 rounded-xl bg-background border border-border text-center text-xs text-foreground-muted">
+            Aucun barème contractuel dérogatoire actif enregistré pour le moment.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {partnerConfigs.map((p) => (
+              <div
+                key={p.partner_id}
+                className="p-4 rounded-xl bg-background border border-border hover:border-gold/60 transition-all flex flex-col justify-between gap-3 shadow-xs"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground truncate">{p.partner_name}</span>
+                    <span className="text-xs font-mono font-bold text-navy px-2 py-0.5 rounded-full bg-navy-light">
+                      {p.custom_royalty_rate}%
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-foreground-muted font-mono">Contrat: {p.contract_reference}</p>
+                  <p className="text-[11px] text-foreground-muted">
+                    Canal: {p.payment_method_preferred === "bank" ? "Virement Bancaire" : "Mobile Money"} ({p.account_identifier})
+                  </p>
                 </div>
-                <p className="text-[11px] text-foreground-muted font-mono">Contrat: {p.contract_reference}</p>
-                <p className="text-[11px] text-foreground-muted">
-                  Canal: {p.payment_method_preferred === "bank" ? "Virement Bancaire" : "Mobile Money"} ({p.account_identifier})
-                </p>
-              </div>
 
-              <div className="pt-2 border-t border-border flex items-center justify-between">
-                <span className="text-[10px] text-foreground-muted">MAJ: {p.last_updated}</span>
-                <button
-                  onClick={() => handleOpenEditPartner(p)}
-                  className="px-3 py-1.5 rounded-lg bg-navy-light text-navy font-semibold text-xs hover:bg-navy hover:text-white transition-colors flex items-center gap-1"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-gold" />
-                  Modifier Taux
-                </button>
+                <div className="pt-2 border-t border-border flex items-center justify-between">
+                  <span className="text-[10px] text-foreground-muted">MAJ: {p.last_updated}</span>
+                  <button
+                    onClick={() => handleOpenEditPartner(p)}
+                    className="px-3 py-1.5 rounded-lg bg-navy-light text-navy font-semibold text-xs hover:bg-navy hover:text-white transition-colors flex items-center gap-1"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-gold" />
+                    Modifier Taux
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 3. Demandes de Versement en Attente & Règlements */}
