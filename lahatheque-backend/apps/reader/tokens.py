@@ -59,7 +59,7 @@ class ReaderTokenService:
             "exp": exp_ts,
         }
 
-        token_str = jwt.encode(payload, settings.SECRET_KEY, algorithm=cls.ALGORITHM)
+        token_str = jwt.encode(payload, settings.READER_JWT_SIGNING_KEY, algorithm=cls.ALGORITHM)
         token_hash = hashlib.sha256(token_str.encode("utf-8")).hexdigest()
 
         return token_str, token_hash
@@ -82,7 +82,7 @@ class ReaderTokenService:
             raise ReaderTokenError("Token de session manquant")
 
         try:
-            payload = jwt.decode(token_str, settings.SECRET_KEY, algorithms=[cls.ALGORITHM])
+            payload = jwt.decode(token_str, settings.READER_JWT_SIGNING_KEY, algorithms=[cls.ALGORITHM])
         except jwt.ExpiredSignatureError:
             raise ReaderTokenError("La session de lecture a expiré")
         except jwt.InvalidTokenError as e:

@@ -417,6 +417,17 @@ class DeliveryDetailView(APIView):
         except PhysicalDelivery.DoesNotExist:
             return Response({"success": False, "data": None, "error": "Livraison introuvable."}, status=404)
 
+        lignes = d.commande.lignes.select_related('ouvrage').filter(format_type='paper')
+        items = [
+            {
+                "id": str(l.id),
+                "book_title": l.ouvrage.title,
+                "isbn": l.ouvrage.isbn or "—",
+                "quantity": l.quantity,
+            }
+            for l in lignes
+        ]
+
         data = {
             "id": str(d.id),
             "commande_id": str(d.commande_id),
@@ -430,17 +441,44 @@ class DeliveryDetailView(APIView):
             "statut": d.statut,
             "created_at": d.created_at.isoformat(),
             "updated_at": d.updated_at.isoformat(),
+            "date_livraison_souhaitee": d.date_livraison_souhaitee.isoformat() if d.date_livraison_souhaitee else None,
+            "plage_horaire_debut": d.plage_horaire_debut.strftime("%H:%M") if d.plage_horaire_debut else None,
+            "plage_horaire_fin": d.plage_horaire_fin.strftime("%H:%M") if d.plage_horaire_fin else None,
+            "items": items,
         }
+
+        notifications_list = []
+        try:
+            from apps.reporting.models import Notification
+            notifs = Notification.objects.filter(
+                user=d.commande.user,
+                resource_id=str(d.commande_id),
+                notification_type__in=['order_shipped', 'order_delivered']
+            ).order_by('created_at')
+            for n in notifs:
+                notifications_list.append({
+                    "id": str(n.id),
+                    "type": "shipment" if n.notification_type == "order_shipped" else "delivery",
+                    "sent_at": n.created_at.isoformat(),
+                    "recipient_email": d.commande.user.email if d.commande.user else "",
+                })
+        except Exception:
+            pass
+        data["notifications"] = notifications_list
+
         return Response({"success": True, "data": data, "error": None})
 
     def patch(self, request, pk):
-        """Mise à jour statut, transporteur et numéro de suivi."""
+        """Mise à jour statut, transporteur et numéro de suivi. Notifie le client et
+        clôture automatiquement la commande à la livraison."""
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
         try:
-            d = PhysicalDelivery.objects.get(pk=pk)
+            d = PhysicalDelivery.objects.select_related('commande__user').get(pk=pk)
         except PhysicalDelivery.DoesNotExist:
             return Response({"success": False, "data": None, "error": "Livraison introuvable."}, status=404)
+
+        previous_statut = d.statut
 
         allowed = ["statut", "carrier_name", "tracking_number", "shipping_address", "city", "country"]
         for field in allowed:
@@ -449,7 +487,53 @@ class DeliveryDetailView(APIView):
                 setattr(d, field, val)
         d.save()
 
-        return Response({"success": True, "data": {"id": str(d.id), "statut": d.statut}, "error": None})
+        # Notification client + clôture de commande sur transition de statut réelle
+        if d.statut != previous_statut and d.commande.user:
+            from apps.reporting.services import notify_user
+            from apps.reporting.models import Notification
+
+            if d.statut == 'expedie':
+                try:
+                    notify_user(
+                        user=d.commande.user,
+                        notification_type=Notification.NotificationType.ORDER_SHIPPED,
+                        title="Votre commande a été expédiée",
+                        message=(
+                            f"Votre commande #{str(d.commande_id)[:8]} a été expédiée"
+                            + (f" via {d.carrier_name}" if d.carrier_name else "")
+                            + (f" (suivi : {d.tracking_number})" if d.tracking_number else "")
+                            + "."
+                        ),
+                        action_url="/student/orders",
+                        resource_id=str(d.commande_id),
+                    )
+                except Exception:
+                    pass
+
+            elif d.statut == 'livre':
+                d.commande.statut_commande = 'completed'
+                d.commande.save(update_fields=['statut_commande'])
+                try:
+                    notify_user(
+                        user=d.commande.user,
+                        notification_type=Notification.NotificationType.ORDER_DELIVERED,
+                        title="Votre commande a été livrée",
+                        message=f"Votre commande #{str(d.commande_id)[:8]} a été livrée avec succès. Merci de votre confiance !",
+                        action_url="/student/orders",
+                        resource_id=str(d.commande_id),
+                    )
+                except Exception:
+                    pass
+
+        return Response({
+            "success": True,
+            "data": {
+                "id": str(d.id),
+                "statut": d.statut,
+                "commande_statut": d.commande.statut_commande,
+            },
+            "error": None
+        })
 
 
 class EntrepotsListView(APIView):

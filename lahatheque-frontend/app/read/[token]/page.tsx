@@ -166,13 +166,18 @@ export default function HostedReaderPage() {
     if (!session) return;
     let isCancelled = false;
 
-    const targetUrl = session.book?.file_url || (session.book?.id ? `/api/bff/catalog/books/${session.book.id}/stream/` : "");
-    if (!targetUrl) return;
+    // Le flux protégé exige le token de session en en-tête X-Reader-Token —
+    // jamais de lien direct vers le fichier brut.
+    const targetUrl = "/api/bff/reader/sessions/stream/";
+    if (!token) return;
 
     const loadBlob = async () => {
       try {
         const streamRes = await fetch(targetUrl, {
-          headers: { Accept: "application/pdf" },
+          headers: {
+            Accept: "application/pdf",
+            "X-Reader-Token": token,
+          },
           credentials: "include",
         });
         if (streamRes.ok) {

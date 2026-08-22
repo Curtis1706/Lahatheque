@@ -11,6 +11,7 @@ from .views import (
     ReaderValidateTokenView,
     QuizRetrieveOrGenerateView,
     QuizSubmitAnswersView,
+    ReaderProtectedStreamView,
 )
 
 app_name = "reader"
@@ -18,6 +19,9 @@ app_name = "reader"
 urlpatterns = [
     # Création de session partenaire
     path('sessions/', ReaderSessionViewSet.as_view({'post': 'create'}), name='session-create'),
+
+    # Streaming protégé et filigrané du document d'une session (remplace file_url brut)
+    path('sessions/stream/', ReaderProtectedStreamView.as_view(), name='session-stream'),
     
     # Consultation et révocation de session
     path('sessions/<uuid:pk>/', ReaderSessionViewSet.as_view({

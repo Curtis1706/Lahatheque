@@ -44,13 +44,19 @@ class CreateOrderView(APIView):
             format_type = item['format_type']
             quantity = item['quantity']
 
-            # Correction 2.4 : Vérification du stock disponible pour le format papier
+            # Vérification du stock disponible pour le format papier, agrégé sur tous les entrepôts
             if format_type == 'paper':
                 has_paper = True
-                stock_obj = getattr(ouvrage, 'stock', None)
-                if stock_obj and stock_obj.stock_disponible < quantity:
+                from django.db.models import Sum, F
+
+                total_disponible = ouvrage.stocks_entrepots.aggregate(
+                    total=Sum(F('quantite_reelle') - F('quantite_reservee'))
+                )['total'] or 0
+
+                if total_disponible < quantity:
                     return Response({
-                        'error': f"Stock suffisant indisponible pour '{ouvrage.title}' en format Papier (stock: {stock_obj.stock_disponible})."
+                        'error': f"Stock insuffisant pour '{ouvrage.title}' en format Papier "
+                                 f"(disponible : {total_disponible}, demandé : {quantity})."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             unit_price = ouvrage.price if format_type == 'digital' else (ouvrage.price_paper or ouvrage.price)

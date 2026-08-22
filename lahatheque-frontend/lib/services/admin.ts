@@ -249,6 +249,16 @@ export async function getAdminSales(): Promise<AdminSale[]> {
   return json.data || json.results || [];
 }
 
+export async function rotatePartnerApiSecret(keyId: string): Promise<{ clientSecret: string; secretWarning: string } | null> {
+  const res = await fetch(`/api/bff/partners/apps/${keyId}/rotate-secret/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error("Erreur lors de la régénération du secret.");
+  const json = await res.json();
+  return json.success ? json.data : null;
+}
+
 // =========================================================================
 // REDEVANCES & VALIDATION DES VERSEMENTS (AUTEURS, ÉDITEURS, UNIVERSITÉS)
 // =========================================================================

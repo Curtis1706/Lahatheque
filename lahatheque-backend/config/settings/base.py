@@ -7,6 +7,7 @@ from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-lahatheque-dev-key-change-in-prod')
+READER_JWT_SIGNING_KEY = config('READER_JWT_SIGNING_KEY', default=SECRET_KEY)
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
@@ -55,6 +56,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # Anti-Bruteforce
     'axes.middleware.AxesMiddleware',
+    # Reader API real request logging
+    'apps.reader.middleware.ReaderApiLoggingMiddleware',
 ]
 
 AUTHENTICATION_BACKENDS = [

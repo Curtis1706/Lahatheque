@@ -21,7 +21,11 @@ class LigneCommandeSerializer(serializers.ModelSerializer):
 class PhysicalDeliverySerializer(serializers.ModelSerializer):
     class Meta:
         model = PhysicalDelivery
-        fields = ['id', 'shipping_address', 'city', 'country', 'tracking_number', 'carrier_name', 'statut', 'updated_at']
+        fields = [
+            'id', 'shipping_address', 'city', 'country',
+            'tracking_number', 'carrier_name', 'statut', 'updated_at',
+            'date_livraison_souhaitee', 'plage_horaire_debut', 'plage_horaire_fin',
+        ]
 
 class OrderSerializer(serializers.ModelSerializer):
     lignes = LigneCommandeSerializer(many=True, read_only=True)

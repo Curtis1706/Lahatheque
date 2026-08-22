@@ -71,6 +71,13 @@ class ReaderSessionViewSet(ViewSet):
                     allowed_return_origins=["*"]
                 )
 
+        from .throttling import check_and_increment_daily_quota, check_concurrent_sessions_quota, PartnerQuotaError
+        try:
+            check_and_increment_daily_quota(partner)
+            check_concurrent_sessions_quota(partner)
+        except PartnerQuotaError as e:
+            return standard_response(error=str(e), status_code=status.HTTP_429_TOO_MANY_REQUESTS)
+
         serializer = ReaderSessionCreateSerializer(data=request.data, context={'partner': partner})
         if not serializer.is_valid():
             return standard_response(
@@ -296,8 +303,10 @@ class ReaderValidateTokenView(APIView):
         doc_cover = getattr(session.ouvrage, 'couverture', None) or getattr(session.ouvrage, 'cover_image', None)
         doc_cover_url = doc_cover.url if (doc_cover and hasattr(doc_cover, 'url')) else None
 
-        doc_file = getattr(session.ouvrage, 'fichier_numerique', None) or getattr(session.ouvrage, 'file', None)
-        doc_file_url = doc_file.url if (doc_file and hasattr(doc_file, 'url')) else (session.custom_document_url or "/api/pdf?file=PromptBreeder_Original_Paper-2309.16797v1.pdf")
+        # Le fichier n'est JAMAIS exposé en direct. Le frontend doit appeler
+        # GET /api/v1/reader/sessions/stream/ avec le token de session pour recevoir
+        # le flux filigrané et tatoué (voir ReaderProtectedStreamView).
+        doc_file_url = None
 
         response_data = {
             "session_id": str(session.id),
@@ -308,7 +317,8 @@ class ReaderValidateTokenView(APIView):
                 "title": doc_title or "Document Sécurisé",
                 "author": doc_author or "Auteur Inconnu",
                 "cover_url": doc_cover_url,
-                "file_url": doc_file_url,
+                "file_url": None,  # Intentionnellement vide — utiliser stream_endpoint ci-dessous
+                "stream_endpoint": "/api/v1/reader/sessions/stream/",
                 "total_pages": getattr(session.ouvrage, 'nombre_pages', 0) or getattr(session.ouvrage, 'page_count', 28) or 28,
                 "has_audio": bool(session.custom_audio_url or getattr(session.ouvrage, 'fichier_audio', None)),
                 "audio_url": session.custom_audio_url or (session.ouvrage.fichier_audio.url if session.ouvrage and hasattr(session.ouvrage, 'fichier_audio') and session.ouvrage.fichier_audio else None),
@@ -659,3 +669,138 @@ class QuizSubmitAnswersView(APIView):
                 "details": details,
             }
         })
+
+
+import re
+from django.http import HttpResponse
+
+
+class ReaderProtectedStreamView(APIView):
+    """
+    GET /api/v1/reader/sessions/stream/
+    Sert le document d'une session de lecture hébergée en flux fragmenté Range HTTP 206,
+    avec filigrane et tatouage réellement appliqués dans les octets (jamais de fichier brut).
+    Authentification par jeton de session (X-Reader-Token, Bearer, ou ?token=).
+    """
+    authentication_classes = []
+    permission_classes = [IsValidReaderSession]
+
+    DEFAULT_CHUNK_SIZE = 256 * 1024
+
+    def get(self, request: Request) -> Response:
+        from apps.protection.derived_materializer import DerivedMaterializer
+        from apps.protection.models import ProtectionConfig, TraceAcces
+
+        session: ReaderSession = request.reader_session
+
+        if not session.is_valid:
+            return standard_response(
+                error="Session de lecture expirée ou révoquée.",
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
+        # 1. Résolution de la configuration de protection
+        protection_config = None
+        if session.ouvrage_id:
+            protection_config = ProtectionConfig.objects.filter(ouvrage=session.ouvrage).first()
+
+        # 2. Métadonnées utilisateur pour le filigrane nominatif
+        ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "127.0.0.1")).split(",")[0].strip()
+        user_info = {
+            "nom": session.end_user.display_name or session.end_user.external_ref,
+            "email": session.end_user.email or "",
+            "ip": ip,
+            "user_id": f"partner:{session.partner_id}:{session.end_user.external_ref}",
+        }
+
+        # 3. Matérialisation du dérivé filigrané (catalogue interne OU BYOD externe)
+        try:
+            if session.source_type == "catalog_book" and session.ouvrage_id:
+                pdf_bytes, total_size = DerivedMaterializer.get_or_create_derived(
+                    source_type="catalog_book",
+                    source_reference=str(session.ouvrage_id),
+                    user_info=user_info,
+                    config=protection_config,
+                )
+            elif session.source_type == "external_url" and session.custom_document_url:
+                partner_quotas = session.partner.quotas or {}
+                options = {
+                    "allowed_document_sources": partner_quotas.get("allowed_document_sources", []),
+                    "max_file_size_mb": partner_quotas.get("max_file_size_mb", 200),
+                }
+                pdf_bytes, total_size = DerivedMaterializer.get_or_create_derived(
+                    source_type="external_url",
+                    source_reference=session.custom_document_url,
+                    user_info=user_info,
+                    config=protection_config,
+                    options=options,
+                )
+            else:
+                return standard_response(
+                    error="Source de document non résolue pour cette session.",
+                    status_code=status.HTTP_404_NOT_FOUND
+                )
+        except Exception as e:
+            logger.error(f"[ReaderStream] Erreur matérialisation dérivé (session {session.id}): {e}")
+            return standard_response(
+                error="Impossible de charger le document sécurisé.",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # 4. Traitement du Range HTTP
+        range_header = request.META.get("HTTP_RANGE")
+        start_byte, end_byte = self._parse_range_header(range_header, total_size)
+
+        if start_byte is None:
+            response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
+            response["Content-Range"] = f"bytes */{total_size}"
+            return response
+
+        chunk_data = pdf_bytes[start_byte:end_byte + 1]
+
+        # 5. Journalisation légale
+        try:
+            doc_title = session.ouvrage.titre if session.ouvrage else session.custom_document_title
+            TraceAcces.objects.create(
+                ouvrage=session.ouvrage,
+                partner_id=str(session.partner_id),
+                document_title=doc_title or "Document Partenaire",
+                ip_address=ip,
+                user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
+                access_type="read_chunk",
+                derived_hash=session.token_hash[:16] if session.token_hash else "nohash",
+            )
+        except Exception as log_err:
+            logger.warning(f"[ReaderStream] Erreur TraceAcces: {log_err}")
+
+        response = HttpResponse(chunk_data, status=status.HTTP_206_PARTIAL_CONTENT, content_type="application/pdf")
+        response["Accept-Ranges"] = "bytes"
+        response["Content-Range"] = f"bytes {start_byte}-{end_byte}/{total_size}"
+        response["Content-Length"] = str(len(chunk_data))
+        response["Cache-Control"] = "private, no-store, must-revalidate"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    def _parse_range_header(self, range_header, total_size):
+        if not range_header or not range_header.startswith("bytes="):
+            end = min(self.DEFAULT_CHUNK_SIZE - 1, total_size - 1)
+            return 0, end
+
+        match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+        if not match:
+            return None, None
+
+        start_str, end_str = match.groups()
+        start = int(start_str)
+        if start >= total_size:
+            return None, None
+
+        if end_str:
+            end = min(int(end_str), total_size - 1)
+        else:
+            end = min(start + self.DEFAULT_CHUNK_SIZE - 1, total_size - 1)
+
+        if start > end:
+            return None, None
+
+        return start, end

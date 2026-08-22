@@ -24,6 +24,10 @@ class Notification(models.Model):
         ASSIGNMENT_GRADED = 'assignment_graded', 'Devoir Noté'
         ASSIGNMENT_SUBMITTED = 'assignment_submitted', 'Devoir Soumis'
         ASSIGNMENT_OVERDUE = 'assignment_overdue', 'Devoir En Retard'
+        PAYMENT_SUCCESS = 'payment_success', 'Paiement Confirmé'
+        PAYMENT_FAILED = 'payment_failed', 'Paiement Échoué'
+        ORDER_SHIPPED = 'order_shipped', 'Commande Expédiée'
+        ORDER_DELIVERED = 'order_delivered', 'Commande Livrée'
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications')
     title = models.CharField(max_length=255)

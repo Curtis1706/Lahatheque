@@ -38,6 +38,24 @@ class PartnerApp(models.Model):
         max_length=128,
         help_text="Clé secrète privée utilisée pour la signature HMAC-SHA256 des webhooks"
     )
+    client_id = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+        blank=True,
+        null=True,
+        help_text="Identifiant public complet du client OAuth2 Machine-to-Machine"
+    )
+    client_secret_hash = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text="Empreinte SHA-256 du secret client. Le secret en clair n'est JAMAIS stocké."
+    )
+    client_secret_last4 = models.CharField(
+        max_length=4,
+        blank=True,
+        help_text="4 derniers caractères du secret pour affichage masqué (ex: ****a4f2)"
+    )
     quotas = models.JSONField(
         default=dict,
         help_text="Limites d'utilisation (max_concurrent_sessions, max_daily_requests, etc.)"
@@ -320,3 +338,26 @@ class WebhookLog(models.Model):
 
     def __str__(self) -> str:
         return f"Webhook {self.event_type} vers {self.partner.name} ({self.delivery_id}) - {'OK' if self.is_success else 'ERR'}"
+
+
+class ApiRequestLog(models.Model):
+    """
+    Journal RÉEL de chaque requête HTTP reçue sur l'API Lecteur Hébergé,
+    capturée par un middleware Django (pas reconstruite a posteriori).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    partner = models.ForeignKey(
+        PartnerApp, null=True, blank=True, on_delete=models.SET_NULL, related_name='request_logs'
+    )
+    method = models.CharField(max_length=10)
+    endpoint = models.CharField(max_length=255, db_index=True)
+    status_code = models.IntegerField()
+    response_time_ms = models.IntegerField()
+    client_ip = models.GenericIPAddressField(null=True, blank=True)
+    request_id = models.CharField(max_length=64, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "Journal de Requête API (Réel)"
+        verbose_name_plural = "Journaux de Requêtes API (Réels)"
+        ordering = ["-created_at"]

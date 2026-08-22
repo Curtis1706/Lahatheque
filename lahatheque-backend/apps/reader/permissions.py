@@ -11,15 +11,43 @@ from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 from .models import PartnerApp, ReaderSession
 from .tokens import ReaderTokenService, ReaderTokenError
+from .auth_utils import verify_secret
+
+
+def _authenticate_by_client_credentials(request) -> PartnerApp | None:
+    """
+    Authentifie un partenaire par client_id + client_secret.
+    Cherche les identifiants dans les headers (X-Client-Id / X-Client-Secret)
+    OU dans le corps JSON (client_id / client_secret). Le secret est TOUJOURS requis.
+    """
+    client_id = request.headers.get("X-Client-Id")
+    client_secret = request.headers.get("X-Client-Secret")
+
+    if not client_id and hasattr(request, 'data') and isinstance(request.data, dict):
+        client_id = request.data.get("client_id")
+        client_secret = request.data.get("client_secret")
+
+    if not client_id or not client_secret:
+        return None
+
+    partner = PartnerApp.objects.filter(client_id=client_id, is_active=True).first()
+    if not partner or not partner.client_secret_hash:
+        return None
+
+    if not verify_secret(client_secret, partner.client_secret_hash):
+        return None
+
+    return partner
 
 
 class PartnerAuthentication(BaseAuthentication):
     """
     Authentification Machine-to-Machine pour les partenaires.
-    Assigne request.partner et court-circuite l'interception de SimpleJWT.
+    Deux méthodes supportées : Bearer JWT signé, ou client_id + client_secret.
+    Le secret est TOUJOURS requis — plus aucune authentification par client_id seul.
     """
     def authenticate(self, request):
-        # 1. Bearer JWT
+        # 1. Bearer JWT (émis côté serveur, ex: pour des intégrations OAuth2 futures)
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token_str = auth_header.split(" ", 1)[1].strip()
@@ -34,31 +62,24 @@ class PartnerAuthentication(BaseAuthentication):
             except Exception:
                 pass
 
-        # 2. X-Client-Id / X-Partner-Key
-        client_id_header = request.headers.get("X-Client-Id") or request.headers.get("X-Partner-Key")
-        if client_id_header:
-            prefix = client_id_header.replace("laha_client_", "")
-            partner = PartnerApp.objects.filter(is_active=True).filter(id__startswith=prefix).first()
-            if not partner:
-                for p in PartnerApp.objects.filter(is_active=True):
-                    if str(p.id).replace("-", "").startswith(prefix):
-                        partner = p
-                        break
-            if partner:
-                request.partner = partner
-                return (None, partner)
+        # 2. client_id + client_secret (headers ou body)
+        partner = _authenticate_by_client_credentials(request)
+        if partner:
+            request.partner = partner
+            return (None, partner)
 
         return None
 
 
 class IsAuthenticatedPartner(BasePermission):
     """
-    Vérifie que la requête émane d'une application partenaire active
-    authentifiée par jeton OAuth2 (Bearer JWT), clé d'API ou identifiants directs.
+    Vérifie que la requête émane d'une application partenaire active,
+    authentifiée par jeton Bearer JWT OU par client_id + client_secret vérifiés.
+    Aucun chemin d'authentification ne bypass la vérification du secret.
     """
 
     def has_permission(self, request: Request, view: Any) -> bool:
-        # 1. Vérification via En-tête Authorization Bearer JWT
+        # 1. Bearer JWT
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token_str = auth_header.split(" ", 1)[1].strip()
@@ -73,59 +94,24 @@ class IsAuthenticatedPartner(BasePermission):
             except Exception:
                 pass
 
-        # 2. Vérification via Header API Key direct (X-Partner-Key ou X-Client-Id)
-        client_id_header = request.headers.get("X-Client-Id") or request.headers.get("X-Partner-Key")
-        if client_id_header:
-            # Recherche directe ou par préfixe
-            prefix = client_id_header.replace("laha_client_", "")
-            partner = PartnerApp.objects.filter(is_active=True).filter(id__startswith=prefix).first()
-            if not partner:
-                for p in PartnerApp.objects.filter(is_active=True):
-                    if str(p.id).replace("-", "").startswith(prefix):
-                        partner = p
-                        break
-            if partner:
-                request.partner = partner
-                return True
+        # 2. client_id + client_secret — SEUL chemin d'authentification directe
+        partner = _authenticate_by_client_credentials(request)
+        if partner:
+            request.partner = partner
+            return True
 
-        # 3. Vérification via paramètres dans le corps JSON (client_id + client_secret)
-        if hasattr(request, 'data') and isinstance(request.data, dict):
-            client_id = request.data.get("client_id")
-            if client_id:
-                prefix = client_id.replace("laha_client_", "")
-                partner = PartnerApp.objects.filter(is_active=True).filter(id__startswith=prefix).first()
-                if not partner:
-                    for p in PartnerApp.objects.filter(is_active=True):
-                        if str(p.id).replace("-", "").startswith(prefix):
-                            partner = p
-                            break
-                if partner:
-                    request.partner = partner
-                    return True
-
-        # 4. Vérification via OAuth2 classique django-oauth-toolkit
-        if hasattr(request, 'auth') and request.auth:
-            application = getattr(request.auth, 'application', None)
-            if application:
-                partner = getattr(application, 'partner_profile', None)
-                if partner and partner.is_active:
-                    request.partner = partner
-                    return True
-
-        # 5. Vérification si l'utilisateur est admin Django ou staff
-        if request.user and request.user.is_authenticated and request.user.is_staff:
-            first_partner = PartnerApp.objects.filter(is_active=True).first()
-            if first_partner:
-                request.partner = first_partner
-                return True
-
-        # 6. Fallback pour environnement local de développement (DEBUG=True)
+        # 3. Fallback DEBUG uniquement, pour le développement local
         if getattr(settings, "DEBUG", False):
             partner = PartnerApp.objects.filter(is_active=True).first()
             if not partner:
+                from .auth_utils import generate_client_id, generate_client_secret, hash_secret
+                secret = generate_client_secret()
                 partner = PartnerApp.objects.create(
-                    name="LAHALEX (Partenaire Test BYOD VIP)",
-                    webhook_secret="sec_live_xng70u4wnknofh020br",
+                    name="Partenaire Test (DEBUG uniquement)",
+                    client_id=generate_client_id(),
+                    client_secret_hash=hash_secret(secret),
+                    client_secret_last4=secret[-4:],
+                    webhook_secret="dev-only-secret",
                     allowed_return_origins=["*"],
                     is_active=True
                 )
@@ -142,22 +128,16 @@ class IsValidReaderSession(BasePermission):
     """
 
     def has_permission(self, request: Request, view: Any) -> bool:
-        token_str = None
-
-        # 1. En-tête X-Reader-Token
         token_str = request.headers.get("X-Reader-Token")
 
-        # 2. Authorization Bearer
         if not token_str:
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
                 token_str = auth_header.split(" ", 1)[1].strip()
 
-        # 3. Corps JSON request.data['token']
         if not token_str and hasattr(request, 'data') and isinstance(request.data, dict):
             token_str = request.data.get("token")
 
-        # 4. Query param ?token=
         if not token_str:
             token_str = request.query_params.get("token")
 
@@ -168,17 +148,5 @@ class IsValidReaderSession(BasePermission):
             session = ReaderTokenService.decode_and_validate_token(token_str)
             request.reader_session = session
             return True
-        except ReaderTokenError as e:
-            # Fallback en mode DEBUG si token JWT valide
-            if getattr(settings, "DEBUG", False):
-                try:
-                    payload = jwt.decode(token_str, settings.SECRET_KEY, algorithms=["HS256"])
-                    session_id = payload.get("session_id") or payload.get("sub")
-                    if session_id:
-                        session = ReaderSession.objects.filter(id=session_id).first()
-                        if session:
-                            request.reader_session = session
-                            return True
-                except Exception:
-                    pass
+        except ReaderTokenError:
             return False

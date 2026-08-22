@@ -17,6 +17,7 @@ from rest_framework.response import Response
 
 from apps.accounts.permissions import IsAdminOrSuperAdmin
 from apps.reader.models import PartnerApp, ReaderSession, WebhookLog
+from apps.reader.auth_utils import generate_client_id, generate_client_secret, hash_secret
 from apps.protection.models import TraceAcces
 from .models import Institution, StudentAffiliation, EtudiantInscrit
 from .serializers import InstitutionSerializer, StudentAffiliationSerializer, EtudiantInscritSerializer
@@ -268,9 +269,9 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                 except Exception:
                     active_sessions = 0
 
-                # Client ID & Secret
-                client_id = f"laha_client_{str(app.id).replace('-', '')[:8]}"
-                client_secret = app.webhook_secret or f"sec_live_{str(uuid.uuid4()).replace('-', '')}"
+                # Client ID public (jamais le secret en clair ici)
+                client_id = app.client_id or f"laha_client_{str(app.id).replace('-', '')[:8]}"
+                client_secret_masked = f"sec_live_{'•' * 28}{app.client_secret_last4}" if app.client_secret_last4 else "Non généré — cliquez sur Régénérer"
 
                 scopes = ["reader:sessions"]
                 if allow_byod:
@@ -283,7 +284,8 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                     "name": app.name,
                     "partner": app.name,
                     "clientId": client_id,
-                    "clientSecret": client_secret,
+                    "clientSecret": client_secret_masked,
+                    "hasSecret": bool(app.client_secret_hash),
                     "allowedOrigins": app.allowed_return_origins or ["*"],
                     "webhookUrl": app.webhook_url or "",
                     "scopes": scopes,
@@ -338,25 +340,31 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                 "max_file_size_mb": data.get("maxFileSizeMb", 200),
             }
 
-            secret_gen = data.get("clientSecret") or f"sec_live_{str(uuid.uuid4()).replace('-', '')}"
+            client_id_gen = generate_client_id()
+            client_secret_plain = generate_client_secret()  # Existera UNIQUEMENT dans cette réponse
+            webhook_signing_secret = f"whsec_{str(uuid.uuid4()).replace('-', '')}"  # Dédié à la signature HMAC des webhooks
 
             app = PartnerApp.objects.create(
                 name=name,
+                client_id=client_id_gen,
+                client_secret_hash=hash_secret(client_secret_plain),
+                client_secret_last4=client_secret_plain[-4:],
                 allowed_return_origins=data.get("allowedOrigins", ["*"]),
                 webhook_url=data.get("webhookUrl", ""),
-                webhook_secret=secret_gen,
+                webhook_secret=webhook_signing_secret,
                 quotas=quotas,
                 is_active=True
             )
 
-            client_id = f"laha_client_{str(app.id).replace('-', '')[:8]}"
+            client_id = client_id_gen
 
             result = {
                 "id": str(app.id),
                 "name": app.name,
                 "partner": data.get("partner", app.name),
                 "clientId": client_id,
-                "clientSecret": secret_gen,
+                "clientSecret": client_secret_plain,  # Affiché UNE SEULE FOIS — le frontend doit avertir l'utilisateur
+                "secretWarning": "Ce secret ne sera plus jamais affiché en clair. Copiez-le et conservez-le en lieu sûr.",
                 "allowedOrigins": app.allowed_return_origins,
                 "webhookUrl": app.webhook_url,
                 "scopes": scopes,
@@ -416,6 +424,25 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
         except Exception as e:
             logger.exception("Erreur destruction PartnerApp:")
             return standard_response(error=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"], url_path="rotate-secret")
+    def rotate_secret(self, request: Request, pk: str = None) -> Response:
+        """POST /api/v1/partners/apps/<id>/rotate-secret/ - Régénère le client secret."""
+        try:
+            app = PartnerApp.objects.get(id=pk)
+        except PartnerApp.DoesNotExist:
+            return standard_response(error="Application introuvable.", status_code=status.HTTP_404_NOT_FOUND)
+
+        new_secret = generate_client_secret()
+        app.client_secret_hash = hash_secret(new_secret)
+        app.client_secret_last4 = new_secret[-4:]
+        app.save(update_fields=["client_secret_hash", "client_secret_last4", "updated_at"])
+
+        return standard_response(data={
+            "id": str(app.id),
+            "clientSecret": new_secret,
+            "secretWarning": "Ce secret ne sera plus jamais affiché en clair. L'ancien secret est immédiatement invalidé."
+        })
 
 
 class PartnerSessionSupervisionViewSet(viewsets.ViewSet):
@@ -489,126 +516,45 @@ class PartnerLogAdminViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request: Request) -> Response:
-        """GET /api/v1/partners/logs/ - Liste les journaux d'audit API."""
+        """GET /api/v1/partners/logs/ - Liste les journaux RÉELS de requêtes API."""
         try:
+            from apps.reader.models import ApiRequestLog
+
+            logs = ApiRequestLog.objects.select_related("partner").order_by("-created_at")[:100]
             results: List[Dict[str, Any]] = []
 
-            # 1. Logs de Webhooks
-            webhook_logs = WebhookLog.objects.all().select_related("partner", "session").order_by("-delivered_at")[:50]
-            for log in webhook_logs:
-                partner_name = log.partner.name if log.partner else "Partenaire Inconnu"
+            for log in logs:
                 results.append({
-                    "id": f"wh-{str(log.id)[:8]}",
-                    "endpoint": f"/api/v1/webhooks/{log.event_type}",
+                    "id": str(log.id),
+                    "endpoint": log.endpoint,
+                    "method": log.method,
+                    "status": log.status_code,
+                    "responseTimeMs": log.response_time_ms,
+                    "timestamp": log.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    "partner": log.partner.name if log.partner else "Inconnu",
+                    "clientIp": log.client_ip or "—",
+                    "requestPayload": "{}",
+                    "responsePayload": "{}",
+                })
+
+            # Journaux de webhooks (déjà réels — inchangés)
+            webhook_logs = WebhookLog.objects.all().select_related("partner").order_by("-delivered_at")[:50]
+            for wlog in webhook_logs:
+                results.append({
+                    "id": f"wh-{str(wlog.id)[:8]}",
+                    "endpoint": f"webhook:{wlog.event_type}",
                     "method": "POST",
-                    "status": log.status_code or (200 if log.is_success else 500),
-                    "responseTimeMs": 145,
-                    "timestamp": log.delivered_at.strftime("%Y-%m-%d %H:%M:%S") if log.delivered_at else timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "partner": partner_name,
-                    "clientIp": "154.68.24.112",
-                    "requestPayload": log.payload_json or "{}",
-                    "responsePayload": log.response_body or '{"success": true}',
+                    "status": wlog.status_code or (200 if wlog.is_success else 0),
+                    "responseTimeMs": None,
+                    "timestamp": wlog.delivered_at.strftime("%Y-%m-%d %H:%M:%S") if wlog.delivered_at else "",
+                    "partner": wlog.partner.name if wlog.partner else "Inconnu",
+                    "clientIp": "—",
+                    "requestPayload": wlog.payload_json or "{}",
+                    "responsePayload": wlog.response_body or "{}",
                 })
 
-            # 2. Requêtes API réelles issues des sessions de lecture
-            sessions = ReaderSession.objects.all().select_related("partner", "ouvrage", "end_user").order_by("-created_at")[:50]
-            for s in sessions:
-                p_name = s.partner.name if s.partner else "LAHALEX"
-                doc_title = s.custom_document_title or (getattr(s.ouvrage, 'titre', None) or getattr(s.ouvrage, 'title', 'Document Test'))
-                u_name = s.end_user.display_name if s.end_user else "Utilisateur Distant"
-                u_email = s.end_user.email if s.end_user else "partenaire@cabinet.bj"
-
-                # Log de création de session (POST /api/v1/reader/sessions/)
-                results.append({
-                    "id": f"req-create-{str(s.id)[:8]}",
-                    "endpoint": "/api/v1/reader/sessions/",
-                    "method": "POST",
-                    "status": 201,
-                    "responseTimeMs": 85,
-                    "timestamp": s.created_at.strftime("%Y-%m-%d %H:%M:%S") if s.created_at else timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "partner": p_name,
-                    "clientIp": "127.0.0.1",
-                    "requestPayload": json.dumps({
-                        "source_type": s.source_type,
-                        "document_title": doc_title,
-                        "external_user_name": u_name,
-                        "external_user_email": u_email,
-                        "return_url": s.return_url,
-                    }, indent=2),
-                    "responsePayload": json.dumps({
-                        "session_id": str(s.id),
-                        "status": s.status,
-                        "source_type": s.source_type,
-                    }, indent=2),
-                })
-
-                # Log de validation de token (POST /api/v1/reader/sessions/validate-token/)
-                if s.status != "created":
-                    results.append({
-                        "id": f"req-val-{str(s.id)[:8]}",
-                        "endpoint": "/api/v1/reader/sessions/validate-token/",
-                        "method": "POST",
-                        "status": 403 if s.status == "revoked" else 200,
-                        "responseTimeMs": 42,
-                        "timestamp": s.created_at.strftime("%Y-%m-%d %H:%M:%S") if s.created_at else timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "partner": p_name,
-                        "clientIp": "127.0.0.1",
-                        "requestPayload": json.dumps({"token": f"bearer_{str(s.id)[:8]}..."}, indent=2),
-                        "responsePayload": json.dumps({
-                            "session_id": str(s.id),
-                            "status": s.status,
-                            "book_title": doc_title,
-                        }, indent=2),
-                    })
-
-                # Log de synchronisation de progression (POST /api/v1/reader/sessions/progress/)
-                if s.last_page > 1:
-                    results.append({
-                        "id": f"req-prog-{str(s.id)[:8]}",
-                        "endpoint": "/api/v1/reader/sessions/progress/",
-                        "method": "POST",
-                        "status": 200,
-                        "responseTimeMs": 28,
-                        "timestamp": s.updated_at.strftime("%Y-%m-%d %H:%M:%S") if s.updated_at else s.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                        "partner": p_name,
-                        "clientIp": "127.0.0.1",
-                        "requestPayload": json.dumps({
-                            "token": f"bearer_{str(s.id)[:8]}...",
-                            "current_page": s.last_page,
-                            "reading_time_seconds": s.reading_time_seconds,
-                        }, indent=2),
-                        "responsePayload": json.dumps({"success": True, "page": s.last_page}, indent=2),
-                    })
-
-            # 3. Traces d'accès réelles (TraceAcces)
-            traces = TraceAcces.objects.all().select_related("ouvrage").order_by("-timestamp")[:50]
-            for t in traces:
-                doc_title = t.document_title or (getattr(t.ouvrage, 'titre', None) or getattr(t.ouvrage, 'title', 'Document Protégé'))
-                results.append({
-                    "id": f"trace-{str(t.id)[:8] if hasattr(t, 'id') else str(uuid.uuid4())[:8]}",
-                    "endpoint": f"/api/v1/reader/stream/{t.derived_hash[:8]}" if t.derived_hash else "/api/v1/protection/access/",
-                    "method": "GET",
-                    "status": 206 if t.access_type == "read_chunk" else 200,
-                    "responseTimeMs": 35,
-                    "timestamp": t.timestamp.strftime("%Y-%m-%d %H:%M:%S") if t.timestamp else timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "partner": t.partner_id or "LAHALEX",
-                    "clientIp": t.ip_address or "127.0.0.1",
-                    "requestPayload": json.dumps({
-                        "access_type": t.access_type,
-                        "document": doc_title,
-                        "user_agent": t.user_agent[:60] if t.user_agent else "Navigateur Client",
-                    }, indent=2),
-                    "responsePayload": json.dumps({
-                        "status": "authorized",
-                        "access_type": t.access_type,
-                        "watermarked": True,
-                    }, indent=2),
-                })
-
-            # Tri antichronologique
             results.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-
-            return standard_response(data=results)
+            return standard_response(data=results[:100])
         except Exception as e:
-            logger.exception("Erreur liste WebhookLog / ApiLogs:")
+            logger.exception("Erreur liste ApiRequestLog:")
             return standard_response(data=[], error=str(e), status_code=status.HTTP_200_OK)
