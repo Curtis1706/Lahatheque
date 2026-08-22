@@ -182,3 +182,98 @@ class SubscriptionPlanListView(APIView):
             'institution_name': inst_info.get('institution_name'),
             'plans': plans_data
         })
+
+
+class SubscribeView(APIView):
+    """POST /api/v1/commerce/subscriptions/subscribe/ - Souscrit à un plan d'abonnement."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from datetime import timedelta
+        from django.utils import timezone
+        from .models import SubscriptionPlan, Subscription
+
+        plan_id = request.data.get("plan_id")
+        if not plan_id:
+            return Response({"success": False, "error": "plan_id requis."}, status=400)
+
+        try:
+            plan = SubscriptionPlan.objects.get(id=plan_id)
+        except SubscriptionPlan.DoesNotExist:
+            return Response({"success": False, "error": "Plan introuvable."}, status=404)
+
+        existing = Subscription.objects.filter(
+            user=request.user, is_active=True, expires_at__gt=timezone.now()
+        ).first()
+        if existing:
+            return Response({
+                "success": False,
+                "error": "Vous avez déjà un abonnement actif. Annulez-le avant d'en souscrire un nouveau."
+            }, status=400)
+
+        now = timezone.now()
+        subscription = Subscription.objects.create(
+            user=request.user,
+            plan=plan,
+            starts_at=now,
+            expires_at=now + timedelta(days=plan.duration_days),
+            is_active=True,
+        )
+
+        # Paiement : réutilise le même provider que les commandes (Moneroo)
+        provider_name = request.data.get("payment_provider", "moneroo")
+        try:
+            from .payment_providers import get_payment_provider
+            provider = get_payment_provider(provider_name)
+            return_url = f"{request.scheme}://{request.get_host()}/student/subscriptions"
+            payment_res = provider.initiate_payment(
+                amount=plan.price_amount,
+                currency=plan.currency.code if hasattr(plan.currency, 'code') else "XOF",
+                description=f"Abonnement {plan.name}",
+                customer_email=request.user.email,
+                customer_name=request.user.get_full_name() or request.user.email,
+                return_url=return_url,
+                metadata={"subscription_id": str(subscription.id)},
+            )
+            return Response({
+                "success": True,
+                "data": {
+                    "id": str(subscription.id),
+                    "plan_name": plan.name,
+                    "expires_at": subscription.expires_at.isoformat(),
+                    "checkout_url": payment_res.get("checkout_url"),
+                },
+                "error": None
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({
+                "success": True,
+                "data": {
+                    "id": str(subscription.id),
+                    "plan_name": plan.name,
+                    "expires_at": subscription.expires_at.isoformat(),
+                    "checkout_url": None,
+                },
+                "warning": f"Abonnement créé mais paiement à finaliser manuellement ({str(e)})",
+            }, status=status.HTTP_201_CREATED)
+
+
+class SubscriptionCancelView(APIView):
+    """POST /api/v1/commerce/subscriptions/<id>/cancel/ - Annule un abonnement actif."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, sub_id):
+        from .models import Subscription
+
+        try:
+            sub = Subscription.objects.get(id=sub_id, user=request.user)
+        except Subscription.DoesNotExist:
+            return Response({"success": False, "message": "Abonnement introuvable."}, status=404)
+
+        if not sub.is_active:
+            return Response({"success": False, "message": "Cet abonnement est déjà inactif."}, status=400)
+
+        sub.is_active = False
+        sub.save(update_fields=["is_active"])
+
+        return Response({"success": True, "message": "Abonnement annulé avec succès."})

@@ -307,24 +307,94 @@ class UniversityPaperOrdersView(APIView):
         return Response({"success": True, "data": orders, "error": None})
 
     def post(self, request):
+        from decimal import Decimal
+        from django.db import transaction
+        from django.db.models import Sum, F
+        from apps.catalog.models import Ouvrage
+        from apps.commerce.models import StockOuvrage, MouvementStock
+
         inst = get_user_institution(request.user)
         if not inst:
             return Response({"success": False, "error": "Université introuvable"}, status=400)
 
         data = request.data
-        order_number = f"CMD-UNIV-2026-{int(timezone.now().timestamp()) % 1000:03d}"
-        order = UniversityPaperOrder.objects.create(
-            institution=inst,
-            order_number=order_number,
-            delivery_campus=data.get("delivery_campus", "Campus Universitaire"),
-            contact_person=data.get("contact_person", "Responsable Réception"),
-            contact_phone=data.get("contact_phone", ""),
-            items=data.get("items", []),
-            total_amount=data.get("total_amount", 0),
-            currency=data.get("currency", "XOF"),
-            status="pending",
-            tracking_number=f"TRK-BEN-2026-{int(timezone.now().timestamp()) % 10000:04d}"
-        )
+        raw_items = data.get("items", [])
+        if not raw_items:
+            return Response({"success": False, "error": "La commande est vide."}, status=400)
+
+        # Recalcul serveur du prix et vérification du stock — JAMAIS de confiance envers le client
+        validated_items = []
+        total_amount = Decimal("0.00")
+
+        for it in raw_items:
+            book_id = it.get("book_id")
+            quantity = int(it.get("quantity", 0))
+            if quantity <= 0:
+                continue
+
+            try:
+                book = Ouvrage.objects.get(id=book_id)
+            except Ouvrage.DoesNotExist:
+                return Response({"success": False, "error": f"Ouvrage introuvable : {book_id}"}, status=400)
+
+            total_disponible = book.stocks_entrepots.aggregate(
+                total=Sum(F('quantite_reelle') - F('quantite_reservee'))
+            )['total'] or 0
+
+            if total_disponible < quantity:
+                return Response({
+                    "success": False,
+                    "error": f"Stock insuffisant pour « {book.title} » (disponible : {total_disponible}, demandé : {quantity})."
+                }, status=400)
+
+            unit_price = book.price_paper or Decimal("0.00")
+            line_total = unit_price * quantity
+            total_amount += line_total
+
+            validated_items.append({
+                "book_id": str(book.id),
+                "title": book.title,
+                "quantity": quantity,
+                "unit_price": float(unit_price),
+                "line_total": float(line_total),
+            })
+
+        if not validated_items:
+            return Response({"success": False, "error": "Aucun article valide dans la commande."}, status=400)
+
+        with transaction.atomic():
+            order_number = f"CMD-UNIV-{timezone.now().year}-{uuid.uuid4().hex[:6].upper()}"
+            order = UniversityPaperOrder.objects.create(
+                institution=inst,
+                order_number=order_number,
+                delivery_campus=data.get("delivery_campus", "Campus Universitaire"),
+                contact_person=data.get("contact_person", "Responsable Réception"),
+                contact_phone=data.get("contact_phone", ""),
+                items=validated_items,
+                total_amount=total_amount,  # Calculé serveur, jamais fourni par le client
+                currency="XOF",
+                status="pending",
+                tracking_number="",  # Généré uniquement à l'expédition réelle, pas à la commande
+            )
+
+            # Réservation du stock
+            for it in validated_items:
+                book = Ouvrage.objects.get(id=it["book_id"])
+                stock = book.stocks_entrepots.filter(
+                    quantite_reelle__gte=it["quantity"]
+                ).order_by('-quantite_reelle').first()
+                if stock:
+                    stock.quantite_reservee = F('quantite_reservee') + it["quantity"]
+                    stock.save(update_fields=['quantite_reservee'])
+                    MouvementStock.objects.create(
+                        stock=stock,
+                        type_mouvement='adjustment',
+                        quantite=it["quantity"],
+                        reference_document=order_number,
+                        motif=f"Réservation commande université {inst.name}",
+                        auteur=request.user,
+                    )
+
         res = {
             "id": str(order.id),
             "order_number": order.order_number,
@@ -336,7 +406,7 @@ class UniversityPaperOrdersView(APIView):
             "currency": order.currency,
             "status": order.status,
             "tracking_number": order.tracking_number,
-            "pdf_order_url": f"/documents/bon-{order.order_number}.pdf",
+            "pdf_order_url": None,  # Bon de commande PDF non encore disponible
             "created_at": order.created_at.isoformat()
         }
         return Response({"success": True, "data": res, "error": None}, status=status.HTTP_201_CREATED)

@@ -84,7 +84,7 @@ class WholesalerCatalogListView(APIView):
             
             # Stock physique disponible
             stocks = StockOuvrage.objects.filter(ouvrage=o)
-            total_dispo = sum(s.quantite_disponible for s in stocks) if stocks.exists() else 150
+            total_dispo = sum(s.quantite_disponible for s in stocks) if stocks.exists() else 0
 
             data.append({
                 "id": str(o.id),
@@ -121,7 +121,7 @@ class WholesalerCatalogDetailView(APIView):
             prt_p = float(o.prix_gros_papier or int(public_p * 0.70))
             
             stocks = StockOuvrage.objects.filter(ouvrage=o)
-            total_dispo = sum(s.quantite_disponible for s in stocks) if stocks.exists() else 150
+            total_dispo = sum(s.quantite_disponible for s in stocks) if stocks.exists() else 0
 
             return Response({
                 "success": True,
@@ -228,12 +228,15 @@ class WholesalerOrdersListView(APIView):
             contact_phone=contact_phone or (prof.contact_phone if prof else ""),
             currency="XOF",
             status=WholesaleOrderStatus.PENDING,
-            invoice_url=f"/invoices/{ref}.pdf",
+            invoice_url="",  # Facture PDF non encore disponible
         )
 
         tot_dig = 0
         tot_prt = 0
         tot_amt = Decimal("0.00")
+
+        from django.db.models import Sum, F
+        from .models import StockOuvrage, MouvementStock, WholesaleDiscountTier
 
         for ci in cart_items:
             book_id = ci.get("book_id")
@@ -244,13 +247,58 @@ class WholesalerOrdersListView(APIView):
 
             dig_qty = int(ci.get("digital_licenses_qty", 0))
             prt_qty = int(ci.get("print_copies_qty", 0))
-            dig_price = Decimal(str(ci.get("digital_unit_price", book.prix_gros_numerique or 3000)))
-            prt_price = Decimal(str(ci.get("print_unit_price", book.prix_gros_papier or 3500)))
+            total_qty = dig_qty + prt_qty
+
+            if total_qty <= 0:
+                continue
+
+            # Prix TOUJOURS recalculé serveur — jamais depuis le client
+            dig_price = book.prix_gros_numerique or Decimal("3000.00")
+            prt_price = book.prix_gros_papier or Decimal("3500.00")
+
+            # Application du palier de remise applicable selon la quantité totale
+            tier = WholesaleDiscountTier.objects.filter(
+                min_quantity__lte=total_qty
+            ).order_by('-min_quantity').first()
+
+            if tier:
+                dig_price = dig_price * (Decimal("1.00") - tier.digital_discount_percent / Decimal("100.00"))
+                prt_price = prt_price * (Decimal("1.00") - tier.print_discount_percent / Decimal("100.00"))
+
+            # Vérification du stock papier disponible
+            if prt_qty > 0:
+                total_disponible = book.stocks_entrepots.aggregate(
+                    total=Sum(F('quantite_reelle') - F('quantite_reservee'))
+                )['total'] or 0
+                if total_disponible < prt_qty:
+                    order.delete()
+                    return Response({
+                        "success": False,
+                        "data": None,
+                        "error": f"Stock papier insuffisant pour « {book.title} » (disponible : {total_disponible}, demandé : {prt_qty})."
+                    }, status=status.HTTP_400_BAD_REQUEST)
 
             subtotal = (dig_qty * dig_price) + (prt_qty * prt_price)
             tot_dig += dig_qty
             tot_prt += prt_qty
             tot_amt += subtotal
+
+            # Réservation du stock papier
+            if prt_qty > 0:
+                stock = book.stocks_entrepots.filter(
+                    quantite_reelle__gte=prt_qty
+                ).order_by('-quantite_reelle').first()
+                if stock:
+                    stock.quantite_reservee = F('quantite_reservee') + prt_qty
+                    stock.save(update_fields=['quantite_reservee'])
+                    MouvementStock.objects.create(
+                        stock=stock,
+                        type_mouvement='adjustment',
+                        quantite=prt_qty,
+                        reference_document=ref,
+                        motif=f"Réservation commande grossiste {comp_name}",
+                        auteur=user,
+                    )
 
             WholesaleOrderItem.objects.create(
                 order=order,

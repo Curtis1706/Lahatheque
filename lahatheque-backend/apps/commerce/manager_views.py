@@ -756,3 +756,127 @@ class AvailableBooksForStockView(APIView):
 
         return Response({"success": True, "data": result})
 
+
+class InstitutionalDeliveriesView(APIView):
+    """
+    GET /api/v1/commerce/manager/deliveries/institutional/
+    Vue fusionnée : commandes papier universités + grossistes en attente de traitement,
+    invisibles autrement dans le flux de livraison standard (Order/PhysicalDelivery).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not _is_manager_or_admin(request.user):
+            return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
+
+        from apps.partners.models import UniversityPaperOrder
+        from .models import WholesaleOrder
+
+        results = []
+
+        for o in UniversityPaperOrder.objects.exclude(status__in=['delivered', 'cancelled']).select_related('institution'):
+            results.append({
+                "id": str(o.id),
+                "source": "university",
+                "reference": o.order_number,
+                "client_nom": o.institution.name,
+                "destination": o.delivery_campus,
+                "contact": f"{o.contact_person} — {o.contact_phone}",
+                "items": o.items,
+                "total_amount": float(o.total_amount),
+                "statut": o.status,
+                "tracking_number": o.tracking_number,
+                "created_at": o.created_at.isoformat(),
+            })
+
+        for o in WholesaleOrder.objects.filter(total_print_copies__gt=0).exclude(
+            status__in=['delivered', 'cancelled']
+        ):
+            results.append({
+                "id": str(o.id),
+                "source": "wholesaler",
+                "reference": o.reference,
+                "client_nom": o.company_name,
+                "destination": o.delivery_address,
+                "contact": o.contact_phone,
+                "items": [],
+                "total_amount": float(o.total_amount),
+                "statut": o.status,
+                "tracking_number": getattr(o, 'tracking_number', ''),
+                "created_at": o.created_at.isoformat(),
+            })
+
+        results.sort(key=lambda x: x["created_at"], reverse=True)
+        return Response({"success": True, "data": results, "error": None})
+
+    def patch(self, request):
+        """Met à jour le statut d'une commande université ou grossiste et notifie le client."""
+        if not _is_manager_or_admin(request.user):
+            return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
+
+        source = request.data.get("source")
+        order_id = request.data.get("id")
+        new_status = request.data.get("statut")
+        tracking_number = request.data.get("tracking_number", "")
+
+        if not source or not order_id or not new_status:
+            return Response({"success": False, "error": "source, id et statut sont requis."}, status=400)
+
+        from apps.partners.models import UniversityPaperOrder
+        from .models import WholesaleOrder
+        from apps.reporting.services import notify_user
+        from apps.reporting.models import Notification
+
+        if source == "university":
+            try:
+                order = UniversityPaperOrder.objects.select_related('institution__user').get(id=order_id)
+            except UniversityPaperOrder.DoesNotExist:
+                return Response({"success": False, "error": "Commande introuvable."}, status=404)
+
+            order.status = new_status
+            if tracking_number:
+                order.tracking_number = tracking_number
+            order.save()
+
+            recipient = getattr(order.institution, 'user', None)
+            if recipient and new_status in ('in_transit', 'delivered'):
+                try:
+                    label = "expédiée" if new_status == "in_transit" else "livrée"
+                    notify_user(
+                        user=recipient,
+                        notification_type=Notification.NotificationType.ORDER_SHIPPED if new_status == "in_transit" else Notification.NotificationType.ORDER_DELIVERED,
+                        title=f"Commande {order.order_number} {label}",
+                        message=f"Votre commande de livres papier « {order.order_number} » a été {label}.",
+                        action_url="/university/purchases",
+                        resource_id=str(order.id),
+                    )
+                except Exception:
+                    pass
+
+        elif source == "wholesaler":
+            try:
+                order = WholesaleOrder.objects.select_related('user').get(id=order_id)
+            except WholesaleOrder.DoesNotExist:
+                return Response({"success": False, "error": "Commande introuvable."}, status=404)
+
+            order.status = new_status
+            order.save()
+
+            if new_status in ('shipped', 'delivered'):
+                try:
+                    label = "expédiée" if new_status == "shipped" else "livrée"
+                    notify_user(
+                        user=order.user,
+                        notification_type=Notification.NotificationType.ORDER_SHIPPED if new_status == "shipped" else Notification.NotificationType.ORDER_DELIVERED,
+                        title=f"Commande {order.reference} {label}",
+                        message=f"Votre commande grossiste « {order.reference} » a été {label}.",
+                        action_url="/wholesaler/orders",
+                        resource_id=str(order.id),
+                    )
+                except Exception:
+                    pass
+        else:
+            return Response({"success": False, "error": "source invalide (university ou wholesaler)."}, status=400)
+
+        return Response({"success": True, "data": {"id": order_id, "statut": new_status}, "error": None})
+

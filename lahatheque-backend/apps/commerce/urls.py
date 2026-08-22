@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import CreateOrderView, OrderListView, OrderDetailView, SubscriptionPlanListView
+from .views import CreateOrderView, OrderListView, OrderDetailView, SubscriptionPlanListView, SubscribeView, SubscriptionCancelView
 from .webhooks import MonerooWebhookView
 from .manager_views import (
     ManagerKpisView,
@@ -15,6 +15,7 @@ from .manager_views import (
     StockEscalateView,
     ManagerReportExportView,
     AvailableBooksForStockView,
+    InstitutionalDeliveriesView,
 )
 
 from .wholesaler_views import (
@@ -35,6 +36,8 @@ urlpatterns = [
     path('orders/my/', OrderListView.as_view(), name='commerce-orders-list'),
     path('orders/<uuid:order_id>/', OrderDetailView.as_view(), name='commerce-orders-detail'),
     path('subscriptions/plans/', SubscriptionPlanListView.as_view(), name='commerce-subscriptions-plans'),
+    path('subscriptions/subscribe/', SubscribeView.as_view(), name='commerce-subscriptions-subscribe'),
+    path('subscriptions/<uuid:sub_id>/cancel/', SubscriptionCancelView.as_view(), name='commerce-subscriptions-cancel'),
     path('webhooks/moneroo/', MonerooWebhookView.as_view(), name='webhook-moneroo'),
 
     # ─── Manager : Stock & Livraison ───────────────────────────────────────────
@@ -50,6 +53,7 @@ urlpatterns = [
     path('manager/stock/escalate/', StockEscalateView.as_view(), name='manager-stock-escalate'),
     path('manager/stock/<uuid:pk>/', StockDetailView.as_view(), name='manager-stock-detail'),
     path('manager/deliveries/', DeliveriesListView.as_view(), name='manager-deliveries-list'),
+    path('manager/deliveries/institutional/', InstitutionalDeliveriesView.as_view(), name='manager-deliveries-institutional'),
     path('manager/deliveries/<uuid:pk>/', DeliveryDetailView.as_view(), name='manager-delivery-detail'),
 
     # ─── Grossiste (B2B) ────────────────────────────────────────────────────────

@@ -471,6 +471,35 @@ export async function escalateToAdmin(alertId: string, impactDescription: string
   };
 }
 
+// ─── Commandes Institutionnelles (Universités & Grossistes) ────────────────────
+
+export interface InstitutionalDelivery {
+  id: string;
+  source: "university" | "wholesaler";
+  reference: string;
+  client_nom: string;
+  destination: string;
+  contact: string;
+  items: any[];
+  total_amount: number;
+  statut: string;
+  tracking_number: string;
+  created_at: string;
+}
+
+export async function getInstitutionalDeliveries(): Promise<InstitutionalDelivery[]> {
+  return bffGet<InstitutionalDelivery[]>("/deliveries/institutional/");
+}
+
+export async function updateInstitutionalDelivery(payload: {
+  source: "university" | "wholesaler";
+  id: string;
+  statut: string;
+  tracking_number?: string;
+}): Promise<void> {
+  await bffPatch("/deliveries/institutional/", payload);
+}
+
 
 
 
