@@ -63,6 +63,17 @@ class Order(models.Model):
         ('completed', 'Terminée'),
         ('cancelled', 'Annulée'),
     ]
+    ORDER_TYPE_CHOICES = [
+        ('rentree_scolaire', 'Rentrée scolaire'),
+        ('personnel', 'Personnel'),
+        ('institutionnel', 'Institutionnel'),
+    ]
+    PAYMENT_METHOD_CHOICES = [
+        ('mobile_money', 'Mobile Money'),
+        ('virement', 'Virement bancaire'),
+        ('especes', 'Espèces'),
+        ('carte', 'Carte bancaire'),
+    ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='commandes')
@@ -70,6 +81,12 @@ class Order(models.Model):
     currency = models.ForeignKey(Currency, on_delete=models.PROTECT)
     statut_paiement = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
     statut_commande = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default='pending')
+    type_commande = models.CharField(
+        max_length=20, choices=ORDER_TYPE_CHOICES, default='personnel'
+    )
+    mode_paiement = models.CharField(
+        max_length=20, choices=PAYMENT_METHOD_CHOICES, default='mobile_money'
+    )
     payment_transaction = models.ForeignKey(PaymentTransaction, null=True, blank=True, on_delete=models.SET_NULL, related_name='commandes')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -102,6 +119,9 @@ class PhysicalDelivery(models.Model):
     shipping_address = models.TextField()
     city = models.CharField(max_length=100)
     country = models.CharField(max_length=2, default='BJ')
+    date_livraison_souhaitee = models.DateField(null=True, blank=True)
+    plage_horaire_debut = models.TimeField(null=True, blank=True)
+    plage_horaire_fin = models.TimeField(null=True, blank=True)
     tracking_number = models.CharField(max_length=100, blank=True, default='')
     carrier_name = models.CharField(max_length=100, blank=True, default='')
     statut = models.CharField(max_length=30, choices=STATUS_CHOICES, default='en_preparation')

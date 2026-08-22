@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   PackageCheck,
@@ -13,6 +13,7 @@ import {
   Copy,
   Download,
   CheckCircle2,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,6 +21,7 @@ import {
   type OrderAPI,
   type OrderLineAPI,
 } from "@/lib/services/student";
+import OrderCreateForm from "@/components/student/OrderCreateForm";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -231,24 +233,26 @@ export default function StudentOrdersPage() {
   const [orders, setOrders] = useState<OrderAPI[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getStudentOrders();
+      setOrders(data);
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Erreur de chargement des commandes"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await getStudentOrders();
-        setOrders(data);
-      } catch (err: unknown) {
-        setError(
-          err instanceof Error ? err.message : "Erreur de chargement des commandes"
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
     loadData();
-  }, []);
+  }, [loadData]);
 
   const paidCount = orders.filter((o) => o.statut_paiement === "paid").length;
   const pendingCount = orders.filter(
@@ -278,17 +282,28 @@ export default function StudentOrdersPage() {
           <ArrowLeft className="w-3.5 h-3.5" />
           Retour
         </Link>
-        <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
-          <PackageCheck className="w-4 h-4 text-gold" />
-          Historique des Transactions
+        <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+              <PackageCheck className="w-4 h-4 text-gold" />
+              Historique des Transactions
+            </div>
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+              Achats &amp; Commandes
+            </h1>
+            <p className="text-xs text-foreground-muted mt-1">
+              Achats unitaires numériques et commandes de livres papier avec suivi
+              d&apos;expédition en temps réel.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCreateForm((v) => !v)}
+            className="inline-flex items-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shrink-0 min-h-[44px]"
+          >
+            <Plus className="w-4 h-4" aria-hidden="true" />
+            Nouvelle commande
+          </button>
         </div>
-        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-          Achats &amp; Commandes
-        </h1>
-        <p className="text-xs text-foreground-muted mt-1">
-          Achats unitaires numériques et commandes de livres papier avec suivi
-          d&apos;expédition en temps réel.
-        </p>
       </div>
 
       {/* ── Erreur ────────────────────────────────────────────────────── */}
@@ -297,6 +312,17 @@ export default function StudentOrdersPage() {
           <AlertCircle className="w-4 h-4 shrink-0" />
           {error}
         </div>
+      )}
+
+      {/* ── Formulaire Nouvelle Commande ────────────────────────────────── */}
+      {showCreateForm && (
+        <OrderCreateForm
+          onCancel={() => setShowCreateForm(false)}
+          onSuccess={() => {
+            setShowCreateForm(false);
+            loadData();
+          }}
+        />
       )}
 
       {/* ── KPIs ──────────────────────────────────────────────────────── */}

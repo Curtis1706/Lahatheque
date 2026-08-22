@@ -24,6 +24,7 @@ import {
 } from "@/lib/services/student";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
 import { PaperOrderModal } from "@/components/features/student/paper-order-modal";
+import { createOrder } from "@/lib/services/commerce-orders";
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -249,7 +250,20 @@ export default function StudentBookDetailPage() {
     address: string,
     quantity: number
   ) => {
-    toast.success(`Commande physique confirmée : ${quantity} ex. de « ${bookTitle} »`);
+    try {
+      await createOrder({
+        items: [{ ouvrage_id: bookId, format_type: "paper", quantity }],
+        type_commande: "personnel",
+        mode_paiement: "especes",
+        shipping_address: address,
+        city: "Cotonou",
+        country: "BJ",
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur lors de la création de la commande.";
+      toast.error(msg);
+      throw err;
+    }
   };
 
   if (loading) {

@@ -19,10 +19,15 @@ class CreateOrderView(APIView):
 
         validated = serializer.validated_data
         items = validated['items']
-        provider_name = validated.get('payment_provider', 'mock')
+        provider_name = validated.get('payment_provider', 'moneroo')
+        type_commande = validated.get('type_commande', 'personnel')
+        mode_paiement = validated.get('mode_paiement', 'mobile_money')
         shipping_address = validated.get('shipping_address', '')
         city = validated.get('city', '')
         country = validated.get('country', 'BJ')
+        date_livraison = validated.get('date_livraison_souhaitee')
+        plage_debut = validated.get('plage_horaire_debut')
+        plage_fin = validated.get('plage_horaire_fin')
 
         currency, _ = Currency.objects.get_or_create(code='XOF', defaults={'peg_rate_to_eur': 655.957})
 
@@ -65,7 +70,9 @@ class CreateOrderView(APIView):
                 total_amount=total_amount,
                 currency=currency,
                 statut_paiement='pending',
-                statut_commande='pending'
+                statut_commande='pending',
+                type_commande=type_commande,
+                mode_paiement=mode_paiement,
             )
 
             for l in lignes_to_create:
@@ -83,8 +90,22 @@ class CreateOrderView(APIView):
                     shipping_address=shipping_address,
                     city=city,
                     country=country,
-                    statut='en_preparation'
+                    statut='en_preparation',
+                    date_livraison_souhaitee=date_livraison,
+                    plage_horaire_debut=plage_debut,
+                    plage_horaire_fin=plage_fin,
                 )
+
+            # Si le mode de règlement n'est pas Mobile Money → règlement manuel
+            if mode_paiement != 'mobile_money':
+                commande.statut_paiement = 'pending'
+                commande.statut_commande = 'processing'
+                commande.save(update_fields=['statut_paiement', 'statut_commande'])
+                return Response({
+                    'success': True,
+                    'data': OrderSerializer(commande).data,
+                    'message': f"Commande enregistrée. Réglez par {commande.get_mode_paiement_display()} pour finaliser — un agent LAHA Éditions vous contactera.",
+                }, status=status.HTTP_201_CREATED)
 
             provider = get_payment_provider(provider_name)
             return_url = f"{request.scheme}://{request.get_host()}/student/orders"

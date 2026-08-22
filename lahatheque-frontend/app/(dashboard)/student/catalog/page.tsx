@@ -19,6 +19,7 @@ import {
   type BookAPI,
   type CatalogDataAPI,
 } from "@/lib/services/student";
+import { createOrder } from "@/lib/services/commerce-orders";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
 import { PaperOrderModal } from "@/components/features/student/paper-order-modal";
 
@@ -195,7 +196,20 @@ export default function StudentCatalogPage() {
     address: string,
     quantity: number
   ) => {
-    toast.success(`Commande papier confirmée : ${quantity} ex. de « ${bookTitle} »`);
+    try {
+      await createOrder({
+        items: [{ ouvrage_id: bookId, format_type: "paper", quantity }],
+        type_commande: "personnel",
+        mode_paiement: "especes",
+        shipping_address: address,
+        city: "Cotonou",
+        country: "BJ",
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur lors de la création de la commande.";
+      toast.error(msg);
+      throw err;
+    }
   };
 
   const books = catalogData?.books || [];

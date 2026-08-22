@@ -16,6 +16,7 @@ import { ClientBookAccess } from "@/lib/types/student";
 import { BookCover } from "./book-cover";
 import { BookSampleModal } from "./book-sample-modal";
 import { PaperOrderModal } from "./paper-order-modal";
+import { createOrder } from "@/lib/services/commerce-orders";
 import { cn } from "@/lib/utils";
 
 interface BookListItemProps {
@@ -49,7 +50,20 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
     address: string,
     quantity: number
   ) => {
-    toast.success(`Commande papier de ${quantity} ex. enregistrée pour « ${bookTitle} » !`);
+    try {
+      await createOrder({
+        items: [{ ouvrage_id: bookId, format_type: "paper", quantity }],
+        type_commande: "personnel",
+        mode_paiement: "especes",
+        shipping_address: address,
+        city: "Cotonou",
+        country: "BJ",
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur lors de la création de la commande.";
+      toast.error(msg);
+      throw err;
+    }
   };
 
   const authorName =
