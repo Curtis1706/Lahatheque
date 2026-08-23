@@ -17,6 +17,7 @@ import {
 import HeroCarousel from "@/components/ui/hero-carousel";
 import { Book } from "@/components/ui/book";
 import { CountingNumber } from "@/components/ui/counting-number";
+import { PanafricanPresenceSection } from "@/components/features/home/panafrican-presence-section";
 
 const bestSellers = [
   {
@@ -410,43 +411,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Présence Panafricaine */}
-      <section className="py-20 px-6 md:px-10 bg-navy text-white">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 className="font-serif text-3xl font-bold mb-8">Une présence panafricaine</h2>
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-serif text-lg text-gold font-bold mb-2">Expertise locale</h3>
-                <p className="text-sm text-white/80">Des contenus adaptés aux réalités et aux programmes académiques africains.</p>
-              </div>
-              <div>
-                <h3 className="font-serif text-lg text-gold font-bold mb-2">Innovation technologique</h3>
-                <p className="text-sm text-white/80">Une plateforme pensée pour les connexions bas débit et la lecture sur mobile.</p>
-              </div>
-              <div>
-                <h3 className="font-serif text-lg text-gold font-bold mb-2">Impact social</h3>
-                <p className="text-sm text-white/80">Contribution au développement de l'économie du savoir sur le continent.</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-navy-dark p-8 rounded-xl border border-navy-hover text-center">
-            <Globe className="w-16 h-16 text-gold mx-auto mb-4 opacity-90" />
-            <p className="text-base font-medium mb-4">Déjà présent dans plusieurs pays :</p>
-            <div className="flex flex-wrap justify-center gap-3 text-xs font-bold">
-              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Bénin</span>
-              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Sénégal</span>
-              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Niger</span>
-              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Togo</span>
-              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Côte d'Ivoire</span>
-              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Gabon</span>
-              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">RDC</span>
-              <span className="px-4 py-2 bg-navy-hover border border-navy-hover rounded-full">Mali</span>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Présence Panafricaine avec Globe 3D Cobe */}
+      <PanafricanPresenceSection />
 
       {/* Pourquoi Lahathèque */}
       <section className="py-20 px-6 md:px-10 bg-background">
