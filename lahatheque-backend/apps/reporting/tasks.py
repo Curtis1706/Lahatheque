@@ -302,3 +302,55 @@ def task_calculate_monthly_royalties():
         created_count += 1
 
     return {"period": period, "calculations_created": created_count}
+
+
+@shared_task
+def task_check_stock_alerts():
+    """
+    Vérifie les stocks sous le seuil d'alerte et notifie Gestionnaires + Administrateurs.
+    Exécutée périodiquement (toutes les 6h).
+    """
+    from apps.commerce.models import StockOuvrage
+    from apps.accounts.models import User
+    from apps.reporting.models import Notification
+    from apps.reporting.services import notify_user
+
+    stocks = StockOuvrage.objects.select_related('ouvrage', 'entrepot').all()
+    alert_stocks = [s for s in stocks if s.quantite_disponible <= s.seuil_alerte]
+
+    if not alert_stocks:
+        return {"alerts_sent": 0}
+
+    recipients = User.objects.filter(role__in=['manager', 'admin', 'super_admin'], is_active=True)
+    if not recipients.exists():
+        return {"alerts_sent": 0, "warning": "Aucun gestionnaire/admin actif trouvé."}
+
+    sent = 0
+    for stock in alert_stocks:
+        already_notified = Notification.objects.filter(
+            notification_type='system',
+            resource_id=str(stock.id),
+            is_read=False,
+        ).exists()
+        if already_notified:
+            continue
+
+        for recipient in recipients:
+            try:
+                notify_user(
+                    user=recipient,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Alerte de stock bas" if stock.quantite_disponible > 0 else "Rupture de stock",
+                    message=(
+                        f"« {stock.ouvrage.title} » — {stock.quantite_disponible} exemplaire(s) "
+                        f"disponible(s) à {stock.entrepot.nom} (seuil : {stock.seuil_alerte})."
+                    ),
+                    action_url="/manager/stock/alerts",
+                    resource_id=str(stock.id),
+                )
+                sent += 1
+            except Exception:
+                pass
+
+    return {"alerts_sent": sent, "articles_en_alerte": len(alert_stocks)}
+

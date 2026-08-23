@@ -145,6 +145,25 @@ class CreateOrderView(APIView):
                 handle_payment_success(tx)
                 commande.refresh_from_db()
 
+        if has_paper:
+            try:
+                from apps.accounts.models import User
+                from apps.reporting.services import notify_user
+                from apps.reporting.models import Notification
+
+                managers = User.objects.filter(role__in=['manager', 'admin', 'super_admin'], is_active=True)
+                for m in managers:
+                    notify_user(
+                        user=m,
+                        notification_type=Notification.NotificationType.SYSTEM,
+                        title="Nouvelle commande papier à préparer",
+                        message=f"Commande #{str(commande.id)[:8]} de {request.user.get_full_name() or request.user.email} — préparation requise.",
+                        action_url="/manager/delivery",
+                        resource_id=str(commande.id),
+                    )
+            except Exception:
+                pass
+
         return Response({
             'order_id': str(commande.id),
             'checkout_url': payment_res.get('checkout_url'),

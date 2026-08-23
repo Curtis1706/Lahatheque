@@ -4,6 +4,7 @@ import React, { Component, ErrorInfo, ReactNode } from "react";
 import AuthGuard from "@/components/auth-guard";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
+import { NotificationBell } from "@/components/ui/notification-bell";
 
 interface Props {
   children: ReactNode;
@@ -55,6 +56,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <DashboardErrorBoundary>
       <AuthGuard>
         <div className="min-h-screen bg-background flex flex-col md:flex-row w-full relative pb-20 md:pb-0">
+          <NotificationBell />
           <DashboardSidebar />
           <main className="flex-1 min-w-0 flex flex-col overflow-y-auto">
             <div className="flex-1 min-w-0">{children}</div>

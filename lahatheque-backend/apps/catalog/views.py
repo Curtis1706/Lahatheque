@@ -304,6 +304,25 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
 
         ouvrage.status = 'submitted'
         ouvrage.save(update_fields=['status'])
+
+        try:
+            from apps.accounts.models import User
+            from apps.reporting.services import notify_user
+            from apps.reporting.models import Notification
+
+            chiefs = User.objects.filter(role__in=['chief_layout', 'admin', 'super_admin'], is_active=True)
+            for chief in chiefs:
+                notify_user(
+                    user=chief,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Nouveau dépôt à valider",
+                    message=f"« {ouvrage.title} » a été soumis par {request.user.get_full_name() or request.user.email}.",
+                    action_url="/chief-layout/validation",
+                    resource_id=str(ouvrage.id),
+                )
+        except Exception:
+            pass
+
         return Response({
             "success": True,
             "message": f"L'ouvrage « {ouvrage.title} » a été soumis au Chef Maquettiste."

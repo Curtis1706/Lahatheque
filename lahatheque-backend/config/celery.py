@@ -15,6 +15,10 @@ app.conf.beat_schedule = {
         'task': 'apps.reporting.tasks.task_calculate_monthly_royalties',
         'schedule': crontab(day_of_month='1', hour='3', minute='0'),
     },
+    'stock-alerts-check': {
+        'task': 'apps.reporting.tasks.task_check_stock_alerts',
+        'schedule': crontab(minute='0', hour='*/6'),
+    },
 }
 
 @app.task(bind=True)
