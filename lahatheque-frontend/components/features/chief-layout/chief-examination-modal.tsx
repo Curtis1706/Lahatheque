@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { CheckCircle2, AlertCircle, X, ShieldCheck, User, Sparkles, FileText, Send, Eye } from "lucide-react";
+import { CheckCircle2, AlertCircle, X, ShieldCheck, User, Sparkles, FileText, Send, Eye, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
@@ -166,6 +166,34 @@ export function ChiefExaminationModal({
                 <p className="text-xs text-foreground bg-background p-3.5 rounded-2xl border border-border leading-relaxed">
                   {deposit.metadata.summary || "Aucun résumé renseigné."}
                 </p>
+              </div>
+
+              {/* Document soumis par le maquettiste & Téléchargement */}
+              <div className="p-4 rounded-2xl bg-background-secondary border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2.5 rounded-xl bg-navy/10 text-navy shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-navy text-xs truncate">
+                      {deposit.files.book_file_name || `${deposit.metadata.title}.${(deposit.files.format || "pdf").toLowerCase()}`}
+                    </p>
+                    <p className="text-[11px] text-foreground-muted">
+                      Document original soumis par <span className="font-medium text-foreground">{deposit.maquettiste_name}</span>
+                      {deposit.files.book_file_size ? ` • ${(deposit.files.book_file_size / (1024 * 1024)).toFixed(1)} Mo` : ""}
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href={deposit.files.book_file_url || `/mock/droit-obligations.pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={deposit.files.book_file_name || `${deposit.metadata.title}.${(deposit.files.format || "pdf").toLowerCase()}`}
+                  className="px-4 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center justify-center gap-2 shrink-0 shadow-xs transition-colors cursor-pointer min-h-[40px]"
+                >
+                  <Download className="w-4 h-4 text-gold" />
+                  Télécharger le document
+                </a>
               </div>
 
               {/* DRM & Filigrane */}

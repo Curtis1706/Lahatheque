@@ -16,7 +16,8 @@ import {
   FileCode, 
   Check, 
   Layers,
-  GraduationCap
+  GraduationCap,
+  Download
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
@@ -38,6 +39,7 @@ export default function ChefValidationDetailPage() {
   const [showXmlNotice, setShowXmlNotice] = useState(false);
   const [priceDigital, setPriceDigital] = useState<number>(5000);
   const [pricePaper, setPricePaper] = useState<number>(7500);
+  const [isPaperAvailable, setIsPaperAvailable] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -46,6 +48,7 @@ export default function ChefValidationDetailPage() {
       setDeposit(data);
       if (data) {
         if (data.default_price) setPriceDigital(data.default_price);
+        if (data.is_paper_available !== undefined) setIsPaperAvailable(data.is_paper_available);
       }
       setLoading(false);
     }
@@ -55,7 +58,13 @@ export default function ChefValidationDetailPage() {
   const handleValidate = async () => {
     if (!deposit) return;
     setValidating(true);
-    const success = await validateDeposit(deposit.id, undefined, priceDigital, pricePaper);
+    const success = await validateDeposit(
+      deposit.id,
+      undefined,
+      priceDigital,
+      isPaperAvailable ? pricePaper : 0,
+      isPaperAvailable
+    );
     setValidating(false);
     if (success) {
       toast.success(`Ouvrage validé et publié avec succès au tarif de ${priceDigital.toLocaleString("fr-FR")} FCFA !`);
@@ -142,7 +151,18 @@ export default function ChefValidationDetailPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={deposit.files.book_file_url || `/mock/droit-obligations.pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            download={deposit.files.book_file_name || `${deposit.metadata.title}.${(deposit.files.format || "pdf").toLowerCase()}`}
+            className="px-4 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy border border-gold/30 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-navy" />
+            Télécharger le document
+          </a>
+
           <button
             onClick={() => setShowXmlNotice(!showXmlNotice)}
             className="px-4 py-2 rounded-xl border border-border text-xs font-bold text-navy hover:bg-background-secondary flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -249,6 +269,24 @@ export default function ChefValidationDetailPage() {
             <Sparkles className="w-5 h-5 text-gold" />
             <h3 className="text-sm font-bold text-navy">Décision de validation éditoriale</h3>
           </div>
+          {/* Toggle Disponibilité Papier */}
+          <div className="flex items-center justify-between p-3.5 rounded-2xl border border-border bg-background-secondary">
+            <div>
+              <p className="text-xs font-bold text-navy">Disponible en version papier physique</p>
+              <p className="text-[11px] text-foreground-muted">
+                Active le format papier sur la vitrine et l&apos;entrée en stock pour le Gestionnaire.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPaperAvailable((v) => !v)}
+              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${isPaperAvailable ? "bg-gold" : "bg-border"}`}
+              title={isPaperAvailable ? "Désactiver la version papier" : "Activer la version papier"}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isPaperAvailable ? "translate-x-5" : ""}`} />
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-background-secondary border border-border">
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-navy uppercase tracking-wider">Prix Numérique (FCFA)</label>
@@ -261,13 +299,21 @@ export default function ChefValidationDetailPage() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-navy uppercase tracking-wider">Prix Papier (FCFA)</label>
+              <label className="text-[11px] font-bold text-navy uppercase tracking-wider flex items-center justify-between">
+                <span>Prix Papier (FCFA)</span>
+                {!isPaperAvailable && (
+                  <span className="text-[10px] font-normal text-foreground-muted lowercase">Non disponible</span>
+                )}
+              </label>
               <input
                 type="number"
                 step="500"
-                value={pricePaper}
+                disabled={!isPaperAvailable}
+                value={isPaperAvailable ? pricePaper : 0}
                 onChange={(e) => setPricePaper(parseFloat(e.target.value) || 0)}
-                className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground font-bold focus:ring-2 focus:ring-navy min-h-[40px]"
+                className={`w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground font-bold focus:ring-2 focus:ring-navy min-h-[40px] transition-opacity ${
+                  !isPaperAvailable ? "opacity-40 cursor-not-allowed bg-background-secondary" : ""
+                }`}
               />
             </div>
           </div>

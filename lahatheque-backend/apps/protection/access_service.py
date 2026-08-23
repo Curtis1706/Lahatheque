@@ -2,6 +2,7 @@
 Service unifié de contrôle d'accès aux ouvrages et abonnements (AccessService).
 Point d'entrée unique pour la vérification des droits individuels et institutionnels.
 """
+from django.conf import settings
 from apps.commerce.models import LigneCommande, Subscription
 from apps.partners.models import StudentAffiliation
 
@@ -15,11 +16,22 @@ class AccessService:
         if not user or not user.is_authenticated:
             return {"access_granted": False, "reason": "unauthenticated"}
 
-        # Privilèges administratifs & auteurs
-        if user.is_superuser or user.is_staff or getattr(user, 'role', '') in ['admin', 'author']:
+        # Privilèges administratifs, éditoriaux, auteurs, réviseurs & mode développement
+        privileged_roles = [
+            'admin', 'author', 'publisher', 'chief_layout',
+            'layout_artist', 'legal_reviewer', 'manager'
+        ]
+        is_privileged = (
+            user.is_superuser
+            or user.is_staff
+            or getattr(user, 'role', '') in privileged_roles
+            or getattr(settings, 'DEBUG', False)
+        )
+
+        if is_privileged:
             return {
                 "access_granted": True,
-                "reason": "privilege_access",
+                "reason": "privilege_access" if (user.is_superuser or user.is_staff) else "development_access",
                 "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
             }
 

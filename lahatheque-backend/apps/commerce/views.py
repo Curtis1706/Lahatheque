@@ -47,6 +47,12 @@ class CreateOrderView(APIView):
             # Vérification du stock disponible pour le format papier, agrégé sur tous les entrepôts
             if format_type == 'paper':
                 has_paper = True
+
+                if not getattr(ouvrage, 'is_paper_available', False):
+                    return Response({
+                        'error': f"« {ouvrage.title} » n'est pas disponible en version papier."
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
                 from django.db.models import Sum, F
 
                 total_disponible = ouvrage.stocks_entrepots.aggregate(
@@ -131,13 +137,13 @@ class CreateOrderView(APIView):
                 status=payment_res.get('status', 'pending')
             )
             commande.payment_transaction = tx
+            commande.save(update_fields=['payment_transaction'])
 
             # Si le provider est mock et immédiat, valider le paiement tout de suite
             if payment_res.get('status') == 'success':
                 from .services import handle_payment_success
                 handle_payment_success(tx)
-            else:
-                commande.save()
+                commande.refresh_from_db()
 
         return Response({
             'order_id': str(commande.id),

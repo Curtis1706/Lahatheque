@@ -32,7 +32,7 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             'discipline_name', 'publisher_name', 'institution_name',
             'country', 'format_type', 'page_count', 'publication_date',
             'language', 'summary', 'status', 'price_digital', 'price_paper',
-            'cover_url',
+            'is_paper_available', 'cover_url',
         ]
 
     def get_cover_url(self, obj) -> str:

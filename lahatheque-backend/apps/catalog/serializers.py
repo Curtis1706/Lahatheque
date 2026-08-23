@@ -83,7 +83,8 @@ class OuvrageCreateSerializer(serializers.Serializer):
     cover_image = serializers.ImageField(required=False, allow_null=True)
 
     def create(self, validated_data):
-        from apps.partners.models import Institution
+        from django.apps import apps
+        Institution = apps.get_model('partners', 'Institution')
 
         user = self.context['request'].user
 
@@ -135,7 +136,22 @@ class OuvrageCreateSerializer(serializers.Serializer):
         if book_file:
             ouvrage.file = book_file
             ouvrage.file_size_bytes = book_file.size
-            ouvrage.save(update_fields=['file', 'file_size_bytes'])
+
+            # Calcul du nombre de pages réel pour les fichiers PDF
+            page_count = 0
+            try:
+                if book_file.name.lower().endswith('.pdf'):
+                    import fitz  # PyMuPDF
+                    book_file.seek(0)
+                    file_bytes = book_file.read()
+                    book_file.seek(0)
+                    with fitz.open(stream=file_bytes, filetype="pdf") as doc:
+                        page_count = doc.page_count
+            except Exception:
+                page_count = 0  # Ne bloque jamais la création si l'extraction échoue
+
+            ouvrage.page_count = page_count
+            ouvrage.save(update_fields=['file', 'file_size_bytes', 'page_count'])
 
         if cover_image:
             ouvrage.cover_image = cover_image

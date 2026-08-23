@@ -64,6 +64,7 @@ export interface LayoutDeposit {
   chef_comment?: string;
   default_price: number;
   admin_price?: number;
+  is_paper_available?: boolean;
 }
 
 export interface SparklinePoint {

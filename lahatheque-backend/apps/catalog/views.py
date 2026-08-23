@@ -241,6 +241,8 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
             except (ValueError, TypeError):
                 pass
 
+        ouvrage.is_paper_available = bool(request.data.get('is_paper_available', False))
+
         ouvrage.status = 'published'
         ouvrage.save()
 
@@ -259,29 +261,30 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
             pass
 
         # Initialisation automatique du stock physique pour le Gestionnaire de Stock
-        try:
-            from apps.commerce.models import Entrepot, StockOuvrage
-            entrepot = Entrepot.objects.first()
-            if not entrepot:
-                entrepot = Entrepot.objects.create(
-                    nom="Entrepôt Principal LAHA Cotonou",
-                    code="WAR-CTN-01",
-                    pays="Bénin",
-                    ville="Cotonou",
-                    adresse="Siège LAHA Éditions, Cotonou",
-                    is_active=True
+        if ouvrage.is_paper_available:
+            try:
+                from apps.commerce.models import Entrepot, StockOuvrage
+                entrepot = Entrepot.objects.first()
+                if not entrepot:
+                    entrepot = Entrepot.objects.create(
+                        nom="Entrepôt Principal LAHA Cotonou",
+                        code="WAR-CTN-01",
+                        pays="Bénin",
+                        ville="Cotonou",
+                        adresse="Siège LAHA Éditions, Cotonou",
+                        is_active=True
+                    )
+                StockOuvrage.objects.get_or_create(
+                    ouvrage=ouvrage,
+                    entrepot=entrepot,
+                    defaults={
+                        'quantite_reelle': 0,
+                        'quantite_reservee': 0,
+                        'seuil_alerte': 10
+                    }
                 )
-            StockOuvrage.objects.get_or_create(
-                ouvrage=ouvrage,
-                entrepot=entrepot,
-                defaults={
-                    'quantite_reelle': 0,
-                    'quantite_reservee': 0,
-                    'seuil_alerte': 10
-                }
-            )
-        except Exception as stock_err:
-            logger.warning(f"Impossible d'initialiser le stock pour l'ouvrage {ouvrage.id}: {stock_err}")
+            except Exception as stock_err:
+                logger.warning(f"Impossible d'initialiser le stock pour l'ouvrage {ouvrage.id}: {stock_err}")
 
         return Response({
             "success": True,

@@ -53,12 +53,13 @@ export async function createOrder(payload: OrderCreatePayload): Promise<OrderCre
   const data = await res.json();
   // Le backend peut répondre { success, data, ... } ou directement { order_id, checkout_url, ... }
   const inner = data.data || data;
+  const orderObj = inner.order || inner;
   return {
-    id: inner.id || inner.order_id || "",
-    total_amount: inner.total_amount || 0,
-    currency: inner.currency || "XOF",
-    statut_paiement: inner.statut_paiement || "pending",
-    statut_commande: inner.statut_commande || "pending",
+    id: orderObj.id || inner.order_id || inner.id || "",
+    total_amount: Number(orderObj.total_amount || inner.total_amount || 0),
+    currency: typeof orderObj.currency === "string" ? orderObj.currency : inner.currency || "XOF",
+    statut_paiement: orderObj.statut_paiement || inner.statut_paiement || (inner.status === "success" ? "paid" : "pending"),
+    statut_commande: orderObj.statut_commande || inner.statut_commande || (inner.status === "success" ? "completed" : "pending"),
     payment_url: inner.checkout_url || inner.payment_url,
   };
 }

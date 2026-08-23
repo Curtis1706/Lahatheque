@@ -48,6 +48,11 @@ class Ouvrage(models.Model):
     protection_type = models.CharField(max_length=30, default='lcp')
     price_digital = models.DecimalField(max_digits=10, decimal_places=2, default=5000.00)
     price_paper = models.DecimalField(max_digits=10, decimal_places=2, default=7500.00)
+    is_paper_available = models.BooleanField(
+        default=False,
+        verbose_name="Disponible en version papier",
+        help_text="Décision éditoriale du Chef Maquettiste — distincte du prix papier renseigné."
+    )
     cover_image = models.ImageField(upload_to='covers/', null=True, blank=True)
 
     # Traçabilité & dates
@@ -74,12 +79,14 @@ class Ouvrage(models.Model):
 
     @property
     def titre(self) -> str:
-        return self.title
+        return str(self.title or '')
 
     @property
     def auteur(self) -> str:
-        if self.pk and self.authors.exists():
-            return ", ".join([f"{a.first_name} {a.last_name}".strip() for a in self.authors.all()])
+        if self.pk and hasattr(self, 'authors'):
+            authors_qs = getattr(self, 'authors')
+            if hasattr(authors_qs, 'all'):
+                return ", ".join([f"{a.first_name} {a.last_name}".strip() for a in authors_qs.all()])
         return ""
 
 
@@ -118,7 +125,8 @@ class QuizQuestion(models.Model):
         ordering = ['order']
 
     def __str__(self):
-        return f"Q{self.order}: {self.question_text[:60]}"
+        text = str(self.question_text) if self.question_text else ""
+        return f"Q{self.order}: {text[:60]}"
 
 
 class MetadataONIX(models.Model):

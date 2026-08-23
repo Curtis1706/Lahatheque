@@ -23,8 +23,7 @@ import {
   type BookAPI,
 } from "@/lib/services/student";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
-import { PaperOrderModal } from "@/components/features/student/paper-order-modal";
-import { createOrder } from "@/lib/services/commerce-orders";
+import { UnifiedBookOrderModal } from "@/components/features/student/unified-book-order-modal";
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -51,12 +50,12 @@ function AccessBlock({
   access,
   book,
   onOpenSample,
-  onOpenPaper,
+  onOpenOrder,
 }: {
   access: { access_granted: boolean; reason: string; stream_url?: string; error?: string };
   book: BookAPI;
   onOpenSample: () => void;
-  onOpenPaper: () => void;
+  onOpenOrder: () => void;
 }) {
   if (access.access_granted) {
     const reasonLabels: Record<string, string> = {
@@ -88,11 +87,11 @@ function AccessBlock({
             Ouvrir la Liseuse Sécurisée
           </Link>
 
-          {book.price_paper > 0 && (
+          {book.is_paper_available && book.price_paper > 0 && (
             <button
               type="button"
-              onClick={onOpenPaper}
-              className="py-3 px-4 rounded-2xl bg-background border border-border hover:border-gold text-navy text-xs font-semibold transition-all flex items-center justify-center gap-1.5 min-h-[44px]"
+              onClick={onOpenOrder}
+              className="py-3 px-4 rounded-2xl bg-background border border-border hover:border-gold text-navy text-xs font-semibold transition-all flex items-center justify-center gap-1.5 min-h-[44px] cursor-pointer"
             >
               <ShoppingBag className="w-4 h-4 text-gold" />
               Commander en Papier
@@ -115,7 +114,7 @@ function AccessBlock({
         <button
           type="button"
           onClick={onOpenSample}
-          className="p-4 rounded-2xl border border-border bg-background-secondary hover:border-gold text-left space-y-1 transition-all"
+          className="p-4 rounded-2xl border border-border bg-background-secondary hover:border-gold text-left space-y-1 transition-all cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-navy flex items-center gap-1.5">
@@ -131,66 +130,42 @@ function AccessBlock({
           </p>
         </button>
 
-        {/* Achat numérique */}
-        {book.price_digital > 0 && (
-          <button
-            type="button"
-            onClick={() => toast.info(`Achat numérique initié pour ${book.price_digital} XOF`)}
-            className="p-4 rounded-2xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-left space-y-1 transition-all"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-navy flex items-center gap-1.5">
-                <ShoppingBag className="w-4 h-4 text-gold" />
-                Achat Numérique
-              </span>
-              <span className="text-xs font-bold font-mono text-gold">
-                {book.price_digital.toLocaleString("fr-FR")} XOF
-              </span>
-            </div>
-            <p className="text-[11px] text-foreground-muted">
-              Accès perpétuel sur liseuse et applications mobiles.
-            </p>
-          </button>
-        )}
-
-        {/* Commande papier */}
-        {book.price_paper > 0 && (
-          <button
-            type="button"
-            onClick={onOpenPaper}
-            className="p-4 rounded-2xl border border-border bg-background-secondary hover:border-gold text-left space-y-1 transition-all"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-navy flex items-center gap-1.5">
-                <ShoppingBag className="w-4 h-4 text-navy" />
-                Livre Papier Physique
-              </span>
-              <span className="text-xs font-bold font-mono text-navy">
-                {book.price_paper.toLocaleString("fr-FR")} XOF
-              </span>
-            </div>
-            <p className="text-[11px] text-foreground-muted">
-              Impression soignée, livraison campus ou domicile.
-            </p>
-          </button>
-        )}
+        {/* Commander cet ouvrage — Unifié */}
+        <button
+          type="button"
+          onClick={onOpenOrder}
+          className="p-4 rounded-2xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-left space-y-1 transition-all cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+              <ShoppingBag className="w-4 h-4 text-gold" />
+              Commander cet Ouvrage
+            </span>
+            <span className="text-xs font-bold font-mono text-gold">
+              {(book.price_digital ?? 0).toLocaleString("fr-FR")} XOF
+            </span>
+          </div>
+          <p className="text-[11px] text-foreground-muted">
+            Choisissez le format numérique (accès immédiat) ou papier (si disponible).
+          </p>
+        </button>
 
         {/* Bouquet campus */}
         <Link
           href="/student/university"
-          className="p-4 rounded-2xl border border-navy/20 bg-navy/5 hover:bg-navy/10 text-left space-y-1 transition-all flex flex-col justify-between"
+          className="p-4 rounded-2xl border border-navy/20 bg-navy/5 hover:bg-navy/10 text-left space-y-1 transition-all flex flex-col justify-between sm:col-span-2"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-navy flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-gold" />
-              Bouquet Campus
+              Bouquet Campus Universitaire
             </span>
             <span className="text-[10px] uppercase font-bold text-navy bg-navy/15 px-2 py-0.5 rounded-md">
               Sans Frais
             </span>
           </div>
           <p className="text-[11px] text-foreground-muted">
-            Rattachez votre matricule universitaire.
+            Rattachez votre matricule universitaire pour débloquer les ouvrages de votre faculté.
           </p>
         </Link>
       </div>
@@ -220,7 +195,7 @@ export default function StudentBookDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [showSample, setShowSample] = useState(false);
-  const [showPaper, setShowPaper] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   useEffect(() => {
     if (!bookId) return;
@@ -242,29 +217,6 @@ export default function StudentBookDetailPage() {
     }
     loadData();
   }, [bookId]);
-
-  const handleConfirmPaper = async (
-    bookId: string,
-    bookTitle: string,
-    price: number,
-    address: string,
-    quantity: number
-  ) => {
-    try {
-      await createOrder({
-        items: [{ ouvrage_id: bookId, format_type: "paper", quantity }],
-        type_commande: "personnel",
-        mode_paiement: "especes",
-        shipping_address: address,
-        city: "Cotonou",
-        country: "BJ",
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erreur lors de la création de la commande.";
-      toast.error(msg);
-      throw err;
-    }
-  };
 
   if (loading) {
     return (
@@ -446,7 +398,7 @@ export default function StudentBookDetailPage() {
           access={access}
           book={book}
           onOpenSample={() => setShowSample(true)}
-          onOpenPaper={() => setShowPaper(true)}
+          onOpenOrder={() => setShowOrderModal(true)}
         />
       )}
 
@@ -460,15 +412,22 @@ export default function StudentBookDetailPage() {
         onClose={() => setShowSample(false)}
       />
 
-      <PaperOrderModal
-        book={{
-          ...book,
-          author: authorName,
-        }}
-        isOpen={showPaper}
-        onClose={() => setShowPaper(false)}
-        onConfirmOrder={handleConfirmPaper}
-      />
+      {showOrderModal && book && (
+        <UnifiedBookOrderModal
+          book={book}
+          onClose={() => setShowOrderModal(false)}
+          onOpenSample={() => {
+            setShowOrderModal(false);
+            setShowSample(true);
+          }}
+          onDigitalPurchaseSuccess={async () => {
+            const refreshed = await getStudentBookDetail(bookId);
+            setBook(refreshed.ouvrage);
+            setAccess(refreshed.access);
+            setProgress(refreshed.reading_progress);
+          }}
+        />
+      )}
     </div>
   );
 }

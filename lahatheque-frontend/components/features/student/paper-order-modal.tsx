@@ -43,8 +43,13 @@ export function PaperOrderModal({
       await onConfirmOrder(book.id, book.title, unitPrice, shippingAddress, quantity);
       toast.success(`Commande de ${quantity} exemplaire(s) enregistrée avec succès !`);
       onClose();
-    } catch {
-      toast.error("Une erreur est survenue lors de l'enregistrement de votre commande.");
+    } catch (err: unknown) {
+      // Le message réel (ex: "Stock insuffisant pour...") vient du backend via onConfirmOrder.
+      // On ne le réaffiche pas ici pour éviter un double toast — onConfirmOrder l'affiche déjà.
+      // On garde seulement un filet de sécurité si aucun message n'a été fourni.
+      if (!(err instanceof Error) || !err.message) {
+        toast.error("Une erreur est survenue lors de l'enregistrement de votre commande.");
+      }
     } finally {
       setSubmitting(false);
     }

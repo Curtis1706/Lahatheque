@@ -40,7 +40,9 @@ function mapBackendToDeposit(b: any, fallbackUserId?: string): LayoutDeposit {
     },
     files: {
       format: (b.format_type || "pdf").toUpperCase() as "PDF" | "EPUB" | "AUDIO" | "PAPIER",
-      book_file_name: b.file ? b.file.split("/").pop() : b.title,
+      book_file_url: typeof b.file === "string" ? b.file : b.file?.url || b.file_url || b.book_file_url || undefined,
+      book_file_name: typeof b.file === "string" ? b.file.split("/").pop() : b.book_file_name || b.title,
+      book_file_size: b.file_size_bytes || b.file_size || b.book_file_size || undefined,
       cover_url: b.cover_image || b.cover_url || undefined,
     },
     status:
@@ -315,13 +317,14 @@ export async function validateDeposit(
   id: string,
   comment?: string,
   price_digital?: number,
-  price_paper?: number
+  price_paper?: number,
+  is_paper_available?: boolean
 ): Promise<boolean> {
   const res = await fetch(`/api/bff/catalog/deposits/${id}/validate/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ comment, price_digital, price_paper }),
+    body: JSON.stringify({ comment, price_digital, price_paper, is_paper_available }),
   });
   return res.ok;
 }

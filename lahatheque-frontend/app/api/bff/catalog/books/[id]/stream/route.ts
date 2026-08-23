@@ -43,8 +43,8 @@ export async function GET(
       cache: 'no-store',
     });
 
-    // Seuls 200 et 206 contiennent un corps PDF valide — 204 No Content doit tomber en fallback
-    if ((backendRes.status === 200 || backendRes.status === 206)) {
+    // Seuls 200 et 206 contiennent un corps PDF valide
+    if (backendRes.status === 200 || backendRes.status === 206) {
 
       const responseHeaders = new Headers();
       responseHeaders.set('Content-Type', backendRes.headers.get('content-type') || 'application/pdf');
@@ -64,53 +64,71 @@ export async function GET(
         headers: responseHeaders,
       });
     }
-  } catch (error) {
-    // Backend indisponible, bascule sur le fichier de démonstration local
-  }
 
-  // 2. Fallback de démonstration résilient avec support Range RFC 7233
-  const samplePath = path.join(process.cwd(), 'public', 'PromptBreeder_Original_Paper-2309.16797v1.pdf');
-  if (!fs.existsSync(samplePath)) {
-    return new NextResponse('Document de démonstration introuvable', { status: 404 });
-  }
-
-  const stat = fs.statSync(samplePath);
-  const totalSize = stat.size;
-
-  if (rangeHeader) {
-    const match = rangeHeader.match(/bytes=(\d+)-(\d+)?/);
-    if (match) {
-      const start = parseInt(match[1], 10);
-      const end = match[2] ? parseInt(match[2], 10) : Math.min(start + 256 * 1024 - 1, totalSize - 1);
-      const chunkSize = end - start + 1;
-
-      const fd = fs.openSync(samplePath, 'r');
-      const buffer = Buffer.alloc(chunkSize);
-      fs.readSync(fd, buffer, 0, chunkSize, start);
-      fs.closeSync(fd);
-
-      return new NextResponse(buffer, {
-        status: 206,
-        headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Range': `bytes ${start}-${end}/${totalSize}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': chunkSize.toString(),
-          'Cache-Control': 'private, no-store, must-revalidate',
-        },
-      });
+    // Django a répondu mais avec une erreur (401, 403, 404, 500...) :
+    // Propager le statut exact au lieu de servir un document fallback étranger
+    let errorMessage = 'Document indisponible';
+    try {
+      const errorBody = await backendRes.json();
+      errorMessage = errorBody?.error || errorBody?.detail || errorMessage;
+    } catch {
+      // Body non-JSON, garder le message par défaut
     }
-  }
 
-  // Envoi standard 200 OK
-  const fileBuffer = fs.readFileSync(samplePath);
-  return new NextResponse(fileBuffer, {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Accept-Ranges': 'bytes',
-      'Content-Length': totalSize.toString(),
-      'Cache-Control': 'private, no-store, must-revalidate',
-    },
-  });
+    return NextResponse.json(
+      { success: false, error: errorMessage },
+      { status: backendRes.status }
+    );
+  } catch (error) {
+    // Backend Django entièrement inaccessible (réseau coupé) :
+    // Fallback de démonstration uniquement dans ce cas extrême
+    const samplePath = path.join(process.cwd(), 'public', 'PromptBreeder_Original_Paper-2309.16797v1.pdf');
+    if (!fs.existsSync(samplePath)) {
+      return NextResponse.json(
+        { success: false, error: 'Serveur de documents indisponible.' },
+        { status: 503 }
+      );
+    }
+
+    const stat = fs.statSync(samplePath);
+    const totalSize = stat.size;
+
+    if (rangeHeader) {
+      const match = rangeHeader.match(/bytes=(\d+)-(\d+)?/);
+      if (match) {
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : Math.min(start + 256 * 1024 - 1, totalSize - 1);
+        const chunkSize = end - start + 1;
+
+        const fd = fs.openSync(samplePath, 'r');
+        const buffer = Buffer.alloc(chunkSize);
+        fs.readSync(fd, buffer, 0, chunkSize, start);
+        fs.closeSync(fd);
+
+        return new NextResponse(buffer, {
+          status: 206,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunkSize.toString(),
+            'Cache-Control': 'private, no-store, must-revalidate',
+          },
+        });
+      }
+    }
+
+    // Envoi standard 200 OK
+    const fileBuffer = fs.readFileSync(samplePath);
+    return new NextResponse(fileBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Accept-Ranges': 'bytes',
+        'Content-Length': totalSize.toString(),
+        'Cache-Control': 'private, no-store, must-revalidate',
+      },
+    });
+  }
 }
+

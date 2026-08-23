@@ -31,6 +31,20 @@ export interface QuizData {
   questions: QuizQuestion[];
 }
 
+/**
+ * Normalise une stream_url renvoyée par Django (/api/v1/...) vers le proxy BFF Next.js (/api/bff/...).
+ * Le backend renvoie des chemins internes Django que le navigateur ne peut pas atteindre directement.
+ */
+function normalizeBffStreamUrl(streamUrl: string | undefined, bookId: string): string {
+  const fallback = `/api/bff/catalog/books/${bookId}/stream/`;
+  if (!streamUrl) return fallback;
+  // Réécrire /api/v1/catalog/books/{id}/stream/ → /api/bff/catalog/books/{id}/stream/
+  if (streamUrl.startsWith('/api/v1/')) {
+    return streamUrl.replace('/api/v1/', '/api/bff/');
+  }
+  return streamUrl;
+}
+
 export const libraryApi = {
   async getBook(id: string): Promise<BookDetail> {
     try {
@@ -46,7 +60,7 @@ export const libraryApi = {
             id: ouvrage.id,
             title: ouvrage.title,
             author: ouvrage.authors?.map((a: any) => a.full_name || `${a.first_name || ""} ${a.last_name || ""}`).join(", ") || "Auteur académique",
-            file: access?.stream_url || `/api/bff/catalog/books/${id}/stream/`,
+            file: normalizeBffStreamUrl(access?.stream_url, id),
             total_pages: ouvrage.page_count || 100,
             category: ouvrage.discipline_name || "Ouvrage Académique",
             subject: ouvrage.collection_name || ouvrage.discipline_name || "Général",

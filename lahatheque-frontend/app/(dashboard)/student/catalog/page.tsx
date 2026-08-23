@@ -19,9 +19,8 @@ import {
   type BookAPI,
   type CatalogDataAPI,
 } from "@/lib/services/student";
-import { createOrder } from "@/lib/services/commerce-orders";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
-import { PaperOrderModal } from "@/components/features/student/paper-order-modal";
+import { UnifiedBookOrderModal } from "@/components/features/student/unified-book-order-modal";
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -46,11 +45,11 @@ function SkeletonBook() {
 function CatalogBookCard({
   book,
   onOpenSample,
-  onOpenPaperOrder,
+  onOpenOrderModal,
 }: {
   book: BookAPI;
   onOpenSample: (book: BookAPI) => void;
-  onOpenPaperOrder: (book: BookAPI) => void;
+  onOpenOrderModal: (book: BookAPI) => void;
 }) {
   const authorName =
     book.authors?.map((a) => a.full_name).join(", ") || "Auteur académique";
@@ -92,43 +91,40 @@ function CatalogBookCard({
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-2 pt-3 border-t border-border flex-wrap">
-        <div>
+      <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
+        <div className="flex items-center gap-3 flex-wrap">
           {book.price_digital > 0 ? (
-            <p className="font-mono font-bold text-gold text-xs sm:text-sm">
-              {book.price_digital.toLocaleString("fr-FR")} XOF
-            </p>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-foreground-muted">Numérique</span>
+              <span className="font-mono font-bold text-gold text-xs sm:text-sm">
+                {book.price_digital.toLocaleString("fr-FR")} XOF
+              </span>
+            </div>
           ) : (
             <span className="text-xs font-bold text-success">Accès libre</span>
           )}
+          {book.is_paper_available && book.price_paper > 0 && (
+            <span className="text-[10px] font-bold text-navy bg-navy/10 px-2 py-0.5 rounded-full">
+              Disponible en papier
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-1.5 ml-auto">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onOpenSample(book)}
-            className="p-2 rounded-xl bg-background-secondary border border-border hover:border-gold transition-colors text-navy"
-            title="Consulter l'extrait gratuit (15 pages)"
+            onClick={() => onOpenOrderModal(book)}
+            className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 min-h-[40px] shadow-xs cursor-pointer"
           >
-            <Eye className="w-3.5 h-3.5 text-gold" />
+            <ShoppingBag className="w-3.5 h-3.5 text-gold" />
+            Commander
           </button>
-
-          {book.price_paper > 0 && (
-            <button
-              type="button"
-              onClick={() => onOpenPaperOrder(book)}
-              className="p-2 rounded-xl bg-background-secondary border border-border hover:border-gold transition-colors text-navy"
-              title="Commander la version papier physique"
-            >
-              <ShoppingBag className="w-3.5 h-3.5 text-gold" />
-            </button>
-          )}
 
           <Link
             href={`/student/catalog/${book.id}`}
-            className="px-3.5 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 min-h-[38px] shadow-xs"
+            className="px-3 py-2 rounded-xl bg-background-secondary border border-border hover:border-gold text-navy text-xs font-semibold flex items-center justify-center min-h-[40px] transition-colors"
+            title="Consulter la fiche détaillée"
           >
-            <Play className="w-3 h-3 text-gold fill-gold" />
             Détail
           </Link>
         </div>
@@ -149,7 +145,7 @@ export default function StudentCatalogPage() {
   const [debouncedQ, setDebouncedQ] = useState("");
 
   const [sampleModalBook, setSampleModalBook] = useState<BookAPI | null>(null);
-  const [paperModalBook, setPaperModalBook] = useState<BookAPI | null>(null);
+  const [orderModalBook, setOrderModalBook] = useState<BookAPI | null>(null);
 
   // Debounce la recherche
   useEffect(() => {
@@ -183,33 +179,6 @@ export default function StudentCatalogPage() {
   const handleOpenSample = (book: BookAPI) => {
     setSampleModalBook(book);
     toast.info(`Ouverture de l'extrait pour « ${book.title} »`);
-  };
-
-  const handleOpenPaper = (book: BookAPI) => {
-    setPaperModalBook(book);
-  };
-
-  const handleConfirmPaper = async (
-    bookId: string,
-    bookTitle: string,
-    price: number,
-    address: string,
-    quantity: number
-  ) => {
-    try {
-      await createOrder({
-        items: [{ ouvrage_id: bookId, format_type: "paper", quantity }],
-        type_commande: "personnel",
-        mode_paiement: "especes",
-        shipping_address: address,
-        city: "Cotonou",
-        country: "BJ",
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erreur lors de la création de la commande.";
-      toast.error(msg);
-      throw err;
-    }
   };
 
   const books = catalogData?.books || [];
@@ -389,7 +358,7 @@ export default function StudentCatalogPage() {
                 key={book.id}
                 book={book}
                 onOpenSample={handleOpenSample}
-                onOpenPaperOrder={handleOpenPaper}
+                onOpenOrderModal={(b) => setOrderModalBook(b)}
               />
             ))}
           </div>
@@ -410,19 +379,17 @@ export default function StudentCatalogPage() {
         onClose={() => setSampleModalBook(null)}
       />
 
-      <PaperOrderModal
-        book={
-          paperModalBook
-            ? {
-                ...paperModalBook,
-                author: paperModalBook.authors?.map((a) => a.full_name).join(", "),
-              }
-            : null
-        }
-        isOpen={Boolean(paperModalBook)}
-        onClose={() => setPaperModalBook(null)}
-        onConfirmOrder={handleConfirmPaper}
-      />
+      {orderModalBook && (
+        <UnifiedBookOrderModal
+          book={orderModalBook}
+          onClose={() => setOrderModalBook(null)}
+          onOpenSample={() => {
+            const targetBook = orderModalBook;
+            setOrderModalBook(null);
+            setSampleModalBook(targetBook);
+          }}
+        />
+      )}
     </div>
   );
 }

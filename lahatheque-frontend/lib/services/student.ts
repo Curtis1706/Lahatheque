@@ -74,6 +74,7 @@ export interface BookAPI {
   status: string;
   price_digital: number;
   price_paper: number;
+  is_paper_available?: boolean;
   cover_url: string;
   // Champs enrichis par la bibliothèque
   progress_percent?: number;
