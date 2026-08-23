@@ -41,6 +41,7 @@ export interface DepositClassification {
 
 export interface DepositMetadata {
   title: string;
+  subtitle?: string;
   authors: string[];
   publication_year: number;
   language: string;

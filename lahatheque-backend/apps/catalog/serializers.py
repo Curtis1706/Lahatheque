@@ -68,6 +68,7 @@ class OuvrageCreateSerializer(serializers.Serializer):
     price_paper = serializers.DecimalField(
         max_digits=10, decimal_places=2, required=False, default=7500.00
     )
+    is_paper_available = serializers.BooleanField(required=False, default=False)
 
     # Classification
     faculty = serializers.CharField(max_length=255, required=False, default='')
@@ -122,6 +123,7 @@ class OuvrageCreateSerializer(serializers.Serializer):
             publication_date=validated_data.get('publication_date'),
             price_digital=validated_data.get('price_digital', 5000.00),
             price_paper=validated_data.get('price_paper', 7500.00),
+            is_paper_available=validated_data.get('is_paper_available', False),
             faculty=validated_data.get('faculty', ''),
             department=validated_data.get('department', ''),
             keywords=validated_data.get('keywords', []),

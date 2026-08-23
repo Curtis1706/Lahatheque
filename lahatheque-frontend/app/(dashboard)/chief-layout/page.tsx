@@ -16,6 +16,9 @@ import {
   Sparkles,
   ChevronRight,
   ArrowRight,
+  Plus,
+  FileUp,
+  BookOpen,
 } from "lucide-react";
 
 // Générateur de timeline dynamique basée sur la date réelle
@@ -66,17 +69,35 @@ export default function ChefMaquettisteOverviewPage() {
             Bonjour, {user?.first_name || "Chef Maquettiste"}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
-            Validez les dépôts des maquettistes pour déclencher la mise en ligne automatique sur la vitrine publique.
+            Déposez des ouvrages certifiés avec validation directe ou supervisez les épreuves soumises par les maquettistes.
           </p>
         </div>
 
-        <Link
-          href="/chief-layout/validation"
-          className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 shadow-sm shrink-0 min-h-[44px]"
-        >
-          <CheckSquare className="w-4 h-4" />
-          Dépôts à Valider
-        </Link>
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <Link
+            href="/chief-layout/catalog"
+            className="px-4 py-2.5 rounded-xl bg-background border border-border text-navy font-bold text-xs hover:border-gold hover:text-gold transition-all flex items-center gap-2 shadow-xs shrink-0 min-h-[44px]"
+          >
+            <BookOpen className="w-4 h-4 text-gold" />
+            Catalogue des Ouvrages
+          </Link>
+
+          <Link
+            href="/chief-layout/deposit"
+            className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 shadow-sm shrink-0 min-h-[44px]"
+          >
+            <Plus className="w-4 h-4 text-navy" />
+            Déposer un Ouvrage
+          </Link>
+
+          <Link
+            href="/chief-layout/validation"
+            className="px-4 py-2.5 rounded-xl bg-navy-hover text-white font-bold text-xs hover:bg-navy-light/20 transition-all flex items-center gap-2 border border-border shrink-0 min-h-[44px]"
+          >
+            <CheckSquare className="w-4 h-4 text-gold" />
+            Dépôts à Valider
+          </Link>
+        </div>
       </div>
 
       {/* 4 KPI Cards */}
@@ -94,7 +115,7 @@ export default function ChefMaquettisteOverviewPage() {
           />
         </Link>
 
-        <Link href="/chief-layout/history" className="block">
+        <Link href="/chief-layout/catalog" className="block">
           <ProgressMetricCard
             title="Validés ce Mois"
             total={`${kpis?.validatedThisMonth ?? 0} livre${(kpis?.validatedThisMonth ?? 0) > 1 ? "s" : ""}`}
@@ -137,29 +158,68 @@ export default function ChefMaquettisteOverviewPage() {
         <div className="pb-3 border-b border-border flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold font-serif text-navy">Actions Rapides &amp; Gestion des Dépôts</h2>
-            <p className="text-[11px] text-foreground-muted mt-0.5">Supervision globale des maquettistes</p>
+            <p className="text-[11px] text-foreground-muted mt-0.5">Dépôt certifié, catalogue &amp; supervision éditoriale</p>
           </div>
           <Link
-            href="/chief-layout/validation"
+            href="/chief-layout/catalog"
             className="text-xs font-bold text-gold hover:text-gold-dark flex items-center gap-1"
           >
-            Examiner la file <ArrowRight className="w-3.5 h-3.5" />
+            Voir tout le catalogue <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Link
+            href="/chief-layout/catalog"
+            className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all flex items-center justify-between group shadow-xs cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-gold/15 text-gold">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-sm text-navy">Catalogue des Ouvrages</p>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Modifier les attributs, tarifs et disponibilité papier
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-foreground-muted group-hover:text-gold group-hover:translate-x-1 transition-all" />
+          </Link>
+
+          <Link
+            href="/chief-layout/deposit"
+            className="p-5 rounded-2xl bg-gold/10 border border-gold/40 hover:bg-gold/20 transition-all flex items-center justify-between group shadow-xs cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-gold text-navy font-bold">
+                <Plus className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-bold text-sm text-navy">Déposer un Ouvrage</p>
+                  <span className="text-[9px] font-bold uppercase bg-gold text-navy px-1.5 py-0.5 rounded">Direct</span>
+                </div>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Publication immédiate sans étape d&apos;approbation
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gold group-hover:translate-x-1 transition-transform" />
+          </Link>
+
           <Link
             href="/chief-layout/validation"
-            className="p-5 rounded-2xl bg-navy border border-navy-hover text-white hover:border-gold transition-all flex items-center justify-between group shadow-sm"
+            className="p-5 rounded-2xl bg-navy border border-navy-hover text-white hover:border-gold transition-all flex items-center justify-between group shadow-sm cursor-pointer"
           >
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-xl bg-gold/20 text-gold">
                 <CheckSquare className="w-5 h-5" />
               </div>
               <div>
-                <p className="font-bold text-sm text-white">File de Validation des Épreuves</p>
+                <p className="font-bold text-sm text-white">File de Validation</p>
                 <p className="text-xs text-white/70 mt-0.5">
-                  Examiner les PDF/EPUB, vérifier la classification et valider la publication
+                  Examiner les PDF/EPUB, classifier et valider
                 </p>
               </div>
             </div>
@@ -168,16 +228,16 @@ export default function ChefMaquettisteOverviewPage() {
 
           <Link
             href="/chief-layout/history"
-            className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all flex items-center justify-between group shadow-xs"
+            className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all flex items-center justify-between group shadow-xs cursor-pointer"
           >
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-xl bg-navy-light text-navy">
                 <History className="w-5 h-5" />
               </div>
               <div>
-                <p className="font-bold text-sm text-navy">Historique des Validations</p>
+                <p className="font-bold text-sm text-navy">Historique</p>
                 <p className="text-xs text-foreground-muted mt-0.5">
-                  Consulter tous les ouvrages validés et les demandes de retouche
+                  Consulter tous les ouvrages validés et retouches
                 </p>
               </div>
             </div>

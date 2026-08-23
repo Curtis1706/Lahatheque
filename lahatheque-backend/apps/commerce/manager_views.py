@@ -380,29 +380,53 @@ class DeliveriesListView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
 
-        qs = PhysicalDelivery.objects.select_related("commande__user").all().order_by("-created_at")
+        qs = PhysicalDelivery.objects.select_related("commande__user").prefetch_related("commande__lignes__ouvrage").all().order_by("-created_at")
 
         statut_filter = request.query_params.get("statut")
         if statut_filter:
             qs = qs.filter(statut=statut_filter)
 
-        data = [
-            {
+        data = []
+        for d in qs:
+            lignes = d.commande.lignes.select_related('ouvrage').all() if d.commande else []
+            items = [
+                {
+                    "id": str(l.id),
+                    "book_id": str(l.ouvrage_id) if l.ouvrage_id else "",
+                    "book_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
+                    "cover_url": l.ouvrage.cover_image.url if l.ouvrage and l.ouvrage.cover_image else None,
+                    "isbn": (l.ouvrage.isbn if l.ouvrage else "") or "—",
+                    "quantity": l.quantity or 1,
+                    "format_type": l.format_type,
+                    "unit_price": float(l.unit_price) if l.unit_price else 0.0,
+                    "total_price": float(l.unit_price * (l.quantity or 1)) if l.unit_price else 0.0,
+                }
+                for l in lignes
+            ]
+            client_user = d.commande.user if d.commande else None
+            data.append({
                 "id": str(d.id),
                 "commande_id": str(d.commande_id),
-                "client_nom": d.commande.user.get_full_name() if d.commande.user else "—",
-                "client_email": d.commande.user.email if d.commande.user else "—",
+                "client_nom": client_user.get_full_name() if client_user else "Client Anonyme",
+                "client_email": client_user.email if client_user else "—",
+                "client_phone": getattr(client_user, 'phone', '') if client_user else "—",
                 "shipping_address": d.shipping_address,
                 "city": d.city,
                 "country": d.country,
                 "carrier_name": d.carrier_name,
                 "tracking_number": d.tracking_number,
                 "statut": d.statut,
+                "total_amount": float(d.commande.total_amount) if d.commande and d.commande.total_amount else 0.0,
+                "mode_paiement": d.commande.mode_paiement if d.commande else "mobile_money",
+                "statut_paiement": d.commande.statut_paiement if d.commande else "paid",
                 "created_at": d.created_at.isoformat(),
                 "updated_at": d.updated_at.isoformat(),
-            }
-            for d in qs
-        ]
+                "date_livraison_souhaitee": d.date_livraison_souhaitee.isoformat() if d.date_livraison_souhaitee else None,
+                "plage_horaire_debut": d.plage_horaire_debut.strftime("%H:%M") if d.plage_horaire_debut else None,
+                "plage_horaire_fin": d.plage_horaire_fin.strftime("%H:%M") if d.plage_horaire_fin else None,
+                "items": items,
+            })
+
         return Response({"success": True, "data": data, "error": None})
 
 
@@ -413,32 +437,42 @@ class DeliveryDetailView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
         try:
-            d = PhysicalDelivery.objects.select_related("commande__user").get(pk=pk)
+            d = PhysicalDelivery.objects.select_related("commande__user").prefetch_related("commande__lignes__ouvrage").get(pk=pk)
         except PhysicalDelivery.DoesNotExist:
             return Response({"success": False, "data": None, "error": "Livraison introuvable."}, status=404)
 
-        lignes = d.commande.lignes.select_related('ouvrage').filter(format_type='paper')
+        lignes = d.commande.lignes.select_related('ouvrage').all() if d.commande else []
         items = [
             {
                 "id": str(l.id),
-                "book_title": l.ouvrage.title,
-                "isbn": l.ouvrage.isbn or "—",
-                "quantity": l.quantity,
+                "book_id": str(l.ouvrage_id) if l.ouvrage_id else "",
+                "book_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
+                "cover_url": l.ouvrage.cover_image.url if l.ouvrage and l.ouvrage.cover_image else None,
+                "isbn": (l.ouvrage.isbn if l.ouvrage else "") or "—",
+                "quantity": l.quantity or 1,
+                "format_type": l.format_type,
+                "unit_price": float(l.unit_price) if l.unit_price else 0.0,
+                "total_price": float(l.unit_price * (l.quantity or 1)) if l.unit_price else 0.0,
             }
             for l in lignes
         ]
 
+        client_user = d.commande.user if d.commande else None
         data = {
             "id": str(d.id),
             "commande_id": str(d.commande_id),
-            "client_nom": d.commande.user.get_full_name() if d.commande.user else "—",
-            "client_email": d.commande.user.email if d.commande.user else "—",
+            "client_nom": client_user.get_full_name() if client_user else "Client Anonyme",
+            "client_email": client_user.email if client_user else "—",
+            "client_phone": getattr(client_user, 'phone', '') if client_user else "—",
             "shipping_address": d.shipping_address,
             "city": d.city,
             "country": d.country,
             "carrier_name": d.carrier_name,
             "tracking_number": d.tracking_number,
             "statut": d.statut,
+            "total_amount": float(d.commande.total_amount) if d.commande and d.commande.total_amount else 0.0,
+            "mode_paiement": d.commande.mode_paiement if d.commande else "mobile_money",
+            "statut_paiement": d.commande.statut_paiement if d.commande else "paid",
             "created_at": d.created_at.isoformat(),
             "updated_at": d.updated_at.isoformat(),
             "date_livraison_souhaitee": d.date_livraison_souhaitee.isoformat() if d.date_livraison_souhaitee else None,

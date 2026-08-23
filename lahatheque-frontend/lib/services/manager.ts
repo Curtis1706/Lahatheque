@@ -9,6 +9,7 @@ import type {
   StockMovement,
   StockAlert,
   ManagerOrder,
+  ManagerOrderItem,
   ManagerKpi,
   EscalatedOutage,
 } from "@/lib/types/manager";
@@ -311,10 +312,26 @@ function normalizeDelivery(raw: any): ManagerOrder {
   const rawStatut = raw.statut ?? raw.status ?? "to_ship";
   const frontendStatus = statusMap[rawStatut] ?? ("to_ship" as ManagerOrder["status"]);
 
+  const items: ManagerOrderItem[] = Array.isArray(raw.items)
+    ? raw.items.map((it: any) => ({
+        id: String(it.id || ""),
+        book_id: it.book_id ? String(it.book_id) : undefined,
+        book_title: it.book_title || it.title || "Ouvrage",
+        cover_url: it.cover_url || undefined,
+        isbn: it.isbn || "—",
+        quantity: Number(it.quantity) || 1,
+        format_type: it.format_type || "paper",
+        unit_price: Number(it.unit_price) || 0,
+        total_price: Number(it.total_price) || (Number(it.unit_price) || 0) * (Number(it.quantity) || 1),
+      }))
+    : [];
+
   return {
-    id: raw.id,
+    id: String(raw.id),
+    commande_id: raw.commande_id ? String(raw.commande_id) : undefined,
     customer_name: raw.client_nom ?? raw.customer_name ?? "—",
     customer_email: raw.client_email ?? raw.customer_email ?? "—",
+    customer_phone: raw.client_phone ?? raw.customer_phone ?? "",
     shipping_address: raw.shipping_address ?? "",
     city: raw.city ?? "",
     country: raw.country ?? "",
@@ -324,8 +341,14 @@ function normalizeDelivery(raw: any): ManagerOrder {
     order_date: raw.created_at ?? raw.order_date ?? "",
     shipped_at: raw.shipped_at,
     delivered_at: raw.delivered_at,
+    date_livraison_souhaitee: raw.date_livraison_souhaitee,
+    plage_horaire_debut: raw.plage_horaire_debut,
+    plage_horaire_fin: raw.plage_horaire_fin,
+    total_amount: Number(raw.total_amount) || 0,
+    mode_paiement: raw.mode_paiement || "mobile_money",
+    statut_paiement: raw.statut_paiement || "paid",
     warehouse: raw.warehouse ?? "",
-    items: raw.items ?? [],
+    items,
     notifications: raw.notifications ?? [],
   } as ManagerOrder;
 }

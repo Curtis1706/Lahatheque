@@ -55,6 +55,8 @@ function mapBackendToDeposit(b: any, fallbackUserId?: string): LayoutDeposit {
             : "pending_validation",
     created_at: b.created_at || new Date().toISOString(),
     default_price: Number(b.price_digital) || 5000,
+    admin_price: Number(b.price_paper) || 7500,
+    is_paper_available: Boolean(b.is_paper_available),
   };
 }
 
@@ -185,6 +187,10 @@ export async function createDepositWithFiles(
   formData.append("language", data.metadata?.language || "fr");
   formData.append("format_type", (data.files?.format || "pdf").toLowerCase());
   formData.append("price_digital", String(data.default_price || 5000));
+  formData.append("price_paper", String(data.admin_price || 7500));
+  if (data.is_paper_available !== undefined) {
+    formData.append("is_paper_available", String(data.is_paper_available));
+  }
   formData.append("status", data.status || "draft");
 
   if (data.classification) {
@@ -337,4 +343,97 @@ export async function requestRevision(id: string, comment: string): Promise<bool
     body: JSON.stringify({ motif_rejet: comment }),
   });
   return res.ok;
+}
+
+export async function getCatalogBooks(filters?: {
+  search?: string;
+  discipline?: string;
+  status?: string;
+}): Promise<LayoutDeposit[]> {
+  const params = new URLSearchParams();
+  params.append("all", "true");
+  if (filters?.status && filters.status !== "all") {
+    params.append("status", filters.status);
+  }
+  if (filters?.discipline && filters.discipline !== "all") {
+    params.append("discipline", filters.discipline);
+  }
+
+  const res = await fetch(`/api/bff/catalog/my-deposits/?${params.toString()}`, {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const fallbackRes = await fetch("/api/bff/catalog/books/", {
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (!fallbackRes.ok) return [];
+    const fallbackData = await fallbackRes.json();
+    const items = Array.isArray(fallbackData) ? fallbackData : fallbackData.results || fallbackData.data || [];
+    return items.map((b: any) => mapBackendToDeposit(b));
+  }
+
+  const data = await res.json();
+  const results = Array.isArray(data) ? data : data.results || data.data || [];
+  let deposits = results.map((b: any) => mapBackendToDeposit(b));
+
+  if (filters?.search) {
+    const q = filters.search.toLowerCase();
+    deposits = deposits.filter(
+      (d: LayoutDeposit) =>
+        d.metadata.title.toLowerCase().includes(q) ||
+        d.metadata.authors.some((a) => a.toLowerCase().includes(q)) ||
+        d.classification.discipline.toLowerCase().includes(q)
+    );
+  }
+  return deposits;
+}
+
+export async function updateCatalogBookWithFiles(
+  id: string,
+  data: Partial<LayoutDeposit>,
+  coverFile?: File | null,
+  bookFile?: File | null
+): Promise<LayoutDeposit> {
+  const formData = new FormData();
+
+  if (data.metadata?.title) formData.append("title", data.metadata.title);
+  if (data.metadata?.subtitle !== undefined) formData.append("subtitle", data.metadata.subtitle);
+  if (data.metadata?.authors) formData.append("authors_names", data.metadata.authors.join(", "));
+  if (data.metadata?.isbn !== undefined) formData.append("isbn", data.metadata.isbn);
+  if (data.metadata?.summary !== undefined) formData.append("summary", data.metadata.summary);
+  if (data.metadata?.language) formData.append("language", data.metadata.language);
+  if (data.files?.format) formData.append("format_type", data.files.format.toLowerCase());
+  if (data.default_price !== undefined) formData.append("price_digital", String(data.default_price));
+  if (data.admin_price !== undefined) formData.append("price_paper", String(data.admin_price));
+  if (data.is_paper_available !== undefined) formData.append("is_paper_available", String(data.is_paper_available));
+  if (data.status) formData.append("status", data.status);
+
+  if (data.classification) {
+    if (data.classification.country) formData.append("country", data.classification.country);
+    if (data.classification.university) formData.append("institution_name", data.classification.university);
+    if (data.classification.faculty) formData.append("faculty", data.classification.faculty);
+    if (data.classification.discipline) formData.append("discipline_name", data.classification.discipline);
+    if (data.classification.department) formData.append("department", data.classification.department);
+  }
+
+  if (bookFile) formData.append("book_file", bookFile);
+  if (coverFile) formData.append("cover_image", coverFile);
+
+  const res = await fetch(`/api/bff/catalog/my-deposits/${id}/`, {
+    method: "PUT",
+    credentials: "include",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Erreur modification: ${res.status}`);
+  }
+
+  const respData = await res.json();
+  if (!respData.success && respData.error) throw new Error(respData.error);
+
+  return mapBackendToDeposit(respData.data || respData);
 }

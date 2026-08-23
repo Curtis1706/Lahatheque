@@ -56,10 +56,19 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        """Le maquettiste ne voit que SES propres dépôts."""
-        qs = Ouvrage.objects.filter(
-            created_by=self.request.user
-        ).select_related('publisher', 'discipline', 'institution').prefetch_related('authors')
+        """Le maquettiste voit ses propres dépôts, le Chef Maquettiste et les admins ont accès à tous les ouvrages."""
+        user = self.request.user
+        user_role = getattr(user, 'role', '')
+        is_chief_or_admin = user_role in ('chief_layout', 'admin', 'super_admin') or user.is_superuser or user.is_staff
+
+        if is_chief_or_admin and (self.request.query_params.get('all') == 'true' or self.action in ('retrieve', 'update', 'partial_update', 'destroy')):
+            qs = Ouvrage.objects.all().select_related(
+                'publisher', 'discipline', 'institution', 'created_by'
+            ).prefetch_related('authors')
+        else:
+            qs = Ouvrage.objects.filter(
+                created_by=user
+            ).select_related('publisher', 'discipline', 'institution').prefetch_related('authors')
 
         status_filter = self.request.query_params.get('status')
         if status_filter:
@@ -82,14 +91,78 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
         return OuvrageReadSerializer
 
     def create(self, request, *args, **kwargs):
-        """Dépôt d'une nouvelle maquette par un maquettiste."""
+        """Dépôt d'une nouvelle maquette par un maquettiste ou publication directe par le Chef Maquettiste."""
         serializer = OuvrageCreateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         ouvrage = serializer.save()
 
-        # Appliquer le statut demandé par le frontend
+        user_role = getattr(request.user, 'role', '')
+        is_chief_or_admin = user_role in ('chief_layout', 'admin', 'super_admin') or request.user.is_superuser or request.user.is_staff
+
         requested_status = request.data.get('status', 'draft')
-        if requested_status in ('submitted', 'pending_validation'):
+
+        # Si l'utilisateur est Chef Maquettiste (ou admin) et soumet l'ouvrage -> validation directe
+        if is_chief_or_admin and requested_status in ('submitted', 'published', 'pending_validation'):
+            ouvrage.status = 'published'
+            if 'is_paper_available' in request.data:
+                val = str(request.data.get('is_paper_available')).lower()
+                ouvrage.is_paper_available = val in ('true', '1', 'yes')
+            if 'price_paper' in request.data and request.data['price_paper'] is not None:
+                try:
+                    ouvrage.price_paper = float(request.data['price_paper'])
+                except (ValueError, TypeError):
+                    pass
+            ouvrage.save()
+
+            # Protection DRM
+            try:
+                from apps.protection.models import ProtectionConfig
+                ProtectionConfig.objects.get_or_create(
+                    ouvrage=ouvrage,
+                    defaults={
+                        'watermark_visible': True,
+                        'invisible_watermark_enabled': True,
+                        'allow_print': False,
+                        'allow_copy': False,
+                        'allow_download': False,
+                    }
+                )
+            except Exception as prot_err:
+                logger.warning(f"Erreur init protection: {prot_err}")
+
+            # Initialisation stock si version papier
+            if ouvrage.is_paper_available:
+                try:
+                    from apps.commerce.models import Entrepot, StockOuvrage
+                    entrepot = Entrepot.objects.first()
+                    if not entrepot:
+                        entrepot = Entrepot.objects.create(
+                            nom="Entrepôt Principal LAHA Cotonou",
+                            code="WAR-CTN-01",
+                            pays="Bénin",
+                            ville="Cotonou",
+                            adresse="Siège LAHA Éditions, Cotonou",
+                            is_active=True
+                        )
+                    StockOuvrage.objects.get_or_create(
+                        ouvrage=ouvrage,
+                        entrepot=entrepot,
+                        defaults={
+                            'quantite_reelle': 0,
+                            'quantite_reservee': 0,
+                            'seuil_alerte': 10
+                        }
+                    )
+                except Exception as stock_err:
+                    logger.warning(f"Impossible d'initialiser le stock pour l'ouvrage {ouvrage.id}: {stock_err}")
+
+            return Response({
+                "success": True,
+                "message": f"L'ouvrage « {ouvrage.title} » a été déposé et validé directement. Il est publié sur le catalogue officiel.",
+                "data": OuvrageReadSerializer(ouvrage).data
+            }, status=status.HTTP_201_CREATED)
+
+        elif requested_status in ('submitted', 'pending_validation'):
             ouvrage.status = 'submitted'
             ouvrage.save(update_fields=['status'])
 
@@ -101,12 +174,15 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        """Mise à jour d'un brouillon ou d'un ouvrage rejeté."""
+        """Mise à jour d'un brouillon par un maquettiste ou modification complète d'un ouvrage par le Chef Maquettiste."""
         ouvrage = self.get_object()
-        if ouvrage.status not in ('draft', 'rejected'):
+        user_role = getattr(request.user, 'role', '')
+        is_chief_or_admin = user_role in ('chief_layout', 'admin', 'super_admin') or request.user.is_superuser or request.user.is_staff
+
+        if not is_chief_or_admin and ouvrage.status not in ('draft', 'rejected'):
             return Response({
                 "success": False,
-                "error": "Seuls les brouillons et les ouvrages rejetés peuvent être modifiés."
+                "error": "Seuls les brouillons et les ouvrages rejetés peuvent être modifiés par un maquettiste."
             }, status=status.HTTP_403_FORBIDDEN)
 
         # Mise à jour partielle des champs texte
@@ -121,6 +197,87 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
         if 'keywords' in request.data:
             ouvrage.keywords = request.data['keywords']
 
+        if 'price_digital' in request.data and request.data['price_digital'] is not None:
+            try:
+                ouvrage.price_digital = float(request.data['price_digital'])
+            except (ValueError, TypeError):
+                pass
+
+        if 'price_paper' in request.data and request.data['price_paper'] is not None:
+            try:
+                ouvrage.price_paper = float(request.data['price_paper'])
+            except (ValueError, TypeError):
+                pass
+
+        if 'is_paper_available' in request.data:
+            val = str(request.data.get('is_paper_available')).lower()
+            ouvrage.is_paper_available = val in ('true', '1', 'yes')
+            if ouvrage.is_paper_available:
+                try:
+                    from apps.commerce.models import Entrepot, StockOuvrage
+                    entrepot = Entrepot.objects.first()
+                    if not entrepot:
+                        entrepot = Entrepot.objects.create(
+                            nom="Entrepôt Principal LAHA Cotonou",
+                            code="WAR-CTN-01",
+                            pays="Bénin",
+                            ville="Cotonou",
+                            adresse="Siège LAHA Éditions, Cotonou",
+                            is_active=True
+                        )
+                    StockOuvrage.objects.get_or_create(
+                        ouvrage=ouvrage,
+                        entrepot=entrepot,
+                        defaults={
+                            'quantite_reelle': 0,
+                            'quantite_reservee': 0,
+                            'seuil_alerte': 10
+                        }
+                    )
+                except Exception as stock_err:
+                    logger.warning(f"Erreur init stock lors update: {stock_err}")
+
+        # Discipline
+        if 'discipline_name' in request.data and request.data['discipline_name']:
+            discipline_name = request.data['discipline_name']
+            discipline_obj, _ = Discipline.objects.get_or_create(
+                name=discipline_name,
+                defaults={'code_dewey': ouvrage.dewey_code or ''}
+            )
+            ouvrage.discipline = discipline_obj
+
+        # Institution
+        if 'institution_name' in request.data:
+            institution_name = request.data['institution_name']
+            if institution_name and 'non affilié' not in str(institution_name).lower():
+                from django.apps import apps
+                Institution = apps.get_model('partners', 'Institution')
+                institution_obj = Institution.objects.filter(
+                    name__icontains=str(institution_name).split('(')[0].strip()
+                ).first()
+                ouvrage.institution = institution_obj
+            elif 'non affilié' in str(institution_name).lower():
+                ouvrage.institution = None
+
+        # Statut (Chef Maquettiste / Admin)
+        if is_chief_or_admin and 'status' in request.data:
+            ouvrage.status = request.data['status']
+
+        # Auteurs
+        if 'authors_names' in request.data:
+            authors_str = request.data['authors_names']
+            from .models import BookAuthor
+            ouvrage.authors.clear()
+            for name in str(authors_str).split(','):
+                name = name.strip()
+                if not name:
+                    continue
+                parts = name.rsplit(' ', 1)
+                first = parts[0] if len(parts) > 1 else name
+                last = parts[1] if len(parts) > 1 else ''
+                author_obj, _ = BookAuthor.objects.get_or_create(first_name=first, last_name=last)
+                ouvrage.authors.add(author_obj)
+
         if 'book_file' in request.FILES:
             ouvrage.file = request.FILES['book_file']
             ouvrage.file_size_bytes = request.FILES['book_file'].size
@@ -131,7 +288,7 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
         ouvrage.save()
         return Response({
             "success": True,
-            "message": "Modifications enregistrées.",
+            "message": f"L'ouvrage « {ouvrage.title} » a été mis à jour avec succès.",
             "data": OuvrageReadSerializer(ouvrage).data
         })
 
@@ -251,10 +408,11 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
             ProtectionConfig.objects.get_or_create(
                 ouvrage=ouvrage,
                 defaults={
-                    'watermark_enabled': True,
-                    'invisible_watermark': True,
-                    'allow_printing': False,
+                    'watermark_visible': True,
+                    'invisible_watermark_enabled': True,
+                    'allow_print': False,
                     'allow_copy': False,
+                    'allow_download': False,
                 }
             )
         except Exception:

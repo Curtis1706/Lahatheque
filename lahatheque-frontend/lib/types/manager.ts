@@ -85,9 +85,14 @@ export type ManagerOrderStatus = "to_ship" | "shipped" | "delivered";
 
 export interface ManagerOrderItem {
   id: string;
+  book_id?: string;
   book_title: string;
+  cover_url?: string;
   isbn: string;
   quantity: number;
+  format_type?: string;
+  unit_price?: number;
+  total_price?: number;
 }
 
 export interface OrderNotification {
@@ -99,8 +104,10 @@ export interface OrderNotification {
 
 export interface ManagerOrder {
   id: string;
+  commande_id?: string;
   customer_name: string;
   customer_email: string;
+  customer_phone?: string;
   shipping_address: string;
   city: string;
   country: string;
@@ -111,6 +118,12 @@ export interface ManagerOrder {
   order_date: string;
   shipped_at?: string;
   delivered_at?: string;
+  date_livraison_souhaitee?: string;
+  plage_horaire_debut?: string;
+  plage_horaire_fin?: string;
+  total_amount?: number;
+  mode_paiement?: string;
+  statut_paiement?: string;
   notifications: OrderNotification[];
   warehouse: string;
 }

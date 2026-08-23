@@ -241,7 +241,7 @@ export function DashboardSidebar() {
             ],
           },
           {
-            label: "Livraison",
+            label: "Gestion des commandes",
             href: "/manager/delivery",
             icon: <Truck className="w-5 h-5" />,
             sublinks: [
@@ -308,6 +308,8 @@ export function DashboardSidebar() {
       case "chief_layout":
         return [
           { label: "Vue d'ensemble", href: "/chief-layout", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Catalogue des ouvrages", href: "/chief-layout/catalog", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Déposer un ouvrage", href: "/chief-layout/deposit", icon: <PlusCircle className="w-5 h-5" /> },
           { label: "Dépôts à valider", href: "/chief-layout/validation", icon: <CheckSquare className="w-5 h-5" /> },
           { label: "Historique validations", href: "/chief-layout/history", icon: <History className="w-5 h-5" /> },
         ];
