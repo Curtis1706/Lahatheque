@@ -34,8 +34,14 @@ def notify_user(
         Notification.NotificationType.ASSIGNMENT_GRADED,
         Notification.NotificationType.ASSIGNMENT_SUBMITTED,
         Notification.NotificationType.ASSIGNMENT_OVERDUE,
+        Notification.NotificationType.PAYMENT_SUCCESS,
+        Notification.NotificationType.PAYMENT_FAILED,
+        Notification.NotificationType.ORDER_SHIPPED,
+        Notification.NotificationType.ORDER_DELIVERED,
     ]:
-        should_notify = True # Alertes systèmes et académiques toujours activées
+        should_notify = True  # Alertes systèmes, commerciales et académiques toujours activées
+    else:
+        should_notify = True  # Par défaut, toute notification métier transmise est enregistrée
 
     if not should_notify:
         return None
@@ -64,7 +70,7 @@ def notify_user(
             )
         except Exception as e:
             import logging
-            logging.getLogger(__name__).error(f"Erreur sending notification email to {user.email}: {str(e)}", exc_info=True)
+            logging.getLogger(__name__).warning(f"Email non expédié (broker offline): {e}")
 
     # C. WhatsApp 
     if prefs.whatsapp_enabled and user.phone:

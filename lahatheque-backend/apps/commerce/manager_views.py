@@ -247,6 +247,9 @@ class StockRestockView(APIView):
                 }
             )
 
+        if not s:
+            return Response({"success": False, "data": None, "error": "Veuillez spécifier stock_id ou ouvrage_id."}, status=400)
+
         s.quantite_reelle = F("quantite_reelle") + qty
         s.last_restock_at = timezone.now()
         s.save(update_fields=["quantite_reelle", "last_restock_at"])
@@ -519,10 +522,16 @@ class DeliveryDetailView(APIView):
             val = request.data.get(field)
             if val is not None:
                 setattr(d, field, val)
+        # Normaliser le statut si besoin
+        if d.statut in ('in_transit', 'shipped'):
+            d.statut = 'expedie'
+        elif d.statut in ('delivered', 'completed'):
+            d.statut = 'livre'
+
         d.save()
 
         # Notification client + clôture de commande sur transition de statut réelle
-        if d.statut != previous_statut and d.commande.user:
+        if d.statut != previous_statut and d.commande and d.commande.user:
             from apps.reporting.services import notify_user
             from apps.reporting.models import Notification
 

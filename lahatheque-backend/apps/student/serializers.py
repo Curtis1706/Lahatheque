@@ -24,6 +24,8 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     publisher_name = serializers.CharField(source='publisher.name', read_only=True, default='')
     institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
     cover_url = serializers.SerializerMethodField()
+    is_owned = serializers.SerializerMethodField()
+    has_digital_access = serializers.SerializerMethodField()
 
     class Meta:
         model = Ouvrage
@@ -32,11 +34,20 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             'discipline_name', 'publisher_name', 'institution_name',
             'country', 'format_type', 'page_count', 'publication_date',
             'language', 'summary', 'status', 'price_digital', 'price_paper',
-            'is_paper_available', 'cover_url',
+            'is_paper_available', 'cover_url', 'is_owned', 'has_digital_access',
         ]
 
     def get_cover_url(self, obj) -> str:
         return obj.cover_url or ''
+
+    def get_is_owned(self, obj) -> bool:
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            return ReadingProgress.objects.filter(user=request.user, ouvrage=obj).exists()
+        return False
+
+    def get_has_digital_access(self, obj) -> bool:
+        return self.get_is_owned(obj)
 
 
 class ReadingProgressSerializer(serializers.ModelSerializer):

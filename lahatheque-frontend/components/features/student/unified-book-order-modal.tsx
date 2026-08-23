@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, ShoppingBag, BookOpen, Truck, Eye, Loader2, CheckCircle2 } from "lucide-react";
+import { X, ShoppingBag, BookOpen, Truck, Eye, Loader2, CheckCircle2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { createOrder } from "@/lib/services/commerce-orders";
 import type { BookAPI } from "@/lib/services/student";
@@ -22,8 +22,14 @@ export function UnifiedBookOrderModal({
 }) {
   const router = useRouter();
   const paperAvailable = Boolean(book.is_paper_available) && (book.price_paper ?? 0) > 0;
+  const isDigitalOwned = Boolean(book.is_owned || book.has_digital_access || book.progress_percent !== undefined);
 
-  const [format, setFormat] = useState<Format>("digital");
+  // Si le numérique est déjà possédé, sélectionner "paper" par défaut si disponible
+  const [format, setFormat] = useState<Format>(() => {
+    if (isDigitalOwned && paperAvailable) return "paper";
+    return "digital";
+  });
+
   const [quantity, setQuantity] = useState(1);
   const [shippingAddress, setShippingAddress] = useState("");
   const [modePaiement, setModePaiement] = useState<"mobile_money" | "virement" | "especes" | "carte">("mobile_money");
@@ -40,6 +46,13 @@ export function UnifiedBookOrderModal({
       : (book as any).author || "Auteur LAHA";
 
   async function handleSubmit() {
+    // Si déjà possédé en numérique et sélectionné, rediriger directement vers la lecture
+    if (format === "digital" && isDigitalOwned) {
+      router.push(`/catalog/reader/${book.id}`);
+      onClose();
+      return;
+    }
+
     if (format === "paper" && !shippingAddress.trim()) {
       toast.error("Veuillez renseigner votre adresse de livraison.");
       return;
@@ -119,7 +132,7 @@ export function UnifiedBookOrderModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-background-secondary text-foreground-muted hover:text-navy transition-colors shrink-0"
+            className="p-2 rounded-xl hover:bg-background-secondary text-foreground-muted hover:text-navy transition-colors shrink-0 cursor-pointer"
             title="Fermer"
           >
             <X className="w-4 h-4" />
@@ -137,24 +150,66 @@ export function UnifiedBookOrderModal({
           </button>
         )}
 
+        {/* Bannière d'information si déjà acquis */}
+        {isDigitalOwned && (
+          <div className="p-3.5 rounded-2xl bg-success/10 border border-success/30 flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
+            <div className="text-xs">
+              <p className="font-bold text-navy">Vous possédez déjà cet ouvrage numérique</p>
+              <p className="text-foreground-muted text-[11px] mt-0.5">
+                L&apos;accès numérique est actif dans votre bibliothèque. Vous pouvez le lire directement ou commander un exemplaire papier ci-dessous.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Sélection Format */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Option Numérique */}
           <button
             type="button"
-            onClick={() => setFormat("digital")}
-            className={`p-4 rounded-2xl border text-left space-y-1 transition-all cursor-pointer ${
-              format === "digital" ? "border-gold bg-gold/10" : "border-border bg-background-secondary"
+            onClick={() => {
+              if (!isDigitalOwned) {
+                setFormat("digital");
+              }
+            }}
+            className={`p-4 rounded-2xl border text-left space-y-1 transition-all relative ${
+              isDigitalOwned
+                ? "border-success/30 bg-success/5 cursor-default"
+                : format === "digital"
+                ? "border-gold bg-gold/10 cursor-pointer"
+                : "border-border bg-background-secondary cursor-pointer"
             }`}
           >
-            <span className="text-xs font-bold text-navy flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4 text-gold" />
-              Numérique
-            </span>
-            <span className="block text-sm font-mono font-bold text-gold">
-              {(book.price_digital ?? 0).toLocaleString("fr-FR")} XOF
-            </span>
-            <p className="text-[10px] text-foreground-muted">Accès immédiat dans votre bibliothèque.</p>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4 text-gold" />
+                Numérique
+              </span>
+              {isDigitalOwned && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success/15 text-success flex items-center gap-1">
+                  <CheckCircle2 className="w-2.5 h-2.5" /> Acquis
+                </span>
+              )}
+            </div>
+
+            {isDigitalOwned ? (
+              <p className="text-xs font-bold text-success pt-1">
+                Déjà dans votre bibliothèque
+              </p>
+            ) : (
+              <span className="block text-sm font-mono font-bold text-gold">
+                {(book.price_digital ?? 0).toLocaleString("fr-FR")} XOF
+              </span>
+            )}
+            <p className="text-[10px] text-foreground-muted">
+              {isDigitalOwned
+                ? "Accès illimité actif."
+                : "Accès immédiat dans votre bibliothèque."}
+            </p>
           </button>
 
+          {/* Option Papier */}
           <button
             type="button"
             onClick={() => paperAvailable && setFormat("paper")}
@@ -167,10 +222,17 @@ export function UnifiedBookOrderModal({
                 : "border-border bg-background-secondary cursor-pointer"
             }`}
           >
-            <span className="text-xs font-bold text-navy flex items-center gap-1.5">
-              <Truck className="w-4 h-4 text-navy" />
-              Papier
-            </span>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                <Truck className="w-4 h-4 text-navy" />
+                Papier
+              </span>
+              {paperAvailable && isDigitalOwned && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-gold/15 text-navy">
+                  Disponible
+                </span>
+              )}
+            </div>
             {paperAvailable ? (
               <>
                 <span className="block text-sm font-mono font-bold text-navy">
@@ -186,84 +248,136 @@ export function UnifiedBookOrderModal({
           </button>
         </div>
 
+        {/* Formulaire Papier */}
         {format === "paper" && (
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-background-secondary border border-border">
-            <label className="text-[11px] font-bold text-navy uppercase tracking-wider flex-1">
-              Quantité
-            </label>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                className="w-8 h-8 rounded-lg border border-border bg-background flex items-center justify-center text-navy font-bold hover:bg-background-secondary transition-colors cursor-pointer"
-              >
-                -
-              </button>
-              <span className="w-8 text-center font-mono font-bold text-sm text-navy">{quantity}</span>
-              <button
-                type="button"
-                onClick={() => setQuantity((q) => q + 1)}
-                className="w-8 h-8 rounded-lg border border-border bg-background flex items-center justify-center text-navy font-bold hover:bg-background-secondary transition-colors cursor-pointer"
-              >
-                +
-              </button>
+          <>
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-background-secondary border border-border">
+              <label className="text-[11px] font-bold text-navy uppercase tracking-wider flex-1">
+                Quantité
+              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  className="w-8 h-8 rounded-lg border border-border bg-background flex items-center justify-center text-navy font-bold hover:bg-background-secondary transition-colors cursor-pointer"
+                >
+                  -
+                </button>
+                <span className="w-8 text-center font-mono font-bold text-sm text-navy">{quantity}</span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => q + 1)}
+                  className="w-8 h-8 rounded-lg border border-border bg-background flex items-center justify-center text-navy font-bold hover:bg-background-secondary transition-colors cursor-pointer"
+                >
+                  +
+                </button>
+              </div>
             </div>
-          </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-navy uppercase tracking-wider">
+                Adresse de livraison complète
+              </label>
+              <textarea
+                value={shippingAddress}
+                onChange={(e) => setShippingAddress(e.target.value)}
+                rows={2}
+                placeholder="Quartier, rue, repère, ville, téléphone..."
+                className="w-full px-3.5 py-2.5 text-xs border border-border rounded-2xl bg-background-secondary text-foreground focus:outline-none focus:border-navy resize-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-navy uppercase tracking-wider">
+                Mode de règlement
+              </label>
+              <select
+                value={modePaiement}
+                onChange={(e) => setModePaiement(e.target.value as any)}
+                className="w-full px-3.5 py-2.5 text-xs border border-border rounded-2xl bg-background-secondary text-foreground font-medium focus:outline-none focus:border-navy min-h-[40px]"
+              >
+                <option value="mobile_money">Mobile Money (MTN / Moov / Orange / Wave)</option>
+                <option value="virement">Virement bancaire</option>
+                <option value="especes">Espèces à la livraison</option>
+                <option value="carte">Carte bancaire</option>
+              </select>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-navy/5 border border-navy/20 space-y-1 text-right">
+              <p className="text-[11px] text-foreground-muted">
+                Frais de livraison : {shippingFee.toLocaleString("fr-FR")} XOF
+              </p>
+              <p className="text-sm font-bold text-gold">Total : {total.toLocaleString("fr-FR")} XOF</p>
+            </div>
+          </>
         )}
 
-        {format === "paper" && (
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-navy uppercase tracking-wider">
-              Adresse de livraison complète
-            </label>
-            <textarea
-              value={shippingAddress}
-              onChange={(e) => setShippingAddress(e.target.value)}
-              rows={2}
-              placeholder="Quartier, rue, repère, ville, téléphone..."
-              className="w-full px-3.5 py-2.5 text-xs border border-border rounded-2xl bg-background-secondary text-foreground focus:outline-none focus:border-navy resize-none"
-            />
+        {/* Cas 1: Déjà possédé en numérique et pas de version papier */}
+        {isDigitalOwned && !paperAvailable ? (
+          <div className="pt-2 space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                router.push(`/catalog/reader/${book.id}`);
+                onClose();
+              }}
+              className="w-full px-4 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4 text-gold" />
+              Ouvrir dans la liseuse
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                router.push("/student/books");
+                onClose();
+              }}
+              className="w-full px-4 py-2.5 rounded-2xl border border-border text-xs font-semibold text-navy hover:bg-background-secondary transition-colors min-h-[40px] cursor-pointer"
+            >
+              Voir dans Ma Bibliothèque
+            </button>
           </div>
-        )}
-
-        <div className="space-y-1.5">
-          <label className="text-[11px] font-bold text-navy uppercase tracking-wider">
-            Mode de règlement
-          </label>
-          <select
-            value={modePaiement}
-            onChange={(e) => setModePaiement(e.target.value as any)}
-            className="w-full px-3.5 py-2.5 text-xs border border-border rounded-2xl bg-background-secondary text-foreground font-medium focus:outline-none focus:border-navy min-h-[40px]"
+        ) : isDigitalOwned && format === "digital" ? (
+          /* Cas 2: Déjà possédé en numérique et format digital sélectionné alors que papier existe */
+          <div className="pt-2 space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                router.push(`/catalog/reader/${book.id}`);
+                onClose();
+              }}
+              className="w-full px-4 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4 text-gold" />
+              Ouvrir dans la liseuse
+            </button>
+            {paperAvailable && (
+              <button
+                type="button"
+                onClick={() => setFormat("paper")}
+                className="w-full px-4 py-2.5 rounded-2xl border border-border text-xs font-bold text-navy hover:bg-background-secondary transition-colors flex items-center justify-center gap-1.5 min-h-[40px] cursor-pointer"
+              >
+                <Truck className="w-3.5 h-3.5 text-navy" />
+                Commander plutôt la version papier
+              </button>
+            )}
+          </div>
+        ) : (
+          /* Cas 3: Commande standard (numérique non possédé ou commande papier) */
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="w-full px-4 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover disabled:opacity-50 transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
           >
-            <option value="mobile_money">Mobile Money (MTN / Moov / Orange / Wave)</option>
-            <option value="virement">Virement bancaire</option>
-            <option value="especes">Espèces à la livraison</option>
-            <option value="carte">Carte bancaire</option>
-          </select>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-navy/5 border border-navy/20 space-y-1 text-right">
-          {format === "paper" && (
-            <p className="text-[11px] text-foreground-muted">
-              Frais de livraison : {shippingFee.toLocaleString("fr-FR")} XOF
-            </p>
-          )}
-          <p className="text-sm font-bold text-gold">Total : {total.toLocaleString("fr-FR")} XOF</p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="w-full px-4 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover disabled:opacity-50 transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
-        >
-          {submitting ? (
-            <Loader2 className="w-4 h-4 animate-spin text-gold" />
-          ) : (
-            <ShoppingBag className="w-4 h-4 text-gold" />
-          )}
-          {format === "digital" ? "Acheter maintenant" : "Confirmer la commande"}
-        </button>
+            {submitting ? (
+              <Loader2 className="w-4 h-4 animate-spin text-gold" />
+            ) : (
+              <ShoppingBag className="w-4 h-4 text-gold" />
+            )}
+            {format === "digital" ? "Acheter maintenant" : "Confirmer la commande papier"}
+          </button>
+        )}
       </div>
     </div>
   );

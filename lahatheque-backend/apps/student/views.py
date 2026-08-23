@@ -11,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
 from apps.catalog.models import Ouvrage, Discipline
-from apps.commerce.models import Order, LigneCommande, PhysicalDelivery, Currency
+from apps.commerce.models import Order, LigneCommande, PhysicalDelivery, Currency, PaymentTransaction
 from apps.partners.models import StudentAffiliation, UniversityBouquetSubscription, Institution
 
 from .models import ReadingProgress, ReadingSession
@@ -184,7 +184,7 @@ class StudentBookDetailView(APIView):
         return Response({
             'success': True,
             'data': {
-                'ouvrage': OuvrageBasicSerializer(ouvrage).data,
+                'ouvrage': OuvrageBasicSerializer(ouvrage, context={'request': request}).data,
                 'access': access_info,
                 'reading_progress': progress_data,
             },
@@ -555,7 +555,7 @@ class StudentCatalogView(APIView):
             ouvrages__status='published'
         ).distinct().values('id', 'name')
 
-        serializer = OuvrageBasicSerializer(qs[:60], many=True)
+        serializer = OuvrageBasicSerializer(qs[:60], many=True, context={'request': request})
         return Response({
             'success': True,
             'data': {

@@ -12,6 +12,8 @@ import {
   Eye,
   Globe,
   Sparkles,
+  CheckCircle2,
+  Truck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -92,8 +94,12 @@ function CatalogBookCard({
       </div>
 
       <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
-        <div className="flex items-center gap-3 flex-wrap">
-          {book.price_digital > 0 ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          {book.is_owned || book.has_digital_access ? (
+            <span className="text-[10px] font-bold text-success bg-success/10 border border-success/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 text-success" /> Déjà acquis
+            </span>
+          ) : book.price_digital > 0 ? (
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] uppercase font-bold text-foreground-muted">Numérique</span>
               <span className="font-mono font-bold text-gold text-xs sm:text-sm">
@@ -111,14 +117,37 @@ function CatalogBookCard({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onOpenOrderModal(book)}
-            className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 min-h-[40px] shadow-xs cursor-pointer"
-          >
-            <ShoppingBag className="w-3.5 h-3.5 text-gold" />
-            Commander
-          </button>
+          {book.is_owned || book.has_digital_access ? (
+            <div className="flex items-center gap-1.5">
+              <Link
+                href={`/catalog/reader/${book.id}`}
+                className="px-3.5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 min-h-[40px] shadow-xs"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-gold" />
+                Lire
+              </Link>
+              {book.is_paper_available && (
+                <button
+                  type="button"
+                  onClick={() => onOpenOrderModal(book)}
+                  className="px-3 py-2 rounded-xl border border-border bg-background hover:border-gold text-navy text-xs font-bold transition-colors flex items-center gap-1 min-h-[40px] shadow-2xs cursor-pointer"
+                  title="Commander la version papier"
+                >
+                  <Truck className="w-3.5 h-3.5 text-navy" />
+                  Papier
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onOpenOrderModal(book)}
+              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 min-h-[40px] shadow-xs cursor-pointer"
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-gold" />
+              Commander
+            </button>
+          )}
 
           <Link
             href={`/student/catalog/${book.id}`}

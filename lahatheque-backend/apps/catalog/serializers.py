@@ -22,6 +22,8 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
     institution_name = serializers.SerializerMethodField()
     authors_names = serializers.SerializerMethodField()
     faculty_name = serializers.CharField(source='faculty', read_only=True)
+    is_owned = serializers.SerializerMethodField()
+    has_digital_access = serializers.SerializerMethodField()
 
     class Meta:
         model = Ouvrage
@@ -37,6 +39,16 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
         if obj.pk and obj.authors.exists():
             return ", ".join([f"{a.first_name} {a.last_name}".strip() for a in obj.authors.all()])
         return ""
+
+    def get_is_owned(self, obj) -> bool:
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            from apps.student.models import ReadingProgress
+            return ReadingProgress.objects.filter(user=request.user, ouvrage=obj).exists()
+        return False
+
+    def get_has_digital_access(self, obj) -> bool:
+        return self.get_is_owned(obj)
 
 
 # Alias pour rétrocompatibilité

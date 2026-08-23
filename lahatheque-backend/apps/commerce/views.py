@@ -44,6 +44,14 @@ class CreateOrderView(APIView):
             format_type = item['format_type']
             quantity = item['quantity']
 
+            # Vérification anti-doublon pour l'achat numérique
+            if format_type == 'digital':
+                from apps.student.models import ReadingProgress
+                if ReadingProgress.objects.filter(user=request.user, ouvrage=ouvrage).exists():
+                    return Response({
+                        'error': f"Vous possédez déjà la version numérique de « {ouvrage.title} » dans votre bibliothèque."
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
             # Vérification du stock disponible pour le format papier, agrégé sur tous les entrepôts
             if format_type == 'paper':
                 has_paper = True
@@ -128,7 +136,7 @@ class CreateOrderView(APIView):
                 customer_email=request.user.email,
                 customer_name=f"{request.user.first_name} {request.user.last_name}",
                 return_url=return_url
-            )
+            ) or {}
 
             tx = PaymentTransaction.objects.create(
                 user=request.user,
@@ -259,7 +267,7 @@ class SubscribeView(APIView):
                 customer_name=request.user.get_full_name() or request.user.email,
                 return_url=return_url,
                 metadata={"subscription_id": str(subscription.id)},
-            )
+            ) or {}
             return Response({
                 "success": True,
                 "data": {
