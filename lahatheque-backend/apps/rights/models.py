@@ -181,6 +181,11 @@ class PreEditionDossier(models.Model):
     code_dossier = models.CharField(max_length=64, unique=True, db_index=True)
     titre_previsionnel = models.CharField(max_length=255, db_index=True)
     auteur_nom = models.CharField(max_length=255)
+    auteur_email = models.EmailField(blank=True, default='')
+    auteur_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='pre_editions_liees'
+    )
     universite_nom = models.CharField(max_length=128, blank=True)
     faculte_nom = models.CharField(max_length=128, blank=True)
     date_prevue_remise = models.DateField(null=True, blank=True)
@@ -231,3 +236,33 @@ class RelanceEmailJournal(models.Model):
 
     class Meta:
         ordering = ["-date_envoi"]
+
+
+class AuthorManuscriptSubmission(models.Model):
+    """Manuscrit déposé par un auteur pour étude avant finalisation éditoriale."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    VERSION_CHOICES = [
+        ('brouillon', 'Brouillon'),
+        ('finale', 'Version finale'),
+    ]
+    STATUS_CHOICES = [
+        ('study_pending', "À l'étude"),
+        ('catalog_preparation', 'En préparation catalogue'),
+        ('accepted', 'Accepté'),
+        ('rejected', 'Refusé'),
+    ]
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='manuscript_submissions'
+    )
+    title = models.CharField(max_length=255)
+    manuscript_file = models.FileField(upload_to='manuscripts/', blank=True, null=True)
+    version_type = models.CharField(max_length=20, choices=VERSION_CHOICES, default='brouillon')
+    suggested_summary = models.TextField(blank=True, default='')
+    suggested_language = models.CharField(max_length=50, default='Français')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='study_pending')
+    editorial_note = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']

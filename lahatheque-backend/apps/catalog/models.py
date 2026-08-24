@@ -56,6 +56,10 @@ class Ouvrage(models.Model):
     cover_image = models.ImageField(upload_to='covers/', null=True, blank=True)
 
     # Traçabilité & dates
+    pre_edition_dossier = models.ForeignKey(
+        'rights.PreEditionDossier', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ouvrages'
+    )
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='ouvrages_created')
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)

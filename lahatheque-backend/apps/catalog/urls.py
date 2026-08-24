@@ -6,6 +6,7 @@ from .views import (
     MaquettisteDepositViewSet,
     ChiefLayoutValidationViewSet,
     ONIXImportView,
+    PreEditionSearchView,
 )
 from .stream_views import BookStreamView
 
@@ -22,6 +23,7 @@ router.register(r'my-deposits', MaquettisteDepositViewSet, basename='my-deposits
 router.register(r'deposits', ChiefLayoutValidationViewSet, basename='deposits')
 
 urlpatterns = [
+    path('pre-editions/search/', PreEditionSearchView.as_view(), name='pre-edition-search'),
     path('onix/import/', ONIXImportView.as_view(), name='onix-import'),
     path('books/<str:book_id>/stream/', BookStreamView.as_view(), name='book-stream'),
 ] + router.urls

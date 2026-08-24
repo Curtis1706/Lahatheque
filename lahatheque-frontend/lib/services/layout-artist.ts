@@ -173,15 +173,41 @@ export async function createDeposit(data: Partial<LayoutDeposit>): Promise<Layou
   return mapBackendToDeposit(respData.data);
 }
 
+export interface PreEditionSearchResult {
+  id: string;
+  code_dossier: string;
+  titre_previsionnel: string;
+  auteur_nom: string;
+  auteur_email?: string;
+  universite_nom: string;
+  faculte_nom: string;
+}
+
+export async function searchPreEditions(query: string): Promise<PreEditionSearchResult[]> {
+  const res = await fetch(`/api/bff/catalog/pre-editions/search/?q=${encodeURIComponent(query)}`, {
+    credentials: "include",
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data || [];
+}
+
 export async function createDepositWithFiles(
   data: Partial<LayoutDeposit>,
   bookFile?: File | null,
-  coverFile?: File | null
+  coverFile?: File | null,
+  extra?: { pre_edition_dossier_id?: string; authors_emails?: string }
 ): Promise<LayoutDeposit> {
   const formData = new FormData();
 
   formData.append("title", data.metadata?.title || "Nouveau Titre");
   formData.append("authors_names", data.metadata?.authors?.join(", ") || "");
+  if (extra?.authors_emails) {
+    formData.append("authors_emails", extra.authors_emails);
+  }
+  if (extra?.pre_edition_dossier_id) {
+    formData.append("pre_edition_dossier_id", extra.pre_edition_dossier_id);
+  }
   formData.append("isbn", data.metadata?.isbn || "");
   formData.append("summary", data.metadata?.summary || "");
   formData.append("language", data.metadata?.language || "fr");

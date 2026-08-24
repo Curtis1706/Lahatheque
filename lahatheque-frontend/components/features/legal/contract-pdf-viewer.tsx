@@ -38,20 +38,18 @@ export function ContractPdfViewer({
 }: ContractPdfViewerProps) {
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
+  const [viewMode, setViewMode] = useState<"preview" | "summary">("preview");
 
   const isDocx = fileName.toLowerCase().endsWith(".docx") || fileName.toLowerCase().endsWith(".doc");
 
-  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 25, 200));
-  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 25, 50));
-  const handleRotate = () => setRotation((prev) => (prev + 90) % 360);
+  const effectiveFileUrl = fileUrl || "/PromptBreeder_Original_Paper-2309.16797v1.pdf";
+  const readerUrl = `/catalog/reader/lesson_pdf?file=${encodeURIComponent(effectiveFileUrl)}&title=${encodeURIComponent(title)}`;
 
   const formatSize = (bytes?: number) => {
     if (!bytes) return "";
     if (bytes > 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
     return `${Math.round(bytes / 1024)} Ko`;
   };
-
-  const readerUrl = `/catalog/reader/lesson_pdf?file=${encodeURIComponent(fileUrl || "/PromptBreeder_Original_Paper-2309.16797v1.pdf")}&title=${encodeURIComponent(title)}`;
 
   return (
     <div className={cn("p-5 rounded-3xl bg-background border border-border shadow-md space-y-4", className)}>
@@ -82,8 +80,31 @@ export function ContractPdfViewer({
           </div>
         </div>
 
-        {/* Action Liseuse LAHAThèque Complète */}
+        {/* Actions mode & Liseuse LAHAThèque Complète */}
         <div className="flex items-center gap-2">
+          <div className="flex items-center bg-background-secondary p-1 rounded-xl border border-border text-xs">
+            <button
+              type="button"
+              onClick={() => setViewMode("preview")}
+              className={cn(
+                "px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer",
+                viewMode === "preview" ? "bg-navy text-white shadow-xs" : "text-foreground-muted hover:text-navy"
+              )}
+            >
+              Aperçu Direct
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("summary")}
+              className={cn(
+                "px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer",
+                viewMode === "summary" ? "bg-navy text-white shadow-xs" : "text-foreground-muted hover:text-navy"
+              )}
+            >
+              Notice Légale
+            </button>
+          </div>
+
           <Link
             href={readerUrl}
             target="_blank"
@@ -99,9 +120,9 @@ export function ContractPdfViewer({
 
       {/* Cadre de Visualisation Intégré */}
       <div className="relative bg-navy-dark rounded-2xl min-h-[420px] flex flex-col items-center justify-center text-center p-4 border border-navy-hover overflow-hidden">
-        {fileUrl && !isDocx ? (
+        {viewMode === "preview" && !isDocx ? (
           <iframe
-            src={fileUrl}
+            src={effectiveFileUrl}
             title={title}
             className="w-full h-[420px] rounded-xl bg-white border-0"
           />
@@ -119,7 +140,7 @@ export function ContractPdfViewer({
               <p className="text-[11px] text-foreground-muted">
                 {isDocx
                   ? "Fichier Word DOCX converti pour la liseuse LAHAThèque et indexé dans le moteur de recherche légal."
-                  : "Contrat juridique signé et archivé dans la base documentaire."}
+                  : "Contrat juridique signé et archivé dans la base documentaire certifiée LAHAThèque."}
               </p>
             </div>
 
