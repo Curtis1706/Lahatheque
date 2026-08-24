@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
   transpilePackages: ["pdfjs-dist"],
   serverExternalPackages: ["canvas"],
   images: {

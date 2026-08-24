@@ -10,9 +10,9 @@ const DJANGO_API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:800
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
-  const { id } = await params;
+  const { id } = await context.params;
   const targetUrl = `${DJANGO_API_URL}/v1/catalog/books/${id}/stream/`;
 
   const accessToken = request.cookies.get('laha_access')?.value || request.cookies.get('access_token')?.value;

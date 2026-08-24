@@ -242,6 +242,25 @@ CORS_EXPOSE_HEADERS = ['Authorization', 'Content-Disposition', 'X-CSRFToken']
 # LCP Server & External API Configurations
 LCP_SERVER_URL = config('LCP_SERVER_URL', default='http://localhost:8989')
 
+# OpenAI & AI Engine Configuration
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
+
+# Passerelles de Paiement
+MONEROO_API_KEY = config('MONEROO_API_KEY', default='')
+STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
+STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
+
+# SMS & Notifications (FasterMessage)
+FASTERMESSAGE_USERNAME = config('FASTERMESSAGE_USERNAME', default='')
+FASTERMESSAGE_PASSWORD = config('FASTERMESSAGE_PASSWORD', default='')
+FASTERMESSAGE_SENDER = config('FASTERMESSAGE_SENDER', default='LAHA')
+
+# Cloudflare Stream Video & Audio
+CLOUDFLARE_STREAM_ACCOUNT_ID = config('CLOUDFLARE_STREAM_ACCOUNT_ID', default='')
+CLOUDFLARE_STREAM_API_TOKEN = config('CLOUDFLARE_STREAM_API_TOKEN', default='')
+CLOUDFLARE_STREAM_SUBDOMAIN = config('CLOUDFLARE_STREAM_SUBDOMAIN', default='')
+CLOUDFLARE_STREAM_WEBHOOK_SECRET = config('CLOUDFLARE_STREAM_WEBHOOK_SECRET', default='')
+
 # Cloudflare R2 Storage (S3-compatible)
 CLOUDFLARE_R2_BUCKET_NAME = config('CLOUDFLARE_R2_BUCKET_NAME', default='lahatheque')
 CLOUDFLARE_R2_ENDPOINT = config('CLOUDFLARE_R2_ENDPOINT', default='')

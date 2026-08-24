@@ -102,22 +102,22 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   }
 }
 
-export async function GET(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+export async function GET(request: NextRequest, context: any) {
   return handleProxy(request, context)
 }
 
-export async function POST(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+export async function POST(request: NextRequest, context: any) {
   return handleProxy(request, context)
 }
 
-export async function PUT(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+export async function PUT(request: NextRequest, context: any) {
   return handleProxy(request, context)
 }
 
-export async function PATCH(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+export async function PATCH(request: NextRequest, context: any) {
   return handleProxy(request, context)
 }
 
-export async function DELETE(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+export async function DELETE(request: NextRequest, context: any) {
   return handleProxy(request, context)
 }

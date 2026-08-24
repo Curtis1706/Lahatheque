@@ -2,18 +2,23 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 /**
- * Next.js 16 Proxy Router (ex-middleware.ts)
- * Exécuté au niveau Node.js pour contrôler l'accès UI et le routage par rôle.
+ * Next.js 16 Proxy Router & HTTP Request Logger
+ * Intercepte toutes les requêtes en production et en développement pour :
+ * 1. Écrire les logs d'accès HTTP en direct sur stdout (capturés par Coolify / Docker)
+ * 2. Gérer la sécurité des sessions et les redirections par rôle
  */
 export default function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname, search } = request.nextUrl
+  const method = request.method
+  const now = new Date().toISOString().replace('T', ' ').substring(0, 19)
 
-  // Extraction du cookie de session UI
+  // 1. Extraction de la session utilisateur
   const userSessionRaw =
     request.cookies.get('user_session_client')?.value ||
     request.cookies.get('user_session')?.value
 
   let role = ''
+  let userIdentifier = 'anonymous'
   let isLoggedIn = false
 
   if (userSessionRaw) {
@@ -26,6 +31,8 @@ export default function proxy(request: NextRequest) {
       }
 
       role = session?.role?.toLowerCase() || ''
+      userIdentifier = session?.email || session?.id || session?.username || 'user'
+
       if (!role && Array.isArray(session?.active_roles)) {
         const adminRoles = ['admin', 'super_admin']
         for (const r of session.active_roles) {
@@ -37,17 +44,25 @@ export default function proxy(request: NextRequest) {
       }
 
       isLoggedIn = !!(session?.id || session?.email)
-    } catch (e) {
-      console.error('Proxy: Error parsing session cookie', e)
+    } catch {
+      // Ignorer l'erreur de parsing
     }
   }
 
-  // Fallback : présence du cookie laha_access ou laha_refresh (HttpOnly)
   if (!isLoggedIn) {
     isLoggedIn = request.cookies.has('laha_access') || request.cookies.has('laha_refresh')
+    if (isLoggedIn) userIdentifier = 'auth-token'
   }
 
-  // Helper pour obtenir la bonne URL de redirection selon le rôle
+  // 2. Journalisation HTTP directe sur stdout (visible dans Coolify Runtime Logs)
+  const isStaticAsset = pathname.startsWith('/_next/') || pathname.startsWith('/images/') || pathname.includes('.')
+  
+  if (!isStaticAsset) {
+    const authTag = isLoggedIn ? `[${role || 'auth'}:${userIdentifier}]` : '[guest]'
+    console.log(`[HTTP ${now}] ${method} ${pathname}${search} ${authTag}`)
+  }
+
+  // 3. Helper pour obtenir l'URL de redirection par rôle
   const getRoleDashboardUrl = (userRole: string): string => {
     switch (userRole) {
       case 'student':
@@ -79,16 +94,17 @@ export default function proxy(request: NextRequest) {
     }
   }
 
-  // 2. Si l'utilisateur est connecté et tente d'accéder aux pages d'authentification (/login, /register)
+  // 4. Si connecté et tente d'accéder aux pages d'auth (/login, /register)
   const isAuthPage = pathname === '/login' || pathname.startsWith('/register')
   if (isLoggedIn && isAuthPage && role) {
     const dashboardUrl = getRoleDashboardUrl(role)
     if (dashboardUrl && dashboardUrl !== pathname) {
+      console.log(`[HTTP Auth ${now}] Redirection auto ${userIdentifier} (${role}) -> ${dashboardUrl}`)
       return NextResponse.redirect(new URL(dashboardUrl, request.url))
     }
   }
 
-  // 3. Si l'utilisateur n'est pas connecté et tente d'accéder à un espace protégé
+  // 5. Si non connecté et tente d'accéder à un espace protégé
   const protectedRoutes = [
     '/student',
     '/wholesaler',
@@ -105,6 +121,7 @@ export default function proxy(request: NextRequest) {
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   
   if (!isLoggedIn && isProtectedRoute && pathname !== '/login') {
+    console.log(`[HTTP Auth ${now}] Accès refusé non-authentifié -> Redirection /login pour ${pathname}`)
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
@@ -115,18 +132,13 @@ export default function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/student/:path*',
-    '/wholesaler/:path*',
-    '/librarian/:path*',
-    '/publisher/:path*',
-    '/author/:path*',
-    '/legal-reviewer/:path*',
-    '/layout-artist/:path*',
-    '/chief-layout/:path*',
-    '/manager/:path*',
-    '/admin/:path*',
-    '/super-admin/:path*',
-    '/login',
-    '/register/:path*',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public files (images, icons, etc.)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

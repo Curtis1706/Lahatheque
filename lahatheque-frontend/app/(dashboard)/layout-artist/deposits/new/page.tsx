@@ -23,6 +23,7 @@ import {
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper, DEPOSIT_STEPS } from "@/components/features/layout-artist/deposit-wizard-stepper";
+import { AIAnalysisProgressCard } from "@/components/features/layout-artist/ai-analysis-progress-card";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { createDeposit, createDepositWithFiles } from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/ai";
@@ -303,8 +304,13 @@ export default function NewDepositPage() {
       {/* Stepper Navigation */}
       <DepositWizardStepper currentStep={currentStep} onStepClick={(s) => setCurrentStep(s)} />
 
+      {/* ─── ANIMATION D'ANALYSE IA EN COURS ─────────────────────────────── */}
+      {aiLoading && (
+        <AIAnalysisProgressCard fileName={bookFile?.name} />
+      )}
+
       {/* ─── BANDEAU ASSISTANT IA SI ANALYSE DISPONIBLE ──────────────────────── */}
-      {aiResult && (
+      {aiResult && !aiLoading && (
         <div className="p-5 rounded-3xl bg-navy text-white border border-navy-hover space-y-3 shadow-md">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
@@ -357,6 +363,8 @@ export default function NewDepositPage() {
                 onFileSelect={handleBookFileSelect}
                 selectedFileName={bookFile?.name}
                 selectedFileSize={bookFile?.size}
+                isLoading={aiLoading}
+                loadingLabel="Analyse IA en cours (OpenAI & PyMuPDF)..."
                 onFileRemove={() => {
                   setBookFile(null);
                   setAiResult(null);

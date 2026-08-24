@@ -15,6 +15,8 @@ interface FileDropzoneProps {
   selectedFileSize?: number;
   previewUrl?: string;
   className?: string;
+  isLoading?: boolean;
+  loadingLabel?: string;
 }
 
 export function FileDropzone({
@@ -27,6 +29,8 @@ export function FileDropzone({
   selectedFileSize,
   previewUrl,
   className,
+  isLoading,
+  loadingLabel = "Analyse en cours...",
 }: FileDropzoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +80,10 @@ export function FileDropzone({
       <label className="block text-xs font-bold text-navy uppercase tracking-wider">{label}</label>
 
       {selectedFileName ? (
-        <div className="p-4 rounded-2xl bg-background-secondary border border-border flex items-center justify-between gap-4 shadow-xs">
+        <div className="relative overflow-hidden p-4 rounded-2xl bg-background-secondary border border-border flex items-center justify-between gap-4 shadow-xs">
+          {isLoading && (
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gold/10 to-transparent animate-pulse pointer-events-none" />
+          )}
           <div className="flex items-center gap-3 min-w-0">
             {previewUrl && isImage ? (
               <img
@@ -92,7 +99,12 @@ export function FileDropzone({
             <div className="min-w-0">
               <p className="font-semibold text-xs text-navy truncate">{selectedFileName}</p>
               <p className="text-[10px] text-foreground-muted">
-                {formatFileSize(selectedFileSize)} • <span className="text-success font-medium">Prêt à téléverser</span>
+                {formatFileSize(selectedFileSize)} •{" "}
+                {isLoading ? (
+                  <span className="text-gold font-semibold animate-pulse">{loadingLabel}</span>
+                ) : (
+                  <span className="text-success font-medium">Prêt à téléverser</span>
+                )}
               </p>
             </div>
           </div>
@@ -101,7 +113,8 @@ export function FileDropzone({
             <button
               type="button"
               onClick={onFileRemove}
-              className="p-2 rounded-xl border border-border bg-background hover:bg-error/10 hover:text-error hover:border-error/30 transition-colors text-foreground-muted shrink-0"
+              disabled={isLoading}
+              className="p-2 rounded-xl border border-border bg-background hover:bg-error/10 hover:text-error hover:border-error/30 transition-colors text-foreground-muted shrink-0 disabled:opacity-50"
               title="Supprimer ou remplacer"
             >
               <X className="w-4 h-4" />
