@@ -79,6 +79,8 @@ export interface PreEditionContract {
   id: string;
   title: string; // Titre prévisionnel
   author_name: string;
+  author_email?: string;
+  author_user_id?: string;
   university: string;
   faculty: string;
   status: "en_attente_depot" | "maquette_en_cours" | "depot_lie" | "valide_legalement";

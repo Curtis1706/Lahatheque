@@ -62,11 +62,34 @@ export async function getContractDetail(id: string): Promise<LegalContract | nul
   return data.data || data;
 }
 
-export async function createLegalContract(data: Partial<LegalContract>): Promise<LegalContract | null> {
+export async function createLegalContract(
+  data: Partial<LegalContract>,
+  file?: File | null
+): Promise<LegalContract | null> {
+  let body: any;
+  const headers: Record<string, string> = {};
+
+  if (file) {
+    const formData = new FormData();
+    formData.append("title", data.title || "");
+    formData.append("contracting_party", data.contracting_party || "");
+    formData.append("party_type", data.party_type || "edition_auteur");
+    formData.append("notes", data.notes || "");
+    formData.append("file", file);
+    formData.append("file_name", file.name);
+    formData.append("file_size", String(file.size));
+    if (data.signed_at) formData.append("signed_at", data.signed_at);
+    if (data.expires_at) formData.append("expires_at", data.expires_at);
+    body = formData;
+  } else {
+    body = JSON.stringify(data);
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(`${API_BASE}/contracts/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    headers,
+    body,
     credentials: "include",
   });
   if (!res.ok) throw new Error(`Erreur création contrat: ${res.status}`);
@@ -189,6 +212,8 @@ export async function getPreEditionContracts(): Promise<PreEditionContract[]> {
     id: p.id,
     title: p.provisional_title || p.title,
     author_name: p.author_name,
+    author_email: p.author_email,
+    author_user_id: p.author_user_id,
     university: p.university,
     faculty: p.faculty,
     status: p.status,
@@ -201,6 +226,7 @@ export async function getPreEditionContracts(): Promise<PreEditionContract[]> {
 export async function createPreEditionContract(data: {
   title: string;
   author_name: string;
+  author_email?: string;
   university: string;
   faculty: string;
   expected_delivery_date?: string;
@@ -212,6 +238,7 @@ export async function createPreEditionContract(data: {
     body: JSON.stringify({
       provisional_title: data.title,
       author_name: data.author_name,
+      author_email: data.author_email,
       university: data.university,
       faculty: data.faculty,
       expected_delivery_date: data.expected_delivery_date,

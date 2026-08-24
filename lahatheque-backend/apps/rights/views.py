@@ -7,6 +7,7 @@ from django.db.models import Sum, Count, Q, F
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from apps.accounts.permissions import IsAuthor, IsLegalReviewerRole, IsAdminOrSuperAdmin
 
 from apps.catalog.models import Ouvrage, BookAuthor
@@ -20,7 +21,8 @@ from apps.rights.models import (
     RepartitionDroits,
     AIRoyaltySuggestion,
     PreEditionDossier,
-    RelanceEmailJournal
+    RelanceEmailJournal,
+    AuthorManuscriptSubmission
 )
 from apps.publishers_portal.models import SubmissionDraft, Publisher
 from apps.commerce.models import LigneCommande, Order
@@ -336,57 +338,58 @@ class AdminPayoutDecisionView(APIView):
             return Response({"success": False, "error": "Décision invalide. Valeurs acceptées: 'approve', 'reject'"}, status=400)
 
 class AuthorSubmissionsView(APIView):
-    """GET/POST /api/v1/rights/author/submissions/ - Gestion des manuscrits déposés."""
+    """GET/POST /api/v1/rights/author/submissions/ - Gestion RÉELLE des manuscrits déposés."""
     permission_classes = [permissions.IsAuthenticated, IsAuthor]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
-        subs = [
-            {
-                "id": "sub-aut-001",
-                "title": "Traité pratique du droit commercial général OHADA (Tome II)",
-                "manuscript_file_url": "/mock/manuscrits/ohada-tome2.pdf",
-                "submitted_at": "2026-08-10",
-                "version_type": "finale",
-                "status": "study_pending",
-                "suggested_summary": "Analyse approfondie et commentaires exhaustifs de l'Acte Uniforme OHADA révisé.",
-                "suggested_language": "Français"
-            },
-            {
-                "id": "sub-aut-002",
-                "title": "Introduction à la Microfinance et Inclusion Financière UEMOA",
-                "manuscript_file_url": "/mock/manuscrits/microfinance-uemoa.pdf",
-                "submitted_at": "2026-07-28",
-                "version_type": "brouillon",
-                "status": "catalog_preparation",
-                "suggested_summary": "Guide théorique et études de cas sur les systèmes financiers décentralisés en zone francophone.",
-                "suggested_language": "Français"
-            }
-        ]
-        return Response({"success": True, "data": subs})
+        subs = AuthorManuscriptSubmission.objects.filter(author=request.user)
+        data = [{
+            "id": str(s.id),
+            "title": s.title,
+            "manuscript_file_url": s.manuscript_file.url if s.manuscript_file else None,
+            "submitted_at": s.created_at.date().isoformat(),
+            "version_type": s.version_type,
+            "status": s.status,
+            "suggested_summary": s.suggested_summary,
+            "suggested_language": s.suggested_language,
+            "editorial_note": s.editorial_note,
+        } for s in subs]
+        return Response({"success": True, "data": data})
 
     def post(self, request):
         title = request.data.get("title", "").strip()
         version_type = request.data.get("version_type", "brouillon")
         summary = request.data.get("summary", "")
         language = request.data.get("language", "Français")
+        manuscript_file = request.FILES.get("manuscript_file")
 
         if not title:
             return Response({"success": False, "error": "Le titre du manuscrit est obligatoire."}, status=400)
 
-        new_sub = {
-            "id": f"sub-aut-{uuid.uuid4().hex[:4]}",
-            "title": title,
-            "manuscript_file_url": "/uploads/submissions/manuscrit.pdf",
-            "submitted_at": str(timezone.now().date()),
-            "version_type": version_type,
-            "status": "study_pending",
-            "suggested_summary": summary or "Résumé transmis lors du dépôt de manuscrit.",
-            "suggested_language": language
-        }
+        submission = AuthorManuscriptSubmission.objects.create(
+            author=request.user,
+            title=title,
+            manuscript_file=manuscript_file,
+            version_type=version_type,
+            suggested_summary=summary,
+            suggested_language=language,
+            status='study_pending',
+        )
+
         return Response({
             "success": True,
             "message": "Manuscrit déposé avec succès auprès du comité éditorial LAHA Éditions.",
-            "data": new_sub
+            "data": {
+                "id": str(submission.id),
+                "title": submission.title,
+                "manuscript_file_url": submission.manuscript_file.url if submission.manuscript_file else None,
+                "submitted_at": submission.created_at.date().isoformat(),
+                "version_type": submission.version_type,
+                "status": submission.status,
+                "suggested_summary": submission.suggested_summary,
+                "suggested_language": submission.suggested_language,
+            }
         }, status=201)
 
 
@@ -403,23 +406,28 @@ class LegalKpisView(APIView):
         w3_start = now - timedelta(days=14)
         w4_start = now - timedelta(days=7)
 
-        contracts_count = ContratLegal.objects.count() or 48
-        pending_ai_count = AIRoyaltySuggestion.objects.filter(is_validated=False).count() or 3
-        active_pre_editions_count = PreEditionDossier.objects.filter(status='en_attente_depot').count() or 6
-        reminders_sent_count = RelanceEmailJournal.objects.count() or 14
-        clients_in_debt_count = 5
+        contracts_count = ContratLegal.objects.count()
+        pending_ai_count = AIRoyaltySuggestion.objects.filter(is_validated=False).count()
+        active_pre_editions_count = PreEditionDossier.objects.filter(status='en_attente_depot').count()
+        reminders_sent_count = RelanceEmailJournal.objects.count()
+        clients_in_debt_count = Order.objects.filter(
+            statut_paiement='pending'
+        ).values('user').distinct().count()
 
-        # Timeline pour les contrats
+        # Timeline pour les contrats basée sur les vraies dates
         def format_date_label(dt):
             months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
             return f"{dt.day:02d} {months[dt.month - 1]}"
 
-        timeline = [
-            {"date": format_date_label(w1_start), "value": max(0, contracts_count - 12)},
-            {"date": format_date_label(w2_start), "value": max(0, contracts_count - 8)},
-            {"date": format_date_label(w3_start), "value": max(0, contracts_count - 4)},
-            {"date": format_date_label(w4_start), "value": contracts_count},
-        ]
+        timeline = []
+        date_field = 'date_signature' if hasattr(ContratLegal, 'date_signature') else 'created_at'
+        for week_start, week_end in [
+            (w1_start, w2_start), (w2_start, w3_start),
+            (w3_start, w4_start), (w4_start, now)
+        ]:
+            filter_kwargs = {f'{date_field}__gte': week_start, f'{date_field}__lt': week_end}
+            week_count = ContratLegal.objects.filter(**filter_kwargs).count()
+            timeline.append({"date": format_date_label(week_start), "value": week_count})
 
         return Response({
             "success": True,
@@ -437,6 +445,7 @@ class LegalKpisView(APIView):
 class LegalContractsListView(APIView):
     """GET/POST /api/v1/rights/legal/contracts/ - GED et Recherche plein texte des contrats."""
     permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         search_query = request.query_params.get("search", "").strip().lower()
@@ -533,6 +542,16 @@ class LegalContractsListView(APIView):
         file_name = request.data.get("file_name", "Contrat.pdf")
         file_size = request.data.get("file_size", 1024 * 1024)
         notes = request.data.get("notes", "")
+
+        uploaded_file = request.FILES.get("file")
+        if uploaded_file:
+            file_name = uploaded_file.name
+            file_size = uploaded_file.size
+            from django.core.files.storage import default_storage
+            try:
+                default_storage.save(f"contrats/{file_name}", uploaded_file)
+            except Exception:
+                pass
 
         if not title or not contracting_party:
             return Response({"success": False, "error": "Le titre et la partie contractante sont obligatoires."}, status=400)
@@ -736,62 +755,78 @@ class LegalAiSuggestionDecisionView(APIView):
 
 
 class LegalPreEditionsListView(APIView):
-    """GET/POST /api/v1/rights/legal/pre-editions/ - Dossiers de pré-édition."""
+    """GET/POST /api/v1/rights/legal/pre-editions/ - Dossiers de pré-édition RÉELS."""
     permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request):
-        dossiers = [
-            {
-                "id": "pre-001",
-                "code_dossier": "PRE-2026-042",
-                "provisional_title": "Manuel Pratique de Procédure Pénale Béninoise",
-                "author_name": "Prof. Séfou Adjovi",
-                "university": "Université d'Abomey-Calavi (UAC)",
-                "faculty": "Faculté de Droit (FADESP)",
-                "expected_delivery_date": "2026-10-15",
-                "status": "en_attente_depot",
-                "contract_reference": "CTR-JUR-2026-085",
-                "notes": "Convention d'écriture signée. Dépôt de la première épreuve prévu mi-octobre."
-            },
-            {
-                "id": "pre-002",
-                "code_dossier": "PRE-2026-043",
-                "provisional_title": "Pharmacopée Traditionnelle et Plantes Médicinales d'Afrique",
-                "author_name": "Dr. Fatoumata Diallo",
-                "university": "Université Cheikh Anta Diop (UCAD)",
-                "faculty": "Faculté de Médecine et Pharmacie",
-                "expected_delivery_date": "2026-11-30",
-                "status": "maquette_en_cours",
-                "contract_reference": "CTR-JUR-2026-088",
-                "notes": "Textes remis, en cours de calibration chez le maquettiste."
-            }
-        ]
-        return Response({"success": True, "data": dossiers})
+        dossiers = PreEditionDossier.objects.all().select_related('contrat', 'auteur_user').order_by('-created_at')
+        data = [{
+            "id": str(d.id),
+            "code_dossier": d.code_dossier,
+            "provisional_title": d.titre_previsionnel,
+            "author_name": d.auteur_nom,
+            "author_email": d.auteur_email,
+            "author_user_id": str(d.auteur_user_id) if d.auteur_user_id else None,
+            "university": d.universite_nom,
+            "faculty": d.faculte_nom,
+            "expected_delivery_date": d.date_prevue_remise.isoformat() if d.date_prevue_remise else None,
+            "status": d.status,
+            "contract_reference": d.contrat.numero_contrat if d.contrat else None,
+            "notes": d.notes_juridiques,
+        } for d in dossiers]
+        return Response({"success": True, "data": data})
 
     def post(self, request):
+        import uuid as uuid_lib
+
         title = request.data.get("provisional_title", "").strip()
         author = request.data.get("author_name", "").strip()
+        author_email = request.data.get("author_email", "").strip()
         university = request.data.get("university", "")
         faculty = request.data.get("faculty", "")
-        delivery_date = request.data.get("expected_delivery_date")
+        delivery_date = request.data.get("expected_delivery_date") or None
         notes = request.data.get("notes", "")
 
         if not title or not author:
             return Response({"success": False, "error": "Le titre prévisionnel et l'auteur sont obligatoires."}, status=400)
 
-        code = f"PRE-2026-{uuid.uuid4().hex[:3].upper()}"
-        dossier = {
-            "id": f"pre-{uuid.uuid4().hex[:4]}",
-            "code_dossier": code,
-            "provisional_title": title,
-            "author_name": author,
-            "university": university,
-            "faculty": faculty,
-            "expected_delivery_date": delivery_date,
-            "status": "en_attente_depot",
-            "notes": notes
-        }
-        return Response({"success": True, "message": "Fiche de pré-édition créée.", "data": dossier}, status=201)
+        linked_user = None
+        if author_email:
+            from apps.accounts.models import User
+            linked_user = User.objects.filter(email__iexact=author_email, role='author').first()
+
+        code = f"PRE-{timezone.now().year}-{uuid_lib.uuid4().hex[:4].upper()}"
+
+        dossier = PreEditionDossier.objects.create(
+            code_dossier=code,
+            titre_previsionnel=title,
+            auteur_nom=author,
+            auteur_email=author_email,
+            auteur_user=linked_user,
+            universite_nom=university,
+            faculte_nom=faculty,
+            date_prevue_remise=delivery_date,
+            notes_juridiques=notes,
+            status="en_attente_depot",
+        )
+
+        return Response({
+            "success": True,
+            "message": "Fiche de pré-édition créée.",
+            "data": {
+                "id": str(dossier.id),
+                "code_dossier": dossier.code_dossier,
+                "provisional_title": dossier.titre_previsionnel,
+                "author_name": dossier.auteur_nom,
+                "author_email": dossier.auteur_email,
+                "author_user_id": str(dossier.auteur_user_id) if dossier.auteur_user_id else None,
+                "university": dossier.universite_nom,
+                "faculty": dossier.faculte_nom,
+                "expected_delivery_date": dossier.date_prevue_remise.isoformat() if dossier.date_prevue_remise else None,
+                "status": dossier.status,
+                "notes": dossier.notes_juridiques,
+            }
+        }, status=201)
 
 
 class LegalRelancesListView(APIView):

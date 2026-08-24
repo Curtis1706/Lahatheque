@@ -90,6 +90,8 @@ class OuvrageCreateSerializer(serializers.Serializer):
     dewey_code = serializers.CharField(max_length=20, required=False, default='')
     discipline_name = serializers.CharField(max_length=255, required=False, default='')
     institution_name = serializers.CharField(max_length=255, required=False, default='')
+    pre_edition_dossier_id = serializers.CharField(required=False, allow_blank=True, default='')
+    authors_emails = serializers.CharField(required=False, allow_blank=True, default='')
 
     # Fichiers (optionnels — envoyés en multipart)
     book_file = serializers.FileField(required=False, allow_null=True)
@@ -100,6 +102,13 @@ class OuvrageCreateSerializer(serializers.Serializer):
         Institution = apps.get_model('partners', 'Institution')
 
         user = self.context['request'].user
+
+        # Résolution du dossier de pré-édition
+        dossier = None
+        dossier_id = validated_data.pop('pre_edition_dossier_id', '')
+        if dossier_id:
+            from apps.rights.models import PreEditionDossier
+            dossier = PreEditionDossier.objects.filter(id=dossier_id).first()
 
         # Résolution de la discipline par nom
         discipline_obj = None
@@ -118,8 +127,9 @@ class OuvrageCreateSerializer(serializers.Serializer):
                 name__icontains=institution_name.split('(')[0].strip()
             ).first()
 
-        # Extraction des noms d'auteurs
+        # Extraction des noms et emails d'auteurs
         authors_names = validated_data.pop('authors_names', '')
+        authors_emails = validated_data.pop('authors_emails', '')
         book_file = validated_data.pop('book_file', None)
         cover_image = validated_data.pop('cover_image', None)
         validated_data.pop('dewey_code_field', None)
@@ -143,6 +153,7 @@ class OuvrageCreateSerializer(serializers.Serializer):
             dewey_code=validated_data.get('dewey_code', ''),
             discipline=discipline_obj,
             institution=institution_obj,
+            pre_edition_dossier=dossier,
             created_by=user,
             status='draft',
         )
@@ -171,20 +182,44 @@ class OuvrageCreateSerializer(serializers.Serializer):
             ouvrage.cover_image = cover_image
             ouvrage.save(update_fields=['cover_image'])
 
-        # Créer les BookAuthor à partir des noms
+        # Créer les BookAuthor à partir des noms et lier les comptes auteurs si fournis
         if authors_names:
-            for name in authors_names.split(','):
-                name = name.strip()
-                if not name:
-                    continue
+            names = [n.strip() for n in authors_names.split(',') if n.strip()]
+            emails = [e.strip() for e in authors_emails.split(',') if e.strip()] if authors_emails else []
+            for idx, name in enumerate(names):
                 parts = name.rsplit(' ', 1)
                 first = parts[0] if len(parts) > 1 else name
                 last = parts[1] if len(parts) > 1 else ''
-                author_obj, _ = BookAuthor.objects.get_or_create(
+                author_email = emails[idx] if idx < len(emails) else ''
+
+                author_user = None
+                if author_email:
+                    from apps.accounts.models import User
+                    author_user = User.objects.filter(email__iexact=author_email, role='author').first()
+
+                author_obj, created = BookAuthor.objects.get_or_create(
                     first_name=first,
                     last_name=last,
+                    defaults={'email': author_email, 'user': author_user}
                 )
+                if not created and not author_obj.user and author_user:
+                    author_obj.user = author_user
+                    if author_email:
+                        author_obj.email = author_email
+                    author_obj.save(update_fields=['user', 'email'])
+
                 ouvrage.authors.add(author_obj)
+
+                # Si un dossier de pré-édition est lié et possède un auteur_user
+                if dossier and dossier.auteur_user and not author_obj.user:
+                    author_obj.user = dossier.auteur_user
+                    author_obj.email = dossier.auteur_email or author_obj.email
+                    author_obj.save(update_fields=['user', 'email'])
+
+        # Mise à jour du statut du dossier de pré-édition si applicable
+        if dossier and dossier.status == 'en_attente_depot':
+            dossier.status = 'maquette_en_cours'
+            dossier.save(update_fields=['status'])
 
         return ouvrage
 

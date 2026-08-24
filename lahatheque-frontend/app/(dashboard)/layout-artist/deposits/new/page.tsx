@@ -18,14 +18,17 @@ import {
   Layers,
   GraduationCap,
   Tag,
-  Check
+  Check,
+  Search,
+  FileText,
+  X
 } from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper, DEPOSIT_STEPS } from "@/components/features/layout-artist/deposit-wizard-stepper";
 import { AIAnalysisProgressCard } from "@/components/features/layout-artist/ai-analysis-progress-card";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
-import { createDeposit, createDepositWithFiles } from "@/lib/services/layout-artist";
+import { createDeposit, createDepositWithFiles, searchPreEditions, type PreEditionSearchResult } from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/ai";
 import type { ClassificationSource } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
@@ -66,6 +69,12 @@ export default function NewDepositPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
+  // Pre-Edition State
+  const [preEditionSearch, setPreEditionSearch] = useState("");
+  const [preEditionResults, setPreEditionResults] = useState<PreEditionSearchResult[]>([]);
+  const [selectedPreEdition, setSelectedPreEdition] = useState<PreEditionSearchResult | null>(null);
+  const [searchingPreEdition, setSearchingPreEdition] = useState(false);
+
   // Form State
   const [bookFile, setBookFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -75,6 +84,7 @@ export default function NewDepositPage() {
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [authorsStr, setAuthorsStr] = useState("");
+  const [authorsEmailsStr, setAuthorsEmailsStr] = useState("");
   const [year, setYear] = useState(2026);
   const [language, setLanguage] = useState("Français");
   const [summary, setSummary] = useState("");
@@ -154,6 +164,41 @@ export default function NewDepositPage() {
     setCoverPreview(URL.createObjectURL(file));
   };
 
+  const handleSearchPreEditions = async (query: string) => {
+    setPreEditionSearch(query);
+    if (!query.trim()) {
+      setPreEditionResults([]);
+      return;
+    }
+    setSearchingPreEdition(true);
+    try {
+      const results = await searchPreEditions(query);
+      setPreEditionResults(results);
+    } catch {
+      setPreEditionResults([]);
+    } finally {
+      setSearchingPreEdition(false);
+    }
+  };
+
+  const handleSelectPreEdition = (dossier: PreEditionSearchResult) => {
+    setSelectedPreEdition(dossier);
+    setPreEditionResults([]);
+    setPreEditionSearch(dossier.titre_previsionnel);
+    if (dossier.titre_previsionnel) setTitle(dossier.titre_previsionnel);
+    if (dossier.auteur_nom) setAuthorsStr(dossier.auteur_nom);
+    if (dossier.auteur_email) setAuthorsEmailsStr(dossier.auteur_email);
+    if (dossier.universite_nom) setUniversity(dossier.universite_nom);
+    if (dossier.faculte_nom) setFaculty(dossier.faculte_nom);
+    toast.success(`Dossier ${dossier.code_dossier} rattaché ! Métadonnées pré-remplies.`);
+  };
+
+  const handleClearPreEdition = () => {
+    setSelectedPreEdition(null);
+    setPreEditionSearch("");
+    setPreEditionResults([]);
+  };
+
   const handleGenreChange = (newGenre: string) => {
     setGenreCategory(newGenre);
     const found = GENRE_CATEGORIES.find((g) => g.label === newGenre);
@@ -196,7 +241,11 @@ export default function NewDepositPage() {
           default_price: 5000,
         },
         bookFile,
-        coverFile
+        coverFile,
+        {
+          pre_edition_dossier_id: selectedPreEdition?.id,
+          authors_emails: authorsEmailsStr,
+        }
       );
       toast.success("Brouillon sauvegardé avec succès.");
       router.push(`/layout-artist/deposits/${dep.id}`);
@@ -243,7 +292,11 @@ export default function NewDepositPage() {
           default_price: 5000,
         },
         bookFile,
-        coverFile
+        coverFile,
+        {
+          pre_edition_dossier_id: selectedPreEdition?.id,
+          authors_emails: authorsEmailsStr,
+        }
       );
       toast.success("Maquette soumise au Chef Maquettiste avec succès !");
       router.push("/layout-artist/deposits");
@@ -424,6 +477,84 @@ export default function NewDepositPage() {
           </div>
 
           <div className="space-y-4">
+            {/* Rattachement Pré-édition */}
+            <div className="space-y-1.5">
+              {selectedPreEdition ? (
+                <div className="p-3.5 bg-navy/5 border border-navy/20 rounded-2xl flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-gold/10 text-gold flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-mono font-bold text-gold uppercase px-1.5 py-0.5 bg-gold/10 rounded">
+                          {selectedPreEdition.code_dossier}
+                        </span>
+                        <span className="text-xs font-bold text-navy">{selectedPreEdition.titre_previsionnel}</span>
+                      </div>
+                      <p className="text-[11px] text-foreground-muted">
+                        Auteur : <strong className="text-foreground">{selectedPreEdition.auteur_nom}</strong>
+                        {selectedPreEdition.auteur_email ? ` (${selectedPreEdition.auteur_email})` : ""} · {selectedPreEdition.universite_nom}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearPreEdition}
+                    className="p-1.5 text-foreground-muted hover:text-red-500 rounded-lg hover:bg-background transition-colors"
+                    title="Détacher le dossier"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5 mb-1.5">
+                    <FileText className="w-3.5 h-3.5 text-gold" />
+                    Dossier de pré-édition Juriste (Facultatif)
+                  </label>
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Rechercher par titre provisoire ou nom d'auteur pré-enregistré..."
+                      value={preEditionSearch}
+                      onChange={(e) => handleSearchPreEditions(e.target.value)}
+                      className="w-full bg-background-secondary border border-border rounded-xl pl-9 pr-3 py-2.5 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                    />
+                    {searchingPreEdition && (
+                      <span className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full animate-spin absolute right-3 top-1/2 -translate-y-1/2" />
+                    )}
+                  </div>
+                  {preEditionResults.length > 0 && (
+                    <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-background border border-border rounded-xl shadow-lg max-h-56 overflow-y-auto divide-y divide-border">
+                      {preEditionResults.map((dossier) => (
+                        <button
+                          key={dossier.id}
+                          type="button"
+                          onClick={() => handleSelectPreEdition(dossier)}
+                          className="w-full text-left p-3 hover:bg-navy/5 transition-colors flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[10px] font-bold text-gold px-1.5 py-0.5 bg-gold/10 rounded">
+                                {dossier.code_dossier}
+                              </span>
+                              <span className="font-semibold text-navy">{dossier.titre_previsionnel}</span>
+                            </div>
+                            <p className="text-[11px] text-foreground-muted mt-0.5">
+                              {dossier.auteur_nom} · {dossier.universite_nom}
+                            </p>
+                          </div>
+                          <span className="text-[11px] font-bold text-gold shrink-0">Rattacher →</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Titre */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
@@ -474,64 +605,86 @@ export default function NewDepositPage() {
             </div>
 
             {/* Auteurs, ISBN, Année */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Auteur(s) *</label>
-                  {aiResult?.authors && (
-                    <button
-                      type="button"
-                      onClick={() => setAuthorsStr(aiResult.authors.join(", "))}
-                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      IA
-                    </button>
-                  )}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-navy">Auteur(s) *</label>
+                    {aiResult?.authors && (
+                      <button
+                        type="button"
+                        onClick={() => setAuthorsStr(aiResult.authors.join(", "))}
+                        className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Wand2 className="w-2.5 h-2.5" />
+                        IA
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Pr. Jean KOUADIO, Dr. Aminata SOW"
+                    value={authorsStr}
+                    onChange={(e) => setAuthorsStr(e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                  />
                 </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-navy">ISBN-13</label>
+                    {aiResult?.isbn && (
+                      <button
+                        type="button"
+                        onClick={() => setIsbn(aiResult.isbn)}
+                        className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Wand2 className="w-2.5 h-2.5" />
+                        IA
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="978-99919-X-XXX-X"
+                    value={isbn}
+                    onChange={(e) => setIsbn(e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Année de Publication</label>
+                  <input
+                    type="number"
+                    value={year}
+                    onChange={(e) => setYear(parseInt(e.target.value) || 2026)}
+                    className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                  />
+                </div>
+              </div>
+
+              {/* Email compte auteur optionnel */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                  Email(s) du/des compte(s) auteur(s) (Facultatif)
+                </label>
                 <input
                   type="text"
-                  required
-                  placeholder="Pr. Jean KOUADIO, Dr. Aminata SOW"
-                  value={authorsStr}
-                  onChange={(e) => setAuthorsStr(e.target.value)}
+                  placeholder="ex: auteur1@lahatheque.com, auteur2@lahatheque.com"
+                  value={authorsEmailsStr}
+                  onChange={(e) => setAuthorsEmailsStr(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 />
+                <p className="text-[11px] text-foreground-muted">
+                  Si l&apos;auteur possède un compte LAHAThèque, son email permet d&apos;associer automatiquement ses futures statistiques de vente à son espace personnel. Facultatif.
+                </p>
               </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">ISBN-13</label>
-                  {aiResult?.isbn && (
-                    <button
-                      type="button"
-                      onClick={() => setIsbn(aiResult.isbn)}
-                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      IA
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  placeholder="978-99919-X-XXX-X"
-                  value={isbn}
-                  onChange={(e) => setIsbn(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-navy">Année de Publication</label>
-                <input
-                  type="number"
-                  value={year}
-                  onChange={(e) => setYear(parseInt(e.target.value) || 2026)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                />
-              </div>
-
+            {/* Prix */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-navy">Prix Numérique (FCFA)</label>
                 <input

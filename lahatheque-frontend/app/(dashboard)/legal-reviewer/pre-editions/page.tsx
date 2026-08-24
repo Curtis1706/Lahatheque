@@ -17,6 +17,7 @@ export default function LegalPreEditionsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [authorName, setAuthorName] = useState("");
+  const [authorEmail, setAuthorEmail] = useState("");
   const [university, setUniversity] = useState("Université d'Abomey-Calavi (UAC)");
   const [faculty, setFaculty] = useState("Faculté de Droit et de Science Politique (FADESP)");
   const [submitting, setSubmitting] = useState(false);
@@ -40,6 +41,7 @@ export default function LegalPreEditionsPage() {
       const created = await createPreEditionContract({
         title,
         author_name: authorName,
+        author_email: authorEmail.trim() || undefined,
         university,
         faculty,
       });
@@ -50,6 +52,7 @@ export default function LegalPreEditionsPage() {
       setIsModalOpen(false);
       setTitle("");
       setAuthorName("");
+      setAuthorEmail("");
     } finally {
       setSubmitting(false);
     }
@@ -192,6 +195,23 @@ export default function LegalPreEditionsPage() {
               className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
               required
             />
+          </div>
+
+          <div>
+            <label htmlFor="pre-author-email" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+              Email du compte auteur (facultatif)
+            </label>
+            <input
+              id="pre-author-email"
+              type="email"
+              value={authorEmail}
+              onChange={(e) => setAuthorEmail(e.target.value)}
+              placeholder="ex. auteur@lahatheque.com"
+              className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
+            />
+            <p className="text-[11px] text-foreground-muted mt-1">
+              Si l&apos;auteur a un compte LAHAThèque, son email permet de lier automatiquement ses futures statistiques de vente à ce dossier. Facultatif.
+            </p>
           </div>
 
           <div>

@@ -7,6 +7,7 @@ import { ArrowLeft, ShieldCheck, FileText, Upload, Save } from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { createLegalContract } from "@/lib/services/legal";
 import type { ContractType } from "@/lib/types/legal";
+import { toast } from "sonner";
 
 export default function NewLegalContractPage() {
   const router = useRouter();
@@ -27,23 +28,26 @@ export default function NewLegalContractPage() {
 
     setSubmitting(true);
     try {
-      await createLegalContract({
-        title,
-        contracting_party: contractingParty,
-        party_type: partyType,
-        type,
-        signed_at: signedAt,
-        expires_at: expiresAt || undefined,
-        file_name: file ? file.name : "Contrat_Official.pdf",
-        file_size: file ? file.size : 2500000,
-        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-        notes,
-      });
+      await createLegalContract(
+        {
+          title,
+          contracting_party: contractingParty,
+          party_type: partyType,
+          type,
+          signed_at: signedAt,
+          expires_at: expiresAt || undefined,
+          file_name: file ? file.name : "Contrat_Official.pdf",
+          file_size: file ? file.size : 2500000,
+          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+          notes,
+        },
+        file
+      );
 
-      alert("Le contrat a été enregistré, chiffré et indexé avec succès dans le moteur de recherche !");
+      toast.success("Le contrat a été enregistré, chiffré et indexé avec succès dans le moteur de recherche !");
       router.push("/legal-reviewer/contracts");
     } catch (err) {
-      alert("Erreur lors de l'enregistrement du contrat.");
+      toast.error("Erreur lors de l'enregistrement du contrat.");
     } finally {
       setSubmitting(false);
     }

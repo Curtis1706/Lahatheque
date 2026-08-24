@@ -540,3 +540,32 @@ class ONIXImportView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def post(self, request):
         return Response({"detail": "ONIX import stub"})
+
+
+class PreEditionSearchView(APIView):
+    """GET /api/v1/catalog/pre-editions/search/?q=... - Recherche pour rattachement au dépôt."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.rights.models import PreEditionDossier
+
+        query = request.query_params.get('q', '').strip()
+        dossiers = PreEditionDossier.objects.filter(
+            status__in=['en_attente_depot', 'maquette_en_cours']
+        )
+        if query:
+            dossiers = dossiers.filter(
+                Q(titre_previsionnel__icontains=query) | Q(auteur_nom__icontains=query)
+            )
+
+        results = [{
+            "id": str(d.id),
+            "code_dossier": d.code_dossier,
+            "titre_previsionnel": d.titre_previsionnel,
+            "auteur_nom": d.auteur_nom,
+            "auteur_email": d.auteur_email,
+            "universite_nom": d.universite_nom,
+            "faculte_nom": d.faculte_nom,
+        } for d in dossiers[:15]]
+
+        return Response({"success": True, "data": results})
