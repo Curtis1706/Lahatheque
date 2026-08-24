@@ -9,6 +9,24 @@ from .serializers import OrderSerializer, CreateOrderSerializer, SubscriptionPla
 from .payment_providers import get_payment_provider
 from apps.catalog.models import Ouvrage
 
+from django.conf import settings
+from urllib.parse import urlparse
+
+def get_frontend_base_url(request) -> str:
+    """Détermine dynamiquement l'URL de base du frontend (lahatheque.com, www.lahatheque.com, localhost)."""
+    origin = request.headers.get('origin') or request.headers.get('referer', '')
+    if origin:
+        parsed = urlparse(origin)
+        if parsed.scheme and parsed.netloc:
+            netloc = parsed.netloc.lower()
+            if (netloc == 'lahatheque.com' or 
+                netloc == 'www.lahatheque.com' or 
+                netloc.endswith('.lahatheque.com') or 
+                netloc.startswith('localhost') or 
+                netloc.startswith('127.0.0.1')):
+                return f"{parsed.scheme}://{parsed.netloc}"
+    return getattr(settings, 'FRONTEND_URL', 'https://lahatheque.com').rstrip('/')
+
 class CreateOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -128,7 +146,8 @@ class CreateOrderView(APIView):
                 }, status=status.HTTP_201_CREATED)
 
             provider = get_payment_provider(provider_name)
-            return_url = f"{request.scheme}://{request.get_host()}/student/orders"
+            frontend_base = get_frontend_base_url(request)
+            return_url = validated.get('return_url') or f"{frontend_base}/student/orders"
             payment_res = provider.initiate_payment(
                 amount=total_amount,
                 currency=currency.code,
@@ -258,7 +277,8 @@ class SubscribeView(APIView):
         try:
             from .payment_providers import get_payment_provider
             provider = get_payment_provider(provider_name)
-            return_url = f"{request.scheme}://{request.get_host()}/student/subscriptions"
+            frontend_base = get_frontend_base_url(request)
+            return_url = request.data.get("return_url") or f"{frontend_base}/student/subscriptions"
             payment_res = provider.initiate_payment(
                 amount=plan.price_amount,
                 currency=plan.currency.code if hasattr(plan.currency, 'code') else "XOF",
