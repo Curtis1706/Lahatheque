@@ -10,7 +10,11 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-lahatheque-dev-key-ch
 READER_JWT_SIGNING_KEY = config('READER_JWT_SIGNING_KEY', default=SECRET_KEY)
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1,testserver,.lahatheque.com,lahatheque.com,www.lahatheque.com,api.lahatheque.com',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
+)
 
 # Applications installées
 INSTALLED_APPS = [
@@ -167,6 +171,8 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_DOMAIN = config('SESSION_COOKIE_DOMAIN', default='.lahatheque.com' if not DEBUG else None)
+CSRF_COOKIE_DOMAIN = config('CSRF_COOKIE_DOMAIN', default='.lahatheque.com' if not DEBUG else None)
 
 # En-têtes de sécurité Django (Audit ZAP Sprint 0)
 SECURE_BROWSER_XSS_FILTER = True
@@ -176,17 +182,19 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
-# SSL / Proxy (Reverse Proxy SSL Header)
+# SSL / Proxy (Reverse Proxy SSL Header & Host Header)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 SECURE_SSL_REDIRECT = not DEBUG
 
-# ── FRONTEND & Domaines de Déploiement ────────────────────────────────────────
+# ── FRONTEND, BACKEND & Domaines de Déploiement ─────────────────────────────
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000' if DEBUG else 'https://lahatheque.com')
+BACKEND_URL = config('BACKEND_URL', default='http://localhost:8000' if DEBUG else 'https://api.lahatheque.com')
 
 # ── CORS Settings ─────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.lahatheque\.com$",
-    r"^https://lahatheque\.com$",
+    r"^https://([a-zA-Z0-9-]+\.)?lahatheque\.com$",
     r"^https://.*\.vercel\.app$",
     r"^https://lahatheque\.vercel\.app$",
     r"^http://localhost(:\d+)?$",
@@ -195,25 +203,41 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 CORS_ALLOWED_ORIGINS = [
     "https://lahatheque.com",
+    "https://www.lahatheque.com",
     "https://lahatheque.vercel.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+extra_cors = config('CORS_ALLOWED_ORIGINS', default='', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
+if extra_cors:
+    for origin in extra_cors:
+        if origin not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append(origin)
+
 CSRF_TRUSTED_ORIGINS = [
     "https://lahatheque.com",
+    "https://www.lahatheque.com",
+    "https://api.lahatheque.com",
     "https://*.lahatheque.com",
     "https://lahatheque.vercel.app",
     "https://*.vercel.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+extra_csrf = config('CSRF_TRUSTED_ORIGINS', default='', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
+if extra_csrf:
+    for origin in extra_csrf:
+        if origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']
 CORS_ALLOW_HEADERS = [
     'accept', 'accept-encoding', 'authorization', 'content-type',
-    'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with'
+    'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with',
+    'x-reader-token', 'baggage', 'sentry-trace'
 ]
-CORS_EXPOSE_HEADERS = ['Authorization']
+CORS_EXPOSE_HEADERS = ['Authorization', 'Content-Disposition', 'X-CSRFToken']
 
 # LCP Server & External API Configurations
 LCP_SERVER_URL = config('LCP_SERVER_URL', default='http://localhost:8989')

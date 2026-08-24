@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api').replace(/\/+$/, '')
-const DJANGO_API_URL = rawApiUrl.replace('localhost:8000', '127.0.0.1:8000')
+const rawApiUrl = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api').replace(/\/+$/, '')
+const DJANGO_API_URL = rawApiUrl.replace('localhost:8000', '127.0.0.1:8000').replace(/\/v1$/, '').replace(/\/api$/, '') + '/api'
 
 async function handleProxy(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const resolvedParams = await params
@@ -15,6 +15,14 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   const contentType = request.headers.get('content-type')
   if (contentType) {
     headers.set('content-type', contentType)
+  }
+  const origin = request.headers.get('origin')
+  if (origin) {
+    headers.set('origin', origin)
+  }
+  const referer = request.headers.get('referer')
+  if (referer) {
+    headers.set('referer', referer)
   }
 
   const accessToken = request.cookies.get('laha_access')?.value || request.cookies.get('access_token')?.value
