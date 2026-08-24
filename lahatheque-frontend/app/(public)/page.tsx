@@ -18,6 +18,7 @@ import HeroCarousel from "@/components/ui/hero-carousel";
 import { Book } from "@/components/ui/book";
 import { CountingNumber } from "@/components/ui/counting-number";
 import { PanafricanPresenceSection } from "@/components/features/home/panafrican-presence-section";
+import { WhyChooseSection } from "@/components/features/home/why-choose-section";
 
 const bestSellers = [
   {
@@ -414,55 +415,8 @@ export default function HomePage() {
       {/* Présence Panafricaine avec Globe 3D Cobe */}
       <PanafricanPresenceSection />
 
-      {/* Pourquoi Lahathèque */}
-      <section className="py-20 px-6 md:px-10 bg-background">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="font-serif text-3xl font-bold text-navy text-center mb-16">Pourquoi choisir Lahathèque ?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            
-            <div className="flex gap-4">
-              <span className="font-serif text-4xl font-bold text-gold/30">01</span>
-              <div>
-                <h4 className="font-serif font-bold text-base text-navy mb-2">Richesse du catalogue</h4>
-                <p className="text-sm text-foreground-muted">Plus grand fonds d'ouvrages universitaires africains numérisés.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <span className="font-serif text-4xl font-bold text-gold/30">02</span>
-              <div>
-                <h4 className="font-serif font-bold text-base text-navy mb-2">Qualité garantie</h4>
-                <p className="text-sm text-foreground-muted">Ouvrages sélectionnés et validés par des comités scientifiques.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <span className="font-serif text-4xl font-bold text-gold/30">03</span>
-              <div>
-                <h4 className="font-serif font-bold text-base text-navy mb-2">Accessibilité</h4>
-                <p className="text-sm text-foreground-muted">Lecture hors ligne et compatibilité multi-supports (PC, tablette, mobile).</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <span className="font-serif text-4xl font-bold text-gold/30">04</span>
-              <div>
-                <h4 className="font-serif font-bold text-base text-navy mb-2">Tarifs adaptés</h4>
-                <p className="text-sm text-foreground-muted">Des offres pensées pour le pouvoir d'achat des étudiants africains.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <span className="font-serif text-4xl font-bold text-gold/30">05</span>
-              <div>
-                <h4 className="font-serif font-bold text-base text-navy mb-2">Moyens de paiement</h4>
-                <p className="text-sm text-foreground-muted">Intégration des solutions de paiement local (Mobile Money).</p>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
+      {/* Pourquoi choisir Lahathèque (Composant animé) */}
+      <WhyChooseSection />
 
       {/* CTA Final */}
       <section className="py-20 px-6 md:px-10 bg-gradient-to-b from-background-secondary to-background border-t border-border">

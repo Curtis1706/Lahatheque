@@ -20,6 +20,7 @@ export interface GlobeProps {
   markers?: Marker[];
   arcs?: Arc[];
   className?: string;
+  focusLocation?: [number, number] | null;
   markerColor?: [number, number, number];
   baseColor?: [number, number, number];
   arcColor?: [number, number, number];
@@ -40,19 +41,20 @@ export function Globe({
   markers = [],
   arcs = [],
   className = "",
-  markerColor = [0.69, 0.55, 0.26], // Gold token
-  baseColor = [0.11, 0.16, 0.31],   // Navy token
-  arcColor = [0.69, 0.55, 0.26],    // Gold token
-  glowColor = [0.18, 0.25, 0.40],   // Navy hover token
-  dark = 1,
-  mapBrightness = 8,
-  markerSize = 0.04,
-  markerElevation = 0.02,
-  arcWidth = 0.8,
-  arcHeight = 0.3,
-  speed = 0.003,
-  theta = 0.1,
-  diffuse = 1.6,
+  focusLocation = null,
+  markerColor = [0.93, 0.70, 0.25], // Gold vibrant (#EF9F27)
+  baseColor = [0.22, 0.32, 0.58],   // Bleu Navy lumineux et contrasté pour voir nettement les continents
+  arcColor = [0.93, 0.70, 0.25],    // Gold vibrant
+  glowColor = [0.25, 0.38, 0.68],   // Halo lumineux
+  dark = 0.82,                      // Contraste optimal (pas trop sombre)
+  mapBrightness = 13,               // Contours des continents éclatants et lisibles
+  markerSize = 0.05,
+  markerElevation = 0.03,
+  arcWidth = 0.9,
+  arcHeight = 0.32,
+  speed = 0.002,
+  theta = 0.12,
+  diffuse = 1.8,
   mapSamples = 16000,
 }: GlobeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -63,18 +65,32 @@ export function Globe({
   const phiOffsetRef = useRef(0);
   const thetaOffsetRef = useRef(0);
   const isPausedRef = useRef(false);
+  const focusTargetRef = useRef<{ phi: number; theta: number } | null>(null);
+
+  // Mettre à jour la cible de focus lors d'un changement de pays
+  useEffect(() => {
+    if (focusLocation) {
+      const [lat, lon] = focusLocation;
+      // Convertir lat/lon en coordonnées cobe phi/theta
+      // Dans cobe: phi 0 fait face à l'Afrique centrale (~0 lon), theta 0 à l'équateur
+      const targetPhi = -(lon * Math.PI) / 180 + Math.PI / 2;
+      const targetTheta = (lat * Math.PI) / 180 * 0.5;
+      focusTargetRef.current = { phi: targetPhi, theta: targetTheta };
+    }
+  }, [focusLocation]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     pointerInteracting.current = { x: e.clientX, y: e.clientY };
     if (canvasRef.current) canvasRef.current.style.cursor = "grabbing";
     isPausedRef.current = true;
+    focusTargetRef.current = null; // Libérer le focus si l'utilisateur interagit
   }, []);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (pointerInteracting.current !== null) {
       const deltaX = e.clientX - pointerInteracting.current.x;
       const deltaY = e.clientY - pointerInteracting.current.y;
-      dragOffset.current = { phi: deltaX / 300, theta: deltaY / 1000 };
+      dragOffset.current = { phi: deltaX / 250, theta: deltaY / 800 };
       const now = Date.now();
       if (lastPointer.current) {
         const dt = Math.max(now - lastPointer.current.t, 1);
@@ -160,12 +176,30 @@ export function Globe({
         arcColor,
         arcWidth,
         arcHeight,
-        opacity: 0.9,
+        opacity: 0.95,
       });
 
       function animate() {
         if (!isPausedRef.current) {
-          phi += speed;
+          // Si un focus est actif, interpoler doucement vers la cible
+          if (focusTargetRef.current) {
+            const currentTotalPhi = phi + phiOffsetRef.current;
+            // Normaliser l'angle pour trouver le chemin le plus court
+            let diffPhi = (focusTargetRef.current.phi - currentTotalPhi) % (Math.PI * 2);
+            if (diffPhi > Math.PI) diffPhi -= Math.PI * 2;
+            if (diffPhi < -Math.PI) diffPhi += Math.PI * 2;
+
+            phiOffsetRef.current += diffPhi * 0.06;
+            const diffTheta = focusTargetRef.current.theta - (theta + thetaOffsetRef.current);
+            thetaOffsetRef.current += diffTheta * 0.06;
+
+            if (Math.abs(diffPhi) < 0.005 && Math.abs(diffTheta) < 0.005) {
+              focusTargetRef.current = null; // Animation terminée, reprendre la lente rotation
+            }
+          } else {
+            phi += speed;
+          }
+
           if (
             Math.abs(velocity.current.phi) > 0.0001 ||
             Math.abs(velocity.current.theta) > 0.0001
@@ -175,16 +209,16 @@ export function Globe({
             velocity.current.phi *= 0.95;
             velocity.current.theta *= 0.95;
           }
+
           const thetaMin = -0.4;
           const thetaMax = 0.4;
           if (thetaOffsetRef.current < thetaMin) {
-            thetaOffsetRef.current +=
-              (thetaMin - thetaOffsetRef.current) * 0.1;
+            thetaOffsetRef.current += (thetaMin - thetaOffsetRef.current) * 0.1;
           } else if (thetaOffsetRef.current > thetaMax) {
-            thetaOffsetRef.current +=
-              (thetaMax - thetaOffsetRef.current) * 0.1;
+            thetaOffsetRef.current += (thetaMax - thetaOffsetRef.current) * 0.1;
           }
         }
+
         globe?.update({
           phi: phi + phiOffsetRef.current + dragOffset.current.phi,
           theta: theta + thetaOffsetRef.current + dragOffset.current.theta,

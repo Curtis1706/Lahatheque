@@ -1,24 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
-import { Globe as GlobeIcon, MapPin, Sparkles, Building2, BookOpen } from "lucide-react";
+import React from "react";
+import { BookOpen, Building2, MapPin, Sparkles } from "lucide-react";
 import { Globe, type Marker, type Arc } from "@/components/ui/cobe-globe";
 
 const COUNTRIES = [
-  { id: "bj", name: "Bénin", city: "Cotonou", location: [6.3654, 2.4183] as [number, number], hub: true },
-  { id: "sn", name: "Sénégal", city: "Dakar", location: [14.7167, -17.4677] as [number, number] },
-  { id: "ci", name: "Côte d'Ivoire", city: "Abidjan", location: [5.3600, -4.0083] as [number, number] },
-  { id: "tg", name: "Togo", city: "Lomé", location: [6.1375, 1.2123] as [number, number] },
-  { id: "ne", name: "Niger", city: "Niamey", location: [13.5116, 2.1254] as [number, number] },
-  { id: "ml", name: "Mali", city: "Bamako", location: [12.6392, -8.0029] as [number, number] },
-  { id: "ga", name: "Gabon", city: "Libreville", location: [0.4162, 9.4673] as [number, number] },
-  { id: "cd", name: "RDC", city: "Kinshasa", location: [-4.4419, 15.2663] as [number, number] },
+  { id: "bj", name: "Bénin", location: [6.3654, 2.4183] as [number, number], hub: true },
+  { id: "sn", name: "Sénégal", location: [14.7167, -17.4677] as [number, number] },
+  { id: "ci", name: "Côte d'Ivoire", location: [5.3600, -4.0083] as [number, number] },
+  { id: "tg", name: "Togo", location: [6.1375, 1.2123] as [number, number] },
+  { id: "ne", name: "Niger", location: [13.5116, 2.1254] as [number, number] },
+  { id: "ml", name: "Mali", location: [12.6392, -8.0029] as [number, number] },
+  { id: "ga", name: "Gabon", location: [0.4162, 9.4673] as [number, number] },
+  { id: "cd", name: "RDC", location: [-4.4419, 15.2663] as [number, number] },
 ];
 
 const markers: Marker[] = COUNTRIES.map((c) => ({
   id: c.id,
   location: c.location,
-  label: `${c.name} (${c.city})`,
+  label: c.name,
 }));
 
 const hubLocation: [number, number] = [6.3654, 2.4183]; // Cotonou, Bénin
@@ -31,20 +31,13 @@ const arcs: Arc[] = COUNTRIES.filter((c) => !c.hub).map((c) => ({
 }));
 
 export function PanafricanPresenceSection() {
-  const [activeCountry, setActiveCountry] = useState<string>("bj");
-
-  const selectedCountry = COUNTRIES.find((c) => c.id === activeCountry) || COUNTRIES[0];
-
   return (
-    <section className="py-20 px-6 md:px-10 bg-navy text-white relative overflow-hidden border-t border-navy-hover">
-      {/* Halo lumineux subtil */}
-      <div className="absolute top-1/2 left-3/4 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gold/5 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
+    <section className="py-20 px-6 md:px-10 bg-navy text-white relative overflow-hidden">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
         {/* Colonne Gauche — Argumentaire */}
-        <div className="lg:col-span-5 space-y-8">
+        <div className="space-y-8">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/15 border border-gold/30 text-gold text-xs font-bold uppercase tracking-wider mb-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/15 text-gold text-xs font-bold uppercase tracking-wider mb-4">
               <Sparkles className="w-3.5 h-3.5" />
               Rayonnement Continental
             </div>
@@ -56,108 +49,80 @@ export function PanafricanPresenceSection() {
             </p>
           </div>
 
-          <div className="space-y-6 divide-y divide-navy-hover/60">
-            <div className="pt-2">
+          <div className="space-y-6">
+            <div className="p-5 rounded-2xl bg-navy-dark/60">
               <h3 className="font-serif text-lg text-gold font-bold mb-1.5 flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-gold" />
                 Expertise locale
               </h3>
               <p className="text-sm text-white/80 leading-relaxed">
-                Des contenus académiques rigoureusement conformes aux programmes universitaires et réalités africaines.
+                Des contenus adaptés aux réalités et aux programmes académiques africains (CAMES, ministères nationaux).
               </p>
             </div>
 
-            <div className="pt-6">
+            <div className="p-5 rounded-2xl bg-navy-dark/60">
               <h3 className="font-serif text-lg text-gold font-bold mb-1.5 flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-gold" />
                 Innovation technologique
               </h3>
               <p className="text-sm text-white/80 leading-relaxed">
-                Liseuse optimisée pour les connexions bas débit, protection LCP et synchronisation hors-ligne.
+                Une liseuse ultra-légère sous DRM LCP, pensée pour les connexions bas débit et la lecture fluide sur mobile.
               </p>
             </div>
 
-            <div className="pt-6">
+            <div className="p-5 rounded-2xl bg-navy-dark/60">
               <h3 className="font-serif text-lg text-gold font-bold mb-1.5 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-gold" />
                 Réseau logistique &amp; dépôts
               </h3>
               <p className="text-sm text-white/80 leading-relaxed">
-                Entrepôts et partenaires d&apos;impression pour la livraison physique express de vos manuels reliés.
+                Entrepôts locaux et partenaires d&apos;impression pour la livraison physique express de vos manuels reliés.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Colonne Droite — Globe 3D Cobe & Pays */}
-        <div className="lg:col-span-7 flex flex-col items-center">
-          <div className="w-full max-w-xl bg-navy-dark/90 p-6 sm:p-8 rounded-3xl border border-navy-hover shadow-2xl flex flex-col items-center backdrop-blur-xs">
-            {/* Titre & sous-titre */}
-            <div className="text-center space-y-1 mb-4">
-              <div className="w-10 h-10 rounded-2xl bg-gold/15 border border-gold/30 text-gold flex items-center justify-center mx-auto mb-2 shadow-xs">
-                <GlobeIcon className="w-5 h-5 text-gold" />
-              </div>
-              <h3 className="font-serif font-bold text-lg text-white">
-                Déjà présent dans plusieurs pays :
-              </h3>
-              <p className="text-xs text-white/60">
-                Faites tourner le globe ou sélectionnez un pays pour explorer notre réseau
-              </p>
-            </div>
+        {/* Colonne Droite — Carte avec Globe 3D & Tags Pays */}
+        <div className="flex justify-center">
+          <div className="w-full max-w-lg bg-navy-dark p-6 sm:p-8 rounded-3xl text-center shadow-xl">
+            <p className="text-base font-medium text-white mb-2">
+              Déjà présent dans plusieurs pays :
+            </p>
+            <p className="text-xs text-white/60 mb-6">
+              Réseau de distribution académique et logistique actif
+            </p>
 
-            {/* Globe 3D interactif Cobe */}
-            <div className="w-full max-w-[340px] sm:max-w-[400px] aspect-square relative my-2">
+            {/* Globe 3D Cobe */}
+            <div className="w-full max-w-[320px] sm:max-w-[380px] aspect-square mx-auto relative my-2">
               <Globe
                 markers={markers}
                 arcs={arcs}
-                markerColor={[0.85, 0.68, 0.32]} // Gold vibrant
-                baseColor={[0.12, 0.18, 0.35]}   // Navy doux
-                arcColor={[0.85, 0.68, 0.32]}    // Gold arcs
-                glowColor={[0.18, 0.28, 0.52]}   // Halo navy
-                dark={1}
-                mapBrightness={8}
-                markerSize={0.045}
+                markerColor={[0.93, 0.70, 0.25]} // Gold (#EF9F27)
+                baseColor={[0.22, 0.32, 0.58]}   // Continents contrastés
+                arcColor={[0.93, 0.70, 0.25]}    // Arcs dorés
+                glowColor={[0.12, 0.18, 0.35]}   // Halo navy sombre
+                dark={0.82}
+                mapBrightness={13}
+                markerSize={0.05}
                 markerElevation={0.025}
-                arcWidth={0.7}
+                arcWidth={0.8}
                 arcHeight={0.3}
                 speed={0.0025}
-                theta={0.1}
-                diffuse={1.7}
+                theta={0.12}
+                diffuse={1.8}
               />
             </div>
 
-            {/* Pills des pays */}
-            <div className="w-full pt-4 border-t border-navy-hover/60">
-              <div className="flex flex-wrap justify-center gap-2 text-xs font-bold">
-                {COUNTRIES.map((c) => {
-                  const isActive = c.id === activeCountry;
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setActiveCountry(c.id)}
-                      className={`px-3.5 py-1.5 rounded-full border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        isActive
-                          ? "bg-gold text-navy border-gold shadow-xs scale-105"
-                          : "bg-navy border-navy-hover text-white/90 hover:border-gold/60 hover:text-white"
-                      }`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-navy" : "bg-gold"}`} />
-                      {c.name}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Détails du pays actif */}
-              <div className="mt-4 p-3 rounded-2xl bg-navy/60 border border-navy-hover/80 text-center text-xs">
-                <span className="text-gold font-bold font-serif">{selectedCountry.name} ({selectedCountry.city})</span>
-                <span className="text-white/70 block text-[11px] mt-0.5">
-                  {selectedCountry.hub
-                    ? "Siège principal & Hub logistique d'expédition Afrique de l'Ouest"
-                    : "Réseau de distribution académique & partenariats universitaires actifs"}
+            {/* Badges Pays (statiques, sans sélection) */}
+            <div className="flex flex-wrap justify-center gap-2 text-xs font-bold pt-6">
+              {COUNTRIES.map((c) => (
+                <span
+                  key={c.id}
+                  className="px-3.5 py-1.5 bg-navy-hover text-white rounded-full text-xs font-semibold"
+                >
+                  {c.name}
                 </span>
-              </div>
+              ))}
             </div>
           </div>
         </div>
