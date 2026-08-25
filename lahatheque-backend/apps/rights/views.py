@@ -732,7 +732,7 @@ class LegalRoyaltiesBatchView(APIView):
     def post(self, request):
         book_id = request.data.get("book_id")
         beneficiaires = request.data.get("beneficiaires", [])
-        raw_rate = request.data.get("rate") or request.data.get("new_rate") or request.data.get("author_share_percent")
+        raw_rate = request.data.get("rate") if "rate" in request.data else (request.data.get("new_rate") if "new_rate" in request.data else request.data.get("author_share_percent"))
         apply_retroactively = bool(request.data.get("apply_retroactively", False))
 
         # Cas 1 : Ajustement d'un taux simple (ex: modale Juriste "Ajuster le taux")
@@ -741,13 +741,17 @@ class LegalRoyaltiesBatchView(APIView):
             if rate < 0 or rate > 100:
                 return Response({"success": False, "error": "Le pourcentage doit être compris entre 0% et 100%."}, status=400)
 
-            # Recherche de l'ouvrage
+            # Recherche robuste de l'ouvrage par UUID ou par titre
             ouvrage = None
             if book_id:
                 try:
-                    ouvrage = Ouvrage.objects.filter(Q(id=book_id) | Q(titre__iexact=book_id)).first()
-                except Exception:
+                    b_uuid = uuid.UUID(str(book_id).strip())
+                    ouvrage = Ouvrage.objects.filter(id=b_uuid).first()
+                except (ValueError, TypeError, AttributeError):
                     ouvrage = None
+
+                if not ouvrage:
+                    ouvrage = Ouvrage.objects.filter(title__iexact=str(book_id).strip()).first()
 
             if ouvrage:
                 RoyaltyRate.objects.update_or_create(
@@ -768,15 +772,20 @@ class LegalRoyaltiesBatchView(APIView):
                     author_right.user = ouvrage.authors.first().user
                 author_right.save()
 
-            return Response({
-                "success": True,
-                "message": f"Taux de droits d'auteur enregistré avec succès à {rate}%.",
-                "data": {
-                    "book_id": str(ouvrage.id) if ouvrage else str(book_id),
-                    "current_rate": rate,
-                    "apply_retroactively": apply_retroactively
-                }
-            }, status=200)
+                return Response({
+                    "success": True,
+                    "message": f"Taux de droits d'auteur pour « {ouvrage.title} » mis à jour à {rate}%.",
+                    "data": {
+                        "book_id": str(ouvrage.id),
+                        "current_rate": rate,
+                        "apply_retroactively": apply_retroactively
+                    }
+                }, status=200)
+            else:
+                return Response({
+                    "success": False,
+                    "error": f"Ouvrage introuvable pour l'identifiant '{book_id}'."
+                }, status=404)
 
         # Cas 2 : Clé de répartition multi-auteurs (doit sommer à 100%)
         if len(beneficiaires) > 1:
@@ -972,10 +981,16 @@ class LegalRelancesListView(APIView):
                 "currency": "XOF",
             })
 
-        # 2. Relances Dettes Clients — commandes impayées réelles depuis plus de 7 jours
+        # 2. Relances Dettes Clients & Achats à Crédit Auteurs
+        from django.db.models import Q as DQ
+
         cutoff = now - timedelta(days=7)
         unpaid_orders = Order.objects.filter(
-            statut_paiement='pending', created_at__lte=cutoff
+            DQ(statut_paiement='pending') &
+            (
+                (DQ(is_credit_purchase=False) & DQ(created_at__lte=cutoff)) |
+                (DQ(is_credit_purchase=True) & DQ(credit_due_date__lt=now.date()))
+            )
         ).select_related('user')
 
         debts_by_user = {}
@@ -990,6 +1005,8 @@ class LegalRelancesListView(APIView):
                     "client_email": order.user.email,
                     "unpaid_amount": 0.0,
                     "oldest_due_date": order.created_at,
+                    "is_credit": order.is_credit_purchase,
+                    "credit_due_date": order.credit_due_date.isoformat() if order.credit_due_date else None,
                 }
             debts_by_user[uid]["unpaid_amount"] += float(order.total_amount)
             if order.created_at < debts_by_user[uid]["oldest_due_date"]:
@@ -1009,6 +1026,8 @@ class LegalRelancesListView(APIView):
                 "due_date": d["oldest_due_date"].date().isoformat(),
                 "days_overdue": days_overdue,
                 "reminder_count": reminder_count,
+                "is_credit": d.get("is_credit", False),
+                "credit_due_date": d.get("credit_due_date"),
                 "status": f"relance_niveau_{min(reminder_count + 1, 3)}",
             })
 
@@ -1080,5 +1099,216 @@ class LegalRelancesListView(APIView):
             "success": True,
             "message": f"Relance envoyée avec succès à {recipient.get_full_name() or recipient.email}.",
             "data": {"id": str(journal_entry.id)}
+        })
+
+
+class DebtReminderConfigView(APIView):
+    """GET/POST /api/v1/rights/legal/relances/config/"""
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+
+    def get(self, request):
+        from .models import DebtReminderConfig
+        config = DebtReminderConfig.get_or_create_singleton()
+        return Response({
+            "success": True,
+            "data": {
+                "auto_remind_enabled": config.auto_remind_enabled,
+                "first_reminder_days": config.first_reminder_days,
+                "days_before_first_reminder": config.first_reminder_days,
+                "min_amount_threshold": float(config.min_amount_threshold),
+                "max_reminders_count": config.max_reminders_count,
+                "frequency_days": 5,
+            }
+        })
+
+    def post(self, request):
+        from .models import DebtReminderConfig
+        config = DebtReminderConfig.get_or_create_singleton()
+
+        if "auto_remind_enabled" in request.data:
+            config.auto_remind_enabled = bool(request.data["auto_remind_enabled"])
+        if "first_reminder_days" in request.data:
+            config.first_reminder_days = int(request.data["first_reminder_days"])
+        elif "days_before_first_reminder" in request.data:
+            config.first_reminder_days = int(request.data["days_before_first_reminder"])
+        if "min_amount_threshold" in request.data:
+            config.min_amount_threshold = float(request.data["min_amount_threshold"])
+        if "max_reminders_count" in request.data:
+            config.max_reminders_count = int(request.data["max_reminders_count"])
+        config.save()
+
+        return Response({
+            "success": True,
+            "message": "Règles de relance mises à jour.",
+            "data": {
+                "auto_remind_enabled": config.auto_remind_enabled,
+                "first_reminder_days": config.first_reminder_days,
+                "days_before_first_reminder": config.first_reminder_days,
+                "min_amount_threshold": float(config.min_amount_threshold),
+                "max_reminders_count": config.max_reminders_count,
+                "frequency_days": 5,
+            }
+        })
+
+
+class ManuscriptReviewPermission(permissions.BasePermission):
+    """Accès réservé au Chef Maquettiste et à l'Administrateur — étude des manuscrits d'auteurs."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        allowed_roles = ('chief_layout', 'admin', 'super_admin')
+        user = request.user
+        active = user.active_roles if isinstance(getattr(user, 'active_roles', None), list) else []
+        return bool(user.role in allowed_roles or any(r in active for r in allowed_roles))
+
+
+class ManuscriptReviewListView(APIView):
+    """GET /api/v1/rights/manuscripts/ - File d'étude des manuscrits, pour Chef Maquettiste et Admin."""
+    permission_classes = [permissions.IsAuthenticated, ManuscriptReviewPermission]
+
+    def get(self, request):
+        from .models import AuthorManuscriptSubmission
+
+        status_filter = request.query_params.get('status', '')
+        qs = AuthorManuscriptSubmission.objects.select_related('author').order_by('-created_at')
+        if status_filter and status_filter != 'all':
+            qs = qs.filter(status=status_filter)
+
+        data = [{
+            "id": str(s.id),
+            "title": s.title,
+            "author_name": s.author.get_full_name() or s.author.email,
+            "author_email": s.author.email,
+            "manuscript_file_url": s.manuscript_file.url if s.manuscript_file else None,
+            "version_type": s.version_type,
+            "status": s.status,
+            "suggested_summary": s.suggested_summary,
+            "suggested_language": s.suggested_language,
+            "editorial_note": s.editorial_note,
+            "submitted_at": s.created_at.isoformat(),
+        } for s in qs]
+
+        return Response({"success": True, "data": data})
+
+
+class ManuscriptReviewDecisionView(APIView):
+    """POST /api/v1/rights/manuscripts/<id>/decision/ - Accepte ou refuse un manuscrit étudié."""
+    permission_classes = [permissions.IsAuthenticated, ManuscriptReviewPermission]
+
+    def post(self, request, id):
+        from .models import AuthorManuscriptSubmission
+        from apps.reporting.services import notify_user
+        from apps.reporting.models import Notification
+
+        decision = request.data.get("decision")
+        note = request.data.get("editorial_note", "").strip()
+
+        if decision not in ("accept", "reject"):
+            return Response({"success": False, "error": "decision doit être 'accept' ou 'reject'."}, status=400)
+
+        try:
+            submission = AuthorManuscriptSubmission.objects.select_related('author').get(id=id)
+        except AuthorManuscriptSubmission.DoesNotExist:
+            return Response({"success": False, "error": "Manuscrit introuvable."}, status=404)
+
+        submission.status = 'catalog_preparation' if decision == 'accept' else 'rejected'
+        submission.editorial_note = note
+        submission.save(update_fields=['status', 'editorial_note', 'updated_at'])
+
+        try:
+            if decision == 'accept':
+                title = "Manuscrit accepté"
+                message = (
+                    f"Votre manuscrit « {submission.title} » a été accepté par le comité éditorial. "
+                    f"Un maquettiste va préparer sa mise en catalogue."
+                    + (f" Note : {note}" if note else "")
+                )
+            else:
+                title = "Manuscrit non retenu"
+                message = (
+                    f"Votre manuscrit « {submission.title} » n'a pas été retenu en l'état."
+                    + (f" Motif : {note}" if note else "")
+                )
+            notify_user(
+                user=submission.author,
+                notification_type=Notification.NotificationType.SYSTEM,
+                title=title,
+                message=message,
+                action_url="/author/submissions",
+                resource_id=str(submission.id),
+            )
+        except Exception:
+            pass
+
+        return Response({
+            "success": True,
+            "message": "Décision enregistrée et auteur notifié.",
+            "data": {"id": str(submission.id), "status": submission.status}
+        })
+
+
+class AuthorOrderReturnView(APIView):
+    """POST /api/v1/rights/author/orders/<order_id>/return/ - Retour d'une commande à crédit."""
+    permission_classes = [permissions.IsAuthenticated, IsAuthor]
+
+    def post(self, request, order_id):
+        from apps.commerce.models import Order, LigneCommande, StockOuvrage, MouvementStock
+        from apps.student.models import ReadingProgress
+        from django.db import transaction
+        from django.utils import timezone
+
+        try:
+            commande = Order.objects.get(id=order_id, user=request.user)
+        except Order.DoesNotExist:
+            return Response({"success": False, "error": "Commande introuvable."}, status=404)
+
+        if not commande.is_credit_purchase:
+            return Response({
+                "success": False,
+                "error": "Seules les commandes à crédit peuvent être retournées."
+            }, status=400)
+
+        if commande.statut_paiement == 'paid':
+            return Response({
+                "success": False,
+                "error": "Cette commande a déjà été réglée — un retour après paiement doit passer par le service financier."
+            }, status=400)
+
+        if commande.statut_commande == 'returned':
+            return Response({"success": False, "error": "Cette commande a déjà été retournée."}, status=400)
+
+        reason = request.data.get("reason", "").strip()
+
+        with transaction.atomic():
+            lignes = LigneCommande.objects.filter(commande=commande).select_related('ouvrage')
+
+            for ligne in lignes:
+                if ligne.format_type in ('digital', 'pdf', 'epub'):
+                    ReadingProgress.objects.filter(user=commande.user, ouvrage=ligne.ouvrage).delete()
+
+                elif ligne.format_type in ('paper', 'papier'):
+                    stock = StockOuvrage.objects.filter(ouvrage=ligne.ouvrage).first()
+                    if stock:
+                        stock.quantite_reelle += ligne.quantity
+                        stock.save(update_fields=['quantite_reelle'])
+                        MouvementStock.objects.create(
+                            stock=stock,
+                            type_mouvement='return',
+                            quantite=ligne.quantity,
+                            reference_document=f"Retour commande #{commande.id}",
+                            motif=reason or "Retour par l'auteur — achat à crédit annulé",
+                            auteur=commande.user,
+                        )
+
+            commande.statut_commande = 'returned'
+            commande.statut_paiement = 'refunded'
+            commande.returned_at = timezone.now()
+            commande.return_reason = reason
+            commande.save(update_fields=['statut_commande', 'statut_paiement', 'returned_at', 'return_reason'])
+
+        return Response({
+            "success": True,
+            "message": f"Commande #{str(commande.id)[:8]} retournée avec succès. Le stock a été mis à jour.",
+            "data": {"id": str(commande.id), "statut_commande": "returned"}
         })
 

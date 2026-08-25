@@ -267,6 +267,14 @@ class WholesalerOrdersListView(APIView):
 
             # Vérification du stock papier disponible
             if prt_qty > 0:
+                if not book.is_paper_available:
+                    order.delete()
+                    return Response({
+                        "success": False,
+                        "data": None,
+                        "error": f"« {book.title} » n'est pas disponible en version papier."
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
                 total_disponible = book.stocks_entrepots.aggregate(
                     total=Sum(F('quantite_reelle') - F('quantite_reservee'))
                 )['total'] or 0

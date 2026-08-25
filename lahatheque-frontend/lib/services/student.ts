@@ -147,6 +147,10 @@ export interface OrderAPI {
   statut_paiement_display: string;
   statut_commande: string;
   statut_commande_display: string;
+  is_credit_purchase?: boolean;
+  credit_due_date?: string;
+  returned_at?: string;
+  return_reason?: string;
   lignes: OrderLineAPI[];
   livraison: DeliveryAPI | null;
   created_at: string;

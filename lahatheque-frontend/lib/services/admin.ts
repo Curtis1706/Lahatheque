@@ -661,3 +661,44 @@ export async function getAdminSubscriptions(): Promise<AdminSubscriptionItem[]> 
   const json = await res.json();
   return json.data || json.results || [];
 }
+
+// =========================================================================
+// FINANCES GLOBALES & REDEVANCES AUTEURS
+// =========================================================================
+
+export interface AdminGlobalFinance {
+  total_platform_revenue: number;
+  breakdown: {
+    student_author_orders: { total: number; count: number };
+    university_orders: { total: number; count: number };
+    wholesale_orders: { total: number; count: number };
+  };
+  credit: { outstanding_total: number; outstanding_count: number };
+  subscriptions: { active_count: number };
+  author_payouts: { total_processed: number; total_pending: number; pending_count: number };
+}
+
+export interface AuthorRoyaltyReportLine {
+  author_id: string;
+  author_name: string;
+  books_count: number;
+  books_sold_total: number;
+  royalty_rate_percent: number;
+  total_royalties_due: number;
+  total_royalties_paid: number;
+  total_royalties_outstanding: number;
+}
+
+export async function getAdminGlobalFinance(): Promise<AdminGlobalFinance | null> {
+  const res = await fetch("/api/bff/admin/finance/global/", { credentials: "include", cache: "no-store" });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.data || null;
+}
+
+export async function getAuthorRoyaltiesReport(): Promise<AuthorRoyaltyReportLine[]> {
+  const res = await fetch("/api/bff/admin/finance/author-royalties/", { credentials: "include", cache: "no-store" });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data || [];
+}

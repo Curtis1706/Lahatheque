@@ -6,9 +6,9 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
-from .models import Ouvrage, Discipline
-from .serializers import OuvrageReadSerializer, OuvrageCreateSerializer, DisciplineSerializer
-from .permissions import IsLayoutArtistOrAbove, IsChiefLayoutOnly
+from .models import Ouvrage, Discipline, Domain
+from .serializers import OuvrageReadSerializer, OuvrageCreateSerializer, DisciplineSerializer, DomainSerializer
+from .permissions import IsLayoutArtistOrAbove, IsChiefLayoutOnly, IsManagerOrAdmin
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,42 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 
 
-class DisciplineViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Discipline.objects.all()
+class DisciplineViewSet(viewsets.ModelViewSet):
+    """CRUD des disciplines — lecture publique, écriture réservée Gestionnaire/Admin."""
+    queryset = Discipline.objects.all().order_by('name')
     serializer_class = DisciplineSerializer
-    permission_classes = [permissions.AllowAny]
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), IsManagerOrAdmin()]
+
+    def destroy(self, request, *args, **kwargs):
+        discipline = self.get_object()
+        books_count = discipline.ouvrages.count() if hasattr(discipline, 'ouvrages') else 0
+        if books_count > 0:
+            return Response({
+                "success": False,
+                "error": f"Impossible de supprimer : {books_count} ouvrage(s) sont rattachés à cette discipline."
+            }, status=400)
+        return super().destroy(request, *args, **kwargs)
+
+
+class DomainViewSet(viewsets.ModelViewSet):
+    """CRUD des sous-catégories rattachées à une discipline."""
+    serializer_class = DomainSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), IsManagerOrAdmin()]
+
+    def get_queryset(self):
+        qs = Domain.objects.select_related('discipline').order_by('name')
+        discipline_id = self.request.query_params.get('discipline')
+        if discipline_id:
+            qs = qs.filter(discipline_id=discipline_id)
+        return qs
 
 
 class MaquettisteDepositViewSet(viewsets.ModelViewSet):

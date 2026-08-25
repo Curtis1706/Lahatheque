@@ -28,3 +28,14 @@ class IsChiefLayoutOnly(BasePermission):
         user = request.user
         active = user.active_roles if isinstance(getattr(user, 'active_roles', None), list) else []
         return bool(user.role in chief_roles or any(r in chief_roles for r in active))
+
+
+class IsManagerOrAdmin(BasePermission):
+    """Gestion du référentiel disciplines/catégories — réservé Gestionnaire et Admin."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        allowed_roles = ('manager', 'admin', 'super_admin')
+        user = request.user
+        active = user.active_roles if isinstance(getattr(user, 'active_roles', None), list) else []
+        return bool(user.role in allowed_roles or any(r in active for r in allowed_roles))

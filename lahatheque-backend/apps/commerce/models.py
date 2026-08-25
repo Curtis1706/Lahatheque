@@ -62,6 +62,7 @@ class Order(models.Model):
         ('processing', 'En traitement'),
         ('completed', 'Terminée'),
         ('cancelled', 'Annulée'),
+        ('returned', 'Retournée'),
     ]
     ORDER_TYPE_CHOICES = [
         ('rentree_scolaire', 'Rentrée scolaire'),
@@ -88,6 +89,14 @@ class Order(models.Model):
         max_length=20, choices=PAYMENT_METHOD_CHOICES, default='mobile_money'
     )
     payment_transaction = models.ForeignKey(PaymentTransaction, null=True, blank=True, on_delete=models.SET_NULL, related_name='commandes')
+    is_credit_purchase = models.BooleanField(default=False)
+    credit_due_date = models.DateField(null=True, blank=True)
+    credit_granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='credits_accordes'
+    )
+    returned_at = models.DateTimeField(null=True, blank=True)
+    return_reason = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -20,6 +20,8 @@ export interface OrderCreatePayload {
   date_livraison_souhaitee?: string; // "YYYY-MM-DD"
   plage_horaire_debut?: string;      // "HH:MM"
   plage_horaire_fin?: string;        // "HH:MM"
+  is_credit_purchase?: boolean;
+  credit_due_date?: string;          // "YYYY-MM-DD"
 }
 
 export interface OrderCreateResponse {

@@ -16,6 +16,8 @@ from .manager_views import (
     ManagerReportExportView,
     AvailableBooksForStockView,
     InstitutionalDeliveriesView,
+    ManualPaymentConfirmView,
+    ManagerFinanceReportView,
 )
 
 from .wholesaler_views import (
@@ -55,6 +57,8 @@ urlpatterns = [
     path('manager/deliveries/', DeliveriesListView.as_view(), name='manager-deliveries-list'),
     path('manager/deliveries/institutional/', InstitutionalDeliveriesView.as_view(), name='manager-deliveries-institutional'),
     path('manager/deliveries/<uuid:pk>/', DeliveryDetailView.as_view(), name='manager-delivery-detail'),
+    path('manager/orders/<uuid:order_id>/confirm-payment/', ManualPaymentConfirmView.as_view(), name='manager-confirm-manual-payment'),
+    path('manager/finance/report/', ManagerFinanceReportView.as_view(), name='manager-finance-report'),
 
     # ─── Grossiste (B2B) ────────────────────────────────────────────────────────
     path('wholesaler/kpis/', WholesalerKpisView.as_view(), name='wholesaler-kpis'),

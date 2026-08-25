@@ -47,6 +47,24 @@ class CreateOrderView(APIView):
         plage_debut = validated.get('plage_horaire_debut')
         plage_fin = validated.get('plage_horaire_fin')
 
+        is_credit_purchase = validated.get('is_credit_purchase', False)
+        credit_due_date = validated.get('credit_due_date')
+
+        if is_credit_purchase:
+            if request.user.role != 'author':
+                return Response({
+                    'error': "L'achat à crédit est réservé aux comptes Auteur."
+                }, status=status.HTTP_403_FORBIDDEN)
+            if not credit_due_date:
+                return Response({
+                    'error': "Une date d'échéance de paiement est obligatoire pour un achat à crédit."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            from datetime import date
+            if credit_due_date <= date.today():
+                return Response({
+                    'error': "La date d'échéance doit être dans le futur."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
         currency, _ = Currency.objects.get_or_create(code='XOF', defaults={'peg_rate_to_eur': 655.957})
 
         total_amount = 0
@@ -111,6 +129,9 @@ class CreateOrderView(APIView):
                 statut_commande='pending',
                 type_commande=type_commande,
                 mode_paiement=mode_paiement,
+                is_credit_purchase=is_credit_purchase,
+                credit_due_date=credit_due_date if is_credit_purchase else None,
+                credit_granted_by=request.user if is_credit_purchase else None,
             )
 
             for l in lignes_to_create:
@@ -133,6 +154,17 @@ class CreateOrderView(APIView):
                     plage_horaire_debut=plage_debut,
                     plage_horaire_fin=plage_fin,
                 )
+
+            if is_credit_purchase:
+                from .services import fulfill_credit_order
+                fulfill_credit_order(commande)
+                return Response({
+                    'success': True,
+                    'order_id': str(commande.id),
+                    'data': OrderSerializer(commande).data,
+                    'order': OrderSerializer(commande).data,
+                    'message': f"Commande en dépôt confirmée. Paiement dû avant le {credit_due_date.strftime('%d/%m/%Y')}.",
+                }, status=status.HTTP_201_CREATED)
 
             # Si le mode de règlement n'est pas Mobile Money → règlement manuel
             if mode_paiement != 'mobile_money':

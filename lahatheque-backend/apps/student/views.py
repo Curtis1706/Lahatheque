@@ -319,12 +319,12 @@ class StudentHistoryStatsView(APIView):
         ]
 
         # Progression globale
-        total_books = ReadingProgress.objects.filter(user=user).count() or 1
+        total_books = ReadingProgress.objects.filter(user=user).count()
         avg_progress = (
             ReadingProgress.objects
             .filter(user=user)
             .aggregate(avg=Sum('progress_percent'))['avg'] or 0
-        ) / total_books
+        ) / total_books if total_books > 0 else 0
 
         # Livres terminés
         books_completed = ReadingProgress.objects.filter(user=user, is_completed=True).count()

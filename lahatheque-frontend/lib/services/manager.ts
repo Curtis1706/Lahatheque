@@ -523,6 +523,41 @@ export async function updateInstitutionalDelivery(payload: {
   await bffPatch("/deliveries/institutional/", payload);
 }
 
+export async function confirmManualPayment(orderId: string): Promise<boolean> {
+  const res = await fetch(`/api/bff/commerce/manager/orders/${orderId}/confirm-payment/`, {
+    method: "POST",
+    credentials: "include",
+  });
+  return res.ok;
+}
+
+// ─── Rapport Financier Gestionnaire ───────────────────────────────────────────
+
+export interface ManagerFinanceReport {
+  revenue_by_payment_method: { method: string; total: number; count: number }[];
+  total_revenue_paid: number;
+  credit_outstanding_total: number;
+  credit_settled_total: number;
+  credit_overdue_count: number;
+  credit_orders: {
+    id: string;
+    author_name: string;
+    amount: number;
+    due_date: string | null;
+    is_overdue: boolean;
+    statut_paiement: string;
+    statut_commande: string;
+    created_at: string;
+  }[];
+}
+
+export async function getManagerFinanceReport(): Promise<ManagerFinanceReport | null> {
+  const res = await fetch("/api/bff/commerce/manager/finance/report/", { credentials: "include", cache: "no-store" });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.data || null;
+}
+
 
 
 

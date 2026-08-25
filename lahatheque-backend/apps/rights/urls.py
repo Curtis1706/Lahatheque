@@ -7,6 +7,9 @@ from .views import (
     AuthorPayoutRequestView,
     AdminPayoutDecisionView,
     AuthorSubmissionsView,
+    AuthorOrderReturnView,
+    ManuscriptReviewListView,
+    ManuscriptReviewDecisionView,
     LegalKpisView,
     LegalContractsListView,
     LegalContractDetailView,
@@ -16,6 +19,7 @@ from .views import (
     LegalAiSuggestionDecisionView,
     LegalPreEditionsListView,
     LegalRelancesListView,
+    DebtReminderConfigView,
 )
 
 app_name = 'rights'
@@ -29,6 +33,9 @@ urlpatterns = [
     path('author/payout-request/', AuthorPayoutRequestView.as_view(), name='author-payout-request'),
     path('admin/payouts/<uuid:id>/decision/', AdminPayoutDecisionView.as_view(), name='admin-payout-decision'),
     path('author/submissions/', AuthorSubmissionsView.as_view(), name='author-submissions'),
+    path('author/orders/<uuid:order_id>/return/', AuthorOrderReturnView.as_view(), name='author-order-return'),
+    path('manuscripts/', ManuscriptReviewListView.as_view(), name='manuscripts-review-list'),
+    path('manuscripts/<str:id>/decision/', ManuscriptReviewDecisionView.as_view(), name='manuscripts-review-decision'),
 
     # Juriste / Legal Reviewer
     path('legal/kpis/', LegalKpisView.as_view(), name='legal-kpis'),
@@ -39,6 +46,7 @@ urlpatterns = [
     path('legal/ai-suggestions/', LegalAiSuggestionsListView.as_view(), name='legal-ai-suggestions-list'),
     path('legal/ai-suggestions/<str:id>/decide/', LegalAiSuggestionDecisionView.as_view(), name='legal-ai-suggestion-decide'),
     path('legal/pre-editions/', LegalPreEditionsListView.as_view(), name='legal-pre-editions-list'),
+    path('legal/relances/config/', DebtReminderConfigView.as_view(), name='legal-relances-config'),
     path('legal/relances/', LegalRelancesListView.as_view(), name='legal-relances-list'),
 ]
 

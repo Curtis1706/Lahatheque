@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from .models import (
     PublisherProfile,
@@ -274,6 +275,18 @@ class PublisherAiMetadataExtractView(APIView):
 
 class PublisherDepositsView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def _save_uploaded_file(self, request):
+        from django.core.files.storage import default_storage
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return ""
+        try:
+            saved_path = default_storage.save(f"publisher_deposits/{uploaded.name}", uploaded)
+            return default_storage.url(saved_path)
+        except Exception:
+            return ""
 
     def post(self, request):
         user = request.user
@@ -309,7 +322,7 @@ class PublisherDepositsView(APIView):
             summary=data.get("summary", "Ouvrage déposé pour examen par le comité éditorial."),
             authors_bio=data.get("authors_bio", ""),
             cover_url=data.get("cover_url", "/placeholder-cover.jpg"),
-            file_url=data.get("file_url", "/mock/files/manuscript.pdf"),
+            file_url=self._save_uploaded_file(request) if request.FILES.get("file") else data.get("file_url", ""),
             file_format=data.get("file_format", "pdf"),
             licence_type=data.get("licence_type", "tous_droits_reserves"),
             status=PublisherDepositStatus.PENDING,

@@ -1260,4 +1260,95 @@ class AdminSubscriptionsListAPIView(APIView):
         return Response({"success": True, "data": results, "error": None})
 
 
+class AdminGlobalFinanceView(APIView):
+    """GET /api/v1/admin/finance/global/ - Vue financière complète — tous paiements."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from apps.commerce.models import Order, Subscription, WholesaleOrder
+        from apps.partners.models import UniversityPaperOrder
+        from apps.rights.models import PayoutRequest
+        from django.db.models import Sum
+
+        orders_paid = Order.objects.filter(statut_paiement='paid')
+        orders_credit_outstanding = Order.objects.filter(is_credit_purchase=True, statut_paiement='pending')
+        univ_orders = UniversityPaperOrder.objects.exclude(status='cancelled')
+        wholesale_orders = WholesaleOrder.objects.exclude(status='cancelled')
+        subscriptions_active = Subscription.objects.filter(is_active=True)
+        payouts_processed = PayoutRequest.objects.filter(status='processed')
+        payouts_pending = PayoutRequest.objects.filter(status='pending')
+
+        total_platform_revenue = (
+            float(orders_paid.aggregate(t=Sum('total_amount'))['t'] or 0) +
+            float(univ_orders.aggregate(t=Sum('total_amount'))['t'] or 0) +
+            float(wholesale_orders.aggregate(t=Sum('total_amount'))['t'] or 0)
+        )
+
+        return Response({
+            "success": True,
+            "data": {
+                "total_platform_revenue": total_platform_revenue,
+                "breakdown": {
+                    "student_author_orders": {"total": float(orders_paid.aggregate(t=Sum('total_amount'))['t'] or 0), "count": orders_paid.count()},
+                    "university_orders": {"total": float(univ_orders.aggregate(t=Sum('total_amount'))['t'] or 0), "count": univ_orders.count()},
+                    "wholesale_orders": {"total": float(wholesale_orders.aggregate(t=Sum('total_amount'))['t'] or 0), "count": wholesale_orders.count()},
+                },
+                "credit": {
+                    "outstanding_total": float(orders_credit_outstanding.aggregate(t=Sum('total_amount'))['t'] or 0),
+                    "outstanding_count": orders_credit_outstanding.count(),
+                },
+                "subscriptions": {"active_count": subscriptions_active.count()},
+                "author_payouts": {
+                    "total_processed": float(payouts_processed.aggregate(t=Sum('amount'))['t'] or 0),
+                    "total_pending": float(payouts_pending.aggregate(t=Sum('amount'))['t'] or 0),
+                    "pending_count": payouts_pending.count(),
+                },
+            }
+        })
+
+
+class AdminAuthorRoyaltiesReportView(APIView):
+    """GET /api/v1/admin/finance/author-royalties/ - Redevances par auteur (ventes, taux Juriste, dû/versé)."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from apps.accounts.models import User
+        from apps.rights.models import AuthorRight, RoyaltyPayoutLine
+        from apps.commerce.models import LigneCommande
+        from django.db.models import Sum
+
+        authors = User.objects.filter(role='author', is_active=True)
+        results = []
+
+        for author in authors:
+            rights = AuthorRight.objects.filter(user=author).select_related('ouvrage')
+            if not rights.exists():
+                continue
+
+            ouvrage_ids = rights.values_list('ouvrage_id', flat=True)
+            lignes = LigneCommande.objects.filter(ouvrage_id__in=ouvrage_ids, commande__statut_paiement='paid')
+            books_sold = lignes.aggregate(t=Sum('quantity'))['t'] or 0
+
+            payout_lines = RoyaltyPayoutLine.objects.filter(author_right__user=author)
+            total_due = float(payout_lines.aggregate(t=Sum('payout_amount'))['t'] or 0)
+            total_paid = float(payout_lines.filter(is_settled=True).aggregate(t=Sum('payout_amount'))['t'] or 0)
+
+            rights_count = rights.count()
+            avg_rate = float(sum(r.pool_share_percent for r in rights) / rights_count) if rights_count else 0
+
+            results.append({
+                "author_id": str(author.id),
+                "author_name": author.get_full_name() or author.email,
+                "books_count": rights.values('ouvrage').distinct().count(),
+                "books_sold_total": books_sold,
+                "royalty_rate_percent": round(avg_rate, 2),
+                "total_royalties_due": total_due,
+                "total_royalties_paid": total_paid,
+                "total_royalties_outstanding": total_due - total_paid,
+            })
+
+        results.sort(key=lambda x: x["total_royalties_due"], reverse=True)
+        return Response({"success": True, "data": results})
+
+
 

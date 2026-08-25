@@ -112,7 +112,7 @@ export async function getBookRoyalties(): Promise<BookRoyalty[]> {
     book_id: r.book_id || r.id,
     title: r.book_title || r.title || "Ouvrage",
     authors: Array.isArray(r.authors) ? r.authors : [r.author_name || "Auteur"],
-    current_rate: r.author_share_percent || 15,
+    current_rate: r.author_share_percent !== undefined && r.author_share_percent !== null ? Number(r.author_share_percent) : 15,
     source: "manual_override",
     last_updated: r.effective_date || new Date().toISOString(),
     history: [],

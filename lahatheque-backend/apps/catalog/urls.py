@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     OuvrageViewSet,
     DisciplineViewSet,
+    DomainViewSet,
     MaquettisteDepositViewSet,
     ChiefLayoutValidationViewSet,
     ONIXImportView,
@@ -15,6 +16,7 @@ app_name = 'catalog'
 router = DefaultRouter()
 router.register(r'books', OuvrageViewSet, basename='ouvrage')
 router.register(r'disciplines', DisciplineViewSet, basename='discipline')
+router.register(r'domains', DomainViewSet, basename='domain')
 
 # Espace Maquettiste : CRUD sur ses propres dépôts
 router.register(r'my-deposits', MaquettisteDepositViewSet, basename='my-deposits')

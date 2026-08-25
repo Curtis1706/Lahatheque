@@ -549,3 +549,44 @@ export async function updateCatalogBookWithFiles(
 
   return mapBackendToDeposit(respData.data || respData);
 }
+
+// ─── Étude des Manuscrits Auteurs (Chef Maquettiste & Admin) ─────────────────
+
+export interface ManuscriptForReview {
+  id: string;
+  title: string;
+  author_name: string;
+  author_email: string;
+  manuscript_file_url: string | null;
+  version_type: string;
+  status: string;
+  suggested_summary: string;
+  suggested_language: string;
+  editorial_note: string;
+  submitted_at: string;
+}
+
+export async function getManuscriptsForReview(status?: string): Promise<ManuscriptForReview[]> {
+  const params = status && status !== "all" ? `?status=${status}` : "";
+  const res = await fetch(`/api/bff/rights/manuscripts/${params}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data || [];
+}
+
+export async function decideOnManuscript(
+  id: string,
+  decision: "accept" | "reject",
+  editorialNote: string
+): Promise<boolean> {
+  const res = await fetch(`/api/bff/rights/manuscripts/${id}/decision/`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision, editorial_note: editorialNote }),
+  });
+  return res.ok;
+}

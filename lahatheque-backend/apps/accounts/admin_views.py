@@ -394,6 +394,43 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
         except User.DoesNotExist:
             return Response({"error": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
+    def partial_update(self, request, pk=None):
+        """PATCH /api/v1/admin/users/<id>/ - Modification d'un compte existant."""
+        try:
+            user = User.objects.get(id=pk)
+        except User.DoesNotExist:
+            return Response({"error": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        allowed_fields = ['first_name', 'last_name', 'phone', 'role', 'is_active', 'country', 'pen_name']
+        updated_fields = []
+
+        for field in allowed_fields:
+            if field in request.data:
+                setattr(user, field, request.data[field])
+                updated_fields.append(field)
+
+        if 'email' in request.data:
+            new_email = request.data['email'].strip().lower()
+            if new_email != user.email and User.objects.filter(email=new_email).exclude(id=user.id).exists():
+                return Response({"error": "Cet email est déjà utilisé par un autre compte."}, status=400)
+            user.email = new_email
+            user.username = new_email
+            updated_fields.extend(['email', 'username'])
+
+        if updated_fields:
+            user.save(update_fields=updated_fields)
+
+        return Response({
+            "id": str(user.id),
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": user.role,
+            "is_active": user.is_active,
+            "phone": user.phone,
+            "country": user.country,
+        })
+
     @action(detail=True, methods=['patch'], url_path='toggle-status')
     def toggle_status(self, request, pk=None):
         """PATCH /api/v1/admin/users/<id>/toggle-status/"""

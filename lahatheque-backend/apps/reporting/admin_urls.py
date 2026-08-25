@@ -12,6 +12,8 @@ from apps.reporting.admin_views import (
     AdminSalesListAPIView,
     AdminSalesByCountryAPIView,
     AdminSubscriptionsListAPIView,
+    AdminGlobalFinanceView,
+    AdminAuthorRoyaltiesReportView,
     AdminCatalogPricingViewSet,
     AdminRoyaltiesPayoutViewSet,
     AdminRemindersViewSet,
@@ -39,5 +41,7 @@ urlpatterns = [
     path('sales/', AdminSalesListAPIView.as_view(), name='admin-sales-list'),
     path('sales/by-country/', AdminSalesByCountryAPIView.as_view(), name='admin-sales-by-country'),
     path('subscriptions/', AdminSubscriptionsListAPIView.as_view(), name='admin-subscriptions-list'),
+    path('finance/global/', AdminGlobalFinanceView.as_view(), name='admin-finance-global'),
+    path('finance/author-royalties/', AdminAuthorRoyaltiesReportView.as_view(), name='admin-finance-author-royalties'),
     path('', include(router.urls)),
 ]

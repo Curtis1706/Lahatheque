@@ -20,14 +20,34 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { OrderStatusStepper } from "@/components/features/manager/order-status-stepper";
-import { getOrderDetail } from "@/lib/services/manager";
+import { getOrderDetail, confirmManualPayment } from "@/lib/services/manager";
 import type { ManagerOrder } from "@/lib/types/manager";
+import { toast } from "sonner";
 
 export default function DeliveryDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const [order, setOrder] = useState<ManagerOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
+
+  const handleConfirmManualPayment = async () => {
+    if (!order) return;
+    setConfirmingPayment(true);
+    try {
+      const ok = await confirmManualPayment(order.id);
+      if (ok) {
+        toast.success(`Le paiement manuel de la commande #${order.id.slice(0, 8)} a été confirmé avec succès.`);
+        setOrder((prev) => (prev ? { ...prev, statut_paiement: "paid", status: "to_ship" } : null));
+      } else {
+        toast.error("Échec de la confirmation du paiement.");
+      }
+    } catch {
+      toast.error("Une erreur est survenue lors de la confirmation du paiement.");
+    } finally {
+      setConfirmingPayment(false);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -206,6 +226,23 @@ export default function DeliveryDetailPage() {
                 {totalAmount.toLocaleString("fr-FR")} XOF
               </span>
             </div>
+
+            {order.mode_paiement !== "mobile_money" && order.statut_paiement !== "paid" && (
+              <div className="pt-3 border-t border-border">
+                <button
+                  type="button"
+                  onClick={handleConfirmManualPayment}
+                  disabled={confirmingPayment}
+                  className="w-full py-2.5 px-4 rounded-xl bg-navy hover:bg-navy-dark text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-gold" />
+                  {confirmingPayment ? "Confirmation en cours..." : "Confirmer le paiement reçu (Manuel)"}
+                </button>
+                <p className="text-[10px] text-foreground-muted text-center mt-1.5">
+                  Débloquera les accès numériques et validera le stock physique.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

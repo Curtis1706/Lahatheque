@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Ouvrage, BookAuthor, Discipline, MetadataONIX
+from .models import Ouvrage, BookAuthor, Discipline, Domain, MetadataONIX
 
 
 class BookAuthorSerializer(serializers.ModelSerializer):
@@ -12,6 +12,14 @@ class DisciplineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Discipline
         fields = '__all__'
+
+
+class DomainSerializer(serializers.ModelSerializer):
+    discipline_name = serializers.CharField(source='discipline.name', read_only=True)
+
+    class Meta:
+        model = Domain
+        fields = ['id', 'discipline', 'discipline_name', 'name']
 
 
 class OuvrageReadSerializer(serializers.ModelSerializer):

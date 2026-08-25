@@ -12,8 +12,13 @@ class BookAuthor(models.Model):
     biography = models.TextField(blank=True)
 
 class Discipline(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
     code_dewey = models.CharField(max_length=50, blank=True)
+    description = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+
+    def __str__(self):
+        return self.name
 
 class Domain(models.Model):
     discipline = models.ForeignKey(Discipline, on_delete=models.CASCADE, related_name='domains')

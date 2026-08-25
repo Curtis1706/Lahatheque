@@ -289,3 +289,13 @@ export async function removeAuthorDelegate(delegateId: string): Promise<boolean>
   }
   return false;
 }
+
+export async function returnCreditOrder(orderId: string, reason: string): Promise<boolean> {
+  const res = await fetch(`/api/bff/rights/author/orders/${orderId}/return/`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  return res.ok;
+}

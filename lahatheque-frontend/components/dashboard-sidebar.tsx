@@ -46,7 +46,12 @@ import {
   Scale,
   FileCheck2,
   Boxes,
-  TrendingDown
+  TrendingDown,
+  BookOpenCheck,
+  Wallet,
+  TrendingUp,
+  Landmark,
+  Layers,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -248,9 +253,12 @@ export function DashboardSidebar() {
               { label: "À expédier", href: "/manager/delivery", icon: <Package className="w-4 h-4 text-gold" /> },
               { label: "En transit", href: "/manager/delivery/in-transit", icon: <Truck className="w-4 h-4 text-gold" /> },
               { label: "Livrées", href: "/manager/delivery/delivered", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
+              { label: "Institutionnelles", href: "/manager/delivery/institutional", icon: <Building2 className="w-4 h-4 text-gold" /> },
             ],
           },
           { label: "Coordination Admin", href: "/manager/coordination", icon: <ArrowUpCircle className="w-5 h-5" /> },
+          { label: "Disciplines & Catégories", href: "/manager/catalog/disciplines", icon: <Layers className="w-5 h-5" /> },
+          { label: "Finances & Flux", href: "/manager/finance", icon: <Wallet className="w-5 h-5" /> },
           { label: "Rapports & Export", href: "/manager/reports", icon: <FileBarChart className="w-5 h-5" /> },
           { label: "Profil & Paramètres", href: "/manager/profile", icon: <UserIcon className="w-5 h-5" /> },
         ];
@@ -280,6 +288,7 @@ export function DashboardSidebar() {
           { label: "Mes Livres Publiés", href: "/author/books", icon: <BookOpen className="w-5 h-5" /> },
           { label: "Mes Dépôts (Manuscrit)", href: "/author/submissions", icon: <PenTool className="w-5 h-5" /> },
           { label: "Droits & Paiements", href: "/author/royalties", icon: <DollarSign className="w-5 h-5" /> },
+          { label: "Catalogue Général", href: "/author/catalog", icon: <Search className="w-5 h-5" /> },
           { label: "Mes Achats", href: "/author/purchases", icon: <ShoppingBag className="w-5 h-5" /> },
           { label: "Profil & Délégation", href: "/author/profile", icon: <UserIcon className="w-5 h-5" /> },
         ];
@@ -308,6 +317,7 @@ export function DashboardSidebar() {
       case "chief_layout":
         return [
           { label: "Vue d'ensemble", href: "/chief-layout", icon: <LayoutDashboard className="w-5 h-5" /> },
+          { label: "Manuscrits Auteurs", href: "/chief-layout/manuscripts", icon: <BookOpenCheck className="w-5 h-5" /> },
           { label: "Catalogue des ouvrages", href: "/chief-layout/catalog", icon: <BookOpen className="w-5 h-5" /> },
           { label: "Déposer un ouvrage", href: "/chief-layout/deposit", icon: <PlusCircle className="w-5 h-5" /> },
           { label: "Dépôts à valider", href: "/chief-layout/validation", icon: <CheckSquare className="w-5 h-5" /> },
@@ -335,6 +345,7 @@ export function DashboardSidebar() {
             ]
           },
           { label: "Catalogue Global", href: "/admin/catalog", icon: <BookOpen className="w-5 h-5" /> },
+          { label: "Disciplines & Catégories", href: "/admin/catalog/disciplines", icon: <Layers className="w-5 h-5" /> },
           { label: "Validation BAT & Maquettes", href: "/admin/validation", icon: <FileCheck2 className="w-5 h-5" /> },
           { label: "Contrats & Droits d'Auteur", href: "/admin/contracts", icon: <Scale className="w-5 h-5" /> },
           { 
@@ -348,6 +359,7 @@ export function DashboardSidebar() {
             ]
           },
           { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="w-5 h-5" /> },
+          { label: "Finances Globales", href: "/admin/finance", icon: <Landmark className="w-5 h-5" /> },
           { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="w-5 h-5" /> },
           { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="w-5 h-5" /> },
           { label: "Reporting & Exports", href: "/admin/reports", icon: <FileSpreadsheet className="w-5 h-5" /> },

@@ -33,7 +33,11 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['id', 'user', 'total_amount', 'currency', 'statut_paiement', 'statut_commande', 'lignes', 'livraison', 'created_at']
+        fields = [
+            'id', 'user', 'total_amount', 'currency', 'statut_paiement', 'statut_commande',
+            'is_credit_purchase', 'credit_due_date', 'returned_at', 'return_reason',
+            'lignes', 'livraison', 'created_at'
+        ]
         read_only_fields = ['id', 'user', 'created_at']
 
 class CreateOrderItemSerializer(serializers.Serializer):
@@ -56,4 +60,6 @@ class CreateOrderSerializer(serializers.Serializer):
     date_livraison_souhaitee = serializers.DateField(required=False, allow_null=True, default=None)
     plage_horaire_debut = serializers.TimeField(required=False, allow_null=True, default=None)
     plage_horaire_fin = serializers.TimeField(required=False, allow_null=True, default=None)
+    is_credit_purchase = serializers.BooleanField(required=False, default=False)
+    credit_due_date = serializers.DateField(required=False, allow_null=True, default=None)
 

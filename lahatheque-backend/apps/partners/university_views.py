@@ -337,6 +337,12 @@ class UniversityPaperOrdersView(APIView):
             except Ouvrage.DoesNotExist:
                 return Response({"success": False, "error": f"Ouvrage introuvable : {book_id}"}, status=400)
 
+            if not book.is_paper_available:
+                return Response({
+                    "success": False,
+                    "error": f"« {book.title} » n'est pas disponible en version papier."
+                }, status=400)
+
             total_disponible = book.stocks_entrepots.aggregate(
                 total=Sum(F('quantite_reelle') - F('quantite_reservee'))
             )['total'] or 0

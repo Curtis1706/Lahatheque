@@ -266,3 +266,18 @@ class AuthorManuscriptSubmission(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class DebtReminderConfig(models.Model):
+    """Configuration unique des règles de relance automatique des impayés (singleton)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    auto_remind_enabled = models.BooleanField(default=True)
+    first_reminder_days = models.IntegerField(default=7)
+    min_amount_threshold = models.DecimalField(max_digits=10, decimal_places=2, default=5000.00)
+    max_reminders_count = models.IntegerField(default=3)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def get_or_create_singleton(cls):
+        obj, _ = cls.objects.get_or_create(id='00000000-0000-0000-0000-000000000001')
+        return obj

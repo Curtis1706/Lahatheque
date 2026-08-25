@@ -43,6 +43,7 @@ import {
   getCountryOptions, 
   getGenreOptions 
 } from "@/lib/constants/classification";
+import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 
 export default function NewDepositPage() {
   const router = useRouter();
@@ -73,6 +74,7 @@ export default function NewDepositPage() {
   const [pricePaper, setPricePaper] = useState(7500);
 
   // Classification State
+  const [realDisciplines, setRealDisciplines] = useState<DisciplineItem[]>([]);
   const [genreCategory, setGenreCategory] = useState("Littérature Africaine & Conte");
   const [deweyCode, setDeweyCode] = useState("800");
   const [country, setCountry] = useState("BJ");
@@ -81,6 +83,14 @@ export default function NewDepositPage() {
   const [targetAudience, setTargetAudience] = useState("Grand Public & Universitaire");
   const [keywords, setKeywords] = useState<string[]>([]);
   const [onixXml, setOnixXml] = useState<string>("");
+
+  React.useEffect(() => {
+    getDisciplines().then((res) => {
+      if (res && res.length > 0) {
+        setRealDisciplines(res);
+      }
+    });
+  }, []);
 
   // IA State
   const [aiLoading, setAiLoading] = useState(false);
@@ -192,9 +202,15 @@ export default function NewDepositPage() {
 
   const handleGenreChange = (newGenre: string) => {
     setGenreCategory(newGenre);
+    const realFound = realDisciplines.find((d) => d.name === newGenre);
+    if (realFound && realFound.code_dewey) {
+      setDeweyCode(realFound.code_dewey);
+    }
     const found = matchGenreCategory(newGenre);
     if (found) {
-      setDeweyCode(found.dewey);
+      if (!realFound?.code_dewey) {
+        setDeweyCode(found.dewey);
+      }
       if (found.faculty) {
         setFaculty(found.faculty);
       }
@@ -778,11 +794,17 @@ export default function NewDepositPage() {
                   onChange={(e) => handleGenreChange(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 >
-                  {getGenreOptions(aiResult?.genre_category, genreCategory).map((g, i) => (
-                    <option key={i} value={g.label}>
-                      {g.label} ({g.dewey})
-                    </option>
-                  ))}
+                  {realDisciplines.length > 0
+                    ? realDisciplines.map((d) => (
+                        <option key={d.id} value={d.name}>
+                          {d.name} {d.code_dewey ? `(${d.code_dewey})` : ""}
+                        </option>
+                      ))
+                    : getGenreOptions(aiResult?.genre_category, genreCategory).map((g, i) => (
+                        <option key={i} value={g.label}>
+                          {g.label} ({g.dewey})
+                        </option>
+                      ))}
                 </select>
               </div>
 

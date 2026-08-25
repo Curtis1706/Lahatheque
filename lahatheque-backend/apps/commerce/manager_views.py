@@ -923,3 +923,86 @@ class InstitutionalDeliveriesView(APIView):
 
         return Response({"success": True, "data": {"id": order_id, "statut": new_status}, "error": None})
 
+
+class ManualPaymentConfirmView(APIView):
+    """POST /api/v1/commerce/manager/orders/<order_id>/confirm-payment/"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        if not _is_manager_or_admin(request.user):
+            return Response({"success": False, "error": "Accès réservé au Gestionnaire."}, status=403)
+
+        from .models import Order
+        from .services import confirm_manual_payment
+
+        try:
+            commande = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"success": False, "error": "Commande introuvable."}, status=404)
+
+        if commande.mode_paiement == 'mobile_money':
+            return Response({
+                "success": False,
+                "error": "Cette commande utilise Mobile Money — le paiement se confirme automatiquement via Moneroo."
+            }, status=400)
+
+        if commande.statut_paiement == 'paid':
+            return Response({"success": False, "error": "Cette commande est déjà marquée payée."}, status=400)
+
+        confirm_manual_payment(commande, request.user)
+
+        return Response({
+            "success": True,
+            "message": f"Paiement de la commande #{str(commande.id)[:8]} confirmé manuellement.",
+            "data": {"id": str(commande.id), "statut_paiement": "paid"}
+        })
+
+
+class ManagerFinanceReportView(APIView):
+    """GET /api/v1/commerce/manager/finance/report/ - Rapport financier du Gestionnaire."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not _is_manager_or_admin(request.user):
+            return Response({"success": False, "error": "Accès refusé."}, status=403)
+
+        from .models import Order
+        from django.db.models import Sum, Count
+        from django.utils import timezone
+
+        now = timezone.now()
+
+        paid_orders = Order.objects.filter(statut_paiement='paid')
+        by_method = paid_orders.values('mode_paiement').annotate(total=Sum('total_amount'), count=Count('id'))
+
+        credit_orders = Order.objects.filter(is_credit_purchase=True).exclude(statut_commande='returned').select_related('user')
+
+        credit_outstanding = credit_orders.filter(statut_paiement='pending').aggregate(total=Sum('total_amount'))['total'] or 0
+        credit_settled = credit_orders.filter(statut_paiement='paid').aggregate(total=Sum('total_amount'))['total'] or 0
+        credit_overdue = credit_orders.filter(statut_paiement='pending', credit_due_date__lt=now.date())
+
+        credit_details = [{
+            "id": str(o.id),
+            "author_name": o.user.get_full_name() or o.user.email,
+            "amount": float(o.total_amount),
+            "due_date": o.credit_due_date.isoformat() if o.credit_due_date else None,
+            "is_overdue": bool(o.credit_due_date and o.credit_due_date < now.date()),
+            "statut_paiement": o.statut_paiement,
+            "statut_commande": o.statut_commande,
+            "created_at": o.created_at.isoformat(),
+        } for o in credit_orders.order_by('-created_at')[:50]]
+
+        return Response({
+            "success": True,
+            "data": {
+                "revenue_by_payment_method": [
+                    {"method": r['mode_paiement'], "total": float(r['total']), "count": r['count']} for r in by_method
+                ],
+                "total_revenue_paid": float(paid_orders.aggregate(t=Sum('total_amount'))['t'] or 0),
+                "credit_outstanding_total": float(credit_outstanding),
+                "credit_settled_total": float(credit_settled),
+                "credit_overdue_count": credit_overdue.count(),
+                "credit_orders": credit_details,
+            }
+        })
+
