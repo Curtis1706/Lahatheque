@@ -577,10 +577,7 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks. Format exact 
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=2000,
-                temperature=0.7,
             )
-
             raw = response.choices[0].message.content.strip()
             # Nettoyer le markdown si présent
             if raw.startswith("```"):
@@ -676,6 +673,16 @@ class QuizSubmitAnswersView(APIView):
 
 import re
 from django.http import HttpResponse
+from rest_framework.renderers import BaseRenderer, JSONRenderer
+
+
+class PassthroughStreamRenderer(BaseRenderer):
+    """Renderer universel autorisant le streaming binaire PDF, audio et vidéo."""
+    media_type = "*/*"
+    format = "binary"
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
 
 
 class ReaderProtectedStreamView(APIView):
@@ -687,6 +694,7 @@ class ReaderProtectedStreamView(APIView):
     """
     authentication_classes = []
     permission_classes = [IsValidReaderSession]
+    renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
 
     DEFAULT_CHUNK_SIZE = 256 * 1024
 
@@ -766,7 +774,6 @@ class ReaderProtectedStreamView(APIView):
             response["Content-Range"] = f"bytes {start_byte}-{end_byte}/{total_size}"
             response["Content-Length"] = str(len(chunk_data))
         else:
-            # Requête standard (fetch Blob complet côté liseuse) -> renvoyer les octets complets
             chunk_data = pdf_bytes
             response = HttpResponse(chunk_data, status=status.HTTP_200_OK, content_type="application/pdf")
             response["Content-Length"] = str(total_size)
