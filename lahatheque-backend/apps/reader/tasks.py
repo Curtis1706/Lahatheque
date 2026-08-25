@@ -90,27 +90,30 @@ def dispatch_partner_webhook_task(
     is_success = False
 
     try:
-        resp = requests.post(partner.webhook_url, data=payload_str, headers=headers, timeout=10)
+        resp = requests.post(partner.webhook_url, data=payload_str, headers=headers, timeout=3)
         status_code = resp.status_code
         response_body = resp.text[:2000]
         is_success = 200 <= status_code < 300
     except Exception as e:
         response_body = f"Erreur réseau webhook: {str(e)}"
-        logger.warning(f"Échec envoi webhook {event_type} à {partner.name} (tentative {self.request.retries + 1}): {e}")
+        logger.warning(f"Échec envoi webhook {event_type} à {partner.name}: {e}")
 
-    WebhookLog.objects.create(
-        partner=partner,
-        session=session,
-        event_type=event_type,
-        delivery_id=delivery_id,
-        payload_json=payload_str,
-        status_code=status_code,
-        response_body=response_body,
-        attempt_count=self.request.retries + 1,
-        is_success=is_success
-    )
+    try:
+        WebhookLog.objects.create(
+            partner=partner,
+            session=session,
+            event_type=event_type,
+            delivery_id=delivery_id,
+            payload_json=payload_str,
+            status_code=status_code,
+            response_body=response_body,
+            attempt_count=(getattr(self.request, 'retries', 0) + 1) if self and hasattr(self, 'request') and getattr(self, 'request', None) else 1,
+            is_success=is_success
+        )
+    except Exception as log_err:
+        logger.warning(f"Impossible d'enregistrer WebhookLog: {log_err}")
 
-    if not is_success and self.request.retries < self.max_retries:
+    if not is_success and self and hasattr(self, 'request') and getattr(self, 'request', None) and getattr(self.request, 'retries', 0) < getattr(self, 'max_retries', 3):
         raise self.retry(countdown=30 * (2 ** self.request.retries))
 
     return is_success
@@ -123,12 +126,30 @@ def dispatch_partner_webhook_sync(
     session_id: Optional[str] = None
 ) -> None:
     """
-    Point d'entrée appelé depuis les vues. Met la tâche en file Celery et retourne
-    IMMEDIATEMENT — ne bloque jamais la requête HTTP de l'utilisateur.
+    Point d'entrée appelé depuis les vues. Met la tâche en file Celery ou dans un thread détaché
+    et retourne IMMEDIATEMENT — ne bloque JAMAIS la requête HTTP de l'utilisateur.
     """
-    dispatch_partner_webhook_task.delay(
-        partner_id=partner_id,
-        event_type=event_type,
-        payload_data=payload_data,
-        session_id=session_id,
-    )
+    import threading
+    from django.conf import settings
+
+    if getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
+        threading.Thread(
+            target=dispatch_partner_webhook_task,
+            args=(None, partner_id, event_type, payload_data, session_id),
+            daemon=True
+        ).start()
+    else:
+        try:
+            dispatch_partner_webhook_task.delay(
+                partner_id=partner_id,
+                event_type=event_type,
+                payload_data=payload_data,
+                session_id=session_id,
+            )
+        except Exception as e:
+            logger.warning(f"Impossible de mettre le webhook en file Celery: {e}")
+            threading.Thread(
+                target=dispatch_partner_webhook_task,
+                args=(None, partner_id, event_type, payload_data, session_id),
+                daemon=True
+            ).start()

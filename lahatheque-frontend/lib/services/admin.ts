@@ -80,9 +80,11 @@ export async function getAdminUsers(roleFilter?: AdminRole | string, search?: st
     country: u.country || 'BJ',
     phone: u.phone || '',
     avatar_url: u.avatar_url,
+    avatar: u.avatar || u.avatar_url,
     organization: u.organization || u.institution_name,
     date_joined: u.date_joined ? u.date_joined.split('T')[0] : '2026-08-01',
     status: u.is_suspended ? 'suspended' : 'active',
+    extra_info: u.extra_info || {},
   }));
 }
 
@@ -238,6 +240,17 @@ export async function resetBookPricing(bookId: string): Promise<{ success: boole
   return { success: false, error: data.error || 'Erreur réalignement tarif.' };
 }
 
+export async function deleteAdminCatalogBook(bookId: string): Promise<{ success: boolean; message?: string; error?: string }> {
+  const res = await fetch(`/api/bff/admin/catalog/pricing/${bookId}/`, {
+    method: 'DELETE',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.ok) {
+    return { success: true, message: data.message || 'Ouvrage supprimé définitivement du catalogue.' };
+  }
+  return { success: false, error: data.error || 'Erreur lors de la suppression de l\'ouvrage.' };
+}
+
 // =========================================================================
 // TRANSACTIONS & VENTES
 // =========================================================================
@@ -367,6 +380,24 @@ export async function createPartnerApiKey(
     return json.data;
   }
   throw new Error(json?.error || "Réponse invalide du serveur");
+}
+
+export async function updatePartnerApiKey(
+  keyId: string,
+  data: Partial<PartnerApiKey>
+): Promise<PartnerApiKey | null> {
+  const res = await fetch(`/api/bff/partners/apps/${keyId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    throw new Error("Erreur lors de la mise à jour de la clé API.");
+  }
+
+  const json = await res.json();
+  return json?.data || null;
 }
 
 export async function togglePartnerApiKeyStatus(keyId: string): Promise<PartnerApiKey | null> {
@@ -503,6 +534,13 @@ export async function getAdminValidationProofs(): Promise<AdminValidationProof[]
   if (!res.ok) throw new Error(`Erreur épreuves validation: ${res.status}`);
   const json = await res.json();
   return json.data || json.results || [];
+}
+
+export async function getAdminValidationProofById(id: string): Promise<AdminValidationProof> {
+  const res = await fetch(`/api/bff/admin/validation/${id}/`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Erreur épreuve validation: ${res.status}`);
+  const json = await res.json();
+  return json.data || json;
 }
 
 export async function processAdminValidation(

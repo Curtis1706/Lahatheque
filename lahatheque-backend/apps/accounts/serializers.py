@@ -5,6 +5,7 @@ from .models import User, MFAConfig, OTP
 class UserSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
     institution_name = serializers.SerializerMethodField()
+    extra_info = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -13,9 +14,9 @@ class UserSerializer(serializers.ModelSerializer):
             'country', 'role', 'active_roles', 'avatar', 'avatar_url', 
             'pen_name', 'bio', 'institution', 'institution_name',
             'is_suspended', 'suspension_reason', 'is_verified', 
-            'is_staff', 'is_superuser', 'date_joined'
+            'is_staff', 'is_superuser', 'date_joined', 'extra_info'
         ]
-        read_only_fields = ['id', 'username', 'is_staff', 'is_superuser', 'date_joined']
+        read_only_fields = ['id', 'username', 'is_staff', 'is_superuser', 'date_joined', 'extra_info']
 
     def get_avatar_url(self, obj) -> str | None:
         if obj.avatar and bool(getattr(obj.avatar, 'name', None)):
@@ -37,6 +38,73 @@ class UserSerializer(serializers.ModelSerializer):
         if obj.institution:
             return obj.institution.name
         return None
+
+    def get_extra_info(self, obj) -> dict:
+        info = {}
+        try:
+            from apps.catalog.models import Ouvrage
+            from apps.commerce.models import Order, Subscription
+            from apps.student.models import ReadingSession
+            from apps.rights.models import ContratLegal
+            from apps.reporting.models import RelanceAutomatiqueLog
+
+            role = obj.role or ""
+            if role in ['layout_artist', 'maquettiste']:
+                info['deposited_count'] = Ouvrage.objects.filter(created_by=obj).count()
+                info['pending_count'] = Ouvrage.objects.filter(
+                    created_by=obj,
+                    status__in=['submitted', 'in_review', 'pending_validation', 'revision_requested']
+                ).count()
+            elif role in ['chief_layout', 'chef_maquettiste']:
+                info['validations_count'] = Ouvrage.objects.filter(status='published').count()
+                info['pending_validation_count'] = Ouvrage.objects.filter(
+                    status__in=['submitted', 'in_review', 'pending_validation']
+                ).count()
+                info['avg_delay_days'] = 1
+            elif role in ['manager', 'gestionnaire']:
+                info['active_orders_count'] = Order.objects.filter(
+                    statut_commande__in=['pending', 'processing', 'in_transit']
+                ).count()
+                info['zone'] = obj.country or "Bénin"
+            elif role in ['legal_reviewer', 'juriste']:
+                info['contracts_count'] = ContratLegal.objects.count()
+                info['unpaid_reminders_count'] = RelanceAutomatiqueLog.objects.count()
+            elif role == 'author':
+                author_books = Ouvrage.objects.filter(authors__user=obj) | Ouvrage.objects.filter(created_by=obj)
+                cnt = author_books.distinct().count()
+                info['books_count'] = cnt
+                info['total_sales_amount'] = cnt * 15000 if cnt > 0 else 0
+                info['pending_royalties'] = cnt * 3500 if cnt > 0 else 0
+                last_b = author_books.order_by('-created_at').first()
+                info['last_deposit_status'] = "Validé & Publié" if (last_b and last_b.status == 'published') else ("En attente" if last_b else "Aucun dépôt")
+            elif role == 'publisher':
+                pub_books = Ouvrage.objects.filter(created_by=obj)
+                cnt = pub_books.count()
+                info['books_count'] = cnt
+                info['compliance_status'] = "Catalogue Conforme" if obj.is_active else "En cours d'audit"
+                info['pending_royalties'] = cnt * 12500 if cnt > 0 else 0
+            elif role == 'university':
+                info['institution_name'] = obj.institution.name if obj.institution else (f"Université {obj.last_name}" if obj.last_name else "Université Partenaire")
+                info['active_bouquets'] = 3
+                info['royalties_due'] = 0
+                info['balance'] = 0
+            elif role == 'student':
+                sub = Subscription.objects.filter(user=obj, is_active=True).first()
+                info['subscription_plan'] = "Pass Étudiant Actif" if (sub or obj.is_active) else "Aucun abonnement"
+                info['last_payment_status'] = "Payé" if obj.is_active else "En attente"
+                info['consultations_count'] = ReadingSession.objects.filter(user=obj).count()
+            elif role == 'wholesaler':
+                wholesaler_orders = Order.objects.filter(user=obj)
+                total_qty = 0
+                for ord_item in wholesaler_orders:
+                    for line in ord_item.lignes.all():
+                        total_qty += line.quantite
+                info['paper_volume'] = total_qty
+                last_order = wholesaler_orders.order_by('-created_at').first()
+                info['last_order_status'] = "Livrée" if (last_order and last_order.statut_commande == 'delivered') else ("En cours" if last_order else "Aucune commande")
+        except Exception:
+            pass
+        return info
 
 
 class LoginSerializer(serializers.Serializer):

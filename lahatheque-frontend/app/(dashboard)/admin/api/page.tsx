@@ -25,11 +25,14 @@ import {
   FileText,
   Layers,
   X,
+  Sliders,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getPartnerApiKeys,
   createPartnerApiKey,
+  updatePartnerApiKey,
   togglePartnerApiKeyStatus,
   revokePartnerApiKey,
 } from "@/lib/services/admin";
@@ -47,6 +50,7 @@ export default function AdminApiKeysPage() {
 
   // Modales
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [keyToEdit, setKeyToEdit] = useState<PartnerApiKey | null>(null);
   const [keyToRevoke, setKeyToRevoke] = useState<PartnerApiKey | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,11 +60,41 @@ export default function AdminApiKeysPage() {
     partner: "",
     tier: "vip" as "vip" | "enterprise" | "standard",
     accessMode: "mixed" as "mixed" | "external_only" | "catalog_only",
-    allowedOrigins: "https://",
-    allowedDocumentSources: "https://",
+    allowedOrigins: "",
+    allowedDocumentSources: "",
     maxFileSizeMb: 200,
     webhookUrl: "",
   });
+
+  // État formulaire édition
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    partner: "",
+    accessMode: "mixed" as "mixed" | "external_only" | "catalog_only",
+    isUnlimited: false,
+    dailyRequestLimit: 10000,
+    concurrentSessionsLimit: 200,
+    allowedOrigins: "",
+    allowedDocumentSources: "",
+    maxFileSizeMb: 200,
+    webhookUrl: "",
+  });
+
+  const openEditModal = (k: PartnerApiKey) => {
+    setKeyToEdit(k);
+    setEditFormData({
+      name: k.name,
+      partner: k.partner,
+      accessMode: k.accessMode || (k.allowByod ? "mixed" : "catalog_only"),
+      isUnlimited: k.isUnlimited,
+      dailyRequestLimit: typeof k.dailyRequestLimit === "number" ? k.dailyRequestLimit : 10000,
+      concurrentSessionsLimit: typeof k.concurrentSessionsLimit === "number" ? k.concurrentSessionsLimit : 200,
+      allowedOrigins: (k.allowedOrigins || []).join(", "),
+      allowedDocumentSources: (k.allowedDocumentSources || []).join(", "),
+      maxFileSizeMb: k.maxFileSizeMb || 200,
+      webhookUrl: k.webhookUrl || "",
+    });
+  };
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -71,7 +105,7 @@ export default function AdminApiKeysPage() {
       setLoading(true);
       const data = await getPartnerApiKeys();
       setKeys(data);
-    } catch (err) {
+    } catch {
       toast.error("Erreur lors de la récupération des clés API partenaires.");
     } finally {
       setLoading(false);
@@ -100,17 +134,27 @@ export default function AdminApiKeysPage() {
       const concurrentLimit = isVip ? "unlimited" : formData.tier === "enterprise" ? 1000 : 200;
       const allowByod = formData.accessMode === "mixed" || formData.accessMode === "external_only";
 
+      const cleanedOrigins = formData.allowedOrigins
+        ? formData.allowedOrigins
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s && s !== "https://" && s !== "http://" && s !== "https:" && s !== "http:")
+        : ["*"];
+
+      const cleanedSources = formData.allowedDocumentSources
+        ? formData.allowedDocumentSources
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s && s !== "https://" && s !== "http://" && s !== "https:" && s !== "http:")
+        : ["*"];
+
       const created = await createPartnerApiKey({
         name: formData.name.trim(),
         partner: formData.partner.trim(),
         clientId: `laha_client_${Math.random().toString(36).substring(2, 10)}`,
         clientSecret: `sec_live_${Math.random().toString(36).substring(2, 18)}${Math.random().toString(36).substring(2, 10)}`,
-        allowedOrigins: formData.allowedOrigins
-          ? formData.allowedOrigins.split(",").map((s) => s.trim()).filter(Boolean)
-          : ["*"],
-        allowedDocumentSources: formData.allowedDocumentSources
-          ? formData.allowedDocumentSources.split(",").map((s) => s.trim()).filter(Boolean)
-          : ["*"],
+        allowedOrigins: cleanedOrigins.length > 0 ? cleanedOrigins : ["*"],
+        allowedDocumentSources: cleanedSources.length > 0 ? cleanedSources : ["*"],
         webhookUrl: formData.webhookUrl.trim() || "",
         scopes: allowByod ? ["reader:byod", "catalog:read"] : ["catalog:read"],
         dailyRequestLimit: dailyLimit,
@@ -129,8 +173,8 @@ export default function AdminApiKeysPage() {
         partner: "",
         tier: "vip",
         accessMode: "mixed",
-        allowedOrigins: "https://",
-        allowedDocumentSources: "https://",
+        allowedOrigins: "",
+        allowedDocumentSources: "",
         maxFileSizeMb: 200,
         webhookUrl: "",
       });
@@ -142,6 +186,77 @@ export default function AdminApiKeysPage() {
       });
     } catch (err) {
       toast.error("Erreur lors de la création de la clé API.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!keyToEdit) return;
+    if (!editFormData.name.trim() || !editFormData.partner.trim()) {
+      toast.error("Veuillez renseigner le nom de l'intégration et de l'institution.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const cleanedOrigins = editFormData.allowedOrigins
+        ? editFormData.allowedOrigins
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s && s !== "https://" && s !== "http://" && s !== "https:" && s !== "http:")
+        : ["*"];
+
+      const cleanedSources = editFormData.allowedDocumentSources
+        ? editFormData.allowedDocumentSources
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s && s !== "https://" && s !== "http://" && s !== "https:" && s !== "http:")
+        : ["*"];
+
+      const allowByod = editFormData.accessMode === "mixed" || editFormData.accessMode === "external_only";
+
+      const updated = await updatePartnerApiKey(keyToEdit.id, {
+        name: editFormData.name.trim(),
+        partner: editFormData.partner.trim(),
+        webhookUrl: editFormData.webhookUrl.trim(),
+        allowedOrigins: cleanedOrigins.length > 0 ? cleanedOrigins : ["*"],
+        allowedDocumentSources: cleanedSources.length > 0 ? cleanedSources : ["*"],
+        accessMode: editFormData.accessMode,
+        allowByod: allowByod,
+        isUnlimited: editFormData.isUnlimited,
+        dailyRequestLimit: editFormData.isUnlimited ? "unlimited" : Number(editFormData.dailyRequestLimit) || 10000,
+        concurrentSessionsLimit: editFormData.isUnlimited ? "unlimited" : Number(editFormData.concurrentSessionsLimit) || 200,
+        maxFileSizeMb: Number(editFormData.maxFileSizeMb) || 200,
+      });
+
+      if (updated) {
+        setKeys((prev) =>
+          prev.map((k) =>
+            k.id === keyToEdit.id
+              ? {
+                  ...k,
+                  name: editFormData.name.trim(),
+                  partner: editFormData.partner.trim(),
+                  webhookUrl: editFormData.webhookUrl.trim(),
+                  allowedOrigins: cleanedOrigins.length > 0 ? cleanedOrigins : ["*"],
+                  allowedDocumentSources: cleanedSources.length > 0 ? cleanedSources : ["*"],
+                  accessMode: editFormData.accessMode,
+                  allowByod: allowByod,
+                  isUnlimited: editFormData.isUnlimited,
+                  dailyRequestLimit: editFormData.isUnlimited ? "unlimited" : Number(editFormData.dailyRequestLimit) || 10000,
+                  concurrentSessionsLimit: editFormData.isUnlimited ? "unlimited" : Number(editFormData.concurrentSessionsLimit) || 200,
+                  maxFileSizeMb: Number(editFormData.maxFileSizeMb) || 200,
+                }
+              : k
+          )
+        );
+        toast.success("Paramètres et domaines de l'application mis à jour avec succès !");
+        setKeyToEdit(null);
+      }
+    } catch (err) {
+      toast.error("Erreur lors de la mise à jour de l'application.");
     } finally {
       setIsSubmitting(false);
     }
@@ -431,6 +546,14 @@ export default function AdminApiKeysPage() {
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0">
                     <button
+                      onClick={() => openEditModal(k)}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-navy text-white hover:bg-navy-dark transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Modifier les domaines autorisés, quotas et paramètres"
+                    >
+                      <Sliders className="w-3.5 h-3.5 text-gold" />
+                      <span>Modifier</span>
+                    </button>
+                    <button
                       onClick={() => handleToggleStatus(k.id)}
                       className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-border bg-background hover:bg-background-secondary transition-all cursor-pointer"
                     >
@@ -549,8 +672,8 @@ export default function AdminApiKeysPage() {
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
                     <div className="flex items-center gap-1.5">
                       <Globe className="w-3.5 h-3.5 text-gold shrink-0" />
-                      <span>Redirections autorisées :</span>
-                      <span className="font-mono font-semibold text-foreground">
+                      <span>Redirections autorisées (return_url) :</span>
+                      <span className="font-mono font-semibold text-navy bg-navy/5 px-2 py-0.5 rounded-md border border-navy/10">
                         {k.allowedOrigins.join(", ")}
                       </span>
                     </div>
@@ -585,6 +708,7 @@ export default function AdminApiKeysPage() {
                 <tr className="border-b border-border bg-background text-foreground-secondary">
                   <th className="py-3 px-4 font-semibold">Application & Institution</th>
                   <th className="py-3 px-4 font-semibold">Périmètre Documentaire</th>
+                  <th className="py-3 px-4 font-semibold">Domaines return_url</th>
                   <th className="py-3 px-4 font-semibold">Client ID & Secret</th>
                   <th className="py-3 px-4 font-semibold">Plafond / 24h</th>
                   <th className="py-3 px-4 font-semibold">Sessions Direct</th>
@@ -637,6 +761,21 @@ export default function AdminApiKeysPage() {
                             <span>Catalogue</span>
                           </span>
                         )}
+                      </td>
+
+                      {/* Domaines return_url */}
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap items-center gap-1 max-w-xs">
+                          {k.allowedOrigins.map((orig, idx) => (
+                            <span
+                              key={idx}
+                              className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-background border border-border text-navy font-semibold truncate max-w-[150px]"
+                              title={orig}
+                            >
+                              {orig}
+                            </span>
+                          ))}
+                        </div>
                       </td>
 
                       {/* Client ID / Secret */}
@@ -714,6 +853,14 @@ export default function AdminApiKeysPage() {
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => openEditModal(k)}
+                            className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-navy text-white hover:bg-navy-dark transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                            title="Modifier les domaines et quotas"
+                          >
+                            <Sliders className="w-3 h-3 text-gold" />
+                            <span>Modifier</span>
+                          </button>
                           <button
                             onClick={() => handleToggleStatus(k.id)}
                             className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-border bg-background hover:bg-background-secondary transition-all cursor-pointer"
@@ -1058,6 +1205,280 @@ export default function AdminApiKeysPage() {
                     <Plus className="w-3.5 h-3.5 text-gold" />
                   )}
                   <span>Créer l'Intégration</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modale de Modification / Configuration d'une Clé Partenaire */}
+      {keyToEdit && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-background border border-border rounded-2xl p-6 max-w-xl w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-navy/10 text-navy">
+                  <Sliders className="w-5 h-5 text-gold" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-navy">
+                    Modifier les Paramètres de l'Application
+                  </h2>
+                  <p className="text-[11px] text-foreground-secondary font-mono">
+                    Client ID : {keyToEdit.clientId}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setKeyToEdit(null)}
+                className="text-foreground-muted hover:text-foreground p-1 rounded-lg transition-colors cursor-pointer"
+                title="Fermer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateKey} className="space-y-4 text-xs">
+              {/* Bloc 1 : Identité */}
+              <div className="space-y-3 p-3.5 rounded-xl bg-background-secondary border border-border">
+                <h3 className="font-bold text-sm text-navy">
+                  1. Identité de l'Intégration
+                </h3>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">
+                    Nom de l'intégration *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-gold text-foreground"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">
+                    Institution / Entreprise Partenaire *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.partner}
+                    onChange={(e) => setEditFormData({ ...editFormData, partner: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-gold text-foreground"
+                  />
+                </div>
+              </div>
+
+              {/* Bloc 2 : Périmètre & BYOD */}
+              <div className="space-y-3 p-3.5 rounded-xl bg-background-secondary border border-border">
+                <h3 className="font-bold text-sm text-navy flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-gold" />
+                  <span>2. Périmètre Documentaire</span>
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {[
+                    {
+                      id: "mixed",
+                      label: "Mixte (Catalogue + Vos Fichiers)",
+                      desc: "Lit les livres LAHA et vos propres PDF distants",
+                    },
+                    {
+                      id: "external_only",
+                      label: "Vos Fichiers Uniquement",
+                      desc: "Liseuse souveraine pour vos cours/PDF privés",
+                    },
+                    {
+                      id: "catalog_only",
+                      label: "Catalogue LAHA Seul",
+                      desc: "Accès restreint au catalogue officiel de la plateforme",
+                    },
+                  ].map((mode) => (
+                    <label
+                      key={mode.id}
+                      className={`p-3 rounded-xl border cursor-pointer flex flex-col justify-between transition-all ${
+                        editFormData.accessMode === mode.id
+                          ? "border-navy bg-navy/5 text-navy font-semibold ring-1 ring-navy"
+                          : "border-border bg-background hover:bg-background-secondary text-foreground"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-1 mb-1">
+                        <span className="font-bold text-xs">{mode.label}</span>
+                        <input
+                          type="radio"
+                          name="editAccessMode"
+                          value={mode.id}
+                          checked={editFormData.accessMode === mode.id}
+                          onChange={(e) =>
+                            setEditFormData({
+                              ...editFormData,
+                              accessMode: e.target.value as any,
+                            })
+                          }
+                          className="sr-only"
+                        />
+                      </div>
+                      <span className="text-[10px] text-foreground-muted leading-relaxed">
+                        {mode.desc}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bloc 3 : Sécurité Redirection (return_url) */}
+              <div className="space-y-3 p-3.5 rounded-xl bg-background-secondary border border-border">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-navy flex items-center gap-1.5">
+                    <Globe className="w-4 h-4 text-gold" />
+                    <span>3. Domaines Autorisés pour return_url *</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditFormData({
+                        ...editFormData,
+                        allowedOrigins: "*",
+                      })
+                    }
+                    className="text-[11px] font-semibold text-gold hover:underline cursor-pointer"
+                  >
+                    Autoriser tous (*)
+                  </button>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">
+                    Origines ou Domaines (séparés par des virgules) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ex: https://up.bj, https://lms.up.bj, *"
+                    value={editFormData.allowedOrigins}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, allowedOrigins: e.target.value })
+                    }
+                    className="w-full p-2.5 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-gold text-foreground font-mono text-[11px]"
+                  />
+                  <div className="mt-1.5 flex flex-wrap gap-1.5 items-center">
+                    <span className="text-[10px] text-foreground-muted">Domaines actuels :</span>
+                    {editFormData.allowedOrigins
+                      .split(",")
+                      .map((d) => d.trim())
+                      .filter(Boolean)
+                      .map((domain, i) => (
+                        <span
+                          key={i}
+                          className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-navy text-white"
+                        >
+                          {domain}
+                        </span>
+                      ))}
+                  </div>
+                  <span className="text-[10px] text-foreground-muted mt-1 block">
+                    Important : si vous entrez <strong>https://up.bj</strong>, tous les sous-domaines comme <em>https://lms.up.bj</em> et <em>https://cours.up.bj</em> sont automatiquement autorisés. Utilisez <strong>*</strong> pour autoriser n'importe quel domaine lors de vos tests.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-foreground block mb-1">
+                    URL de Webhook (Optionnel)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="ex: https://up.bj/api/webhooks/reader"
+                    value={editFormData.webhookUrl}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, webhookUrl: e.target.value })
+                    }
+                    className="w-full p-2.5 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-gold text-foreground font-mono text-[11px]"
+                  />
+                </div>
+              </div>
+
+              {/* Bloc 4 : Quotas */}
+              <div className="space-y-3 p-3.5 rounded-xl bg-background-secondary border border-border">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-navy flex items-center gap-1.5">
+                    <Crown className="w-4 h-4 text-gold" />
+                    <span>4. Quotas & Plafonds</span>
+                  </h3>
+                  <label className="flex items-center gap-2 cursor-pointer font-semibold text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.isUnlimited}
+                      onChange={(e) =>
+                        setEditFormData({ ...editFormData, isUnlimited: e.target.checked })
+                      }
+                      className="rounded border-border text-navy focus:ring-gold"
+                    />
+                    <span>Privilège VIP Illimité</span>
+                  </label>
+                </div>
+
+                {!editFormData.isUnlimited && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="font-semibold text-foreground block mb-1">
+                        Plafond Requêtes / 24h
+                      </label>
+                      <input
+                        type="number"
+                        value={editFormData.dailyRequestLimit}
+                        onChange={(e) =>
+                          setEditFormData({
+                            ...editFormData,
+                            dailyRequestLimit: Number(e.target.value),
+                          })
+                        }
+                        className="w-full p-2 rounded-lg border border-border bg-background text-foreground font-mono text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-semibold text-foreground block mb-1">
+                        Sessions Simultanées
+                      </label>
+                      <input
+                        type="number"
+                        value={editFormData.concurrentSessionsLimit}
+                        onChange={(e) =>
+                          setEditFormData({
+                            ...editFormData,
+                            concurrentSessionsLimit: Number(e.target.value),
+                          })
+                        }
+                        className="w-full p-2 rounded-lg border border-border bg-background text-foreground font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setKeyToEdit(null)}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-xl border border-border hover:bg-background-secondary transition-all font-semibold cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-xl bg-navy text-white hover:bg-navy-dark transition-all font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-3.5 h-3.5 text-gold animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5 text-gold" />
+                  )}
+                  <span>Enregistrer les Modifications</span>
                 </button>
               </div>
             </form>

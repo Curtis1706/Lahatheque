@@ -344,12 +344,23 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
             client_secret_plain = generate_client_secret()  # Existera UNIQUEMENT dans cette réponse
             webhook_signing_secret = f"whsec_{str(uuid.uuid4()).replace('-', '')}"  # Dédié à la signature HMAC des webhooks
 
+            raw_origins = data.get("allowedOrigins", ["*"])
+            if isinstance(raw_origins, str):
+                raw_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+            cleaned_origins = []
+            for o in raw_origins:
+                o_str = str(o).strip().rstrip('/')
+                if o_str and o_str not in ["https:", "http:", "https://", "http://"]:
+                    cleaned_origins.append(o_str)
+            if not cleaned_origins:
+                cleaned_origins = ["*"]
+
             app = PartnerApp.objects.create(
                 name=name,
                 client_id=client_id_gen,
                 client_secret_hash=hash_secret(client_secret_plain),
                 client_secret_last4=client_secret_plain[-4:],
-                allowed_return_origins=data.get("allowedOrigins", ["*"]),
+                allowed_return_origins=cleaned_origins,
                 webhook_url=data.get("webhookUrl", ""),
                 webhook_secret=webhook_signing_secret,
                 quotas=quotas,
@@ -406,6 +417,71 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
             return standard_response(error="Application introuvable.", status_code=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.exception("Erreur toggle status:")
+            return standard_response(error=str(e), status_code=status.HTTP_400_BAD_REQUEST)
+
+    def partial_update(self, request: Request, pk: str = None) -> Response:
+        """PATCH /api/v1/partners/apps/<id>/ - Met à jour les paramètres de l'application."""
+        try:
+            app = PartnerApp.objects.get(id=pk)
+            data = request.data
+
+            if "name" in data and data["name"].strip():
+                app.name = data["name"].strip()
+            if "webhookUrl" in data:
+                app.webhook_url = data["webhookUrl"].strip()
+            if "allowedOrigins" in data:
+                raw_origins = data["allowedOrigins"]
+                if isinstance(raw_origins, str):
+                    raw_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+                cleaned_origins = []
+                for o in raw_origins:
+                    o_str = str(o).strip().rstrip('/')
+                    if o_str and o_str not in ["https:", "http:", "https://", "http://"]:
+                        cleaned_origins.append(o_str)
+                app.allowed_return_origins = cleaned_origins if cleaned_origins else ["*"]
+            
+            quotas = app.quotas or {}
+            if "isUnlimited" in data:
+                quotas["is_unlimited"] = data["isUnlimited"]
+            if "dailyRequestLimit" in data:
+                quotas["daily_request_limit"] = data["dailyRequestLimit"]
+            if "concurrentSessionsLimit" in data:
+                quotas["concurrent_sessions_limit"] = data["concurrentSessionsLimit"]
+            if "accessMode" in data:
+                quotas["access_mode"] = data["accessMode"]
+                quotas["allow_byod"] = data["accessMode"] in ["mixed", "external_only"]
+                quotas["allow_catalog"] = data["accessMode"] in ["mixed", "catalog_only"]
+            if "allowedDocumentSources" in data:
+                raw_sources = data["allowedDocumentSources"]
+                if isinstance(raw_sources, str):
+                    raw_sources = [s.strip() for s in raw_sources.split(",") if s.strip()]
+                cleaned_sources = [s.strip().rstrip('/') for s in raw_sources if s and s not in ["https:", "http:", "https://", "http://"]]
+                quotas["allowed_document_sources"] = cleaned_sources if cleaned_sources else ["*"]
+            if "maxFileSizeMb" in data:
+                quotas["max_file_size_mb"] = data["maxFileSizeMb"]
+
+            app.quotas = quotas
+            app.save()
+
+            return standard_response(data={
+                "id": str(app.id),
+                "name": app.name,
+                "partner": data.get("partner", app.name),
+                "allowedOrigins": app.allowed_return_origins,
+                "webhookUrl": app.webhook_url,
+                "is_active": app.is_active,
+                "isUnlimited": quotas.get("is_unlimited", False),
+                "dailyRequestLimit": quotas.get("daily_request_limit", 10000),
+                "concurrentSessionsLimit": quotas.get("concurrent_sessions_limit", 200),
+                "accessMode": quotas.get("access_mode", "mixed"),
+                "allowByod": quotas.get("allow_byod", True),
+                "allowedDocumentSources": quotas.get("allowed_document_sources", ["*"]),
+                "maxFileSizeMb": quotas.get("max_file_size_mb", 200),
+            })
+        except PartnerApp.DoesNotExist:
+            return standard_response(error="Application introuvable.", status_code=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.exception("Erreur update PartnerApp:")
             return standard_response(error=str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request: Request, pk: str = None) -> Response:

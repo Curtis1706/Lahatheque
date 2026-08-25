@@ -3,11 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Modal } from "@/components/ui/modal";
 import { CreateAccountModal } from "@/components/features/admin/create-account-modal";
 import { SendEmailModal } from "@/components/features/admin/send-email-modal";
 import { getAdminUsers, toggleAdminUserStatus, deleteAdminUser } from "@/lib/services/admin";
-import { AdminUser, AdminRole } from "@/lib/types/admin";
+import { AdminUser, AdminRole, formatRoleLabel, formatCountryName } from "@/lib/types/admin";
 import {
   Users,
   UserPlus,
@@ -82,14 +83,17 @@ export default function AdminUsersGlobalPage() {
 
   const roleFilterOptions = [
     { value: "all", label: "Tous les Rôles" },
-    { value: "student", label: "Étudiants / Lecteurs" },
+    { value: "student", label: "Clients / Lecteurs" },
     { value: "teacher", label: "Enseignants" },
     { value: "author", label: "Auteurs" },
     { value: "publisher", label: "Éditeurs Tiers" },
     { value: "university", label: "Universités Partenaires" },
     { value: "layout_artist", label: "Maquettistes" },
-    { value: "legal_reviewer", label: "Juristes" },
-    { value: "partner_api", label: "Partenaires API / Univ." },
+    { value: "chief_layout", label: "Chef Maquettiste" },
+    { value: "manager", label: "Gestionnaires Stock & Livraison" },
+    { value: "legal_reviewer", label: "Juristes / Relecteurs" },
+    { value: "wholesaler", label: "Grossistes Commerciaux" },
+    { value: "partner_api", label: "Partenaires API" },
     { value: "admin", label: "Administrateurs" },
   ];
 
@@ -99,9 +103,11 @@ export default function AdminUsersGlobalPage() {
       header: "Nom & Prénom",
       cell: (row) => (
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-navy/10 text-navy font-bold text-xs flex items-center justify-center border border-navy/20 shrink-0">
-            {row.first_name[0]}
-          </div>
+          <UserAvatar
+            src={row.avatar_url || row.avatar}
+            name={`${row.first_name} ${row.last_name}`}
+            size="sm"
+          />
           <div>
             <p className="font-semibold text-xs text-foreground">
               {row.first_name} {row.last_name}
@@ -115,8 +121,8 @@ export default function AdminUsersGlobalPage() {
       key: "role",
       header: "Rôle Principal",
       cell: (row) => (
-        <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-light text-navy font-semibold capitalize">
-          {row.role}
+        <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-light text-navy font-semibold">
+          {formatRoleLabel(row.role)}
         </span>
       ),
     },
@@ -124,8 +130,8 @@ export default function AdminUsersGlobalPage() {
       key: "country",
       header: "Pays",
       cell: (row) => (
-        <span className="font-mono text-xs font-medium text-foreground px-2 py-0.5 rounded-md bg-background border border-border">
-          {row.country}
+        <span className="font-sans text-xs font-semibold text-foreground px-2.5 py-0.5 rounded-md bg-background-secondary border border-border">
+          {formatCountryName(row.country)}
         </span>
       ),
     },
@@ -232,9 +238,11 @@ export default function AdminUsersGlobalPage() {
         <Modal open={!!inspectUser} onClose={() => setInspectUser(null)} title="Profil Utilisateur">
           <div className="p-6 max-w-md mx-auto space-y-4 bg-background text-foreground">
             <div className="flex items-center gap-3 pb-3 border-b border-border">
-              <div className="w-10 h-10 rounded-full bg-navy text-gold font-bold text-sm flex items-center justify-center">
-                {inspectUser.first_name[0]}
-              </div>
+              <UserAvatar
+                src={inspectUser.avatar_url || inspectUser.avatar}
+                name={`${inspectUser.first_name} ${inspectUser.last_name}`}
+                size="lg"
+              />
               <div>
                 <h3 className="font-bold text-sm text-foreground">
                   {inspectUser.first_name} {inspectUser.last_name}
@@ -250,11 +258,11 @@ export default function AdminUsersGlobalPage() {
               </div>
               <div className="flex justify-between py-1 border-b border-border">
                 <span className="text-foreground-muted">Rôle principal :</span>
-                <span className="font-semibold text-navy">{inspectUser.role}</span>
+                <span className="font-semibold text-navy">{formatRoleLabel(inspectUser.role)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border">
                 <span className="text-foreground-muted">Pays :</span>
-                <span className="font-mono font-semibold">{inspectUser.country}</span>
+                <span className="font-semibold text-foreground">{formatCountryName(inspectUser.country)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border">
                 <span className="text-foreground-muted">Téléphone :</span>
