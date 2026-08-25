@@ -24,44 +24,41 @@ def compute_webhook_signature(secret: str, timestamp: int, payload_str: str) -> 
     return f"t={timestamp},v1={sig_hex}"
 
 
-@shared_task(bind=True, max_retries=5, default_retry_delay=30)
-def dispatch_partner_webhook_task(
-    self,
+def send_partner_webhook(
     partner_id: str,
     event_type: str,
     payload_data: Dict[str, Any],
-    session_id: Optional[str] = None
+    session_id: Optional[str] = None,
+    attempt: int = 1
 ) -> bool:
-    """
-    Envoie de manière ASYNCHRONE un événement webhook signé à un partenaire,
-    avec retry exponentiel automatique en cas d'échec réseau.
-    """
+    """Envoie de manière non bloquante un événement webhook signé à un partenaire."""
     from .models import PartnerApp, ReaderSession, WebhookLog
 
     partner = PartnerApp.objects.filter(id=partner_id).first()
     if not partner or not partner.webhook_url:
-        logger.info(f"Pas de webhook_url configurée pour le partenaire {partner_id}")
         return False
 
     try:
         DocumentSourceAdapter._validate_ssrf_and_whitelist(partner.webhook_url, {"allowed_document_sources": ["*"]})
     except DocumentSourceError as e:
         logger.error(f"[Webhook] URL de webhook rejetée pour {partner.name} (Anti-SSRF): {e}")
-        WebhookLog.objects.create(
-            partner=partner,
-            session=ReaderSession.objects.filter(id=session_id).first() if session_id else None,
-            event_type=event_type,
-            delivery_id=f"del_{uuid.uuid4().hex}",
-            payload_json="{}",
-            status_code=None,
-            response_body=f"URL de webhook bloquée par la sécurité Anti-SSRF: {str(e)}",
-            attempt_count=1,
-            is_success=False
-        )
+        try:
+            WebhookLog.objects.create(
+                partner=partner,
+                session=ReaderSession.objects.filter(id=session_id).first() if session_id else None,
+                event_type=event_type,
+                delivery_id=f"del_{uuid.uuid4().hex}",
+                payload_json="{}",
+                status_code=None,
+                response_body=f"URL de webhook bloquée par la sécurité Anti-SSRF: {str(e)}",
+                attempt_count=attempt,
+                is_success=False
+            )
+        except Exception:
+            pass
         return False
 
     session = ReaderSession.objects.filter(id=session_id).first() if session_id else None
-
     delivery_id = f"del_{uuid.uuid4().hex}"
     timestamp = int(timezone.now().timestamp())
 
@@ -107,15 +104,28 @@ def dispatch_partner_webhook_task(
             payload_json=payload_str,
             status_code=status_code,
             response_body=response_body,
-            attempt_count=(getattr(self.request, 'retries', 0) + 1) if self and hasattr(self, 'request') and getattr(self, 'request', None) else 1,
+            attempt_count=attempt,
             is_success=is_success
         )
     except Exception as log_err:
         logger.warning(f"Impossible d'enregistrer WebhookLog: {log_err}")
 
-    if not is_success and self and hasattr(self, 'request') and getattr(self, 'request', None) and getattr(self.request, 'retries', 0) < getattr(self, 'max_retries', 3):
-        raise self.retry(countdown=30 * (2 ** self.request.retries))
+    return is_success
 
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=30)
+def dispatch_partner_webhook_task(
+    self,
+    partner_id: str,
+    event_type: str,
+    payload_data: Dict[str, Any],
+    session_id: Optional[str] = None
+) -> bool:
+    """Tâche Celery pour l'envoi de webhooks avec retries."""
+    attempt = (getattr(self.request, 'retries', 0) + 1) if hasattr(self, 'request') and self.request else 1
+    is_success = send_partner_webhook(partner_id, event_type, payload_data, session_id, attempt=attempt)
+    if not is_success and hasattr(self, 'request') and self.request and getattr(self.request, 'retries', 0) < getattr(self, 'max_retries', 3):
+        raise self.retry(countdown=30 * (2 ** self.request.retries))
     return is_success
 
 
@@ -126,30 +136,13 @@ def dispatch_partner_webhook_sync(
     session_id: Optional[str] = None
 ) -> None:
     """
-    Point d'entrée appelé depuis les vues. Met la tâche en file Celery ou dans un thread détaché
-    et retourne IMMEDIATEMENT — ne bloque JAMAIS la requête HTTP de l'utilisateur.
+    Point d'entrée appelé depuis les vues. Met la tâche dans un thread détaché
+    et retourne IMMEDIATEMENT — ne bloque JAMAIS la requête HTTP.
     """
     import threading
-    from django.conf import settings
 
-    if getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
-        threading.Thread(
-            target=dispatch_partner_webhook_task,
-            args=(None, partner_id, event_type, payload_data, session_id),
-            daemon=True
-        ).start()
-    else:
-        try:
-            dispatch_partner_webhook_task.delay(
-                partner_id=partner_id,
-                event_type=event_type,
-                payload_data=payload_data,
-                session_id=session_id,
-            )
-        except Exception as e:
-            logger.warning(f"Impossible de mettre le webhook en file Celery: {e}")
-            threading.Thread(
-                target=dispatch_partner_webhook_task,
-                args=(None, partner_id, event_type, payload_data, session_id),
-                daemon=True
-            ).start()
+    threading.Thread(
+        target=send_partner_webhook,
+        args=(partner_id, event_type, payload_data, session_id, 1),
+        daemon=True
+    ).start()

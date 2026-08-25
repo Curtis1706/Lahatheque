@@ -136,19 +136,22 @@ class ReaderSessionViewSet(ViewSet):
         frontend_base = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
         reader_url = f"{frontend_base.rstrip('/')}/read/{token_str}"
 
-        # 5. Déclenchement webhook asynchrone reader.session.opened
-        dispatch_partner_webhook_sync(
-            partner_id=str(partner.id),
-            event_type="reader.session.opened",
-            session_id=str(session.id),
-            payload_data={
-                "session_id": str(session.id),
-                "external_user_ref": end_user.external_ref,
-                "book_id": str(session.ouvrage_id) if session.ouvrage_id else None,
-                "document_title": session.ouvrage.titre if session.ouvrage else session.custom_document_title,
-                "expires_at": expires_at.isoformat()
-            }
-        )
+        # 5. Déclenchement webhook asynchrone reader.session.opened (non bloquant)
+        try:
+            dispatch_partner_webhook_sync(
+                partner_id=str(partner.id),
+                event_type="reader.session.opened",
+                session_id=str(session.id),
+                payload_data={
+                    "session_id": str(session.id),
+                    "external_user_ref": end_user.external_ref,
+                    "book_id": str(session.ouvrage_id) if session.ouvrage_id else None,
+                    "document_title": session.ouvrage.titre if session.ouvrage else session.custom_document_title,
+                    "expires_at": expires_at.isoformat()
+                }
+            )
+        except Exception as wh_err:
+            logger.warning(f"Erreur déclenchement webhook session.opened: {wh_err}")
 
         book_info = {
             "id": str(session.ouvrage_id) if session.ouvrage_id else str(session.id),
