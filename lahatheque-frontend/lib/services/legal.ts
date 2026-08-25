@@ -132,13 +132,19 @@ export async function updateBookRoyaltyRate(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       book_id: bookId,
+      rate: newRate,
+      apply_retroactively: applyRetroactively,
       beneficiaires: [
         { pourcentage: newRate, role: "Auteur Principal", apply_retroactively: applyRetroactively }
       ]
     }),
     credentials: "include",
   });
-  if (!res.ok) return false;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.error("[updateBookRoyaltyRate Error]", err);
+    return false;
+  }
   const data = await res.json();
   return !!data.success;
 }
@@ -298,17 +304,17 @@ export async function getAuthorEmailReports(): Promise<AuthorEmailReport[]> {
   });
   if (!res.ok) throw new Error(`Erreur relances: ${res.status}`);
   const data = await res.json();
-  const history = data.data?.history || data.results || [];
-  return history.map((h: any) => ({
-    report_id: h.id,
-    author_name: h.recipient,
-    author_email: h.email,
-    period: "Juillet 2026",
-    books_covered: ["Traité pratique de Droit Commercial General OHADA"],
-    total_revenue_reported: 275000,
-    currency: "XOF",
-    sent_at: h.sent_at,
-    status: h.status === "envoye" ? "sent" : "pending",
+  const reports = data.data?.reports || [];
+  return reports.map((r: any) => ({
+    author_id: r.author_id,
+    name: r.name,
+    email: r.email,
+    total_sales_count: r.total_sales_count,
+    total_royalties_paid: r.total_royalties_paid,
+    total_revenue_reported: r.total_revenue_reported,
+    currency: r.currency || "XOF",
+    last_report_date: r.last_report_date,
+    status: "scheduled",
   }));
 }
 
@@ -333,16 +339,28 @@ export async function getClientDebts(): Promise<ClientDebt[]> {
     currency: "XOF",
     days_overdue: d.days_overdue,
     reminder_count: d.reminder_count,
-    last_reminder_at: d.last_reminder_at,
+    last_reminder_at: d.due_date,
     status: d.reminder_count > 1 ? "formal_notice" : "reminded",
   }));
 }
 
-export async function remindClientDebt(debtId: string, clientName?: string): Promise<boolean> {
+export async function remindClientDebt(clientId: string, clientName?: string): Promise<boolean> {
   const res = await fetch(`${API_BASE}/relances/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ debt_id: debtId, recipient: clientName || "Client" }),
+    body: JSON.stringify({ recipient_id: clientId, type: "facture_impayee_client", recipient: clientName || "Client" }),
+    credentials: "include",
+  });
+  if (!res.ok) return false;
+  const data = await res.json();
+  return !!data.success;
+}
+
+export async function sendAuthorRoyaltyReport(authorId: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/relances/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recipient_id: authorId, type: "rapport_droits_auteur" }),
     credentials: "include",
   });
   if (!res.ok) return false;

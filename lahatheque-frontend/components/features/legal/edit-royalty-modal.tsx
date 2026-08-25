@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Percent, X, AlertCircle, Save, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { BookRoyalty } from "@/lib/types/legal";
@@ -21,6 +21,10 @@ export function EditRoyaltyModal({
   const [rate, setRate] = useState(royalty.current_rate);
   const [applyRetroactively, setApplyRetroactively] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setRate(royalty.current_rate);
+  }, [royalty]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

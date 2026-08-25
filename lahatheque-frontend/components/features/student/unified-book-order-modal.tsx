@@ -1,8 +1,6 @@
-"use client";
-
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, ShoppingBag, BookOpen, Truck, Eye, Loader2, CheckCircle2, ArrowRight } from "lucide-react";
+import { X, ShoppingBag, BookOpen, Truck, Eye, Loader2, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { createOrder } from "@/lib/services/commerce-orders";
 import type { BookAPI } from "@/lib/services/student";
@@ -34,6 +32,9 @@ export function UnifiedBookOrderModal({
   const [shippingAddress, setShippingAddress] = useState("");
   const [modePaiement, setModePaiement] = useState<"mobile_money" | "virement" | "especes" | "carte">("mobile_money");
   const [submitting, setSubmitting] = useState(false);
+  const [paymentPhase, setPaymentPhase] = useState<"idle" | "countdown" | "success">("idle");
+  const [countdownAmount, setCountdownAmount] = useState<number>(0);
+  const [progressPct, setProgressPct] = useState<number>(0);
   const [success, setSuccess] = useState(false);
 
   const unitPrice = format === "digital" ? (book.price_digital ?? 0) : (book.price_paper ?? 0);
@@ -44,6 +45,31 @@ export function UnifiedBookOrderModal({
     book.authors && Array.isArray(book.authors) && book.authors.length > 0
       ? book.authors.map((a: any) => a.full_name || `${a.first_name || ""} ${a.last_name || ""}`.trim()).join(", ")
       : (book as any).author || "Auteur LAHA";
+
+  function runCountdownAnimation(startAmount: number, durationMs: number): Promise<void> {
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      function step(now: number) {
+        const elapsed = now - startTime;
+        const rawProgress = Math.min(elapsed / durationMs, 1);
+        // easeOutCubic: 1 - (1 - t)^3
+        const eased = 1 - Math.pow(1 - rawProgress, 3);
+        const currentAmount = Math.max(0, Math.round(startAmount * (1 - eased)));
+        
+        setCountdownAmount(currentAmount);
+        setProgressPct(Math.min(100, Math.round(rawProgress * 100)));
+
+        if (rawProgress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          setCountdownAmount(0);
+          setProgressPct(100);
+          resolve();
+        }
+      }
+      requestAnimationFrame(step);
+    });
+  }
 
   async function handleSubmit() {
     // Si déjà possédé en numérique et sélectionné, rediriger directement vers la lecture
@@ -59,22 +85,34 @@ export function UnifiedBookOrderModal({
     }
 
     setSubmitting(true);
+    setPaymentPhase("countdown");
+    setCountdownAmount(total);
+    setProgressPct(0);
+
+    const orderPromise = createOrder({
+      items: [{ ouvrage_id: book.id, format_type: format, quantity }],
+      type_commande: "personnel",
+      mode_paiement: modePaiement,
+      shipping_address: format === "paper" ? shippingAddress : undefined,
+      city: "Cotonou",
+      country: "BJ",
+    });
+
+    const animationPromise = runCountdownAnimation(total, 1800);
+
     try {
-      const result = await createOrder({
-        items: [{ ouvrage_id: book.id, format_type: format, quantity }],
-        type_commande: "personnel",
-        mode_paiement: modePaiement,
-        shipping_address: format === "paper" ? shippingAddress : undefined,
-        city: "Cotonou",
-        country: "BJ",
-      });
+      const [result] = await Promise.all([orderPromise, animationPromise]);
 
       if (result.payment_url) {
         window.location.href = result.payment_url;
         return;
       }
 
+      // Pause visuelle de confirmation à 0 XOF
+      await new Promise((r) => setTimeout(r, 350));
+
       if (format === "digital") {
+        setPaymentPhase("success");
         setSuccess(true);
         onDigitalPurchaseSuccess?.();
       } else {
@@ -82,6 +120,7 @@ export function UnifiedBookOrderModal({
         onClose();
       }
     } catch (err: unknown) {
+      setPaymentPhase("idle");
       const msg = err instanceof Error ? err.message : "Erreur lors de la commande.";
       toast.error(msg);
     } finally {
@@ -89,27 +128,94 @@ export function UnifiedBookOrderModal({
     }
   }
 
+  // Écran d'animation du décompte de paiement (de 4500 à 0 XOF)
+  if (paymentPhase === "countdown") {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="bg-background border border-border rounded-3xl shadow-2xl w-full max-w-sm p-7 text-center space-y-5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold/10 text-gold text-[10px] font-bold uppercase tracking-wider border border-gold/20">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Débit Sécurisé LAHAThèque</span>
+          </div>
+
+          <div className="space-y-1 py-1">
+            <p className="text-[11px] font-mono uppercase tracking-widest text-foreground-muted">Montant débité</p>
+            <div className="font-mono text-4xl sm:text-5xl font-black text-navy tracking-tight flex items-baseline justify-center gap-2">
+              <span className="tabular-nums transition-all">{countdownAmount.toLocaleString("fr-FR")}</span>
+              <span className="text-base sm:text-lg font-bold text-gold">XOF</span>
+            </div>
+            <p className="text-[11px] text-foreground-muted truncate max-w-xs mx-auto pt-1 font-medium">
+              « {book.title} »
+            </p>
+          </div>
+
+          {/* Barre de progression fluide */}
+          <div className="space-y-2">
+            <div className="w-full bg-background-secondary rounded-full h-2.5 overflow-hidden border border-border">
+              <div
+                className="bg-gold h-full rounded-full transition-all duration-75 ease-out shadow-xs"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-foreground-muted font-mono">
+              <span>{countdownAmount > 0 ? "Traitement du règlement..." : "Règlement finalisé"}</span>
+              <span className="font-bold text-navy">{progressPct}%</span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-background-secondary border border-border text-xs text-foreground-muted flex items-center justify-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-gold shrink-0" />
+            <span>Sécurisation de la transaction &amp; transfert de licence...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (success) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/70 backdrop-blur-xs p-4">
-        <div className="bg-background border border-border rounded-3xl shadow-xl w-full max-w-sm p-6 text-center space-y-4">
-          <CheckCircle2 className="w-12 h-12 text-success mx-auto" />
-          <h3 className="font-serif text-lg font-bold text-navy">Achat confirmé !</h3>
-          <p className="text-xs text-foreground-muted">
-            « {book.title} » est maintenant disponible dans votre bibliothèque.
-          </p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/80 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-300">
+        <div className="bg-background border border-border rounded-3xl shadow-2xl w-full max-w-sm p-7 text-center space-y-5">
+          <div className="w-16 h-16 rounded-full bg-success/10 text-success flex items-center justify-center mx-auto border border-success/30 animate-in zoom-in duration-300">
+            <CheckCircle2 className="w-9 h-9" />
+          </div>
+
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-bold border border-success/20 mb-1">
+              <span>0 XOF Restant</span>
+              <span>•</span>
+              <span>Débit Effectué</span>
+            </div>
+            <h3 className="font-serif text-2xl font-bold text-navy">Paiement effectué !</h3>
+            <p className="text-xs text-foreground-muted">
+              « {book.title} » est maintenant disponible dans votre bibliothèque.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-background-secondary border border-border text-left space-y-1.5 text-xs">
+            <div className="flex items-center justify-between text-navy font-bold">
+              <span>Format activé</span>
+              <span className="text-gold font-mono uppercase text-[11px] font-bold">Numérique (Accès illimité)</span>
+            </div>
+            <div className="flex items-center justify-between text-foreground-muted text-[11px]">
+              <span>Total réglé</span>
+              <span className="font-mono font-bold text-navy">{total.toLocaleString("fr-FR")} XOF</span>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-2 pt-2">
             <button
               type="button"
               onClick={() => router.push(`/catalog/reader/${book.id}`)}
-              className="w-full px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[40px] cursor-pointer"
+              className="w-full px-4 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
             >
+              <BookOpen className="w-4 h-4 text-gold" />
               Ouvrir la liseuse maintenant
             </button>
             <button
               type="button"
               onClick={() => router.push("/student/books")}
-              className="w-full px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-background-secondary transition-colors min-h-[40px] cursor-pointer"
+              className="w-full px-4 py-2.5 rounded-2xl border border-border text-xs font-semibold text-navy hover:bg-background-secondary transition-colors min-h-[40px] cursor-pointer"
             >
               Aller à Ma Bibliothèque
             </button>

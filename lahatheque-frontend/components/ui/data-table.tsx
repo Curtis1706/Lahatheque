@@ -22,6 +22,8 @@ export interface DataTableFilterOption {
 export interface DataTableProps<T> {
   data: T[];
   columns: DataTableColumn<T>[];
+  /** Afficher la barre de recherche interne (défaut: true) */
+  searchable?: boolean;
   /** Clé utilisée pour le filtre de statut (optionnel) */
   filterKey?: keyof T;
   filterOptions?: DataTableFilterOption[];
@@ -56,6 +58,7 @@ export interface DataTableProps<T> {
 export function DataTable<T extends Record<string, any>>({
   data,
   columns,
+  searchable = true,
   filterKey,
   filterOptions,
   filterPlaceholder = "Tous les statuts",
@@ -87,7 +90,7 @@ export function DataTable<T extends Record<string, any>>({
   const filtered = React.useMemo(() => {
     let rows = data;
 
-    if (search.trim()) {
+    if (searchable && search.trim()) {
       const q = search.toLowerCase();
       rows = rows.filter((row) =>
         Object.values(row).some((v) =>
@@ -103,7 +106,7 @@ export function DataTable<T extends Record<string, any>>({
     }
 
     return rows;
-  }, [data, search, statusFilter, filterKey]);
+  }, [data, search, statusFilter, filterKey, searchable]);
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
   const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
@@ -114,61 +117,66 @@ export function DataTable<T extends Record<string, any>>({
     return filtered.slice(start, start + itemsPerPage);
   }, [filtered, safeCurrentPage, itemsPerPage, showPagination]);
 
-  const hasFilters = Boolean(search || statusFilter !== "all");
+  const hasHeader = Boolean(searchable || (filterOptions && filterKey) || headerActions);
+  const hasFilters = Boolean((searchable && search) || statusFilter !== "all");
 
   return (
     <div className={cn("bg-background border border-border rounded-2xl shadow-sm overflow-hidden", className)}>
       {/* ── Barre search + filtre ── */}
-      <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {/* Recherche */}
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none" aria-hidden="true" />
-            <input
-              type="search"
-              aria-label={searchPlaceholder}
-              placeholder={searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={cn(
-                "w-full pl-9 pr-4 py-2 rounded-xl border border-border bg-background",
-                "text-sm text-foreground placeholder:text-foreground-muted",
-                "focus:outline-none focus:ring-2 focus:ring-navy focus:border-navy transition-all"
-              )}
-            />
+      {hasHeader && (
+        <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* Recherche */}
+            {searchable && (
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none" aria-hidden="true" />
+                <input
+                  type="search"
+                  aria-label={searchPlaceholder}
+                  placeholder={searchPlaceholder}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className={cn(
+                    "w-full pl-9 pr-4 py-2 rounded-xl border border-border bg-background",
+                    "text-sm text-foreground placeholder:text-foreground-muted",
+                    "focus:outline-none focus:ring-2 focus:ring-navy focus:border-navy transition-all"
+                  )}
+                />
+              </div>
+            )}
+
+            {/* Filtre statut */}
+            {filterOptions && filterKey && (
+              <div className="relative">
+                <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-muted pointer-events-none" aria-hidden="true" />
+                <select
+                  aria-label="Filtrer par statut"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className={cn(
+                    "pl-8 pr-8 py-2 rounded-xl border border-border bg-background",
+                    "text-sm text-foreground appearance-none cursor-pointer",
+                    "focus:outline-none focus:ring-2 focus:ring-navy focus:border-navy transition-all"
+                  )}
+                >
+                  <option value="all">{filterPlaceholder}</option>
+                  {filterOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-foreground-muted text-xs">▾</span>
+              </div>
+            )}
           </div>
 
-          {/* Filtre statut */}
-          {filterOptions && filterKey && (
-            <div className="relative">
-              <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-muted pointer-events-none" aria-hidden="true" />
-              <select
-                aria-label="Filtrer par statut"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className={cn(
-                  "pl-8 pr-8 py-2 rounded-xl border border-border bg-background",
-                  "text-sm text-foreground appearance-none cursor-pointer",
-                  "focus:outline-none focus:ring-2 focus:ring-navy focus:border-navy transition-all"
-                )}
-              >
-                <option value="all">{filterPlaceholder}</option>
-                {filterOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-foreground-muted text-xs">▾</span>
-            </div>
+          {/* Actions header (bouton Exporter, Nouveau, etc.) */}
+          {headerActions && (
+            <div className="flex items-center gap-2 shrink-0">{headerActions}</div>
           )}
         </div>
-
-        {/* Actions header (bouton Exporter, Nouveau, etc.) */}
-        {headerActions && (
-          <div className="flex items-center gap-2 shrink-0">{headerActions}</div>
-        )}
-      </div>
+      )}
 
       {/* ── Contenu ── */}
       {loading ? (

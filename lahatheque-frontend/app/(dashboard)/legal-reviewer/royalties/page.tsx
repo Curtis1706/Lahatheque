@@ -62,6 +62,8 @@ export default function LegalRoyaltiesPage() {
             : "S'applique aux ventes futures."
         }`
       );
+    } else {
+      toast.error("Échec de la mise à jour du taux de droits d'auteur.");
     }
   };
 

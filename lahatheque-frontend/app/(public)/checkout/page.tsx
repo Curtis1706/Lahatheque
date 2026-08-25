@@ -30,9 +30,79 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [orderCompleted, setOrderCompleted] = useState<any | null>(null);
 
+  const [paymentPhase, setPaymentPhase] = useState<"idle" | "countdown" | "success">("idle");
+  const [countdownAmount, setCountdownAmount] = useState<number>(0);
+  const [progressPct, setProgressPct] = useState<number>(0);
+
   const hasPaperItem = items.some((i) => i.format === "paper");
 
-  if (items.length === 0 && !orderCompleted) {
+  function runCountdownAnimation(startAmount: number, durationMs: number): Promise<void> {
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      function step(now: number) {
+        const elapsed = now - startTime;
+        const rawProgress = Math.min(elapsed / durationMs, 1);
+        const eased = 1 - Math.pow(1 - rawProgress, 3);
+        const currentAmount = Math.max(0, Math.round(startAmount * (1 - eased)));
+        
+        setCountdownAmount(currentAmount);
+        setProgressPct(Math.min(100, Math.round(rawProgress * 100)));
+
+        if (rawProgress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          setCountdownAmount(0);
+          setProgressPct(100);
+          resolve();
+        }
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  if (paymentPhase === "countdown") {
+    return (
+      <div className="min-h-[70vh] bg-background text-foreground py-16 px-4 flex items-center justify-center">
+        <div className="bg-background border border-border rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center space-y-6 animate-in fade-in duration-200">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-gold/10 text-gold text-[11px] font-bold uppercase tracking-wider border border-gold/20">
+            <Lock className="w-3.5 h-3.5" />
+            <span>Débit Sécurisé LAHAThèque</span>
+          </div>
+
+          <div className="space-y-1 py-1">
+            <p className="text-[11px] font-mono uppercase tracking-widest text-foreground-muted">Montant débité</p>
+            <div className="font-mono text-4xl sm:text-5xl font-black text-navy tracking-tight flex items-baseline justify-center gap-2">
+              <span className="tabular-nums transition-all">{countdownAmount.toLocaleString("fr-FR")}</span>
+              <span className="text-base sm:text-lg font-bold text-gold">FCFA</span>
+            </div>
+            <p className="text-xs text-foreground-muted pt-1">
+              Règlement de votre panier ({totalCount} article{totalCount > 1 ? "s" : ""})
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="w-full bg-background-secondary rounded-full h-2.5 overflow-hidden border border-border">
+              <div
+                className="bg-gold h-full rounded-full transition-all duration-75 ease-out shadow-xs"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-foreground-muted font-mono">
+              <span>{countdownAmount > 0 ? "Traitement du paiement..." : "Règlement finalisé"}</span>
+              <span className="font-bold text-navy">{progressPct}%</span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-background-secondary border border-border text-xs text-foreground-muted flex items-center justify-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-gold shrink-0" />
+            <span>Sécurisation de la transaction &amp; génération des accès...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (items.length === 0 && !orderCompleted && paymentPhase === "idle") {
     return (
       <div className="min-h-[60vh] bg-background text-foreground py-16 px-4 flex flex-col items-center justify-center text-center">
         <h1 className="font-serif text-2xl font-bold text-navy mb-2">Aucun article à commander</h1>
@@ -50,16 +120,21 @@ export default function CheckoutPage() {
   if (orderCompleted) {
     return (
       <div className="min-h-[70vh] bg-background text-foreground py-16 px-4 flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-6 animate-in fade-in zoom-in duration-300">
-        <div className="w-20 h-20 rounded-full bg-success/10 text-success flex items-center justify-center">
+        <div className="w-20 h-20 rounded-full bg-success/10 text-success flex items-center justify-center mx-auto border border-success/30">
           <CheckCircle2 className="w-10 h-10" />
         </div>
         <div className="space-y-2">
-          <h1 className="font-serif text-2xl font-bold text-navy">Commande confirmée !</h1>
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-bold border border-success/20 mb-1">
+            <span>0 FCFA Restant</span>
+            <span>•</span>
+            <span>Paiement Validé</span>
+          </div>
+          <h1 className="font-serif text-2xl font-bold text-navy">Paiement effectué !</h1>
           <p className="text-xs text-foreground-muted">
             Numéro de commande : <span className="font-bold font-mono text-navy">{orderCompleted.order_id}</span>
           </p>
           <p className="text-xs text-foreground/80 leading-relaxed pt-2">
-            Votre paiement de <span className="font-bold text-gold-dark">{parseInt(orderCompleted.total_amount || 0).toLocaleString("fr-FR")} FCFA</span> a été validé avec succès.
+            Votre règlement de <span className="font-bold text-gold-dark font-mono">{parseInt(orderCompleted.total_amount || 0).toLocaleString("fr-FR")} FCFA</span> a été débité et validé avec succès.
             Vos accès de lecture sont désormais immédiatement actifs.
           </p>
         </div>
@@ -92,25 +167,33 @@ export default function CheckoutPage() {
       return;
     }
 
-    try {
-      const payload = {
-        payment_provider: paymentProvider,
-        shipping_address: shippingAddress,
-        city: city,
-        country: country,
-        items: items.map((item) => ({
-          ouvrage_id: item.bookId,
-          format_type: item.format,
-          quantity: item.quantity,
-        })),
-      };
+    setPaymentPhase("countdown");
+    setCountdownAmount(totalAmount);
+    setProgressPct(0);
 
-      const res = await fetch("/api/bff/commerce/orders/", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    const payload = {
+      payment_provider: paymentProvider,
+      shipping_address: shippingAddress,
+      city: city,
+      country: country,
+      items: items.map((item) => ({
+        ouvrage_id: item.bookId,
+        format_type: item.format,
+        quantity: item.quantity,
+      })),
+    };
+
+    const orderPromise = fetch("/api/bff/commerce/orders/", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const animationPromise = runCountdownAnimation(totalAmount, 1800);
+
+    try {
+      const [res] = await Promise.all([orderPromise, animationPromise]);
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -118,9 +201,12 @@ export default function CheckoutPage() {
       }
 
       const data = await res.json();
+      await new Promise((r) => setTimeout(r, 350));
+      setPaymentPhase("success");
       setOrderCompleted(data);
       clearCart();
     } catch (err: any) {
+      setPaymentPhase("idle");
       setError(err.message || "Erreur réseau lors de la validation de commande.");
     } finally {
       setLoading(false);

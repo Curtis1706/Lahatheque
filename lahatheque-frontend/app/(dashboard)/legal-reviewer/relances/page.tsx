@@ -10,10 +10,12 @@ import {
   getAuthorEmailReports,
   getClientDebts,
   remindClientDebt,
+  sendAuthorRoyaltyReport,
   getDebtReminderConfig,
   updateDebtReminderConfig,
 } from "@/lib/services/legal";
 import type { AuthorEmailReport, ClientDebt, DebtReminderConfig } from "@/lib/types/legal";
+import { toast } from "sonner";
 
 export default function LegalRelancesPage() {
   const searchParams = useSearchParams();
@@ -27,6 +29,7 @@ export default function LegalRelancesPage() {
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [remindingId, setRemindingId] = useState<string | null>(null);
+  const [sendingAuthorId, setSendingAuthorId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -44,18 +47,41 @@ export default function LegalRelancesPage() {
     loadData();
   }, []);
 
-  const handleRemindDebt = async (debtId: string) => {
+  const handleRemindDebt = async (debtId: string, clientName?: string) => {
     setRemindingId(debtId);
     try {
-      const success = await remindClientDebt(debtId);
+      const success = await remindClientDebt(debtId, clientName);
       if (success) {
         setDebts((prev) =>
           prev.map((d) => (d.id === debtId ? { ...d, status: "reminded", reminder_count: d.reminder_count + 1 } : d))
         );
-        alert("E-mail de relance automatique envoyé avec succès au client !");
+        toast.success("E-mail de relance automatique envoyé avec succès au client !");
+      } else {
+        toast.error("Échec de l'envoi de la relance.");
       }
+    } catch {
+      toast.error("Erreur lors de l'envoi de la relance.");
     } finally {
       setRemindingId(null);
+    }
+  };
+
+  const handleSendAuthorReport = async (authorId?: string) => {
+    if (!authorId) return;
+    setSendingAuthorId(authorId);
+    try {
+      const success = await sendAuthorRoyaltyReport(authorId);
+      if (success) {
+        toast.success("Relevé de redevances transmis avec succès à l'auteur !");
+        const refreshed = await getAuthorEmailReports();
+        setAuthorReports(refreshed);
+      } else {
+        toast.error("Échec de l'envoi du relevé.");
+      }
+    } catch {
+      toast.error("Erreur lors de l'envoi du relevé.");
+    } finally {
+      setSendingAuthorId(null);
     }
   };
 
@@ -63,7 +89,9 @@ export default function LegalRelancesPage() {
     const success = await updateDebtReminderConfig(newConfig);
     if (success) {
       setReminderConfig(newConfig);
-      alert("La configuration des relances automatiques d'impayés a été enregistrée avec succès !");
+      toast.success("La configuration des relances automatiques d'impayés a été enregistrée avec succès !");
+    } else {
+      toast.error("Erreur lors de l'enregistrement de la configuration.");
     }
   };
 
@@ -73,44 +101,50 @@ export default function LegalRelancesPage() {
       header: "Auteur Destinataire",
       cell: (row) => (
         <div>
-          <p className="font-bold text-xs text-navy">{row.name}</p>
-          <p className="text-[10px] text-foreground-muted font-mono">{row.email}</p>
+          <p className="font-bold text-xs text-navy">{row.name || "Auteur Inconnu"}</p>
+          <p className="text-[10px] text-foreground-muted font-mono">{row.email || "—"}</p>
         </div>
       ),
     },
     {
       key: "total_sales_count",
       header: "Volume Ventes",
-      cell: (row) => <span className="font-mono font-bold text-xs text-navy">{row.total_sales_count} exemplaires</span>,
+      cell: (row) => <span className="font-mono font-bold text-xs text-navy">{row.total_sales_count || 0} exemplaires</span>,
     },
     {
       key: "total_royalties_paid",
       header: "Redevances Versées",
       cell: (row) => (
         <span className="font-mono font-bold text-gold text-xs">
-          {(row.total_royalties_paid || row.total_revenue_reported || 0).toLocaleString("fr-FR")} XOF
+          {(row.total_royalties_paid || 0).toLocaleString("fr-FR")} {row.currency || "XOF"}
         </span>
       ),
     },
     {
-      key: "next_report_date",
-      header: "Prochain Envoi Automatique",
+      key: "last_report_date",
+      header: "Dernier Relevé",
       cell: (row) => (
         <span className="font-mono text-xs text-foreground-muted">
-          {row.next_report_date
-            ? new Date(row.next_report_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })
-            : (row.sent_at || "Programmée")}
+          {row.last_report_date
+            ? new Date(row.last_report_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })
+            : "Aucun envoi précédent"}
         </span>
       ),
     },
     {
-      key: "status",
-      header: "Statut",
+      key: "actions" as keyof AuthorEmailReport,
+      header: "Action",
       cell: (row) => (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
-          <CheckCircle2 className="w-3 h-3" />
-          Planifié / Automatique
-        </span>
+        <button
+          type="button"
+          disabled={sendingAuthorId === row.author_id}
+          onClick={() => handleSendAuthorReport(row.author_id)}
+          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+          title="Transmettre le relevé de ventes et redevances par e-mail"
+        >
+          <Mail className="w-3.5 h-3.5 text-gold" />
+          {sendingAuthorId === row.author_id ? "Envoi..." : "Envoyer Relevé"}
+        </button>
       ),
     },
   ];
@@ -131,7 +165,7 @@ export default function LegalRelancesPage() {
       header: "Montant Dû",
       cell: (row) => (
         <span className="font-mono font-bold text-rose-600 text-xs">
-          {(row.amount || row.total_debt_amount || 0).toLocaleString("fr-FR")} {row.currency}
+          {(row.total_debt_amount || row.amount || 0).toLocaleString("fr-FR")} {row.currency}
         </span>
       ),
     },
@@ -155,16 +189,16 @@ export default function LegalRelancesPage() {
     },
     {
       key: "actions" as keyof ClientDebt,
-      header: "",
+      header: "Action",
       cell: (row) => (
         <button
           type="button"
           disabled={remindingId === row.id}
-          onClick={() => handleRemindDebt(row.id)}
-          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1 disabled:opacity-50"
+          onClick={() => handleRemindDebt(row.id, row.client_name)}
+          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1 disabled:opacity-50 cursor-pointer"
         >
           <Send className="w-3.5 h-3.5 text-gold" />
-          Déclencher Relance
+          {remindingId === row.id ? "Envoi..." : "Déclencher Relance"}
         </button>
       ),
     },

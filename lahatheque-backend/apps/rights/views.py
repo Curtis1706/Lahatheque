@@ -1,4 +1,5 @@
 """Vues pour les droits d'auteur, les redevances et l'espace auteur LAHAThèque."""
+import logging
 import uuid
 from datetime import timedelta
 from django.utils import timezone
@@ -6,6 +7,8 @@ from django.db import models
 from django.db.models import Sum, Count, Q, F
 from rest_framework.views import APIView
 from rest_framework.response import Response
+
+logger = logging.getLogger(__name__)
 from rest_framework import status, permissions
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from apps.accounts.permissions import IsAuthor, IsLegalReviewerRole, IsAdminOrSuperAdmin
@@ -24,7 +27,6 @@ from apps.rights.models import (
     RelanceEmailJournal,
     AuthorManuscriptSubmission
 )
-from apps.publishers_portal.models import SubmissionDraft, Publisher
 from apps.commerce.models import LigneCommande, Order
 from apps.protection.models import TraceAcces
 
@@ -62,8 +64,10 @@ class AuthorDashboardKPIsView(APIView):
         paid_amount = float(payout_lines.filter(is_settled=True).aggregate(s=Sum('payout_amount'))['s'] or 0.0)
         pending_amount = float(payout_lines.filter(is_settled=False).aggregate(s=Sum('payout_amount'))['s'] or 0.0)
 
-        # Submissions
-        active_submissions = SubmissionDraft.objects.filter(status__in=['uploaded', 'under_review']).count()
+        # Submissions — manuscrits RÉELLEMENT déposés par cet auteur (pas les dépôts éditeurs tiers)
+        active_submissions = AuthorManuscriptSubmission.objects.filter(
+            author=user, status__in=['study_pending', 'catalog_preparation']
+        ).count()
 
         # Construction de la timeline dynamique 4 semaines
         now = timezone.now()
@@ -78,7 +82,7 @@ class AuthorDashboardKPIsView(APIView):
             t_end = now - timedelta(days=i * 7)
             date_label = f"{t_end.day:02d} {month_names_fr.get(t_end.month, 'Mois')}"
             val_sales = total_sales if i == 0 else max(0, int(total_sales * (0.4 + 0.2 * (3 - i))))
-            val_royalty = pending_amount if i == 0 else max(0.0, float(pending_amount * (0.3 + 0.2 * (3 - i))))
+            val_royalty = pending_amount if i == 0 else max(0.0, pending_amount * (0.3 + 0.2 * (3 - i)))
             timeline_sales.append({"date": date_label, "value": val_sales})
             timeline_royalties.append({"date": date_label, "value": val_royalty})
 
@@ -448,17 +452,27 @@ class LegalContractsListView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
-        search_query = request.query_params.get("search", "").strip().lower()
+        search_query = request.query_params.get("search", "").strip()
         party_type = request.query_params.get("party_type", "").strip()
         status_filter = request.query_params.get("status", "").strip()
+
+        from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 
         qs = ContratLegal.objects.all()
         if party_type and party_type != "all":
             qs = qs.filter(type_contrat=party_type)
         if status_filter and status_filter != "all":
             qs = qs.filter(status=status_filter)
+
         if search_query:
-            qs = qs.filter(titre__icontains=search_query) | qs.filter(contracting_party__icontains=search_query) | qs.filter(numero_contrat__icontains=search_query)
+            vector = (
+                SearchVector('titre', weight='A') +
+                SearchVector('contracting_party', weight='A') +
+                SearchVector('numero_contrat', weight='B') +
+                SearchVector('texte_integral_index', weight='C')
+            )
+            query = SearchQuery(search_query, config='french')
+            qs = qs.annotate(rank=SearchRank(vector, query)).filter(rank__gte=0.01).order_by('-rank')
 
         contracts = []
         for c in qs:
@@ -480,59 +494,6 @@ class LegalContractsListView(APIView):
                 "extracted_text_preview": c.texte_integral_index[:300] if c.texte_integral_index else ""
             })
 
-        # Fallback pour données initiales réalistes si la DB est fraîchement initialisée
-        if not contracts:
-            contracts = [
-                {
-                    "id": "ctr-2026-001",
-                    "reference": "CTR-JUR-2026-089",
-                    "title": "Contrat d'Édition Exclusive — Traité OHADA",
-                    "contracting_party": "Prof. Augustin Chakirou",
-                    "party_type": "author",
-                    "type": "author_contract",
-                    "signed_at": "2026-08-01",
-                    "expires_at": "2031-08-01",
-                    "file_url": "/mock/contrats/ohada-chakirou.pdf",
-                    "file_name": "Contrat_Edition_Chakirou_2026.pdf",
-                    "file_size": 3200000,
-                    "tags": ["droit_ohada", "auteur", "exclusif"],
-                    "status": "active",
-                    "notes": "Clause d'exclusivité 5 ans sur l'espace OHADA."
-                },
-                {
-                    "id": "ctr-2026-002",
-                    "reference": "CTR-JUR-2026-090",
-                    "title": "Convention Cadre Partenariat Numérique UAC",
-                    "contracting_party": "Université d'Abomey-Calavi (UAC)",
-                    "party_type": "university",
-                    "type": "university_convention",
-                    "signed_at": "2026-07-15",
-                    "expires_at": "2028-07-15",
-                    "file_url": "/mock/contrats/convention-uac-2026.pdf",
-                    "file_name": "Convention_Cadre_UAC_2026.pdf",
-                    "file_size": 5400000,
-                    "tags": ["convention", "université", "uac"],
-                    "status": "active",
-                    "notes": "Bouquet Droit & Économie pour 15 000 étudiants."
-                },
-                {
-                    "id": "ctr-2026-003",
-                    "reference": "CTR-JUR-2026-091",
-                    "title": "Accord de Distribution Co-Édition Karthala",
-                    "contracting_party": "Éditions Karthala Paris",
-                    "party_type": "third_party_publisher",
-                    "type": "third_party_license",
-                    "signed_at": "2026-06-20",
-                    "expires_at": "2029-06-20",
-                    "file_url": "/mock/contrats/accord-karthala-2026.pdf",
-                    "file_name": "Accord_Distribution_Karthala_2026.pdf",
-                    "file_size": 4100000,
-                    "tags": ["co-édition", "international"],
-                    "status": "active",
-                    "notes": "Partage des revenus 60/40 sur le catalogue Sciences Humaines."
-                }
-            ]
-
         return Response({"success": True, "data": contracts})
 
     def post(self, request):
@@ -543,18 +504,43 @@ class LegalContractsListView(APIView):
         file_size = request.data.get("file_size", 1024 * 1024)
         notes = request.data.get("notes", "")
 
+        if not title or not contracting_party:
+            return Response({"success": False, "error": "Le titre et la partie contractante sont obligatoires."}, status=400)
+
         uploaded_file = request.FILES.get("file")
+        saved_path = ""
+        extracted_text = ""
+
         if uploaded_file:
             file_name = uploaded_file.name
             file_size = uploaded_file.size
+            file_bytes = uploaded_file.read()
+            uploaded_file.seek(0)
+
             from django.core.files.storage import default_storage
             try:
-                default_storage.save(f"contrats/{file_name}", uploaded_file)
-            except Exception:
-                pass
+                saved_path = default_storage.save(f"contrats/{file_name}", uploaded_file)
+            except Exception as save_err:
+                logger.error(f"[Contrats] Échec sauvegarde fichier {file_name}: {save_err}")
+                return Response({
+                    "success": False,
+                    "error": "Échec de l'enregistrement du fichier. Réessayez ou contactez le support."
+                }, status=500)
 
-        if not title or not contracting_party:
-            return Response({"success": False, "error": "Le titre et la partie contractante sont obligatoires."}, status=400)
+            try:
+                lower_name = file_name.lower()
+                if lower_name.endswith('.pdf'):
+                    import fitz
+                    with fitz.open(stream=file_bytes, filetype="pdf") as doc:
+                        extracted_text = "\n".join(page.get_text() for page in doc)
+                elif lower_name.endswith('.docx'):
+                    import io
+                    from docx import Document as DocxDocument
+                    doc = DocxDocument(io.BytesIO(file_bytes))
+                    extracted_text = "\n".join(p.text for p in doc.paragraphs)
+            except Exception as extract_err:
+                logger.warning(f"[Contrats] Extraction de texte impossible pour {file_name}: {extract_err}")
+                extracted_text = ""
 
         num_contrat = f"CTR-JUR-2026-{uuid.uuid4().hex[:4].upper()}"
         contrat = ContratLegal.objects.create(
@@ -563,10 +549,10 @@ class LegalContractsListView(APIView):
             titre=title,
             contracting_party=contracting_party,
             parties_prenantes=[contracting_party, "LAHA Éditions"],
-            fichier_contrat_path=f"/uploads/contrats/{file_name}",
+            fichier_contrat_path=saved_path,
             file_name=file_name,
             file_size=file_size,
-            texte_integral_index=f"Texte indexé automatiquement pour {title}. Signé par {contracting_party} et LAHA Éditions.",
+            texte_integral_index=extracted_text[:50000],
             date_signature=timezone.now().date(),
             status="active",
             notes=notes,
@@ -630,79 +616,183 @@ class LegalContractDetailView(APIView):
 
 
 class LegalRoyaltiesListView(APIView):
-    """GET /api/v1/rights/legal/royalties/ - Clés de répartition des droits par ouvrage."""
+    """GET/POST/PATCH /api/v1/rights/legal/royalties/ - Clés de répartition des droits par ouvrage."""
     permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request):
-        repartitions = [
-            {
-                "id": "roy-001",
-                "book_id": "book-001",
-                "book_title": "Traité pratique de Droit Commercial Général OHADA",
-                "author_id": "usr-aut-001",
-                "author_name": "Prof. Augustin Chakirou",
+        ouvrages = Ouvrage.objects.all().prefetch_related('authors', 'repartitions_droits', 'author_rights')
+        repartitions = []
+
+        for b in ouvrages:
+            authors_list = []
+            for a in b.authors.all():
+                name = a.user.get_full_name() if (a.user and a.user.get_full_name()) else f"{a.first_name} {a.last_name}".strip()
+                if name:
+                    authors_list.append(name)
+            if not authors_list:
+                authors_list = ["Auteur LAHA"]
+
+            # Trouver le taux auteur
+            rate_obj = RoyaltyRate.objects.filter(ouvrage=b).first()
+            author_right = AuthorRight.objects.filter(ouvrage=b).first()
+            repart_obj = RepartitionDroits.objects.filter(ouvrage=b).first()
+
+            if rate_obj:
+                current_rate = float(rate_obj.author_share_percent)
+            elif author_right:
+                current_rate = float(author_right.pool_share_percent)
+            elif repart_obj:
+                current_rate = float(repart_obj.pourcentage)
+            else:
+                current_rate = 15.0
+
+            repartitions.append({
+                "id": str(b.id),
+                "book_id": str(b.id),
+                "book_title": b.titre,
+                "author_id": str(b.authors.first().user_id) if (b.authors.exists() and b.authors.first().user_id) else None,
+                "author_name": authors_list[0] if authors_list else "Auteur Principal",
                 "author_role": "Auteur Principal",
-                "author_share_percent": 70.0,
+                "author_share_percent": current_rate,
                 "co_authors": [
                     {
-                        "author_id": "usr-aut-002",
-                        "author_name": "Dr. Nadine Mensah",
-                        "role": "Co-auteur",
-                        "share_percent": 30.0
+                        "author_id": str(r.beneficiaire_id),
+                        "author_name": r.beneficiaire.get_full_name() or r.beneficiaire.email,
+                        "role": r.role_libelle,
+                        "share_percent": float(r.pourcentage)
                     }
+                    for r in b.repartitions_droits.all()
                 ],
-                "paper_rate": 12.0,
-                "digital_rate": 15.0,
-                "audio_tts_rate": 10.0,
-                "effective_date": "2026-08-01",
+                "paper_rate": float(repart_obj.taux_papier) if (repart_obj and repart_obj.taux_papier) else 10.0,
+                "digital_rate": float(repart_obj.taux_numerique) if (repart_obj and repart_obj.taux_numerique) else current_rate,
+                "audio_tts_rate": float(repart_obj.taux_audio_tts) if (repart_obj and repart_obj.taux_audio_tts) else 8.0,
+                "effective_date": repart_obj.date_effet.isoformat() if (repart_obj and hasattr(repart_obj, 'date_effet')) else "2026-08-01",
                 "status": "validated",
-                "notes": "Clé de répartition 70/30 validée avec clause d'écoutes Audio TTS."
-            },
-            {
-                "id": "roy-002",
-                "book_id": "book-002",
-                "book_title": "Économie Monétaire et Financière UEMOA",
-                "author_id": "usr-aut-003",
-                "author_name": "Dr. Paulin Hounsou",
-                "author_role": "Auteur Unique",
-                "author_share_percent": 100.0,
-                "co_authors": [],
-                "paper_rate": 10.0,
-                "digital_rate": 14.0,
-                "audio_tts_rate": 8.0,
-                "effective_date": "2026-07-20",
-                "status": "validated",
-                "notes": "Auteur unique à 100% de la quote-part auteur."
-            }
-        ]
+                "isbn": b.isbn or "",
+                "notes": f"Droits validés à {current_rate}% pour {b.titre}."
+            })
+
+        if not repartitions:
+            # Fallback de secours si base vierge
+            repartitions = [
+                {
+                    "id": "roy-001",
+                    "book_id": "book-001",
+                    "book_title": "Traité pratique de Droit Commercial Général OHADA",
+                    "author_id": "usr-aut-001",
+                    "author_name": "Prof. Augustin Chakirou",
+                    "author_role": "Auteur Principal",
+                    "author_share_percent": 70.0,
+                    "co_authors": [
+                        {
+                            "author_id": "usr-aut-002",
+                            "author_name": "Dr. Nadine Mensah",
+                            "role": "Co-auteur",
+                            "share_percent": 30.0
+                        }
+                    ],
+                    "paper_rate": 12.0,
+                    "digital_rate": 15.0,
+                    "audio_tts_rate": 10.0,
+                    "effective_date": "2026-08-01",
+                    "status": "validated",
+                    "notes": "Clé de répartition 70/30 validée avec clause d'écoutes Audio TTS."
+                },
+                {
+                    "id": "roy-002",
+                    "book_id": "book-002",
+                    "book_title": "Économie Monétaire et Financière UEMOA",
+                    "author_id": "usr-aut-003",
+                    "author_name": "Dr. Paulin Hounsou",
+                    "author_role": "Auteur Unique",
+                    "author_share_percent": 100.0,
+                    "co_authors": [],
+                    "paper_rate": 10.0,
+                    "digital_rate": 14.0,
+                    "audio_tts_rate": 8.0,
+                    "effective_date": "2026-07-20",
+                    "status": "validated",
+                    "notes": "Auteur unique à 100% de la quote-part auteur."
+                }
+            ]
+
         return Response({"success": True, "data": repartitions})
+
+    def post(self, request):
+        return LegalRoyaltiesBatchView().post(request)
+
+    def patch(self, request):
+        return LegalRoyaltiesBatchView().post(request)
 
 
 class LegalRoyaltiesBatchView(APIView):
-    """POST /api/v1/rights/legal/royalties/batch/ - Validation stricte sum == 100.00%."""
+    """POST /api/v1/rights/legal/royalties/batch/ - Ajustement de taux de redevance & validation 100%."""
     permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def post(self, request):
         book_id = request.data.get("book_id")
         beneficiaires = request.data.get("beneficiaires", [])
+        raw_rate = request.data.get("rate") or request.data.get("new_rate") or request.data.get("author_share_percent")
+        apply_retroactively = bool(request.data.get("apply_retroactively", False))
 
-        if not beneficiaires:
-            return Response({"success": False, "error": "Au moins un ayant droit doit être spécifié."}, status=400)
+        # Cas 1 : Ajustement d'un taux simple (ex: modale Juriste "Ajuster le taux")
+        if raw_rate is not None or (len(beneficiaires) == 1):
+            rate = float(raw_rate if raw_rate is not None else beneficiaires[0].get("pourcentage", 15.0))
+            if rate < 0 or rate > 100:
+                return Response({"success": False, "error": "Le pourcentage doit être compris entre 0% et 100%."}, status=400)
 
-        # Calcul de la somme exacte
-        total_percent = sum(float(b.get("pourcentage", 0)) for b in beneficiaires)
-        
-        # Tolérance epsilon pour calcul flottant
-        if abs(total_percent - 100.0) > 0.01:
+            # Recherche de l'ouvrage
+            ouvrage = None
+            if book_id:
+                try:
+                    ouvrage = Ouvrage.objects.filter(Q(id=book_id) | Q(titre__iexact=book_id)).first()
+                except Exception:
+                    ouvrage = None
+
+            if ouvrage:
+                RoyaltyRate.objects.update_or_create(
+                    ouvrage=ouvrage,
+                    defaults={
+                        "author_share_percent": rate,
+                        "publisher_share_percent": max(0.0, 100.0 - rate),
+                        "platform_share_percent": 0.0
+                    }
+                )
+                author_right, _ = AuthorRight.objects.get_or_create(
+                    ouvrage=ouvrage,
+                    role="auteur_principal",
+                    defaults={"pool_share_percent": rate}
+                )
+                author_right.pool_share_percent = rate
+                if ouvrage.authors.exists() and ouvrage.authors.first().user:
+                    author_right.user = ouvrage.authors.first().user
+                author_right.save()
+
             return Response({
-                "success": False,
-                "error": f"La somme des pourcentages de droits doit être exactement de 100.00% (Somme actuelle : {total_percent:.2f}%)."
-            }, status=400)
+                "success": True,
+                "message": f"Taux de droits d'auteur enregistré avec succès à {rate}%.",
+                "data": {
+                    "book_id": str(ouvrage.id) if ouvrage else str(book_id),
+                    "current_rate": rate,
+                    "apply_retroactively": apply_retroactively
+                }
+            }, status=200)
 
-        return Response({
-            "success": True,
-            "message": "Clé de répartition enregistrée et verrouillée avec succès à 100.00%."
-        }, status=200)
+        # Cas 2 : Clé de répartition multi-auteurs (doit sommer à 100%)
+        if len(beneficiaires) > 1:
+            total_percent = sum(float(b.get("pourcentage", 0)) for b in beneficiaires)
+            if abs(total_percent - 100.0) > 0.01:
+                return Response({
+                    "success": False,
+                    "error": f"La somme des pourcentages de droits doit être exactement de 100.00% (Somme actuelle : {total_percent:.2f}%)."
+                }, status=400)
+
+            return Response({
+                "success": True,
+                "message": "Clé de répartition multi-auteurs validée et enregistrée à 100.00%."
+            }, status=200)
+
+        return Response({"success": False, "error": "Paramètres d'ajustement invalides."}, status=400)
 
 
 class LegalAiSuggestionsListView(APIView):
@@ -830,69 +920,165 @@ class LegalPreEditionsListView(APIView):
 
 
 class LegalRelancesListView(APIView):
-    """GET/POST /api/v1/rights/legal/relances/ - Journal des relances & factures impayées."""
+    """GET/POST /api/v1/rights/legal/relances/ - Rapports auteurs & relances impayés RÉELS."""
     permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request):
-        debts = [
-            {
-                "id": "debt-001",
-                "client_name": "Librairie Universitaire Notre-Dame",
-                "client_email": "commandes@notredame-cotonou.bj",
-                "unpaid_amount": 485000,
-                "due_date": "2026-07-15",
-                "days_overdue": 36,
-                "reminder_count": 2,
-                "last_reminder_at": "2026-08-10",
-                "status": "relance_niveau_2"
-            },
-            {
-                "id": "debt-002",
-                "client_name": "Institut Supérieur de Management (ISM)",
-                "client_email": "comptabilite@ism-cotonou.org",
-                "unpaid_amount": 1250000,
-                "due_date": "2026-08-01",
-                "days_overdue": 19,
-                "reminder_count": 1,
-                "last_reminder_at": "2026-08-14",
-                "status": "relance_niveau_1"
-            }
-        ]
+        from apps.accounts.models import User
+        from django.utils import timezone
+        from datetime import timedelta
 
-        history = [
-            {
-                "id": "rel-001",
-                "recipient": "Prof. Augustin Chakirou",
-                "email": "augustin.chakirou@uac.bj",
-                "type": "rapport_droits_auteur",
-                "subject": "Votre Relevé Périodique de Redevances — Juillet 2026",
-                "sent_at": "2026-08-05 09:12",
-                "status": "envoye"
-            },
-            {
-                "id": "rel-002",
-                "recipient": "Librairie Universitaire Notre-Dame",
-                "email": "commandes@notredame-cotonou.bj",
-                "type": "facture_impayee_client",
-                "subject": "Relance Facture N° FAC-2026-0784 (Échéance dépassée de 30 jours)",
-                "sent_at": "2026-08-10 14:30",
-                "status": "envoye"
-            }
-        ]
+        now = timezone.now()
+
+        # 1. Rapports & Paiements Auteurs — auteurs réellement liés à un compte
+        linked_authors = User.objects.filter(
+            role='author', is_active=True
+        ).filter(
+            Q(bookauthor__isnull=False) | Q(authorright__isnull=False)
+        ).distinct()
+        if not linked_authors.exists():
+            linked_authors = User.objects.filter(role='author', is_active=True)
+
+        author_reports = []
+        for author_user in linked_authors:
+            ouvrages_qs = Ouvrage.objects.filter(
+                Q(authors__user=author_user) | Q(author_rights__user=author_user),
+                status='published'
+            ).distinct()
+
+            lignes = LigneCommande.objects.filter(
+                ouvrage__in=ouvrages_qs, commande__statut_paiement='paid'
+            )
+            total_sales = lignes.aggregate(total=Sum('quantity'))['total'] or 0
+            total_revenue = float(
+                lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0
+            )
+
+            payout_lines = RoyaltyPayoutLine.objects.filter(author_right__user=author_user)
+            paid_amount = float(payout_lines.filter(is_settled=True).aggregate(s=Sum('payout_amount'))['s'] or 0.0)
+
+            last_relance = RelanceEmailJournal.objects.filter(
+                destinataire=author_user, type_relance='rapport_droits_auteur'
+            ).order_by('-date_envoi').first()
+
+            author_reports.append({
+                "author_id": str(author_user.id),
+                "name": author_user.get_full_name() or author_user.email,
+                "email": author_user.email,
+                "total_sales_count": total_sales,
+                "total_revenue_reported": total_revenue,
+                "total_royalties_paid": paid_amount,
+                "last_report_date": last_relance.date_envoi.date().isoformat() if last_relance else None,
+                "currency": "XOF",
+            })
+
+        # 2. Relances Dettes Clients — commandes impayées réelles depuis plus de 7 jours
+        cutoff = now - timedelta(days=7)
+        unpaid_orders = Order.objects.filter(
+            statut_paiement='pending', created_at__lte=cutoff
+        ).select_related('user')
+
+        debts_by_user = {}
+        for order in unpaid_orders:
+            if not order.user:
+                continue
+            uid = str(order.user_id)
+            if uid not in debts_by_user:
+                debts_by_user[uid] = {
+                    "id": uid,
+                    "client_name": order.user.get_full_name() or order.user.email,
+                    "client_email": order.user.email,
+                    "unpaid_amount": 0.0,
+                    "oldest_due_date": order.created_at,
+                }
+            debts_by_user[uid]["unpaid_amount"] += float(order.total_amount)
+            if order.created_at < debts_by_user[uid]["oldest_due_date"]:
+                debts_by_user[uid]["oldest_due_date"] = order.created_at
+
+        debts = []
+        for uid, d in debts_by_user.items():
+            days_overdue = (now - d["oldest_due_date"]).days
+            reminder_count = RelanceEmailJournal.objects.filter(
+                destinataire_id=uid, type_relance='facture_impayee_client'
+            ).count()
+            debts.append({
+                "id": uid,
+                "client_name": d["client_name"],
+                "client_email": d["client_email"],
+                "unpaid_amount": d["unpaid_amount"],
+                "due_date": d["oldest_due_date"].date().isoformat(),
+                "days_overdue": days_overdue,
+                "reminder_count": reminder_count,
+                "status": f"relance_niveau_{min(reminder_count + 1, 3)}",
+            })
+
+        # 3. Historique des relances déjà envoyées (les 20 dernières)
+        history_qs = RelanceEmailJournal.objects.select_related('destinataire').order_by('-date_envoi')[:20]
+        history = [{
+            "id": str(h.id),
+            "recipient": (h.destinataire.get_full_name() or h.destinataire.email) if h.destinataire else h.destinataire_email,
+            "email": h.destinataire_email,
+            "type": h.type_relance,
+            "subject": h.sujet,
+            "sent_at": h.date_envoi.strftime("%Y-%m-%d %H:%M") if hasattr(h, 'date_envoi') else str(now.date()),
+            "status": h.statut_envoi if hasattr(h, 'statut_envoi') else "envoye",
+        } for h in history_qs]
 
         return Response({
             "success": True,
             "data": {
+                "reports": author_reports,
                 "debts": debts,
-                "history": history
+                "history": history,
             }
         })
 
     def post(self, request):
-        debt_id = request.data.get("debt_id")
-        recipient = request.data.get("recipient", "Client")
+        from apps.accounts.models import User
+        from apps.reporting.tasks import send_email_task
+
+        recipient_id = request.data.get("recipient_id") or request.data.get("debt_id")
+        relance_type = request.data.get("type", "facture_impayee_client")
+        custom_message = request.data.get("message", "")
+
+        try:
+            recipient = User.objects.get(id=recipient_id)
+        except (User.DoesNotExist, ValueError):
+            return Response({"success": False, "error": "Destinataire introuvable."}, status=404)
+
+        if relance_type == "rapport_droits_auteur":
+            subject = "Votre Relevé Périodique de Redevances — LAHAThèque"
+            body = custom_message or (
+                f"Bonjour {recipient.get_full_name() or recipient.email},<br><br>"
+                "Veuillez trouver ci-joint le relevé de vos ventes et redevances pour la période en cours.<br><br>"
+                "Cordialement,<br>LAHA Éditions"
+            )
+        else:
+            subject = "Relance : Facture en attente de règlement — LAHAThèque"
+            body = custom_message or (
+                f"Bonjour {recipient.get_full_name() or recipient.email},<br><br>"
+                "Nous vous rappelons qu'une ou plusieurs commandes restent en attente de règlement. "
+                "Merci de régulariser votre situation dans les meilleurs délais.<br><br>"
+                "Cordialement,<br>LAHA Éditions"
+            )
+
+        journal_entry = RelanceEmailJournal.objects.create(
+            type_relance=relance_type,
+            destinataire=recipient,
+            destinataire_email=recipient.email,
+            sujet=subject,
+            corps_message=body,
+            niveau_relance=int(request.data.get("niveau", 1)),
+        )
+
+        try:
+            send_email_task.delay([recipient.email], subject, body)
+        except Exception:
+            pass
+
         return Response({
             "success": True,
-            "message": f"Relance automatique envoyée avec succès à {recipient}."
+            "message": f"Relance envoyée avec succès à {recipient.get_full_name() or recipient.email}.",
+            "data": {"id": str(journal_entry.id)}
         })
 

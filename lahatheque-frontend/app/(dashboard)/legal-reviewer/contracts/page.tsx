@@ -17,30 +17,26 @@ export default function LegalContractsListPage() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    async function loadData() {
+    const timer = setTimeout(async () => {
       setLoading(true);
-      const data = await getLegalContracts();
-      setContracts(data);
-      setLoading(false);
-    }
-    loadData();
-  }, []);
-
-  const filteredContracts = useMemo(() => {
-    return contracts.filter((c) => {
-      if (partyTypeFilter !== "all" && c.party_type !== partyTypeFilter) return false;
-      if (statusFilter !== "all" && c.status !== statusFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchTitle = c.title.toLowerCase().includes(q);
-        const matchRef = c.reference.toLowerCase().includes(q);
-        const matchParty = c.contracting_party.toLowerCase().includes(q);
-        const matchTag = c.tags.some((t) => t.toLowerCase().includes(q));
-        if (!matchTitle && !matchRef && !matchParty && !matchTag) return false;
+      try {
+        const data = await getLegalContracts({
+          search: searchQuery.trim() || undefined,
+          partyType: partyTypeFilter !== "all" ? partyTypeFilter : undefined,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+        });
+        setContracts(data);
+      } catch (err) {
+        console.error("Erreur chargement contrats:", err);
+      } finally {
+        setLoading(false);
       }
-      return true;
-    });
-  }, [contracts, searchQuery, partyTypeFilter, statusFilter]);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, partyTypeFilter, statusFilter]);
+
+  const filteredContracts = contracts;
 
   const columns: DataTableColumn<LegalContract>[] = [
     {
@@ -155,6 +151,7 @@ export default function LegalContractsListPage() {
         columns={columns}
         rowKey="id"
         loading={loading}
+        searchable={false}
         emptyMessage="Aucun contrat ne correspond à votre recherche."
         onRowClick={(row) => { window.location.href = `/legal-reviewer/contracts/${row.id}`; }}
         pageSize={10}
