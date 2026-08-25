@@ -68,9 +68,12 @@ class BookStreamView(APIView):
 
 
         # 2. Récupération ou création de la configuration de protection
+        from apps.protection.models import GlobalDrmConfig
+        global_drm = GlobalDrmConfig.get_singleton()
         protection_config = getattr(ouvrage, "protection_config", None)
         if not protection_config:
             protection_config = ProtectionConfig.objects.filter(ouvrage=ouvrage).first()
+        effective_config = protection_config or global_drm
 
         # 3. Préparation des métadonnées utilisateur
         ip = request.META.get("HTTP_X_FORWARDED_FOR")
@@ -85,6 +88,9 @@ class BookStreamView(APIView):
             "ip": ip,
             "user_id": str(request.user.id),
             "device_fingerprint": request.headers.get("X-Device-Fingerprint", ""),
+            "title": getattr(ouvrage, "titre", getattr(ouvrage, "title", "Ouvrage")),
+            "id": str(ouvrage.id),
+            "is_partner": False,
         }
 
         # 4. Obtention du dérivé filigrané en cache
@@ -93,7 +99,7 @@ class BookStreamView(APIView):
                 source_type="catalog_book",
                 source_reference=str(book_id),
                 user_info=user_info,
-                config=protection_config
+                config=effective_config
             )
         except Exception as e:
             logger.error(f"Erreur matérialisation dérivé ({book_id}): {e}")

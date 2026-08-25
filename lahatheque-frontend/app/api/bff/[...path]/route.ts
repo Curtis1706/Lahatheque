@@ -40,7 +40,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
     headers.set('x-reader-token', readerToken)
   }
 
-  const isReaderSessionRoute = cleanSubPath.startsWith('reader/sessions')
+  const isReaderSessionRoute = cleanSubPath.startsWith('reader/')
   if (isReaderSessionRoute && (authHeader || readerToken)) {
     if (authHeader) headers.set('authorization', authHeader)
   } else if (accessToken) {

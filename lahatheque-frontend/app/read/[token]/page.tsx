@@ -534,80 +534,6 @@ export default function HostedReaderPage() {
 
   const pageNavigationPluginInstance = pageNavigationPlugin();
 
-  // Plugin de gravure dynamique du filigrane sur chaque page en mode normal
-  const pageWatermarkPlugin = useMemo<Plugin>(() => {
-    const mainText =
-      session?.theme?.watermark_text ||
-      (session?.user?.name ? `${cleanBrandName} • ${session.user.name}` : cleanBrandName);
-    const subText = session?.user?.ip
-      ? `IP: ${session.user.ip} • Document Protégé & Traçable`
-      : session?.user?.email || "Licence Authentifiée";
-
-    return {
-      renderPageLayer: (renderProps: PluginRenderPageLayer) => {
-        const positionStyles: React.CSSProperties = {
-          pointerEvents: "none",
-          position: "absolute",
-          left: 0,
-          right: 0,
-          zIndex: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          userSelect: "none",
-          opacity: effectiveWatermarkOpacity,
-          padding: "0 24px",
-        };
-
-        if (effectiveWatermarkPosition === "header") {
-          positionStyles.top = "24px";
-        } else if (effectiveWatermarkPosition === "footer") {
-          positionStyles.bottom = "24px";
-        } else {
-          positionStyles.top = "50%";
-          positionStyles.transform = "translateY(-50%) rotate(-45deg)";
-        }
-
-        const baseFontSize = Math.max(12, Math.floor(renderProps.scale * 16));
-
-        return (
-          <div style={positionStyles} aria-hidden="true">
-            <div
-              style={{
-                fontSize: `${baseFontSize}px`,
-                fontWeight: 800,
-                color: "#B4AB6B",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                textAlign: "center",
-                lineHeight: 1.3,
-                textShadow: "0 0 1px rgba(0,0,0,0.1)",
-              }}
-            >
-              {mainText}
-            </div>
-            {subText && (
-              <div
-                style={{
-                  fontSize: `${Math.max(9, Math.floor(baseFontSize * 0.65))}px`,
-                  fontWeight: 600,
-                  color: "rgba(180, 171, 107, 0.9)",
-                  fontFamily: "monospace",
-                  letterSpacing: "0.04em",
-                  marginTop: "4px",
-                  textAlign: "center",
-                }}
-              >
-                {subText}
-              </div>
-            )}
-          </div>
-        );
-      },
-    };
-  }, [session, cleanBrandName, effectiveWatermarkPosition, effectiveWatermarkOpacity]);
-
   // Thème personnalisé dynamique
   const customThemeVars = useMemo(() => {
     const t = session?.theme || {};
@@ -842,7 +768,6 @@ export default function HostedReaderPage() {
                     defaultLayoutPluginInstance,
                     pageNavigationPluginInstance,
                     highlightPluginInstance,
-                    pageWatermarkPlugin,
                   ]}
                   localization={fr_FR_Locale}
                   theme={isNightMode ? "dark" : "light"}

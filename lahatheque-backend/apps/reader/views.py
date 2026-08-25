@@ -483,8 +483,9 @@ class QuizRetrieveOrGenerateView(APIView):
     """
     GET /api/v1/reader/quizzes/?book_id=<uuid>
     Retourne le quiz existant pour un ouvrage, ou en génère un via IA si aucun n'existe.
+    Accessible aux lecteurs internes authentifiés et aux étudiants invités des sessions de lecture.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def get(self, request):
         from apps.catalog.models import Ouvrage, Quiz, QuizQuestion
@@ -503,7 +504,8 @@ class QuizRetrieveOrGenerateView(APIView):
 
         if not quiz:
             # Générer via IA
-            quiz = self._generate_quiz_with_ai(ouvrage, request.user)
+            creator = request.user if (hasattr(request, 'user') and request.user.is_authenticated) else None
+            quiz = self._generate_quiz_with_ai(ouvrage, creator)
 
         if not quiz:
             return Response({"success": True, "data": None})
@@ -618,9 +620,10 @@ class QuizSubmitAnswersView(APIView):
     """
     POST /api/v1/reader/quizzes/<quiz_id>/submit/
     Soumet les réponses de l'étudiant et calcule le score.
+    Accessible aux lecteurs internes et aux étudiants invités.
     Body: { "answers": { "question_id": selected_index, ... } }
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def post(self, request, quiz_id):
         from apps.catalog.models import Quiz
@@ -700,7 +703,7 @@ class ReaderProtectedStreamView(APIView):
 
     def get(self, request: Request) -> Response:
         from apps.protection.derived_materializer import DerivedMaterializer
-        from apps.protection.models import ProtectionConfig, TraceAcces
+        from apps.protection.models import ProtectionConfig, TraceAcces, GlobalDrmConfig
 
         session: ReaderSession = request.reader_session
 
@@ -710,18 +713,25 @@ class ReaderProtectedStreamView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN
             )
 
-        # 1. Résolution de la configuration de protection
+        # 1. Résolution de la configuration de protection (Par ouvrage avec fallback GlobalDrmConfig)
+        global_drm = GlobalDrmConfig.get_singleton()
         protection_config = None
         if session.ouvrage_id:
             protection_config = ProtectionConfig.objects.filter(ouvrage=session.ouvrage).first()
 
+        effective_config = protection_config or global_drm
+
         # 2. Métadonnées utilisateur pour le filigrane nominatif
         ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "127.0.0.1")).split(",")[0].strip()
+        doc_title = session.ouvrage.titre if session.ouvrage else session.custom_document_title or "Document"
         user_info = {
             "nom": session.end_user.display_name or session.end_user.external_ref,
             "email": session.end_user.email or "",
             "ip": ip,
             "user_id": f"partner:{session.partner_id}:{session.end_user.external_ref}",
+            "title": doc_title,
+            "id": str(session.ouvrage_id) if session.ouvrage_id else str(session.id),
+            "is_partner": True,
         }
 
         # 3. Matérialisation du dérivé filigrané (catalogue interne OU BYOD externe)
@@ -731,7 +741,7 @@ class ReaderProtectedStreamView(APIView):
                     source_type="catalog_book",
                     source_reference=str(session.ouvrage_id),
                     user_info=user_info,
-                    config=protection_config,
+                    config=effective_config,
                 )
             elif session.source_type == "external_url" and session.custom_document_url:
                 partner_quotas = session.partner.quotas or {}
@@ -743,7 +753,7 @@ class ReaderProtectedStreamView(APIView):
                     source_type="external_url",
                     source_reference=session.custom_document_url,
                     user_info=user_info,
-                    config=protection_config,
+                    config=effective_config,
                     options=options,
                 )
             else:
