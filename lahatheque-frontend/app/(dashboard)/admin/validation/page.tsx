@@ -162,22 +162,29 @@ export default function AdminValidationPage() {
     {
       key: "submitted_at",
       header: "Date de Publication / Soumission",
-      cell: (row) => (
-        <div className="space-y-1 text-[11px]">
-          <div className="flex items-center gap-1.5 text-foreground-muted">
-            <Clock className="w-3.5 h-3.5 text-gold shrink-0" />
-            <span className="font-mono text-xs text-foreground font-medium">
-              {row.submitted_at
-                ? new Date(row.submitted_at).toLocaleDateString("fr-FR", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })
-                : "Date non renseignée"}
-            </span>
+      cell: (row) => {
+        let displayDate = "Aujourd'hui";
+        if (row.submitted_at) {
+          const d = new Date(row.submitted_at);
+          if (!isNaN(d.getTime()) && d.getFullYear() > 1970) {
+            displayDate = d.toLocaleDateString("fr-FR", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            });
+          }
+        }
+        return (
+          <div className="space-y-1 text-[11px]">
+            <div className="flex items-center gap-1.5 text-foreground-muted">
+              <Clock className="w-3.5 h-3.5 text-gold shrink-0" />
+              <span className="font-mono text-xs text-foreground font-medium">
+                {displayDate}
+              </span>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "status",

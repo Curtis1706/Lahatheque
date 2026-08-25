@@ -107,6 +107,7 @@ interface PageProps {
     email?: string;
     ip?: string;
   };
+  showWatermarkOverlay?: boolean;
 }
 
 const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
@@ -125,6 +126,7 @@ const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
     watermarkLahaSubtext,
     watermarkMode = "laha",
     watermarkUser,
+    showWatermarkOverlay = false,
   } = props;
 
   const pageAnnotations = useMemo(
@@ -175,72 +177,76 @@ const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
         {/* Layer 1 — Page Image */}
         {children}
 
-        {/* Layer 2 — Calque Filigrane Réactif */}
-        <div style={positionStyles} aria-hidden="true">
-          {watermarkMode === "laha" ? (
-            <>
-              <div
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  color: "#B08D42",
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  textAlign: "center",
-                  lineHeight: 1.3,
-                  textShadow: "0 0 1px rgba(0,0,0,0.1)",
-                }}
-              >
-                {watermarkLahaText || "LAHAThèque • Document Certifié & Protégé"}
-              </div>
-              {watermarkLahaSubtext && (
+        {/* Layer 2 — Calque Filigrane Réactif (Désactivé si le PDF est déjà filigrané par le backend) */}
+        {showWatermarkOverlay && (
+          <div style={positionStyles} aria-hidden="true">
+            {watermarkMode === "laha" ? (
+              <>
                 <div
                   style={{
-                    fontSize: "9px",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    color: "#B08D42",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    textAlign: "center",
+                    lineHeight: 1.3,
+                    textShadow: "0 0 1px rgba(0,0,0,0.1)",
+                  }}
+                >
+                  {watermarkLahaText || "LAHAThèque • Document Certifié & Protégé"}
+                </div>
+                {watermarkLahaSubtext && (
+                  <div
+                    style={{
+                      fontSize: "9px",
+                      fontWeight: 600,
+                      color: "rgba(176, 141, 66, 0.85)",
+                      fontFamily: "monospace",
+                      letterSpacing: "0.04em",
+                      marginTop: "4px",
+                      textAlign: "center",
+                    }}
+                  >
+                    {watermarkLahaSubtext}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 800,
+                    color: "#B4AB6B",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    textAlign: "center",
+                    lineHeight: 1.3,
+                    textShadow: "0 0 1px rgba(0,0,0,0.1)",
+                  }}
+                >
+                  {watermarkLahaText || (watermarkUser?.displayName ? `LAHALEX • ${watermarkUser.displayName}` : "Document Juridique Sécurisé")}
+                </div>
+                <div
+                  style={{
+                    fontSize: "10px",
                     fontWeight: 600,
-                    color: "rgba(176, 141, 66, 0.85)",
+                    color: "rgba(180, 171, 107, 0.9)",
                     fontFamily: "monospace",
                     letterSpacing: "0.04em",
-                    marginTop: "4px",
+                    marginTop: "3px",
                     textAlign: "center",
                   }}
                 >
-                  {watermarkLahaSubtext}
+                  {watermarkUser?.email || watermarkUser?.ip
+                    ? `IP: ${watermarkUser?.ip || "127.0.0.1"} • ${watermarkUser?.email || ""}`
+                    : "Licence Partenaire • Reproduction Interdite"}
                 </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  color: "#B4AB6B",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  textAlign: "center",
-                  lineHeight: 1.3,
-                  textShadow: "0 0 1px rgba(0,0,0,0.1)",
-                }}
-              >
-                {watermarkLahaText || (watermarkUser?.displayName ? `LAHALEX • ${watermarkUser.displayName}` : "Document Juridique Sécurisé")}
-              </div>
-              <div
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 600,
-                  color: "rgba(180, 171, 107, 0.9)",
-                  fontFamily: "monospace",
-                  letterSpacing: "0.04em",
-                  marginTop: "3px",
-                  textAlign: "center",
-                }}
-              >
-                {watermarkUser?.ip ? `IP: ${watermarkUser.ip} • ` : ""}{watermarkUser?.email || "Licence Authentifiée"}
-              </div>
-            </>
-          )}
-        </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Layer 3 — Annotations */}
         <AnnotationLayer

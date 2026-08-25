@@ -4,12 +4,13 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Modal } from "@/components/ui/modal";
 import { CreateAccountModal } from "@/components/features/admin/create-account-modal";
 import { SendEmailModal } from "@/components/features/admin/send-email-modal";
-import { getAdminUsers, toggleAdminUserStatus } from "@/lib/services/admin";
-import { AdminUser, AdminRole } from "@/lib/types/admin";
-import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock } from "lucide-react";
+import { getAdminUsers, toggleAdminUserStatus, deleteAdminUser } from "@/lib/services/admin";
+import { AdminUser, AdminRole, formatRoleLabel, formatCountryName } from "@/lib/types/admin";
+import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -29,6 +30,7 @@ export default function AdminRoleUsersPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [emailUser, setEmailUser] = useState<AdminUser | null>(null);
   const [inspectUser, setInspectUser] = useState<AdminUser | null>(null);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<AdminUser | null>(null);
 
   const loadRoleUsers = async () => {
     try {
@@ -81,12 +83,31 @@ export default function AdminRoleUsersPage() {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!deleteConfirmUser) return;
+    const target = deleteConfirmUser;
+    setUsers((prev) => prev.filter((u) => u.id !== target.id));
+    setDeleteConfirmUser(null);
+    try {
+      const res = await deleteAdminUser(target.id);
+      if (res.success) {
+        toast.success(`Le compte de ${target.first_name} ${target.last_name} (${target.email}) a été supprimé.`);
+      } else {
+        toast.error(res.error || "Erreur lors de la suppression du compte.");
+        loadRoleUsers();
+      }
+    } catch {
+      toast.error("Erreur serveur lors de la suppression.");
+      loadRoleUsers();
+    }
+  };
+
   // Helper actions communes
   const renderActions = (row: AdminUser) => (
     <div className="flex items-center justify-end gap-1">
       <button
         onClick={() => setEmailUser(row)}
-        className="p-1.5 rounded-lg hover:bg-navy-light text-navy transition-colors"
+        className="p-1.5 rounded-lg hover:bg-navy-light text-navy transition-colors cursor-pointer"
         title="Envoyer un e-mail"
       >
         <Mail className="w-4 h-4" />
@@ -94,7 +115,7 @@ export default function AdminRoleUsersPage() {
 
       <button
         onClick={() => setInspectUser(row)}
-        className="p-1.5 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-foreground transition-colors"
+        className="p-1.5 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
         title="Inspecter la fiche"
       >
         <Eye className="w-4 h-4" />
@@ -102,12 +123,20 @@ export default function AdminRoleUsersPage() {
 
       <button
         onClick={() => handleToggleActive(row)}
-        className={`p-1.5 rounded-lg transition-colors ${
+        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
           row.is_active ? "hover:bg-error/15 text-error" : "hover:bg-success/15 text-success"
         }`}
         title={row.is_active ? "Rendre inactif" : "Réactiver"}
       >
         {row.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+      </button>
+
+      <button
+        onClick={() => setDeleteConfirmUser(row)}
+        className="p-1.5 rounded-lg hover:bg-error/15 text-error/80 hover:text-error transition-colors cursor-pointer"
+        title="Supprimer définitivement le compte"
+      >
+        <Trash2 className="w-4 h-4" />
       </button>
     </div>
   );
@@ -118,9 +147,11 @@ export default function AdminRoleUsersPage() {
     header: "Nom & Prénom",
     cell: (row) => (
       <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-full bg-navy/10 text-navy font-bold text-xs flex items-center justify-center border border-navy/20 shrink-0">
-          {row.first_name[0]}
-        </div>
+        <UserAvatar
+          src={row.avatar_url || row.avatar}
+          name={`${row.first_name} ${row.last_name}`}
+          size="sm"
+        />
         <div>
           <p className="font-semibold text-xs text-foreground">
             {row.first_name} {row.last_name}
@@ -141,8 +172,8 @@ export default function AdminRoleUsersPage() {
     key: "country",
     header: "Pays",
     cell: (row) => (
-      <span className="font-mono text-xs font-medium text-foreground px-2 py-0.5 rounded-md bg-background border border-border">
-        {row.country}
+      <span className="font-sans text-xs font-semibold text-foreground px-2.5 py-0.5 rounded-md bg-background-secondary border border-border">
+        {formatCountryName(row.country)}
       </span>
     ),
   };
@@ -279,9 +310,16 @@ export default function AdminRoleUsersPage() {
             key: "inst_name",
             header: "Établissement & Contact",
             cell: (row) => (
-              <div>
-                <p className="font-bold text-xs text-navy">{row.extra_info?.institution_name || `${row.first_name} ${row.last_name}`}</p>
-                <p className="text-[11px] text-foreground-muted">{row.email}</p>
+              <div className="flex items-center gap-2.5">
+                <UserAvatar
+                  src={row.avatar_url || row.avatar}
+                  name={row.extra_info?.institution_name || `${row.first_name} ${row.last_name}`}
+                  size="sm"
+                />
+                <div>
+                  <p className="font-bold text-xs text-navy">{row.extra_info?.institution_name || `${row.first_name} ${row.last_name}`}</p>
+                  <p className="text-[11px] text-foreground-muted">{row.email}</p>
+                </div>
               </div>
             ),
           },
@@ -312,9 +350,16 @@ export default function AdminRoleUsersPage() {
             key: "pub_name",
             header: "Maison d'Édition",
             cell: (row) => (
-              <div>
-                <p className="font-bold text-xs text-gold">{row.first_name} {row.last_name}</p>
-                <p className="text-[11px] text-foreground-muted">{row.email}</p>
+              <div className="flex items-center gap-2.5">
+                <UserAvatar
+                  src={row.avatar_url || row.avatar}
+                  name={`${row.first_name} ${row.last_name}`}
+                  size="sm"
+                />
+                <div>
+                  <p className="font-bold text-xs text-gold">{row.first_name} {row.last_name}</p>
+                  <p className="text-[11px] text-foreground-muted">{row.email}</p>
+                </div>
               </div>
             ),
           },
@@ -469,14 +514,16 @@ export default function AdminRoleUsersPage() {
         >
           <div className="p-6 max-w-md mx-auto space-y-4 bg-background text-foreground">
             <div className="flex items-center gap-3 pb-4 border-b border-border">
-              <div className="w-12 h-12 rounded-full bg-navy text-white font-bold text-base flex items-center justify-center border-2 border-gold shrink-0">
-                {inspectUser.first_name[0]}
-              </div>
+              <UserAvatar
+                src={inspectUser.avatar_url || inspectUser.avatar}
+                name={`${inspectUser.first_name} ${inspectUser.last_name}`}
+                size="lg"
+              />
               <div>
                 <h3 className="font-bold text-sm text-navy">{inspectUser.first_name} {inspectUser.last_name}</h3>
                 <p className="text-xs text-foreground-muted">{inspectUser.email}</p>
-                <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-navy-light text-navy font-bold uppercase">
-                  {inspectUser.role}
+                <span className="inline-block mt-1 text-[10px] px-2.5 py-0.5 rounded-full bg-navy-light text-navy font-bold">
+                  {formatRoleLabel(inspectUser.role)}
                 </span>
               </div>
             </div>
@@ -488,7 +535,7 @@ export default function AdminRoleUsersPage() {
               </div>
               <div className="flex justify-between py-1.5 border-b border-border">
                 <span className="text-foreground-muted">Pays de résidence :</span>
-                <span className="font-mono text-foreground font-semibold">{inspectUser.country}</span>
+                <span className="font-semibold text-foreground">{formatCountryName(inspectUser.country)}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-border">
                 <span className="text-foreground-muted">Date d'inscription :</span>
@@ -509,15 +556,50 @@ export default function AdminRoleUsersPage() {
                   setInspectUser(null);
                   setEmailUser(u);
                 }}
-                className="px-3.5 py-2 rounded-xl bg-navy-light text-navy font-semibold text-xs hover:bg-navy/20 transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-navy-light text-navy font-semibold text-xs hover:bg-navy/20 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Mail className="w-3.5 h-3.5" /> Envoyer un mail
               </button>
               <button
                 onClick={() => setInspectUser(null)}
-                className="px-4 py-2 rounded-xl bg-navy text-white font-semibold text-xs hover:bg-navy-hover transition-colors"
+                className="px-4 py-2 rounded-xl bg-navy text-white font-semibold text-xs hover:bg-navy-hover transition-colors cursor-pointer"
               >
                 Fermer
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Confirmation de Suppression */}
+      {deleteConfirmUser && (
+        <Modal open={!!deleteConfirmUser} onClose={() => setDeleteConfirmUser(null)} title="Confirmation de Suppression">
+          <div className="p-6 max-w-sm mx-auto space-y-4 bg-background text-foreground text-center">
+            <div className="w-12 h-12 rounded-full bg-error/15 text-error mx-auto flex items-center justify-center">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-foreground">Confirmer la Suppression</h3>
+              <p className="text-xs text-foreground-muted mt-1">
+                Êtes-vous sûr de vouloir supprimer définitivement le compte de{" "}
+                <span className="font-semibold text-foreground">
+                  {deleteConfirmUser.first_name} {deleteConfirmUser.last_name}
+                </span>{" "}
+                ({deleteConfirmUser.email}) ? Cette action est irréversible.
+              </p>
+            </div>
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                onClick={() => setDeleteConfirmUser(null)}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-foreground-muted hover:bg-background-secondary cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                className="px-4 py-2 rounded-xl bg-error text-white font-bold text-xs hover:bg-error/90 transition-colors cursor-pointer shadow-xs"
+              >
+                Supprimer Définitivement
               </button>
             </div>
           </div>

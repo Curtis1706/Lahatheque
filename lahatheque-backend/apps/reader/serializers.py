@@ -144,24 +144,40 @@ class ReaderSessionCreateSerializer(serializers.Serializer):
         # 2. Validation Anti-Open-Redirect sur return_url
         partner = self.context.get('partner')
         if partner and partner.allowed_return_origins:
-            return_url = attrs.get('return_url', '')
+            return_url = attrs.get('return_url', '').strip()
             parsed_return = urlparse(return_url)
-            return_origin = f"{parsed_return.scheme}://{parsed_return.netloc}"
+            return_origin = f"{parsed_return.scheme}://{parsed_return.netloc}".rstrip('/')
 
             # Tolérance spéciale en mode DEBUG pour les tests sur serveur local (localhost / 127.0.0.1)
             is_local_dev = getattr(settings, 'DEBUG', False) and parsed_return.hostname in ['localhost', '127.0.0.1', '0.0.0.0']
 
-            # Vérifie si l'origine est explicitement listée dans les origines autorisées du partenaire
             allowed = is_local_dev
             if not allowed:
                 for allowed_orig in partner.allowed_return_origins:
-                    if allowed_orig == "*" or return_origin == allowed_orig.rstrip('/') or return_url.startswith(allowed_orig):
+                    allowed_orig = str(allowed_orig).strip().rstrip('/')
+                    # Ignorer les entrées triviales vides ou invalides
+                    if not allowed_orig or allowed_orig in ["https:", "http:", "https://", "http://"]:
+                        continue
+                    if allowed_orig == "*":
+                        allowed = True
+                        break
+                    # Comparaison d'origine exacte (ex: https://uac.bj)
+                    if return_origin == allowed_orig:
+                        allowed = True
+                        break
+                    # Comparaison de préfixe valide (ex: https://uac.bj/cours)
+                    if return_url.startswith(allowed_orig + "/") or return_url == allowed_orig:
+                        allowed = True
+                        break
+                    # Comparaison sous-domaine si spécifié comme domaine (ex: uac.bj -> lms.uac.bj)
+                    domain_clean = allowed_orig.replace("https://", "").replace("http://", "").split("/")[0]
+                    if parsed_return.hostname and (parsed_return.hostname == domain_clean or parsed_return.hostname.endswith("." + domain_clean)):
                         allowed = True
                         break
             
             if not allowed:
                 raise serializers.ValidationError({
-                    "return_url": f"L'URL de retour '{return_url}' n'appartient pas aux origines autorisées par votre compte partenaire ({partner.allowed_return_origins})."
+                    "return_url": f"L'URL de retour '{return_url}' n'appartient pas aux domaines/origines autorisés par votre compte partenaire ({partner.allowed_return_origins})."
                 })
 
         return attrs

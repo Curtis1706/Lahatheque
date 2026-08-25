@@ -59,12 +59,12 @@ export default function AdminDrmSettingsPage() {
         if (data.profil_default === "renforce" || data.profil_default === "standard") {
           setProfilDefault(data.profil_default);
         }
-        setWatermarkLahaTemplate(data.watermark_laha_template || "LAHAThèque • Exemplaire Certifié • {titre}");
+        setWatermarkLahaTemplate(data.watermark_laha_template || "LAHAThèque • Document Certifié & Protégé");
         setWatermarkLahaSubtext(data.watermark_laha_subtext || "Licence accordée au Lecteur Authentifié • Reproduction interdite");
+        setWatermarkTemplate(data.watermark_template || "Document confié à {nom} ({email}) • IP: {ip}");
         const opacityNum = data.watermark_opacity != null ? parseFloat(String(data.watermark_opacity)) : 0.20;
         setWatermarkOpacity(!isNaN(opacityNum) ? opacityNum : 0.20);
         if (data.watermark_position === "header" || data.watermark_position === "footer" || data.watermark_position === "diagonal") {
-
           setWatermarkPosition(data.watermark_position);
         }
         setInvisibleEnabled(data.invisible_watermark_enabled ?? true);

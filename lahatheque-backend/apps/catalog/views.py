@@ -505,24 +505,38 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
                 logger.warning(f"Impossible d'initialiser le stock pour l'ouvrage {ouvrage.id}: {stock_err}")
 
         # Notification au Maquettiste qui a soumis le dépôt
-        if ouvrage.created_by:
-            try:
-                from apps.reporting.services import notify_user
-                from apps.reporting.models import Notification
+        try:
+            from apps.accounts.models import User
+            from apps.reporting.services import notify_user
+            from apps.reporting.models import Notification
+
+            if ouvrage.created_by:
                 notify_user(
                     user=ouvrage.created_by,
                     notification_type=Notification.NotificationType.SYSTEM,
-                    title="Dépôt validé et publié",
-                    message=f"Félicitations ! Votre maquette pour « {ouvrage.title} » a été validée et publiée sur la vitrine officielle par le Chef Maquettiste.",
+                    title="Dépôt validé par le Chef Maquettiste",
+                    message=f"Félicitations ! Votre maquette pour « {ouvrage.title} » a été validée par le Chef Maquettiste et transmise à la Direction pour Bon à Tirer.",
                     action_url=f"/layout-artist/deposits/{ouvrage.id}",
                     resource_id=str(ouvrage.id),
                 )
-            except Exception as notif_err:
-                logger.warning(f"Erreur notification validation maquettiste: {notif_err}")
+
+            # Notification systématique aux Administrateurs
+            admins = User.objects.filter(role__in=['admin', 'super_admin'], is_active=True)
+            for adm in admins:
+                notify_user(
+                    user=adm,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Nouvelle épreuve validée par le Chef Maquettiste",
+                    message=f"Le Chef Maquettiste {request.user.get_full_name() or request.user.email} a validé l'épreuve de « {ouvrage.title} ». Le Bon à Tirer est prêt pour contrôle.",
+                    action_url=f"/admin/validation/{ouvrage.id}",
+                    resource_id=str(ouvrage.id),
+                )
+        except Exception as notif_err:
+            logger.warning(f"Erreur notification validation: {notif_err}")
 
         return Response({
             "success": True,
-            "message": f"L'ouvrage « {ouvrage.title} » a été validé et publié sur la vitrine.",
+            "message": f"L'ouvrage « {ouvrage.title} » a été validé par le Chef Maquettiste.",
             "data": OuvrageReadSerializer(ouvrage).data
         })
 
@@ -545,11 +559,13 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
         ouvrage.rejection_reason = motif
         ouvrage.save(update_fields=['status', 'rejection_reason'])
 
-        # Notification au Maquettiste qui a soumis le dépôt
-        if ouvrage.created_by:
-            try:
-                from apps.reporting.services import notify_user
-                from apps.reporting.models import Notification
+        # Notifications au Maquettiste et aux Administrateurs
+        try:
+            from apps.accounts.models import User
+            from apps.reporting.services import notify_user
+            from apps.reporting.models import Notification
+
+            if ouvrage.created_by:
                 notify_user(
                     user=ouvrage.created_by,
                     notification_type=Notification.NotificationType.SYSTEM,
@@ -558,8 +574,19 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
                     action_url=f"/layout-artist/deposits/{ouvrage.id}",
                     resource_id=str(ouvrage.id),
                 )
-            except Exception as notif_err:
-                logger.warning(f"Erreur notification rejet maquettiste: {notif_err}")
+
+            admins = User.objects.filter(role__in=['admin', 'super_admin'], is_active=True)
+            for adm in admins:
+                notify_user(
+                    user=adm,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Épreuve renvoyée pour correction",
+                    message=f"Le Chef Maquettiste {request.user.get_full_name() or request.user.email} a demandé des corrections sur « {ouvrage.title} ». Motif : {motif}",
+                    action_url=f"/admin/validation/{ouvrage.id}",
+                    resource_id=str(ouvrage.id),
+                )
+        except Exception as notif_err:
+            logger.warning(f"Erreur notification rejet: {notif_err}")
 
         return Response({
             "success": True,

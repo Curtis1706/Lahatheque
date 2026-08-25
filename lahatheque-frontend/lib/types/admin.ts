@@ -15,11 +15,64 @@ export type AdminRole =
   | "coordination_manager"
   | "partner_api";
 
+export const ADMIN_ROLE_LABELS: Record<string, string> = {
+  student: "Client / Lecteur",
+  teacher: "Enseignant",
+  author: "Auteur",
+  publisher: "Éditeur Tiers",
+  university: "Université / Établissement",
+  layout_artist: "Maquettiste",
+  chief_layout: "Chef Maquettiste",
+  manager: "Gestionnaire Stock & Livraison",
+  coordination_manager: "Gestionnaire Coordination",
+  legal_reviewer: "Juriste / Relecteur",
+  wholesaler: "Grossiste Commercial",
+  commercial_wholesaler: "Grossiste Commercial",
+  partner_api: "Partenaire API",
+  admin: "Administrateur",
+  super_admin: "Super Administrateur",
+};
+
+export function formatRoleLabel(role?: string): string {
+  if (!role) return "Non défini";
+  const normalized = role.toLowerCase().trim();
+  return ADMIN_ROLE_LABELS[normalized] || normalized.replace(/_/g, " ");
+}
+
+export const COUNTRY_NAMES: Record<string, string> = {
+  BJ: "Bénin",
+  TG: "Togo",
+  CI: "Côte d'Ivoire",
+  SN: "Sénégal",
+  NE: "Niger",
+  BF: "Burkina Faso",
+  ML: "Mali",
+  GN: "Guinée",
+  CM: "Cameroun",
+  GA: "Gabon",
+  CG: "Congo",
+  CD: "RDC",
+  FR: "France",
+  BE: "Belgique",
+  CA: "Canada",
+  CH: "Suisse",
+  US: "États-Unis",
+  GB: "Royaume-Uni",
+};
+
+export function formatCountryName(code?: string): string {
+  if (!code) return "Bénin";
+  const upper = code.toUpperCase().trim();
+  return COUNTRY_NAMES[upper] || code;
+}
+
 export interface AdminUser {
   id: string;
   email: string;
   first_name: string;
   last_name: string;
+  avatar_url?: string;
+  avatar?: string;
   role: AdminRole;
   active_roles: AdminRole[];
   is_active: boolean;
@@ -68,6 +121,8 @@ export interface AdminCatalogBook {
   id: string;
   isbn?: string;
   title: string;
+  cover_url?: string;
+  cover_image?: string;
   authors: string[];
   author_name?: string;
   publisher_name: string;
@@ -236,13 +291,26 @@ export interface PartnerApiKey {
 
 export interface AdminValidationProof {
   id: string;
+  isbn?: string;
   title: string;
+  subtitle?: string;
+  authors?: string[];
   author_name: string;
   publisher_name: string;
   discipline: string;
+  dewey_code?: string;
+  faculty?: string;
+  department?: string;
+  keywords?: string[];
+  summary?: string;
+  target_audience?: string;
+  classification_source?: string;
+  cover_url?: string;
+  cover_image?: string;
   version: string;
   format: string;
   status: "pending_admin_approval" | "approved" | "published" | "rejected";
+  raw_status?: string;
   submitted_by: string;
   submitted_at: string;
   reviewed_by: string;
@@ -250,7 +318,11 @@ export interface AdminValidationProof {
   rejection_reason?: string | null;
   file_url?: string;
   page_count?: number;
+  price_digital?: number;
+  price_paper?: number;
+  is_paper_available?: boolean;
   lcp_compliant?: boolean;
+  tts_compatible?: boolean;
   notes?: string;
 }
 

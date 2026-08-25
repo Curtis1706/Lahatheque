@@ -37,10 +37,12 @@ class DerivedMaterializer:
         user_id: str,
         config_version: int = 1,
         profil: str = "standard",
-        watermark_template: str = ""
+        watermark_template: str = "",
+        watermark_position: str = "header",
+        watermark_opacity: float = 0.50
     ) -> str:
-        """Génère la clé SHA-256 unique pour le triplet (source, user, config, profil)."""
-        raw = f"{source_id}:{user_id}:{config_version}:{profil}:{watermark_template}"
+        """Génère la clé SHA-256 unique pour le tuple complet de configuration."""
+        raw = f"{source_id}:{user_id}:{config_version}:{profil}:{watermark_template}:{watermark_position}:{watermark_opacity}"
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     @classmethod
@@ -59,25 +61,39 @@ class DerivedMaterializer:
             source_type: 'catalog_book', 'external_url', 'direct_upload', ou 'local_path'.
             source_reference: Identifiant ou URL du document source.
             user_info: Métadonnées de l'utilisateur (nom, email, ip, user_id).
-            config: Instance ProtectionConfig ou configuration dictionnaire.
+            config: Instance ProtectionConfig, GlobalDrmConfig ou configuration dictionnaire.
             options: Paramètres optionnels de téléchargement ou téléversement.
 
         Returns:
             Tuple[bytes, int]: (Octets clairs du PDF filigrané prêt pour le streaming, taille totale en octets).
         """
-        from .models import DerivedCacheRegistry
+        from .models import DerivedCacheRegistry, GlobalDrmConfig
+
+        if config is None:
+            try:
+                config = GlobalDrmConfig.get_singleton()
+            except Exception:
+                config = None
 
         user_id = str(user_info.get("user_id") or "anonymous")
         config_version = getattr(config, "config_version", 1) if config else 1
-        profil = getattr(config, "profil", "standard") if config else "standard"
-        template = getattr(config, "watermark_text_template", "") if config else ""
+        profil = getattr(config, "profil_default", getattr(config, "profil", "standard")) if config else "standard"
+        template = (
+            getattr(config, "watermark_template", None)
+            or getattr(config, "watermark_text_template", None)
+            or ""
+        ) if config else ""
+        position = getattr(config, "watermark_position", "header") if config else "header"
+        opacity = float(getattr(config, "watermark_opacity", 0.50)) if config else 0.50
 
         cache_key = cls.compute_cache_key(
             source_id=source_reference,
             user_id=user_id,
             config_version=config_version,
             profil=profil,
-            watermark_template=template
+            watermark_template=template,
+            watermark_position=position,
+            watermark_opacity=opacity
         )
 
         cache_dir = cls._get_cache_dir()

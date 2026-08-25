@@ -19,6 +19,17 @@ from apps.protection.models import ProtectionConfig, TraceAcces
 logger = logging.getLogger(__name__)
 
 
+from rest_framework.renderers import BaseRenderer, JSONRenderer
+
+class PassthroughStreamRenderer(BaseRenderer):
+    """Renderer universel autorisant le streaming binaire PDF, audio et vidéo."""
+    media_type = "*/*"
+    format = "binary"
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
+
+
 class BookStreamView(APIView):
     """
     Sert un ouvrage du catalogue en flux fragmenté Range HTTP 206.
@@ -26,6 +37,7 @@ class BookStreamView(APIView):
     Le client reçoit exclusivement des fragments chiffrés/filigranés au nom de l'utilisateur.
     """
     permission_classes = [IsAuthenticated]
+    renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
 
     # Taille standard d'un bloc de streaming: 256 Kio
     DEFAULT_CHUNK_SIZE = 256 * 1024
@@ -56,9 +68,12 @@ class BookStreamView(APIView):
 
 
         # 2. Récupération ou création de la configuration de protection
+        from apps.protection.models import GlobalDrmConfig
+        global_drm = GlobalDrmConfig.get_singleton()
         protection_config = getattr(ouvrage, "protection_config", None)
         if not protection_config:
             protection_config = ProtectionConfig.objects.filter(ouvrage=ouvrage).first()
+        effective_config = protection_config or global_drm
 
         # 3. Préparation des métadonnées utilisateur
         ip = request.META.get("HTTP_X_FORWARDED_FOR")
@@ -73,6 +88,9 @@ class BookStreamView(APIView):
             "ip": ip,
             "user_id": str(request.user.id),
             "device_fingerprint": request.headers.get("X-Device-Fingerprint", ""),
+            "title": getattr(ouvrage, "titre", getattr(ouvrage, "title", "Ouvrage")),
+            "id": str(ouvrage.id),
+            "is_partner": False,
         }
 
         # 4. Obtention du dérivé filigrané en cache
@@ -81,7 +99,7 @@ class BookStreamView(APIView):
                 source_type="catalog_book",
                 source_reference=str(book_id),
                 user_info=user_info,
-                config=protection_config
+                config=effective_config
             )
         except Exception as e:
             logger.error(f"Erreur matérialisation dérivé ({book_id}): {e}")
