@@ -7,7 +7,6 @@ import { ContractPdfViewer } from "./contract-pdf-viewer";
 import type { LegalContract } from "@/lib/types/legal";
 import {
   ShieldCheck,
-  Download,
   FileText,
   Clock,
   Tag,
@@ -59,21 +58,13 @@ export function ContractConsultationModal({
 
           <div className="flex items-center gap-2 shrink-0">
             <Link
-              href={`/catalog/reader/lesson_pdf?file=${encodeURIComponent(contract.file_url || "/PromptBreeder_Original_Paper-2309.16797v1.pdf")}&title=${encodeURIComponent(contract.title)}`}
+              href={`/catalog/reader/lesson_pdf?contract_id=${contract.id}&file=${encodeURIComponent(contract.file_url || "/PromptBreeder_Original_Paper-2309.16797v1.pdf")}&title=${encodeURIComponent(contract.title)}`}
               target="_blank"
               className="px-3.5 py-2 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
               title="Ouvrir dans la liseuse officielle LAHAThèque avec FlipBook et défilement continu"
             >
               <BookOpen className="w-3.5 h-3.5" /> Ouvrir dans la Liseuse
             </Link>
-            <a
-              href={contract.file_url}
-              download={contract.file_name}
-              className="px-3.5 py-2 rounded-xl bg-background-secondary hover:bg-background border border-border text-navy font-bold text-xs transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
-              title="Télécharger le fichier"
-            >
-              <Download className="w-3.5 h-3.5" /> Télécharger
-            </a>
           </div>
         </div>
 
@@ -176,9 +167,9 @@ export function ContractConsultationModal({
                         <p className="font-bold text-navy text-[11px]">{am.title}</p>
                         <p className="text-[10px] text-foreground-muted font-mono">{am.date}</p>
                       </div>
-                      <a href={am.file_url} download className="p-1.5 rounded-lg hover:bg-background-secondary text-navy transition-colors">
-                        <Download className="w-3.5 h-3.5 text-gold" />
-                      </a>
+                      <span className="px-2 py-0.5 rounded-full bg-navy/10 text-navy font-bold text-[10px]">
+                        Enregistré
+                      </span>
                     </div>
                   ))}
                 </div>

@@ -12,14 +12,19 @@ from .views import (
     ManuscriptReviewDecisionView,
     LegalKpisView,
     LegalContractsListView,
+    LegalContractsFormOptionsView,
     LegalContractDetailView,
+    LegalContractStreamView,
     LegalRoyaltiesListView,
     LegalRoyaltiesBatchView,
+    LegalUniversityRoyaltiesListView,
+    LegalPublisherRoyaltiesListView,
     LegalAiSuggestionsListView,
     LegalAiSuggestionDecisionView,
     LegalPreEditionsListView,
-    LegalRelancesListView,
+    LegalPreEditionDetailView,
     DebtReminderConfigView,
+    LegalRelancesListView,
 )
 
 app_name = 'rights'
@@ -39,13 +44,19 @@ urlpatterns = [
 
     # Juriste / Legal Reviewer
     path('legal/kpis/', LegalKpisView.as_view(), name='legal-kpis'),
+    path('legal/contracts/form-options/', LegalContractsFormOptionsView.as_view(), name='legal-contracts-form-options'),
     path('legal/contracts/', LegalContractsListView.as_view(), name='legal-contracts-list'),
     path('legal/contracts/<uuid:id>/', LegalContractDetailView.as_view(), name='legal-contract-detail'),
+    path('legal/contracts/<uuid:id>/stream/', LegalContractStreamView.as_view(), name='legal-contract-stream'),
     path('legal/royalties/', LegalRoyaltiesListView.as_view(), name='legal-royalties-list'),
     path('legal/royalties/batch/', LegalRoyaltiesBatchView.as_view(), name='legal-royalties-batch'),
+    path('legal/royalties/universities/', LegalUniversityRoyaltiesListView.as_view(), name='legal-royalties-universities'),
+    path('legal/royalties/publishers/', LegalPublisherRoyaltiesListView.as_view(), name='legal-royalties-publishers'),
+    path('legal/royalties/publishers/<str:publisher_id>/', LegalPublisherRoyaltiesListView.as_view(), name='legal-royalties-publisher-detail'),
     path('legal/ai-suggestions/', LegalAiSuggestionsListView.as_view(), name='legal-ai-suggestions-list'),
     path('legal/ai-suggestions/<str:id>/decide/', LegalAiSuggestionDecisionView.as_view(), name='legal-ai-suggestion-decide'),
     path('legal/pre-editions/', LegalPreEditionsListView.as_view(), name='legal-pre-editions-list'),
+    path('legal/pre-editions/<uuid:pk>/', LegalPreEditionDetailView.as_view(), name='legal-pre-edition-detail'),
     path('legal/relances/config/', DebtReminderConfigView.as_view(), name='legal-relances-config'),
     path('legal/relances/', LegalRelancesListView.as_view(), name='legal-relances-list'),
 ]

@@ -11,6 +11,65 @@ export type LegalContractStatus = "active" | "expired" | "pending_signature" | "
 
 export type ClassificationSource = "ai_suggested" | "manual_override";
 
+export interface EligibleContractBook {
+  id: string;
+  title: string;
+  isbn: string;
+  status: string;
+  cover_url: string;
+  authors: string[];
+  author_user_ids: string[];
+}
+
+export interface EligibleContractAuthor {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export interface EligibleContractPublisher {
+  id: string;
+  name: string;
+  email: string;
+  rate: number;
+}
+
+export interface EligibleContractInstitution {
+  id: string;
+  name: string;
+  country: string;
+  rate: number;
+}
+
+export interface EligibleContractPreEdition {
+  id: string;
+  code: string;
+  title: string;
+  author_name: string;
+  author_email: string;
+}
+
+export interface ContractFormOptions {
+  ouvrages: EligibleContractBook[];
+  authors: EligibleContractAuthor[];
+  publishers: EligibleContractPublisher[];
+  institutions: EligibleContractInstitution[];
+  pre_editions: EligibleContractPreEdition[];
+}
+
+export interface ContractRoyaltySplit {
+  id?: string;
+  user_id?: string;
+  name?: string;
+  beneficiaire_nom?: string;
+  role_libelle: string;
+  pourcentage: number;
+  taux_papier?: number;
+  taux_numerique?: number;
+  taux_audio_tts?: number;
+}
+
 export interface LegalContract {
   id: string;
   reference: string;
@@ -25,14 +84,50 @@ export interface LegalContract {
   file_size?: number; // octets (jusqu'à 800 Mo)
   tags: string[];
   status: LegalContractStatus;
+  notes?: string;
+  extracted_text?: string;
+  extracted_text_preview?: string;
+  
+  // Liaisons directes avec les entités réelles
+  ouvrage_id?: string;
+  ouvrage_title?: string;
+  ouvrage_cover?: string;
+  ouvrage_isbn?: string;
+  signataire_user_id?: string;
+  signataire_name?: string;
+  
+  ouvrage?: {
+    id: string;
+    title: string;
+    isbn: string;
+    status: string;
+    cover_url: string;
+    total_sales_count: number;
+    total_sales_revenue: number;
+  };
+  signataire?: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+  };
+  repartitions?: ContractRoyaltySplit[];
   linked_book_id?: string;
   linked_book_title?: string;
-  notes?: string;
   amendments?: {
     id: string;
     title: string;
-    date: string;
-    file_url: string;
+    date?: string;
+    signed_at?: string;
+    file_url?: string;
+  }[];
+  avenants?: {
+    id: string;
+    reference: string;
+    title: string;
+    signed_at: string;
+    notes?: string;
+    file_name?: string;
   }[];
 }
 
@@ -77,15 +172,18 @@ export interface AIRoyaltySuggestion {
 
 export interface PreEditionContract {
   id: string;
+  code_dossier?: string;
   title: string; // Titre prévisionnel
   author_name: string;
   author_email?: string;
   author_user_id?: string;
   university: string;
   faculty: string;
-  status: "en_attente_depot" | "maquette_en_cours" | "depot_lie" | "valide_legalement";
+  expected_delivery_date?: string;
+  status: "en_attente_depot" | "maquette_en_cours" | "depot_lie" | "valide_legalement" | "archive";
   linked_book_id?: string;
-  code_dossier?: string;
+  contract_id?: string;
+  contract_reference?: string;
   notes?: string;
   created_at: string;
 }

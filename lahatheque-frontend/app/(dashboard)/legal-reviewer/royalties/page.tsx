@@ -17,8 +17,9 @@ import {
 import type { BookRoyalty, AIRoyaltySuggestion, CoAuthorSplit } from "@/lib/types/legal";
 
 import { toast } from "sonner";
+import { Suspense } from "react";
 
-export default function LegalRoyaltiesPage() {
+function LegalRoyaltiesPageContent() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") === "suggestions" ? "suggestions" : "global";
   const [activeTab, setActiveTab] = useState<"global" | "suggestions">(initialTab);
@@ -82,7 +83,9 @@ export default function LegalRoyaltiesPage() {
       cell: (row) => (
         <div>
           <p className="font-serif font-bold text-xs text-navy leading-snug">{row.title}</p>
-          <p className="text-[10px] text-foreground-muted font-mono">ISBN : {row.isbn || "En cours"}</p>
+          <p className="text-[10px] text-foreground-muted font-mono">
+            {row.isbn ? `ISBN : ${row.isbn}` : "ISBN : Non assigné"}
+          </p>
         </div>
       ),
     },
@@ -243,7 +246,6 @@ export default function LegalRoyaltiesPage() {
         </div>
       )}
 
-      {/* Modale d'ajustement du % de droits */}
       {selectedRoyalty && (
         <EditRoyaltyModal
           royalty={selectedRoyalty}
@@ -253,5 +255,13 @@ export default function LegalRoyaltiesPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function LegalRoyaltiesPage() {
+  return (
+    <Suspense fallback={<div className="p-8 space-y-4 animate-pulse"><div className="h-8 bg-background-secondary rounded w-1/3" /><div className="h-96 bg-background-secondary rounded-3xl" /></div>}>
+      <LegalRoyaltiesPageContent />
+    </Suspense>
   );
 }

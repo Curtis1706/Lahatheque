@@ -354,3 +354,133 @@ def task_check_stock_alerts():
 
     return {"alerts_sent": sent, "articles_en_alerte": len(alert_stocks)}
 
+
+def check_and_generate_legal_notifications(user=None):
+    """
+    Génère et synchronise les alertes et notifications réelles pour les juristes et administrateurs.
+    - Contrats expirant dans moins de 30 jours ou expirés
+    - Contrats en attente de signature
+    - Suggestions IA de redevances non validées
+    - Dossiers de pré-édition actifs en attente de dépôt
+    - Factures clients impayées dépassant le seuil configuré
+    """
+    from apps.rights.models import ContratLegal, AIRoyaltySuggestion, PreEditionDossier, DebtReminderConfig
+    from apps.commerce.models import Order
+    from apps.accounts.models import User
+    from apps.reporting.models import Notification
+    from apps.reporting.services import notify_user
+    from django.utils import timezone
+    from datetime import timedelta
+
+    recipients = [user] if user else list(User.objects.filter(role__in=['legal_reviewer', 'admin', 'super_admin'], is_active=True))
+    if not recipients:
+        return 0
+
+    now = timezone.now()
+    today = now.date()
+    sent_count = 0
+
+    # 1. Contrats approchant de l'échéance (< 30 jours)
+    expiring_contracts = ContratLegal.objects.filter(
+        status='active',
+        date_expiration__isnull=False,
+        date_expiration__lte=today + timedelta(days=30),
+        date_expiration__gte=today
+    )
+    for c in expiring_contracts:
+        res_id = f"contract_expiry_{c.id}_{c.date_expiration}"
+        for r in recipients:
+            if not Notification.objects.filter(user=r, resource_id=res_id).exists():
+                notify_user(
+                    user=r,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Échéance contractuelle proche",
+                    message=f"Le contrat « {c.titre} » ({c.numero_contrat}) avec {c.contracting_party} expire le {c.date_expiration.strftime('%d/%m/%Y')}.",
+                    action_url=f"/legal-reviewer/contracts/{c.id}",
+                    resource_id=res_id,
+                )
+                sent_count += 1
+
+    # 2. Contrats en attente de signature
+    pending_contracts = ContratLegal.objects.filter(status='pending_signature')
+    for c in pending_contracts:
+        res_id = f"contract_pending_sig_{c.id}"
+        for r in recipients:
+            if not Notification.objects.filter(user=r, resource_id=res_id).exists():
+                notify_user(
+                    user=r,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Contrat en attente de signature",
+                    message=f"L'acte contractuel « {c.titre} » ({c.numero_contrat}) est en attente de signature de {c.contracting_party}.",
+                    action_url=f"/legal-reviewer/contracts/{c.id}",
+                    resource_id=res_id,
+                )
+                sent_count += 1
+
+    # 3. Suggestions IA de redevances non validées
+    ai_suggs = AIRoyaltySuggestion.objects.filter(is_validated=False).select_related('ouvrage')
+    for sug in ai_suggs:
+        book_title = sug.ouvrage.titre if sug.ouvrage else sug.contrat.titre
+        res_id = f"ai_royalty_sug_{sug.id}"
+        for r in recipients:
+            if not Notification.objects.filter(user=r, resource_id=res_id).exists():
+                notify_user(
+                    user=r,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Suggestion IA de redevances",
+                    message=f"L'analyse IA propose une clé de répartition pour « {book_title} » ({sug.pourcentage_suggere}% pour {sug.beneficiaire_nom}).",
+                    action_url="/legal-reviewer/royalties?tab=suggestions",
+                    resource_id=res_id,
+                )
+                sent_count += 1
+
+    # 4. Dossiers de pré-édition actifs
+    pre_editions = PreEditionDossier.objects.filter(status='en_attente_depot')
+    for d in pre_editions:
+        res_id = f"pre_edition_{d.id}"
+        for r in recipients:
+            if not Notification.objects.filter(user=r, resource_id=res_id).exists():
+                notify_user(
+                    user=r,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Dossier de pré-édition actif",
+                    message=f"Le dossier « {d.titre_previsionnel} » ({d.code_dossier}) pour {d.auteur_nom} est en attente du dépôt maquette.",
+                    action_url="/legal-reviewer/pre-editions",
+                    resource_id=res_id,
+                )
+                sent_count += 1
+
+    # 5. Créances et impayés clients
+    config = DebtReminderConfig.get_or_create_singleton()
+    if config.auto_remind_enabled:
+        cutoff = now - timedelta(days=config.first_reminder_days)
+        unpaid_orders = Order.objects.filter(
+            statut_paiement='pending',
+            created_at__lte=cutoff,
+            total_amount__gte=config.min_amount_threshold
+        ).select_related('user')
+
+        for o in unpaid_orders:
+            client_name = o.user.get_full_name() or o.user.email if o.user else "Client"
+            res_id = f"unpaid_order_{o.id}"
+            for r in recipients:
+                if not Notification.objects.filter(user=r, resource_id=res_id).exists():
+                    notify_user(
+                        user=r,
+                        notification_type=Notification.NotificationType.SYSTEM,
+                        title="Facture client impayée",
+                        message=f"La commande #{o.id} de {client_name} ({float(o.total_amount):,.0f} XOF) a dépassé le délai de paiement.",
+                        action_url="/legal-reviewer/relances?tab=debts",
+                        resource_id=res_id,
+                    )
+                    sent_count += 1
+
+    return sent_count
+
+
+@shared_task
+def task_check_legal_alerts():
+    """Tâche périodique pour la génération des alertes et notifications juridiques."""
+    sent = check_and_generate_legal_notifications()
+    return {"legal_alerts_sent": sent}
+

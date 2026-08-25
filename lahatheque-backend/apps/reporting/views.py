@@ -17,7 +17,19 @@ class NotificationViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+        user = self.request.user
+        if user and user.is_authenticated and user.role in ['legal_reviewer', 'admin', 'super_admin']:
+            try:
+                from .tasks import check_and_generate_legal_notifications
+                check_and_generate_legal_notifications(user)
+            except Exception:
+                pass
+        return Notification.objects.filter(user=user).order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        serializer = self.get_serializer(qs, many=True)
+        return Response({"success": True, "data": serializer.data, "results": serializer.data})
 
     @action(detail=False, methods=['get'], url_path='unread-count')
     def unread_count(self, request):
@@ -26,5 +38,5 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='mark-all-read')
     def mark_all_read(self, request):
-        updated = self.get_queryset().filter(is_read=False).update(is_read=True)
+        updated = Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return Response({"success": True, "data": {"marked_count": updated}})

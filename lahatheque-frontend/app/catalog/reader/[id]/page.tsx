@@ -606,25 +606,54 @@ export default function DocumentReaderPage() {
       try {
         if (id === 'lesson_pdf') {
           const sParams = new URLSearchParams(window.location.search)
-          const file = sParams.get('file') || ''
+          const contractId = sParams.get('contract_id') || ''
+          let file = sParams.get('file') || ''
           const title = sParams.get('title') || 'Support de cours'
           const lessonId = sParams.get('lesson_id') || ''
           
+          if (contractId) {
+            file = `/api/bff/rights/legal/contracts/${contractId}/stream`
+          } else if (file && !file.startsWith('http') && !file.startsWith('/')) {
+            file = `/uploads/${file}`
+          }
+          
           const fakeBook = {
-            id: 'lesson_pdf',
+            id: contractId || 'lesson_pdf',
             title,
             file,
             progress: { last_page: 0 }
           }
           setBook(fakeBook)
+
+          // Chargement de la configuration DRM globale
+          try {
+            const drmConfig = await getDrmGlobalSettings()
+            if (drmConfig) setDrmSettings(drmConfig)
+          } catch (e) {
+            console.warn('[Reader] Erreur récupération drm settings:', e)
+          }
           
           if (file) {
-            setRawPdfData(file)
+            try {
+              const streamRes = await fetch(file, {
+                headers: { Accept: 'application/pdf' },
+                credentials: 'include',
+              });
+              if (streamRes.ok) {
+                const blob = await streamRes.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                setRawPdfData(blobUrl);
+              } else {
+                setRawPdfData(file);
+              }
+            } catch {
+              setRawPdfData(file);
+            }
           } else {
-            setRawPdfData(null)
+            setRawPdfData(null);
           }
-          setIsLoading(false)
-          return
+          setIsLoading(false);
+          return;
         }
 
         const data = await libraryApi.getBook(id as string)

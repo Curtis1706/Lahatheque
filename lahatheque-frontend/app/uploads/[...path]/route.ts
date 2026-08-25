@@ -10,6 +10,33 @@ export async function GET(
   const subPath = (resolvedParams.path || []).join("/");
   const cleanPath = subPath.replace(/^\/+|\/+$/g, "");
 
+  // 1. Essai direct sur le stockage d'objets Cloudflare R2 (fichiers réels du catalogue & contrats)
+  const r2PublicDomain = (process.env.NEXT_PUBLIC_R2_URL || process.env.CLOUDFLARE_R2_PUBLIC_URL || "https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev").replace(/\/+$/, "");
+  const targetR2Url = `${r2PublicDomain}/${cleanPath}`;
+
+  try {
+    const r2Res = await fetch(targetR2Url, {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    if (r2Res.ok) {
+      const contentType = r2Res.headers.get("content-type") || "application/pdf";
+      const blob = await r2Res.arrayBuffer();
+      return new NextResponse(blob, {
+        status: 200,
+        headers: {
+          "Content-Type": contentType,
+          "Content-Disposition": "inline",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    }
+  } catch {
+    // R2 indisponible, continuer vers Django media
+  }
+
+  // 2. Essai de repli sur Django media local
   const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
   const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
   const targetUrl = `${djangoBaseUrl}/media/${cleanPath}`;

@@ -513,6 +513,35 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
                     ressource_id=str(payout.id),
                     details={"amount": float(payout.amount), "transaction_reference": tx_ref}
                 )
+
+                try:
+                    from apps.accounts.models import User
+                    from apps.reporting.services import notify_user
+                    from apps.reporting.models import Notification
+
+                    if payout.author:
+                        notify_user(
+                            user=payout.author,
+                            notification_type=Notification.NotificationType.SYSTEM,
+                            title="Versement de redevances validé",
+                            message=f"Votre retrait de {float(payout.amount):,.0f} XOF a été validé par la Direction. Référence transaction : {tx_ref or 'Confirmé'}.",
+                            action_url="/author/royalties",
+                            resource_id=str(payout.id),
+                        )
+
+                    juristes = User.objects.filter(role='legal_reviewer', is_active=True)
+                    for j in juristes:
+                        notify_user(
+                            user=j,
+                            notification_type=Notification.NotificationType.SYSTEM,
+                            title="Reversement de droits validé par l'Administration",
+                            message=f"Le versement de {float(payout.amount):,.0f} XOF pour {payout.author.get_full_name() if payout.author else 'Auteur'} a été exécuté.",
+                            action_url="/legal-reviewer/redevances",
+                            resource_id=str(payout.id),
+                        )
+                except Exception:
+                    pass
+
                 return Response({"success": True, "message": "Demande de versement validée et enregistrée.", "error": None})
 
             elif action_type == 'reject':
@@ -529,6 +558,35 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
                     ressource_id=str(payout.id),
                     details={"amount": float(payout.amount), "reason": notes}
                 )
+
+                try:
+                    from apps.accounts.models import User
+                    from apps.reporting.services import notify_user
+                    from apps.reporting.models import Notification
+
+                    if payout.author:
+                        notify_user(
+                            user=payout.author,
+                            notification_type=Notification.NotificationType.SYSTEM,
+                            title="Demande de versement refusée",
+                            message=f"Votre demande de retrait de {float(payout.amount):,.0f} XOF a été rejetée par la Direction. Motif : {notes or 'Coordonnées non conformes'}.",
+                            action_url="/author/royalties",
+                            resource_id=str(payout.id),
+                        )
+
+                    juristes = User.objects.filter(role='legal_reviewer', is_active=True)
+                    for j in juristes:
+                        notify_user(
+                            user=j,
+                            notification_type=Notification.NotificationType.SYSTEM,
+                            title="Demande de versement rejetée par l'Administration",
+                            message=f"Le versement de {float(payout.amount):,.0f} XOF pour {payout.author.get_full_name() if payout.author else 'Auteur'} a été refusé.",
+                            action_url="/legal-reviewer/redevances",
+                            resource_id=str(payout.id),
+                        )
+                except Exception:
+                    pass
+
                 return Response({"success": True, "message": "Demande de versement rejetée.", "error": None})
 
             return Response({"success": False, "error": "Action invalide. Utilisez 'approve' ou 'reject'."}, status=status.HTTP_400_BAD_REQUEST)

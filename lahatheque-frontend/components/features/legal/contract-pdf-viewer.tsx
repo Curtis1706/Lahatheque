@@ -1,14 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   FileText, 
-  Download, 
-  ZoomIn, 
-  ZoomOut, 
-  RotateCw, 
-  ExternalLink, 
   ShieldCheck, 
   BookOpen,
   Sparkles,
@@ -17,8 +12,12 @@ import {
   Maximize2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Viewer, Worker as PdfWorker, SpecialZoomLevel } from "@react-pdf-viewer/core";
+import "@react-pdf-viewer/core/lib/styles/index.css";
 
 interface ContractPdfViewerProps {
+  contractId?: string;
+  streamUrl?: string;
   fileUrl: string;
   fileName: string;
   fileSize?: number;
@@ -29,6 +28,8 @@ interface ContractPdfViewerProps {
 }
 
 export function ContractPdfViewer({
+  contractId,
+  streamUrl,
   fileUrl,
   fileName,
   fileSize,
@@ -36,14 +37,53 @@ export function ContractPdfViewer({
   reference,
   className,
 }: ContractPdfViewerProps) {
-  const [zoom, setZoom] = useState(100);
-  const [rotation, setRotation] = useState(0);
   const [viewMode, setViewMode] = useState<"preview" | "summary">("preview");
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loadingPdf, setLoadingPdf] = useState(true);
 
   const isDocx = fileName.toLowerCase().endsWith(".docx") || fileName.toLowerCase().endsWith(".doc");
 
-  const effectiveFileUrl = fileUrl || "/PromptBreeder_Original_Paper-2309.16797v1.pdf";
-  const readerUrl = `/catalog/reader/lesson_pdf?file=${encodeURIComponent(effectiveFileUrl)}&title=${encodeURIComponent(title)}`;
+  const targetPdfUrl = React.useMemo(() => {
+    if (streamUrl) return streamUrl;
+    if (contractId) return `/api/bff/rights/legal/contracts/${contractId}/stream`;
+    if (!fileUrl) return "/PromptBreeder_Original_Paper-2309.16797v1.pdf";
+    if (fileUrl.startsWith("http") || fileUrl.startsWith("/")) return fileUrl;
+    return `/uploads/${fileUrl}`;
+  }, [contractId, streamUrl, fileUrl]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    setLoadingPdf(true);
+    fetch(targetPdfUrl, {
+      headers: { Accept: "application/pdf" },
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const blob = await res.blob();
+          if (!isCancelled) {
+            setBlobUrl(URL.createObjectURL(blob));
+          }
+        } else if (fileUrl && fileUrl !== targetPdfUrl) {
+          // Fallback sur le fichier direct si le stream échoue
+          const fallbackRes = await fetch(fileUrl.startsWith("http") || fileUrl.startsWith("/") ? fileUrl : `/uploads/${fileUrl}`);
+          if (fallbackRes.ok && !isCancelled) {
+            const fallbackBlob = await fallbackRes.blob();
+            setBlobUrl(URL.createObjectURL(fallbackBlob));
+          }
+        }
+      })
+      .catch((err) => console.warn("[ContractPdfViewer] Erreur chargement stream DRM:", err))
+      .finally(() => {
+        if (!isCancelled) setLoadingPdf(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [targetPdfUrl, fileUrl]);
+
+  const readerUrl = `/catalog/reader/lesson_pdf?${contractId ? `contract_id=${contractId}&` : ""}file=${encodeURIComponent(fileUrl || "")}&title=${encodeURIComponent(title)}`;
 
   const formatSize = (bytes?: number) => {
     if (!bytes) return "";
@@ -118,14 +158,23 @@ export function ContractPdfViewer({
         </div>
       </div>
 
-      {/* Cadre de Visualisation Intégré */}
-      <div className="relative bg-navy-dark rounded-2xl min-h-[420px] flex flex-col items-center justify-center text-center p-4 border border-navy-hover overflow-hidden">
+      {/* Cadre de Visualisation Intégré — Anti-Interception IDM */}
+      <div className="relative bg-navy-dark rounded-2xl min-h-[440px] max-h-[520px] w-full flex flex-col items-center justify-center text-center p-3 border border-navy-hover overflow-hidden">
         {viewMode === "preview" && !isDocx ? (
-          <iframe
-            src={effectiveFileUrl}
-            title={title}
-            className="w-full h-[420px] rounded-xl bg-white border-0"
-          />
+          loadingPdf ? (
+            <div className="flex flex-col items-center justify-center gap-3 text-white">
+              <span className="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-white/70 font-medium">Chargement sécurisé du document...</p>
+            </div>
+          ) : blobUrl ? (
+            <div className="w-full h-[440px] rounded-xl overflow-hidden bg-white shadow-inner">
+              <PdfWorker workerUrl="/pdf.worker.min.js">
+                <Viewer fileUrl={blobUrl} defaultScale={SpecialZoomLevel.PageFit} />
+              </PdfWorker>
+            </div>
+          ) : (
+            <div className="text-white/70 text-xs">Impossible de charger le document.</div>
+          )
         ) : (
           <div className="bg-background p-8 rounded-2xl shadow-2xl max-w-md w-full text-left space-y-4 border border-border text-foreground">
             <div className="flex items-center justify-between border-b border-border pb-3">
@@ -167,23 +216,11 @@ export function ContractPdfViewer({
       </div>
 
       {/* Footer Actions */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs border-t border-border">
+      <div className="flex items-center justify-between pt-2 text-xs border-t border-border">
         <span className="text-foreground-muted flex items-center gap-1.5 text-[11px]">
           <ShieldCheck className="w-3.5 h-3.5 text-success" />
           Filigrane dynamique DRM &amp; Sécurité anti-capture activés
         </span>
-
-        <div className="flex items-center gap-2">
-          <a
-            href={fileUrl || "#"}
-            download={fileName}
-            className="px-3.5 py-2 rounded-xl bg-background-secondary hover:bg-background text-navy text-xs font-bold border border-border transition-colors inline-flex items-center gap-1.5 shadow-xs min-h-[36px] cursor-pointer"
-            title="Télécharger une copie du fichier original"
-          >
-            <Download className="w-3.5 h-3.5 text-gold" />
-            Télécharger ({isDocx ? "DOCX" : "PDF"})
-          </a>
-        </div>
       </div>
     </div>
   );
