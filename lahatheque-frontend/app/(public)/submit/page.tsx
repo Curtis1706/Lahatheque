@@ -220,7 +220,7 @@ export default function SubmitManuscriptPage() {
                 }`}
               >
                 <input 
-                  accept=".pdf,.doc,.docx" 
+                  accept=".pdf" 
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
                   type="file"
                   onChange={handleFileChange}
@@ -230,7 +230,7 @@ export default function SubmitManuscriptPage() {
                   Cliquez pour parcourir ou glissez-déposez
                 </p>
                 <p className="text-xs text-foreground-muted mb-4">
-                  PDF, DOC ou DOCX — 20 Mo max.
+                  Format accepté : PDF uniquement (20 Mo max.)
                 </p>
                 {fileName ? (
                   <p className="text-xs font-bold text-success">

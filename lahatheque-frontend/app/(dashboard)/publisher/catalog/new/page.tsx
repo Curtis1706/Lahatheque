@@ -471,11 +471,11 @@ export default function NewPublisherBookPage() {
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                  Fichier d&apos;Épreuve Numérique (PDF ou EPUB)
+                  Fichier d&apos;Épreuve Numérique (PDF uniquement)
                 </label>
                 <FileDropzone
-                  label="Téléverser le Manuscrit Numérique (.pdf, .epub)"
-                  acceptTypes={[".pdf", ".epub"]}
+                  label="Téléverser le Manuscrit Numérique (PDF uniquement)"
+                  acceptTypes={[".pdf"]}
                   selectedFileName={manuscriptFile?.name}
                   selectedFileSize={manuscriptFile?.size}
                   onFileSelect={(f) => {

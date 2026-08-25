@@ -77,7 +77,7 @@ export default function NewLegalContractPage() {
           Enregistrer un Nouveau Contrat
         </h1>
         <p className="text-xs text-foreground-muted mt-1">
-          Téléversement sécurisé (PDF ou Word) et indexation automatique dans le moteur de recherche légal.
+          Téléversement sécurisé (PDF uniquement) et indexation automatique dans le moteur de recherche légal.
         </p>
       </div>
 
@@ -86,12 +86,12 @@ export default function NewLegalContractPage() {
         <div className="p-6 rounded-3xl bg-background border border-border shadow-xs space-y-4">
           <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
             <Upload className="w-4 h-4 text-gold" />
-            1. Document du Contrat (PDF ou Word)
+            1. Document du Contrat (PDF)
           </h3>
 
           <FileDropzone
-            acceptTypes={[".pdf", ".doc", ".docx"]}
-            label="Téléversement sécurisé du fichier scanné ou signé *"
+            acceptTypes={[".pdf"]}
+            label="Téléversement sécurisé du fichier scanné ou signé (PDF uniquement) *"
             onFileSelect={(f) => setFile(f)}
             onFileRemove={() => setFile(null)}
             selectedFileName={file?.name}
