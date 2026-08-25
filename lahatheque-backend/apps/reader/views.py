@@ -322,7 +322,7 @@ class ReaderValidateTokenView(APIView):
                 "cover_url": doc_cover_url,
                 "file_url": None,  # Intentionnellement vide — utiliser stream_endpoint ci-dessous
                 "stream_endpoint": "/api/v1/reader/sessions/stream/",
-                "total_pages": getattr(session.ouvrage, 'nombre_pages', 0) or getattr(session.ouvrage, 'page_count', 28) or 28,
+                "total_pages": getattr(session.ouvrage, 'nombre_pages', 0) or getattr(session.ouvrage, 'page_count', 0) or 0,
                 "has_audio": bool(session.custom_audio_url or getattr(session.ouvrage, 'fichier_audio', None)),
                 "audio_url": session.custom_audio_url or (session.ouvrage.fichier_audio.url if session.ouvrage and hasattr(session.ouvrage, 'fichier_audio') and session.ouvrage.fichier_audio else None),
             },

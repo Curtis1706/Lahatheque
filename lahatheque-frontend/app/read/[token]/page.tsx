@@ -754,6 +754,7 @@ export default function HostedReaderPage() {
               email: session.user.email,
               ip: session.user.ip,
             }}
+            onDocumentLoad={(pages) => setTotalPages(pages)}
             onPageChange={handlePageChange}
             onClose={handleExit}
           />
@@ -771,6 +772,7 @@ export default function HostedReaderPage() {
                   ]}
                   localization={fr_FR_Locale}
                   theme={isNightMode ? "dark" : "light"}
+                  onDocumentLoad={(e) => setTotalPages(e.doc.numPages)}
                   onPageChange={(e) => handlePageChange(e.currentPage + 1)}
                   initialPage={currentPage - 1}
                   viewMode={ViewMode.SinglePage}
