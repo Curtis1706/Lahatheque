@@ -594,16 +594,36 @@ class PartnerLogAdminViewSet(viewsets.ViewSet):
     def list(self, request: Request) -> Response:
         """GET /api/v1/partners/logs/ - Liste les journaux RÉELS de requêtes API."""
         try:
-            from apps.reader.models import ApiRequestLog, PartnerApp, ReaderSession
+            from apps.reader.models import ApiRequestLog, ReaderSession
 
-            default_partner = PartnerApp.objects.filter(is_active=True).first()
-            default_partner_name = default_partner.name if default_partner else "Lahathèque test"
-
-            logs = ApiRequestLog.objects.select_related("partner").order_by("-created_at")[:100]
+            logs = list(ApiRequestLog.objects.select_related("partner").order_by("-created_at")[:100])
+            sessions = list(ReaderSession.objects.select_related("partner").order_by("-created_at")[:100])
             results: List[Dict[str, Any]] = []
 
             for log in logs:
-                partner_name = log.partner.name if log.partner else default_partner_name
+                if log.partner:
+                    partner_name = log.partner.name
+                else:
+                    # Rapprochement temporel avec la session réelle créée
+                    matched_session = None
+                    for s in sessions:
+                        if s.partner and abs((s.created_at - log.created_at).total_seconds()) <= 300:
+                            matched_session = s
+                            break
+
+                    if matched_session and matched_session.partner:
+                        partner_name = matched_session.partner.name
+                        # Rétro-affectation en base pour nettoyer les anciens enregistrements
+                        try:
+                            log.partner = matched_session.partner
+                            log.save(update_fields=["partner"])
+                        except Exception:
+                            pass
+                    elif log.client_ip in ["127.0.0.1", "localhost", "::1"]:
+                        partner_name = "Test Local (127.0.0.1)"
+                    else:
+                        partner_name = "Non authentifié"
+
                 results.append({
                     "id": str(log.id),
                     "endpoint": log.endpoint,

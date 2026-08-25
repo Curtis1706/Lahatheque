@@ -77,12 +77,6 @@ class ReaderApiLoggingMiddleware:
                                 partner = p
                                 break
 
-            # Dernier recours pour les sessions récentes du même client IP
-            if not partner:
-                recent_session = ReaderSession.objects.select_related("partner").order_by("-created_at").first()
-                if recent_session and recent_session.partner:
-                    partner = recent_session.partner
-
             ApiRequestLog.objects.create(
                 partner=partner,
                 method=request.method,
