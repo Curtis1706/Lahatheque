@@ -33,36 +33,16 @@ import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/
 import type { ClassificationSource } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
-// Catégories universelles de la bibliothèque
-const GENRE_CATEGORIES = [
-  { label: "Romans, Nouvelles & Récits", dewey: "840", faculty: null },
-  { label: "Mangas, Bandes Dessinées & Comics", dewey: "741.5", faculty: null },
-  { label: "Littérature Africaine & Conte", dewey: "800", faculty: "Faculté des Lettres, Langues, Arts et Communication (FLLAC)" },
-  { label: "Jeunesse & Éveil", dewey: "808", faculty: null },
-  { label: "Manuels Scolaires (Primaire / Collège / Lycée)", dewey: "370", faculty: null },
-  { label: "Droit Privé, Droit des Affaires OHADA & Sciences Politiques", dewey: "340", faculty: "Faculté de Droit et de Science Politique (FADESP)" },
-  { label: "Sciences Économiques, Gestion & Finances UEMOA", dewey: "330", faculty: "Faculté des Sciences Économiques et de Gestion (FASEG)" },
-  { label: "Médecine, Pharmacopée & Santé Publique Tropicale", dewey: "610", faculty: "Faculté des Sciences de la Santé (FSS)" },
-  { label: "Sciences Exactes, Informatique & Technologies", dewey: "500", faculty: "Faculté des Sciences et Techniques (FAST)" },
-  { label: "Agronomie Tropicale & Développement Rural", dewey: "630", faculty: "Faculté des Sciences Agronomiques (FSA)" },
-  { label: "Histoire, Civilisations & Patrimoine Africain", dewey: "960", faculty: "Faculté des Lettres, Langues, Arts et Communication (FLLAC)" },
-  { label: "Philosophie, Psychologie & Sciences Humaines", dewey: "100", faculty: "Faculté des Sciences Humaines et Sociales (FASHS)" },
-  { label: "Développement Personnel, Essais & Société", dewey: "150", faculty: null },
-  { label: "Arts, Culture, Cuisine & Musique", dewey: "700", faculty: null },
-];
-
-const AFRICAN_UNIVERSITIES = [
-  "Non affilié (Grand Public / Fiction / Scolaire)",
-  "Université d'Abomey-Calavi (UAC - Bénin)",
-  "Université de Parakou (UP - Bénin)",
-  "Université Cheikh Anta Diop (UCAD - Sénégal)",
-  "Université Félix Houphouët-Boigny (UFHB - Côte d'Ivoire)",
-  "Université de Lomé (UL - Togo)",
-  "Université Abdou Moumouni (UAM - Niger)",
-  "Université de Yaoundé I (Cameroun)",
-  "Université Joseph Ki-Zerbo (Burkina Faso)",
-  "Université de Kinshasa (UNIKIN - RDC)",
-];
+import { 
+  GENRE_CATEGORIES, 
+  matchGenreCategory, 
+  matchLanguage, 
+  matchCountry, 
+  getUniversityOptions, 
+  getLanguageOptions, 
+  getCountryOptions, 
+  getGenreOptions 
+} from "@/lib/constants/classification";
 
 export default function NewDepositPage() {
   const router = useRouter();
@@ -124,18 +104,23 @@ export default function NewDepositPage() {
       setAiResult(res.data);
       toast.success("Suggestions IA générées ! Vous pouvez tout appliquer ou choisir champ par champ.");
       
-      // Auto-application initiale intelligente si les champs sont encore vides
+      const matchedGenre = matchGenreCategory(res.data.genre_category, res.data.dewey_code);
+      const matchedLang = matchLanguage(res.data.language || res.data.language_code);
+      const matchedCountry = matchCountry(res.data.country);
+
+      // Auto-application initiale intelligente
       if (!title || title === file.name.replace(/\.[^/.]+$/, "")) setTitle(res.data.title);
       if (!subtitle && res.data.subtitle) setSubtitle(res.data.subtitle);
       if (!authorsStr) setAuthorsStr(res.data.authors.join(", "));
       if (!summary) setSummary(res.data.summary);
       if (res.data.isbn) setIsbn(res.data.isbn);
-      if (res.data.dewey_code) setDeweyCode(res.data.dewey_code);
-      if (res.data.genre_category) setGenreCategory(res.data.genre_category);
-      if (res.data.language) setLanguage(res.data.language);
-      if (res.data.country) setCountry(res.data.country);
+      setDeweyCode(res.data.dewey_code || matchedGenre.dewey);
+      setGenreCategory(matchedGenre.label);
+      setLanguage(matchedLang);
+      setCountry(matchedCountry);
       if (res.data.institution_suggestion) setUniversity(res.data.institution_suggestion);
-      if (res.data.faculty_suggestion) setFaculty(res.data.faculty_suggestion);
+      if (res.data.faculty_suggestion || matchedGenre.faculty) setFaculty(res.data.faculty_suggestion || matchedGenre.faculty || "");
+      if (res.data.target_audience) setTargetAudience(res.data.target_audience);
       if (res.data.keywords) setKeywords(res.data.keywords);
       if (res.data.onix_3_xml) setOnixXml(res.data.onix_3_xml);
     }
@@ -148,15 +133,21 @@ export default function NewDepositPage() {
     setAuthorsStr(aiResult.authors.join(", "));
     setSummary(aiResult.summary);
     setIsbn(aiResult.isbn);
-    setDeweyCode(aiResult.dewey_code);
-    setGenreCategory(aiResult.genre_category);
-    setLanguage(aiResult.language);
-    setCountry(aiResult.country);
+
+    const matchedGenre = matchGenreCategory(aiResult.genre_category, aiResult.dewey_code);
+    const matchedLang = matchLanguage(aiResult.language || aiResult.language_code);
+    const matchedCountry = matchCountry(aiResult.country);
+
+    setDeweyCode(aiResult.dewey_code || matchedGenre.dewey);
+    setGenreCategory(matchedGenre.label);
+    setLanguage(matchedLang);
+    setCountry(matchedCountry);
     if (aiResult.institution_suggestion) setUniversity(aiResult.institution_suggestion);
-    if (aiResult.faculty_suggestion) setFaculty(aiResult.faculty_suggestion);
+    if (aiResult.faculty_suggestion || matchedGenre.faculty) setFaculty(aiResult.faculty_suggestion || matchedGenre.faculty || "");
+    if (aiResult.target_audience) setTargetAudience(aiResult.target_audience);
     if (aiResult.keywords) setKeywords(aiResult.keywords);
     if (aiResult.onix_3_xml) setOnixXml(aiResult.onix_3_xml);
-    toast.success("Toutes les suggestions IA ont été appliquées !");
+    toast.success("Toutes les suggestions IA ont été appliquées avec succès !");
   };
 
   const handleCoverSelect = (file: File) => {
@@ -201,7 +192,7 @@ export default function NewDepositPage() {
 
   const handleGenreChange = (newGenre: string) => {
     setGenreCategory(newGenre);
-    const found = GENRE_CATEGORIES.find((g) => g.label === newGenre);
+    const found = matchGenreCategory(newGenre);
     if (found) {
       setDeweyCode(found.dewey);
       if (found.faculty) {
@@ -469,11 +460,9 @@ export default function NewDepositPage() {
               <BookOpen className="w-5 h-5 text-gold" />
               Métadonnées de la Notice Éditoriale
             </h3>
-            {aiResult && (
-              <span className="text-xs text-foreground-muted">
-                Vous pouvez insérer les suggestions IA individuellement ou les éditer librement.
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              <AISuggestionBadge source={aiResult ? "ai_suggested" : "manual"} />
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -761,11 +750,9 @@ export default function NewDepositPage() {
               <Layers className="w-5 h-5 text-gold" />
               Classification Universelle &amp; Rattachement Institutionnel
             </h3>
-            {aiResult && (
-              <span className="text-xs text-foreground-muted">
-                Sélectionnez parmi les référentiels ou modifiez directement les champs.
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              <AISuggestionBadge source={aiResult ? "ai_suggested" : "manual"} />
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -779,6 +766,7 @@ export default function NewDepositPage() {
                       type="button"
                       onClick={() => handleGenreChange(aiResult.genre_category)}
                       className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer la discipline IA : ${aiResult.genre_category}`}
                     >
                       <Wand2 className="w-2.5 h-2.5" />
                       IA : {aiResult.genre_category}
@@ -790,7 +778,7 @@ export default function NewDepositPage() {
                   onChange={(e) => handleGenreChange(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 >
-                  {GENRE_CATEGORIES.map((g, i) => (
+                  {getGenreOptions(aiResult?.genre_category, genreCategory).map((g, i) => (
                     <option key={i} value={g.label}>
                       {g.label} ({g.dewey})
                     </option>
@@ -806,6 +794,7 @@ export default function NewDepositPage() {
                       type="button"
                       onClick={() => setDeweyCode(aiResult.dewey_code)}
                       className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer le code Dewey IA : ${aiResult.dewey_code}`}
                     >
                       <Wand2 className="w-2.5 h-2.5" />
                       IA : {aiResult.dewey_code}
@@ -832,9 +821,10 @@ export default function NewDepositPage() {
                       type="button"
                       onClick={() => setUniversity(aiResult.institution_suggestion || "")}
                       className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer l'université suggérée : ${aiResult.institution_suggestion}`}
                     >
                       <Wand2 className="w-2.5 h-2.5" />
-                      IA : {aiResult.institution_suggestion.slice(0, 20)}...
+                      IA : {aiResult.institution_suggestion.length > 25 ? `${aiResult.institution_suggestion.slice(0, 25)}...` : aiResult.institution_suggestion}
                     </button>
                   )}
                 </div>
@@ -843,7 +833,7 @@ export default function NewDepositPage() {
                   onChange={(e) => setUniversity(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 >
-                  {AFRICAN_UNIVERSITIES.map((u, i) => (
+                  {getUniversityOptions(aiResult?.institution_suggestion, university).map((u, i) => (
                     <option key={i} value={u}>
                       {u}
                     </option>
@@ -859,9 +849,10 @@ export default function NewDepositPage() {
                       type="button"
                       onClick={() => setFaculty(aiResult.faculty_suggestion || "")}
                       className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer la faculté suggérée : ${aiResult.faculty_suggestion}`}
                     >
                       <Wand2 className="w-2.5 h-2.5" />
-                      IA : {aiResult.faculty_suggestion.slice(0, 20)}...
+                      IA : {aiResult.faculty_suggestion.length > 25 ? `${aiResult.faculty_suggestion.slice(0, 25)}...` : aiResult.faculty_suggestion}
                     </button>
                   )}
                 </div>
@@ -878,36 +869,58 @@ export default function NewDepositPage() {
             {/* Langue, Pays, Public Cible */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-navy">Langue</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Langue</label>
+                  {aiResult?.language && (
+                    <button
+                      type="button"
+                      onClick={() => setLanguage(matchLanguage(aiResult.language))}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer la langue IA : ${matchLanguage(aiResult.language)}`}
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {matchLanguage(aiResult.language)}
+                    </button>
+                  )}
+                </div>
                 <select
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 >
-                  <option value="Français">Français</option>
-                  <option value="Anglais">Anglais</option>
-                  <option value="Fon">Fon</option>
-                  <option value="Yoruba">Yoruba</option>
-                  <option value="Wolof">Wolof</option>
-                  <option value="Arabe">Arabe</option>
+                  {getLanguageOptions(aiResult?.language ? matchLanguage(aiResult.language) : null, language).map((lang, i) => (
+                    <option key={i} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays d&apos;Ancrage</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays d&apos;Ancrage</label>
+                  {aiResult?.country && (
+                    <button
+                      type="button"
+                      onClick={() => setCountry(matchCountry(aiResult.country))}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer le pays IA : ${matchCountry(aiResult.country)}`}
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {matchCountry(aiResult.country)}
+                    </button>
+                  )}
+                </div>
                 <select
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 >
-                  <option value="BJ">Bénin (BJ)</option>
-                  <option value="SN">Sénégal (SN)</option>
-                  <option value="CI">Côte d&apos;Ivoire (CI)</option>
-                  <option value="TG">Togo (TG)</option>
-                  <option value="NE">Niger (NE)</option>
-                  <option value="CD">RDC (CD)</option>
-                  <option value="CM">Cameroun (CM)</option>
-                  <option value="GLOBAL">International / Global</option>
+                  {getCountryOptions(aiResult?.country ? matchCountry(aiResult.country) : null, country).map((c, i) => (
+                    <option key={i} value={c.code}>
+                      {c.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -918,10 +931,11 @@ export default function NewDepositPage() {
                     <button
                       type="button"
                       onClick={() => setTargetAudience(aiResult.target_audience)}
-                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer le public cible IA : ${aiResult.target_audience}`}
                     >
                       <Wand2 className="w-2.5 h-2.5" />
-                      IA
+                      IA : {aiResult.target_audience.length > 18 ? `${aiResult.target_audience.slice(0, 18)}...` : aiResult.target_audience}
                     </button>
                   )}
                 </div>
@@ -961,9 +975,12 @@ export default function NewDepositPage() {
               <CheckCircle2 className="w-5 h-5 text-gold" />
               Récapitulatif Avant Soumission au Chef Maquettiste
             </h3>
-            <span className="px-3 py-1 rounded-full bg-navy/10 text-navy text-xs font-bold uppercase tracking-wider border border-navy/20">
-              Format {bookFile?.name.endsWith(".epub") ? "EPUB" : "PDF"}
-            </span>
+            <div className="flex items-center gap-2">
+              <AISuggestionBadge source={aiResult ? "ai_suggested" : "manual"} />
+              <span className="px-3 py-1 rounded-full bg-navy/10 text-navy text-xs font-bold uppercase tracking-wider border border-navy/20">
+                Format {bookFile?.name.endsWith(".epub") ? "EPUB" : "PDF"}
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start">

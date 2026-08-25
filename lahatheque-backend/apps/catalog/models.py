@@ -69,7 +69,15 @@ class Ouvrage(models.Model):
     department = models.CharField(max_length=255, blank=True, default='')
     keywords = models.JSONField(default=list, blank=True)
     target_audience = models.CharField(max_length=128, blank=True, default='')
-    dewey_code = models.CharField(max_length=20, blank=True, default='')
+    dewey_code = models.CharField(max_length=50, blank=True, default='')
+    classification_source = models.CharField(max_length=30, blank=True, default='ai_suggested')
+    language_source = models.CharField(max_length=30, blank=True, default='ai_suggested')
+    summary_source = models.CharField(max_length=30, blank=True, default='ai_suggested')
+    rejection_reason = models.TextField(
+        blank=True, default='',
+        verbose_name="Motif de correction ou de rejet",
+        help_text="Motif de rejet ou demande de correction émis par le Chef Maquettiste"
+    )
 
     @property
     def price(self):

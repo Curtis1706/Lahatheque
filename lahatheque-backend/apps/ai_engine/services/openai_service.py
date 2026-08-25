@@ -46,6 +46,28 @@ def extract_text_sample_from_bytes(file_bytes: bytes, file_ext: str = "pdf", max
         return "", 0
 
 
+def generate_laha_isbn(seed_text: str = "") -> str:
+    """
+    Génère un code ISBN-13 LAHA normalisé (978-99919-XXX-X-X) avec calcul exact de la clé de contrôle EAN-13.
+    Préfixe officiel : 978 (GS1) + 99919 (Bénin / LAHA).
+    """
+    import hashlib
+    import random
+    prefix = "97899919"
+    if seed_text:
+        h = int(hashlib.md5(seed_text.encode("utf-8")).hexdigest(), 16)
+        item = str(h % 9000 + 1000)
+    else:
+        item = str(random.randint(1000, 9999))
+
+    digits_12 = prefix + item
+    total = sum(int(d) * (1 if i % 2 == 0 else 3) for i, d in enumerate(digits_12))
+    check_digit = (10 - (total % 10)) % 10
+
+    isbn_raw = digits_12 + str(check_digit)
+    return f"{isbn_raw[:3]}-{isbn_raw[3:8]}-{isbn_raw[8:11]}-{isbn_raw[11:12]}-{isbn_raw[12]}"
+
+
 def generate_onix_3_xml(data: Dict[str, Any]) -> str:
     """
     Génère un bloc XML ONIX 3.0 Release 3.0 standardisé pour le livre analysé.
@@ -168,35 +190,41 @@ Analyse l'échantillon de texte suivant extrait du document "{filename}" (Nombre
 {text_sample[:8000] if text_sample else f"Fichier: {filename}"}
 === FIN DU TEXTE ===
 
-Instructions :
-1. Détermine le titre exact et le sous-titre éventuel.
-2. Identifie les auteurs ou le nom de plume.
-3. Rédige un résumé accrocheur et fidèle de 2 à 3 paragraphes en français soigné.
-4. Identifie le genre principal (`genre_category`) parmi : "Roman & Fiction", "Manga & Bande Dessinée", "Littérature Africaine", "Jeunesse & Contes", "Manuel Scolaire", "Droit & Sciences Politiques", "Sciences Économiques & Gestion", "Médecine & Santé", "Sciences & Technologies", "Histoire & Civilisations", "Philosophie & Sciences Humaines", "Développement Personnel", "Arts & Culture", etc.
-5. Détermine le code Dewey (3 chiffres, ex: 840, 741.5, 340, 330, 610, 500, etc.).
-6. Détecte la langue ("Français", "Anglais", "Fon", "Yoruba", "Wolof", etc.).
-7. Détecte le pays d'ancrage principal (code 2 lettres ex: "BJ", "SN", "CI", "TG", "NE", "CD", "FR", "GLOBAL").
-8. Si et seulement si c'est un ouvrage académique/universitaire, suggère l'université de rattachement (ex: "Université d'Abomey-Calavi (UAC)", "Université Cheikh Anta Diop (UCAD)", "Université Félix Houphouët-Boigny (UFHB)", "Université de Parakou (UP)") et la Faculté. Si c'est un roman, manga ou jeunesse grand public, mets `null`.
-9. Détecte les mots-clés (5 à 8 tags).
-10. Détecte toute incohérence manifeste (ex: titre juridique mais contenu de bande dessinée).
+Instructions détaillées :
+1. Titre & Sous-titre : Détermine le titre exact de l'ouvrage et propose systématiquement un sous-titre pertinent (champ optionnel très utile pour le catalogage).
+2. Auteurs : Identifie tous les auteurs, co-auteurs ou noms de plume mentionnés.
+3. Résumé éditorial : Rédige un résumé accrocheur et fidèle de 2 à 3 paragraphes en français soigné, mettant en valeur l'intérêt de l'ouvrage.
+4. Genre & Discipline : Identifie le genre principal (`genre_category`) parmi les disciplines officielles LAHAThèque ("Philosophie, Psychologie & Sciences Humaines", "Droit & Sciences Politiques", "Sciences Économiques & Gestion", "Médecine & Santé", "Littérature Africaine & Conte", "Roman & Fiction", "Manga & Bande Dessinée", "Manuel Scolaire & Pédagogie", "Sciences & Technologies", "Histoire & Civilisations", etc.).
+5. Code Dewey : Détermine le code de classification décimale Dewey (3 chiffres, ex: 840, 741.5, 340, 330, 610, 100, 500, etc.).
+6. Langue & Pays : Détecte la langue principale de rédaction ("Français", "Anglais", "Portugais", "Espagnol", "Fon", "Yoruba", "Arabe", etc.) et le pays d'ancrage principal (code ISO 2 lettres ex: "BJ", "SN", "CI", "TG", "BR", "FR", "GLOBAL").
+7. Code ISBN : Cherche méticuleusement dans le texte (page de titre, page d'ours/copyright, mentions légales, 4e de couverture) si un code ISBN à 10 ou 13 chiffres est présent. Si trouvé dans le document, extrais-le fidèlement et formate-le (ex: "978-2-..."). S'il est absent du document, génère une proposition d'ISBN standard LAHA ("978-99919-...") et indique `isbn_found_in_document: false`.
+8. Suggestions académiques & contextuelles :
+   - `institution_suggestion` : Suggère une université ou institution de rattachement pertinente (ex: "Université d'Abomey-Calavi (UAC)", "Université de São Paulo (USP)", "Université Cheikh Anta Diop (UCAD)").
+   - `faculty_suggestion` : Suggère la faculté/UFR correspondante (ex: "Faculté de Philosophie", "Faculté de Droit", "Faculté des Sciences Économiques").
+   - `department_suggestion` : Suggère le département d'études spécifique (ex: "Département de Philosophie", "Département de Droit Privé", "Département de Linguistique").
+   - `target_audience` : Suggère le public cible optimal (ex: "Étudiants en Licence & Master", "Chercheurs & Universitaires", "Lycéens & Candidats", "Grand Public Amateur de Philosophie").
+9. Mots-clés : Propose 6 à 10 mots-clés thématiques riches et pertinents.
+10. Incohérences : Détecte toute anomalie majeure entre le titre et le contenu.
 
 Renvoie STRICTEMENT un JSON valide au format suivant :
 {{
-  "title": "Titre du livre",
-  "subtitle": "Sous-titre ou vide",
-  "authors": ["Prénom Nom"],
+  "title": "Titre exact de l'ouvrage",
+  "subtitle": "Sous-titre explicatif ou contextuel",
+  "authors": ["Nom Prénom"],
   "publication_year": 2026,
-  "isbn": "978-99919-...",
-  "summary": "Résumé de 2 à 3 paragraphes...",
-  "genre_category": "Nom du genre",
-  "dewey_code": "840",
+  "isbn": "978-...",
+  "isbn_found_in_document": true,
+  "summary": "Résumé éditorial structuré...",
+  "genre_category": "Discipline principale",
+  "dewey_code": "100",
   "language": "Français",
   "language_code": "fre",
   "country": "BJ",
-  "target_audience": "Grand Public ou Étudiants ou Lycéens",
-  "institution_suggestion": "Université d'Abomey-Calavi (UAC)" ou null,
-  "faculty_suggestion": "Faculté de Droit..." ou null,
-  "keywords": ["mot-clé 1", "mot-clé 2"],
+  "target_audience": "Étudiants en Licence & Master",
+  "institution_suggestion": "Université d'Abomey-Calavi (UAC)",
+  "faculty_suggestion": "Faculté des Lettres et Sciences Humaines",
+  "department_suggestion": "Département de Philosophie",
+  "keywords": ["mot-clé 1", "mot-clé 2", "mot-clé 3", "mot-clé 4", "mot-clé 5"],
   "inconsistencies": []
 }}
 """
@@ -218,6 +246,20 @@ Renvoie STRICTEMENT un JSON valide au format suivant :
         content = response.choices[0].message.content or "{}"
         parsed_data = json.loads(content)
 
+        # Normalisation rigoureuse de l'ISBN
+        isbn_val = str(parsed_data.get("isbn") or "")
+        raw_digits = re.sub(r"[^\dX]", "", isbn_val)
+        is_found_in_doc = bool(parsed_data.get("isbn_found_in_document", False))
+        is_placeholder = "0000" in isbn_val or "..." in isbn_val or "XXX" in isbn_val
+
+        if is_found_in_doc and not is_placeholder and (len(raw_digits) == 13 or len(raw_digits) == 10):
+            parsed_data["isbn_found_in_document"] = True
+        else:
+            # Génération dynamique d'un ISBN officiel LAHA 978-99919-XXX-X-X avec clé EAN-13
+            seed = parsed_data.get("title") or filename
+            parsed_data["isbn"] = generate_laha_isbn(seed)
+            parsed_data["isbn_found_in_document"] = False
+
         # Générer le document ONIX 3.0 correspondant
         parsed_data["onix_3_xml"] = generate_onix_3_xml(parsed_data)
         parsed_data["page_count"] = total_pages
@@ -232,55 +274,98 @@ def _fallback_heuristic_analysis(filename: str, text_sample: str, total_pages: i
     """Mode dégradé intelligent sans crash si l'API est injoignable."""
     clean_name = filename.replace(".pdf", "").replace(".epub", "").replace("_", " ").replace("-", " ")
     
-    # Heuristique Dewey & Genre
+    # 1. Recherche regex de code ISBN dans le texte
+    isbn_match = re.search(r"(?:ISBN(?:-1[03])?:?\s*)(97[89][\d\s-]{10,17}\d|\d[\d\s-]{8,12}[\dX])", text_sample, re.IGNORECASE)
+    isbn_found = False
+    if isbn_match:
+        raw_isbn = re.sub(r"[^\dX]", "", isbn_match.group(1))
+        if len(raw_isbn) == 13:
+            extracted_isbn = f"{raw_isbn[:3]}-{raw_isbn[3]}-{raw_isbn[4:8]}-{raw_isbn[8:12]}-{raw_isbn[12]}"
+            isbn_found = True
+        elif len(raw_isbn) == 10:
+            extracted_isbn = f"978-{raw_isbn[0]}-{raw_isbn[1:5]}-{raw_isbn[5:9]}-{raw_isbn[9]}"
+            isbn_found = True
+        else:
+            extracted_isbn = isbn_match.group(1).strip()
+            isbn_found = True
+    else:
+        extracted_isbn = generate_laha_isbn(clean_name)
+
+    # 2. Heuristique Dewey & Genre
     lower_name = (filename + " " + text_sample).lower()
+    dept: Optional[str] = None
+    sub_title = f"Étude et analyse critique — {clean_name.title()}" if "philosophie" in lower_name or "linguagem" in lower_name else "Manuel de référence & guide pratique"
+
     if any(k in lower_name for k in ["droit", "juridique", "loi", "ohada", "code", "constitution"]):
         genre = "Droit & Sciences Politiques"
         dewey = "340"
         faculty = "Faculté de Droit et de Science Politique (FADESP)"
+        dept = "Département de Droit Privé et Sciences Criminelles"
         inst = "Université d'Abomey-Calavi (UAC)"
+        target = "Étudiants en Droit & Praticiens Juridiques"
     elif any(k in lower_name for k in ["economie", "finance", "gestion", "uemoa", "comptabilite"]):
         genre = "Sciences Économiques & Gestion"
         dewey = "330"
         faculty = "Faculté des Sciences Économiques et de Gestion (FASEG)"
+        dept = "Département d'Économie Appliquée"
         inst = "Université d'Abomey-Calavi (UAC)"
+        target = "Étudiants en Sciences Économiques & Décideurs"
     elif any(k in lower_name for k in ["sante", "medecine", "clinique", "pharmacologie", "anatomie"]):
         genre = "Médecine & Santé"
         dewey = "610"
         faculty = "Faculté des Sciences de la Santé (FSS)"
+        dept = "Département de Médecine et Spécialités"
         inst = "Université d'Abomey-Calavi (UAC)"
+        target = "Étudiants en Médecine & Professionnels de Santé"
+    elif any(k in lower_name for k in ["philosophie", "nietzsche", "linguagem", "linguistique", "socio"]):
+        genre = "Philosophie, Psychologie & Sciences Humaines"
+        dewey = "100"
+        faculty = "Faculté des Lettres, Langues, Arts et Communication (FLLAC)"
+        dept = "Département de Philosophie"
+        inst = "Université d'Abomey-Calavi (UAC)"
+        target = "Étudiants Universitaires & Chercheurs"
     elif any(k in lower_name for k in ["manga", "bd", "comics", "illustration", "tome"]):
         genre = "Manga & Bande Dessinée"
         dewey = "741.5"
         faculty = None
+        dept = None
         inst = None
+        target = "Tout Public & Passionnés de BD/Manga"
+        sub_title = "Édition illustrée"
     elif any(k in lower_name for k in ["roman", "conte", "poeme", "nouvelle", "theatre", "histoire"]):
-        genre = "Littérature & Fiction"
+        genre = "Littérature Africaine & Conte"
         dewey = "840"
         faculty = None
+        dept = None
         inst = None
+        target = "Grand Public & Amateurs de Belles-Lettres"
+        sub_title = "Récit et anthologie"
     else:
         genre = "Sciences Humaines & Savoirs"
         dewey = "000"
         faculty = "Faculté des Lettres, Langues, Arts et Communication (FLLAC)"
+        dept = "Département des Sciences Humaines"
         inst = "Université d'Abomey-Calavi (UAC)"
+        target = "Étudiants Universitaires & Chercheurs"
 
     data = {
         "title": clean_name.title(),
-        "subtitle": "",
+        "subtitle": sub_title,
         "authors": ["Auteur LAHA"],
         "publication_year": 2026,
-        "isbn": f"978-99919-{abs(hash(clean_name)) % 900 + 100}-1",
-        "summary": f"Ouvrage de référence « {clean_name.title()} » publié dans le catalogue LAHAThèque. Analyse détaillée et contenu exhaustif destiné aux lecteurs et étudiants.",
+        "isbn": extracted_isbn,
+        "isbn_found_in_document": isbn_found,
+        "summary": f"Ouvrage de référence « {clean_name.title()} » publié dans le catalogue LAHAThèque. Analyse détaillée, contextualisation rigoureuse et contenu exhaustif destiné aux lecteurs et apprenants.",
         "genre_category": genre,
         "dewey_code": dewey,
-        "language": "Français",
-        "language_code": "fre",
+        "language": "Portugais" if ("linguagem" in lower_name or "produtora" in lower_name) else "Français",
+        "language_code": "por" if ("linguagem" in lower_name or "produtora" in lower_name) else "fre",
         "country": "BJ",
-        "target_audience": "Grand Public" if not inst else "Étudiants Universitaires",
+        "target_audience": target,
         "institution_suggestion": inst,
         "faculty_suggestion": faculty,
-        "keywords": [genre, "Édition Numérique", "LAHAThèque", "Afrique"],
+        "department_suggestion": dept,
+        "keywords": [genre, "Édition Numérique", "LAHAThèque", "Recherche", "Afrique"],
         "inconsistencies": [],
         "page_count": total_pages or 120,
     }

@@ -311,6 +311,23 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='contact@lahacademia.com')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = f"LAHATHEQUE <{EMAIL_HOST_USER}>"
 
+# ── Internationalisation & Fuseau Horaire ─────────────────────────────────────
+LANGUAGE_CODE = 'fr-fr'
+TIME_ZONE = 'Africa/Porto-Novo'
+USE_I18N = True
+USE_TZ = True
+
+# ── Configuration Celery & Broker Redis ──────────────────────────────────────
+REDIS_URL = config('REDIS_URL', default='redis://default:4g5uMsfQ7htgCFQk7gDrkv0PU0h4jWX3blgJfNOG3ZucWK33melhXqJ2w4h0Ut8a@191.218.165.180:6379/0')
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL)
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
 
 

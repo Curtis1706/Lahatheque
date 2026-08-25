@@ -151,13 +151,18 @@ const Page = forwardRef<HTMLDivElement, PageProps>((props, ref) => {
   };
 
   if (watermarkPosition === "header") {
-    positionStyles.top = "24px";
+    positionStyles.top = "20px";
   } else if (watermarkPosition === "footer") {
-    positionStyles.bottom = "28px";
+    positionStyles.bottom = "24px";
   } else {
-    // diagonal par défaut
+    // diagonal exacte (aspect ratio standard livre 1:1.414 -> angle ~54.7°)
+    positionStyles.left = "50%";
     positionStyles.top = "50%";
-    positionStyles.transform = "translateY(-50%) rotate(-45deg)";
+    positionStyles.right = "auto";
+    positionStyles.width = "75%";
+    positionStyles.maxWidth = "75%";
+    positionStyles.transform = "translate(-50%, -50%) rotate(-54.7deg)";
+    positionStyles.whiteSpace = "nowrap";
   }
 
   return (
@@ -427,14 +432,24 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
         if (typeof fileUrl === 'string') {
           const origin = typeof window !== 'undefined' ? window.location.origin : '';
           const absoluteUrl = (fileUrl.startsWith('http') || fileUrl.startsWith('blob:'))
-            ? fileUrl 
+            ? fileUrl
             : `${origin}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
-          
           try {
             const res = await fetch(absoluteUrl, { headers: { Accept: 'application/pdf' } });
             if (res.ok) {
-              const buffer = await res.arrayBuffer();
-              pdfSource = { data: new Uint8Array(buffer) };
+              const contentType = res.headers.get('content-type') || '';
+              if (!contentType.includes('json') && !contentType.includes('html')) {
+                const buffer = await res.arrayBuffer();
+                const bytes = new Uint8Array(buffer);
+                // Vérification basique du header PDF (%PDF-)
+                if (bytes.length > 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+                  pdfSource = { data: bytes };
+                } else {
+                  pdfSource = absoluteUrl;
+                }
+              } else {
+                pdfSource = absoluteUrl;
+              }
             } else {
               pdfSource = absoluteUrl;
             }

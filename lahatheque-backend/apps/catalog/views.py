@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.db.models import Q
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 from .models import Ouvrage, Discipline
 from .serializers import OuvrageReadSerializer, OuvrageCreateSerializer, DisciplineSerializer
@@ -93,7 +94,14 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         """Dépôt d'une nouvelle maquette par un maquettiste ou publication directe par le Chef Maquettiste."""
         serializer = OuvrageCreateSerializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            logger.error(f"[MaquettisteDepositViewSet Create Error] Validation errors: {serializer.errors} | Data: {request.data}")
+            return Response({
+                "success": False,
+                "error": "Données de dépôt invalides",
+                "details": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         ouvrage = serializer.save()
 
         user_role = getattr(request.user, 'role', '')
@@ -178,17 +186,18 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
         ouvrage = self.get_object()
         user_role = getattr(request.user, 'role', '')
         is_chief_or_admin = user_role in ('chief_layout', 'admin', 'super_admin') or request.user.is_superuser or request.user.is_staff
-
-        if not is_chief_or_admin and ouvrage.status not in ('draft', 'rejected'):
+        is_owner = (ouvrage.created_by == request.user)
+        if not is_chief_or_admin and not is_owner:
             return Response({
                 "success": False,
-                "error": "Seuls les brouillons et les ouvrages rejetés peuvent être modifiés par un maquettiste."
+                "error": "Vous n'avez pas l'autorisation de modifier cet ouvrage."
             }, status=status.HTTP_403_FORBIDDEN)
 
         # Mise à jour partielle des champs texte
         updatable_fields = [
             'title', 'subtitle', 'isbn', 'summary', 'language', 'format_type',
-            'country', 'faculty', 'department', 'target_audience', 'dewey_code'
+            'country', 'faculty', 'department', 'target_audience', 'dewey_code',
+            'classification_source', 'language_source', 'summary_source', 'rejection_reason'
         ]
         for field in updatable_fields:
             if field in request.data:
@@ -463,6 +472,22 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
             except Exception as stock_err:
                 logger.warning(f"Impossible d'initialiser le stock pour l'ouvrage {ouvrage.id}: {stock_err}")
 
+        # Notification au Maquettiste qui a soumis le dépôt
+        if ouvrage.created_by:
+            try:
+                from apps.reporting.services import notify_user
+                from apps.reporting.models import Notification
+                notify_user(
+                    user=ouvrage.created_by,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Dépôt validé et publié",
+                    message=f"Félicitations ! Votre maquette pour « {ouvrage.title} » a été validée et publiée sur la vitrine officielle par le Chef Maquettiste.",
+                    action_url=f"/layout-artist/deposits/{ouvrage.id}",
+                    resource_id=str(ouvrage.id),
+                )
+            except Exception as notif_err:
+                logger.warning(f"Erreur notification validation maquettiste: {notif_err}")
+
         return Response({
             "success": True,
             "message": f"L'ouvrage « {ouvrage.title} » a été validé et publié sur la vitrine.",
@@ -485,12 +510,30 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
 
         ouvrage.status = 'rejected'
-        ouvrage.save(update_fields=['status'])
+        ouvrage.rejection_reason = motif
+        ouvrage.save(update_fields=['status', 'rejection_reason'])
+
+        # Notification au Maquettiste qui a soumis le dépôt
+        if ouvrage.created_by:
+            try:
+                from apps.reporting.services import notify_user
+                from apps.reporting.models import Notification
+                notify_user(
+                    user=ouvrage.created_by,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Demande de correction sur votre dépôt",
+                    message=f"Le Chef Maquettiste demande des corrections sur « {ouvrage.title} » : {motif}",
+                    action_url=f"/layout-artist/deposits/{ouvrage.id}",
+                    resource_id=str(ouvrage.id),
+                )
+            except Exception as notif_err:
+                logger.warning(f"Erreur notification rejet maquettiste: {notif_err}")
 
         return Response({
             "success": True,
             "message": f"La maquette « {ouvrage.title} » a été rejetée. Motif : {motif}",
             "motif_rejet": motif,
+            "rejection_reason": motif,
             "data": OuvrageReadSerializer(ouvrage).data
         })
 

@@ -93,9 +93,18 @@ class BookStreamView(APIView):
 
         # 5. Traitement de l'en-tête HTTP Range (RFC 7233)
         range_header = request.META.get("HTTP_RANGE")
+        if not range_header:
+            # Requête standard sans Range: servir le document complet
+            response = HttpResponse(pdf_bytes, status=status.HTTP_200_OK, content_type="application/pdf")
+            response["Accept-Ranges"] = "bytes"
+            response["Content-Length"] = str(total_size)
+            response["Cache-Control"] = "private, no-store, must-revalidate"
+            response["X-Content-Type-Options"] = "nosniff"
+            return response
+
         start_byte, end_byte = self._parse_range_header(range_header, total_size)
 
-        if start_byte is None:
+        if start_byte is None or end_byte is None:
             # Range Not Satisfiable
             response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
             response["Content-Range"] = f"bytes */{total_size}"
@@ -110,7 +119,7 @@ class BookStreamView(APIView):
             TraceAcces.objects.create(
                 user=request.user,
                 ouvrage=ouvrage,
-                document_title=ouvrage.titre,
+                document_title=ouvrage.title,
                 ip_address=ip,
                 country=request.headers.get("CF-IPCountry", ""),
                 user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
@@ -129,15 +138,10 @@ class BookStreamView(APIView):
         response["X-Content-Type-Options"] = "nosniff"
         return response
 
-    def _parse_range_header(self, range_header: Optional[str], total_size: int) -> Tuple[Optional[int], Optional[int]]:
+    def _parse_range_header(self, range_header: str, total_size: int) -> Tuple[Optional[int], Optional[int]]:
         """
         Parse l'en-tête Range (ex: 'bytes=0-262143' ou 'bytes=50000-').
         """
-        if not range_header or not range_header.startswith("bytes="):
-            # Si pas de Range, renvoie le premier chunk de 256 Kio
-            end = min(self.DEFAULT_CHUNK_SIZE - 1, total_size - 1)
-            return 0, end
-
         match = re.match(r"bytes=(\d+)-(\d*)", range_header)
         if not match:
             return None, None
@@ -151,8 +155,7 @@ class BookStreamView(APIView):
         if end_str:
             end = min(int(end_str), total_size - 1)
         else:
-            # Si fin non spécifiée, on sert au maximum un chunk
-            end = min(start + self.DEFAULT_CHUNK_SIZE - 1, total_size - 1)
+            end = total_size - 1
 
         if start > end:
             return None, None

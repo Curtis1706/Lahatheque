@@ -60,7 +60,7 @@ def notify_user(
         )
 
     # B. Email
-    if prefs.email_enabled:
+    if prefs.email_enabled and getattr(user, "email", None):
         try:
             from .tasks import send_email_task
             send_email_task.delay(
@@ -68,9 +68,17 @@ def notify_user(
                 subject=title, 
                 html_content=f"<h3>{title}</h3><p>{message}</p>"
             )
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"Email non expédié (broker offline): {e}")
+        except Exception:
+            try:
+                from .tasks import send_email_task
+                send_email_task.apply(args=[
+                    [user.email],
+                    title,
+                    f"<h3>{title}</h3><p>{message}</p>"
+                ])
+            except Exception as sync_err:
+                import logging
+                logging.getLogger(__name__).warning(f"Email non expédié: {sync_err}")
 
     # C. WhatsApp 
     if prefs.whatsapp_enabled and user.phone:

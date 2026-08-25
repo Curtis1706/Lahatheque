@@ -62,17 +62,13 @@ class OuvrageCreateSerializer(serializers.Serializer):
     Gère la création de l'Ouvrage + association d'auteurs.
     """
     title = serializers.CharField(max_length=255)
-    subtitle = serializers.CharField(max_length=255, required=False, default='')
-    isbn = serializers.CharField(max_length=17, required=False, default='')
-    authors_names = serializers.CharField(required=False, default='')
-    summary = serializers.CharField(required=False, default='')
-    language = serializers.CharField(max_length=10, required=False, default='fr')
-    format_type = serializers.ChoiceField(
-        choices=['pdf', 'epub', 'audio', 'papier'],
-        required=False,
-        default='pdf'
-    )
-    country = serializers.CharField(max_length=2, required=False, default='BJ')
+    subtitle = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+    isbn = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+    authors_names = serializers.CharField(required=False, allow_blank=True, default='')
+    summary = serializers.CharField(required=False, allow_blank=True, default='')
+    language = serializers.CharField(max_length=50, required=False, allow_blank=True, default='fr')
+    format_type = serializers.CharField(max_length=20, required=False, allow_blank=True, default='pdf')
+    country = serializers.CharField(max_length=20, required=False, allow_blank=True, default='BJ')
     publication_date = serializers.DateField(required=False, allow_null=True, default=None)
     price_digital = serializers.DecimalField(
         max_digits=10, decimal_places=2, required=False, default=5000.00
@@ -83,19 +79,22 @@ class OuvrageCreateSerializer(serializers.Serializer):
     is_paper_available = serializers.BooleanField(required=False, default=False)
 
     # Classification
-    faculty = serializers.CharField(max_length=255, required=False, default='')
-    department = serializers.CharField(max_length=255, required=False, default='')
-    keywords = serializers.JSONField(required=False, default=list)
-    target_audience = serializers.CharField(max_length=128, required=False, default='')
-    dewey_code = serializers.CharField(max_length=20, required=False, default='')
-    discipline_name = serializers.CharField(max_length=255, required=False, default='')
-    institution_name = serializers.CharField(max_length=255, required=False, default='')
+    faculty = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+    department = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+    keywords = serializers.CharField(required=False, allow_blank=True, default='')
+    target_audience = serializers.CharField(max_length=128, required=False, allow_blank=True, default='')
+    dewey_code = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+    discipline_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+    institution_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
     pre_edition_dossier_id = serializers.CharField(required=False, allow_blank=True, default='')
     authors_emails = serializers.CharField(required=False, allow_blank=True, default='')
+    classification_source = serializers.CharField(max_length=30, required=False, allow_blank=True, default='ai_suggested')
+    language_source = serializers.CharField(max_length=30, required=False, allow_blank=True, default='ai_suggested')
+    summary_source = serializers.CharField(max_length=30, required=False, allow_blank=True, default='ai_suggested')
 
     # Fichiers (optionnels — envoyés en multipart)
     book_file = serializers.FileField(required=False, allow_null=True)
-    cover_image = serializers.ImageField(required=False, allow_null=True)
+    cover_image = serializers.FileField(required=False, allow_null=True)
 
     def create(self, validated_data):
         from django.apps import apps
@@ -134,14 +133,17 @@ class OuvrageCreateSerializer(serializers.Serializer):
         cover_image = validated_data.pop('cover_image', None)
         validated_data.pop('dewey_code_field', None)
 
+        raw_country = validated_data.get('country', 'BJ') or 'BJ'
+        country_code = 'GL' if raw_country.upper() in ('GLOBAL', 'INTERNATIONAL') else raw_country[:2].upper()
+
         ouvrage = Ouvrage.objects.create(
             title=validated_data['title'],
             subtitle=validated_data.get('subtitle', ''),
-            isbn=validated_data.get('isbn', ''),
+            isbn=validated_data.get('isbn', '')[:17],
             summary=validated_data.get('summary', ''),
-            language=validated_data.get('language', 'fr'),
-            format_type=validated_data.get('format_type', 'pdf'),
-            country=validated_data.get('country', 'BJ'),
+            language=validated_data.get('language', 'fr')[:10],
+            format_type=validated_data.get('format_type', 'pdf').lower()[:20],
+            country=country_code,
             publication_date=validated_data.get('publication_date'),
             price_digital=validated_data.get('price_digital', 5000.00),
             price_paper=validated_data.get('price_paper', 7500.00),
@@ -151,6 +153,9 @@ class OuvrageCreateSerializer(serializers.Serializer):
             keywords=validated_data.get('keywords', []),
             target_audience=validated_data.get('target_audience', ''),
             dewey_code=validated_data.get('dewey_code', ''),
+            classification_source=validated_data.get('classification_source', 'ai_suggested'),
+            language_source=validated_data.get('language_source', 'ai_suggested'),
+            summary_source=validated_data.get('summary_source', 'ai_suggested'),
             discipline=discipline_obj,
             institution=institution_obj,
             pre_edition_dossier=dossier,

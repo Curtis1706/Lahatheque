@@ -74,9 +74,9 @@ class ReadingProgressSerializer(serializers.ModelSerializer):
 class UpdateReadingProgressSerializer(serializers.Serializer):
     ouvrage_id = serializers.UUIDField()
     progress_percent = serializers.IntegerField(min_value=0, max_value=100)
-    current_page = serializers.IntegerField(min_value=1, required=False)
-    total_pages = serializers.IntegerField(min_value=0, required=False)
-    last_read_chapter = serializers.CharField(required=False, allow_blank=True)
+    current_page = serializers.IntegerField(min_value=0, required=False, default=0)
+    total_pages = serializers.IntegerField(min_value=0, required=False, default=0)
+    last_read_chapter = serializers.CharField(required=False, allow_blank=True, default='')
     duration_seconds = serializers.IntegerField(min_value=0, required=False, default=0)
     pages_read = serializers.IntegerField(min_value=0, required=False, default=0)
 
