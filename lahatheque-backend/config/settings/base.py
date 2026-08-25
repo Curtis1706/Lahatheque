@@ -242,6 +242,25 @@ CORS_EXPOSE_HEADERS = ['Authorization', 'Content-Disposition', 'X-CSRFToken']
 # LCP Server & External API Configurations
 LCP_SERVER_URL = config('LCP_SERVER_URL', default='http://localhost:8989')
 
+# OpenAI & AI Engine Configuration
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
+
+# Passerelles de Paiement
+MONEROO_API_KEY = config('MONEROO_API_KEY', default='')
+STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
+STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
+
+# SMS & Notifications (FasterMessage)
+FASTERMESSAGE_USERNAME = config('FASTERMESSAGE_USERNAME', default='')
+FASTERMESSAGE_PASSWORD = config('FASTERMESSAGE_PASSWORD', default='')
+FASTERMESSAGE_SENDER = config('FASTERMESSAGE_SENDER', default='LAHA')
+
+# Cloudflare Stream Video & Audio
+CLOUDFLARE_STREAM_ACCOUNT_ID = config('CLOUDFLARE_STREAM_ACCOUNT_ID', default='')
+CLOUDFLARE_STREAM_API_TOKEN = config('CLOUDFLARE_STREAM_API_TOKEN', default='')
+CLOUDFLARE_STREAM_SUBDOMAIN = config('CLOUDFLARE_STREAM_SUBDOMAIN', default='')
+CLOUDFLARE_STREAM_WEBHOOK_SECRET = config('CLOUDFLARE_STREAM_WEBHOOK_SECRET', default='')
+
 # Cloudflare R2 Storage (S3-compatible)
 CLOUDFLARE_R2_BUCKET_NAME = config('CLOUDFLARE_R2_BUCKET_NAME', default='lahatheque')
 CLOUDFLARE_R2_ENDPOINT = config('CLOUDFLARE_R2_ENDPOINT', default='')
@@ -292,6 +311,23 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='contact@lahacademia.com')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = f"LAHATHEQUE <{EMAIL_HOST_USER}>"
 
+# ── Internationalisation & Fuseau Horaire ─────────────────────────────────────
+LANGUAGE_CODE = 'fr-fr'
+TIME_ZONE = 'Africa/Porto-Novo'
+USE_I18N = True
+USE_TZ = True
+
+# ── Configuration Celery & Broker Redis ──────────────────────────────────────
+REDIS_URL = config('REDIS_URL', default='redis://default:4g5uMsfQ7htgCFQk7gDrkv0PU0h4jWX3blgJfNOG3ZucWK33melhXqJ2w4h0Ut8a@191.218.165.180:6379/0')
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL)
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
 
 

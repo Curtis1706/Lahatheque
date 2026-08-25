@@ -16,8 +16,7 @@ import {
   FileCode, 
   Check, 
   Layers,
-  GraduationCap,
-  Download
+  GraduationCap
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
@@ -152,17 +151,6 @@ export default function ChefValidationDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <a
-            href={deposit.files.book_file_url || `/mock/droit-obligations.pdf`}
-            target="_blank"
-            rel="noopener noreferrer"
-            download={deposit.files.book_file_name || `${deposit.metadata.title}.${(deposit.files.format || "pdf").toLowerCase()}`}
-            className="px-4 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy border border-gold/30 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-navy" />
-            Télécharger le document
-          </a>
-
           <button
             onClick={() => setShowXmlNotice(!showXmlNotice)}
             className="px-4 py-2 rounded-xl border border-border text-xs font-bold text-navy hover:bg-background-secondary flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -172,11 +160,12 @@ export default function ChefValidationDetailPage() {
           </button>
 
           <Link
-            href={`/read/${deposit.id}`}
-            className="px-5 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            href={`/catalog/reader/${deposit.id}`}
+            target="_blank"
+            className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
           >
             <BookOpen className="w-4 h-4 text-gold" />
-            Feuilleter l&apos;Épreuve
+            Lire dans la Liseuse LAHAThèque
           </Link>
         </div>
       </div>

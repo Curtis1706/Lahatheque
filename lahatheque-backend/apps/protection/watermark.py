@@ -6,6 +6,7 @@ Conforme aux spécifications DRM de LAHAThèque (docs/drm/01-architecture-cible.
 import hashlib
 import json
 import logging
+import math
 from typing import Any, Dict, Optional
 import fitz # PyMuPDF
 
@@ -89,16 +90,28 @@ class WatermarkEngine:
 
             # 1. Filigrane Visible
             if position == "diagonal":
-                font_size = max(12, int(page_width / 35))
-                center_point = fitz.Point(page_width / 4, page_height / 2)
-                # Insertion avec rotation 45° via matrice morphologique
+                theta = math.degrees(math.atan2(page_height, page_width))
+                diag_len = math.sqrt(page_width**2 + page_height**2)
+                font_size = max(10.0, min(14.0, float(page_width / 42)))
+                text_len = fitz.get_text_length(watermark_text, fontname="helv", fontsize=font_size)
+
+                # Ajustement dynamique de la taille pour que le texte ne dépasse JAMAIS 70% de la diagonale
+                max_allowed_len = diag_len * 0.70
+                if text_len > max_allowed_len and text_len > 0:
+                    font_size = max(8.5, font_size * (max_allowed_len / text_len))
+                    text_len = fitz.get_text_length(watermark_text, fontname="helv", fontsize=font_size)
+
+                center_point = fitz.Point(page_width / 2, page_height / 2)
+                start_point = fitz.Point(page_width / 2 - text_len / 2, page_height / 2 + font_size * 0.35)
+
+                # Insertion parfaitement centrée le long de la diagonale ascendante (bas-gauche -> haut-droit)
                 page.insert_text(
-                    center_point,
+                    start_point,
                     watermark_text,
                     fontsize=font_size,
-                    color=(0.3, 0.3, 0.35),
+                    color=(0.35, 0.35, 0.40),
                     fill_opacity=opacity,
-                    morph=(center_point, fitz.Matrix(45))
+                    morph=(center_point, fitz.Matrix(theta))
                 )
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { GraduationCap, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,31 +16,31 @@ export interface BookCover3DProps {
 
 const SIZES = {
   xs: {
-    width: "w-10 h-14",
+    width: "w-11 h-16 min-w-[44px] min-h-[64px]",
     spine: "w-1.5",
     text: "text-[7px]",
     title: "text-[8px] line-clamp-1",
   },
   sm: {
-    width: "w-16 h-22",
+    width: "w-20 h-28 min-w-[80px] min-h-[112px]",
     spine: "w-2",
     text: "text-[8px]",
     title: "text-[9px] line-clamp-2",
   },
   md: {
-    width: "w-24 h-32 sm:w-28 sm:h-38",
+    width: "w-28 h-40 min-w-[112px] min-h-[160px]",
     spine: "w-2.5",
     text: "text-[9px]",
     title: "text-xs line-clamp-3",
   },
   lg: {
-    width: "w-32 h-44 sm:w-40 sm:h-56",
+    width: "w-36 h-52 min-w-[144px] min-h-[208px]",
     spine: "w-3.5",
     text: "text-[10px]",
     title: "text-sm line-clamp-4",
   },
   xl: {
-    width: "w-44 h-60 sm:w-52 sm:h-72",
+    width: "w-48 h-68 min-w-[192px] min-h-[272px]",
     spine: "w-4",
     text: "text-xs",
     title: "text-base line-clamp-4",
@@ -56,10 +56,13 @@ export function BookCover3D({
   size = "md",
   interactive = true,
 }: BookCover3DProps) {
+  const [imageError, setImageError] = useState(false);
   const sz = SIZES[size] || SIZES.md;
   const authorList = Array.isArray(authors)
     ? authors.join(", ")
     : authors || "LAHA Éditions";
+
+  const hasValidCover = Boolean(coverUrl && !imageError);
 
   return (
     <div
@@ -90,11 +93,12 @@ export function BookCover3D({
       {/* Realistic book lighting sheen on top-right */}
       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/15 pointer-events-none z-20" />
 
-      {coverUrl ? (
+      {hasValidCover ? (
         <img
-          src={coverUrl}
+          src={coverUrl!}
           alt={title}
-          className="w-full h-full object-cover absolute inset-0 z-10"
+          onError={() => setImageError(true)}
+          className="w-full h-full object-cover absolute inset-0 z-10 block"
         />
       ) : (
         <div className="flex flex-col justify-between h-full p-2 sm:p-2.5 relative z-10">

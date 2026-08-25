@@ -20,6 +20,9 @@ const statusConfig: Record<string, { style: string; defaultLabel: string; defaul
   warning: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Attention", defaultIcon: Clock },
   pending: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En attente", defaultIcon: Clock },
   pending_admin_approval: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En attente", defaultIcon: Clock },
+  pending_validation: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En attente", defaultIcon: Clock },
+  pending_signature: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En attente signature", defaultIcon: Clock },
+  revision_requested: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Correction demandée", defaultIcon: AlertTriangle },
   in_review: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En cours d'examen", defaultIcon: Clock },
   under_review: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En cours d'examen", defaultIcon: Clock },
   expiring_soon: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Expire bientôt", defaultIcon: Clock },
@@ -27,6 +30,24 @@ const statusConfig: Record<string, { style: string; defaultLabel: string; defaul
   refunded: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Remboursé", defaultIcon: ArrowUpCircle },
   processing: { style: "bg-info/10 text-info border-info/20", defaultLabel: "En traitement", defaultIcon: Clock },
   submitted: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Soumis", defaultIcon: FileText },
+
+  // ─── Statuts Pré-édition & Contrats Juridiques ──────────────────────────────
+  en_attente_depot: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En attente dépôt", defaultIcon: Clock },
+  maquette_en_cours: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Maquette en cours", defaultIcon: FileText },
+  depot_lie: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Dépôt lié", defaultIcon: CheckCircle2 },
+  valide_legalement: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Validé légalement", defaultIcon: CheckCircle2 },
+  archived: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Archivé", defaultIcon: FileText },
+
+  // ─── Statuts Redevances & Relances Créances ────────────────────────────────
+  up_to_date: { style: "bg-success/10 text-success border-success/20", defaultLabel: "À jour", defaultIcon: CheckCircle2 },
+  pending_transfer: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Virement en attente", defaultIcon: Clock },
+  scheduled: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Programmé", defaultIcon: Clock },
+  sent: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Envoyé", defaultIcon: CheckCircle2 },
+  reminded: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Relancé", defaultIcon: Clock },
+  relance_niveau_1: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Relance 1", defaultIcon: Clock },
+  relance_niveau_2: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Relance 2", defaultIcon: AlertTriangle },
+  formal_notice: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Mise en demeure", defaultIcon: XCircle },
+  final_notice: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Dernier avis", defaultIcon: AlertTriangle },
 
   draft: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Brouillon", defaultIcon: FileText },
   expired: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Expiré", defaultIcon: Clock },

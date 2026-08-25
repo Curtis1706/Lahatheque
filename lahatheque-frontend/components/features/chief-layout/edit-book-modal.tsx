@@ -18,35 +18,16 @@ import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { updateCatalogBookWithFiles } from "@/lib/services/layout-artist";
 import { toast } from "sonner";
 
-const GENRE_CATEGORIES = [
-  { label: "Romans, Nouvelles & Récits", dewey: "840", faculty: "" },
-  { label: "Mangas, Bandes Dessinées & Comics", dewey: "741.5", faculty: "" },
-  { label: "Littérature Africaine & Conte", dewey: "800", faculty: "Faculté des Lettres, Langues, Arts et Communication (FLLAC)" },
-  { label: "Jeunesse & Éveil", dewey: "808", faculty: "" },
-  { label: "Manuels Scolaires (Primaire / Collège / Lycée)", dewey: "370", faculty: "" },
-  { label: "Droit Privé, Droit des Affaires OHADA & Sciences Politiques", dewey: "340", faculty: "Faculté de Droit et de Science Politique (FADESP)" },
-  { label: "Sciences Économiques, Gestion & Finances UEMOA", dewey: "330", faculty: "Faculté des Sciences Économiques et de Gestion (FASEG)" },
-  { label: "Médecine, Pharmacopée & Santé Publique Tropicale", dewey: "610", faculty: "Faculté des Sciences de la Santé (FSS)" },
-  { label: "Sciences Exactes, Informatique & Technologies", dewey: "500", faculty: "Faculté des Sciences et Techniques (FAST)" },
-  { label: "Agronomie Tropicale & Développement Rural", dewey: "630", faculty: "Faculté des Sciences Agronomiques (FSA)" },
-  { label: "Histoire, Civilisations & Patrimoine Africain", dewey: "960", faculty: "Faculté des Lettres, Langues, Arts et Communication (FLLAC)" },
-  { label: "Philosophie, Psychologie & Sciences Humaines", dewey: "100", faculty: "Faculté des Sciences Humaines et Sociales (FASHS)" },
-  { label: "Développement Personnel, Essais & Société", dewey: "150", faculty: "" },
-  { label: "Arts, Culture, Cuisine & Musique", dewey: "700", faculty: "" },
-];
-
-const AFRICAN_UNIVERSITIES = [
-  "Non affilié (Grand Public / Fiction / Scolaire)",
-  "Université d'Abomey-Calavi (UAC - Bénin)",
-  "Université de Parakou (UP - Bénin)",
-  "Université Cheikh Anta Diop (UCAD - Sénégal)",
-  "Université Félix Houphouët-Boigny (UFHB - Côte d'Ivoire)",
-  "Université de Lomé (UL - Togo)",
-  "Université Abdou Moumouni (UAM - Niger)",
-  "Université de Yaoundé I (Cameroun)",
-  "Université Joseph Ki-Zerbo (Burkina Faso)",
-  "Université de Kinshasa (UNIKIN - RDC)",
-];
+import { 
+  GENRE_CATEGORIES, 
+  matchGenreCategory, 
+  matchLanguage, 
+  matchCountry, 
+  getUniversityOptions, 
+  getLanguageOptions, 
+  getCountryOptions, 
+  getGenreOptions 
+} from "@/lib/constants/classification";
 
 interface EditBookModalProps {
   book: LayoutDeposit;
@@ -65,7 +46,7 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
   const [authorsStr, setAuthorsStr] = useState(book.metadata.authors.join(", "));
   const [summary, setSummary] = useState(book.metadata.summary);
   const [isbn, setIsbn] = useState(book.metadata.isbn || "");
-  const [language, setLanguage] = useState(book.metadata.language || "fr");
+  const [language, setLanguage] = useState(matchLanguage(book.metadata.language || "fr"));
   const [year, setYear] = useState(book.metadata.publication_year || 2026);
 
   // Pricing & Formats
@@ -78,7 +59,7 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
   const [deweyCode, setDeweyCode] = useState(book.classification.discipline ? "" : "800");
   const [university, setUniversity] = useState(book.classification.university || "Université d'Abomey-Calavi (UAC - Bénin)");
   const [faculty, setFaculty] = useState(book.classification.faculty || "");
-  const [country, setCountry] = useState(book.classification.country || "BJ");
+  const [country, setCountry] = useState(matchCountry(book.classification.country || "BJ"));
   const [targetAudience, setTargetAudience] = useState("Grand Public & Universitaire");
 
   // Files
@@ -104,7 +85,7 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
 
   const handleGenreChange = (newGenre: string) => {
     setDiscipline(newGenre);
-    const found = GENRE_CATEGORIES.find((g) => g.label === newGenre);
+    const found = matchGenreCategory(newGenre);
     if (found) {
       setDeweyCode(found.dewey);
       if (found.faculty) setFaculty(found.faculty);
@@ -510,7 +491,7 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                     onChange={(e) => handleGenreChange(e.target.value)}
                     className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                   >
-                    {GENRE_CATEGORIES.map((g, i) => (
+                    {getGenreOptions(null, discipline).map((g, i) => (
                       <option key={i} value={g.label}>
                         {g.label} ({g.dewey})
                       </option>
@@ -542,7 +523,7 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                     onChange={(e) => setUniversity(e.target.value)}
                     className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                   >
-                    {AFRICAN_UNIVERSITIES.map((u, i) => (
+                    {getUniversityOptions(null, university).map((u, i) => (
                       <option key={i} value={u}>
                         {u}
                       </option>
@@ -574,14 +555,11 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                     onChange={(e) => setCountry(e.target.value)}
                     className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                   >
-                    <option value="BJ">Bénin (BJ)</option>
-                    <option value="SN">Sénégal (SN)</option>
-                    <option value="CI">Côte d&apos;Ivoire (CI)</option>
-                    <option value="TG">Togo (TG)</option>
-                    <option value="NE">Niger (NE)</option>
-                    <option value="CD">RDC (CD)</option>
-                    <option value="CM">Cameroun (CM)</option>
-                    <option value="GLOBAL">International</option>
+                    {getCountryOptions(null, country).map((c, i) => (
+                      <option key={i} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

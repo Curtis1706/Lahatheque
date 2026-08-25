@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { CheckSquare, Search, Filter, ArrowLeft, User, Eye, CheckCircle2, AlertCircle, Download } from "lucide-react";
+import { CheckSquare, Search, Filter, ArrowLeft, User, Eye, CheckCircle2, AlertCircle, BookOpen } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
@@ -121,24 +121,22 @@ export default function ChefValidationPage() {
     },
     {
       key: "actions" as keyof LayoutDeposit,
-      header: "",
+      header: "Actions",
       cell: (row) => (
         <div className="flex items-center gap-1.5 justify-end">
-          <a
-            href={row.files.book_file_url || "/mock/droit-obligations.pdf"}
+          <Link
+            href={`/catalog/reader/${row.id}`}
             target="_blank"
-            rel="noopener noreferrer"
-            download={row.files.book_file_name || `${row.metadata.title}.${(row.files.format || "pdf").toLowerCase()}`}
             onClick={(e) => e.stopPropagation()}
             className="p-2 rounded-xl border border-border bg-background-secondary hover:bg-navy hover:text-white text-foreground-muted transition-colors inline-flex items-center justify-center min-h-[36px] min-w-[36px]"
-            title="Télécharger le document soumis"
+            title="Lire dans la Liseuse LAHAThèque"
           >
-            <Download className="w-3.5 h-3.5 text-gold" />
-          </a>
+            <BookOpen className="w-3.5 h-3.5 text-gold" />
+          </Link>
           <button
             type="button"
             onClick={() => setSelectedDeposit(row)}
-            className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1 shadow-xs"
+            className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1 shadow-xs cursor-pointer"
           >
             <Eye className="w-3.5 h-3.5 text-gold" />
             Examiner &amp; Décider

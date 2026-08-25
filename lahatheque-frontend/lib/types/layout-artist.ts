@@ -35,6 +35,8 @@ export interface DepositClassification {
   faculty: string;
   department?: string;
   discipline: string;
+  target_audience?: string;
+  dewey_code?: string;
   collection?: string;
   source: ClassificationSource;
 }
@@ -49,6 +51,10 @@ export interface DepositMetadata {
   summary: string;
   summary_source: ClassificationSource;
   isbn?: string;
+  keywords?: string[];
+  pre_edition_code?: string;
+  pre_edition_title?: string;
+  pre_edition_author?: string;
 }
 
 export interface LayoutDeposit {
@@ -66,6 +72,7 @@ export interface LayoutDeposit {
   default_price: number;
   admin_price?: number;
   is_paper_available?: boolean;
+  pre_edition_dossier?: any;
 }
 
 export interface SparklinePoint {
@@ -74,11 +81,13 @@ export interface SparklinePoint {
 }
 
 export interface MaquettisteKpi {
+  totalDeposits?: number;
   draftCount: number;
   pendingValidationCount: number;
   revisionRequestedCount: number;
   publishedCount: number;
   timelines?: {
+    total?: SparklinePoint[];
     pending: SparklinePoint[];
     published: SparklinePoint[];
     drafts: SparklinePoint[];

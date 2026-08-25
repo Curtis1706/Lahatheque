@@ -81,19 +81,6 @@ export default function MaquettisteOverviewPage() {
 
       {/* 4 KPI Cards Connectées au Backend */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link href="/layout-artist/deposits?status=draft" className="block">
-          <ProgressMetricCard
-            title="Dépôts en Brouillon"
-            total={`${kpis?.draftCount ?? 0} ouvrage${(kpis?.draftCount ?? 0) > 1 ? "s" : ""}`}
-            percent="En cours"
-            trend="up"
-            accent="neutral"
-            delta="À finaliser"
-            deltaLabel="cette semaine"
-            data={kpis?.timelines?.drafts || getRollingTimeline(kpis?.draftCount ?? 0)}
-          />
-        </Link>
-
         <Link href="/layout-artist/deposits?status=pending_validation" className="block">
           <ProgressMetricCard
             title="En Attente de Validation"
@@ -104,6 +91,19 @@ export default function MaquettisteOverviewPage() {
             delta="Chef Maquettiste"
             deltaLabel="en étude"
             data={kpis?.timelines?.pending || getRollingTimeline(kpis?.pendingValidationCount ?? 0)}
+          />
+        </Link>
+
+        <Link href="/layout-artist/deposits" className="block">
+          <ProgressMetricCard
+            title="Total des Dépôts"
+            total={`${kpis?.totalDeposits ?? 0} ouvrage${(kpis?.totalDeposits ?? 0) > 1 ? "s" : ""}`}
+            percent="Activité"
+            trend="up"
+            accent="neutral"
+            delta="Historique"
+            deltaLabel="tous statuts"
+            data={kpis?.timelines?.total || getRollingTimeline(kpis?.totalDeposits ?? 0)}
           />
         </Link>
 

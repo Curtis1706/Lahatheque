@@ -15,12 +15,12 @@ export function AISuggestionBadge({ source, className }: AISuggestionBadgeProps)
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gold/10 text-gold border border-gold/30 text-[10px] font-bold tracking-wide uppercase shadow-xs",
+          "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gold/10 text-gold border border-gold/30 text-[10px] font-bold tracking-wide uppercase shadow-xs whitespace-nowrap shrink-0",
           className
         )}
         title="Cette information a été détectée et suggérée par l'IA. Vous pouvez la modifier si nécessaire."
       >
-        <Sparkles className="w-3 h-3 text-gold" />
+        <Sparkles className="w-3 h-3 text-gold shrink-0" />
         Suggéré par l&apos;IA
       </span>
     );
@@ -29,12 +29,12 @@ export function AISuggestionBadge({ source, className }: AISuggestionBadgeProps)
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-navy/10 text-navy border border-navy/20 text-[10px] font-bold tracking-wide uppercase shadow-xs",
+        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-navy/10 text-navy border border-navy/20 text-[10px] font-bold tracking-wide uppercase shadow-xs whitespace-nowrap shrink-0",
         className
       )}
       title="Cette information a été saisie ou modifiée manuellement par le maquettiste."
     >
-      <Edit3 className="w-3 h-3 text-navy" />
+      <Edit3 className="w-3 h-3 text-navy shrink-0" />
       Saisie manuelle
     </span>
   );
