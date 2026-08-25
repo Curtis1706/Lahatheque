@@ -53,6 +53,9 @@ module.exports = {
         error: {
           DEFAULT: "var(--error)",
         },
+        destructive: {
+          DEFAULT: "var(--error)",
+        },
         warning: {
           DEFAULT: "var(--warning)",
         },

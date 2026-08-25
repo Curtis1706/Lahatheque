@@ -3,6 +3,7 @@ Vues de gestion de la protection DRM, traçabilité légale et annotations.
 Conforme au format d'API unifié LAHAThèque: { success, data, error }.
 """
 
+import uuid
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework.response import Response
@@ -131,7 +132,12 @@ class AnnotationViewSet(ModelViewSet):
         qs = Annotation.objects.filter(user=self.request.user)
         ouvrage_id = self.request.query_params.get('ouvrage') or self.request.query_params.get('book')
         if ouvrage_id:
-            qs = qs.filter(ouvrage_id=ouvrage_id)
+            try:
+                uuid.UUID(str(ouvrage_id))
+                qs = qs.filter(ouvrage_id=ouvrage_id)
+            except (ValueError, TypeError):
+                # Si ouvrage_id n'est pas un UUID valide (ex: 'lesson_pdf' pour un contrat), retourner queryset vide
+                return qs.none()
         return qs
 
     def perform_create(self, serializer):

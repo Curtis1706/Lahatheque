@@ -531,6 +531,18 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
                     action_url=f"/admin/validation/{ouvrage.id}",
                     resource_id=str(ouvrage.id),
                 )
+
+            # Notification aux Juristes pour attribution/vérification du cadre contractuel et des redevances
+            juristes = User.objects.filter(role='legal_reviewer', is_active=True)
+            for jur in juristes:
+                notify_user(
+                    user=jur,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Nouvelle maquette validée — Vérification contractuelle",
+                    message=f"L'ouvrage « {ouvrage.title} » a été validé par la maquette. Veuillez vérifier la grille de répartition des droits d'auteur.",
+                    action_url="/legal-reviewer/royalties",
+                    resource_id=str(ouvrage.id),
+                )
         except Exception as notif_err:
             logger.warning(f"Erreur notification validation: {notif_err}")
 

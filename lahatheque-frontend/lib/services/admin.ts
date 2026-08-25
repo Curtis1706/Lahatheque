@@ -572,6 +572,13 @@ export async function getAdminContracts(): Promise<AdminContract[]> {
   return json.data || json.results || [];
 }
 
+export async function getAdminContractById(id: string): Promise<AdminContract> {
+  const res = await fetch(`/api/bff/admin/contracts/${id}/`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Erreur contrat admin: ${res.status}`);
+  const json = await res.json();
+  return json.data || json;
+}
+
 export async function processAdminContract(
   id: string,
   action: 'approve' | 'reject',

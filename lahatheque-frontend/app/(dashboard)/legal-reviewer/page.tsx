@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
@@ -107,13 +107,37 @@ export default function LegalReviewerOverviewPage() {
     }
   };
 
-  // Donut chart segments pour le type de contrats
-  const contractDistributionSegments: DonutChartSegment[] = [
-    { value: 45, label: "Contrats Auteurs", color: "#B08D42", percentage: 45 },
-    { value: 25, label: "Conventions Universités (15%)", color: "#1B2A4E", percentage: 25 },
-    { value: 20, label: "Accords Éditeurs Tiers", color: "#10b981", percentage: 20 },
-    { value: 10, label: "Pré-éditions", color: "#f59e0b", percentage: 10 },
-  ];
+  // Donut chart segments calculés dynamiquement depuis les vrais contrats
+  const contractDistributionSegments: DonutChartSegment[] = useMemo(() => {
+    if (contracts.length === 0) {
+      return [
+        { value: 1, label: "Aucun contrat", color: "var(--color-navy)", percentage: 100 },
+      ];
+    }
+    const authorCount = contracts.filter((c) => c.party_type === "author").length;
+    const univCount = contracts.filter((c) => c.party_type === "university").length;
+    const pubCount = contracts.filter((c) => c.party_type === "publisher").length;
+    const total = contracts.length;
+
+    const segs: DonutChartSegment[] = [];
+    if (authorCount > 0) {
+      const pct = Math.round((authorCount / total) * 100);
+      segs.push({ value: authorCount, label: "Contrats Auteurs", color: "var(--color-gold)", percentage: pct });
+    }
+    if (univCount > 0) {
+      const pct = Math.round((univCount / total) * 100);
+      segs.push({ value: univCount, label: "Conventions Universités", color: "var(--color-navy)", percentage: pct });
+    }
+    if (pubCount > 0) {
+      const pct = Math.round((pubCount / total) * 100);
+      segs.push({ value: pubCount, label: "Accords Éditeurs Tiers", color: "var(--color-success)", percentage: pct });
+    }
+    return segs.length > 0 ? segs : [{ value: total, label: "Actes Enregistrés", color: "var(--color-navy)", percentage: 100 }];
+  }, [contracts]);
+
+  const userDisplayName = user?.first_name 
+    ? `Me. ${user.first_name} ${user.last_name || ""}`.trim() 
+    : (user?.email ? `Me. ${user.email}` : "Espace Juriste");
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8">
@@ -126,7 +150,7 @@ export default function LegalReviewerOverviewPage() {
             Espace Juriste • Direction des Affaires Juridiques
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
-            Bonjour, {user?.first_name ? `Me. ${user.first_name}` : "Me. François KÉRÉKOU"}
+            Bonjour, {userDisplayName}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
             Gérez la base contractuelle, validez les droits d&apos;auteur et pilotez le suivi des redevances et relances d&apos;impayés.
@@ -159,90 +183,65 @@ export default function LegalReviewerOverviewPage() {
         <Link href="/legal-reviewer/contracts" className="block">
           <ProgressMetricCard
             title="Contrats Stockés"
-            total={`${kpis?.totalContracts || 4} actes`}
-            percent="+12.0%"
+            total={`${kpis?.totalContracts ?? contracts.length} actes`}
+            percent={kpis?.totalContracts ? "Actif" : "À jour"}
             trend="up"
             accent="gold"
-            delta="+1 contrat"
-            deltaLabel="ce mois"
-            data={kpis?.timeline || [
-              { value: 2, date: "01 Août" },
-              { value: 3, date: "08 Août" },
-              { value: 3, date: "15 Août" },
-              { value: 4, date: "20 Août" }
-            ]}
+            delta={`${kpis?.totalContracts ?? contracts.length} contrat(s)`}
+            deltaLabel="enregistrés"
+            data={kpis?.timeline || []}
           />
         </Link>
 
         <Link href="/legal-reviewer/royalties?tab=suggestions" className="block">
           <ProgressMetricCard
             title="Suggestions IA"
-            total={`${kpis?.pendingAiSuggestions || 2} clés`}
-            percent="À valider"
+            total={`${kpis?.pendingAiSuggestions ?? aiSuggestions.length} clés`}
+            percent={aiSuggestions.length > 0 ? "À valider" : "À jour"}
             trend="up"
             accent="gold"
-            delta="2 requêtes"
+            delta={`${aiSuggestions.length} suggestion(s)`}
             deltaLabel="en attente"
-            data={kpis?.timeline || [
-              { value: 1, date: "01 Août" },
-              { value: 2, date: "08 Août" },
-              { value: 2, date: "15 Août" },
-              { value: 2, date: "20 Août" }
-            ]}
+            data={kpis?.timeline || []}
           />
         </Link>
 
         <Link href="/legal-reviewer/relances?tab=debts" className="block">
           <ProgressMetricCard
             title="Clients en Impayé"
-            total={`${kpis?.clientsInDebt || 2} factures`}
-            percent="-5.0%"
-            trend="down"
+            total={`${kpis?.clientsInDebt ?? debts.length} créances`}
+            percent={debts.length > 0 ? "À traiter" : "0 impayé"}
+            trend={debts.length > 0 ? "down" : "up"}
             accent="rose"
-            delta="1.07M FCFA"
+            delta={`${debts.length} dossier(s)`}
             deltaLabel="à recouvrir"
-            data={kpis?.timeline || [
-              { value: 4, date: "01 Août" },
-              { value: 3, date: "08 Août" },
-              { value: 3, date: "15 Août" },
-              { value: 2, date: "20 Août" }
-            ]}
+            data={kpis?.timeline || []}
           />
         </Link>
 
         <Link href="/legal-reviewer/relances?tab=authors" className="block">
           <ProgressMetricCard
             title="Relances Envoyées"
-            total={`${kpis?.authorRemindersSent || 2} relances`}
-            percent="+15.0%"
+            total={`${kpis?.authorRemindersSent ?? 0} relances`}
+            percent="Historique"
             trend="up"
             accent="emerald"
-            delta="+2 envoyées"
-            deltaLabel="ce mois"
-            data={kpis?.timeline || [
-              { value: 1, date: "01 Août" },
-              { value: 1, date: "08 Août" },
-              { value: 2, date: "15 Août" },
-              { value: 2, date: "20 Août" }
-            ]}
+            delta={`${kpis?.authorRemindersSent ?? 0} envoyée(s)`}
+            deltaLabel="au total"
+            data={kpis?.timeline || []}
           />
         </Link>
 
         <Link href="/legal-reviewer/pre-editions" className="block">
           <ProgressMetricCard
             title="Pré-éditions"
-            total={`${kpis?.activePreEditions || 2} projets`}
-            percent="+8.0%"
+            total={`${kpis?.activePreEditions ?? 0} projets`}
+            percent="En cours"
             trend="up"
             accent="navy"
-            delta="+1 projet"
+            delta={`${kpis?.activePreEditions ?? 0} dossier(s)`}
             deltaLabel="en attente"
-            data={kpis?.timeline || [
-              { value: 1, date: "01 Août" },
-              { value: 1, date: "08 Août" },
-              { value: 2, date: "15 Août" },
-              { value: 2, date: "20 Août" }
-            ]}
+            data={kpis?.timeline || []}
           />
         </Link>
       </div>

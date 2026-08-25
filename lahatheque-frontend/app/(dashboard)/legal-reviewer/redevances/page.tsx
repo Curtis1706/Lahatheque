@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DollarSign, ArrowLeft, Building2, Edit2, ShieldCheck, CheckCircle2, Lock } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
+import { toast } from "sonner";
 import {
   getUniversityRoyalties,
   getThirdPartyPublisherRoyalties,
@@ -51,9 +52,13 @@ export default function LegalRedevancesPage() {
               : p
           )
         );
-        alert(`Taux contractuel de ${selectedPub.name} mis à jour à ${newRate}% !`);
+        toast.success(`Le taux contractuel de ${selectedPub.name} a été ajusté à ${newRate}% avec succès.`);
         setSelectedPub(null);
+      } else {
+        toast.error("Impossible de mettre à jour le taux éditeur.");
       }
+    } catch {
+      toast.error("Erreur de connexion lors de la mise à jour du taux.");
     } finally {
       setUpdating(false);
     }

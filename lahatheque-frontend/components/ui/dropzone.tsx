@@ -9,7 +9,7 @@ interface DropzoneProps {
   maxSizeMB?: number;
 }
 
-export function Dropzone({ onFileSelect, acceptTypes = [".pdf", ".epub"], maxSizeMB = 800 }: DropzoneProps) {
+export function Dropzone({ onFileSelect, acceptTypes = [".pdf"], maxSizeMB = 800 }: DropzoneProps) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState("");
@@ -30,7 +30,7 @@ export function Dropzone({ onFileSelect, acceptTypes = [".pdf", ".epub"], maxSiz
     const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
     
     if (!acceptTypes.includes(fileExtension)) {
-      setError(`Format de fichier non supporté. Formats acceptés : ${acceptTypes.join(", ")}`);
+      setError(`Format de fichier non supporté. Format accepté : ${acceptTypes.join(", ")} uniquement`);
       return false;
     }
 
@@ -70,7 +70,9 @@ export function Dropzone({ onFileSelect, acceptTypes = [".pdf", ".epub"], maxSiz
     e.stopPropagation();
     setSelectedFile(null);
     setError("");
-    if (inputRef.current) inputRef.current.value = "";
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
   };
 
   return (
@@ -126,7 +128,7 @@ export function Dropzone({ onFileSelect, acceptTypes = [".pdf", ".epub"], maxSiz
               <p className="text-xs text-foreground-muted">ou cliquez pour parcourir vos fichiers</p>
             </div>
             <p className="text-[10px] text-foreground-muted uppercase tracking-wider font-bold">
-              PDF, EPUB (Max. {maxSizeMB} Mo)
+              PDF uniquement (Max. {maxSizeMB} Mo)
             </p>
           </>
         )}

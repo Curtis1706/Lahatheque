@@ -36,6 +36,7 @@ const statusConfig: Record<string, { style: string; defaultLabel: string; defaul
   maquette_en_cours: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Maquette en cours", defaultIcon: FileText },
   depot_lie: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Dépôt lié", defaultIcon: CheckCircle2 },
   valide_legalement: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Validé légalement", defaultIcon: CheckCircle2 },
+  archive: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Archivé", defaultIcon: FileText },
   archived: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Archivé", defaultIcon: FileText },
 
   // ─── Statuts Redevances & Relances Créances ────────────────────────────────

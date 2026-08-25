@@ -326,20 +326,44 @@ export interface AdminValidationProof {
   notes?: string;
 }
 
+export interface AdminContractRepartitionLine {
+  id?: string;
+  author_name: string;
+  author_email?: string;
+  role?: string;
+  percentage: number;
+  paper_rate?: number;
+  digital_rate?: number;
+  audio_tts_rate?: number;
+}
+
 export interface AdminContract {
   id: string;
   contract_number: string;
+  type?: string;
   title: string;
   partner_name: string;
   partner_type: "author" | "publisher" | "university";
   partner_email: string;
   royalty_rate: number;
   is_derogatory: boolean;
-  status: "pending_admin_approval" | "en_vigueur" | "rejected" | "resilie";
-  created_at: string;
+  status: "active" | "pending_signature" | "pending_admin_approval" | "en_vigueur" | "expired" | "terminated" | "rejected";
   reviewed_by_juriste: string;
   rejection_reason?: string | null;
+  date_signature?: string | null;
+  date_expiration?: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
+  file_size?: number;
   notes?: string;
+  tags?: string[];
+  repartition_droits?: AdminContractRepartitionLine[];
+  ouvrage?: {
+    id: string;
+    title: string;
+    isbn: string;
+  } | null;
+  created_at: string;
 }
 
 export interface AdminWarehouse {

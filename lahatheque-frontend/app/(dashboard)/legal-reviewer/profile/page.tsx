@@ -18,11 +18,11 @@ import { ChangePasswordCard } from "@/components/features/profile/change-passwor
 export default function LegalReviewerProfilePage() {
   const { user, refreshUser } = useAuth();
 
-  const [firstName, setFirstName] = useState(user?.first_name || "Maitre Patrice");
-  const [lastName, setLastName] = useState(user?.last_name || "HOUNKPONOU");
-  const [affiliation, setAffiliation] = useState("Direction des Affaires Juridiques & Propriété Intellectuelle — LAHA Éditions");
-  const [email, setEmail] = useState(user?.email || "juridique@lahatheque.bj");
-  const [phone, setPhone] = useState("+229 97 22 33 44");
+  const [firstName, setFirstName] = useState(user?.first_name || "");
+  const [lastName, setLastName] = useState(user?.last_name || "");
+  const [affiliation, setAffiliation] = useState((user as any)?.university_affiliation || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [phone, setPhone] = useState(user?.phone || "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>((user as any)?.avatar_url || null);
 
   const [saving, setSaving] = useState(false);

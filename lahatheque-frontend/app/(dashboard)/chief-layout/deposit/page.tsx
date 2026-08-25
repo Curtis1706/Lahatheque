@@ -375,8 +375,8 @@ export default function ChiefLayoutDepositPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <FileDropzone
-                label="1. Fichier de l'Ouvrage (PDF ou EPUB) *"
-                acceptTypes={[".pdf", ".epub"]}
+                label="1. Fichier de l'Ouvrage (PDF uniquement) *"
+                acceptTypes={[".pdf"]}
                 maxSizeMB={800}
                 onFileSelect={handleBookFileSelect}
                 selectedFileName={bookFile?.name}
@@ -389,7 +389,7 @@ export default function ChiefLayoutDepositPage() {
                 }}
               />
               <p className="text-[11px] text-foreground-muted">
-                La liseuse supporte nativement le PDF et l&apos;EPUB avec filigrane dynamique et synthèse vocale TTS intégrée.
+                La liseuse supporte nativement le format PDF sécurisé avec filigrane dynamique et synthèse vocale TTS intégrée.
               </p>
             </div>
 

@@ -97,6 +97,23 @@ class ContratLegal(models.Model):
     titre = models.CharField(max_length=255, db_index=True)
     contracting_party = models.CharField(max_length=255, default="", db_index=True)
     parties_prenantes = models.JSONField(default=list)
+
+    # Liaisons directes avec les entités réelles de la base
+    ouvrage = models.ForeignKey(
+        'catalog.Ouvrage', null=True, blank=True, on_delete=models.SET_NULL, related_name='contrats'
+    )
+    signataire_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='contrats_signes'
+    )
+    institution = models.ForeignKey(
+        'partners.Institution', null=True, blank=True, on_delete=models.SET_NULL, related_name='contrats_partenariat'
+    )
+    publisher = models.ForeignKey(
+        'publishers_portal.Publisher', null=True, blank=True, on_delete=models.SET_NULL, related_name='contrats_distribution'
+    )
+    pre_edition = models.ForeignKey(
+        'rights.PreEditionDossier', null=True, blank=True, on_delete=models.SET_NULL, related_name='contrats_associes'
+    )
     
     fichier_contrat_path = models.CharField(max_length=512, default="")
     file_name = models.CharField(max_length=255, default="")

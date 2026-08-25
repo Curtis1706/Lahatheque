@@ -21,7 +21,7 @@ export interface AuthorFileDropzoneProps {
 }
 
 export function AuthorFileDropzone({
-  accept = ".pdf,.epub,.docx,.doc",
+  accept = ".pdf",
   maxSizeMB = 800,
   onFileSelected,
   selectedFile,
@@ -124,7 +124,7 @@ export function AuthorFileDropzone({
                 Cliquez pour choisir un fichier ou glissez-déposez ici
               </p>
               <p className="text-[11px] text-foreground-muted">
-                Formats acceptés : PDF, EPUB, Word DOCX (Taille max : {maxSizeMB} Mo)
+                Format accepté : PDF uniquement (Taille max : {maxSizeMB} Mo)
               </p>
             </div>
           </div>

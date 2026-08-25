@@ -417,8 +417,8 @@ export default function NewDepositPage() {
             {/* Dropzone Fichier Livre */}
             <div className="space-y-2">
               <FileDropzone
-                label="1. Fichier de l'Ouvrage (PDF ou EPUB) *"
-                acceptTypes={[".pdf", ".epub"]}
+                label="1. Fichier de l'Ouvrage (PDF uniquement) *"
+                acceptTypes={[".pdf"]}
                 maxSizeMB={800}
                 onFileSelect={handleBookFileSelect}
                 selectedFileName={bookFile?.name}
@@ -431,7 +431,7 @@ export default function NewDepositPage() {
                 }}
               />
               <p className="text-[11px] text-foreground-muted">
-                La liseuse supporte nativement le PDF et l&apos;EPUB avec synthèse vocale TTS intégrée.
+                La liseuse supporte nativement le format PDF sécurisé avec synthèse vocale TTS intégrée.
               </p>
             </div>
 

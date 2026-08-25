@@ -494,10 +494,16 @@ class QuizRetrieveOrGenerateView(APIView):
         if not book_id:
             return Response({"success": False, "error": "book_id requis."}, status=400)
 
+        ouvrage = None
         try:
-            ouvrage = Ouvrage.objects.get(id=book_id)
-        except Ouvrage.DoesNotExist:
-            return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
+            import uuid as _uuid
+            valid_uuid = _uuid.UUID(str(book_id).strip())
+            ouvrage = Ouvrage.objects.filter(id=valid_uuid).first()
+        except (ValueError, TypeError, AttributeError, Exception):
+            ouvrage = Ouvrage.objects.filter(slug=book_id).first()
+
+        if not ouvrage:
+            return Response({"success": True, "data": None, "message": "Aucun quiz disponible pour ce document."})
 
         # Chercher un quiz existant
         quiz = Quiz.objects.filter(ouvrage=ouvrage).prefetch_related('questions').first()
