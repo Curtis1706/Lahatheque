@@ -750,16 +750,26 @@ class ReaderProtectedStreamView(APIView):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        # 4. Traitement du Range HTTP
+        # 4. Traitement du Range HTTP (Support HTTP 200 complet & HTTP 206 partiel)
         range_header = request.META.get("HTTP_RANGE")
-        start_byte, end_byte = self._parse_range_header(range_header, total_size)
+        is_range_request = bool(range_header and range_header.startswith("bytes="))
 
-        if start_byte is None:
-            response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
-            response["Content-Range"] = f"bytes */{total_size}"
-            return response
+        if is_range_request:
+            start_byte, end_byte = self._parse_range_header(range_header, total_size)
+            if start_byte is None:
+                response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
+                response["Content-Range"] = f"bytes */{total_size}"
+                return response
 
-        chunk_data = pdf_bytes[start_byte:end_byte + 1]
+            chunk_data = pdf_bytes[start_byte:end_byte + 1]
+            response = HttpResponse(chunk_data, status=status.HTTP_206_PARTIAL_CONTENT, content_type="application/pdf")
+            response["Content-Range"] = f"bytes {start_byte}-{end_byte}/{total_size}"
+            response["Content-Length"] = str(len(chunk_data))
+        else:
+            # Requête standard (fetch Blob complet côté liseuse) -> renvoyer les octets complets
+            chunk_data = pdf_bytes
+            response = HttpResponse(chunk_data, status=status.HTTP_200_OK, content_type="application/pdf")
+            response["Content-Length"] = str(total_size)
 
         # 5. Journalisation légale
         try:
@@ -770,24 +780,20 @@ class ReaderProtectedStreamView(APIView):
                 document_title=doc_title or "Document Partenaire",
                 ip_address=ip,
                 user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
-                access_type="read_chunk",
+                access_type="read_chunk" if is_range_request else "read_full",
                 derived_hash=session.token_hash[:16] if session.token_hash else "nohash",
             )
         except Exception as log_err:
             logger.warning(f"[ReaderStream] Erreur TraceAcces: {log_err}")
 
-        response = HttpResponse(chunk_data, status=status.HTTP_206_PARTIAL_CONTENT, content_type="application/pdf")
         response["Accept-Ranges"] = "bytes"
-        response["Content-Range"] = f"bytes {start_byte}-{end_byte}/{total_size}"
-        response["Content-Length"] = str(len(chunk_data))
         response["Cache-Control"] = "private, no-store, must-revalidate"
         response["X-Content-Type-Options"] = "nosniff"
         return response
 
     def _parse_range_header(self, range_header, total_size):
         if not range_header or not range_header.startswith("bytes="):
-            end = min(self.DEFAULT_CHUNK_SIZE - 1, total_size - 1)
-            return 0, end
+            return 0, total_size - 1
 
         match = re.match(r"bytes=(\d+)-(\d*)", range_header)
         if not match:

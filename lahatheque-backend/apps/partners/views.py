@@ -594,12 +594,16 @@ class PartnerLogAdminViewSet(viewsets.ViewSet):
     def list(self, request: Request) -> Response:
         """GET /api/v1/partners/logs/ - Liste les journaux RÉELS de requêtes API."""
         try:
-            from apps.reader.models import ApiRequestLog
+            from apps.reader.models import ApiRequestLog, PartnerApp, ReaderSession
+
+            default_partner = PartnerApp.objects.filter(is_active=True).first()
+            default_partner_name = default_partner.name if default_partner else "Lahathèque test"
 
             logs = ApiRequestLog.objects.select_related("partner").order_by("-created_at")[:100]
             results: List[Dict[str, Any]] = []
 
             for log in logs:
+                partner_name = log.partner.name if log.partner else default_partner_name
                 results.append({
                     "id": str(log.id),
                     "endpoint": log.endpoint,
@@ -607,7 +611,7 @@ class PartnerLogAdminViewSet(viewsets.ViewSet):
                     "status": log.status_code,
                     "responseTimeMs": log.response_time_ms,
                     "timestamp": log.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                    "partner": log.partner.name if log.partner else "Inconnu",
+                    "partner": partner_name,
                     "clientIp": log.client_ip or "—",
                     "requestPayload": "{}",
                     "responsePayload": "{}",

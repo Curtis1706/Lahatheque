@@ -58,6 +58,8 @@ class PartnerAuthentication(BaseAuthentication):
                     partner = PartnerApp.objects.filter(id=partner_id, is_active=True).first()
                     if partner:
                         request.partner = partner
+                        if hasattr(request, "_request"):
+                            request._request.partner = partner
                         return (None, partner)
             except Exception:
                 pass
@@ -66,6 +68,8 @@ class PartnerAuthentication(BaseAuthentication):
         partner = _authenticate_by_client_credentials(request)
         if partner:
             request.partner = partner
+            if hasattr(request, "_request"):
+                request._request.partner = partner
             return (None, partner)
 
         return None
@@ -90,6 +94,8 @@ class IsAuthenticatedPartner(BasePermission):
                     partner = PartnerApp.objects.filter(id=partner_id, is_active=True).first()
                     if partner:
                         request.partner = partner
+                        if hasattr(request, "_request"):
+                            request._request.partner = partner
                         return True
             except Exception:
                 pass
@@ -98,6 +104,8 @@ class IsAuthenticatedPartner(BasePermission):
         partner = _authenticate_by_client_credentials(request)
         if partner:
             request.partner = partner
+            if hasattr(request, "_request"):
+                request._request.partner = partner
             return True
 
         # 3. Fallback DEBUG uniquement, pour le développement local
@@ -116,6 +124,8 @@ class IsAuthenticatedPartner(BasePermission):
                     is_active=True
                 )
             request.partner = partner
+            if hasattr(request, "_request"):
+                request._request.partner = partner
             return True
 
         return False
@@ -124,7 +134,7 @@ class IsAuthenticatedPartner(BasePermission):
 class IsValidReaderSession(BasePermission):
     """
     Vérifie que la requête porte un jeton JWT de session de lecture valide et actif.
-    Injecte l'objet `reader_session` dans la requête.
+    Injecte l'objet `reader_session` et `partner` dans la requête.
     """
 
     def has_permission(self, request: Request, view: Any) -> bool:
@@ -147,6 +157,10 @@ class IsValidReaderSession(BasePermission):
         try:
             session = ReaderTokenService.decode_and_validate_token(token_str)
             request.reader_session = session
+            request.partner = session.partner
+            if hasattr(request, "_request"):
+                request._request.reader_session = session
+                request._request.partner = session.partner
             return True
         except ReaderTokenError:
             return False
