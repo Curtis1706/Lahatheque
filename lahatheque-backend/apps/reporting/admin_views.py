@@ -1014,33 +1014,105 @@ class AdminValidationViewSet(viewsets.ViewSet):
 class AdminContractViewSet(viewsets.ViewSet):
     """
     GET /api/v1/admin/contracts/
+    GET /api/v1/admin/contracts/{id}/
     POST /api/v1/admin/contracts/{id}/process/
     Supervision des contrats d'édition, accords dérogatoires et arbitrage des litiges.
     """
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def _serialize_contract(self, c):
+        from apps.rights.models import RepartitionDroits
+
+        # Détermination du type de partenaire et de l'email
+        partner_type = "author"
+        partner_email = ""
+        if c.type_contrat == "partenariat_universite" or c.institution:
+            partner_type = "university"
+            partner_email = c.institution.email_contact if (c.institution and hasattr(c.institution, 'email_contact') and c.institution.email_contact) else "partenariat@universite.bj"
+        elif c.type_contrat == "editeur_tiers" or c.publisher:
+            partner_type = "publisher"
+            partner_email = c.publisher.email_contact if (c.publisher and hasattr(c.publisher, 'email_contact') and c.publisher.email_contact) else "contact@editeur.com"
+        elif c.signataire_user:
+            partner_type = "author"
+            partner_email = c.signataire_user.email
+        else:
+            partner_type = "author"
+            partner_email = "auteur@lahatheque.com"
+
+        # Clé de répartition & Taux de redevance
+        repartition_list = []
+        royalty_rate = 15.0
+        is_derogatory = False
+
+        if c.ouvrage:
+            reps = RepartitionDroits.objects.filter(ouvrage=c.ouvrage).select_related('beneficiaire')
+            for r in reps:
+                p_rate = float(r.taux_papier) if r.taux_papier is not None else 10.0
+                d_rate = float(r.taux_numerique) if r.taux_numerique is not None else 15.0
+                a_rate = float(r.taux_audio_tts) if r.taux_audio_tts is not None else 8.0
+                repartition_list.append({
+                    "id": str(r.id),
+                    "author_name": r.beneficiaire.get_full_name() or r.beneficiaire.email,
+                    "author_email": r.beneficiaire.email,
+                    "role": r.role_libelle,
+                    "percentage": float(r.pourcentage),
+                    "paper_rate": p_rate,
+                    "digital_rate": d_rate,
+                    "audio_tts_rate": a_rate,
+                })
+                if d_rate > 15.0:
+                    is_derogatory = True
+            if repartition_list:
+                royalty_rate = repartition_list[0]["digital_rate"]
+        elif partner_type == "university" and c.institution:
+            royalty_rate = float(getattr(c.institution, 'taux_redevance_defaut', 5.0) or 5.0)
+            if royalty_rate > 10.0:
+                is_derogatory = True
+        elif partner_type == "publisher" and c.publisher:
+            royalty_rate = float(getattr(c.publisher, 'taux_commission_standard', 70.0) or 70.0)
+
+        file_url = None
+        if c.fichier_contrat_path:
+            file_url = f"/api/bff/rights/legal/contracts/{c.id}/download/"
+
+        return {
+            "id": str(c.id),
+            "contract_number": c.numero_contrat,
+            "type": c.type_contrat,
+            "title": c.titre,
+            "partner_name": c.contracting_party or (c.signataire_user.get_full_name() if c.signataire_user else "Non renseigné"),
+            "partner_type": partner_type,
+            "partner_email": partner_email,
+            "parties": c.parties_prenantes,
+            "status": c.status,
+            "royalty_rate": royalty_rate,
+            "is_derogatory": is_derogatory,
+            "reviewed_by_juriste": "Cabinet Juridique LAHA",
+            "date_signature": c.date_signature.isoformat() if c.date_signature else None,
+            "date_expiration": c.date_expiration.isoformat() if c.date_expiration else None,
+            "file_url": file_url,
+            "file_name": c.file_name or f"{c.numero_contrat}.pdf",
+            "file_size": c.file_size,
+            "notes": c.notes,
+            "tags": c.tags,
+            "repartition_droits": repartition_list,
+            "ouvrage": {
+                "id": str(c.ouvrage.id),
+                "title": c.ouvrage.titre,
+                "isbn": c.ouvrage.isbn or "",
+            } if c.ouvrage else None,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        }
 
     def list(self, request):
         import logging
         logger = logging.getLogger(__name__)
         try:
             from apps.rights.models import ContratLegal
-            contracts = ContratLegal.objects.all().order_by('-created_at')[:50]
-            results = []
-            for c in contracts:
-                results.append({
-                    "id": str(c.id),
-                    "contract_number": c.numero_contrat,
-                    "type": c.type_contrat,
-                    "title": c.titre,
-                    "partner_name": c.contracting_party or "Non renseigné",
-                    "parties": c.parties_prenantes,
-                    "status": c.status,
-                    "date_signature": c.date_signature.isoformat() if c.date_signature else None,
-                    "date_expiration": c.date_expiration.isoformat() if c.date_expiration else None,
-                    "file_url": c.fichier_contrat_path or None,
-                    "notes": c.notes,
-                    "created_at": c.created_at.isoformat() if c.created_at else None,
-                })
+            contracts = ContratLegal.objects.all().select_related(
+                'ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition'
+            ).order_by('-created_at')[:50]
+            results = [self._serialize_contract(c) for c in contracts]
             return Response({"success": True, "data": results, "error": None})
         except Exception as e:
             logger.error(f"[AdminContractViewSet.list] Erreur : {e}", exc_info=True)
@@ -1048,6 +1120,16 @@ class AdminContractViewSet(viewsets.ViewSet):
                 {"success": False, "data": [], "error": "Erreur lors du chargement des contrats. Consultez les logs serveur."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    def retrieve(self, request, pk=None):
+        try:
+            from apps.rights.models import ContratLegal
+            c = ContratLegal.objects.select_related(
+                'ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition'
+            ).get(id=pk)
+            return Response({"success": True, "data": self._serialize_contract(c), "error": None})
+        except ContratLegal.DoesNotExist:
+            return Response({"success": False, "error": "Contrat introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=['post'], url_path='process')
     def process_contract(self, request, pk=None):
