@@ -132,7 +132,9 @@ export interface OrderLineAPI {
   id: string;
   ouvrage: string;
   ouvrage_title: string;
-  ouvrage_cover_url: string;
+  ouvrage_cover_url?: string;
+  discipline_name?: string;
+  author_name?: string;
   format_type: "digital" | "paper";
   format_display: string;
   unit_price: number;
@@ -147,6 +149,10 @@ export interface OrderAPI {
   statut_paiement_display: string;
   statut_commande: string;
   statut_commande_display: string;
+  mode_paiement?: string;
+  mode_paiement_display?: string;
+  type_commande?: string;
+  type_commande_display?: string;
   is_credit_purchase?: boolean;
   credit_due_date?: string;
   returned_at?: string;
