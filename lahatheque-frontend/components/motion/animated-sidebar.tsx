@@ -75,22 +75,18 @@ const SUBMENU_TRANSITION = {
 const SUBMENU_VARIANTS: Variants = {
   closed: {
     opacity: 0,
-    clipPath: "inset(0 0 100% 0 round 8px)",
+    height: 0,
     transition: {
-      duration: 0.14,
+      duration: 0.16,
       ease: EASE_OUT,
-      staggerChildren: 0.025,
-      staggerDirection: -1,
     },
   },
   open: {
     opacity: 1,
-    clipPath: "inset(0 0 0% 0 round 8px)",
+    height: "auto",
     transition: {
       duration: 0.2,
-      delayChildren: 0.035,
       ease: EASE_OUT,
-      staggerChildren: 0.045,
     },
   },
 };
@@ -98,13 +94,11 @@ const SUBMENU_VARIANTS: Variants = {
 const SUBMENU_ITEM_VARIANTS: Variants = {
   closed: {
     opacity: 0,
-    y: -6,
-    filter: "blur(3px)",
+    y: -4,
   },
   open: {
     opacity: 1,
     y: 0,
-    filter: "blur(0px)",
     transition: SUBMENU_TRANSITION,
   },
 };
@@ -839,14 +833,12 @@ export const AnimatedSidebarMenu = forwardRef<
 
 export const AnimatedSidebarMenuItem = forwardRef<
   HTMLLIElement,
-  HTMLMotionProps<"li">
+  HTMLAttributes<HTMLLIElement>
 >(function AnimatedSidebarMenuItem({ className, ...props }, forwardedRef) {
   return (
-    <motion.li
+    <li
       {...props}
       ref={forwardedRef}
-      layout="position"
-      transition={SPRING_LAYOUT}
       data-slot="sidebar-menu-item"
       className={cn("relative", className)}
     />
@@ -870,20 +862,18 @@ export const AnimatedSidebarMenuSub = forwardRef<
   const panel = useAnimatedSidebarPanel();
 
   return (
-    <AnimatePresence initial={false} mode="popLayout">
+    <AnimatePresence initial={false}>
       {open && !panel.collapsed ? (
         <motion.ul
           {...props}
           ref={forwardedRef}
-          key="sidebar-submenu"
           variants={context.reduce ? undefined : SUBMENU_VARIANTS}
           initial={context.reduce ? false : "closed"}
-          animate={context.reduce ? { opacity: 1 } : "open"}
-          exit={context.reduce ? { opacity: 0 } : "closed"}
-          transition={context.reduce ? { duration: 0.12 } : undefined}
+          animate={context.reduce ? { opacity: 1, height: "auto" } : "open"}
+          exit={context.reduce ? { opacity: 0, height: 0 } : "closed"}
           data-slot="sidebar-menu-sub"
           className={cn(
-            "relative mt-1 ml-4 flex min-w-0 flex-col gap-0.5 border-navy-hover/40 border-l pl-2.5",
+            "relative mt-1 ml-3 flex min-w-0 flex-col gap-0.5 pl-2 overflow-hidden",
             className
           )}
         >

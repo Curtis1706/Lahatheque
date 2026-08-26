@@ -50,6 +50,14 @@ class ManagerKpisView(APIView):
             updated_at__gte=now - timedelta(days=7)
         ).count()
 
+        # Prise en compte des commandes grossistes physiques
+        from .models import WholesaleOrder, WholesaleOrderStatus
+        w_orders = WholesaleOrder.objects.filter(total_print_copies__gt=0)
+        to_ship += w_orders.filter(status__in=[WholesaleOrderStatus.PENDING, WholesaleOrderStatus.VALIDATED]).count()
+        in_transit += w_orders.filter(status=WholesaleOrderStatus.PROCESSING).count()
+        delivered_month += w_orders.filter(status=WholesaleOrderStatus.DELIVERED, updated_at__year=now.year, updated_at__month=now.month).count()
+        delivered_week += w_orders.filter(status=WholesaleOrderStatus.DELIVERED, updated_at__gte=now - timedelta(days=7)).count()
+
         # Calcul des KPI timeline glissante
         months_fr = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin",
                      "Juil", "Août", "Sept", "Oct", "Nov", "Déc"]
@@ -383,11 +391,21 @@ class DeliveriesListView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
 
-        qs = PhysicalDelivery.objects.select_related("commande__user").prefetch_related("commande__lignes__ouvrage").all().order_by("-created_at")
-
         statut_filter = request.query_params.get("statut")
+        target_statut = None
         if statut_filter:
-            qs = qs.filter(statut=statut_filter)
+            if statut_filter in ["to_ship", "en_preparation"]:
+                target_statut = "en_preparation"
+            elif statut_filter in ["in_transit", "shipped", "expedie"]:
+                target_statut = "expedie"
+            elif statut_filter in ["delivered", "livre"]:
+                target_statut = "livre"
+            else:
+                target_statut = statut_filter
+
+        qs = PhysicalDelivery.objects.select_related("commande__user").prefetch_related("commande__lignes__ouvrage").all().order_by("-created_at")
+        if target_statut:
+            qs = qs.filter(statut=target_statut)
 
         data = []
         for d in qs:
@@ -407,10 +425,28 @@ class DeliveriesListView(APIView):
                 for l in lignes
             ]
             client_user = d.commande.user if d.commande else None
+            role_label = ""
+            if client_user and hasattr(client_user, "role"):
+                r = client_user.role
+                if r == "author":
+                    role_label = " (Auteur)"
+                elif r == "university":
+                    role_label = " (Université)"
+                elif r == "wholesaler":
+                    role_label = " (Grossiste)"
+                elif r == "student":
+                    role_label = " (Lecteur)"
+
+            user_display = (client_user.get_full_name() if client_user else "") or (client_user.email if client_user else "Client")
+            if role_label and role_label.strip(" ()").lower() not in user_display.lower():
+                client_nom = f"{user_display}{role_label}"
+            else:
+                client_nom = user_display
+
             data.append({
                 "id": str(d.id),
                 "commande_id": str(d.commande_id),
-                "client_nom": client_user.get_full_name() if client_user else "Client Anonyme",
+                "client_nom": client_nom,
                 "client_email": client_user.email if client_user else "—",
                 "client_phone": getattr(client_user, 'phone', '') if client_user else "—",
                 "shipping_address": d.shipping_address,
@@ -430,6 +466,65 @@ class DeliveriesListView(APIView):
                 "items": items,
             })
 
+        # Commandes grossistes (WholesaleOrder) avec exemplaires physiques
+        from .models import WholesaleOrder, WholesaleOrderStatus
+        w_qs = WholesaleOrder.objects.filter(total_print_copies__gt=0).select_related("user").prefetch_related("items__book").all().order_by("-created_at")
+
+        for wo in w_qs:
+            if wo.status == WholesaleOrderStatus.DELIVERED:
+                wo_statut = "livre"
+            elif wo.status == WholesaleOrderStatus.PROCESSING or bool(wo.carrier_name or wo.tracking_number):
+                wo_statut = "expedie"
+            else:
+                wo_statut = "en_preparation"
+
+            if target_statut and wo_statut != target_statut:
+                continue
+
+            w_items = [
+                {
+                    "id": str(it.id),
+                    "book_id": str(it.book_id),
+                    "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
+                    "cover_url": it.book.cover_url if it.book and it.book.cover_url else (it.book.cover_image.url if it.book and it.book.cover_image else None),
+                    "isbn": it.isbn or (it.book.isbn if it.book else "—"),
+                    "quantity": it.print_copies_qty,
+                    "format_type": "paper",
+                    "unit_price": float(it.print_unit_price),
+                    "total_price": float(it.print_unit_price * it.print_copies_qty),
+                }
+                for it in wo.items.filter(print_copies_qty__gt=0)
+            ]
+
+            user_name = wo.user.get_full_name() if wo.user else ""
+            client_label = f"{wo.company_name} (Grossiste - {user_name or wo.user.email})" if user_name else f"{wo.company_name} (Grossiste)"
+
+            data.append({
+                "id": str(wo.id),
+                "commande_id": wo.reference or str(wo.id),
+                "client_nom": client_label,
+                "client_email": wo.user.email if wo.user else "—",
+                "client_phone": wo.contact_phone or (getattr(wo.user, 'phone', '') if wo.user else "—"),
+                "shipping_address": wo.delivery_address,
+                "city": "Cotonou",
+                "country": "BJ",
+                "carrier_name": wo.carrier_name,
+                "tracking_number": wo.tracking_number,
+                "statut": wo_statut,
+                "total_amount": float(wo.total_amount),
+                "mode_paiement": "Facturation B2B",
+                "statut_paiement": "paid",
+                "created_at": wo.created_at.isoformat(),
+                "updated_at": wo.updated_at.isoformat(),
+                "date_livraison_souhaitee": None,
+                "plage_horaire_debut": None,
+                "plage_horaire_fin": None,
+                "items": w_items,
+            })
+
+        # Tri chronologique de toutes les livraisons confondues
+        data.sort(key=lambda x: x["created_at"], reverse=True)
+
         return Response({"success": True, "data": data, "error": None})
 
 
@@ -441,69 +536,139 @@ class DeliveryDetailView(APIView):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
         try:
             d = PhysicalDelivery.objects.select_related("commande__user").prefetch_related("commande__lignes__ouvrage").get(pk=pk)
-        except PhysicalDelivery.DoesNotExist:
-            return Response({"success": False, "data": None, "error": "Livraison introuvable."}, status=404)
+            lignes = d.commande.lignes.select_related('ouvrage').all() if d.commande else []
+            items = [
+                {
+                    "id": str(l.id),
+                    "book_id": str(l.ouvrage_id) if l.ouvrage_id else "",
+                    "book_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
+                    "cover_url": l.ouvrage.cover_image.url if l.ouvrage and l.ouvrage.cover_image else None,
+                    "isbn": (l.ouvrage.isbn if l.ouvrage else "") or "—",
+                    "quantity": l.quantity or 1,
+                    "format_type": l.format_type,
+                    "unit_price": float(l.unit_price) if l.unit_price else 0.0,
+                    "total_price": float(l.unit_price * (l.quantity or 1)) if l.unit_price else 0.0,
+                }
+                for l in lignes
+            ]
 
-        lignes = d.commande.lignes.select_related('ouvrage').all() if d.commande else []
-        items = [
-            {
-                "id": str(l.id),
-                "book_id": str(l.ouvrage_id) if l.ouvrage_id else "",
-                "book_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
-                "cover_url": l.ouvrage.cover_image.url if l.ouvrage and l.ouvrage.cover_image else None,
-                "isbn": (l.ouvrage.isbn if l.ouvrage else "") or "—",
-                "quantity": l.quantity or 1,
-                "format_type": l.format_type,
-                "unit_price": float(l.unit_price) if l.unit_price else 0.0,
-                "total_price": float(l.unit_price * (l.quantity or 1)) if l.unit_price else 0.0,
+            client_user = d.commande.user if d.commande else None
+            role_label = ""
+            if client_user and hasattr(client_user, "role"):
+                r = client_user.role
+                if r == "author":
+                    role_label = " (Auteur)"
+                elif r == "university":
+                    role_label = " (Université)"
+                elif r == "wholesaler":
+                    role_label = " (Grossiste)"
+                elif r == "student":
+                    role_label = " (Lecteur)"
+
+            user_display = (client_user.get_full_name() if client_user else "") or (client_user.email if client_user else "Client")
+            if role_label and role_label.strip(" ()").lower() not in user_display.lower():
+                client_nom = f"{user_display}{role_label}"
+            else:
+                client_nom = user_display
+
+            data = {
+                "id": str(d.id),
+                "commande_id": str(d.commande_id),
+                "client_nom": client_nom,
+                "client_email": client_user.email if client_user else "—",
+                "client_phone": getattr(client_user, 'phone', '') if client_user else "—",
+                "shipping_address": d.shipping_address,
+                "city": d.city,
+                "country": d.country,
+                "carrier_name": d.carrier_name,
+                "tracking_number": d.tracking_number,
+                "statut": d.statut,
+                "total_amount": float(d.commande.total_amount) if d.commande and d.commande.total_amount else 0.0,
+                "mode_paiement": d.commande.mode_paiement if d.commande else "mobile_money",
+                "statut_paiement": d.commande.statut_paiement if d.commande else "paid",
+                "created_at": d.created_at.isoformat(),
+                "updated_at": d.updated_at.isoformat(),
+                "date_livraison_souhaitee": d.date_livraison_souhaitee.isoformat() if d.date_livraison_souhaitee else None,
+                "plage_horaire_debut": d.plage_horaire_debut.strftime("%H:%M") if d.plage_horaire_debut else None,
+                "plage_horaire_fin": d.plage_horaire_fin.strftime("%H:%M") if d.plage_horaire_fin else None,
+                "items": items,
             }
-            for l in lignes
-        ]
 
-        client_user = d.commande.user if d.commande else None
-        data = {
-            "id": str(d.id),
-            "commande_id": str(d.commande_id),
-            "client_nom": client_user.get_full_name() if client_user else "Client Anonyme",
-            "client_email": client_user.email if client_user else "—",
-            "client_phone": getattr(client_user, 'phone', '') if client_user else "—",
-            "shipping_address": d.shipping_address,
-            "city": d.city,
-            "country": d.country,
-            "carrier_name": d.carrier_name,
-            "tracking_number": d.tracking_number,
-            "statut": d.statut,
-            "total_amount": float(d.commande.total_amount) if d.commande and d.commande.total_amount else 0.0,
-            "mode_paiement": d.commande.mode_paiement if d.commande else "mobile_money",
-            "statut_paiement": d.commande.statut_paiement if d.commande else "paid",
-            "created_at": d.created_at.isoformat(),
-            "updated_at": d.updated_at.isoformat(),
-            "date_livraison_souhaitee": d.date_livraison_souhaitee.isoformat() if d.date_livraison_souhaitee else None,
-            "plage_horaire_debut": d.plage_horaire_debut.strftime("%H:%M") if d.plage_horaire_debut else None,
-            "plage_horaire_fin": d.plage_horaire_fin.strftime("%H:%M") if d.plage_horaire_fin else None,
-            "items": items,
-        }
+            notifications_list = []
+            try:
+                from apps.reporting.models import Notification
+                notifs = Notification.objects.filter(
+                    user=d.commande.user,
+                    resource_id=str(d.commande_id),
+                    notification_type__in=['order_shipped', 'order_delivered']
+                ).order_by('created_at')
+                for n in notifs:
+                    notifications_list.append({
+                        "id": str(n.id),
+                        "type": "shipment" if n.notification_type == "order_shipped" else "delivery",
+                        "sent_at": n.created_at.isoformat(),
+                        "recipient_email": d.commande.user.email if d.commande.user else "",
+                    })
+            except Exception:
+                pass
+            data["notifications"] = notifications_list
 
-        notifications_list = []
-        try:
-            from apps.reporting.models import Notification
-            notifs = Notification.objects.filter(
-                user=d.commande.user,
-                resource_id=str(d.commande_id),
-                notification_type__in=['order_shipped', 'order_delivered']
-            ).order_by('created_at')
-            for n in notifs:
-                notifications_list.append({
-                    "id": str(n.id),
-                    "type": "shipment" if n.notification_type == "order_shipped" else "delivery",
-                    "sent_at": n.created_at.isoformat(),
-                    "recipient_email": d.commande.user.email if d.commande.user else "",
-                })
-        except Exception:
-            pass
-        data["notifications"] = notifications_list
+            return Response({"success": True, "data": data, "error": None})
+        except PhysicalDelivery.DoesNotExist:
+            from .models import WholesaleOrder, WholesaleOrderStatus
+            try:
+                wo = WholesaleOrder.objects.select_related("user").prefetch_related("items__book").get(pk=pk)
+            except WholesaleOrder.DoesNotExist:
+                return Response({"success": False, "data": None, "error": "Livraison introuvable."}, status=404)
 
-        return Response({"success": True, "data": data, "error": None})
+            w_items = [
+                {
+                    "id": str(it.id),
+                    "book_id": str(it.book_id),
+                    "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
+                    "cover_url": it.book.cover_url if it.book and it.book.cover_url else (it.book.cover_image.url if it.book and it.book.cover_image else None),
+                    "isbn": it.isbn or (it.book.isbn if it.book else "—"),
+                    "quantity": it.print_copies_qty,
+                    "format_type": "paper",
+                    "unit_price": float(it.print_unit_price),
+                    "total_price": float(it.print_unit_price * it.print_copies_qty),
+                }
+                for it in wo.items.filter(print_copies_qty__gt=0)
+            ]
+            if wo.status == WholesaleOrderStatus.DELIVERED:
+                wo_statut = "livre"
+            elif wo.status == WholesaleOrderStatus.PROCESSING or bool(wo.carrier_name or wo.tracking_number):
+                wo_statut = "expedie"
+            else:
+                wo_statut = "en_preparation"
+
+            user_name = wo.user.get_full_name() if wo.user else ""
+            client_label = f"{wo.company_name} (Grossiste - {user_name or wo.user.email})" if user_name else f"{wo.company_name} (Grossiste)"
+
+            data = {
+                "id": str(wo.id),
+                "commande_id": wo.reference or str(wo.id),
+                "client_nom": client_label,
+                "client_email": wo.user.email if wo.user else "—",
+                "client_phone": wo.contact_phone or (getattr(wo.user, 'phone', '') if wo.user else "—"),
+                "shipping_address": wo.delivery_address,
+                "city": "Cotonou",
+                "country": "BJ",
+                "carrier_name": wo.carrier_name,
+                "tracking_number": wo.tracking_number,
+                "statut": wo_statut,
+                "total_amount": float(wo.total_amount),
+                "mode_paiement": "Facturation B2B",
+                "statut_paiement": "paid",
+                "created_at": wo.created_at.isoformat(),
+                "updated_at": wo.updated_at.isoformat(),
+                "date_livraison_souhaitee": None,
+                "plage_horaire_debut": None,
+                "plage_horaire_fin": None,
+                "items": w_items,
+                "notifications": [],
+            }
+            return Response({"success": True, "data": data, "error": None})
 
     def patch(self, request, pk):
         """Mise à jour statut, transporteur et numéro de suivi. Notifie le client et
@@ -512,71 +677,120 @@ class DeliveryDetailView(APIView):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
         try:
             d = PhysicalDelivery.objects.select_related('commande__user').get(pk=pk)
+            previous_statut = d.statut
+
+            allowed = ["statut", "carrier_name", "tracking_number", "shipping_address", "city", "country"]
+            for field in allowed:
+                val = request.data.get(field)
+                if val is not None:
+                    setattr(d, field, val)
+            # Normaliser le statut si besoin
+            if d.statut in ('in_transit', 'shipped'):
+                d.statut = 'expedie'
+            elif d.statut in ('delivered', 'completed'):
+                d.statut = 'livre'
+
+            d.save()
+
+            # Notification client + clôture de commande sur transition de statut réelle
+            if d.statut != previous_statut and d.commande and d.commande.user:
+                from apps.reporting.services import notify_user
+                from apps.reporting.models import Notification
+
+                if d.statut == 'expedie':
+                    try:
+                        notify_user(
+                            user=d.commande.user,
+                            notification_type=Notification.NotificationType.ORDER_SHIPPED,
+                            title="Votre commande a été expédiée",
+                            message=(
+                                f"Votre commande #{str(d.commande_id)[:8]} a été expédiée"
+                                + (f" via {d.carrier_name}" if d.carrier_name else "")
+                                + (f" (suivi : {d.tracking_number})" if d.tracking_number else "")
+                                + "."
+                            ),
+                            action_url="/student/orders",
+                            resource_id=str(d.commande_id),
+                        )
+                    except Exception:
+                        pass
+
+                elif d.statut == 'livre':
+                    d.commande.statut_commande = 'completed'
+                    d.commande.save(update_fields=['statut_commande'])
+                    try:
+                        notify_user(
+                            user=d.commande.user,
+                            notification_type=Notification.NotificationType.ORDER_DELIVERED,
+                            title="Votre commande a été livrée",
+                            message=f"Votre commande #{str(d.commande_id)[:8]} a été livrée avec succès. Merci de votre confiance !",
+                            action_url="/student/orders",
+                            resource_id=str(d.commande_id),
+                        )
+                    except Exception:
+                        pass
+
+            return Response({
+                "success": True,
+                "data": {
+                    "id": str(d.id),
+                    "statut": d.statut,
+                    "commande_statut": d.commande.statut_commande,
+                },
+                "error": None
+            })
         except PhysicalDelivery.DoesNotExist:
-            return Response({"success": False, "data": None, "error": "Livraison introuvable."}, status=404)
+            from .models import WholesaleOrder, WholesaleOrderStatus
+            try:
+                wo = WholesaleOrder.objects.select_related('user').get(pk=pk)
+            except WholesaleOrder.DoesNotExist:
+                return Response({"success": False, "data": None, "error": "Livraison introuvable."}, status=404)
 
-        previous_statut = d.statut
+            carrier_name = request.data.get("carrier_name")
+            tracking_number = request.data.get("tracking_number")
+            statut = request.data.get("statut")
 
-        allowed = ["statut", "carrier_name", "tracking_number", "shipping_address", "city", "country"]
-        for field in allowed:
-            val = request.data.get(field)
-            if val is not None:
-                setattr(d, field, val)
-        # Normaliser le statut si besoin
-        if d.statut in ('in_transit', 'shipped'):
-            d.statut = 'expedie'
-        elif d.statut in ('delivered', 'completed'):
-            d.statut = 'livre'
+            if carrier_name is not None:
+                wo.carrier_name = carrier_name
+            if tracking_number is not None:
+                wo.tracking_number = tracking_number
 
-        d.save()
+            if statut in ["expedie", "shipped", "in_transit"]:
+                wo.status = WholesaleOrderStatus.PROCESSING
+            elif statut in ["livre", "delivered", "completed"]:
+                wo.status = WholesaleOrderStatus.DELIVERED
 
-        # Notification client + clôture de commande sur transition de statut réelle
-        if d.statut != previous_statut and d.commande and d.commande.user:
-            from apps.reporting.services import notify_user
-            from apps.reporting.models import Notification
+            wo.save()
 
-            if d.statut == 'expedie':
+            if wo.user and statut in ["expedie", "shipped", "in_transit"]:
+                from apps.reporting.services import notify_user
+                from apps.reporting.models import Notification
                 try:
                     notify_user(
-                        user=d.commande.user,
+                        user=wo.user,
                         notification_type=Notification.NotificationType.ORDER_SHIPPED,
-                        title="Votre commande a été expédiée",
+                        title="Votre commande grossiste a été expédiée",
                         message=(
-                            f"Votre commande #{str(d.commande_id)[:8]} a été expédiée"
-                            + (f" via {d.carrier_name}" if d.carrier_name else "")
-                            + (f" (suivi : {d.tracking_number})" if d.tracking_number else "")
+                            f"Votre commande grossiste {wo.reference} a été expédiée"
+                            + (f" via {wo.carrier_name}" if wo.carrier_name else "")
+                            + (f" (suivi : {wo.tracking_number})" if wo.tracking_number else "")
                             + "."
                         ),
-                        action_url="/student/orders",
-                        resource_id=str(d.commande_id),
+                        action_url=f"/wholesaler/orders/{wo.id}",
+                        resource_id=str(wo.id),
                     )
                 except Exception:
                     pass
 
-            elif d.statut == 'livre':
-                d.commande.statut_commande = 'completed'
-                d.commande.save(update_fields=['statut_commande'])
-                try:
-                    notify_user(
-                        user=d.commande.user,
-                        notification_type=Notification.NotificationType.ORDER_DELIVERED,
-                        title="Votre commande a été livrée",
-                        message=f"Votre commande #{str(d.commande_id)[:8]} a été livrée avec succès. Merci de votre confiance !",
-                        action_url="/student/orders",
-                        resource_id=str(d.commande_id),
-                    )
-                except Exception:
-                    pass
-
-        return Response({
-            "success": True,
-            "data": {
-                "id": str(d.id),
-                "statut": d.statut,
-                "commande_statut": d.commande.statut_commande,
-            },
-            "error": None
-        })
+            return Response({
+                "success": True,
+                "data": {
+                    "id": str(wo.id),
+                    "statut": "expedie" if wo.status == WholesaleOrderStatus.PROCESSING else ("livre" if wo.status == WholesaleOrderStatus.DELIVERED else "en_preparation"),
+                    "commande_statut": wo.status,
+                },
+                "error": None
+            })
 
 
 class EntrepotsListView(APIView):

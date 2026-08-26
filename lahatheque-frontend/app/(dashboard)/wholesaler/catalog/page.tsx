@@ -21,6 +21,7 @@ import {
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { WholesaleCartDrawer } from "@/components/features/wholesaler/wholesale-cart-drawer";
 import { BookPreviewModal } from "@/components/features/wholesaler/book-preview-modal";
+import { WholesaleOrderModal } from "@/components/features/wholesaler/wholesale-order-modal";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 import { getWholesalerBooks } from "@/lib/services/wholesaler";
 import type { WholesalerBookItem, WholesalerCartItem } from "@/lib/types/wholesaler";
@@ -39,8 +40,9 @@ export default function WholesalerCatalogPage() {
   const [cart, setCart] = useState<WholesalerCartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
 
-  // Modale aperçu d'extrait
+  // Modale aperçu d'extrait & modale de commande directe
   const [previewBook, setPreviewBook] = useState<WholesalerBookItem | null>(null);
+  const [orderBook, setOrderBook] = useState<WholesalerBookItem | null>(null);
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
@@ -350,15 +352,11 @@ export default function WholesalerCatalogPage() {
 
                   <button
                     type="button"
-                    onClick={() => handleAddToCart(book)}
-                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer min-h-[44px] ${
-                      isInCart
-                        ? "bg-emerald-600 text-white"
-                        : "bg-navy text-white hover:bg-navy-hover"
-                    }`}
+                    onClick={() => setOrderBook(book)}
+                    className="w-full py-2.5 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer min-h-[44px] bg-gold text-navy hover:bg-gold-light"
                   >
-                    <ShoppingCart className="w-3.5 h-3.5 text-gold" />
-                    {isInCart ? "Dans le Panier Groupé" : "Ajouter à la Commande"}
+                    <Package className="w-3.5 h-3.5" />
+                    Commander cet Ouvrage
                   </button>
                 </div>
               </div>
@@ -366,6 +364,25 @@ export default function WholesalerCatalogPage() {
           })}
         </div>
       )}
+
+      {/* Modale de Commande Grossiste Directe (UX claire et fluide) */}
+      <WholesaleOrderModal
+        book={orderBook}
+        isOpen={orderBook !== null}
+        onClose={() => setOrderBook(null)}
+      />
+
+      {/* Modale d'Extrait & Aperçu */}
+      <BookPreviewModal
+        book={previewBook}
+        isOpen={previewBook !== null}
+        onClose={() => setPreviewBook(null)}
+        onAddToCart={handleAddToCart}
+        onOrder={(b) => {
+          setPreviewBook(null);
+          setOrderBook(b);
+        }}
+      />
 
       {/* Drawer du Panier 21st.dev Shopping Cart (id: 5797) */}
       <WholesaleCartDrawer
@@ -377,14 +394,6 @@ export default function WholesalerCatalogPage() {
         }}
         isOpen={cartOpen}
         onClose={() => setCartOpen(false)}
-      />
-
-      {/* Modale d'Extrait & Aperçu */}
-      <BookPreviewModal
-        book={previewBook}
-        isOpen={previewBook !== null}
-        onClose={() => setPreviewBook(null)}
-        onAddToCart={handleAddToCart}
       />
     </div>
   );

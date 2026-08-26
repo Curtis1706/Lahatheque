@@ -114,6 +114,7 @@ class WholesalerCatalogListView(APIView):
                 "public_price_paper": public_paper,
                 "min_quantity": 20,
                 "stock_available_print": total_dispo,
+                "is_paper_available": bool(o.is_paper_available or total_dispo > 0),
                 "summary": o.summary or "Ouvrage académique et professionnel de référence.",
             })
 
@@ -293,7 +294,12 @@ class WholesalerOrdersListView(APIView):
 
             # Vérification du stock papier disponible
             if prt_qty > 0:
-                if not book.is_paper_available:
+                total_disponible = book.stocks_entrepots.aggregate(
+                    total=Sum(F('quantite_reelle') - F('quantite_reservee'))
+                )['total'] or 0
+
+                is_paper_ok = bool(book.is_paper_available or total_disponible > 0)
+                if not is_paper_ok:
                     order.delete()
                     return Response({
                         "success": False,
@@ -301,9 +307,6 @@ class WholesalerOrdersListView(APIView):
                         "error": f"« {book.title} » n'est pas disponible en version papier."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-                total_disponible = book.stocks_entrepots.aggregate(
-                    total=Sum(F('quantite_reelle') - F('quantite_reservee'))
-                )['total'] or 0
                 if total_disponible < prt_qty:
                     order.delete()
                     return Response({
@@ -322,6 +325,8 @@ class WholesalerOrdersListView(APIView):
                 stock = book.stocks_entrepots.filter(
                     quantite_reelle__gte=prt_qty
                 ).order_by('-quantite_reelle').first()
+                if not stock:
+                    stock = book.stocks_entrepots.first()
                 if stock:
                     stock.quantite_reservee = F('quantite_reservee') + prt_qty
                     stock.save(update_fields=['quantite_reservee'])
@@ -560,24 +565,134 @@ class WholesalerNotificationsListView(APIView):
     permission_classes = [IsAuthenticated, IsWholesaler]
 
     def get(self, request):
-        user = request.user
-        notifs = WholesaleNotification.objects.filter(
-            Q(user=user) | Q(user__isnull=True)
-        )[:30]
+        from apps.catalog.models import Ouvrage
+        from apps.commerce.models import LigneCommande, WholesaleOrderItem
+        from django.db.models import Sum, F
 
-        data = [
-            {
-                "id": str(n.id),
-                "type": n.notification_type,
-                "title": n.title,
-                "book_id": str(n.book_id) if n.book_id else "",
-                "book_title": n.book.title if n.book else "",
-                "cover_url": n.book.cover_url if n.book else "/placeholder-cover.jpg",
-                "description": n.description,
-                "created_at": n.created_at.isoformat(),
-                "is_read": n.is_read,
-                "wholesale_price": float(n.wholesale_price),
-            }
-            for n in notifs
-        ]
-        return Response({"success": True, "data": data, "error": None})
+        # 1. Nouvelles Parutions (ouvrages publiés triés par date la plus récente)
+        recent_books = (
+            Ouvrage.objects.filter(status='published')
+            .select_related('discipline', 'publisher')
+            .prefetch_related('authors')
+            .order_by('-publication_date', '-created_at')[:24]
+        )
+
+        new_releases = []
+        for b in recent_books:
+            pricing = compute_role_price(b, "wholesaler")
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]
+            if not authors_list and hasattr(b, "auteur") and b.auteur:
+                authors_list = [b.auteur]
+
+            pub_date = b.publication_date.isoformat() if b.publication_date else (
+                b.created_at.date().isoformat() if b.created_at else "2026-01-01"
+            )
+
+            new_releases.append({
+                "id": str(b.id),
+                "title": b.title,
+                "authors": authors_list if authors_list else ["Auteur LAHA"],
+                "discipline": b.discipline.name if b.discipline else "Général",
+                "cover_url": b.cover_url or "",
+                "publication_date": pub_date,
+                "format_type": b.format_type,
+                "is_paper_available": bool(b.is_paper_available),
+                "public_digital_price": float(b.price_digital),
+                "public_paper_price": float(b.price_paper),
+                "digital_wholesale_price": pricing["digital_price"],
+                "print_wholesale_price": pricing["paper_price"],
+                "digital_discount_percent": pricing["digital_discount_pct"],
+                "print_discount_percent": pricing["paper_discount_pct"],
+                "summary": b.summary or "",
+                "isbn": b.isbn or "",
+            })
+
+        # 2. Meilleures Ventes (ouvrages publiés ordonnés par volume de ventes B2C + B2B)
+        all_published = (
+            Ouvrage.objects.filter(status='published')
+            .select_related('discipline', 'publisher')
+            .prefetch_related('authors')
+        )
+        scored_books = []
+        for b in all_published:
+            b2c = LigneCommande.objects.filter(ouvrage=b, commande__statut_paiement='paid').aggregate(t=Sum('quantity'))['t'] or 0
+            b2b = WholesaleOrderItem.objects.filter(book=b).exclude(order__status='cancelled').aggregate(t=Sum(F('digital_licenses_qty') + F('print_copies_qty')))['t'] or 0
+            total_sold = b2c + b2b
+            pricing = compute_role_price(b, "wholesaler")
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]
+            if not authors_list and hasattr(b, "auteur") and b.auteur:
+                authors_list = [b.auteur]
+
+            pub_date = b.publication_date.isoformat() if b.publication_date else (
+                b.created_at.date().isoformat() if b.created_at else "2026-01-01"
+            )
+
+            scored_books.append({
+                "id": str(b.id),
+                "title": b.title,
+                "authors": authors_list if authors_list else ["Auteur LAHA"],
+                "discipline": b.discipline.name if b.discipline else "Général",
+                "cover_url": b.cover_url or "",
+                "publication_date": pub_date,
+                "format_type": b.format_type,
+                "is_paper_available": bool(b.is_paper_available),
+                "public_digital_price": float(b.price_digital),
+                "public_paper_price": float(b.price_paper),
+                "digital_wholesale_price": pricing["digital_price"],
+                "print_wholesale_price": pricing["paper_price"],
+                "digital_discount_percent": pricing["digital_discount_pct"],
+                "print_discount_percent": pricing["paper_discount_pct"],
+                "total_sold": total_sold,
+                "summary": b.summary or "",
+                "isbn": b.isbn or "",
+            })
+
+        # Trier par total_sold décroissant puis date
+        scored_books.sort(key=lambda x: (x["total_sold"], x["publication_date"]), reverse=True)
+        best_sellers = []
+        for idx, sb in enumerate(scored_books[:24], 1):
+            sb["rank"] = idx
+            best_sellers.append(sb)
+
+        # 3. Liste de notifications (pour la rétrocompatibilité)
+        notifications_list = []
+        for nr in new_releases[:5]:
+            notifications_list.append({
+                "id": f"notif-new-{nr['id']}",
+                "type": "nouveaute",
+                "title": f"Nouvelle Parution : {nr['title']}",
+                "book_id": nr["id"],
+                "book_title": nr["title"],
+                "cover_url": nr["cover_url"],
+                "description": f"Ajouté au catalogue LAHAThèque en {nr['discipline']}. Tarif préférentiel grossiste disponible.",
+                "created_at": nr["publication_date"],
+                "is_read": False,
+                "wholesale_price": nr["print_wholesale_price"] if nr["is_paper_available"] else nr["digital_wholesale_price"],
+            })
+
+        for bs in best_sellers[:5]:
+            notifications_list.append({
+                "id": f"notif-best-{bs['id']}",
+                "type": "meilleure_vente",
+                "title": f"Top Vente #{bs['rank']} : {bs['title']}",
+                "book_id": bs["id"],
+                "book_title": bs["title"],
+                "cover_url": bs["cover_url"],
+                "description": f"Grand succès d'édition ({bs['total_sold']} exemplaires écoulés). Recommandé pour réapprovisionnement.",
+                "created_at": bs["publication_date"],
+                "is_read": False,
+                "wholesale_price": bs["print_wholesale_price"] if bs["is_paper_available"] else bs["digital_wholesale_price"],
+            })
+
+        return Response({
+            "success": True,
+            "data": {
+                "new_releases": new_releases,
+                "best_sellers": best_sellers,
+                "notifications": notifications_list,
+            },
+            "error": None
+        })
+
+    def patch(self, request, pk=None):
+        return Response({"success": True, "message": "Notification marquée comme lue."})

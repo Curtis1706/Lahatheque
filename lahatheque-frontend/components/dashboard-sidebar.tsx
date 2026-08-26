@@ -398,18 +398,23 @@ export function DashboardSidebar() {
 
   // Synchronise l'ouverture des sous-menus selon la route courante
   useEffect(() => {
+    let matched = false;
     for (const group of groups) {
       for (const item of group.items) {
         if (item.sublinks) {
           const isChildActive = item.sublinks.some((sub) => pathname === sub.href);
           if (isChildActive) {
             setOpenSection(item.label);
+            matched = true;
             return;
           }
         }
       }
     }
-  }, [pathname, groups]);
+    if (!matched) {
+      setOpenSection(null);
+    }
+  }, [pathname]);
 
   return (
     <AnimatedSidebar ariaLabel="Menu de navigation principal" collapsible="icon">
@@ -479,6 +484,8 @@ export function DashboardSidebar() {
                             setOpenSection((current) =>
                               current === item.label ? null : item.label
                             );
+                          } else {
+                            setOpenSection(null);
                           }
                         }}
                       >

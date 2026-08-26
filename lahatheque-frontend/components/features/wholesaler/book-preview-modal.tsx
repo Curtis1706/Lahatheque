@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { BookOpen, FileText, Eye, ShieldCheck, Tag, X, ExternalLink } from "lucide-react";
+import { BookOpen, FileText, Eye, ShieldCheck, Tag, X, ExternalLink, Package } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import type { WholesalerBookItem } from "@/lib/types/wholesaler";
 
@@ -9,7 +9,8 @@ interface BookPreviewModalProps {
   book: WholesalerBookItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onAddToCart: (book: WholesalerBookItem) => void;
+  onAddToCart?: (book: WholesalerBookItem) => void;
+  onOrder?: (book: WholesalerBookItem) => void;
 }
 
 export function BookPreviewModal({
@@ -17,6 +18,7 @@ export function BookPreviewModal({
   isOpen,
   onClose,
   onAddToCart,
+  onOrder,
 }: BookPreviewModalProps) {
   const [activeTab, setActiveTab] = useState<"metadata" | "excerpt">("metadata");
 
@@ -142,21 +144,35 @@ export function BookPreviewModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy"
+            className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy cursor-pointer"
           >
             Fermer
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              onAddToCart(book);
-              onClose();
-            }}
-            className="px-5 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center gap-2 shadow-xs"
-          >
-            <BookOpen className="w-4 h-4" />
-            Ajouter au Panier Groupé
-          </button>
+          <div className="flex items-center gap-2">
+            {onAddToCart && (
+              <button
+                type="button"
+                onClick={() => {
+                  onAddToCart(book);
+                  onClose();
+                }}
+                className="px-3.5 py-2.5 rounded-xl border border-border text-xs font-bold text-navy hover:border-gold transition-colors cursor-pointer"
+              >
+                + Panier Groupé
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                if (onOrder) onOrder(book);
+              }}
+              className="px-5 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center gap-2 shadow-xs cursor-pointer"
+            >
+              <Package className="w-4 h-4" />
+              Commander cet Ouvrage
+            </button>
+          </div>
         </div>
       </div>
     </Modal>

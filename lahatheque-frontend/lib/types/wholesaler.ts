@@ -25,6 +25,7 @@ export interface WholesalerBookItem {
   public_price: number; // Prix public indicatif
   min_quantity: number; // Quantité minimale pour tarif grossiste
   stock_available_print: number;
+  is_paper_available?: boolean;
   sample_excerpt_url?: string;
   summary: string;
 }
@@ -83,6 +84,33 @@ export interface WholesalerNotification {
   created_at: string;
   is_read: boolean;
   wholesale_price: number;
+}
+
+export interface WholesaleTrendBook {
+  id: string;
+  title: string;
+  authors: string[];
+  discipline: string;
+  cover_url: string;
+  publication_date: string;
+  format_type: string;
+  is_paper_available: boolean;
+  public_digital_price: number;
+  public_paper_price: number;
+  digital_wholesale_price: number;
+  print_wholesale_price: number;
+  digital_discount_percent: number;
+  print_discount_percent: number;
+  total_sold?: number;
+  rank?: number;
+  summary: string;
+  isbn: string;
+}
+
+export interface WholesaleTrendingData {
+  new_releases: WholesaleTrendBook[];
+  best_sellers: WholesaleTrendBook[];
+  notifications: WholesalerNotification[];
 }
 
 export interface WholesalerKpis {

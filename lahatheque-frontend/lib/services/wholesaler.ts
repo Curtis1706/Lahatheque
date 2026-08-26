@@ -7,6 +7,7 @@ import type {
   WholesalerBookItem,
   WholesalerOrder,
   WholesalerNotification,
+  WholesaleTrendingData,
   WholesalerKpis,
   WholesalerCartItem,
   WholesaleCompanyProfile,
@@ -115,10 +116,30 @@ export async function requestOrderCancellation(
   return true;
 }
 
-// ─── Notifications Grossiste ─────────────────────────────────────────────────
+// ─── Notifications & Tendances Grossiste ─────────────────────────────────────
+
+export async function getWholesalerTrendingData(): Promise<WholesaleTrendingData> {
+  const res = await bffGet<any>("/notifications/");
+  if (res && Array.isArray(res.new_releases)) {
+    return res as WholesaleTrendingData;
+  }
+  if (Array.isArray(res)) {
+    return {
+      new_releases: [],
+      best_sellers: [],
+      notifications: res,
+    };
+  }
+  return {
+    new_releases: res?.new_releases || [],
+    best_sellers: res?.best_sellers || [],
+    notifications: res?.notifications || [],
+  };
+}
 
 export async function getWholesalerNotifications(): Promise<WholesalerNotification[]> {
-  return bffGet<WholesalerNotification[]>("/notifications/");
+  const data = await getWholesalerTrendingData();
+  return data.notifications;
 }
 
 export async function markNotificationAsRead(id: string): Promise<boolean> {
