@@ -474,7 +474,7 @@ export async function getPartnerReaderSessions(): Promise<PartnerReaderSessionIt
     progressPercent: s.progressPercent || 0,
     currentPage: s.currentPage || 1,
     totalPages: s.totalPages || 1,
-    readingTimeMinutes: s.durationMinutes || s.readingTimeMinutes || 0,
+    readingTimeMinutes: s.durationMinutes ?? s.readingTimeMinutes ?? 0,
     quizCompleted: Boolean(s.quizScore !== null && s.quizScore !== undefined),
     quizScore: s.quizScore,
     status: s.status || "opened",

@@ -104,6 +104,7 @@ class ReaderSessionCreateSerializer(serializers.Serializer):
     external_user_ref = serializers.CharField(max_length=255, required=True)
     external_user_name = serializers.CharField(max_length=255, required=False, default="")
     external_user_email = serializers.EmailField(required=False, allow_blank=True)
+    user_ip = serializers.CharField(max_length=64, required=False, allow_blank=True)
 
     return_url = serializers.URLField(max_length=500, required=True)
     ttl_seconds = serializers.IntegerField(default=3600, min_value=300, max_value=86400, required=False)
@@ -219,7 +220,7 @@ class ReaderSessionDetailSerializer(serializers.ModelSerializer):
             "id": str(obj.id),
             "title": obj.custom_document_title or "Document Partenaire",
             "author": obj.custom_document_author or "Auteur Partenaire",
-            "total_pages": 64,
+            "total_pages": (obj.metadata.get('total_pages') if isinstance(obj.metadata, dict) and obj.metadata.get('total_pages') else 1),
             "has_audio": bool(obj.custom_audio_url),
         }
 
@@ -254,4 +255,5 @@ class ProgressSyncSerializer(serializers.Serializer):
     """Sérialiseur de synchronisation de la progression de lecture."""
     token = serializers.CharField(required=False)
     current_page = serializers.IntegerField(min_value=1)
+    total_pages = serializers.IntegerField(min_value=1, required=False)
     reading_time_seconds = serializers.IntegerField(min_value=0, required=False, default=0)
