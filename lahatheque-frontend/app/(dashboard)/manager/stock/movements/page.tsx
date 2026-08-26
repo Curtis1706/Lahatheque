@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { InlineLoader } from "@/components/ui/page-loader";
 import {
   getStockMovements,
   createRestock,
@@ -251,7 +252,7 @@ function RestockModal({
               className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
             >
               {saving ? (
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <InlineLoader size={16} />
               ) : (
                 <Check className="w-4 h-4" />
               )}
@@ -390,7 +391,7 @@ function ManualExitModal({
             </button>
             <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 rounded-xl bg-error text-white text-xs font-bold hover:bg-error/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]">
               {saving ? (
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <InlineLoader size={16} />
               ) : (
                 <ArrowDownCircle className="w-4 h-4" />
               )}

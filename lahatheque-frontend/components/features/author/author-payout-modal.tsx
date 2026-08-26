@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { requestAuthorPayout } from "@/lib/services/author";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export interface AuthorPayoutModalProps {
   isOpen: boolean;
@@ -168,7 +169,7 @@ export function AuthorPayoutModal({
               className="px-5 py-2.5 rounded-xl bg-gold text-navy font-bold hover:bg-gold-light transition-colors min-h-[44px] shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
             >
               {submitting ? (
-                <span className="w-4 h-4 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+                <InlineLoader size={16} />
               ) : (
                 <>
                   <CreditCard className="w-4 h-4" />

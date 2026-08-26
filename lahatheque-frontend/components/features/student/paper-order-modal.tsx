@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { PackageCheck, Truck, ShoppingBag, Loader2 } from "lucide-react";
+import { PackageCheck, Truck, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import type { ClientBookAccess } from "@/lib/types/student";
 import { BookCover } from "./book-cover";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface PaperOrderModalProps {
   book: (Partial<ClientBookAccess> & { id: string; title: string; author?: string; price_paper?: number; paper_price?: number }) | null;
@@ -156,7 +157,7 @@ export function PaperOrderModal({
             className="px-5 py-2 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-all flex items-center gap-2 shadow-xs min-h-[40px] disabled:opacity-50"
           >
             {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <InlineLoader size={16} />
             ) : (
               <ShoppingBag className="w-4 h-4" />
             )}

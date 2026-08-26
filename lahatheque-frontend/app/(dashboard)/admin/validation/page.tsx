@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
+import { InlineLoader } from "@/components/ui/page-loader";
 import {
   getAdminValidationProofs,
   processAdminValidation,
@@ -426,7 +427,7 @@ export default function AdminValidationPage() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <InlineLoader size={14} />
                   <span>Publication en cours...</span>
                 </>
               ) : (
@@ -493,7 +494,7 @@ export default function AdminValidationPage() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <InlineLoader size={14} />
                   <span>Enregistrement...</span>
                 </>
               ) : (

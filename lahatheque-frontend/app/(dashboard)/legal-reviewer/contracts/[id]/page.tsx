@@ -130,7 +130,7 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
         {/* Liens rapides & Actions de lecture */}
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           <Link
-            href={`/catalog/reader/lesson_pdf?contract_id=${contract.id}&file=${encodeURIComponent(contract.file_url || "/PromptBreeder_Original_Paper-2309.16797v1.pdf")}&title=${encodeURIComponent(contract.title)}`}
+            href={`/catalog/reader/lesson_pdf?contract_id=${contract.id}&file=${encodeURIComponent(contract.file_url || "")}&title=${encodeURIComponent(contract.title)}`}
             target="_blank"
             className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all inline-flex items-center gap-2 shadow-xs min-h-[44px] cursor-pointer"
             title="Ouvrir dans la liseuse officielle LAHAThèque (Modes FlipBook 3D et Défilement continu)"

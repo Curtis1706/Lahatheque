@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileBarChart, Download, FileSpreadsheet, FileText, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 type ReportType = "stock" | "delivery";
 
@@ -175,7 +176,7 @@ export default function ManagerReportsPage() {
                   className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-xs font-semibold text-navy hover:border-gold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-40 min-h-[40px]"
                 >
                   {generating === `${report.id}-excel` ? (
-                    <span className="w-3.5 h-3.5 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
+                    <InlineLoader size={14} />
                   ) : (
                     <Download className="w-3.5 h-3.5" />
                   )}
@@ -218,7 +219,7 @@ export default function ManagerReportsPage() {
                   className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-xs font-semibold text-navy hover:border-gold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-40 min-h-[40px]"
                 >
                   {generating === `${report.id}-excel` ? (
-                    <span className="w-3.5 h-3.5 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
+                    <InlineLoader size={14} />
                   ) : (
                     <Download className="w-3.5 h-3.5" />
                   )}

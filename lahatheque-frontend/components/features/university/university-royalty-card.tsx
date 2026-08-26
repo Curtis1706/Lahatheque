@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface UniversityRoyaltyCardProps {
   availableBalance: number;
@@ -193,7 +194,7 @@ export function UniversityRoyaltyCard({
                 className="flex-1 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center justify-center gap-2"
               >
                 {loading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                 ) : (
                   <CheckCircle2 className="w-4 h-4 text-gold" />
                 )}

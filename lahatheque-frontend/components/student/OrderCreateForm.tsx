@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, X, Loader2, ShoppingCart } from "lucide-react";
+import { Plus, Trash2, X, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { getStudentCatalog } from "@/lib/services/student";
 import { createOrder, type OrderItemPayload } from "@/lib/services/commerce-orders";
 import type { BookAPI } from "@/lib/services/student";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface CartItem {
   ouvrage_id: string;
@@ -510,7 +511,7 @@ export default function OrderCreateForm({
           className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors min-h-[44px]"
         >
           {submitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+            <InlineLoader size={16} />
           ) : null}
           {submitting ? "Création en cours…" : "Créer la commande"}
         </button>

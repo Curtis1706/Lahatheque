@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 import { createOrder } from "@/lib/services/commerce-orders";
 import type { BookAPI } from "@/lib/services/student";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 type Format = "digital" | "paper";
 
@@ -494,7 +495,7 @@ export function AuthorCatalogOrderModal({
               >
                 {submitting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin text-gold" />
+                    <InlineLoader size={16} />
                     <span>Traitement...</span>
                   </>
                 ) : settlementMode === "credit" ? (

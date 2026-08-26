@@ -30,3 +30,6 @@ class IsAdminOrSuperAdmin(BasePermission):
 class IsLegalReviewerRole(IsRoleUser):
     required_role = 'legal_reviewer'
 
+class IsWholesaler(IsRoleUser):
+    required_role = 'wholesaler'
+

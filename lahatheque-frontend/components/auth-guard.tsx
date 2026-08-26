@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
 import type { User } from '@/hooks/use-auth'
+import { PageLoader } from '@/components/ui/page-loader'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -205,11 +206,8 @@ export function AuthGuard({ children, requiredRole, requiredRoles }: AuthGuardPr
 
   if (loading) {
     return (
-      <div suppressHydrationWarning className="min-h-screen bg-gradient-to-br from-laha-black via-laha-black to-laha-gold-dark flex items-center justify-center">
-        <div suppressHydrationWarning className="text-center">
-          <div suppressHydrationWarning className="w-16 h-16 border-4 border-laha-gold border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p suppressHydrationWarning className="text-white/70">Chargement...</p>
-        </div>
+      <div suppressHydrationWarning className="min-h-screen bg-background flex items-center justify-center">
+        <PageLoader label="Vérification de votre session sécurisée" />
       </div>
     )
   }

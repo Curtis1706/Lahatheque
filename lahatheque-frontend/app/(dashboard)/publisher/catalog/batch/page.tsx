@@ -8,6 +8,7 @@ import { FileDropzone } from "@/components/features/layout-artist/file-dropzone"
 import { BatchImportReportView } from "@/components/features/publisher/batch-import-report";
 import { getBatchImportReports, uploadBatchCatalogue } from "@/lib/services/publisher";
 import type { BatchImportReport } from "@/lib/types/publisher";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 
 export default function PublisherBatchImportPage() {
   const [reports, setReports] = useState<BatchImportReport[]>([]);
@@ -131,7 +132,7 @@ export default function PublisherBatchImportPage() {
           >
             {uploading ? (
               <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <InlineLoader size={16} />
                 <span>Analyse syntaxique en cours...</span>
               </>
             ) : (
@@ -148,10 +149,7 @@ export default function PublisherBatchImportPage() {
       <div className="space-y-4">
         <h3 className="font-serif font-bold text-navy text-base">Historique des Lots et Rapports de Conformité</h3>
         {loading ? (
-          <div className="p-8 rounded-3xl bg-background border border-border flex items-center justify-center gap-2">
-            <span className="w-5 h-5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
-            <span className="text-xs text-foreground-muted">Chargement des rapports...</span>
-          </div>
+          <PageLoader label="Chargement des rapports" />
         ) : reports.length === 0 ? (
           <div className="p-8 rounded-3xl bg-background border border-border text-center text-xs text-foreground-muted">
             Aucun import de catalogue enregistré.

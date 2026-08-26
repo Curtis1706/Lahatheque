@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { BookOpen, ArrowLeft, BarChart3, Globe, Layers, DollarSign, Download } from "lucide-react";
 import { getAuthorPublishedBookDetails } from "@/lib/services/author";
 import type { AuthorPublishedBook } from "@/lib/types/author";
+import { PageLoader } from "@/components/ui/page-loader";
 
 export default function AuthorBookDetailPage() {
   const params = useParams();
@@ -25,12 +26,7 @@ export default function AuthorBookDetailPage() {
   }, [bookId]);
 
   if (loading || !book) {
-    return (
-      <div className="p-8 text-center space-y-4">
-        <span className="w-8 h-8 border-2 border-navy border-t-gold rounded-full animate-spin inline-block" />
-        <p className="text-xs text-foreground-muted font-mono">Chargement du détail de l&apos;ouvrage...</p>
-      </div>
-    );
+    return <PageLoader label="Chargement du détail de l'ouvrage" />;
   }
 
   return (

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+
+const SENSITIVE_PREFIXES = ["contrats/", "manuscripts/", "publisher_deposits/"];
 
 export async function GET(
   request: NextRequest,
@@ -10,25 +10,39 @@ export async function GET(
   const subPath = (resolvedParams.path || []).join("/");
   const cleanPath = subPath.replace(/^\/+|\/+$/g, "");
 
-  // 1. Essai direct sur le stockage d'objets Cloudflare R2 (fichiers réels du catalogue & contrats)
-  const r2PublicDomain = (process.env.NEXT_PUBLIC_R2_URL || process.env.CLOUDFLARE_R2_PUBLIC_URL || "https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev").replace(/\/+$/, "");
+  const accessToken =
+    request.cookies.get("laha_access")?.value ||
+    request.cookies.get("access_token")?.value;
+
+  if (!accessToken) {
+    return new NextResponse("Authentification requise.", { status: 401 });
+  }
+
+  if (SENSITIVE_PREFIXES.some((prefix) => cleanPath.startsWith(prefix))) {
+    return new NextResponse(
+      "Ce type de document doit être consulté via son endpoint sécurisé dédié.",
+      { status: 403 }
+    );
+  }
+
+  const r2PublicDomain = (
+    process.env.NEXT_PUBLIC_R2_URL ||
+    process.env.CLOUDFLARE_R2_PUBLIC_URL ||
+    "https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev"
+  ).replace(/\/+$/, "");
   const targetR2Url = `${r2PublicDomain}/${cleanPath}`;
 
   try {
-    const r2Res = await fetch(targetR2Url, {
-      method: "GET",
-      cache: "no-store",
-    });
-
+    const r2Res = await fetch(targetR2Url, { method: "GET", cache: "no-store" });
     if (r2Res.ok) {
-      const contentType = r2Res.headers.get("content-type") || "application/pdf";
+      const contentType = r2Res.headers.get("content-type") || "application/octet-stream";
       const blob = await r2Res.arrayBuffer();
       return new NextResponse(blob, {
         status: 200,
         headers: {
           "Content-Type": contentType,
           "Content-Disposition": "inline",
-          "Cache-Control": "public, max-age=3600",
+          "Cache-Control": "private, max-age=3600",
         },
       });
     }
@@ -36,52 +50,29 @@ export async function GET(
     // R2 indisponible, continuer vers Django media
   }
 
-  // 2. Essai de repli sur Django media local
   const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
   const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
   const targetUrl = `${djangoBaseUrl}/media/${cleanPath}`;
 
   try {
-    const backendRes = await fetch(targetUrl, {
-      method: "GET",
-      cache: "no-store",
-    });
-
+    const backendRes = await fetch(targetUrl, { method: "GET", cache: "no-store" });
     if (backendRes.ok) {
-      const contentType = backendRes.headers.get("content-type") || "application/pdf";
+      const contentType = backendRes.headers.get("content-type") || "application/octet-stream";
       const blob = await backendRes.arrayBuffer();
       return new NextResponse(blob, {
         status: 200,
         headers: {
           "Content-Type": contentType,
           "Content-Disposition": "inline",
-          "Cache-Control": "public, max-age=3600",
+          "Cache-Control": "private, max-age=3600",
         },
       });
     }
   } catch {
-    // Backend unreachable or error, fallback below
+    // Backend inaccessible
   }
 
-  // Fallback vers le document PDF modèle pour garantir qu'aucune liseuse ne reçoit un 404
-  try {
-    const fallbackPath = path.join(process.cwd(), "public", "PromptBreeder_Original_Paper-2309.16797v1.pdf");
-    if (fs.existsSync(fallbackPath)) {
-      const fileBuffer = fs.readFileSync(fallbackPath);
-      return new NextResponse(fileBuffer, {
-        status: 200,
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": "inline",
-          "Cache-Control": "public, max-age=3600",
-        },
-      });
-    }
-  } catch (fsErr) {
-    console.error("[Uploads Proxy Fallback Error]", fsErr);
-  }
-
-  return new NextResponse("Fichier introuvable", { status: 404 });
+  return new NextResponse("Fichier introuvable.", { status: 404 });
 }
 
 export async function HEAD(

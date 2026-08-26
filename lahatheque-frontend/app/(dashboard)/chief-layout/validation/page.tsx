@@ -7,12 +7,14 @@ import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { ChiefExaminationModal } from "@/components/features/chief-layout/chief-examination-modal";
+import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 import { getPendingDeposits, validateDeposit, requestRevision } from "@/lib/services/layout-artist";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
 export default function ChefValidationPage() {
   const [deposits, setDeposits] = useState<LayoutDeposit[]>([]);
+  const [disciplines, setDisciplines] = useState<DisciplineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
@@ -20,9 +22,18 @@ export default function ChefValidationPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const data = await getPendingDeposits();
-    setDeposits(data);
-    setLoading(false);
+    try {
+      const [depositsData, disciplinesData] = await Promise.all([
+        getPendingDeposits(),
+        getDisciplines(),
+      ]);
+      setDeposits(depositsData);
+      setDisciplines(disciplinesData);
+    } catch {
+      toast.error("Erreur de chargement des dépôts.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -194,23 +205,27 @@ export default function ChefValidationPage() {
             <Filter className="w-3 h-3 text-gold" />
             Discipline :
           </span>
-          {[
-            { id: "all", label: "Toutes les disciplines" },
-            { id: "Droit & Sciences Politiques", label: "Droit" },
-            { id: "Médecine & Santé", label: "Médecine" },
-            { id: "Économie & Gestion", label: "Économie" },
-            { id: "Sciences Humaines", label: "Sciences Humaines" },
-          ].map((d) => (
+          <button
+            onClick={() => setDisciplineFilter("all")}
+            className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-colors border cursor-pointer ${
+              disciplineFilter === "all"
+                ? "bg-navy text-white border-navy"
+                : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
+            }`}
+          >
+            Toutes les disciplines ({deposits.length})
+          </button>
+          {disciplines.map((d) => (
             <button
               key={d.id}
-              onClick={() => setDisciplineFilter(d.id)}
-              className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-colors border ${
-                disciplineFilter === d.id
+              onClick={() => setDisciplineFilter(d.name)}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-colors border cursor-pointer ${
+                disciplineFilter === d.name
                   ? "bg-navy text-white border-navy"
                   : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
               }`}
             >
-              {d.label}
+              {d.name}
             </button>
           ))}
         </div>

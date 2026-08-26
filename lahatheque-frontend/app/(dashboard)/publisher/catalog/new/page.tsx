@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +22,8 @@ import { toast } from "sonner";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { createPublisherBook, extractBookMetadataWithAi } from "@/lib/services/publisher";
 import type { SalesModel, PublisherAiMetadataSuggestion } from "@/lib/types/publisher";
+import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function NewPublisherBookPage() {
   const router = useRouter();
@@ -40,10 +42,20 @@ export default function NewPublisherBookPage() {
   const [coAuthors, setCoAuthors] = useState("");
 
   // Bloc 3: Classification & IA
+  const [disciplinesList, setDisciplinesList] = useState<DisciplineItem[]>([]);
   const [discipline, setDiscipline] = useState("Droit Public & Administration");
   const [keywords, setKeywords] = useState("droit, afrique, uac");
   const [targetAudience, setTargetAudience] = useState<"universitaire" | "professionnel" | "grand_public">("universitaire");
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
+
+  useEffect(() => {
+    getDisciplines().then((list) => {
+      if (list && list.length > 0) {
+        setDisciplinesList(list);
+        setDiscipline(list[0].name);
+      }
+    });
+  }, []);
 
   // Bloc 4: Commercial
   const [price, setPrice] = useState(12000);
@@ -174,7 +186,7 @@ export default function NewPublisherBookPage() {
           className="px-4 py-2.5 rounded-xl bg-gold/15 text-gold border border-gold/30 hover:bg-gold/25 font-bold text-xs transition-colors flex items-center gap-2 shadow-xs shrink-0 min-h-[44px] disabled:opacity-50"
         >
           {aiAnalyzing ? (
-            <span className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+            <InlineLoader size={16} />
           ) : (
             <Bot className="w-4 h-4 text-gold" />
           )}
@@ -353,7 +365,7 @@ export default function NewPublisherBookPage() {
                 className="text-xs font-bold text-gold hover:underline inline-flex items-center gap-1.5 disabled:opacity-50"
               >
                 {aiAnalyzing ? (
-                  <span className="w-3.5 h-3.5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+                  <InlineLoader size={14} />
                 ) : (
                   <Bot className="w-3.5 h-3.5" />
                 )}
@@ -369,12 +381,11 @@ export default function NewPublisherBookPage() {
                   onChange={(e) => setDiscipline(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
                 >
-                  <option value="Droit Public & Administration">Droit Public &amp; Administration</option>
-                  <option value="Sciences Économiques & Gestion">Sciences Économiques &amp; Gestion</option>
-                  <option value="Médecine & Santé Publique">Médecine &amp; Santé Publique</option>
-                  <option value="Agronomie & Environnement">Agronomie &amp; Environnement</option>
-                  <option value="Sciences & Technologies">Sciences &amp; Technologies</option>
-                  <option value="Lettres & Sciences Humaines">Lettres &amp; Sciences Humaines</option>
+                  {disciplinesList.map((d) => (
+                    <option key={d.id} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -589,7 +600,7 @@ export default function NewPublisherBookPage() {
             >
               {submitting ? (
                 <>
-                  <span className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                   <span>Envoi en cours...</span>
                 </>
               ) : (

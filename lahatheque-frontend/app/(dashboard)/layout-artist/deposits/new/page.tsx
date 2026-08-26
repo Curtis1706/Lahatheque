@@ -32,6 +32,7 @@ import { createDeposit, createDepositWithFiles, searchPreEditions, type PreEditi
 import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/ai";
 import type { ClassificationSource } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 import { 
   GENRE_CATEGORIES, 
@@ -528,7 +529,9 @@ export default function NewDepositPage() {
                       className="w-full bg-background-secondary border border-border rounded-xl pl-9 pr-3 py-2.5 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                     />
                     {searchingPreEdition && (
-                      <span className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full animate-spin absolute right-3 top-1/2 -translate-y-1/2" />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gold">
+                        <InlineLoader size={14} />
+                      </div>
                     )}
                   </div>
                   {preEditionResults.length > 0 && (

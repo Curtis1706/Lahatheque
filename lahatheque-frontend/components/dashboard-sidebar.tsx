@@ -52,6 +52,7 @@ import {
   TrendingUp,
   Landmark,
   Layers,
+  Tag,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -205,6 +206,7 @@ export function DashboardSidebar() {
           { label: "Mon Université", href: "/student/university", icon: <GraduationCap className="w-5 h-5" /> },
           { label: "Profil & Paramètres", href: "/student/profile", icon: <UserIcon className="w-5 h-5" /> },
         ];
+      case "wholesaler":
       case "super_client":
         return [
           { label: "Vue d'ensemble", href: "/wholesaler", icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -344,8 +346,16 @@ export function DashboardSidebar() {
               { label: "Grossistes", href: "/admin/users/wholesalers", icon: <PackageCheck className="w-4 h-4 text-gold" /> },
             ]
           },
-          { label: "Catalogue Global", href: "/admin/catalog", icon: <BookOpen className="w-5 h-5" /> },
-          { label: "Disciplines & Catégories", href: "/admin/catalog/disciplines", icon: <Layers className="w-5 h-5" /> },
+          { 
+            label: "Catalogue & Tarifs", 
+            href: "/admin/catalog", 
+            icon: <BookOpen className="w-5 h-5" />,
+            sublinks: [
+              { label: "Tous les Ouvrages", href: "/admin/catalog", icon: <BookOpen className="w-4 h-4 text-gold" /> },
+              { label: "Grille & Remises Grossistes", href: "/admin/catalog/pricing", icon: <Tag className="w-4 h-4 text-gold" /> },
+              { label: "Disciplines & Catégories", href: "/admin/catalog/disciplines", icon: <Layers className="w-4 h-4 text-gold" /> },
+            ]
+          },
           { label: "Validation BAT & Maquettes", href: "/admin/validation", icon: <FileCheck2 className="w-5 h-5" /> },
           { label: "Contrats & Droits d'Auteur", href: "/admin/contracts", icon: <Scale className="w-5 h-5" /> },
           { 
@@ -423,7 +433,7 @@ export function DashboardSidebar() {
                   <p className="font-semibold text-xs text-white truncate">{userDisplayName}</p>
                 </Link>
                 <p className="text-[10px] text-gold truncate">
-                  {user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "publisher" ? "Éditeur Tiers • Partenaire" : user.role === "super_client" ? "Grossiste • Partenaire Revente" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : user.role === "legal_reviewer" ? "Juriste • Gestion Légale & Droits" : user.role === "chief_layout" ? "Chef Maquettiste • Validateur" : user.role === "layout_artist" ? "Maquettiste • Création Catalogue" : "Lecteur • LAHAThèque"}
+                  {user.role === "author" ? "Auteur • LAHA Éditions" : user.role === "publisher" ? "Éditeur Tiers • Partenaire" : user.role === "wholesaler" || user.role === "super_client" ? "Grossiste • Partenaire Revente" : user.role === "manager" ? "Gestionnaire • Stock & Livraison" : user.role === "legal_reviewer" ? "Juriste • Gestion Légale & Droits" : user.role === "chief_layout" ? "Chef Maquettiste • Validateur" : user.role === "layout_artist" ? "Maquettiste • Création Catalogue" : "Lecteur • LAHAThèque"}
                 </p>
               </div>
             </div>

@@ -3,10 +3,11 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ShoppingCart, Building2, Send, Plus, Trash2, BookOpen, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, ShoppingCart, Building2, Send, Plus, Trash2, BookOpen, AlertCircle } from "lucide-react";
 import { getWholesalerBooks, createWholesalerOrder } from "@/lib/services/wholesaler";
 import type { WholesalerBookItem, WholesalerCartItem } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 
 export default function NewWholesalerOrderPage() {
   const router = useRouter();
@@ -133,9 +134,8 @@ export default function NewWholesalerOrderPage() {
       </div>
 
       {loadingCatalog ? (
-        <div className="p-12 text-center rounded-3xl bg-background border border-border space-y-3">
-          <Loader2 className="w-8 h-8 text-gold animate-spin mx-auto" />
-          <p className="text-xs text-foreground-muted">Chargement du catalogue grossiste...</p>
+        <div className="p-12 text-center rounded-3xl bg-background border border-border">
+          <PageLoader label="Chargement du catalogue grossiste" />
         </div>
       ) : catalogError ? (
         <div className="p-6 rounded-3xl bg-background border border-border flex items-center gap-3 text-red-600">
@@ -306,7 +306,7 @@ export default function NewWholesalerOrderPage() {
                 className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-xs disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                 ) : (
                   <>
                     <Send className="w-4 h-4 text-gold" />

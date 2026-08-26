@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
 import {
   getUniversityCatalog,
   createUniversityPaperOrder,
@@ -319,7 +320,7 @@ export default function NewUniversityPaperOrderPage() {
             className="px-6 py-3 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs font-bold transition-all inline-flex items-center gap-2 shadow-xs min-h-[44px] disabled:opacity-50"
           >
             {loading ? (
-              <div className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
+              <InlineLoader size={16} />
             ) : (
               <CheckCircle2 className="w-4 h-4" />
             )}

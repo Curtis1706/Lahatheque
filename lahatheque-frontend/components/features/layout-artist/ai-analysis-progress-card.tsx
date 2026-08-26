@@ -9,10 +9,10 @@ import {
   BookOpen, 
   CheckCircle2, 
   ScanLine, 
-  Loader2,
   FileCode
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface AIAnalysisProgressCardProps {
   fileName?: string;
@@ -105,7 +105,7 @@ export function AIAnalysisProgressCard({ fileName, className }: AIAnalysisProgre
                 Analyse Intelligente en Cours
               </h3>
               <span className="px-2 py-0.5 rounded-full bg-gold/20 text-gold text-[10px] font-mono font-semibold flex items-center gap-1 border border-gold/30">
-                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                <InlineLoader size={10} />
                 {progress}%
               </span>
             </div>
@@ -187,7 +187,9 @@ export function AIAnalysisProgressCard({ fileName, className }: AIAnalysisProgre
               {isDone ? (
                 <CheckCircle2 className="w-3 h-3 text-gold shrink-0" />
               ) : isCurrent ? (
-                <Loader2 className="w-3 h-3 text-gold animate-spin shrink-0" />
+                <div className="shrink-0 text-gold flex items-center">
+                  <InlineLoader size={12} />
+                </div>
               ) : (
                 <span className="w-3 h-3 rounded-full border border-current opacity-40 shrink-0 inline-block text-[8px] leading-3 text-center">
                   {idx + 1}

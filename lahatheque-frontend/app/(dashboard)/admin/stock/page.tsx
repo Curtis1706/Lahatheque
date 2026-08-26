@@ -21,6 +21,7 @@ import {
   User,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageLoader } from "@/components/ui/page-loader";
 
 export default function AdminStockOverviewPage() {
   const [overview, setOverview] = useState<AdminStockOverview | null>(null);
@@ -42,14 +43,7 @@ export default function AdminStockOverviewPage() {
   }, []);
 
   if (loading || !overview) {
-    return (
-      <div className="p-8 max-w-7xl mx-auto flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-3 text-foreground-muted">
-          <Loader2 className="w-6 h-6 animate-spin text-navy" />
-          <p className="text-xs">Supervision des stocks multi-entrepôts...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Supervision des stocks multi-entrepôts" />;
   }
 
   return (

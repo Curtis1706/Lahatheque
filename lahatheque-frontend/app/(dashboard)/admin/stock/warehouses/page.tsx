@@ -21,6 +21,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 
 export default function AdminWarehousesPage() {
   const [warehouses, setWarehouses] = useState<AdminWarehouse[]>([]);
@@ -87,14 +88,7 @@ export default function AdminWarehousesPage() {
   };
 
   if (loading) {
-    return (
-      <div className="p-8 max-w-7xl mx-auto flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-3 text-foreground-muted">
-          <Loader2 className="w-6 h-6 animate-spin text-navy" />
-          <p className="text-xs">Chargement des entrepôts régionaux...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Chargement des entrepôts régionaux" />;
   }
 
   return (
@@ -296,7 +290,7 @@ export default function AdminWarehousesPage() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <InlineLoader size={14} />
                   <span>Création...</span>
                 </>
               ) : (

@@ -11,11 +11,11 @@ import {
   Lock, 
   ArrowLeft, 
   ShoppingBag, 
-  Loader2,
   AlertCircle
 } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { useAuth } from "@/hooks/use-auth";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -94,7 +94,7 @@ export default function CheckoutPage() {
           </div>
 
           <div className="p-3 rounded-2xl bg-background-secondary border border-border text-xs text-foreground-muted flex items-center justify-center gap-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-gold shrink-0" />
+            <InlineLoader size={14} />
             <span>Sécurisation de la transaction &amp; génération des accès...</span>
           </div>
         </div>
@@ -431,7 +431,7 @@ export default function CheckoutPage() {
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <InlineLoader size={16} />
                   Traitement en cours...
                 </>
               ) : (

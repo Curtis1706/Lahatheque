@@ -23,6 +23,7 @@ import { FileDropzone } from "@/components/features/layout-artist/file-dropzone"
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { getContractFormOptions, createLegalContract } from "@/lib/services/legal";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 import type {
   ContractType,
   ContractFormOptions,
@@ -831,7 +832,7 @@ function NewLegalContractContent() {
             className="px-6 py-2.5 rounded-xl bg-navy text-gold text-xs font-bold hover:bg-navy-dark transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] border border-gold/30 shadow-xs cursor-pointer"
           >
             {submitting ? (
-              <span className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+              <InlineLoader size={16} />
             ) : (
               <>
                 <Save className="w-4 h-4 text-gold" />
@@ -847,7 +848,7 @@ function NewLegalContractContent() {
 
 export default function NewLegalContractPage() {
   return (
-    <Suspense fallback={<div className="p-8 space-y-4 w-full animate-pulse"><div className="h-8 bg-background-secondary rounded w-1/3" /><div className="h-96 bg-background-secondary rounded-3xl" /></div>}>
+    <Suspense fallback={<PageLoader label="Chargement du formulaire de contrat" />}>
       <NewLegalContractContent />
     </Suspense>
   );

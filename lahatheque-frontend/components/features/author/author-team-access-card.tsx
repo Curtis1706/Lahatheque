@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Users, UserPlus, Trash2, Mail, ShieldCheck, UserCheck, Sparkles, CheckCircle2 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import type { AuthorDelegateAccess } from "@/lib/types/author";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface AuthorTeamAccessCardProps {
   delegates: AuthorDelegateAccess[];
@@ -169,7 +170,7 @@ export function AuthorTeamAccessCard({
               className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 min-h-[44px] shadow-xs disabled:opacity-50"
             >
               {submitting ? (
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <InlineLoader size={16} />
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4 text-gold" />

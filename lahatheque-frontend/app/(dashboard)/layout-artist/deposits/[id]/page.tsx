@@ -29,6 +29,8 @@ import { AISuggestionBadge } from "@/components/features/layout-artist/ai-sugges
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getDepositDetail, updateDeposit, submitDepositForValidation } from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, type AiBookAnalysisResult } from "@/lib/services/ai";
+import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
+import { InlineLoader } from "@/components/ui/page-loader";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
@@ -377,7 +379,7 @@ export default function DepositDetailPage() {
               title="Analyser le document avec l'Intelligence Artificielle pour extraire et suggérer des métadonnées"
             >
               {aiLoading ? (
-                <span className="w-3.5 h-3.5 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+                <InlineLoader size={14} />
               ) : (
                 <Sparkles className="w-3.5 h-3.5 text-gold" />
               )}
@@ -562,7 +564,7 @@ export default function DepositDetailPage() {
                     className="w-full py-2 px-3 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center justify-center gap-2 cursor-pointer min-h-[38px] shadow-sm"
                   >
                     {savingCover ? (
-                      <span className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
+                      <InlineLoader size={16} />
                     ) : (
                       <>
                         <Save className="w-3.5 h-3.5" />
@@ -1071,7 +1073,7 @@ export default function DepositDetailPage() {
             className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
           >
             {saving ? (
-              <span className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
+              <InlineLoader size={16} />
             ) : (
               <>
                 <Send className="w-4 h-4" />

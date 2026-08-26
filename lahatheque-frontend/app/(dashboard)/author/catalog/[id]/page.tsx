@@ -7,6 +7,7 @@ import { ArrowLeft, BookOpen, Eye, ShoppingBag, User } from "lucide-react";
 import { getStudentCatalog, type BookAPI } from "@/lib/services/student";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
 import { AuthorCatalogOrderModal } from "@/components/features/author/author-catalog-order-modal";
+import { PageLoader } from "@/components/ui/page-loader";
 
 export default function AuthorBookDetailPage() {
   const params = useParams();
@@ -36,7 +37,7 @@ export default function AuthorBookDetailPage() {
   const authorName = book?.authors?.map((a) => a.full_name).join(", ") || "Auteur académique";
 
   if (loading) {
-    return <div className="p-8 text-center text-xs text-foreground-muted">Chargement...</div>;
+    return <PageLoader label="Chargement de l'ouvrage" />;
   }
 
   if (!book) {

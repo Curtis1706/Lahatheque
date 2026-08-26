@@ -33,6 +33,7 @@ import {
 } from "@/lib/services/wholesaler";
 import type { WholesaleCompanyProfile } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function WholesalerProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -333,7 +334,7 @@ export default function WholesalerProfilePage() {
                 className="w-full sm:w-auto px-6 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 shadow-sm min-h-[44px] disabled:opacity-50"
               >
                 {savingCompany ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                 ) : (
                   <>
                     <Save className="w-4 h-4 text-gold" />

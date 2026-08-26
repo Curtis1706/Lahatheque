@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
+import { InlineLoader } from "@/components/ui/page-loader";
 import {
   getPublisherRoyaltyPayments,
   getPublisherKpis,
@@ -133,7 +134,7 @@ export default function PublisherRoyaltiesPage() {
             </>
           ) : (
             <>
-              <Clock className="w-3 h-3 animate-spin" /> En Traitement
+              <InlineLoader size={12} /> En Traitement
             </>
           )}
         </span>
@@ -190,7 +191,7 @@ export default function PublisherRoyaltiesPage() {
         >
           {requestingPayout ? (
             <>
-              <span className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
+              <InlineLoader size={16} />
               <span>Demande en cours...</span>
             </>
           ) : (

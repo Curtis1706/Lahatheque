@@ -26,6 +26,7 @@ import {
   Package,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 import {
   getStudentOrders,
   type OrderAPI,
@@ -377,10 +378,7 @@ export default function AuthorPurchasesPage() {
 
       {/* État de chargement */}
       {loading && (
-        <div className="flex flex-col items-center justify-center py-20 space-y-3">
-          <Loader2 className="w-8 h-8 text-gold animate-spin" />
-          <p className="text-xs text-foreground-muted">Chargement de vos commandes...</p>
-        </div>
+        <PageLoader label="Chargement de vos commandes" />
       )}
 
       {/* Liste détaillée des commandes */}
@@ -807,7 +805,7 @@ export default function AuthorPurchasesPage() {
                 >
                   {returning ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <InlineLoader size={16} />
                       <span>Traitement...</span>
                     </>
                   ) : (

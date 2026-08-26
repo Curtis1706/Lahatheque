@@ -7,6 +7,7 @@ import { PenTool, ArrowLeft, Download, FileText } from "lucide-react";
 import { AuthorSubmissionStepper } from "@/components/features/author/author-submission-stepper";
 import { getAuthorSubmissions } from "@/lib/services/author";
 import type { AuthorSubmission } from "@/lib/types/author";
+import { PageLoader } from "@/components/ui/page-loader";
 
 export default function AuthorSubmissionDetailPage() {
   const params = useParams();
@@ -27,12 +28,7 @@ export default function AuthorSubmissionDetailPage() {
   }, [subId]);
 
   if (loading || !sub) {
-    return (
-      <div className="p-8 text-center space-y-4">
-        <span className="w-8 h-8 border-2 border-navy border-t-gold rounded-full animate-spin inline-block" />
-        <p className="text-xs text-foreground-muted font-mono">Chargement du dossier de dépôt...</p>
-      </div>
-    );
+    return <PageLoader label="Chargement du dossier de dépôt" />;
   }
 
   return (

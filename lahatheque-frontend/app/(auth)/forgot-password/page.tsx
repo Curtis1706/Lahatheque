@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Mail, Phone, ArrowLeft, ArrowRight, CheckCircle, Clock } from "lucide-react";
+import { Mail, Phone, ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function ForgotPasswordPage() {
   const [method, setMethod] = useState<"email" | "phone">("email");
@@ -128,7 +129,7 @@ export default function ForgotPasswordPage() {
               >
                 {loading ? (
                   <>
-                    <Clock className="w-4 h-4 animate-spin" />
+                    <InlineLoader size={16} />
                     Envoi en cours...
                   </>
                 ) : (

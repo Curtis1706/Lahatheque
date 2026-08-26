@@ -543,17 +543,18 @@ class StudentCatalogView(APIView):
             ).distinct()
 
         discipline_id = request.query_params.get('discipline')
-        if discipline_id:
-            qs = qs.filter(discipline_id=discipline_id)
+        if discipline_id and discipline_id != 'all':
+            if str(discipline_id).isdigit():
+                qs = qs.filter(discipline_id=discipline_id)
+            else:
+                qs = qs.filter(Q(discipline__name__iexact=discipline_id) | Q(discipline__name__icontains=discipline_id))
 
         format_type = request.query_params.get('format')
         if format_type and format_type != 'all':
             qs = qs.filter(format_type=format_type)
 
-        # Disciplines disponibles pour les filtres
-        disciplines = Discipline.objects.filter(
-            ouvrages__status='published'
-        ).distinct().values('id', 'name')
+        # Disciplines disponibles pour les filtres (toutes les disciplines du référentiel Admin)
+        disciplines = Discipline.objects.all().order_by('name').values('id', 'name')
 
         serializer = OuvrageBasicSerializer(qs[:60], many=True, context={'request': request})
         return Response({

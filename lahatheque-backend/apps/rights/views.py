@@ -1027,7 +1027,7 @@ class LegalContractStreamView(APIView):
     GET /api/v1/rights/legal/contracts/<uuid:id>/stream/
     Sert le document d'un contrat juridique sous forme de flux PDF sécurisé et filigrané Range HTTP 206/200.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
     renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
 
     def get(self, request, id):

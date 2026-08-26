@@ -73,6 +73,7 @@ export function MobileBottomNav() {
             { label: "Logs", href: "/admin/logs", icon: <Activity className="w-5 h-5" /> },
           ]
         };
+      case "wholesaler":
       case "super_client":
         return {
           leftItems: [
@@ -224,6 +225,7 @@ export function MobileBottomNav() {
           { label: "Clés API", href: "/publisher/api", icon: <ShieldCheck className="w-4 h-4" /> },
           { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
+      case "wholesaler":
       case "super_client":
         return [
           { label: "Espace Grossiste", href: "/wholesaler", icon: <LayoutDashboard className="w-4 h-4" /> },
@@ -315,6 +317,7 @@ export function MobileBottomNav() {
         return "UNIVERSITÉ PARTENAIRE";
       case "manager":
         return "GESTIONNAIRE LOGISTIQUE";
+      case "wholesaler":
       case "super_client":
         return "GROSSISTE PARTENAIRE";
       default:

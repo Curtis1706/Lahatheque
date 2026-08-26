@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { CheckCircle2, AlertTriangle, FileCode, UploadCloud, RefreshCw, XCircle } from "lucide-react";
+import { CheckCircle2, AlertTriangle, FileCode, UploadCloud, XCircle } from "lucide-react";
 import type { BatchImportReport } from "@/lib/types/publisher";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface BatchImportReportViewProps {
   report: BatchImportReport;
@@ -46,7 +47,7 @@ export function BatchImportReportView({ report, className }: BatchImportReportVi
           )}
           {report.status === "processing" && (
             <span className="px-3 py-1.5 rounded-xl bg-navy/10 text-navy border border-navy/20 text-xs font-bold inline-flex items-center gap-1.5 animate-pulse">
-              <RefreshCw className="w-4 h-4 animate-spin text-gold" /> Traitement asynchrone...
+              <InlineLoader size={14} /> Traitement asynchrone...
             </span>
           )}
         </div>

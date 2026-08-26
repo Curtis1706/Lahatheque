@@ -18,6 +18,7 @@ import {
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { InlineLoader } from "@/components/ui/page-loader";
 import {
   getStockItemDetail,
   updateStockAlertThreshold,
@@ -352,7 +353,7 @@ export default function StockDetailPage() {
             className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors disabled:opacity-40 flex items-center gap-2 min-h-[42px]"
           >
             {saving ? (
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <InlineLoader size={16} />
             ) : saved ? (
               <>
                 <Check className="w-4 h-4 text-success" />

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  ArrowLeft, Moon, Sun, Loader2,
+  ArrowLeft, Moon, Sun,
   Save, Bookmark, Trash2, LayoutGrid, X, CheckCircle2,
   Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Music, Headphones, StopCircle, Mic2,
   Edit3
@@ -12,6 +12,7 @@ import {
 
 import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader"
 
 // Core viewer
 import { Viewer, Worker as PdfWorker, ThemeContext, Position, Tooltip, ViewMode, SpecialZoomLevel, ScrollMode, Plugin, PluginRenderPageLayer } from '@react-pdf-viewer/core'
@@ -223,7 +224,7 @@ function AskExpertModal({ book, isOpen, onClose, onSuccess }: { book: any, isOpe
             <div className="flex gap-3 pt-4">
               <Button type="button" onClick={onClose} variant="ghost" className="flex-1 h-12 text-muted-foreground hover:bg-muted uppercase text-[10px] font-black tracking-widest">Annuler</Button>
               <Button type="submit" disabled={isSubmitting || !body.trim()} className="flex-1 h-12 bg-laha-gold text-laha-black hover:bg-laha-gold-warm uppercase text-[10px] font-black tracking-widest shadow-xl shadow-laha-gold/10">
-                {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Send size={16} className="mr-2" />}
+                {isSubmitting ? <InlineLoader size={16} /> : <Send size={16} className="mr-2" />}
                 Envoyer
               </Button>
             </div>
@@ -821,11 +822,8 @@ export default function DocumentReaderPage() {
 
   if (isLoading || !book || isPdfLoading) {
     return (
-      <div className="h-screen bg-navy-dark flex flex-col items-center justify-center space-y-4">
-        <Loader2 className="animate-spin text-gold" size={48} />
-        <p className="text-white/40 font-black uppercase tracking-widest text-xs">
-          {isPdfLoading ? 'Chargement sécurisé du document...' : 'Préparation de votre salle de lecture...'}
-        </p>
+      <div className="h-screen bg-background flex flex-col items-center justify-center">
+        <PageLoader label={isPdfLoading ? 'Chargement sécurisé du document' : 'Préparation de votre salle de lecture'} />
       </div>
     )
   }
@@ -949,7 +947,7 @@ export default function DocumentReaderPage() {
             disabled={isSaving}
             className="inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap bg-gold text-navy font-bold text-xs h-9 px-3.5 rounded-lg hover:bg-gold-hover transition-colors shrink-0 cursor-pointer min-h-[36px]"
           >
-            {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {isSaving ? <InlineLoader size={14} /> : <Save size={15} />}
             <span className="hidden sm:inline">Sauvegarder</span>
           </Button>
 
@@ -965,7 +963,7 @@ export default function DocumentReaderPage() {
               )}
             >
               {isFetchingTtsText
-                ? <Loader2 size={15} className="animate-spin" />
+                ? <InlineLoader size={14} />
                 : <Headphones size={15} />
               }
               <span className="hidden md:inline">

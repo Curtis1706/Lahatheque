@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { exportBouquetCatalogWord } from "@/lib/services/university";
 import type { UniversityBouquet } from "@/lib/types/university";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface BouquetCardProps {
   bouquet: UniversityBouquet;
@@ -168,7 +169,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
           >
             {loading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <InlineLoader size={16} />
                 <span>Validation en cours...</span>
               </>
             ) : (
@@ -188,7 +189,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
           title="Exporter la liste des ouvrages du bouquet en Word (.doc)"
         >
           {exporting ? (
-            <div className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
+            <InlineLoader size={16} />
           ) : (
             <Download className="w-4 h-4 text-gold" />
           )}
