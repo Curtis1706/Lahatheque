@@ -26,6 +26,8 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     cover_url = serializers.SerializerMethodField()
     is_owned = serializers.SerializerMethodField()
     has_digital_access = serializers.SerializerMethodField()
+    author_discounted_digital_price = serializers.SerializerMethodField()
+    author_discounted_paper_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Ouvrage
@@ -35,6 +37,7 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             'country', 'format_type', 'page_count', 'publication_date',
             'language', 'summary', 'status', 'price_digital', 'price_paper',
             'is_paper_available', 'cover_url', 'is_owned', 'has_digital_access',
+            'author_discounted_digital_price', 'author_discounted_paper_price',
         ]
 
     def get_cover_url(self, obj) -> str:
@@ -48,6 +51,20 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
 
     def get_has_digital_access(self, obj) -> bool:
         return self.get_is_owned(obj)
+
+    def get_author_discounted_digital_price(self, obj):
+        request = self.context.get('request')
+        if request and getattr(request.user, 'role', None) == 'author':
+            from apps.reporting.pricing_service import compute_role_price
+            return compute_role_price(obj, "author")["digital_price"]
+        return None
+
+    def get_author_discounted_paper_price(self, obj):
+        request = self.context.get('request')
+        if request and getattr(request.user, 'role', None) == 'author':
+            from apps.reporting.pricing_service import compute_role_price
+            return compute_role_price(obj, "author")["paper_price"]
+        return None
 
 
 class ReadingProgressSerializer(serializers.ModelSerializer):

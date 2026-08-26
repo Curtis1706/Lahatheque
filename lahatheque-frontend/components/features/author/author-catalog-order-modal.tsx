@@ -69,7 +69,9 @@ export function AuthorCatalogOrderModal({
   const [progressPct, setProgressPct] = useState<number>(0);
   const [success, setSuccess] = useState(false);
 
-  const unitPrice = format === "digital" ? (book.price_digital ?? 0) : (book.price_paper ?? 0);
+  const effectiveDigitalPrice = book.author_discounted_digital_price ?? (book.price_digital ?? 0);
+  const effectivePaperPrice = book.author_discounted_paper_price ?? (book.price_paper ?? 0);
+  const unitPrice = format === "digital" ? effectiveDigitalPrice : effectivePaperPrice;
   const shippingFee = format === "paper" ? 2500 : 0;
   const total = unitPrice * quantity + shippingFee;
 

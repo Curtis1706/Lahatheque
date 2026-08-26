@@ -56,7 +56,7 @@ export default function NewWholesalerOrderPage() {
       {
         book_id: targetBook.id,
         book: targetBook,
-        digital_licenses_qty: 10,
+        digital_licenses_qty: 1,
         print_copies_qty: 5,
       },
     ]);
@@ -211,14 +211,18 @@ export default function NewWholesalerOrderPage() {
 
                     <div className="flex flex-wrap items-center gap-4 text-right">
                       <div>
-                        <label className="text-[10px] text-foreground-muted block font-bold">Licences Numériques</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={ci.digital_licenses_qty}
-                          onChange={(e) => handleUpdateQty(ci.book_id, "digital_licenses_qty", parseInt(e.target.value) || 0)}
-                          className="w-20 px-2 py-1 bg-background border border-border rounded-lg text-center font-mono font-bold text-navy text-xs"
-                        />
+                        <label className="text-[10px] text-foreground-muted block font-bold">Licence Numérique</label>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQty(ci.book_id, "digital_licenses_qty", ci.digital_licenses_qty > 0 ? 0 : 1)}
+                          className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
+                            ci.digital_licenses_qty > 0
+                              ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                              : "bg-background text-foreground-muted border-border hover:text-navy"
+                          }`}
+                        >
+                          {ci.digital_licenses_qty > 0 ? "✓ 1 unité" : "Non incluse"}
+                        </button>
                       </div>
                       <div>
                         <label className="text-[10px] text-foreground-muted block font-bold">Exemplaires Papier</label>

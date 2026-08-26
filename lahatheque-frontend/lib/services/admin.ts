@@ -251,6 +251,44 @@ export async function deleteAdminCatalogBook(bookId: string): Promise<{ success:
   return { success: false, error: data.error || 'Erreur lors de la suppression de l\'ouvrage.' };
 }
 
+export interface RoleDiscounts {
+  author: { paper_pct: number; digital_pct: number };
+  wholesaler: { paper_pct: number; digital_pct: number };
+  university: { paper_pct: number; digital_pct: number };
+}
+
+export async function getRoleDiscounts(): Promise<RoleDiscounts | null> {
+  try {
+    const res = await fetch("/api/bff/admin/catalog/pricing/role-discounts/", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateRoleDiscounts(data: RoleDiscounts): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch("/api/bff/admin/catalog/pricing/role-discounts/", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) {
+      return { success: true, message: json.message || "Politique tarifaire mise à jour avec succès." };
+    }
+    return { success: false, error: json.error || "Erreur de mise à jour de la politique tarifaire." };
+  } catch {
+    return { success: false, error: "Erreur de communication avec le serveur." };
+  }
+}
+
 // =========================================================================
 // TRANSACTIONS & VENTES
 // =========================================================================

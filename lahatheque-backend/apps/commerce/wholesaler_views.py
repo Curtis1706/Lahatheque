@@ -19,6 +19,7 @@ from .models import (
 )
 from apps.accounts.permissions import IsWholesaler
 from apps.catalog.models import Ouvrage
+from apps.reporting.pricing_service import compute_role_price
 
 
 class WholesalerKpisView(APIView):
@@ -82,8 +83,11 @@ class WholesalerCatalogListView(APIView):
         for o in ouvrages:
             public_digital = float(o.price_digital or 5000)
             public_paper = float(o.price_paper or 7500)
-            dig_p = float(getattr(o, "prix_gros_numerique", None) or int(public_digital * 0.75))
-            prt_p = float(getattr(o, "prix_gros_papier", None) or int(public_paper * 0.70))
+            pricing = compute_role_price(o, "wholesaler")
+            dig_p = pricing["digital_price"]
+            prt_p = pricing["paper_price"]
+            digital_discount_pct = pricing["digital_discount_pct"]
+            paper_discount_pct = pricing["paper_discount_pct"]
             
             # Stock physique disponible
             stocks = StockOuvrage.objects.filter(ouvrage=o)
@@ -104,6 +108,8 @@ class WholesalerCatalogListView(APIView):
                 "publisher_name": o.publisher.name if o.publisher else "LAHA Éditions",
                 "digital_wholesale_price": dig_p,
                 "print_wholesale_price": prt_p,
+                "digital_discount_pct": digital_discount_pct,
+                "paper_discount_pct": paper_discount_pct,
                 "public_price": public_digital,
                 "public_price_paper": public_paper,
                 "min_quantity": 20,
@@ -126,8 +132,11 @@ class WholesalerCatalogDetailView(APIView):
             o = Ouvrage.objects.select_related("discipline", "publisher").prefetch_related("authors").get(id=pk)
             public_digital = float(o.price_digital or 5000)
             public_paper = float(o.price_paper or 7500)
-            dig_p = float(getattr(o, "prix_gros_numerique", None) or int(public_digital * 0.75))
-            prt_p = float(getattr(o, "prix_gros_papier", None) or int(public_paper * 0.70))
+            pricing = compute_role_price(o, "wholesaler")
+            dig_p = pricing["digital_price"]
+            prt_p = pricing["paper_price"]
+            digital_discount_pct = pricing["digital_discount_pct"]
+            paper_discount_pct = pricing["paper_discount_pct"]
             
             stocks = StockOuvrage.objects.filter(ouvrage=o)
             total_dispo = sum(s.quantite_disponible for s in stocks) if stocks.exists() else 0
@@ -149,6 +158,8 @@ class WholesalerCatalogDetailView(APIView):
                     "publisher_name": o.publisher.name if o.publisher else "LAHA Éditions",
                     "digital_wholesale_price": dig_p,
                     "print_wholesale_price": prt_p,
+                    "digital_discount_pct": digital_discount_pct,
+                    "paper_discount_pct": paper_discount_pct,
                     "public_price": public_digital,
                     "public_price_paper": public_paper,
                     "min_quantity": 20,
@@ -267,10 +278,9 @@ class WholesalerOrdersListView(APIView):
                 continue
 
             # Prix TOUJOURS recalculé serveur — jamais depuis le client
-            base_dig = book.price_digital or Decimal("4000.00")
-            base_prt = book.price_paper or Decimal("5000.00")
-            dig_price = getattr(book, "prix_gros_numerique", None) or (base_dig * Decimal("0.75"))
-            prt_price = getattr(book, "prix_gros_papier", None) or (base_prt * Decimal("0.70"))
+            pricing = compute_role_price(book, "wholesaler")
+            dig_price = Decimal(str(pricing["digital_price"]))
+            prt_price = Decimal(str(pricing["paper_price"]))
 
             # Application du palier de remise applicable selon la quantité totale
             tier = WholesaleDiscountTier.objects.filter(

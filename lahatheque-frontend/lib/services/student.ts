@@ -78,6 +78,8 @@ export interface BookAPI {
   cover_url: string;
   is_owned?: boolean;
   has_digital_access?: boolean;
+  author_discounted_digital_price?: number | null;
+  author_discounted_paper_price?: number | null;
   // Champs enrichis par la bibliothèque
   progress_percent?: number;
   current_page?: number;

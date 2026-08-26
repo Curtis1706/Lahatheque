@@ -86,16 +86,16 @@ export default function WholesalerCatalogPage() {
     setCart((prev) => {
       const existing = prev.find((item) => item.book_id === book.id);
       if (existing) {
-        toast.info(`"${book.title}" est déjà dans votre panier groupé.`);
+        toast.info(`"${book.title}" est déjà dans votre panier.`);
         return prev;
       }
-      toast.success(`"${book.title}" ajouté au panier groupé (20 licences + 10 ex. papier).`);
+      toast.success(`"${book.title}" ajouté au panier (1 licence num. + 10 ex. papier).`);
       return [
         ...prev,
         {
           book_id: book.id,
           book,
-          digital_licenses_qty: 20,
+          digital_licenses_qty: 1,
           print_copies_qty: 10,
         },
       ];
@@ -320,26 +320,20 @@ export default function WholesalerCatalogPage() {
                   {/* Tarifs de gros & Remises */}
                   <div className="p-3 rounded-2xl bg-background-secondary border border-border space-y-1.5 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-foreground-muted font-bold">Licence Numérique (-25%) :</span>
+                      <span className="text-[10px] text-foreground-muted font-bold">
+                        Licence Numérique (-{book.digital_discount_pct ?? 25}%) :
+                      </span>
                       <span className="font-mono font-bold text-navy">
                         {book.digital_wholesale_price.toLocaleString("fr-FR")} XOF
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-foreground-muted font-bold">Exemplaire Papier (-30%) :</span>
+                      <span className="text-[10px] text-foreground-muted font-bold">
+                        Exemplaire Papier (-{book.paper_discount_pct ?? 32}%) :
+                      </span>
                       <span className="font-mono font-bold text-navy">
                         {book.print_wholesale_price.toLocaleString("fr-FR")} XOF
                       </span>
-                    </div>
-                    <div className="flex items-center justify-between pt-1 border-t border-border/60">
-                      <span className="text-[9px] text-foreground-muted">Prix public indicatif :</span>
-                      <span className="font-mono text-[10px] text-foreground-muted line-through">
-                        {book.public_price.toLocaleString("fr-FR")} XOF
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-emerald-700 font-semibold pt-0.5">
-                      <span>Stock Papier :</span>
-                      <span>{book.stock_available_print} ex. dispo</span>
                     </div>
                   </div>
                 </div>

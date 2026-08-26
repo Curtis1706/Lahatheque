@@ -1636,4 +1636,83 @@ class AdminAuthorRoyaltiesReportView(APIView):
         return Response({"success": True, "data": results})
 
 
+class AdminRoleDiscountsView(APIView):
+    """GET/PATCH /api/v1/admin/catalog/pricing/role-discounts/ - Remises par profil acheteur."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from .models import ConfigurationPlateformeGlobale
+
+        config = ConfigurationPlateformeGlobale.objects.first()
+        if not config:
+            config = ConfigurationPlateformeGlobale.objects.create()
+
+        return Response({
+            "success": True,
+            "data": {
+                "author": {
+                    "paper_pct": float(config.remise_auteur_papier_pct),
+                    "digital_pct": float(config.remise_auteur_numerique_pct),
+                },
+                "wholesaler": {
+                    "paper_pct": float(config.remise_grossiste_papier_pct),
+                    "digital_pct": float(config.remise_grossiste_numerique_pct),
+                },
+                "university": {
+                    "paper_pct": float(config.remise_campus_papier_pct),
+                    "digital_pct": float(config.remise_campus_numerique_pct),
+                },
+            }
+        })
+
+    def patch(self, request):
+        from .models import ConfigurationPlateformeGlobale, JournalAuditAdmin
+        from .pricing_service import invalidate_platform_config_cache
+        from decimal import Decimal
+
+        config = ConfigurationPlateformeGlobale.objects.first()
+        if not config:
+            config = ConfigurationPlateformeGlobale.objects.create()
+
+        data = request.data
+        field_map = {
+            ("author", "paper_pct"): "remise_auteur_papier_pct",
+            ("author", "digital_pct"): "remise_auteur_numerique_pct",
+            ("wholesaler", "paper_pct"): "remise_grossiste_papier_pct",
+            ("wholesaler", "digital_pct"): "remise_grossiste_numerique_pct",
+            ("university", "paper_pct"): "remise_campus_papier_pct",
+            ("university", "digital_pct"): "remise_campus_numerique_pct",
+        }
+
+        updated_fields = []
+        for role_key in ("author", "wholesaler", "university"):
+            role_data = data.get(role_key, {})
+            for sub_key in ("paper_pct", "digital_pct"):
+                if sub_key in role_data:
+                    model_field = field_map[(role_key, sub_key)]
+                    try:
+                        setattr(config, model_field, Decimal(str(role_data[sub_key])))
+                        updated_fields.append(model_field)
+                    except (ValueError, TypeError):
+                        pass
+
+        if updated_fields:
+            config.save(update_fields=updated_fields)
+            invalidate_platform_config_cache()
+
+            if request.user and request.user.is_authenticated:
+                JournalAuditAdmin.objects.create(
+                    administrateur=request.user,
+                    action="UPDATE_ROLE_DISCOUNT_POLICY",
+                    ressource_type="ConfigurationPlateformeGlobale",
+                    ressource_id=str(config.id),
+                    details=data
+                )
+
+        return Response({
+            "success": True,
+            "message": "Politique tarifaire mise à jour et appliquée sur toute la plateforme.",
+        })
+
+
 

@@ -94,18 +94,40 @@ function AuthorCatalogBookCard({
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1">
                 <span className="text-[9px] uppercase font-bold text-foreground-muted">Numérique</span>
-                <span className="font-mono font-bold text-navy text-xs">
-                  {(book.price_digital ?? 0).toLocaleString("fr-FR")} FCFA
-                </span>
+                {book.author_discounted_digital_price !== undefined && book.author_discounted_digital_price !== null ? (
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono font-bold text-navy text-xs">
+                      {book.author_discounted_digital_price.toLocaleString("fr-FR")} FCFA
+                    </span>
+                    <span className="text-[9px] text-foreground-muted line-through font-mono">
+                      {(book.price_digital ?? 0).toLocaleString("fr-FR")}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="font-mono font-bold text-navy text-xs">
+                    {(book.price_digital ?? 0).toLocaleString("fr-FR")} FCFA
+                  </span>
+                )}
               </div>
               {book.is_paper_available && (
                 <div className="flex items-center gap-1">
                   <span className="text-[9px] uppercase font-bold text-foreground-muted flex items-center gap-0.5">
                     <Truck className="w-2.5 h-2.5 text-gold" /> Papier
                   </span>
-                  <span className="font-mono font-bold text-gold text-xs">
-                    {(book.price_paper ?? 0).toLocaleString("fr-FR")} FCFA
-                  </span>
+                  {book.author_discounted_paper_price !== undefined && book.author_discounted_paper_price !== null ? (
+                    <div className="flex items-center gap-1">
+                      <span className="font-mono font-bold text-gold text-xs">
+                        {book.author_discounted_paper_price.toLocaleString("fr-FR")} FCFA
+                      </span>
+                      <span className="text-[9px] text-foreground-muted line-through font-mono">
+                        {(book.price_paper ?? 0).toLocaleString("fr-FR")}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="font-mono font-bold text-gold text-xs">
+                      {(book.price_paper ?? 0).toLocaleString("fr-FR")} FCFA
+                    </span>
+                  )}
                 </div>
               )}
             </div>

@@ -23,6 +23,8 @@ import {
   getAdminCatalog,
   updateBookPricing,
   resetBookPricing,
+  getRoleDiscounts,
+  updateRoleDiscounts,
 } from "@/lib/services/admin";
 import { AdminCatalogBook, GlobalPricingConfig } from "@/lib/types/admin";
 import { toast } from "sonner";
@@ -49,7 +51,7 @@ export default function AdminPricingCascadePage() {
   const [authorPaperDiscount, setAuthorPaperDiscount] = useState<number>(40);
 
   const [wholesaleDigitalDiscount, setWholesaleDigitalDiscount] = useState<number>(25);
-  const [wholesalePaperDiscount, setWholesalePaperDiscount] = useState<number>(30);
+  const [wholesalePaperDiscount, setWholesalePaperDiscount] = useState<number>(32);
   const [wholesaleMinQty, setWholesaleMinQty] = useState<number>(20);
 
   const [universityDigitalDiscount, setUniversityDigitalDiscount] = useState<number>(35);
@@ -60,9 +62,10 @@ export default function AdminPricingCascadePage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [configData, catalogData] = await Promise.all([
+      const [configData, catalogData, roleDiscountsData] = await Promise.all([
         getGlobalPricingConfig(),
         getAdminCatalog(),
+        getRoleDiscounts(),
       ]);
       setGlobalConfig(configData);
       setBooks(catalogData);
@@ -70,6 +73,20 @@ export default function AdminPricingCascadePage() {
         setDefaultDigitalPrice(configData.prix_defaut_numerique_xof || 3000);
         setDefaultPaperPrice(configData.prix_defaut_papier_xof || 5000);
         setDefaultAudioPrice(configData.prix_defaut_audio_xof || 2500);
+      }
+      if (roleDiscountsData) {
+        if (roleDiscountsData.author) {
+          setAuthorPaperDiscount(roleDiscountsData.author.paper_pct ?? 40);
+          setAuthorDigitalDiscount(roleDiscountsData.author.digital_pct ?? 25);
+        }
+        if (roleDiscountsData.wholesaler) {
+          setWholesalePaperDiscount(roleDiscountsData.wholesaler.paper_pct ?? 32);
+          setWholesaleDigitalDiscount(roleDiscountsData.wholesaler.digital_pct ?? 25);
+        }
+        if (roleDiscountsData.university) {
+          setUniversityPaperDiscount(roleDiscountsData.university.paper_pct ?? 25);
+          setUniversityDigitalDiscount(roleDiscountsData.university.digital_pct ?? 35);
+        }
       }
     } catch (err) {
       toast.error("Erreur de chargement de la cascade tarifaire.");
@@ -103,15 +120,36 @@ export default function AdminPricingCascadePage() {
     }
   };
 
-  const handleSaveMultiRolePolicy = (e: React.FormEvent) => {
+  const handleSaveMultiRolePolicy = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingPolicy(true);
-    setTimeout(() => {
+    try {
+      const res = await updateRoleDiscounts({
+        author: {
+          paper_pct: Number(authorPaperDiscount),
+          digital_pct: Number(authorDigitalDiscount),
+        },
+        wholesaler: {
+          paper_pct: Number(wholesalePaperDiscount),
+          digital_pct: Number(wholesaleDigitalDiscount),
+        },
+        university: {
+          paper_pct: Number(universityPaperDiscount),
+          digital_pct: Number(universityDigitalDiscount),
+        },
+      });
+      if (res.success) {
+        toast.success(
+          res.message || "Grille tarifaire multi-rôles mise à jour pour tous les profils (Auteurs, Grossistes, Universités)."
+        );
+      } else {
+        toast.error(res.error || "Erreur lors de la mise à jour des remises.");
+      }
+    } catch {
+      toast.error("Erreur de communication avec le serveur.");
+    } finally {
       setSavingPolicy(false);
-      toast.success(
-        "Grille tarifaire multi-rôles mise à jour pour tous les profils (Auteurs, Grossistes, Universités)."
-      );
-    }, 450);
+    }
   };
 
   const handleOpenEditBook = (book: AdminCatalogBook) => {

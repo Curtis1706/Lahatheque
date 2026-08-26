@@ -85,15 +85,13 @@ export function BookPreviewModal({
 
               {/* Grille des tarifs de gros */}
               <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-background-secondary border border-border">
-                <div className="p-2 bg-background rounded-xl border border-border text-center">
-                  <span className="text-[10px] text-foreground-muted uppercase font-bold block">Tarif Licences Numériques</span>
-                  <span className="font-mono font-bold text-gold text-sm">{book.digital_wholesale_price.toLocaleString("fr-FR")} XOF</span>
-                  <span className="text-[9px] text-foreground-muted block line-through">Prix Public: {book.public_price.toLocaleString("fr-FR")} XOF</span>
+                <div className="p-2.5 bg-background rounded-xl border border-border text-center">
+                  <span className="text-[10px] text-foreground-muted uppercase font-bold block">Licence Numérique (-{book.digital_discount_pct ?? 25}%)</span>
+                  <span className="font-mono font-bold text-navy text-sm">{book.digital_wholesale_price.toLocaleString("fr-FR")} XOF</span>
                 </div>
-                <div className="p-2 bg-background rounded-xl border border-border text-center">
-                  <span className="text-[10px] text-foreground-muted uppercase font-bold block">Tarif Exemplaires Papier</span>
-                  <span className="font-mono font-bold text-gold text-sm">{book.print_wholesale_price.toLocaleString("fr-FR")} XOF</span>
-                  <span className="text-[9px] text-emerald-600 font-bold block">Stock Dispo: {book.stock_available_print} ex.</span>
+                <div className="p-2.5 bg-background rounded-xl border border-border text-center">
+                  <span className="text-[10px] text-foreground-muted uppercase font-bold block">Exemplaire Papier (-{book.paper_discount_pct ?? 32}%)</span>
+                  <span className="font-mono font-bold text-navy text-sm">{book.print_wholesale_price.toLocaleString("fr-FR")} XOF</span>
                 </div>
               </div>
 

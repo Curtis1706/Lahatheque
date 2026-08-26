@@ -20,6 +20,8 @@ export interface WholesalerBookItem {
   publisher_name: string;
   digital_wholesale_price: number; // Prix de gros défini par l'Admin (XOF)
   print_wholesale_price: number; // Prix de gros papier (XOF)
+  digital_discount_pct?: number; // % remise numérique accordé (ex: 25)
+  paper_discount_pct?: number; // % remise papier accordé (ex: 32)
   public_price: number; // Prix public indicatif
   min_quantity: number; // Quantité minimale pour tarif grossiste
   stock_available_print: number;
