@@ -338,6 +338,21 @@ class WholesaleOrder(models.Model):
     invoice_url = models.CharField(max_length=500, blank=True, default="")
     cancel_reason = models.TextField(blank=True, default="")
     cancel_requested = models.BooleanField(default=False)
+
+    # ─── Fonctionnalité Commande à Crédit / Dépôt-Vente Grossiste ───────────
+    # Permet aux grossistes d'effectuer des commandes en dépôt avec paiement différé à échéance
+    is_credit_purchase = models.BooleanField(default=False, verbose_name="Achat / Dépôt à Crédit Grossiste")
+    credit_due_date = models.DateField(null=True, blank=True, verbose_name="Date d'échéance de paiement du crédit")
+    credit_granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="wholesale_credits_accordes",
+        verbose_name="Validateur du crédit"
+    )
+    returned_at = models.DateTimeField(null=True, blank=True, verbose_name="Date de retour d'invendus")
+    return_reason = models.TextField(blank=True, default="", verbose_name="Motif de retour des invendus")
     
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)

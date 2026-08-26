@@ -1189,11 +1189,21 @@ class ManagerFinanceReportView(APIView):
         paid_orders = Order.objects.filter(statut_paiement='paid')
         by_method = paid_orders.values('mode_paiement').annotate(total=Sum('total_amount'), count=Count('id'))
 
-        credit_orders = Order.objects.filter(is_credit_purchase=True).exclude(statut_commande='returned').select_related('user')
+        from .models import WholesaleOrder
 
-        credit_outstanding = credit_orders.filter(statut_paiement='pending').aggregate(total=Sum('total_amount'))['total'] or 0
-        credit_settled = credit_orders.filter(statut_paiement='paid').aggregate(total=Sum('total_amount'))['total'] or 0
-        credit_overdue = credit_orders.filter(statut_paiement='pending', credit_due_date__lt=now.date())
+        credit_orders = Order.objects.filter(is_credit_purchase=True).exclude(statut_commande='returned').select_related('user')
+        wholesale_credits = WholesaleOrder.objects.filter(is_credit_purchase=True).exclude(status='cancelled').select_related('user')
+
+        credit_outstanding = (
+            (credit_orders.filter(statut_paiement='pending').aggregate(total=Sum('total_amount'))['total'] or 0) +
+            (wholesale_credits.filter(status__in=['pending', 'validated', 'processing']).aggregate(total=Sum('total_amount'))['total'] or 0)
+        )
+        credit_settled = (
+            (credit_orders.filter(statut_paiement='paid').aggregate(total=Sum('total_amount'))['total'] or 0) +
+            (wholesale_credits.filter(status='delivered').aggregate(total=Sum('total_amount'))['total'] or 0)
+        )
+        credit_overdue_b2c = credit_orders.filter(statut_paiement='pending', credit_due_date__lt=now.date()).count()
+        credit_overdue_b2b = wholesale_credits.filter(status__in=['pending', 'validated', 'processing'], credit_due_date__lt=now.date()).count()
 
         credit_details = [{
             "id": str(o.id),
@@ -1204,7 +1214,19 @@ class ManagerFinanceReportView(APIView):
             "statut_paiement": o.statut_paiement,
             "statut_commande": o.statut_commande,
             "created_at": o.created_at.isoformat(),
-        } for o in credit_orders.order_by('-created_at')[:50]]
+        } for o in credit_orders.order_by('-created_at')[:30]]
+
+        for wo in wholesale_credits.order_by('-created_at')[:20]:
+            credit_details.append({
+                "id": str(wo.id),
+                "author_name": f"[Grossiste] {wo.company_name} ({wo.reference})",
+                "amount": float(wo.total_amount),
+                "due_date": wo.credit_due_date.isoformat() if wo.credit_due_date else None,
+                "is_overdue": bool(wo.credit_due_date and wo.credit_due_date < now.date()),
+                "statut_paiement": "paid" if wo.status == "delivered" else "pending",
+                "statut_commande": wo.status,
+                "created_at": wo.created_at.isoformat(),
+            })
 
         return Response({
             "success": True,
@@ -1215,7 +1237,7 @@ class ManagerFinanceReportView(APIView):
                 "total_revenue_paid": float(paid_orders.aggregate(t=Sum('total_amount'))['t'] or 0),
                 "credit_outstanding_total": float(credit_outstanding),
                 "credit_settled_total": float(credit_settled),
-                "credit_overdue_count": credit_overdue.count(),
+                "credit_overdue_count": credit_overdue_b2c + credit_overdue_b2b,
                 "credit_orders": credit_details,
             }
         })

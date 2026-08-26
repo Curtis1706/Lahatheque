@@ -43,6 +43,16 @@ export function WholesaleOrderModal({
   const [paymentMode, setPaymentMode] = useState<"deferred" | "immediate">("deferred");
   const [submitting, setSubmitting] = useState(false);
 
+  // ─── FONCTIONNALITÉ COMMANDE À CRÉDIT GROSSISTE (DÉPÔT / PAIEMENT DIFFÉRÉ) ───
+  // Architecture prête pour activation visuelle dès instruction de l'utilisateur.
+  // Permet le réapprovisionnement en dépôt avec règlement différé sous échéance.
+  const [isCreditPurchase, setIsCreditPurchase] = useState<boolean>(false);
+  const [creditDueDate, setCreditDueDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 60); // 60 jours par défaut
+    return d.toISOString().split("T")[0];
+  });
+
   if (!isOpen || !book) return null;
 
   const unitPaperPrice = book.print_wholesale_price;
@@ -76,7 +86,12 @@ export function WholesaleOrderModal({
       const order = await createWholesalerOrder(
         [cartItem],
         deliveryAddress.trim(),
-        contactPhone.trim()
+        contactPhone.trim(),
+        {
+          // Transmission des options de commande à crédit / dépôt
+          is_credit_purchase: isCreditPurchase,
+          credit_due_date: isCreditPurchase ? creditDueDate : undefined,
+        }
       );
 
       toast.success(`Commande ${order.reference || order.id} enregistrée avec succès !`);
@@ -334,6 +349,45 @@ export function WholesaleOrderModal({
               </button>
             </div>
           </div>
+
+          {/* 
+            ─── OPTION VISUELLE COMMANDE À CRÉDIT / DÉPÔT-VENTE GROSSISTE ──────────
+            Pour rendre visible cette option, décommenter le bloc ci-dessous :
+            
+            <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Coins className="size-4 text-gold" />
+                  <span className="font-bold text-xs text-navy">Commande en Dépôt à Crédit</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isCreditPurchase}
+                    onChange={(e) => setIsCreditPurchase(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-background-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gold"></div>
+                </label>
+              </div>
+              {isCreditPurchase && (
+                <div className="pt-2 border-t border-gold/20 space-y-2">
+                  <label className="block text-[10px] text-foreground-muted font-bold">
+                    Date d'échéance de règlement du dépôt :
+                  </label>
+                  <input
+                    type="date"
+                    value={creditDueDate}
+                    onChange={(e) => setCreditDueDate(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl bg-background border border-border text-navy text-xs focus:outline-none focus:border-gold font-mono"
+                  />
+                  <p className="text-[10px] text-foreground-muted italic">
+                    Les invendus physiques pourront être retournés avant cette date sans pénalité.
+                  </p>
+                </div>
+              )}
+            </div>
+          */}
 
           {/* Récapitulatif financier */}
           <div className="p-4 rounded-2xl bg-navy text-white space-y-2">

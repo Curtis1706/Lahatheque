@@ -65,6 +65,11 @@ export interface WholesalerOrder {
   invoice_url?: string;
   cancel_reason?: string;
   cancel_requested?: boolean;
+  // ─── Commande à Crédit Grossiste (Dépôt / Paiement différé) ───────────────
+  is_credit_purchase?: boolean;
+  credit_due_date?: string | null;
+  returned_at?: string | null;
+  return_reason?: string;
   timeline: {
     step: string;
     date: string;

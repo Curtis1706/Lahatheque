@@ -217,6 +217,11 @@ class WholesalerOrdersListView(APIView):
                 "invoice_url": ord_obj.invoice_url or f"/invoices/{ord_obj.reference}.pdf",
                 "cancel_requested": ord_obj.cancel_requested,
                 "cancel_reason": ord_obj.cancel_reason,
+                # ─── Champs Commande à Crédit Grossiste ─────────────────────────
+                "is_credit_purchase": ord_obj.is_credit_purchase,
+                "credit_due_date": ord_obj.credit_due_date.isoformat() if hasattr(ord_obj.credit_due_date, "isoformat") else (str(ord_obj.credit_due_date) if ord_obj.credit_due_date else None),
+                "returned_at": ord_obj.returned_at.isoformat() if hasattr(ord_obj.returned_at, "isoformat") else (str(ord_obj.returned_at) if ord_obj.returned_at else None),
+                "return_reason": ord_obj.return_reason,
                 "timeline": [
                     {"step": "Commande transmise", "date": ord_obj.created_at.strftime("%d/%m/%Y"), "description": "Dépôt de la commande groupée", "done": True},
                     {"step": "Validation & Proforma", "date": "-", "description": "Émission du devis proforma B2B", "done": ord_obj.status in ["validated", "processing", "delivered"]},
@@ -233,6 +238,14 @@ class WholesalerOrdersListView(APIView):
         cart_items = data.get("items", [])
         delivery_address = data.get("delivery_address", "")
         contact_phone = data.get("contact_phone", "")
+
+        # ─── Paramètres Commande à Crédit / Dépôt Grossiste ───────────────────
+        is_credit = bool(data.get("is_credit_purchase", False))
+        credit_due = data.get("credit_due_date")
+        if is_credit and not credit_due:
+            from datetime import date, timedelta
+            # Délai standard 60 jours pour réapprovisionnement grossiste
+            credit_due = date.today() + timedelta(days=60)
 
         if not cart_items:
             return Response(
@@ -255,6 +268,10 @@ class WholesalerOrdersListView(APIView):
             currency="XOF",
             status=WholesaleOrderStatus.PENDING,
             invoice_url="",  # Facture PDF non encore disponible
+            # Assignation crédit
+            is_credit_purchase=is_credit,
+            credit_due_date=credit_due if is_credit else None,
+            credit_granted_by=user if is_credit else None,
         )
 
         tot_dig = 0
@@ -330,12 +347,13 @@ class WholesalerOrdersListView(APIView):
                 if stock:
                     stock.quantite_reservee = F('quantite_reservee') + prt_qty
                     stock.save(update_fields=['quantite_reservee'])
+                    motif_label = f"Dépôt commande à crédit grossiste {comp_name}" if is_credit else f"Réservation commande grossiste {comp_name}"
                     MouvementStock.objects.create(
                         stock=stock,
                         type_mouvement='adjustment',
                         quantite=prt_qty,
                         reference_document=ref,
-                        motif=f"Réservation commande grossiste {comp_name}",
+                        motif=motif_label,
                         auteur=user,
                     )
 
@@ -361,6 +379,8 @@ class WholesalerOrdersListView(APIView):
         order.total_amount = tot_amt
         order.save(update_fields=["total_digital_licenses", "total_print_copies", "total_amount"])
 
+        order.refresh_from_db()
+
         return Response(
             {
                 "success": True,
@@ -369,6 +389,8 @@ class WholesalerOrdersListView(APIView):
                     "reference": order.reference,
                     "total_amount": float(order.total_amount),
                     "status": order.status,
+                    "is_credit_purchase": order.is_credit_purchase,
+                    "credit_due_date": order.credit_due_date.isoformat() if hasattr(order.credit_due_date, "isoformat") else (str(order.credit_due_date) if order.credit_due_date else None),
                 },
                 "error": None,
             },
@@ -425,6 +447,11 @@ class WholesalerOrderDetailView(APIView):
                     "invoice_url": ord_obj.invoice_url or f"/invoices/{ord_obj.reference}.pdf",
                     "cancel_requested": ord_obj.cancel_requested,
                     "cancel_reason": ord_obj.cancel_reason,
+                    # ─── Champs Commande à Crédit Grossiste ─────────────────────
+                    "is_credit_purchase": ord_obj.is_credit_purchase,
+                    "credit_due_date": ord_obj.credit_due_date.isoformat() if hasattr(ord_obj.credit_due_date, "isoformat") else (str(ord_obj.credit_due_date) if ord_obj.credit_due_date else None),
+                    "returned_at": ord_obj.returned_at.isoformat() if hasattr(ord_obj.returned_at, "isoformat") else (str(ord_obj.returned_at) if ord_obj.returned_at else None),
+                    "return_reason": ord_obj.return_reason,
                     "timeline": [
                         {"step": "Commande transmise", "date": ord_obj.created_at.strftime("%d/%m/%Y"), "description": "Dépôt de la commande groupée", "done": True},
                         {"step": "Validation & Proforma", "date": "-", "description": "Émission du devis proforma B2B", "done": ord_obj.status in ["validated", "processing", "delivered"]},
@@ -436,6 +463,76 @@ class WholesalerOrderDetailView(APIView):
             })
         except Exception as e:
             return Response({"success": False, "data": None, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WholesalerOrderReturnCreditView(APIView):
+    """
+    POST /api/v1/commerce/wholesaler/orders/<pk>/return/
+    Permet au grossiste d'enregistrer le retour d'exemplaires invendus d'une commande à crédit / dépôt.
+    """
+    permission_classes = [IsAuthenticated, IsWholesaler]
+
+    def post(self, request, pk):
+        reason = request.data.get("reason", "").strip() or "Retour des invendus en fin de période de dépôt"
+
+        ord_obj = WholesaleOrder.objects.filter(
+            Q(id=pk) | Q(reference=pk), user=request.user
+        ).first()
+        if not ord_obj:
+            return Response(
+                {"success": False, "data": None, "error": "Commande introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not ord_obj.is_credit_purchase:
+            return Response(
+                {"success": False, "data": None, "error": "Seules les commandes à crédit / dépôt peuvent faire l'objet d'un retour d'invendus."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if ord_obj.returned_at:
+            return Response(
+                {"success": False, "data": None, "error": "Cette commande à crédit a déjà été marquée comme retournée."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from .models import StockOuvrage, MouvementStock
+        from django.db import transaction
+        from django.db.models import F
+
+        with transaction.atomic():
+            for item in ord_obj.items.all():
+                if item.print_copies_qty and item.print_copies_qty > 0:
+                    stock = StockOuvrage.objects.filter(ouvrage_id=item.book_id).first()
+                    if stock:
+                        stock.quantite_reservee = F('quantite_reservee') - item.print_copies_qty
+                        stock.save(update_fields=['quantite_reservee'])
+                        MouvementStock.objects.create(
+                            stock=stock,
+                            type_mouvement='return',
+                            quantite=item.print_copies_qty,
+                            reference_document=f"Retour dépôt grossiste #{ord_obj.reference}",
+                            motif=reason,
+                            auteur=request.user,
+                        )
+
+            ord_obj.returned_at = timezone.now()
+            ord_obj.return_reason = reason
+            ord_obj.status = WholesaleOrderStatus.CANCELLED
+            ord_obj.save(update_fields=["returned_at", "return_reason", "status", "updated_at"])
+
+        return Response({
+            "success": True,
+            "message": "Retour des exemplaires invendus enregistré avec succès.",
+            "data": {
+                "id": str(ord_obj.id),
+                "reference": ord_obj.reference,
+                "status": ord_obj.status,
+                "returned_at": ord_obj.returned_at.isoformat() if ord_obj.returned_at else None,
+                "return_reason": ord_obj.return_reason,
+            },
+            "error": None,
+        })
 
 
 class WholesalerOrderCancelView(APIView):

@@ -58,7 +58,18 @@ export default function WholesalerOrdersListPage() {
       header: "Référence Commande",
       cell: (row) => (
         <Link href={`/wholesaler/orders/${row.id}`} className="hover:text-navy transition-colors">
-          <p className="font-mono font-bold text-xs text-navy leading-snug">{row.reference}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="font-mono font-bold text-xs text-navy leading-snug">{row.reference}</p>
+            {/* 
+              ─── INDICATEUR COMMANDE À CRÉDIT GROSSISTE ─────────────────────────
+              Décommenter ci-dessous pour afficher le badge crédit sur la liste :
+              {row.is_credit_purchase && (
+                <span className="px-1.5 py-0.5 rounded-md bg-gold/15 text-gold text-[9px] font-bold">
+                  Dépôt Crédit
+                </span>
+              )}
+            */}
+          </div>
           <p className="text-[10px] text-foreground-muted">
             Déposée le {new Date(row.created_at).toLocaleDateString("fr-FR")}
           </p>

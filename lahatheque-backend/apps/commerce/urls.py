@@ -27,6 +27,7 @@ from .wholesaler_views import (
     WholesalerOrdersListView,
     WholesalerOrderDetailView,
     WholesalerOrderCancelView,
+    WholesalerOrderReturnCreditView,
     WholesalerProfileView,
     WholesalerNotificationsListView,
 )
@@ -67,6 +68,7 @@ urlpatterns = [
     path('wholesaler/orders/', WholesalerOrdersListView.as_view(), name='wholesaler-orders-list'),
     path('wholesaler/orders/<str:pk>/', WholesalerOrderDetailView.as_view(), name='wholesaler-order-detail'),
     path('wholesaler/orders/<str:pk>/cancel/', WholesalerOrderCancelView.as_view(), name='wholesaler-order-cancel'),
+    path('wholesaler/orders/<str:pk>/return/', WholesalerOrderReturnCreditView.as_view(), name='wholesaler-order-return-credit'),
     path('wholesaler/profile/', WholesalerProfileView.as_view(), name='wholesaler-profile'),
     path('wholesaler/notifications/', WholesalerNotificationsListView.as_view(), name='wholesaler-notifications'),
 ]

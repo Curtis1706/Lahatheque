@@ -92,11 +92,17 @@ export async function getWholesalerOrderDetail(id: string): Promise<WholesalerOr
 export async function createWholesalerOrder(
   cartItems: WholesalerCartItem[],
   deliveryAddress: string,
-  contactPhone: string
+  contactPhone: string,
+  options?: {
+    is_credit_purchase?: boolean;
+    credit_due_date?: string;
+  }
 ): Promise<WholesalerOrder> {
   const payload = {
     delivery_address: deliveryAddress,
     contact_phone: contactPhone,
+    is_credit_purchase: options?.is_credit_purchase || false,
+    credit_due_date: options?.credit_due_date || undefined,
     items: cartItems.map((ci) => ({
       book_id: ci.book.id,
       digital_licenses_qty: ci.digital_licenses_qty,
@@ -113,6 +119,17 @@ export async function requestOrderCancellation(
   reason: string
 ): Promise<boolean> {
   await bffPost(`/orders/${orderId}/cancel/`, { reason });
+  return true;
+}
+
+/**
+ * Retour d'exemplaires invendus d'une commande à crédit / dépôt grossiste.
+ */
+export async function returnWholesaleCreditOrder(
+  orderId: string,
+  reason: string
+): Promise<boolean> {
+  await bffPost(`/orders/${orderId}/return/`, { reason });
   return true;
 }
 
