@@ -10,7 +10,7 @@ export interface User {
   email: string
   first_name: string
   last_name: string
-  role: 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'super_client' | 'publisher' | 'university' | 'legal_reviewer' | 'layout_artist' | 'chief_layout' | 'manager'
+  role: 'student' | 'teacher' | 'parent' | 'author' | 'admin' | 'super_admin' | 'wholesaler' | 'super_client' | 'publisher' | 'university' | 'legal_reviewer' | 'layout_artist' | 'chief_layout' | 'manager'
   active_roles: string[]  // Source de vérité Phase 8 — lire ceci plutôt que role
   phone?: string
   is_verified: boolean
@@ -430,14 +430,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (role === 'teacher') router.push('/teacher')
     else if (role === 'author') router.push('/author')
     else if (role === 'student') router.push('/student')
-    else if (role === 'super_client') router.push('/student')
+    else if (role === 'wholesaler' || role === 'super_client') router.push('/wholesaler')
     else if (role === 'parent') router.push('/student')
     else if (role === 'layout_artist') router.push('/layout-artist')
     else if (role === 'chief_layout') router.push('/chief-layout')
     else if (role === 'manager') router.push('/manager')
     else if (role === 'university') router.push('/university')
     else if (role === 'publisher') router.push('/publisher')
-    else if (role === 'wholesaler') router.push('/wholesaler')
   }
 
   const value = React.useMemo(() => ({

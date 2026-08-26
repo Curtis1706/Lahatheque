@@ -19,6 +19,7 @@ import {
   FileText,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 import {
   getStudentUniversity,
   requestAffiliation,
@@ -327,7 +328,7 @@ function AffiliationForm({
           className="w-full py-3 px-4 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 min-h-[44px] disabled:opacity-60 cursor-pointer"
         >
           {submitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <InlineLoader size={16} />
           ) : (
             <ArrowRight className="w-4 h-4 text-gold" />
           )}
@@ -426,9 +427,7 @@ export default function StudentUniversityPage() {
 
       {/* ── Chargement ────────────────────────────────────────────────── */}
       {loading && (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 text-gold animate-spin" />
-        </div>
+        <PageLoader label="Chargement de votre statut universitaire" />
       )}
 
       {/* ── Affiliation en attente de validation ──────────────────────── */}

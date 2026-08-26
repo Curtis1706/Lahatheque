@@ -14,6 +14,7 @@ import { getProfile, updateProfile } from "@/lib/services/auth";
 import { toast } from "sonner";
 import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
 import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function LegalReviewerProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -179,7 +180,7 @@ export default function LegalReviewerProfilePage() {
                 className="px-6 py-3 rounded-xl bg-gold text-navy font-bold hover:bg-gold-light transition-colors min-h-[44px] flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 text-xs"
               >
                 {saving ? (
-                  <span className="w-4 h-4 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                 ) : (
                   <>
                     <Save className="w-4 h-4" />

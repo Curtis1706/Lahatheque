@@ -8,6 +8,7 @@ import { LahaVideoPlayer } from "@/components/student/LahaVideoPlayer"
 import { getCloudflareThumbnailUrl } from "@/lib/constants/cloudflare"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { PageLoader } from "@/components/ui/page-loader"
 
 // URL média backend (images stockées sur le serveur)
 const getMediaUrl = (path: string | null) => {
@@ -343,14 +344,7 @@ export function GuideViewer({ role, roleTitle }: GuideViewerProps) {
     )
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 space-y-3">
-        <div className="w-7 h-7 border-2 border-laha-gold border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-muted-foreground animate-pulse">
-          Chargement du guide...
-        </p>
-      </div>
-    )
+    return <PageLoader label="Chargement du guide" />
   }
 
   if (error) {

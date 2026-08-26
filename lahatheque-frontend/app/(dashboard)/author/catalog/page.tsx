@@ -39,46 +39,44 @@ function SkeletonBook() {
 
 function AuthorCatalogBookCard({
   book,
-  onOpenSample,
   onOpenOrderModal,
 }: {
   book: BookAPI;
-  onOpenSample: (book: BookAPI) => void;
   onOpenOrderModal: (book: BookAPI) => void;
 }) {
   const authorName =
     book.authors?.map((a) => a.full_name).join(", ") || "Auteur académique";
 
   return (
-    <div className="group p-5 rounded-3xl border border-border bg-background hover:border-gold/60 transition-all shadow-xs flex flex-col justify-between gap-4">
-      <div className="space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="shrink-0 w-12 h-16 rounded-xl bg-navy/10 border border-navy/20 flex items-center justify-center">
-            <BookOpen className="w-5 h-5 text-navy/40" />
-          </div>
-          <div className="min-w-0 flex-1 space-y-1">
-            <p className="text-[10px] font-bold text-gold uppercase tracking-wider truncate">
-              {book.discipline_name || "Académique"}
-            </p>
-            <h3 className="font-serif font-bold text-navy text-sm sm:text-base leading-snug line-clamp-2">
-              {book.title}
-            </h3>
-            <p className="text-[11px] text-foreground-muted truncate">
-              Par {authorName}
-            </p>
-            <div className="flex items-center gap-2 flex-wrap pt-0.5">
-              <span className="px-2 py-0.5 rounded-md bg-navy/5 border border-navy/15 text-[10px] font-mono uppercase text-navy/70">
-                {book.format_type?.toUpperCase() || "EPUB"}
-              </span>
-              {book.publisher_name && (
-                <span className="text-[10px] text-foreground-muted truncate">
-                  {book.publisher_name}
-                </span>
-              )}
+    <div className="group h-full rounded-3xl border border-border bg-background hover:border-gold/60 hover:shadow-md transition-all flex flex-col overflow-hidden">
+      <Link href={`/author/catalog/${book.id}`} className="flex gap-4 p-5 pb-0">
+        <div className="shrink-0 w-20 h-28 rounded-xl bg-navy/10 border border-navy/20 overflow-hidden shadow-sm group-hover:shadow-lg transition-shadow">
+          {book.cover_url ? (
+            <img src={book.cover_url} alt={book.title} className="w-full h-full object-cover" loading="lazy" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <BookOpen className="w-6 h-6 text-navy/40" />
             </div>
-          </div>
+          )}
         </div>
 
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <p className="text-[10px] font-bold text-gold uppercase tracking-wider truncate">
+            {book.discipline_name || "Académique"}
+          </p>
+          <h3 className="font-serif font-bold text-navy text-base leading-snug line-clamp-2 group-hover:text-gold transition-colors">
+            {book.title}
+          </h3>
+          <p className="text-[11px] text-foreground-muted truncate">
+            Par {authorName}
+          </p>
+          <span className="inline-block px-2 py-0.5 rounded-md bg-navy/5 border border-navy/15 text-[10px] font-mono uppercase text-navy/70">
+            {book.format_type?.toUpperCase() || "EPUB"}
+          </span>
+        </div>
+      </Link>
+
+      <div className="px-5 pt-3">
         {book.summary && (
           <p className="text-xs text-foreground-muted line-clamp-2 leading-relaxed">
             {book.summary}
@@ -86,39 +84,68 @@ function AuthorCatalogBookCard({
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="mt-auto p-5 pt-3 space-y-3">
+        <div className="border-t border-border pt-3">
           {book.is_owned || book.has_digital_access ? (
-            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 w-fit">
               <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Déjà acquis
             </span>
           ) : (
-            <span className="font-mono font-bold text-navy text-xs">
-              {(book.price_digital ?? 0).toLocaleString("fr-FR")} FCFA
-            </span>
-          )}
-
-          {book.is_paper_available && (
-            <span className="text-[10px] text-foreground-muted flex items-center gap-1" title="Disponible en livraison papier">
-              <Truck className="w-3 h-3 text-gold" /> Papier
-            </span>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] uppercase font-bold text-foreground-muted">Numérique</span>
+                {book.author_discounted_digital_price !== undefined && book.author_discounted_digital_price !== null ? (
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono font-bold text-navy text-xs">
+                      {book.author_discounted_digital_price.toLocaleString("fr-FR")} FCFA
+                    </span>
+                    <span className="text-[9px] text-foreground-muted line-through font-mono">
+                      {(book.price_digital ?? 0).toLocaleString("fr-FR")}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="font-mono font-bold text-navy text-xs">
+                    {(book.price_digital ?? 0).toLocaleString("fr-FR")} FCFA
+                  </span>
+                )}
+              </div>
+              {book.is_paper_available && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] uppercase font-bold text-foreground-muted flex items-center gap-0.5">
+                    <Truck className="w-2.5 h-2.5 text-gold" /> Papier
+                  </span>
+                  {book.author_discounted_paper_price !== undefined && book.author_discounted_paper_price !== null ? (
+                    <div className="flex items-center gap-1">
+                      <span className="font-mono font-bold text-gold text-xs">
+                        {book.author_discounted_paper_price.toLocaleString("fr-FR")} FCFA
+                      </span>
+                      <span className="text-[9px] text-foreground-muted line-through font-mono">
+                        {(book.price_paper ?? 0).toLocaleString("fr-FR")}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="font-mono font-bold text-gold text-xs">
+                      {(book.price_paper ?? 0).toLocaleString("fr-FR")} FCFA
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onOpenSample(book)}
-            className="p-2 rounded-xl border border-border bg-background-secondary text-foreground-muted hover:text-navy hover:border-gold/40 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
-            title="Lire l'extrait gratuit"
+          <Link
+            href={`/author/catalog/${book.id}`}
+            className="px-4 py-2 rounded-xl border border-border bg-background-secondary text-navy text-xs font-semibold hover:border-gold/40 transition-colors flex items-center justify-center min-h-[38px]"
           >
-            <Eye className="w-4 h-4 text-gold" />
-          </button>
+            Détail
+          </Link>
 
           <button
             type="button"
             onClick={() => onOpenOrderModal(book)}
-            className="px-3.5 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-dark transition-all flex items-center gap-1.5 min-h-[36px]"
+            className="flex-1 px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-dark transition-all flex items-center justify-center gap-1.5 min-h-[38px]"
           >
             <ShoppingBag className="w-3.5 h-3.5 text-gold" />
             <span>Commander</span>
@@ -164,7 +191,7 @@ export default function AuthorCatalogPage() {
   const disciplines = catalog?.disciplines || [];
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto pb-16 animate-in fade-in duration-300">
       {/* Header & Breadcrumb */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -243,7 +270,6 @@ export default function AuthorCatalogPage() {
               <AuthorCatalogBookCard
                 key={book.id}
                 book={book}
-                onOpenSample={(b) => setSampleBook(b)}
                 onOpenOrderModal={(b) => setOrderModalBook(b)}
               />
             ))}

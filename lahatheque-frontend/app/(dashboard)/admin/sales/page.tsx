@@ -76,6 +76,10 @@ export default function AdminSalesPage() {
         <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-light text-navy font-semibold">
           {row.type === "unitaire_digital"
             ? "Livre numérique"
+            : row.type === "grossiste_papier"
+            ? "Grossiste (Papier)"
+            : row.type === "grossiste_numerique"
+            ? "Grossiste (Numérique)"
             : row.type === "bouquet_institution"
             ? "Bouquet B2B"
             : row.type === "abonnement_individuel"

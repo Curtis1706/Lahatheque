@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { KeyRound, Eye, EyeOff, Lock, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { KeyRound, Eye, EyeOff, Lock, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { changePassword } from "@/lib/services/auth";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export function ChangePasswordCard() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -215,7 +216,7 @@ export function ChangePasswordCard() {
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <InlineLoader size={16} />
                 <span>Modification en cours...</span>
               </>
             ) : (

@@ -20,9 +20,12 @@ export interface WholesalerBookItem {
   publisher_name: string;
   digital_wholesale_price: number; // Prix de gros défini par l'Admin (XOF)
   print_wholesale_price: number; // Prix de gros papier (XOF)
+  digital_discount_pct?: number; // % remise numérique accordé (ex: 25)
+  paper_discount_pct?: number; // % remise papier accordé (ex: 32)
   public_price: number; // Prix public indicatif
   min_quantity: number; // Quantité minimale pour tarif grossiste
   stock_available_print: number;
+  is_paper_available?: boolean;
   sample_excerpt_url?: string;
   summary: string;
 }
@@ -62,6 +65,11 @@ export interface WholesalerOrder {
   invoice_url?: string;
   cancel_reason?: string;
   cancel_requested?: boolean;
+  // ─── Commande à Crédit Grossiste (Dépôt / Paiement différé) ───────────────
+  is_credit_purchase?: boolean;
+  credit_due_date?: string | null;
+  returned_at?: string | null;
+  return_reason?: string;
   timeline: {
     step: string;
     date: string;
@@ -81,6 +89,33 @@ export interface WholesalerNotification {
   created_at: string;
   is_read: boolean;
   wholesale_price: number;
+}
+
+export interface WholesaleTrendBook {
+  id: string;
+  title: string;
+  authors: string[];
+  discipline: string;
+  cover_url: string;
+  publication_date: string;
+  format_type: string;
+  is_paper_available: boolean;
+  public_digital_price: number;
+  public_paper_price: number;
+  digital_wholesale_price: number;
+  print_wholesale_price: number;
+  digital_discount_percent: number;
+  print_discount_percent: number;
+  total_sold?: number;
+  rank?: number;
+  summary: string;
+  isbn: string;
+}
+
+export interface WholesaleTrendingData {
+  new_releases: WholesaleTrendBook[];
+  best_sellers: WholesaleTrendBook[];
+  notifications: WholesalerNotification[];
 }
 
 export interface WholesalerKpis {

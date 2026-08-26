@@ -6,6 +6,7 @@ import { DollarSign, ArrowLeft, Building2, Edit2, ShieldCheck, CheckCircle2, Loc
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
 import {
   getUniversityRoyalties,
   getThirdPartyPublisherRoyalties,
@@ -273,7 +274,7 @@ export default function LegalRedevancesPage() {
                 className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] shadow-xs"
               >
                 {updating ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                 ) : (
                   "Enregistrer le nouveau taux"
                 )}

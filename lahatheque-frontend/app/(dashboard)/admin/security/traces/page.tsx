@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Shield, Search, Filter, Globe, Download, RefreshCw, Smartphone, Clock, BookOpen, AlertCircle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { getAccessTraces, type TraceRecord } from "@/lib/services/protection";
+import { PageLoader } from "@/components/ui/page-loader";
 
 
 export default function AdminTracesAccesPage() {
@@ -170,10 +171,7 @@ export default function AdminTracesAccesPage() {
       {/* Tableau des Traces (Desktop & Tablettes) / Cartes (Mobile) */}
       <div className="rounded-2xl bg-background-secondary border border-border overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center space-y-3">
-            <div className="w-8 h-8 mx-auto border-2 border-gold border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs text-foreground-muted font-medium">Chargement des traces d'accès...</p>
-          </div>
+          <PageLoader label="Chargement des traces d'accès" />
         ) : filteredTraces.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-navy/10 flex items-center justify-center mx-auto text-navy">

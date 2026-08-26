@@ -10,6 +10,7 @@ import {
 import { AdminContract } from "@/lib/types/admin";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 import {
   ArrowLeft,
   Scale,
@@ -114,14 +115,7 @@ export default function AdminContractDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="p-8 max-w-5xl mx-auto flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-3 text-foreground-muted">
-          <RotateCw className="w-6 h-6 animate-spin text-navy" />
-          <p className="text-xs">Chargement du dossier juridique...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Chargement du dossier juridique" />;
   }
 
   if (!contract) {
@@ -490,7 +484,7 @@ export default function AdminContractDetailPage() {
             >
               {isSubmitting ? (
                 <>
-                  <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                  <InlineLoader size={14} />
                   <span>Validation...</span>
                 </>
               ) : (
@@ -550,7 +544,7 @@ export default function AdminContractDetailPage() {
             >
               {isSubmitting ? (
                 <>
-                  <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                  <InlineLoader size={14} />
                   <span>Enregistrement...</span>
                 </>
               ) : (

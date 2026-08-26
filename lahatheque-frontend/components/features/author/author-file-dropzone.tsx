@@ -9,6 +9,7 @@ import {
   AlertCircle,
   FileCheck
 } from "lucide-react";
+import { Loader } from "@/components/ui/loader";
 
 export interface AuthorFileDropzoneProps {
   accept?: string;
@@ -131,8 +132,8 @@ export function AuthorFileDropzone({
         )}
 
         {isLoading && (
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-xs rounded-2xl flex flex-col items-center justify-center gap-2">
-            <span className="w-6 h-6 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-xs rounded-2xl flex flex-col items-center justify-center gap-2 text-gold">
+            <Loader variant="dots" size={28} label="Analyse du manuscrit" />
             <p className="text-xs font-bold text-navy">Analyse du manuscrit par l&apos;IA en cours...</p>
           </div>
         )}

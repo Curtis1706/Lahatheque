@@ -17,11 +17,13 @@ from .models import (
     WholesaleNotification,
     StockOuvrage,
 )
+from apps.accounts.permissions import IsWholesaler
 from apps.catalog.models import Ouvrage
+from apps.reporting.pricing_service import compute_role_price
 
 
 class WholesalerKpisView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWholesaler]
 
     def get(self, request):
         user = request.user
@@ -56,51 +58,64 @@ class WholesalerKpisView(APIView):
 
 
 class WholesalerCatalogListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWholesaler]
 
     def get(self, request):
         search_query = request.query_params.get("search", "").strip()
         discipline = request.query_params.get("discipline", "").strip()
 
-        ouvrages = Ouvrage.objects.filter(is_published=True).select_related("discipline_detail")
+        ouvrages = Ouvrage.objects.filter(status="published").select_related("discipline", "publisher").prefetch_related("authors")
 
         if discipline and discipline != "all":
             ouvrages = ouvrages.filter(
-                Q(discipline__iexact=discipline) | Q(discipline_detail__nom__iexact=discipline)
+                Q(discipline__name__iexact=discipline) | Q(discipline__name__icontains=discipline)
             )
 
         if search_query:
             ouvrages = ouvrages.filter(
-                Q(titre__icontains=search_query) |
+                Q(title__icontains=search_query) |
                 Q(isbn__icontains=search_query) |
-                Q(auteurs__icontains=search_query)
-            )
+                Q(authors__first_name__icontains=search_query) |
+                Q(authors__last_name__icontains=search_query)
+            ).distinct()
 
         data = []
         for o in ouvrages:
-            public_p = float(o.prix_public or 5000)
-            dig_p = float(o.prix_gros_numerique or int(public_p * 0.75))
-            prt_p = float(o.prix_gros_papier or int(public_p * 0.70))
+            public_digital = float(o.price_digital or 5000)
+            public_paper = float(o.price_paper or 7500)
+            pricing = compute_role_price(o, "wholesaler")
+            dig_p = pricing["digital_price"]
+            prt_p = pricing["paper_price"]
+            digital_discount_pct = pricing["digital_discount_pct"]
+            paper_discount_pct = pricing["paper_discount_pct"]
             
             # Stock physique disponible
             stocks = StockOuvrage.objects.filter(ouvrage=o)
             total_dispo = sum(s.quantite_disponible for s in stocks) if stocks.exists() else 0
 
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in o.authors.all()]
+            if not authors_list and hasattr(o, "auteur") and o.auteur:
+                authors_list = [o.auteur]
+
             data.append({
                 "id": str(o.id),
-                "title": o.titre,
-                "authors": o.auteurs if isinstance(o.auteurs, list) else [str(o.auteurs)],
-                "cover_url": o.cover_image_url or "/placeholder-cover.jpg",
+                "title": o.title,
+                "authors": authors_list if authors_list else ["Auteur LAHA"],
+                "cover_url": o.cover_url or "/placeholder-cover.jpg",
                 "isbn_digital": o.isbn or "978-2-84129-001-1",
                 "isbn_print": getattr(o, "isbn_print", o.isbn or "978-2-84129-001-2"),
-                "discipline": getattr(o.discipline_detail, "nom", o.discipline or "Général"),
-                "publisher_name": "LAHA Éditions",
+                "discipline": o.discipline.name if o.discipline else "Général",
+                "publisher_name": o.publisher.name if o.publisher else "LAHA Éditions",
                 "digital_wholesale_price": dig_p,
                 "print_wholesale_price": prt_p,
-                "public_price": public_p,
+                "digital_discount_pct": digital_discount_pct,
+                "paper_discount_pct": paper_discount_pct,
+                "public_price": public_digital,
+                "public_price_paper": public_paper,
                 "min_quantity": 20,
                 "stock_available_print": total_dispo,
-                "summary": o.resume or "Ouvrage académique et professionnel de référence.",
+                "is_paper_available": bool(o.is_paper_available or total_dispo > 0),
+                "summary": o.summary or "Ouvrage académique et professionnel de référence.",
             })
 
         return Response({
@@ -111,35 +126,46 @@ class WholesalerCatalogListView(APIView):
 
 
 class WholesalerCatalogDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWholesaler]
 
     def get(self, request, pk):
         try:
-            o = Ouvrage.objects.get(id=pk)
-            public_p = float(o.prix_public or 5000)
-            dig_p = float(o.prix_gros_numerique or int(public_p * 0.75))
-            prt_p = float(o.prix_gros_papier or int(public_p * 0.70))
+            o = Ouvrage.objects.select_related("discipline", "publisher").prefetch_related("authors").get(id=pk)
+            public_digital = float(o.price_digital or 5000)
+            public_paper = float(o.price_paper or 7500)
+            pricing = compute_role_price(o, "wholesaler")
+            dig_p = pricing["digital_price"]
+            prt_p = pricing["paper_price"]
+            digital_discount_pct = pricing["digital_discount_pct"]
+            paper_discount_pct = pricing["paper_discount_pct"]
             
             stocks = StockOuvrage.objects.filter(ouvrage=o)
             total_dispo = sum(s.quantite_disponible for s in stocks) if stocks.exists() else 0
+
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in o.authors.all()]
+            if not authors_list and hasattr(o, "auteur") and o.auteur:
+                authors_list = [o.auteur]
 
             return Response({
                 "success": True,
                 "data": {
                     "id": str(o.id),
-                    "title": o.titre,
-                    "authors": o.auteurs if isinstance(o.auteurs, list) else [str(o.auteurs)],
-                    "cover_url": o.cover_image_url or "/placeholder-cover.jpg",
+                    "title": o.title,
+                    "authors": authors_list if authors_list else ["Auteur LAHA"],
+                    "cover_url": o.cover_url or "/placeholder-cover.jpg",
                     "isbn_digital": o.isbn or "978-2-84129-001-1",
                     "isbn_print": getattr(o, "isbn_print", o.isbn or "978-2-84129-001-2"),
-                    "discipline": getattr(o.discipline_detail, "nom", o.discipline or "Général"),
-                    "publisher_name": "LAHA Éditions",
+                    "discipline": o.discipline.name if o.discipline else "Général",
+                    "publisher_name": o.publisher.name if o.publisher else "LAHA Éditions",
                     "digital_wholesale_price": dig_p,
                     "print_wholesale_price": prt_p,
-                    "public_price": public_p,
+                    "digital_discount_pct": digital_discount_pct,
+                    "paper_discount_pct": paper_discount_pct,
+                    "public_price": public_digital,
+                    "public_price_paper": public_paper,
                     "min_quantity": 20,
                     "stock_available_print": total_dispo,
-                    "summary": o.resume or "",
+                    "summary": o.summary or "",
                 },
                 "error": None,
             })
@@ -151,7 +177,7 @@ class WholesalerCatalogDetailView(APIView):
 
 
 class WholesalerOrdersListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWholesaler]
 
     def get(self, request):
         user = request.user
@@ -191,6 +217,11 @@ class WholesalerOrdersListView(APIView):
                 "invoice_url": ord_obj.invoice_url or f"/invoices/{ord_obj.reference}.pdf",
                 "cancel_requested": ord_obj.cancel_requested,
                 "cancel_reason": ord_obj.cancel_reason,
+                # ─── Champs Commande à Crédit Grossiste ─────────────────────────
+                "is_credit_purchase": ord_obj.is_credit_purchase,
+                "credit_due_date": ord_obj.credit_due_date.isoformat() if hasattr(ord_obj.credit_due_date, "isoformat") else (str(ord_obj.credit_due_date) if ord_obj.credit_due_date else None),
+                "returned_at": ord_obj.returned_at.isoformat() if hasattr(ord_obj.returned_at, "isoformat") else (str(ord_obj.returned_at) if ord_obj.returned_at else None),
+                "return_reason": ord_obj.return_reason,
                 "timeline": [
                     {"step": "Commande transmise", "date": ord_obj.created_at.strftime("%d/%m/%Y"), "description": "Dépôt de la commande groupée", "done": True},
                     {"step": "Validation & Proforma", "date": "-", "description": "Émission du devis proforma B2B", "done": ord_obj.status in ["validated", "processing", "delivered"]},
@@ -207,6 +238,14 @@ class WholesalerOrdersListView(APIView):
         cart_items = data.get("items", [])
         delivery_address = data.get("delivery_address", "")
         contact_phone = data.get("contact_phone", "")
+
+        # ─── Paramètres Commande à Crédit / Dépôt Grossiste ───────────────────
+        is_credit = bool(data.get("is_credit_purchase", False))
+        credit_due = data.get("credit_due_date")
+        if is_credit and not credit_due:
+            from datetime import date, timedelta
+            # Délai standard 60 jours pour réapprovisionnement grossiste
+            credit_due = date.today() + timedelta(days=60)
 
         if not cart_items:
             return Response(
@@ -229,6 +268,10 @@ class WholesalerOrdersListView(APIView):
             currency="XOF",
             status=WholesaleOrderStatus.PENDING,
             invoice_url="",  # Facture PDF non encore disponible
+            # Assignation crédit
+            is_credit_purchase=is_credit,
+            credit_due_date=credit_due if is_credit else None,
+            credit_granted_by=user if is_credit else None,
         )
 
         tot_dig = 0
@@ -253,8 +296,9 @@ class WholesalerOrdersListView(APIView):
                 continue
 
             # Prix TOUJOURS recalculé serveur — jamais depuis le client
-            dig_price = book.prix_gros_numerique or Decimal("3000.00")
-            prt_price = book.prix_gros_papier or Decimal("3500.00")
+            pricing = compute_role_price(book, "wholesaler")
+            dig_price = Decimal(str(pricing["digital_price"]))
+            prt_price = Decimal(str(pricing["paper_price"]))
 
             # Application du palier de remise applicable selon la quantité totale
             tier = WholesaleDiscountTier.objects.filter(
@@ -267,7 +311,12 @@ class WholesalerOrdersListView(APIView):
 
             # Vérification du stock papier disponible
             if prt_qty > 0:
-                if not book.is_paper_available:
+                total_disponible = book.stocks_entrepots.aggregate(
+                    total=Sum(F('quantite_reelle') - F('quantite_reservee'))
+                )['total'] or 0
+
+                is_paper_ok = bool(book.is_paper_available or total_disponible > 0)
+                if not is_paper_ok:
                     order.delete()
                     return Response({
                         "success": False,
@@ -275,9 +324,6 @@ class WholesalerOrdersListView(APIView):
                         "error": f"« {book.title} » n'est pas disponible en version papier."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-                total_disponible = book.stocks_entrepots.aggregate(
-                    total=Sum(F('quantite_reelle') - F('quantite_reservee'))
-                )['total'] or 0
                 if total_disponible < prt_qty:
                     order.delete()
                     return Response({
@@ -296,23 +342,30 @@ class WholesalerOrdersListView(APIView):
                 stock = book.stocks_entrepots.filter(
                     quantite_reelle__gte=prt_qty
                 ).order_by('-quantite_reelle').first()
+                if not stock:
+                    stock = book.stocks_entrepots.first()
                 if stock:
                     stock.quantite_reservee = F('quantite_reservee') + prt_qty
                     stock.save(update_fields=['quantite_reservee'])
+                    motif_label = f"Dépôt commande à crédit grossiste {comp_name}" if is_credit else f"Réservation commande grossiste {comp_name}"
                     MouvementStock.objects.create(
                         stock=stock,
                         type_mouvement='adjustment',
                         quantite=prt_qty,
                         reference_document=ref,
-                        motif=f"Réservation commande grossiste {comp_name}",
+                        motif=motif_label,
                         auteur=user,
                     )
+
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in book.authors.all()]
+            if not authors_list and hasattr(book, "auteur") and book.auteur:
+                authors_list = [book.auteur]
 
             WholesaleOrderItem.objects.create(
                 order=order,
                 book=book,
-                title=book.titre,
-                authors=book.auteurs if isinstance(book.auteurs, list) else [str(book.auteurs)],
+                title=book.title,
+                authors=authors_list if authors_list else ["Auteur LAHA"],
                 isbn=book.isbn or "",
                 digital_licenses_qty=dig_qty,
                 digital_unit_price=dig_price,
@@ -326,6 +379,8 @@ class WholesalerOrdersListView(APIView):
         order.total_amount = tot_amt
         order.save(update_fields=["total_digital_licenses", "total_print_copies", "total_amount"])
 
+        order.refresh_from_db()
+
         return Response(
             {
                 "success": True,
@@ -334,6 +389,8 @@ class WholesalerOrdersListView(APIView):
                     "reference": order.reference,
                     "total_amount": float(order.total_amount),
                     "status": order.status,
+                    "is_credit_purchase": order.is_credit_purchase,
+                    "credit_due_date": order.credit_due_date.isoformat() if hasattr(order.credit_due_date, "isoformat") else (str(order.credit_due_date) if order.credit_due_date else None),
                 },
                 "error": None,
             },
@@ -342,11 +399,13 @@ class WholesalerOrdersListView(APIView):
 
 
 class WholesalerOrderDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWholesaler]
 
     def get(self, request, pk):
         try:
-            ord_obj = WholesaleOrder.objects.filter(Q(id=pk) | Q(reference=pk)).first()
+            ord_obj = WholesaleOrder.objects.filter(
+                Q(id=pk) | Q(reference=pk), user=request.user
+            ).first()
             if not ord_obj:
                 return Response(
                     {"success": False, "data": None, "error": "Commande introuvable."},
@@ -388,6 +447,11 @@ class WholesalerOrderDetailView(APIView):
                     "invoice_url": ord_obj.invoice_url or f"/invoices/{ord_obj.reference}.pdf",
                     "cancel_requested": ord_obj.cancel_requested,
                     "cancel_reason": ord_obj.cancel_reason,
+                    # ─── Champs Commande à Crédit Grossiste ─────────────────────
+                    "is_credit_purchase": ord_obj.is_credit_purchase,
+                    "credit_due_date": ord_obj.credit_due_date.isoformat() if hasattr(ord_obj.credit_due_date, "isoformat") else (str(ord_obj.credit_due_date) if ord_obj.credit_due_date else None),
+                    "returned_at": ord_obj.returned_at.isoformat() if hasattr(ord_obj.returned_at, "isoformat") else (str(ord_obj.returned_at) if ord_obj.returned_at else None),
+                    "return_reason": ord_obj.return_reason,
                     "timeline": [
                         {"step": "Commande transmise", "date": ord_obj.created_at.strftime("%d/%m/%Y"), "description": "Dépôt de la commande groupée", "done": True},
                         {"step": "Validation & Proforma", "date": "-", "description": "Émission du devis proforma B2B", "done": ord_obj.status in ["validated", "processing", "delivered"]},
@@ -401,8 +465,78 @@ class WholesalerOrderDetailView(APIView):
             return Response({"success": False, "data": None, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class WholesalerOrderReturnCreditView(APIView):
+    """
+    POST /api/v1/commerce/wholesaler/orders/<pk>/return/
+    Permet au grossiste d'enregistrer le retour d'exemplaires invendus d'une commande à crédit / dépôt.
+    """
+    permission_classes = [IsAuthenticated, IsWholesaler]
+
+    def post(self, request, pk):
+        reason = request.data.get("reason", "").strip() or "Retour des invendus en fin de période de dépôt"
+
+        ord_obj = WholesaleOrder.objects.filter(
+            Q(id=pk) | Q(reference=pk), user=request.user
+        ).first()
+        if not ord_obj:
+            return Response(
+                {"success": False, "data": None, "error": "Commande introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not ord_obj.is_credit_purchase:
+            return Response(
+                {"success": False, "data": None, "error": "Seules les commandes à crédit / dépôt peuvent faire l'objet d'un retour d'invendus."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if ord_obj.returned_at:
+            return Response(
+                {"success": False, "data": None, "error": "Cette commande à crédit a déjà été marquée comme retournée."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from .models import StockOuvrage, MouvementStock
+        from django.db import transaction
+        from django.db.models import F
+
+        with transaction.atomic():
+            for item in ord_obj.items.all():
+                if item.print_copies_qty and item.print_copies_qty > 0:
+                    stock = StockOuvrage.objects.filter(ouvrage_id=item.book_id).first()
+                    if stock:
+                        stock.quantite_reservee = F('quantite_reservee') - item.print_copies_qty
+                        stock.save(update_fields=['quantite_reservee'])
+                        MouvementStock.objects.create(
+                            stock=stock,
+                            type_mouvement='return',
+                            quantite=item.print_copies_qty,
+                            reference_document=f"Retour dépôt grossiste #{ord_obj.reference}",
+                            motif=reason,
+                            auteur=request.user,
+                        )
+
+            ord_obj.returned_at = timezone.now()
+            ord_obj.return_reason = reason
+            ord_obj.status = WholesaleOrderStatus.CANCELLED
+            ord_obj.save(update_fields=["returned_at", "return_reason", "status", "updated_at"])
+
+        return Response({
+            "success": True,
+            "message": "Retour des exemplaires invendus enregistré avec succès.",
+            "data": {
+                "id": str(ord_obj.id),
+                "reference": ord_obj.reference,
+                "status": ord_obj.status,
+                "returned_at": ord_obj.returned_at.isoformat() if ord_obj.returned_at else None,
+                "return_reason": ord_obj.return_reason,
+            },
+            "error": None,
+        })
+
+
 class WholesalerOrderCancelView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWholesaler]
 
     def post(self, request, pk):
         reason = request.data.get("reason", "").strip()
@@ -412,7 +546,9 @@ class WholesalerOrderCancelView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        ord_obj = WholesaleOrder.objects.filter(Q(id=pk) | Q(reference=pk)).first()
+        ord_obj = WholesaleOrder.objects.filter(
+            Q(id=pk) | Q(reference=pk), user=request.user
+        ).first()
         if not ord_obj:
             return Response(
                 {"success": False, "data": None, "error": "Commande introuvable."},
@@ -425,10 +561,30 @@ class WholesalerOrderCancelView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        ord_obj.status = WholesaleOrderStatus.CANCELLED
-        ord_obj.cancel_requested = True
-        ord_obj.cancel_reason = reason
-        ord_obj.save(update_fields=["status", "cancel_requested", "cancel_reason", "updated_at"])
+        from .models import StockOuvrage, MouvementStock
+        from django.db import transaction
+        from django.db.models import F
+
+        with transaction.atomic():
+            for item in ord_obj.items.all():
+                if item.print_copies_qty and item.print_copies_qty > 0:
+                    stock = StockOuvrage.objects.filter(ouvrage_id=item.book_id).first()
+                    if stock:
+                        stock.quantite_reservee = F('quantite_reservee') - item.print_copies_qty
+                        stock.save(update_fields=['quantite_reservee'])
+                        MouvementStock.objects.create(
+                            stock=stock,
+                            type_mouvement='return',
+                            quantite=item.print_copies_qty,
+                            reference_document=f"Annulation commande grossiste #{ord_obj.reference}",
+                            motif=reason,
+                            auteur=request.user,
+                        )
+
+            ord_obj.status = WholesaleOrderStatus.CANCELLED
+            ord_obj.cancel_requested = True
+            ord_obj.cancel_reason = reason
+            ord_obj.save(update_fields=["status", "cancel_requested", "cancel_reason", "updated_at"])
 
         return Response({
             "success": True,
@@ -438,7 +594,7 @@ class WholesalerOrderCancelView(APIView):
 
 
 class WholesalerProfileView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWholesaler]
 
     def get(self, request):
         user = request.user
@@ -503,27 +659,137 @@ class WholesalerProfileView(APIView):
 
 
 class WholesalerNotificationsListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWholesaler]
 
     def get(self, request):
-        user = request.user
-        notifs = WholesaleNotification.objects.filter(
-            Q(user=user) | Q(user__isnull=True)
-        )[:30]
+        from apps.catalog.models import Ouvrage
+        from apps.commerce.models import LigneCommande, WholesaleOrderItem
+        from django.db.models import Sum, F
 
-        data = [
-            {
-                "id": str(n.id),
-                "type": n.notification_type,
-                "title": n.title,
-                "book_id": str(n.book_id) if n.book_id else "",
-                "book_title": n.book.titre if n.book else "",
-                "cover_url": n.book.cover_image_url if n.book else "/placeholder-cover.jpg",
-                "description": n.description,
-                "created_at": n.created_at.isoformat(),
-                "is_read": n.is_read,
-                "wholesale_price": float(n.wholesale_price),
-            }
-            for n in notifs
-        ]
-        return Response({"success": True, "data": data, "error": None})
+        # 1. Nouvelles Parutions (ouvrages publiés triés par date la plus récente)
+        recent_books = (
+            Ouvrage.objects.filter(status='published')
+            .select_related('discipline', 'publisher')
+            .prefetch_related('authors')
+            .order_by('-publication_date', '-created_at')[:24]
+        )
+
+        new_releases = []
+        for b in recent_books:
+            pricing = compute_role_price(b, "wholesaler")
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]
+            if not authors_list and hasattr(b, "auteur") and b.auteur:
+                authors_list = [b.auteur]
+
+            pub_date = b.publication_date.isoformat() if b.publication_date else (
+                b.created_at.date().isoformat() if b.created_at else "2026-01-01"
+            )
+
+            new_releases.append({
+                "id": str(b.id),
+                "title": b.title,
+                "authors": authors_list if authors_list else ["Auteur LAHA"],
+                "discipline": b.discipline.name if b.discipline else "Général",
+                "cover_url": b.cover_url or "",
+                "publication_date": pub_date,
+                "format_type": b.format_type,
+                "is_paper_available": bool(b.is_paper_available),
+                "public_digital_price": float(b.price_digital),
+                "public_paper_price": float(b.price_paper),
+                "digital_wholesale_price": pricing["digital_price"],
+                "print_wholesale_price": pricing["paper_price"],
+                "digital_discount_percent": pricing["digital_discount_pct"],
+                "print_discount_percent": pricing["paper_discount_pct"],
+                "summary": b.summary or "",
+                "isbn": b.isbn or "",
+            })
+
+        # 2. Meilleures Ventes (ouvrages publiés ordonnés par volume de ventes B2C + B2B)
+        all_published = (
+            Ouvrage.objects.filter(status='published')
+            .select_related('discipline', 'publisher')
+            .prefetch_related('authors')
+        )
+        scored_books = []
+        for b in all_published:
+            b2c = LigneCommande.objects.filter(ouvrage=b, commande__statut_paiement='paid').aggregate(t=Sum('quantity'))['t'] or 0
+            b2b = WholesaleOrderItem.objects.filter(book=b).exclude(order__status='cancelled').aggregate(t=Sum(F('digital_licenses_qty') + F('print_copies_qty')))['t'] or 0
+            total_sold = b2c + b2b
+            pricing = compute_role_price(b, "wholesaler")
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]
+            if not authors_list and hasattr(b, "auteur") and b.auteur:
+                authors_list = [b.auteur]
+
+            pub_date = b.publication_date.isoformat() if b.publication_date else (
+                b.created_at.date().isoformat() if b.created_at else "2026-01-01"
+            )
+
+            scored_books.append({
+                "id": str(b.id),
+                "title": b.title,
+                "authors": authors_list if authors_list else ["Auteur LAHA"],
+                "discipline": b.discipline.name if b.discipline else "Général",
+                "cover_url": b.cover_url or "",
+                "publication_date": pub_date,
+                "format_type": b.format_type,
+                "is_paper_available": bool(b.is_paper_available),
+                "public_digital_price": float(b.price_digital),
+                "public_paper_price": float(b.price_paper),
+                "digital_wholesale_price": pricing["digital_price"],
+                "print_wholesale_price": pricing["paper_price"],
+                "digital_discount_percent": pricing["digital_discount_pct"],
+                "print_discount_percent": pricing["paper_discount_pct"],
+                "total_sold": total_sold,
+                "summary": b.summary or "",
+                "isbn": b.isbn or "",
+            })
+
+        # Trier par total_sold décroissant puis date
+        scored_books.sort(key=lambda x: (x["total_sold"], x["publication_date"]), reverse=True)
+        best_sellers = []
+        for idx, sb in enumerate(scored_books[:24], 1):
+            sb["rank"] = idx
+            best_sellers.append(sb)
+
+        # 3. Liste de notifications (pour la rétrocompatibilité)
+        notifications_list = []
+        for nr in new_releases[:5]:
+            notifications_list.append({
+                "id": f"notif-new-{nr['id']}",
+                "type": "nouveaute",
+                "title": f"Nouvelle Parution : {nr['title']}",
+                "book_id": nr["id"],
+                "book_title": nr["title"],
+                "cover_url": nr["cover_url"],
+                "description": f"Ajouté au catalogue LAHAThèque en {nr['discipline']}. Tarif préférentiel grossiste disponible.",
+                "created_at": nr["publication_date"],
+                "is_read": False,
+                "wholesale_price": nr["print_wholesale_price"] if nr["is_paper_available"] else nr["digital_wholesale_price"],
+            })
+
+        for bs in best_sellers[:5]:
+            notifications_list.append({
+                "id": f"notif-best-{bs['id']}",
+                "type": "meilleure_vente",
+                "title": f"Top Vente #{bs['rank']} : {bs['title']}",
+                "book_id": bs["id"],
+                "book_title": bs["title"],
+                "cover_url": bs["cover_url"],
+                "description": f"Grand succès d'édition ({bs['total_sold']} exemplaires écoulés). Recommandé pour réapprovisionnement.",
+                "created_at": bs["publication_date"],
+                "is_read": False,
+                "wholesale_price": bs["print_wholesale_price"] if bs["is_paper_available"] else bs["digital_wholesale_price"],
+            })
+
+        return Response({
+            "success": True,
+            "data": {
+                "new_releases": new_releases,
+                "best_sellers": best_sellers,
+                "notifications": notifications_list,
+            },
+            "error": None
+        })
+
+    def patch(self, request, pk=None):
+        return Response({"success": True, "message": "Notification marquée comme lue."})

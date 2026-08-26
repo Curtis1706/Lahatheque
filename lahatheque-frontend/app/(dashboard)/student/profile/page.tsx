@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getStudentProfile,
@@ -47,7 +48,7 @@ function AffiliationStatusBadge({
       className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${map[status] || "border-border text-foreground-muted"}`}
     >
       {status === "approved" && <CheckCircle2 className="w-3 h-3" />}
-      {status === "pending" && <Loader2 className="w-3 h-3 animate-spin" />}
+      {status === "pending" && <InlineLoader size={12} />}
       {display}
     </span>
   );
@@ -341,7 +342,7 @@ export default function StudentProfilePage() {
                 className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] disabled:opacity-60 cursor-pointer"
               >
                 {saving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <InlineLoader size={16} />
                 ) : (
                   <Save className="w-4 h-4 text-gold" />
                 )}

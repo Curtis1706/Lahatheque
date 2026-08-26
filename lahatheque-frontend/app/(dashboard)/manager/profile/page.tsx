@@ -21,6 +21,7 @@ import { getEntrepots, type Entrepot } from "@/lib/services/manager";
 import { toast } from "sonner";
 import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
 import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function ManagerProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -249,7 +250,7 @@ export default function ManagerProfilePage() {
                 className="w-full sm:w-auto px-6 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 shadow-sm min-h-[44px] disabled:opacity-50 cursor-pointer"
               >
                 {savingProfile ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                 ) : (
                   <>
                     <Save className="w-4 h-4 text-gold" />

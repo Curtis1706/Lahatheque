@@ -26,6 +26,7 @@ import {
   Eye,
   Loader2,
 } from "lucide-react";
+import { PageLoader } from "@/components/ui/page-loader";
 import { toast } from "sonner";
 import {
   getPartnerReaderSessions,
@@ -293,10 +294,7 @@ export default function AdminHostedSessionsPage() {
 
       {/* Liste / Grille des Sessions de Lecture */}
       {loading ? (
-        <div className="p-12 text-center rounded-2xl bg-background-secondary border border-border space-y-3">
-          <Loader2 className="w-8 h-8 text-gold animate-spin mx-auto" />
-          <p className="text-sm font-semibold text-navy">Chargement des sessions de lecture...</p>
-        </div>
+        <PageLoader label="Chargement des sessions de lecture" />
       ) : filteredSessions.length === 0 ? (
         <div className="p-12 text-center rounded-2xl bg-background-secondary border border-border space-y-3">
           <div className="w-12 h-12 rounded-full bg-navy/10 flex items-center justify-center text-navy mx-auto">

@@ -9,7 +9,7 @@ import { AdminCatalogBook } from "@/lib/types/admin";
 import { BookOpen, Search, Tag, History, Shield, Eye, Pencil, X, Save, CheckCircle2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-
+import { InlineLoader } from "@/components/ui/page-loader";
 import { ViewToggle, ViewMode } from "@/components/features/student/view-toggle";
 
 export default function AdminCatalogPage() {
@@ -442,7 +442,7 @@ export default function AdminCatalogPage() {
                   className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white font-bold transition-colors flex items-center gap-2 shadow-sm"
                 >
                   {saving ? (
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <InlineLoader size={16} />
                   ) : (
                     <>
                       <Save className="w-4 h-4 text-gold" />

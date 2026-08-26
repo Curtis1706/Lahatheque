@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { InlineLoader } from "@/components/ui/page-loader";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
@@ -359,7 +360,7 @@ export function ChiefExaminationModal({
                   className="w-full sm:flex-1 py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
                 >
                   {loading ? (
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <InlineLoader size={16} />
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
@@ -425,7 +426,7 @@ export function ChiefExaminationModal({
                   className="w-full sm:flex-1 py-3 px-4 rounded-2xl bg-error text-white text-xs font-bold hover:bg-error/90 transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
                 >
                   {loading ? (
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <InlineLoader size={16} />
                   ) : (
                     <>
                       <Send className="w-4 h-4" />

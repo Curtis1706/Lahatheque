@@ -13,6 +13,7 @@ import { AuthorFileDropzone } from "@/components/features/author/author-file-dro
 import { createAuthorSubmission } from "@/lib/services/author";
 import { extractBookMetadataWithAi } from "@/lib/services/ai";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function AuthorNewSubmissionPage() {
   const router = useRouter();
@@ -208,7 +209,7 @@ export default function AuthorNewSubmissionPage() {
             className="px-6 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center gap-2 min-h-[44px] shadow-sm disabled:opacity-50 cursor-pointer"
           >
             {submitting ? (
-              <span className="w-4 h-4 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+              <InlineLoader size={16} />
             ) : (
               <>
                 <Send className="w-4 h-4" />

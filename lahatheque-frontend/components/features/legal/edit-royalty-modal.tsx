@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Percent, X, AlertCircle, Save, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { BookRoyalty } from "@/lib/types/legal";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface EditRoyaltyModalProps {
   royalty: BookRoyalty;
@@ -130,7 +131,7 @@ export function EditRoyaltyModal({
                 className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] shadow-xs"
               >
                 {loading ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                 ) : (
                   <>
                     <Save className="w-4 h-4 text-gold" />

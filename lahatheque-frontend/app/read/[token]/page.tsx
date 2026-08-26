@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Loader2,
   Headphones,
   CheckCircle2,
   LogOut,
@@ -22,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageLoader } from "@/components/ui/page-loader";
 
 // Core viewer & plugins
 import {
@@ -584,11 +584,7 @@ export default function HostedReaderPage() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--partner-primary,#770D28)] text-white p-6">
-        <Loader2 className="w-10 h-10 text-[var(--partner-accent,#B4AB6B)] animate-spin mb-4" />
-        <h2 className="text-lg font-bold font-serif">Initialisation de votre session sécurisée...</h2>
-        <p className="text-xs text-white/70 mt-1">
-          Chiffrement et chargement du document en flux continu
-        </p>
+        <PageLoader label="Initialisation de votre session sécurisée" />
       </div>
     );
   }
@@ -761,9 +757,8 @@ export default function HostedReaderPage() {
       {/* 📖 Zone de Lecture Principale */}
       <main className="flex-1 relative w-full h-full overflow-hidden bg-[var(--partner-bg,#FAFAFA)]">
         {!rawPdfData ? (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 border-4 border-[var(--partner-accent,#B4AB6B)] border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs text-[var(--partner-text,#1a1a1a)] font-medium">Chargement du document sécurisé...</p>
+          <div className="w-full h-full flex flex-col items-center justify-center">
+            <PageLoader label="Chargement du document sécurisé" />
           </div>
         ) : immersionMode ? (
           /* Mode Immersion 3D FlipBook Complet */

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ArrowUpCircle, X, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { StockAlert } from "@/lib/types/manager";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface EscalateModalProps {
   alert: StockAlert;
@@ -123,7 +124,7 @@ export function EscalateModal({ alert, isOpen, onClose, onConfirm }: EscalateMod
               className="flex-1 px-4 py-2.5 rounded-xl bg-error text-white text-xs font-bold hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px]"
             >
               {loading ? (
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <InlineLoader size={16} />
               ) : (
                 <>
                   <ArrowUpCircle className="w-4 h-4" />

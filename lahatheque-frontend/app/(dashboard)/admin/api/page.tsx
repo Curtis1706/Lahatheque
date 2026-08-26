@@ -28,6 +28,7 @@ import {
   Sliders,
   Check,
 } from "lucide-react";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 import { toast } from "sonner";
 import {
   getPartnerApiKeys,
@@ -455,10 +456,7 @@ export default function AdminApiKeysPage() {
 
       {/* Liste / Grille des Applications Partenaires */}
       {loading ? (
-        <div className="p-12 text-center rounded-2xl bg-background-secondary border border-border space-y-3">
-          <Loader2 className="w-8 h-8 text-gold animate-spin mx-auto" />
-          <p className="text-sm font-semibold text-navy">Chargement des intégrations réelles...</p>
-        </div>
+        <PageLoader label="Chargement des intégrations réelles" />
       ) : filteredKeys.length === 0 ? (
         <div className="p-12 text-center rounded-2xl bg-background-secondary border border-border space-y-3">
           <div className="w-12 h-12 rounded-full bg-navy/10 flex items-center justify-center text-navy mx-auto">
@@ -1200,7 +1198,7 @@ export default function AdminApiKeysPage() {
                   className="px-4 py-2 rounded-xl bg-navy text-white hover:bg-navy-dark transition-all font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="w-3.5 h-3.5 text-gold animate-spin" />
+                    <InlineLoader size={14} />
                   ) : (
                     <Plus className="w-3.5 h-3.5 text-gold" />
                   )}
@@ -1474,7 +1472,7 @@ export default function AdminApiKeysPage() {
                   className="px-4 py-2 rounded-xl bg-navy text-white hover:bg-navy-dark transition-all font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="w-3.5 h-3.5 text-gold animate-spin" />
+                    <InlineLoader size={14} />
                   ) : (
                     <Check className="w-3.5 h-3.5 text-gold" />
                   )}

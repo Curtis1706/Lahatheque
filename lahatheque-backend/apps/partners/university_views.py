@@ -353,7 +353,9 @@ class UniversityPaperOrdersView(APIView):
                     "error": f"Stock insuffisant pour « {book.title} » (disponible : {total_disponible}, demandé : {quantity})."
                 }, status=400)
 
-            unit_price = book.price_paper or Decimal("0.00")
+            from apps.reporting.pricing_service import compute_role_price
+            pricing = compute_role_price(book, "university")
+            unit_price = Decimal(str(pricing["paper_price"]))
             line_total = unit_price * quantity
             total_amount += line_total
 

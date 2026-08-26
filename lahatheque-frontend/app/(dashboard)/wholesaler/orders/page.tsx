@@ -16,21 +16,27 @@ export default function WholesalerOrdersListPage() {
   const [orders, setOrders] = useState<WholesalerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelOrder, setCancelOrder] = useState<WholesalerOrder | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadData = React.useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const data = await getWholesalerOrders();
+      setOrders(data);
+    } catch (err: unknown) {
+      console.error("Erreur de chargement des commandes", err);
+      setLoadError(
+        err instanceof Error ? err.message : "Impossible de charger vos commandes pour le moment."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      try {
-        const data = await getWholesalerOrders();
-        setOrders(data);
-      } catch (err) {
-        console.error("Erreur de chargement des commandes", err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleConfirmCancel = async (orderId: string, reason: string) => {
     const success = await requestOrderCancellation(orderId, reason);
@@ -52,7 +58,18 @@ export default function WholesalerOrdersListPage() {
       header: "Référence Commande",
       cell: (row) => (
         <Link href={`/wholesaler/orders/${row.id}`} className="hover:text-navy transition-colors">
-          <p className="font-mono font-bold text-xs text-navy leading-snug">{row.reference}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="font-mono font-bold text-xs text-navy leading-snug">{row.reference}</p>
+            {/* 
+              ─── INDICATEUR COMMANDE À CRÉDIT GROSSISTE ─────────────────────────
+              Décommenter ci-dessous pour afficher le badge crédit sur la liste :
+              {row.is_credit_purchase && (
+                <span className="px-1.5 py-0.5 rounded-md bg-gold/15 text-gold text-[9px] font-bold">
+                  Dépôt Crédit
+                </span>
+              )}
+            */}
+          </div>
           <p className="text-[10px] text-foreground-muted">
             Déposée le {new Date(row.created_at).toLocaleDateString("fr-FR")}
           </p>
@@ -150,16 +167,39 @@ export default function WholesalerOrdersListPage() {
         </Link>
       </div>
 
-      {/* Table */}
-      <DataTable
-        data={orders}
-        columns={columns}
-        rowKey="id"
-        loading={loading}
-        emptyMessage="Aucune commande groupée passée pour le moment."
-        onRowClick={(row) => { router.push(`/wholesaler/orders/${row.id}`); }}
-        pageSize={10}
-      />
+      {/* Table ou Erreur */}
+      {loadError ? (
+        <div className="p-8 text-center rounded-3xl bg-error/5 border border-error/20 space-y-4">
+          <div className="w-12 h-12 rounded-full bg-error/10 text-error flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-serif font-bold text-navy text-base">
+              Erreur de chargement des commandes
+            </h3>
+            <p className="text-xs text-foreground-muted max-w-md mx-auto">
+              {loadError || "Une erreur est survenue lors du chargement de vos commandes. Veuillez réessayer."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => loadData()}
+            className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-dark transition-all inline-flex items-center gap-2 min-h-[40px]"
+          >
+            <span>Réessayer</span>
+          </button>
+        </div>
+      ) : (
+        <DataTable
+          data={orders}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          emptyMessage="Aucune commande groupée passée pour le moment."
+          onRowClick={(row) => { router.push(`/wholesaler/orders/${row.id}`); }}
+          pageSize={10}
+        />
+      )}
 
       {/* Modale d'annulation */}
       <CancelOrderModal

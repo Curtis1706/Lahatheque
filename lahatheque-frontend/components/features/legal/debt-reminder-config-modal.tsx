@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { BellRing, X, Save, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { DebtReminderConfig } from "@/lib/types/legal";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface DebtReminderConfigModalProps {
   currentConfig: DebtReminderConfig;
@@ -166,7 +167,7 @@ export function DebtReminderConfigModal({
                 className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] shadow-xs"
               >
                 {loading ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                 ) : (
                   <>
                     <Save className="w-4 h-4 text-gold" />

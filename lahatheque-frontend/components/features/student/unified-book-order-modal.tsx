@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, ShoppingBag, BookOpen, Truck, Eye, Loader2, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
+import { X, ShoppingBag, BookOpen, Truck, Eye, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { createOrder } from "@/lib/services/commerce-orders";
 import type { BookAPI } from "@/lib/services/student";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 type Format = "digital" | "paper";
 
@@ -164,7 +165,7 @@ export function UnifiedBookOrderModal({
           </div>
 
           <div className="p-3 rounded-2xl bg-background-secondary border border-border text-xs text-foreground-muted flex items-center justify-center gap-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-gold shrink-0" />
+            <InlineLoader size={14} />
             <span>Sécurisation de la transaction &amp; transfert de licence...</span>
           </div>
         </div>
@@ -477,7 +478,7 @@ export function UnifiedBookOrderModal({
             className="w-full px-4 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover disabled:opacity-50 transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
           >
             {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin text-gold" />
+              <InlineLoader size={16} />
             ) : (
               <ShoppingBag className="w-4 h-4 text-gold" />
             )}

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, Send, GraduationCap, Building2, FileText, ArrowRight, Loader2 } from "lucide-react";
+import { Search, Send, GraduationCap, Building2, FileText, ArrowRight } from "lucide-react";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export interface ActionItem {
   id: string;
@@ -128,7 +129,9 @@ export function ActionSearchBar({ onSearch, onSelectAction }: ActionSearchBarPro
           className="w-full pl-12 pr-10 py-3.5 rounded-xl border border-border bg-background-secondary text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-navy transition-all shadow-sm text-sm sm:text-base"
         />
         {loading ? (
-          <Loader2 className="absolute right-4 w-4 h-4 text-gold animate-spin" />
+          <div className="absolute right-4 text-gold flex items-center">
+            <InlineLoader size={14} />
+          </div>
         ) : query.length > 0 ? (
           <button 
             onClick={() => { setQuery(""); onSearch(""); }}

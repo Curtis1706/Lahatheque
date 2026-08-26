@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import type { UniversityStudentAffiliationData } from "@/lib/types/university";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface StudentAffiliationTableProps {
   affiliations: UniversityStudentAffiliationData[];
@@ -180,7 +181,7 @@ export function StudentAffiliationTable({
                 className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition-colors inline-flex items-center gap-1 shadow-xs min-h-[36px] disabled:opacity-50"
               >
                 {isCurrentLoading ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineLoader size={14} />
                 ) : (
                   <CheckCircle2 className="w-3.5 h-3.5" />
                 )}
@@ -345,7 +346,7 @@ export function StudentAffiliationTable({
                 className="flex-1 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors inline-flex items-center justify-center gap-2"
               >
                 {actionLoadingId === suspendingStudent.id ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                 ) : null}
                 <span>Confirmer Suspension</span>
               </button>

@@ -20,6 +20,7 @@ import {
   markAllNotificationsRead,
   type AppNotification,
 } from "@/lib/services/notifications";
+import { PageLoader } from "@/components/ui/page-loader";
 
 export default function NotificationsPage() {
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -160,10 +161,7 @@ export default function NotificationsPage() {
       {/* Liste des notifications */}
       <div className="bg-background border border-border rounded-3xl divide-y divide-border overflow-hidden shadow-xs">
         {loading ? (
-          <div className="p-10 text-center space-y-2">
-            <Clock className="w-6 h-6 text-gold animate-spin mx-auto" />
-            <p className="text-xs text-foreground-muted font-medium">Chargement des notifications en temps réel...</p>
-          </div>
+          <PageLoader label="Chargement des notifications en temps réel" />
         ) : filteredItems.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <CheckCircle2 className="w-10 h-10 text-gold mx-auto" />

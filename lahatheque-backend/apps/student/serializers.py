@@ -26,6 +26,8 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     cover_url = serializers.SerializerMethodField()
     is_owned = serializers.SerializerMethodField()
     has_digital_access = serializers.SerializerMethodField()
+    author_discounted_digital_price = serializers.SerializerMethodField()
+    author_discounted_paper_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Ouvrage
@@ -35,6 +37,7 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             'country', 'format_type', 'page_count', 'publication_date',
             'language', 'summary', 'status', 'price_digital', 'price_paper',
             'is_paper_available', 'cover_url', 'is_owned', 'has_digital_access',
+            'author_discounted_digital_price', 'author_discounted_paper_price',
         ]
 
     def get_cover_url(self, obj) -> str:
@@ -48,6 +51,20 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
 
     def get_has_digital_access(self, obj) -> bool:
         return self.get_is_owned(obj)
+
+    def get_author_discounted_digital_price(self, obj):
+        request = self.context.get('request')
+        if request and getattr(request.user, 'role', None) == 'author':
+            from apps.reporting.pricing_service import compute_role_price
+            return compute_role_price(obj, "author")["digital_price"]
+        return None
+
+    def get_author_discounted_paper_price(self, obj):
+        request = self.context.get('request')
+        if request and getattr(request.user, 'role', None) == 'author':
+            from apps.reporting.pricing_service import compute_role_price
+            return compute_role_price(obj, "author")["paper_price"]
+        return None
 
 
 class ReadingProgressSerializer(serializers.ModelSerializer):
@@ -104,11 +121,14 @@ class LigneCommandeStudentSerializer(serializers.ModelSerializer):
     ouvrage_title = serializers.CharField(source='ouvrage.title', read_only=True)
     ouvrage_cover_url = serializers.SerializerMethodField()
     format_display = serializers.SerializerMethodField()
+    discipline_name = serializers.SerializerMethodField()
+    author_name = serializers.SerializerMethodField()
 
     class Meta:
         model = LigneCommande
         fields = [
             'id', 'ouvrage', 'ouvrage_title', 'ouvrage_cover_url',
+            'discipline_name', 'author_name',
             'format_type', 'format_display', 'unit_price', 'quantity'
         ]
 
@@ -118,12 +138,28 @@ class LigneCommandeStudentSerializer(serializers.ModelSerializer):
     def get_format_display(self, obj) -> str:
         return 'Numérique (EPUB/PDF)' if obj.format_type == 'digital' else 'Livre Papier'
 
+    def get_discipline_name(self, obj) -> str:
+        if obj.ouvrage and getattr(obj.ouvrage, 'discipline', None):
+            return obj.ouvrage.discipline.name or ''
+        return ''
+
+    def get_author_name(self, obj) -> str:
+        if not obj.ouvrage:
+            return ''
+        if hasattr(obj.ouvrage, 'authors'):
+            authors = obj.ouvrage.authors.all()
+            if authors.exists():
+                return ', '.join([f"{a.first_name} {a.last_name}".strip() or a.full_name for a in authors])
+        return getattr(obj.ouvrage, 'auteur', '') or ''
+
 
 class OrderStudentSerializer(serializers.ModelSerializer):
     lignes = LigneCommandeStudentSerializer(many=True, read_only=True)
     livraison = PhysicalDeliverySerializer(read_only=True)
     statut_paiement_display = serializers.SerializerMethodField()
     statut_commande_display = serializers.SerializerMethodField()
+    mode_paiement_display = serializers.SerializerMethodField()
+    type_commande_display = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -131,6 +167,10 @@ class OrderStudentSerializer(serializers.ModelSerializer):
             'id', 'total_amount', 'currency',
             'statut_paiement', 'statut_paiement_display',
             'statut_commande', 'statut_commande_display',
+            'mode_paiement', 'mode_paiement_display',
+            'type_commande', 'type_commande_display',
+            'is_credit_purchase', 'credit_due_date',
+            'returned_at', 'return_reason',
             'lignes', 'livraison', 'created_at', 'updated_at',
         ]
 
@@ -149,8 +189,26 @@ class OrderStudentSerializer(serializers.ModelSerializer):
             'processing': 'En traitement',
             'completed': 'Terminée',
             'cancelled': 'Annulée',
+            'returned': 'Retournée',
         }
         return mapping.get(obj.statut_commande, obj.statut_commande)
+
+    def get_mode_paiement_display(self, obj) -> str:
+        mapping = {
+            'mobile_money': 'Mobile Money',
+            'virement': 'Virement bancaire',
+            'especes': 'Espèces',
+            'carte': 'Carte bancaire',
+        }
+        return mapping.get(obj.mode_paiement, obj.mode_paiement or 'Mobile Money')
+
+    def get_type_commande_display(self, obj) -> str:
+        mapping = {
+            'rentree_scolaire': 'Rentrée scolaire',
+            'personnel': 'Personnel',
+            'institutionnel': 'Institutionnel',
+        }
+        return mapping.get(obj.type_commande, obj.type_commande or 'Personnel')
 
 
 class BouquetSerializer(serializers.ModelSerializer):

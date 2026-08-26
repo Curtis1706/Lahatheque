@@ -48,23 +48,47 @@ class AdminPanoramicStatsAPIView(APIView):
         thirty_days_ago = now - timedelta(days=30)
         sixty_days_ago = now - timedelta(days=60)
 
-        # Chiffre d'affaires total
-        total_revenue_current = Order.objects.filter(statut_paiement='paid').aggregate(
+        from apps.commerce.models import WholesaleOrder, WholesaleOrderStatus
+        from apps.partners.models import UniversityPaperOrder
+
+        # 1. Chiffre d'affaires total consolidé (tous rôles confondus)
+        revenue_orders = Order.objects.filter(statut_paiement='paid').aggregate(
             total=Sum('total_amount')
         )['total'] or Decimal('0.00')
 
-        total_revenue_last_month = Order.objects.filter(
+        revenue_wholesale = WholesaleOrder.objects.exclude(status=WholesaleOrderStatus.CANCELLED).aggregate(
+            total=Sum('total_amount')
+        )['total'] or Decimal('0.00')
+
+        revenue_university = UniversityPaperOrder.objects.exclude(status='cancelled').aggregate(
+            total=Sum('total_amount')
+        )['total'] or Decimal('0.00')
+
+        total_revenue_current = revenue_orders + revenue_wholesale + revenue_university
+
+        # Chiffre d'affaires mois dernier
+        revenue_orders_last = Order.objects.filter(
             statut_paiement='paid',
             created_at__gte=sixty_days_ago,
             created_at__lt=thirty_days_ago
         ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
 
+        revenue_wholesale_last = WholesaleOrder.objects.exclude(status=WholesaleOrderStatus.CANCELLED).filter(
+            created_at__gte=sixty_days_ago,
+            created_at__lt=thirty_days_ago
+        ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+
+        total_revenue_last_month = revenue_orders_last + revenue_wholesale_last
+
         revenue_trend = 0.0
         if total_revenue_last_month > 0:
             revenue_trend = round(float(((total_revenue_current - total_revenue_last_month) / total_revenue_last_month) * 100), 1)
 
-        # Nombre de transactions
-        total_sales_count = Order.objects.filter(statut_paiement='paid').count()
+        # Nombre de transactions consolidé
+        sales_count_orders = Order.objects.filter(statut_paiement='paid').count()
+        sales_count_wholesale = WholesaleOrder.objects.exclude(status=WholesaleOrderStatus.CANCELLED).count()
+        sales_count_university = UniversityPaperOrder.objects.exclude(status='cancelled').count()
+        total_sales_count = sales_count_orders + sales_count_wholesale + sales_count_university
 
         # Utilisateurs actifs
         active_users_count = User.objects.filter(is_active=True, is_suspended=False).count()
@@ -121,12 +145,12 @@ class AdminPanoramicStatsAPIView(APIView):
         for r in roles_data:
             role_key = r['role']
             count = r['count']
-            pct = round((count / max(1, active_users_count)) * 100, 1)
+            pct_val = round((count / max(1, active_users_count)) * 100, 1)
             role_distribution.append({
                 "role": role_key,
                 "label": role_labels.get(role_key, role_key.capitalize()),
                 "count": count,
-                "percentage": pct,
+                "percentage": pct_val,
                 "colorToken": color_tokens.get(role_key, "bg-chart-1")
             })
 
@@ -139,6 +163,14 @@ class AdminPanoramicStatsAPIView(APIView):
             .annotate(month=TruncMonth('commande__created_at'))
             .values('month', 'format_type')
             .annotate(total=Sum(models.F('unit_price') * models.F('quantity')))
+        )
+        monthly_wholesale = (
+            WholesaleOrder.objects
+            .exclude(status=WholesaleOrderStatus.CANCELLED)
+            .filter(created_at__gte=six_months_ago)
+            .annotate(month=TruncMonth('created_at'))
+            .values('month')
+            .annotate(total=Sum('total_amount'))
         )
         monthly_subs = (
             Subscription.objects
@@ -162,6 +194,14 @@ class AdminPanoramicStatsAPIView(APIView):
             else:
                 curve_map[key]["wholesalers"] += amount
 
+        for row in monthly_wholesale:
+            if not row.get('month'):
+                continue
+            m = row['month']
+            key = m.strftime('%Y-%m')
+            curve_map.setdefault(key, {"month": month_names_fr[m.month - 1], "online": 0.0, "wholesalers": 0.0, "subscriptions": 0.0})
+            curve_map[key]["wholesalers"] += float(row['total'] or 0)
+
         for row in monthly_subs:
             if not row.get('month'):
                 continue
@@ -181,7 +221,11 @@ class AdminPanoramicStatsAPIView(APIView):
             t=Sum(models.F('unit_price') * models.F('quantity'))
         )['t'] or Decimal('0.00')
         
-        total_paper = LigneCommande.objects.filter(commande__statut_paiement='paid', format_type='paper').aggregate(
+        total_wholesale_amt = WholesaleOrder.objects.exclude(status=WholesaleOrderStatus.CANCELLED).aggregate(
+            t=Sum('total_amount')
+        )['t'] or Decimal('0.00')
+
+        total_paper_direct = LigneCommande.objects.filter(commande__statut_paiement='paid', format_type='paper').aggregate(
             t=Sum(models.F('unit_price') * models.F('quantity'))
         )['t'] or Decimal('0.00')
 
@@ -189,14 +233,15 @@ class AdminPanoramicStatsAPIView(APIView):
             t=Sum('plan__price_amount')
         )['t'] or Decimal('0.00')
 
-        grand_total = float(total_digital) + float(total_paper) + float(total_subs)
+        total_wholesale_combined = total_wholesale_amt + total_paper_direct
+        grand_total = float(total_digital) + float(total_wholesale_combined) + float(total_subs)
 
         def pct(value):
             return round((float(value) / grand_total) * 100, 1) if grand_total > 0 else 0.0
 
         revenue_breakdown = [
             {"category": "numerique", "label": "Ventes Unitaires Numériques", "amount": float(total_digital), "percentage": pct(total_digital), "colorToken": "bg-chart-1"},
-            {"category": "grossistes", "label": "Commandes Grossistes & Librairies", "amount": float(total_paper), "percentage": pct(total_paper), "colorToken": "bg-chart-2"},
+            {"category": "grossistes", "label": "Commandes Grossistes & Librairies", "amount": float(total_wholesale_combined), "percentage": pct(total_wholesale_combined), "colorToken": "bg-chart-2"},
             {"category": "abonnements", "label": "Pass Étudiants & Bouquets Inst.", "amount": float(total_subs), "percentage": pct(total_subs), "colorToken": "bg-chart-3"},
         ]
 
@@ -1397,6 +1442,7 @@ class AdminReportExportAPIView(APIView):
 
         if report_type == 'sales_global':
             writer.writerow(['Référence', 'Date', 'Client', 'Montant (XOF)', 'Statut', 'Format'])
+            from apps.commerce.models import WholesaleOrder, WholesaleOrderStatus
             lignes = (
                 LigneCommande.objects
                 .filter(commande__created_at__gte=start)
@@ -1413,6 +1459,22 @@ class AdminReportExportAPIView(APIView):
                     l.commande.statut_paiement,
                     l.format_type,
                 ])
+            w_orders = (
+                WholesaleOrder.objects
+                .exclude(status=WholesaleOrderStatus.CANCELLED)
+                .filter(created_at__gte=start)
+                .select_related('user')
+                .order_by('-created_at')
+            )
+            for wo in w_orders:
+                writer.writerow([
+                    wo.reference,
+                    wo.created_at.strftime('%Y-%m-%d') if wo.created_at else 'N/A',
+                    f"{wo.company_name} ({wo.user.email if wo.user else 'Grossiste'})",
+                    float(wo.total_amount),
+                    "paid" if wo.status == WholesaleOrderStatus.DELIVERED else "en_cours",
+                    "grossiste_b2b",
+                ])
         else:
             writer.writerow(['Type de rapport', report_type])
             writer.writerow(['Date d\'export', now.strftime('%Y-%m-%d %H:%M:%S')])
@@ -1423,22 +1485,40 @@ class AdminReportExportAPIView(APIView):
 class AdminSalesListAPIView(APIView):
     """
     GET /api/v1/admin/sales/
-    Liste des ventes réelles (commandes payées), tous canaux confondus.
+    Liste des ventes réelles, tous canaux et rôles confondus (lecteurs, auteurs, universités, grossistes).
     """
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def get(self, request):
+        from apps.commerce.models import LigneCommande, WholesaleOrder, WholesaleOrderStatus
+
+        results = []
+
+        # 1. Commandes unitaires & particuliers / auteurs / universités
         lignes = (
             LigneCommande.objects
             .select_related('commande', 'commande__user', 'ouvrage')
             .order_by('-commande__created_at')[:200]
         )
-        results = []
         for l in lignes:
             buyer = l.commande.user
-            buyer_name = f"{buyer.first_name} {buyer.last_name}".strip() if buyer else "Client Inconnu"
-            if not buyer_name:
-                buyer_name = buyer.email if buyer else "Client Inconnu"
+            role_label = ""
+            if buyer and hasattr(buyer, "role"):
+                r = buyer.role
+                if r == "author":
+                    role_label = " (Auteur)"
+                elif r == "university":
+                    role_label = " (Université)"
+                elif r == "wholesaler":
+                    role_label = " (Grossiste)"
+                elif r == "student":
+                    role_label = " (Lecteur)"
+
+            user_display = (buyer.get_full_name() if buyer else "") or (buyer.email if buyer else "Client")
+            if role_label and role_label.strip(" ()").lower() not in user_display.lower():
+                buyer_name = f"{user_display}{role_label}"
+            else:
+                buyer_name = user_display
 
             results.append({
                 "id": str(l.id),
@@ -1448,31 +1528,96 @@ class AdminSalesListAPIView(APIView):
                 "buyer_name": buyer_name,
                 "buyer_email": buyer.email if buyer else "N/A",
                 "buyer_type": getattr(buyer, 'role', 'individual'),
-                "item_type": "book",
+                "item_type": "paper_book" if l.format_type == 'paper' else "digital_book",
+                "type": "unitaire_digital" if l.format_type == 'digital' else "unitaire_papier",
                 "item_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
                 "book_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
-                "amount": float(l.unit_price) * l.quantity,
+                "amount": float(l.unit_price) * (l.quantity or 1),
                 "currency": "XOF",
-                "payment_method": "mobile_money",
+                "payment_method": getattr(l.commande, 'mode_paiement', 'mobile_money'),
                 "payment_status": l.commande.statut_paiement if l.commande.statut_paiement in ['paid', 'pending', 'failed', 'refunded'] else 'paid',
                 "order_status": "completed" if l.commande.statut_commande == 'completed' else "pending",
                 "created_at": l.commande.created_at.isoformat() if l.commande.created_at else None,
                 "country": getattr(buyer, 'country', 'BJ') if buyer else 'BJ',
             })
+
+        # 2. Commandes Grossistes (WholesaleOrder)
+        w_orders = (
+            WholesaleOrder.objects
+            .exclude(status=WholesaleOrderStatus.CANCELLED)
+            .select_related('user')
+            .prefetch_related('items__book')
+            .order_by('-created_at')[:100]
+        )
+        for wo in w_orders:
+            buyer = wo.user
+            user_full = buyer.get_full_name() if buyer else ""
+            buyer_name = f"{wo.company_name} (Grossiste - {user_full or buyer.email})" if (user_full or buyer) else f"{wo.company_name} (Grossiste)"
+
+            for it in wo.items.all():
+                if it.print_copies_qty > 0:
+                    results.append({
+                        "id": f"{it.id}-print",
+                        "order_number": wo.reference or str(wo.id)[:8].upper(),
+                        "user_email": buyer.email if buyer else "N/A",
+                        "user_name": buyer_name,
+                        "buyer_name": buyer_name,
+                        "buyer_email": buyer.email if buyer else "N/A",
+                        "buyer_type": "wholesaler",
+                        "item_type": "paper_book",
+                        "type": "grossiste_papier",
+                        "item_title": f"{it.title} ({it.print_copies_qty} ex.)",
+                        "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
+                        "amount": float(it.print_unit_price * it.print_copies_qty),
+                        "currency": "XOF",
+                        "payment_method": "Facturation B2B",
+                        "payment_status": "paid",
+                        "order_status": "completed" if wo.status == WholesaleOrderStatus.DELIVERED else "pending",
+                        "created_at": wo.created_at.isoformat() if wo.created_at else None,
+                        "country": getattr(buyer, 'country', 'BJ') if buyer else 'BJ',
+                    })
+                if it.digital_licenses_qty > 0:
+                    results.append({
+                        "id": f"{it.id}-digital",
+                        "order_number": wo.reference or str(wo.id)[:8].upper(),
+                        "user_email": buyer.email if buyer else "N/A",
+                        "user_name": buyer_name,
+                        "buyer_name": buyer_name,
+                        "buyer_email": buyer.email if buyer else "N/A",
+                        "buyer_type": "wholesaler",
+                        "item_type": "digital_book",
+                        "type": "grossiste_numerique",
+                        "item_title": f"{it.title} (Licence B2B)",
+                        "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
+                        "amount": float(it.digital_unit_price * it.digital_licenses_qty),
+                        "currency": "XOF",
+                        "payment_method": "Facturation B2B",
+                        "payment_status": "paid",
+                        "order_status": "completed" if wo.status == WholesaleOrderStatus.DELIVERED else "pending",
+                        "created_at": wo.created_at.isoformat() if wo.created_at else None,
+                        "country": getattr(buyer, 'country', 'BJ') if buyer else 'BJ',
+                    })
+
+        # Tri chronologique décroissant
+        results.sort(key=lambda x: x["created_at"] or "", reverse=True)
+
         return Response({"success": True, "data": results, "error": None})
 
 
 class AdminSalesByCountryAPIView(APIView):
     """
     GET /api/v1/admin/sales/by-country/
-    Ventilation géographique des ventes réelles (commandes payées).
+    Ventilation géographique des ventes réelles (commandes payées + commandes grossistes).
     """
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def get(self, request):
-        from apps.commerce.models import LigneCommande
+        from apps.commerce.models import LigneCommande, WholesaleOrder, WholesaleOrderStatus
         from django.db.models import Sum, Count, F
 
+        country_totals = {}
+
+        # 1. Lignes de commandes classiques
         rows = (
             LigneCommande.objects
             .filter(commande__statut_paiement='paid')
@@ -1481,8 +1626,28 @@ class AdminSalesByCountryAPIView(APIView):
                 sales_count=Count('id'),
                 total_revenue=Sum(F('unit_price') * F('quantity')),
             )
-            .order_by('-total_revenue')
         )
+        for r in rows:
+            c = r['commande__user__country'] or "BJ"
+            country_totals[c] = country_totals.get(c, {"sales_count": 0, "total_revenue": 0.0})
+            country_totals[c]["sales_count"] += r['sales_count']
+            country_totals[c]["total_revenue"] += float(r['total_revenue'] or 0)
+
+        # 2. Commandes Grossistes
+        w_rows = (
+            WholesaleOrder.objects
+            .exclude(status=WholesaleOrderStatus.CANCELLED)
+            .values('user__country')
+            .annotate(
+                sales_count=Count('id'),
+                total_revenue=Sum('total_amount'),
+            )
+        )
+        for r in w_rows:
+            c = r['user__country'] or "BJ"
+            country_totals[c] = country_totals.get(c, {"sales_count": 0, "total_revenue": 0.0})
+            country_totals[c]["sales_count"] += r['sales_count']
+            country_totals[c]["total_revenue"] += float(r['total_revenue'] or 0)
 
         country_names = {
             'BJ': "Bénin (BJ)", 'CI': "Côte d'Ivoire (CI)", 'SN': "Sénégal (SN)",
@@ -1490,12 +1655,12 @@ class AdminSalesByCountryAPIView(APIView):
         }
         results = [
             {
-                "country": country_names.get(r['commande__user__country'], r['commande__user__country'] or "Non renseigné"),
-                "code": r['commande__user__country'] or "N/A",
-                "salesCount": r['sales_count'],
-                "totalRevenue": float(r['total_revenue'] or 0),
+                "country": country_names.get(c, f"Pays ({c})"),
+                "code": c,
+                "salesCount": data["sales_count"],
+                "totalRevenue": data["total_revenue"],
             }
-            for r in rows
+            for c, data in sorted(country_totals.items(), key=lambda x: x[1]["total_revenue"], reverse=True)
         ]
         return Response({"success": True, "data": results, "error": None})
 
@@ -1614,6 +1779,13 @@ class AdminAuthorRoyaltiesReportView(APIView):
             lignes = LigneCommande.objects.filter(ouvrage_id__in=ouvrage_ids, commande__statut_paiement='paid')
             books_sold = lignes.aggregate(t=Sum('quantity'))['t'] or 0
 
+            from apps.commerce.models import WholesaleOrderItem, WholesaleOrderStatus
+            w_items = WholesaleOrderItem.objects.filter(
+                book_id__in=ouvrage_ids
+            ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+            w_sold = w_items.aggregate(t=Sum(models.F('digital_licenses_qty') + models.F('print_copies_qty')))['t'] or 0
+            books_sold += w_sold
+
             payout_lines = RoyaltyPayoutLine.objects.filter(author_right__user=author)
             total_due = float(payout_lines.aggregate(t=Sum('payout_amount'))['t'] or 0)
             total_paid = float(payout_lines.filter(is_settled=True).aggregate(t=Sum('payout_amount'))['t'] or 0)
@@ -1634,6 +1806,85 @@ class AdminAuthorRoyaltiesReportView(APIView):
 
         results.sort(key=lambda x: x["total_royalties_due"], reverse=True)
         return Response({"success": True, "data": results})
+
+
+class AdminRoleDiscountsView(APIView):
+    """GET/PATCH /api/v1/admin/catalog/pricing/role-discounts/ - Remises par profil acheteur."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from .models import ConfigurationPlateformeGlobale
+
+        config = ConfigurationPlateformeGlobale.objects.first()
+        if not config:
+            config = ConfigurationPlateformeGlobale.objects.create()
+
+        return Response({
+            "success": True,
+            "data": {
+                "author": {
+                    "paper_pct": float(config.remise_auteur_papier_pct),
+                    "digital_pct": float(config.remise_auteur_numerique_pct),
+                },
+                "wholesaler": {
+                    "paper_pct": float(config.remise_grossiste_papier_pct),
+                    "digital_pct": float(config.remise_grossiste_numerique_pct),
+                },
+                "university": {
+                    "paper_pct": float(config.remise_campus_papier_pct),
+                    "digital_pct": float(config.remise_campus_numerique_pct),
+                },
+            }
+        })
+
+    def patch(self, request):
+        from .models import ConfigurationPlateformeGlobale, JournalAuditAdmin
+        from .pricing_service import invalidate_platform_config_cache
+        from decimal import Decimal
+
+        config = ConfigurationPlateformeGlobale.objects.first()
+        if not config:
+            config = ConfigurationPlateformeGlobale.objects.create()
+
+        data = request.data
+        field_map = {
+            ("author", "paper_pct"): "remise_auteur_papier_pct",
+            ("author", "digital_pct"): "remise_auteur_numerique_pct",
+            ("wholesaler", "paper_pct"): "remise_grossiste_papier_pct",
+            ("wholesaler", "digital_pct"): "remise_grossiste_numerique_pct",
+            ("university", "paper_pct"): "remise_campus_papier_pct",
+            ("university", "digital_pct"): "remise_campus_numerique_pct",
+        }
+
+        updated_fields = []
+        for role_key in ("author", "wholesaler", "university"):
+            role_data = data.get(role_key, {})
+            for sub_key in ("paper_pct", "digital_pct"):
+                if sub_key in role_data:
+                    model_field = field_map[(role_key, sub_key)]
+                    try:
+                        setattr(config, model_field, Decimal(str(role_data[sub_key])))
+                        updated_fields.append(model_field)
+                    except (ValueError, TypeError):
+                        pass
+
+        if updated_fields:
+            config.save(update_fields=updated_fields)
+            invalidate_platform_config_cache()
+
+            if request.user and request.user.is_authenticated:
+                JournalAuditAdmin.objects.create(
+                    administrateur=request.user,
+                    action="UPDATE_ROLE_DISCOUNT_POLICY",
+                    ressource_type="ConfigurationPlateformeGlobale",
+                    ressource_id=str(config.id),
+                    details=data
+                )
+
+        return Response({
+            "success": True,
+            "message": "Politique tarifaire mise à jour et appliquée sur toute la plateforme.",
+        })
 
 
 

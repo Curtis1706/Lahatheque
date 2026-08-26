@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, CheckCircle, Clock, Lock } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, Lock } from "lucide-react";
 import Link from "next/link";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function ResetPasswordPage() {
   const [code, setCode] = useState("");
@@ -114,7 +115,7 @@ export default function ResetPasswordPage() {
               >
                 {loading ? (
                   <>
-                    <Clock className="w-4 h-4 animate-spin" />
+                    <InlineLoader size={16} />
                     Modification...
                   </>
                 ) : (

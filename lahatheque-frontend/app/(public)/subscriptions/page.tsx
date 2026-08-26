@@ -10,9 +10,9 @@ import {
   BookOpen, 
   ArrowRight, 
   Award,
-  Loader2
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { PageLoader } from "@/components/ui/page-loader";
 
 interface SubscriptionPlan {
   id: number | string;
@@ -97,10 +97,7 @@ export default function SubscriptionsPage() {
 
         {/* Liste des Offres Indivudelles */}
         {loading ? (
-          <div className="py-16 flex flex-col items-center justify-center text-navy space-y-3">
-            <Loader2 className="w-8 h-8 animate-spin text-gold" />
-            <p className="text-xs font-bold">Chargement des offres d'abonnement...</p>
-          </div>
+          <PageLoader label="Chargement des offres d'abonnement" />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-4">
             

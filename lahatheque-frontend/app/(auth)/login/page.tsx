@@ -6,17 +6,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, Loader2, Mail, Lock, Phone, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Phone, ArrowRight } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { useAuth, type LoginResponse } from "@/hooks/use-auth";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-background flex items-center justify-center text-navy font-bold">
-        Chargement de l'espace connexion...
-      </div>
-    }>
+    <Suspense fallback={<PageLoader label="Chargement de l'espace connexion" />}>
       <LoginContent />
     </Suspense>
   );
@@ -252,7 +249,7 @@ function LoginContent() {
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin text-white" />
+                    <InlineLoader size={16} />
                     Connexion en cours...
                   </>
                 ) : (

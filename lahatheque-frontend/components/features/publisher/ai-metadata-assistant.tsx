@@ -5,6 +5,7 @@ import { Sparkles, Bot, Check, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { extractBookMetadataWithAi } from "@/lib/services/publisher";
 import type { PublisherAiMetadataSuggestion } from "@/lib/types/publisher";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface AiMetadataAssistantProps {
   currentTitle: string;
@@ -74,7 +75,7 @@ export function AiMetadataAssistant({
         >
           {analyzing ? (
             <>
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <InlineLoader size={16} />
               <span>Analyse du manuscrit...</span>
             </>
           ) : (

@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
 import { FacultyManager } from "@/components/features/university/faculty-manager";
 import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
 import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
@@ -298,7 +299,7 @@ export default function UniversityProfilePage() {
               className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] disabled:opacity-50"
             >
               {saving ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <InlineLoader size={16} />
               ) : (
                 <Save className="w-4 h-4 text-gold" />
               )}

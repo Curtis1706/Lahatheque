@@ -23,6 +23,7 @@ import { AISuggestionBadge } from "@/components/features/layout-artist/ai-sugges
 import { VitrinePreviewCard } from "@/components/features/chief-layout/vitrine-preview-card";
 import { RevisionModal } from "@/components/features/chief-layout/revision-modal";
 import { getDepositDetail, validateDeposit, requestRevision } from "@/lib/services/layout-artist";
+import { InlineLoader } from "@/components/ui/page-loader";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
@@ -324,7 +325,7 @@ export default function ChefValidationDetailPage() {
               className="w-full sm:flex-1 px-6 py-3 rounded-2xl bg-navy hover:bg-navy-hover text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] shadow-sm cursor-pointer"
             >
               {validating ? (
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <InlineLoader size={16} />
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4 text-gold" />

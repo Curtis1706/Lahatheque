@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useRef, forwardRef, useMemo, useCallback } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { 
-  Loader2, ChevronLeft, ChevronRight, X, Check,
+  ChevronLeft, ChevronRight, X, Check,
   Play, Pause, Volume2, VolumeX, Headphones,
   ZoomIn, ZoomOut, Maximize, Minimize
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { libraryApi } from '@/lib/services/library';
 import { cn } from '@/lib/utils';
+import { PageLoader, InlineLoader } from '@/components/ui/page-loader';
 
 // Subcomponents & Hooks
 import { Annotation, AnnotationRect } from './flipbook/types';
@@ -570,11 +571,8 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
 
   if (isLoading || dimensions.width === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-screen bg-[var(--partner-bg,#0F1A33)] space-y-4">
-        <Loader2 className="w-12 h-12 text-[var(--partner-accent,#B4AB6B)] animate-spin" />
-        <p className="text-[var(--partner-accent,#B4AB6B)] font-bold uppercase tracking-widest text-xs font-mono">
-          Préparation du livre 3D...
-        </p>
+      <div className="flex flex-col items-center justify-center h-full min-h-screen bg-[var(--partner-bg,#0F1A33)]">
+        <PageLoader label="Préparation du livre 3D" />
       </div>
     );
   }
@@ -684,7 +682,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
                   : "bg-navy-dark text-gold hover:bg-navy border border-navy-hover"
               )}
             >
-              {isFetchingTtsText ? <Loader2 size={14} className="animate-spin text-gold" /> : <Headphones size={14} />}
+              {isFetchingTtsText ? <InlineLoader size={14} /> : <Headphones size={14} />}
               <span className="hidden md:inline">{isTtsActive ? 'Arrêter TTS' : 'Lecture Vocale'}</span>
             </button>
           )}
@@ -825,8 +823,8 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
                     draggable={false}
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-background space-y-2">
-                    <Loader2 className="w-6 h-6 text-gold animate-spin" />
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-background space-y-2 text-gold">
+                    <InlineLoader size={24} />
                   </div>
                 )}
               </Page>

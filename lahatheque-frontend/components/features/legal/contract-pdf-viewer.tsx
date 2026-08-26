@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Viewer, Worker as PdfWorker, SpecialZoomLevel } from "@react-pdf-viewer/core";
 import "@react-pdf-viewer/core/lib/styles/index.css";
+import { PageLoader } from "@/components/ui/page-loader";
 
 interface ContractPdfViewerProps {
   contractId?: string;
@@ -46,7 +47,7 @@ export function ContractPdfViewer({
   const targetPdfUrl = React.useMemo(() => {
     if (streamUrl) return streamUrl;
     if (contractId) return `/api/bff/rights/legal/contracts/${contractId}/stream`;
-    if (!fileUrl) return "/PromptBreeder_Original_Paper-2309.16797v1.pdf";
+    if (!fileUrl) return "";
     if (fileUrl.startsWith("http") || fileUrl.startsWith("/")) return fileUrl;
     return `/uploads/${fileUrl}`;
   }, [contractId, streamUrl, fileUrl]);
@@ -162,9 +163,8 @@ export function ContractPdfViewer({
       <div className="relative bg-navy-dark rounded-2xl min-h-[440px] max-h-[520px] w-full flex flex-col items-center justify-center text-center p-3 border border-navy-hover overflow-hidden">
         {viewMode === "preview" && !isDocx ? (
           loadingPdf ? (
-            <div className="flex flex-col items-center justify-center gap-3 text-white">
-              <span className="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs text-white/70 font-medium">Chargement sécurisé du document...</p>
+            <div className="flex flex-col items-center justify-center gap-3 text-gold">
+              <PageLoader label="Chargement sécurisé du document" />
             </div>
           ) : blobUrl ? (
             <div className="w-full h-[440px] rounded-xl overflow-hidden bg-white shadow-inner">

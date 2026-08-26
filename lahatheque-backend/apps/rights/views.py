@@ -50,12 +50,34 @@ class AuthorDashboardKPIsView(APIView):
         lignes = LigneCommande.objects.filter(
             ouvrage__in=ouvrages_qs, commande__statut_paiement='paid'
         )
-        total_sales = lignes.aggregate(total=Sum('quantity'))['total'] or 0
-        total_revenue = float(
+        total_sales_individual = lignes.aggregate(total=Sum('quantity'))['total'] or 0
+        total_revenue_individual = float(
             lignes.aggregate(
                 total=Sum(F('unit_price') * F('quantity'))
             )['total'] or 0
         )
+
+        from apps.commerce.models import WholesaleOrderItem, WholesaleOrderStatus
+        w_items = WholesaleOrderItem.objects.filter(
+            book__in=ouvrages_qs
+        ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+
+        w_sales = w_items.aggregate(
+            total=Sum(F('digital_licenses_qty') + F('print_copies_qty'))
+        )['total'] or 0
+
+        w_revenue = float(
+            w_items.aggregate(
+                total=Sum(
+                    F('digital_unit_price') * F('digital_licenses_qty') +
+                    F('print_unit_price') * F('print_copies_qty')
+                )
+            )['total'] or 0.0
+        )
+
+        total_sales = total_sales_individual + w_sales
+        total_revenue = total_revenue_individual + w_revenue
+
         total_downloads = TraceAcces.objects.filter(
             ouvrage__in=ouvrages_qs, access_type='download'
         ).count()
@@ -126,6 +148,7 @@ class AuthorBooksListView(APIView):
             .prefetch_related('authors')[:10]
         )
         results = []
+        from apps.commerce.models import WholesaleOrderItem, WholesaleOrderStatus
         for b in ouvrages:
             lignes = LigneCommande.objects.filter(
                 ouvrage=b, commande__statut_paiement='paid'
@@ -136,6 +159,22 @@ class AuthorBooksListView(APIView):
                     total=Sum(F('unit_price') * F('quantity'))
                 )['total'] or 0
             )
+
+            w_items = WholesaleOrderItem.objects.filter(
+                book=b
+            ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+
+            w_dig_qty = w_items.aggregate(t=Sum('digital_licenses_qty'))['t'] or 0
+            w_prt_qty = w_items.aggregate(t=Sum('print_copies_qty'))['t'] or 0
+            w_rev = float(
+                w_items.aggregate(
+                    t=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))
+                )['t'] or 0.0
+            )
+
+            sales += (w_dig_qty + w_prt_qty)
+            rev += w_rev
+
             downloads = TraceAcces.objects.filter(
                 ouvrage=b, access_type='download'
             ).count()
@@ -143,8 +182,8 @@ class AuthorBooksListView(APIView):
             rate = float(author_right.pool_share_percent) if author_right else 15.0
             share = rev * (rate / 100)
             format_breakdown = {
-                "digital": lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0,
-                "paper": lignes.filter(format_type='paper').aggregate(total=Sum('quantity'))['total'] or 0,
+                "digital": (lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0) + w_dig_qty,
+                "paper": (lignes.filter(format_type='paper').aggregate(total=Sum('quantity'))['total'] or 0) + w_prt_qty,
                 "audio": 0,
             }
             results.append({
@@ -189,6 +228,23 @@ class AuthorBookDetailView(APIView):
                 total=Sum(F('unit_price') * F('quantity'))
             )['total'] or 0
         )
+
+        from apps.commerce.models import WholesaleOrderItem, WholesaleOrderStatus
+        w_items = WholesaleOrderItem.objects.filter(
+            book=b
+        ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+
+        w_dig_qty = w_items.aggregate(t=Sum('digital_licenses_qty'))['t'] or 0
+        w_prt_qty = w_items.aggregate(t=Sum('print_copies_qty'))['t'] or 0
+        w_rev = float(
+            w_items.aggregate(
+                t=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))
+            )['t'] or 0.0
+        )
+
+        sales += (w_dig_qty + w_prt_qty)
+        rev += w_rev
+
         downloads = TraceAcces.objects.filter(
             ouvrage=b, access_type='download'
         ).count()
@@ -196,8 +252,8 @@ class AuthorBookDetailView(APIView):
         rate = float(author_right.pool_share_percent) if author_right else 15.0
         share = rev * (rate / 100)
         format_breakdown = {
-            "digital": lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0,
-            "paper": lignes.filter(format_type='paper').aggregate(total=Sum('quantity'))['total'] or 0,
+            "digital": (lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0) + w_dig_qty,
+            "paper": (lignes.filter(format_type='paper').aggregate(total=Sum('quantity'))['total'] or 0) + w_prt_qty,
             "audio": 0,
         }
         return Response({
@@ -894,6 +950,19 @@ class LegalContractDetailView(APIView):
                 total_sales = lignes.aggregate(total=Sum('quantity'))['total'] or 0
                 total_revenue = float(lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0)
 
+                from apps.commerce.models import WholesaleOrderItem, WholesaleOrderStatus
+                w_items = WholesaleOrderItem.objects.filter(
+                    book=c.ouvrage
+                ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+                w_sales = w_items.aggregate(t=Sum(F('digital_licenses_qty') + F('print_copies_qty')))['t'] or 0
+                w_rev = float(
+                    w_items.aggregate(
+                        t=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))
+                    )['t'] or 0.0
+                )
+                total_sales += w_sales
+                total_revenue += w_rev
+
                 ouvrage_data = {
                     "id": str(c.ouvrage.id),
                     "title": c.ouvrage.title or c.ouvrage.titre,
@@ -1027,7 +1096,7 @@ class LegalContractStreamView(APIView):
     GET /api/v1/rights/legal/contracts/<uuid:id>/stream/
     Sert le document d'un contrat juridique sous forme de flux PDF sécurisé et filigrané Range HTTP 206/200.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
     renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
 
     def get(self, request, id):
@@ -1322,12 +1391,23 @@ class LegalUniversityRoyaltiesListView(APIView):
 
         institutions = Institution.objects.filter(is_active=True).order_by('name')
         data = []
+        from apps.commerce.models import WholesaleOrderItem, WholesaleOrderStatus
         for inst in institutions:
             lignes = LigneCommande.objects.filter(
                 ouvrage__institution=inst,
                 commande__statut_paiement='paid'
             )
             total_sales = float(lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0)
+
+            w_items = WholesaleOrderItem.objects.filter(
+                book__institution=inst
+            ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+            w_rev = float(
+                w_items.aggregate(
+                    t=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))
+                )['t'] or 0.0
+            )
+            total_sales += w_rev
             rate = float(inst.royalty_rate or 15.0)
             amount_due = (total_sales * rate) / 100.0
 
@@ -1351,7 +1431,7 @@ class LegalPublisherRoyaltiesListView(APIView):
 
     def get(self, request):
         from apps.publishers_portal.models import Publisher
-        from apps.commerce.models import LigneCommande
+        from apps.commerce.models import LigneCommande, WholesaleOrderItem, WholesaleOrderStatus
         from django.db.models import Sum, F
 
         publishers = Publisher.objects.all().order_by('company_name')
@@ -1362,6 +1442,16 @@ class LegalPublisherRoyaltiesListView(APIView):
                 commande__statut_paiement='paid'
             )
             total_sales = float(lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0)
+
+            w_items = WholesaleOrderItem.objects.filter(
+                book__publisher=pub
+            ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+            w_rev = float(
+                w_items.aggregate(
+                    t=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))
+                )['t'] or 0.0
+            )
+            total_sales += w_rev
             rate = float(pub.contractual_royalty_rate or 22.0)
             amount_due = (total_sales * rate) / 100.0
 
@@ -1598,6 +1688,19 @@ class LegalRelancesListView(APIView):
             total_revenue = float(
                 lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0
             )
+
+            from apps.commerce.models import WholesaleOrderItem, WholesaleOrderStatus
+            w_items = WholesaleOrderItem.objects.filter(
+                book__in=ouvrages_qs
+            ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+            w_sales = w_items.aggregate(t=Sum(F('digital_licenses_qty') + F('print_copies_qty')))['t'] or 0
+            w_rev = float(
+                w_items.aggregate(
+                    t=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))
+                )['t'] or 0.0
+            )
+            total_sales += w_sales
+            total_revenue += w_rev
 
             payout_lines = RoyaltyPayoutLine.objects.filter(author_right__user=author_user)
             paid_amount = float(payout_lines.filter(is_settled=True).aggregate(s=Sum('payout_amount'))['s'] or 0.0)

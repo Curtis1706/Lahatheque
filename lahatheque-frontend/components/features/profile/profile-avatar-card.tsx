@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Camera, Trash2, Loader2, UploadCloud } from "lucide-react";
+import { Camera, Trash2, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { updateProfile } from "@/lib/services/auth";
 import { useAuth } from "@/hooks/use-auth";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface ProfileAvatarCardProps {
   currentAvatarUrl?: string | null;
@@ -134,7 +135,7 @@ export function ProfileAvatarCard({
           {/* Overlay lors de l'upload */}
           {isUploading && (
             <div className="absolute inset-0 rounded-full bg-navy/70 flex items-center justify-center text-gold z-10">
-              <Loader2 className="w-6 h-6 animate-spin" />
+              <InlineLoader size={20} />
             </div>
           )}
 
@@ -178,7 +179,7 @@ export function ProfileAvatarCard({
             >
               {isUploading ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-gold" />
+                  <InlineLoader size={14} />
                   <span>Envoi en cours...</span>
                 </>
               ) : (

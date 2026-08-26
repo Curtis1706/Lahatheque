@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   AlertCircle, ChevronRight, 
-  Trophy, RotateCcw, X, Loader2 
+  Trophy, RotateCcw, X 
 } from "lucide-react";
 import { libraryApi, QuizData } from "@/lib/services/library";
 import { cn } from "@/lib/utils";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 
 interface FlipBookQuizProps {
   bookId: string;
@@ -75,9 +76,8 @@ export function FlipBookQuiz({ bookId, onClose, onComplete }: FlipBookQuizProps)
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full space-y-5 bg-background rounded-3xl border border-border shadow-xl p-8">
-        <Loader2 className="w-12 h-12 text-gold animate-spin" />
-        <p className="text-foreground-muted font-bold uppercase tracking-wider text-xs italic animate-pulse">Chargement de l&apos;évaluation...</p>
+      <div className="flex flex-col items-center justify-center h-full bg-background rounded-3xl border border-border shadow-xl p-8">
+        <PageLoader label="Chargement de l'évaluation" />
       </div>
     );
   }
@@ -246,7 +246,7 @@ export function FlipBookQuiz({ bookId, onClose, onComplete }: FlipBookQuizProps)
           disabled={answers[currentQuestion.id] === undefined || isSubmitting}
           className="px-6 py-2.5 bg-gold text-navy hover:bg-gold-hover rounded-xl font-bold text-xs shadow-md flex items-center gap-2 disabled:opacity-40 transition-all cursor-pointer min-h-[44px]"
         >
-          {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : (
+          {isSubmitting ? <InlineLoader size={16} /> : (
             <>
               {currentQuestionIdx === quiz.questions.length - 1 ? "Soumettre l'évaluation" : "Suivant"}
               <ChevronRight size={16} />

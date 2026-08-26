@@ -58,7 +58,7 @@ export function ContractConsultationModal({
 
           <div className="flex items-center gap-2 shrink-0">
             <Link
-              href={`/catalog/reader/lesson_pdf?contract_id=${contract.id}&file=${encodeURIComponent(contract.file_url || "/PromptBreeder_Original_Paper-2309.16797v1.pdf")}&title=${encodeURIComponent(contract.title)}`}
+              href={`/catalog/reader/lesson_pdf?contract_id=${contract.id}&file=${encodeURIComponent(contract.file_url || "")}&title=${encodeURIComponent(contract.title)}`}
               target="_blank"
               className="px-3.5 py-2 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
               title="Ouvrir dans la liseuse officielle LAHAThèque avec FlipBook et défilement continu"
@@ -78,6 +78,7 @@ export function ContractConsultationModal({
             </h3>
 
             <ContractPdfViewer
+              contractId={contract.id}
               fileUrl={contract.file_url}
               fileName={contract.file_name}
               fileSize={contract.file_size}

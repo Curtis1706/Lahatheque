@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { AlertCircle, X, Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface RevisionModalProps {
   deposit: LayoutDeposit;
@@ -122,7 +123,7 @@ export function RevisionModal({ deposit, isOpen, onClose, onConfirm }: RevisionM
               className="flex-1 px-4 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] shadow-xs"
             >
               {loading ? (
-                <span className="w-4 h-4 border-2 border-navy/30 border-t-navy rounded-full animate-spin" />
+                <InlineLoader size={16} />
               ) : (
                 <>
                   <Send className="w-4 h-4" />

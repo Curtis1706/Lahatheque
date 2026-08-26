@@ -2,19 +2,26 @@
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, PackageCheck, Download, FileText, AlertTriangle, ShieldCheck, XCircle } from "lucide-react";
+import { ArrowLeft, PackageCheck, Download, FileText, AlertTriangle, ShieldCheck, XCircle, RotateCcw, Clock, Calendar, CheckCircle2 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { OrderTimeline } from "@/components/features/wholesaler/order-timeline";
 import { CancelOrderModal } from "@/components/features/wholesaler/cancel-order-modal";
-import { getWholesalerOrderDetail, requestOrderCancellation } from "@/lib/services/wholesaler";
+import { getWholesalerOrderDetail, requestOrderCancellation, returnWholesaleCreditOrder } from "@/lib/services/wholesaler";
 import type { WholesalerOrder } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
+import { Modal } from "@/components/ui/modal";
 
 export default function WholesalerOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const [order, setOrder] = useState<WholesalerOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+
+  // ─── FONCTIONNALITÉ COMMANDE À CRÉDIT GROSSISTE (DÉPÔT / RETOUR INVENDUS) ───
+  // Architecture prête pour affichage visuel dès instruction de l'utilisateur.
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnReason, setReturnReason] = useState("");
+  const [returning, setReturning] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -40,6 +47,33 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
       toast.success("La demande d'annulation de la commande a été enregistrée avec succès.");
     } else {
       toast.error("Impossible d'annuler cette commande.");
+    }
+  };
+
+  // ─── Handler de retour d'invendus pour commande à crédit grossiste ──────────
+  const handleReturnCredit = async () => {
+    if (!order) return;
+    setReturning(true);
+    try {
+      const success = await returnWholesaleCreditOrder(order.id, returnReason);
+      if (success) {
+        setOrder((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: "cancelled",
+                returned_at: new Date().toISOString(),
+                return_reason: returnReason || "Retour d'invendus fin de dépôt",
+              }
+            : prev
+        );
+        toast.success("Retour des exemplaires invendus enregistré avec succès.");
+        setReturnModalOpen(false);
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors du retour de la commande.");
+    } finally {
+      setReturning(false);
     }
   };
 
@@ -175,7 +209,7 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
         </div>
       </div>
 
-      {/* Modale d'annulation */}
+      {/* Modale d'annulation standard */}
       <CancelOrderModal
         orderId={order.id}
         orderReference={order.reference}
@@ -183,6 +217,58 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
         onClose={() => setCancelModalOpen(false)}
         onConfirmCancel={handleConfirmCancel}
       />
+
+      {/* 
+        ─── MODALE DE RETOUR D'INVENDUS / COMMANDE À CRÉDIT GROSSISTE ──────────
+        Pour activer la modale de retour d'invendus grossiste, décommenter le bloc ci-dessous :
+        
+        <Modal
+          open={returnModalOpen}
+          onClose={() => setReturnModalOpen(false)}
+          title={
+            <div className="flex items-center gap-2 text-navy font-bold text-base">
+              <RotateCcw className="w-5 h-5 text-gold" />
+              Retour des Exemplaires Invendus (Dépôt #{order.reference})
+            </div>
+          }
+          maxWidth={500}
+        >
+          <div className="space-y-4 pt-2 text-xs">
+            <p className="text-foreground-muted">
+              Vous êtes sur le point d'enregistrer le retour des exemplaires physiques invendus de cette commande en dépôt à crédit. Le stock réservé sera automatiquement réintégré.
+            </p>
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-navy">
+                Motif ou observations de retour :
+              </label>
+              <textarea
+                rows={3}
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                placeholder="Ex: Fin de la période de dépôt, invendus réexpédiés au siège..."
+                className="w-full p-2.5 rounded-xl bg-background border border-border text-navy text-xs focus:outline-none focus:border-gold"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setReturnModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-background-secondary border border-border text-foreground-muted text-xs font-bold hover:text-navy cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={returning}
+                onClick={handleReturnCredit}
+                className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {returning ? "Enregistrement..." : "Confirmer le Retour d'Invendus"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      */}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ShieldCheck, Lock, Eye, FileText, Smartphone, Printer, Copy, CheckCircle2, Save } from "lucide-react";
 import { toast } from "sonner";
 import type { ProtectionConfig } from "@/lib/types/publisher";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface ProtectionConfigCardProps {
   initialConfig: ProtectionConfig;
@@ -66,7 +67,7 @@ export function ProtectionConfigCard({
             className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-xs min-h-[40px] disabled:opacity-50"
           >
             {saving ? (
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <InlineLoader size={16} />
             ) : (
               <>
                 <Save className="w-4 h-4 text-gold" />

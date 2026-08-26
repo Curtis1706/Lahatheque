@@ -97,41 +97,31 @@ export function WholesaleCartDrawer({
 
                 {/* Sélecteurs 21st.dev Quantity Stepper (id: 20055) */}
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 text-xs">
-                  {/* Licences Numériques */}
-                  <div className="p-2.5 rounded-xl bg-background border border-border space-y-1.5">
-                    <span className="text-[10px] uppercase font-bold text-navy block">Licences Numériques</span>
-                    <span className="font-mono text-[10px] text-gold block font-bold">
-                      {item.book.digital_wholesale_price.toLocaleString("fr-FR")} XOF / u
-                    </span>
-                    <div className="flex items-center justify-between bg-background-secondary rounded-lg border border-border p-1">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onUpdateQty(
-                            item.book_id,
-                            "digital",
-                            Math.max(0, item.digital_licenses_qty - 5)
-                          )
-                        }
-                        className="p-1 hover:bg-border rounded text-navy"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="font-mono font-bold text-xs text-navy">{item.digital_licenses_qty}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onUpdateQty(
-                            item.book_id,
-                            "digital",
-                            item.digital_licenses_qty + 5
-                          )
-                        }
-                        className="p-1 hover:bg-border rounded text-navy"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
+                  {/* Licence Numérique (1 unité max) */}
+                  <div className="p-2.5 rounded-xl bg-background border border-border space-y-1.5 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-navy block">Licence Numérique</span>
+                      <span className="font-mono text-[10px] text-navy block font-bold">
+                        {item.book.digital_wholesale_price.toLocaleString("fr-FR")} XOF
+                      </span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdateQty(
+                          item.book_id,
+                          "digital",
+                          item.digital_licenses_qty > 0 ? 0 : 1
+                        )
+                      }
+                      className={`text-[11px] font-bold px-2 py-1 rounded-lg border text-center transition-colors cursor-pointer w-full flex items-center justify-center gap-1 ${
+                        item.digital_licenses_qty > 0
+                          ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                          : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
+                      }`}
+                    >
+                      {item.digital_licenses_qty > 0 ? "✓ 1 licence incluse" : "+ Inclure (1 unité)"}
+                    </button>
                   </div>
 
                   {/* Exemplaires Papier */}

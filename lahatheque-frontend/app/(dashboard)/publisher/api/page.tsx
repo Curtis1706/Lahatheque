@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ApiKeyManager } from "@/components/features/publisher/api-key-manager";
 import { getApiKeys, createApiKey, revokeApiKey } from "@/lib/services/publisher";
 import type { ApiKey } from "@/lib/types/publisher";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function PublisherApiPage() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
@@ -148,7 +149,7 @@ export default function PublisherApiPage() {
               >
                 {revoking ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <InlineLoader size={16} />
                     <span>Révocation...</span>
                   </>
                 ) : (

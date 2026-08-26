@@ -3,10 +3,11 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ShoppingCart, Building2, Send, Plus, Trash2, BookOpen, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, ShoppingCart, Building2, Send, Plus, Trash2, BookOpen, AlertCircle } from "lucide-react";
 import { getWholesalerBooks, createWholesalerOrder } from "@/lib/services/wholesaler";
 import type { WholesalerBookItem, WholesalerCartItem } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 
 export default function NewWholesalerOrderPage() {
   const router = useRouter();
@@ -55,7 +56,7 @@ export default function NewWholesalerOrderPage() {
       {
         book_id: targetBook.id,
         book: targetBook,
-        digital_licenses_qty: 10,
+        digital_licenses_qty: 1,
         print_copies_qty: 5,
       },
     ]);
@@ -133,9 +134,8 @@ export default function NewWholesalerOrderPage() {
       </div>
 
       {loadingCatalog ? (
-        <div className="p-12 text-center rounded-3xl bg-background border border-border space-y-3">
-          <Loader2 className="w-8 h-8 text-gold animate-spin mx-auto" />
-          <p className="text-xs text-foreground-muted">Chargement du catalogue grossiste...</p>
+        <div className="p-12 text-center rounded-3xl bg-background border border-border">
+          <PageLoader label="Chargement du catalogue grossiste" />
         </div>
       ) : catalogError ? (
         <div className="p-6 rounded-3xl bg-background border border-border flex items-center gap-3 text-red-600">
@@ -211,14 +211,18 @@ export default function NewWholesalerOrderPage() {
 
                     <div className="flex flex-wrap items-center gap-4 text-right">
                       <div>
-                        <label className="text-[10px] text-foreground-muted block font-bold">Licences Numériques</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={ci.digital_licenses_qty}
-                          onChange={(e) => handleUpdateQty(ci.book_id, "digital_licenses_qty", parseInt(e.target.value) || 0)}
-                          className="w-20 px-2 py-1 bg-background border border-border rounded-lg text-center font-mono font-bold text-navy text-xs"
-                        />
+                        <label className="text-[10px] text-foreground-muted block font-bold">Licence Numérique</label>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQty(ci.book_id, "digital_licenses_qty", ci.digital_licenses_qty > 0 ? 0 : 1)}
+                          className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
+                            ci.digital_licenses_qty > 0
+                              ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                              : "bg-background text-foreground-muted border-border hover:text-navy"
+                          }`}
+                        >
+                          {ci.digital_licenses_qty > 0 ? "✓ 1 unité" : "Non incluse"}
+                        </button>
                       </div>
                       <div>
                         <label className="text-[10px] text-foreground-muted block font-bold">Exemplaires Papier</label>
@@ -306,7 +310,7 @@ export default function NewWholesalerOrderPage() {
                 className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-xs disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <InlineLoader size={16} />
                 ) : (
                   <>
                     <Send className="w-4 h-4 text-gold" />

@@ -3,6 +3,7 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import AuthGuard from "@/components/auth-guard";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { AnimatedSidebarProvider, AnimatedSidebarInset } from "@/components/motion/animated-sidebar";
 import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
 import { NotificationBell } from "@/components/ui/notification-bell";
 
@@ -18,7 +19,7 @@ interface State {
 class DashboardErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null
+    error: null,
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -33,7 +34,7 @@ class DashboardErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="p-6 bg-navy text-white border border-red-500 rounded-xl m-4 max-w-2xl mx-auto space-y-4">
-          <h2 className="text-lg font-bold text-red-400">Une erreur critique est survenue dans l'interface :</h2>
+          <h2 className="text-lg font-bold text-red-400">Une erreur critique est survenue dans l&apos;interface :</h2>
           <pre className="text-xs bg-navy-dark text-red-300 p-4 rounded-lg overflow-auto whitespace-pre-wrap font-mono">
             {this.state.error?.stack || this.state.error?.message}
           </pre>
@@ -55,15 +56,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <DashboardErrorBoundary>
       <AuthGuard>
-        <div className="min-h-screen bg-background flex flex-col md:flex-row w-full relative pb-20 md:pb-0">
-          <NotificationBell />
-          <DashboardSidebar />
-          <main className="flex-1 min-w-0 flex flex-col overflow-y-auto">
-            <div className="flex-1 min-w-0">{children}</div>
-          </main>
-          {/* Floating Dock Bottom Navigation for Mobile (21st.dev Floating Nav) */}
-          <MobileBottomNav />
-        </div>
+        <AnimatedSidebarProvider defaultOpen={false}>
+          <div className="min-h-screen bg-background flex flex-col md:flex-row w-full relative pb-20 md:pb-0">
+            <NotificationBell />
+            <DashboardSidebar />
+            <AnimatedSidebarInset className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-background">
+              <div className="flex-1 min-w-0">{children}</div>
+            </AnimatedSidebarInset>
+            {/* Floating Dock Bottom Navigation for Mobile (21st.dev Floating Nav) */}
+            <MobileBottomNav />
+          </div>
+        </AnimatedSidebarProvider>
       </AuthGuard>
     </DashboardErrorBoundary>
   );

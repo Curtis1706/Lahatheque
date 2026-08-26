@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { AlertTriangle, XCircle, Send } from "lucide-react";
+import { AlertTriangle, Send } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface CancelOrderModalProps {
   orderId: string | null;
@@ -90,7 +91,7 @@ export function CancelOrderModal({
             className="px-5 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors inline-flex items-center gap-2 min-h-[40px] disabled:opacity-50"
           >
             {submitting ? (
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <InlineLoader size={16} />
             ) : (
               <>
                 <Send className="w-3.5 h-3.5" />

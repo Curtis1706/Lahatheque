@@ -81,6 +81,30 @@ class ConfigurationPlateformeGlobale(models.Model):
         max_digits=12, decimal_places=2, default=Decimal("45000.00"),
         help_text="Tarif de l'abonnement Pass Étudiant annuel (XOF)"
     )
+    remise_auteur_papier_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("40.00"),
+        help_text="Remise papier accordée aux Auteurs (%)"
+    )
+    remise_auteur_numerique_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("25.00"),
+        help_text="Remise numérique accordée aux Auteurs (%)"
+    )
+    remise_grossiste_papier_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("32.00"),
+        help_text="Remise papier accordée aux Grossistes B2B (%)"
+    )
+    remise_grossiste_numerique_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("25.00"),
+        help_text="Remise numérique accordée aux Grossistes B2B (%)"
+    )
+    remise_campus_papier_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("25.00"),
+        help_text="Remise papier accordée aux Universités/Campus (%)"
+    )
+    remise_campus_numerique_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("35.00"),
+        help_text="Remise numérique accordée aux Universités/Campus (%)"
+    )
     devise_defaut = models.CharField(max_length=8, default="XOF")
 
     # ── DRM & Paramètres de Protection ─────────────────────────────────────────

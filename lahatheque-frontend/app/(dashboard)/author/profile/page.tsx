@@ -24,6 +24,7 @@ import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-
 import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
 import type { AuthorDelegateAccess } from "@/lib/types/author";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function AuthorProfilePage() {
   const { user } = useAuth();
@@ -304,7 +305,7 @@ export default function AuthorProfilePage() {
             className="px-6 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center gap-2 min-h-[44px] shadow-sm disabled:opacity-50 cursor-pointer"
           >
             {saving ? (
-              <span className="w-4 h-4 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+              <InlineLoader size={16} />
             ) : (
               <>
                 <Save className="w-4 h-4" />

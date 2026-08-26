@@ -23,6 +23,7 @@ import { getPublisherProfile, updatePublisherProfile } from "@/lib/services/publ
 import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
 import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
 import type { PublisherProfileData, PublisherEntityType } from "@/lib/types/publisher";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function PublisherProfilePage() {
   const [profile, setProfile] = useState<PublisherProfileData | null>(null);
@@ -507,7 +508,7 @@ export default function PublisherProfilePage() {
           >
             {saving ? (
               <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <InlineLoader size={16} />
                 <span>Enregistrement en cours...</span>
               </>
             ) : (

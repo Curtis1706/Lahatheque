@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
+import { InlineLoader } from "@/components/ui/page-loader";
 import {
   getAdminContracts,
   processAdminContract,
@@ -510,7 +511,7 @@ export default function AdminContractsPage() {
             >
               {isSubmitting ? (
                 <>
-                  <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                  <InlineLoader size={14} />
                   <span>Validation...</span>
                 </>
               ) : (
@@ -579,7 +580,7 @@ export default function AdminContractsPage() {
             >
               {isSubmitting ? (
                 <>
-                  <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                  <InlineLoader size={14} />
                   <span>Enregistrement...</span>
                 </>
               ) : (

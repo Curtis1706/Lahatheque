@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Key, PlusCircle, ShieldCheck, Eye, EyeOff, Trash2, Copy, Check, Lock, AlertTriangle } from "lucide-react";
 import type { ApiKey } from "@/lib/types/publisher";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface ApiKeyManagerProps {
   keys: ApiKey[];
@@ -77,7 +78,7 @@ export function ApiKeyManager({
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-xs shrink-0 disabled:opacity-50"
           >
             {generating ? (
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <InlineLoader size={16} />
             ) : (
               <>
                 <PlusCircle className="w-4 h-4 text-gold" />

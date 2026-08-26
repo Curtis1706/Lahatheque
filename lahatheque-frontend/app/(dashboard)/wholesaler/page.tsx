@@ -74,55 +74,51 @@ export default function WholesalerOverviewPage() {
         </div>
       </div>
 
-      {/* 4 KPI Cards animées (KpiCard de components/ui/kpi-card.tsx) */}
+      {/* 4 KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link href="/wholesaler/orders" className="block">
           <KpiCard
             label="Commandes en Cours"
-            value={kpis?.pendingOrdersCount || 1}
+            value={kpis?.pendingOrdersCount ?? 0}
             icon={PackageCheck}
-            trend={5}
+            trend={0}
             trendPeriod="ce mois"
             theme="gold"
             subtext="Traitement &amp; Expédition entrepôt"
-            sparkline={[1, 1, 2, 1]}
           />
         </Link>
 
         <Link href="/wholesaler/orders" className="block">
           <KpiCard
             label="Volume de Licences / Livres"
-            value={(kpis?.totalLicensesPurchased || 300) + (kpis?.totalPrintCopiesPurchased || 150)}
+            value={(kpis?.totalLicensesPurchased ?? 0) + (kpis?.totalPrintCopiesPurchased ?? 0)}
             icon={BookOpen}
-            trend={12}
+            trend={0}
             theme="blue"
-            subtext={`${kpis?.totalLicensesPurchased || 300} num. • ${kpis?.totalPrintCopiesPurchased || 150} papier`}
-            sparkline={[200, 320, 410, 450]}
+            subtext={`${kpis?.totalLicensesPurchased ?? 0} num. • ${kpis?.totalPrintCopiesPurchased ?? 0} papier`}
           />
         </Link>
 
         <Link href="/wholesaler/orders" className="block">
           <KpiCard
             label="Montant Total Dépensé"
-            value={kpis?.totalSpentAmount || 4425000}
+            value={kpis?.totalSpentAmount ?? 0}
             formatValue={(v) => `${v.toLocaleString("fr-FR")} XOF`}
             icon={DollarSign}
-            trend={15}
+            trend={0}
             theme="emerald"
             subtext="Achats cumulés"
-            sparkline={[2000000, 3100000, 4000000, 4425000]}
           />
         </Link>
 
         <Link href="/wholesaler/notifications" className="block">
           <KpiCard
             label="Notifications Nouveautés"
-            value={kpis?.unreadNotificationsCount || 2}
+            value={kpis?.unreadNotificationsCount ?? 0}
             icon={BellRing}
             trend={0}
             theme="amber"
             subtext="Nouveautés &amp; Meilleures ventes"
-            sparkline={[1, 2, 2, 2]}
           />
         </Link>
       </div>

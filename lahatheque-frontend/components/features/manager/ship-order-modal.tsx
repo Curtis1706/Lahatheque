@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Truck, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ManagerOrder } from "@/lib/types/manager";
+import { InlineLoader } from "@/components/ui/page-loader";
 
 interface ShipOrderModalProps {
   order: ManagerOrder;
@@ -140,7 +141,7 @@ export function ShipOrderModal({ order, isOpen, onClose, onConfirm }: ShipOrderM
               className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px]"
             >
               {loading ? (
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <InlineLoader size={16} />
               ) : (
                 <>
                   <Truck className="w-4 h-4" />

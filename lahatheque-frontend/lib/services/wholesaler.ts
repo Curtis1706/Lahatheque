@@ -7,6 +7,7 @@ import type {
   WholesalerBookItem,
   WholesalerOrder,
   WholesalerNotification,
+  WholesaleTrendingData,
   WholesalerKpis,
   WholesalerCartItem,
   WholesaleCompanyProfile,
@@ -91,11 +92,17 @@ export async function getWholesalerOrderDetail(id: string): Promise<WholesalerOr
 export async function createWholesalerOrder(
   cartItems: WholesalerCartItem[],
   deliveryAddress: string,
-  contactPhone: string
+  contactPhone: string,
+  options?: {
+    is_credit_purchase?: boolean;
+    credit_due_date?: string;
+  }
 ): Promise<WholesalerOrder> {
   const payload = {
     delivery_address: deliveryAddress,
     contact_phone: contactPhone,
+    is_credit_purchase: options?.is_credit_purchase || false,
+    credit_due_date: options?.credit_due_date || undefined,
     items: cartItems.map((ci) => ({
       book_id: ci.book.id,
       digital_licenses_qty: ci.digital_licenses_qty,
@@ -115,10 +122,41 @@ export async function requestOrderCancellation(
   return true;
 }
 
-// ─── Notifications Grossiste ─────────────────────────────────────────────────
+/**
+ * Retour d'exemplaires invendus d'une commande à crédit / dépôt grossiste.
+ */
+export async function returnWholesaleCreditOrder(
+  orderId: string,
+  reason: string
+): Promise<boolean> {
+  await bffPost(`/orders/${orderId}/return/`, { reason });
+  return true;
+}
+
+// ─── Notifications & Tendances Grossiste ─────────────────────────────────────
+
+export async function getWholesalerTrendingData(): Promise<WholesaleTrendingData> {
+  const res = await bffGet<any>("/notifications/");
+  if (res && Array.isArray(res.new_releases)) {
+    return res as WholesaleTrendingData;
+  }
+  if (Array.isArray(res)) {
+    return {
+      new_releases: [],
+      best_sellers: [],
+      notifications: res,
+    };
+  }
+  return {
+    new_releases: res?.new_releases || [],
+    best_sellers: res?.best_sellers || [],
+    notifications: res?.notifications || [],
+  };
+}
 
 export async function getWholesalerNotifications(): Promise<WholesalerNotification[]> {
-  return bffGet<WholesalerNotification[]>("/notifications/");
+  const data = await getWholesalerTrendingData();
+  return data.notifications;
 }
 
 export async function markNotificationAsRead(id: string): Promise<boolean> {
