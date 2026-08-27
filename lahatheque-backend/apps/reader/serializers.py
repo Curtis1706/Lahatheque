@@ -107,7 +107,7 @@ class ReaderSessionCreateSerializer(serializers.Serializer):
     user_ip = serializers.CharField(max_length=64, required=False, allow_blank=True)
 
     return_url = serializers.URLField(max_length=500, required=True)
-    ttl_seconds = serializers.IntegerField(default=3600, min_value=300, max_value=86400, required=False)
+    ttl_seconds = serializers.IntegerField(default=14400, min_value=300, max_value=86400, required=False)
 
     theme = ThemeConfigSerializer(required=False, default=dict)
     quiz = QuizConfigSerializer(required=False, default=dict)

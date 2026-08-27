@@ -550,6 +550,9 @@ class PartnerSessionSupervisionViewSet(viewsets.ViewSet):
                         total_pages = 1
 
                 current_page = s.last_page or 1
+                if total_pages <= 1 and current_page > 1:
+                    total_pages = current_page
+
                 progress_percent = int((current_page / max(total_pages, 1)) * 100)
                 if progress_percent > 100:
                     progress_percent = 100

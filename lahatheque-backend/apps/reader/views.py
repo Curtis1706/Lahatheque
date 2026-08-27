@@ -87,7 +87,7 @@ class ReaderSessionViewSet(ViewSet):
 
         validated_data = serializer.validated_data
         source_type = validated_data.get('source_type', 'catalog_book')
-        ttl_seconds = validated_data.get('ttl_seconds', 3600)
+        ttl_seconds = validated_data.get('ttl_seconds', 14400)
         expires_at = timezone.now() + timedelta(seconds=ttl_seconds)
 
         with transaction.atomic():
@@ -398,13 +398,19 @@ class ReaderProgressView(APIView):
         session.reading_time_seconds += reading_time
 
         if total_pages and total_pages > 0:
-            if not isinstance(session.metadata, dict):
-                session.metadata = {}
-            session.metadata['total_pages'] = total_pages
+            meta = dict(session.metadata) if isinstance(session.metadata, dict) else {}
+            meta['total_pages'] = total_pages
+            session.metadata = meta
 
         if session.status in ['created', 'opened']:
             session.status = 'in_progress'
-        session.save(update_fields=['last_page', 'reading_time_seconds', 'metadata', 'status', 'updated_at'])
+
+        update_fields = ['last_page', 'reading_time_seconds', 'metadata', 'status', 'updated_at']
+        if session.expires_at and (session.expires_at - timezone.now()).total_seconds() < 3600:
+            session.expires_at = timezone.now() + timedelta(hours=4)
+            update_fields.append('expires_at')
+
+        session.save(update_fields=update_fields)
 
         # Émission webhook de progression
         dispatch_partner_webhook_sync(
