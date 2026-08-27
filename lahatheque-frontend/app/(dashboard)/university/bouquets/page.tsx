@@ -6,11 +6,9 @@ import {
   Layers,
   ArrowLeft,
   Search,
-  Filter,
   CheckCircle2,
-  Download,
-  Building2,
   Sparkles,
+  HelpCircle,
 } from "lucide-react";
 import { BouquetCard } from "@/components/features/university/bouquet-card";
 import {
@@ -23,49 +21,58 @@ export default function UniversityBouquetsPage() {
   const [bouquets, setBouquets] = useState<UniversityBouquet[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("all");
+  const [filterType, setFilterType] = useState<"all" | "available" | "active">("all");
 
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
+  const loadData = async () => {
+    setLoading(true);
+    try {
       const data = await getUniversityBouquets();
       setBouquets(data);
+    } catch {
+      // Erreur gérée au niveau service
+    } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
 
-  const handleSubscribe = async (bouquetId: string) => {
-    const ok = await subscribeUniversityBouquet(bouquetId);
+  const handleSubscribe = async (offeringOrBouquetId: string) => {
+    const ok = await subscribeUniversityBouquet(offeringOrBouquetId);
     if (ok) {
-      setBouquets((prev) =>
-        prev.map((b) =>
-          b.id === bouquetId
-            ? { ...b, status: "active", start_date: "2026-01-01", end_date: "2026-12-31" }
-            : b
-        )
-      );
+      await loadData();
     }
     return ok;
   };
 
-  const filteredBouquets = useMemo(() => {
-    return bouquets.filter((b) => {
-      if (filterType === "active" && b.status !== "active") return false;
-      if (filterType === "available" && b.status !== "available") return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchTitle = b.title.toLowerCase().includes(q);
-        const matchFac = b.faculty_code?.toLowerCase().includes(q);
-        const matchDisc = b.discipline?.toLowerCase().includes(q);
-        if (!matchTitle && !matchFac && !matchDisc) return false;
-      }
-      return true;
-    });
-  }, [bouquets, searchQuery, filterType]);
+  const matchesSearch = (b: UniversityBouquet) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const matchTitle = b.title?.toLowerCase().includes(q);
+    const matchFac = b.faculty_code?.toLowerCase().includes(q);
+    const matchDisc = b.discipline?.toLowerCase().includes(q);
+    return matchTitle || matchFac || matchDisc;
+  };
+
+  const availableBouquets = useMemo(() => {
+    return bouquets
+      .filter((b) => !b.is_subscribed && b.status !== "active")
+      .filter(matchesSearch);
+  }, [bouquets, searchQuery]);
+
+  const activeBouquets = useMemo(() => {
+    return bouquets
+      .filter((b) => b.is_subscribed || b.status === "active")
+      .filter(matchesSearch);
+  }, [bouquets, searchQuery]);
+
+  const showAvailable = filterType === "all" || filterType === "available";
+  const showActive = filterType === "all" || filterType === "active";
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/university" className="hover:text-navy">Vue d&apos;ensemble</Link>
@@ -109,13 +116,13 @@ export default function UniversityBouquetsPage() {
         <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
           {[
             { id: "all", label: "Tous les bouquets" },
-            { id: "active", label: "Souscriptions actives" },
-            { id: "available", label: "Disponibles à l'abonnement" },
+            { id: "available", label: `Disponibles (${availableBouquets.length})` },
+            { id: "active", label: `Souscriptions actives (${activeBouquets.length})` },
           ].map((st) => (
             <button
               key={st.id}
               type="button"
-              onClick={() => setFilterType(st.id)}
+              onClick={() => setFilterType(st.id as any)}
               className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-colors border ${
                 filterType === st.id
                   ? "bg-navy text-white border-navy"
@@ -128,32 +135,92 @@ export default function UniversityBouquetsPage() {
         </div>
       </div>
 
-      {/* Grille de Bouquets */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-64 bg-background-secondary rounded-3xl" />
-          ))}
-        </div>
-      ) : filteredBouquets.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl bg-background border border-dashed border-border space-y-3">
-          <Layers className="w-10 h-10 text-foreground-muted mx-auto" />
-          <h3 className="font-serif font-bold text-navy text-base">
-            Aucun bouquet ne correspond à votre recherche
-          </h3>
-          <p className="text-xs text-foreground-muted max-w-sm mx-auto">
-            Modifiez vos filtres de recherche ou consultez l&apos;intégralité du catalogue universitaire.
-          </p>
+        <div className="space-y-6 animate-pulse">
+          <div className="h-6 bg-background-secondary rounded w-48" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-64 bg-background-secondary rounded-3xl" />
+            ))}
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredBouquets.map((bq) => (
-            <BouquetCard
-              key={bq.id}
-              bouquet={bq}
-              onSubscribe={handleSubscribe}
-            />
-          ))}
+        <div className="space-y-10">
+          {/* Section 1 : Bouquets Disponibles */}
+          {showAvailable && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-gold" />
+                  <h2 className="font-serif text-lg sm:text-xl font-bold text-navy">
+                    Bouquets Disponibles à la Souscription
+                  </h2>
+                </div>
+                <span className="text-xs text-foreground-muted font-medium">
+                  {availableBouquets.length} offre(s)
+                </span>
+              </div>
+
+              {availableBouquets.length === 0 ? (
+                <div className="p-8 text-center rounded-3xl bg-background border border-dashed border-border space-y-2">
+                  <HelpCircle className="w-8 h-8 text-foreground-muted mx-auto" />
+                  <p className="text-xs text-foreground-muted">
+                    {searchQuery.trim()
+                      ? "Aucun bouquet disponible ne correspond à votre recherche."
+                      : "Aucun bouquet disponible pour le moment — contactez LAHA Éditions."}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {availableBouquets.map((bq) => (
+                    <BouquetCard
+                      key={bq.id}
+                      bouquet={bq}
+                      onSubscribe={handleSubscribe}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Section 2 : Mes Souscriptions Actives */}
+          {showActive && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <h2 className="font-serif text-lg sm:text-xl font-bold text-navy">
+                    Mes Souscriptions Actives
+                  </h2>
+                </div>
+                <span className="text-xs text-foreground-muted font-medium">
+                  {activeBouquets.length} souscription(s)
+                </span>
+              </div>
+
+              {activeBouquets.length === 0 ? (
+                <div className="p-8 text-center rounded-3xl bg-background border border-dashed border-border space-y-2">
+                  <Layers className="w-8 h-8 text-foreground-muted mx-auto" />
+                  <p className="text-xs text-foreground-muted">
+                    {searchQuery.trim()
+                      ? "Aucune souscription active ne correspond à votre recherche."
+                      : "Aucune souscription active pour le moment."}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {activeBouquets.map((bq) => (
+                    <BouquetCard
+                      key={bq.id}
+                      bouquet={bq}
+                      onSubscribe={handleSubscribe}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

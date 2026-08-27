@@ -1,5 +1,6 @@
 """Vues API REST complètes pour l'Espace Université (Portail Établissement Partenaire)."""
 import uuid
+from decimal import Decimal
 from datetime import timedelta
 from django.db.models import Sum, Count
 from rest_framework.views import APIView
@@ -153,60 +154,96 @@ class UniversityFacultiesView(APIView):
 
 
 class UniversityBouquetsView(APIView):
-    """GET /api/v1/partners/university/bouquets/ - Bouquets documentaires disponibles et souscrits."""
+    """GET /api/v1/partners/university/bouquets/ - Bouquets disponibles ET déjà souscrits."""
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
-        inst = get_user_institution(request.user)
-        if not inst:
-            return Response({"success": True, "data": [], "error": None})
+        from .models import BouquetOffering
 
-        qs = UniversityBouquetSubscription.objects.filter(institution=inst)
-        data = []
-        for b in qs:
-            data.append({
-                "id": str(b.id),
-                "title": b.title,
-                "bouquet_type": b.bouquet_type,
-                "faculty_code": b.faculty_code,
-                "discipline": b.discipline,
-                "books_count": b.books_count,
-                "annual_price": float(b.annual_price),
-                "currency": b.currency,
-                "status": b.status,
-                "start_date": str(b.start_date),
-                "end_date": str(b.end_date),
+        inst = get_user_institution(request.user)
+        subscribed_offering_ids = set()
+        subscribed_data = []
+
+        if inst:
+            subs = UniversityBouquetSubscription.objects.filter(institution=inst)
+            for b in subs:
+                subscribed_data.append({
+                    "id": str(b.id),
+                    "offering_id": str(b.offering_id) if b.offering_id else None,
+                    "title": b.title,
+                    "bouquet_type": b.bouquet_type,
+                    "faculty_code": b.faculty_code,
+                    "discipline": b.discipline,
+                    "books_count": b.books_count,
+                    "annual_price": float(b.annual_price),
+                    "currency": b.currency,
+                    "status": b.status,
+                    "start_date": str(b.start_date),
+                    "end_date": str(b.end_date),
+                    "is_subscribed": True,
+                })
+                if b.offering_id:
+                    subscribed_offering_ids.add(str(b.offering_id))
+
+        available_data = []
+        for o in BouquetOffering.objects.filter(is_active=True).exclude(id__in=subscribed_offering_ids):
+            available_data.append({
+                "id": str(o.id),
+                "offering_id": str(o.id),
+                "title": o.title,
+                "bouquet_type": o.bouquet_type,
+                "faculty_code": o.faculty_code,
+                "discipline": o.discipline,
+                "country": o.country,
+                "books_count": o.get_books_queryset(requesting_institution=inst).count(),
+                "annual_price": float(o.annual_price),
+                "currency": o.currency,
+                "description": o.description,
+                "status": "available",
+                "is_subscribed": False,
             })
-        return Response({"success": True, "data": data, "error": None})
+
+        return Response({"success": True, "data": available_data + subscribed_data, "error": None})
 
 
 class UniversityBouquetSubscribeView(APIView):
-    """POST /api/v1/partners/university/bouquets/<pk>/subscribe/ - Souscription à un bouquet."""
+    """POST /api/v1/partners/university/bouquets/<offering_id>/subscribe/"""
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def post(self, request, pk):
+        from .models import BouquetOffering
+
         inst = get_user_institution(request.user)
         if not inst:
             return Response({"success": False, "error": "Université introuvable"}, status=400)
 
+        try:
+            offering = BouquetOffering.objects.get(id=pk, is_active=True)
+        except BouquetOffering.DoesNotExist:
+            return Response({"success": False, "error": "Bouquet introuvable ou indisponible."}, status=404)
+
+        if UniversityBouquetSubscription.objects.filter(
+            institution=inst, offering_id=offering.id, status='active'
+        ).exists():
+            return Response({"success": False, "error": "Ce bouquet est déjà souscrit."}, status=400)
+
         start = timezone.now().date()
         end = start + timedelta(days=365)
-        sub_id = pk if len(str(pk)) == 36 else uuid.uuid4()
-        sub, _ = UniversityBouquetSubscription.objects.get_or_create(
-            id=sub_id,
-            defaults={
-                "institution": inst,
-                "title": f"Bouquet Souscrit {pk}",
-                "annual_price": 1000000.00,
-                "status": "active",
-                "start_date": start,
-                "end_date": end,
-            }
+
+        sub = UniversityBouquetSubscription.objects.create(
+            institution=inst,
+            offering_id=offering.id,
+            title=offering.title,
+            bouquet_type=offering.bouquet_type,
+            faculty_code=offering.faculty_code,
+            discipline=offering.discipline,
+            books_count=offering.get_books_queryset(requesting_institution=inst).count(),
+            annual_price=offering.annual_price,
+            currency=offering.currency,
+            status="active",
+            start_date=start,
+            end_date=end,
         )
-        sub.status = "active"
-        sub.start_date = start
-        sub.end_date = end
-        sub.save()
 
         return Response({
             "success": True,
@@ -215,7 +252,7 @@ class UniversityBouquetSubscribeView(APIView):
                 "status": "active",
                 "start_date": str(sub.start_date),
                 "end_date": str(sub.end_date),
-                "message": "Souscription validée avec succès pour l'ensemble des étudiants de l'établissement."
+                "message": f"Souscription au bouquet « {offering.title} » validée."
             },
             "error": None
         })
@@ -254,24 +291,33 @@ class UniversityAffiliationActionView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def patch(self, request, pk):
+        inst = get_user_institution(request.user)
+        if not inst:
+            return Response({"success": False, "error": "Université introuvable."}, status=400)
+
         action = request.data.get("action", "approve")
         new_status = "approved" if action == "approve" else "suspended"
+
         try:
-            aff = StudentAffiliation.objects.get(id=pk)
-            aff.status = new_status
-            aff.is_validated = (action == "approve")
-            aff.reviewed_by = request.user
-            aff.reviewed_at = timezone.now()
-            aff.save()
+            aff = StudentAffiliation.objects.get(id=pk, institution=inst)
         except (StudentAffiliation.DoesNotExist, ValueError):
-            pass
+            return Response({
+                "success": False,
+                "error": "Affiliation introuvable pour votre établissement."
+            }, status=404)
+
+        aff.status = new_status
+        aff.is_validated = (action == "approve")
+        aff.reviewed_by = request.user
+        aff.reviewed_at = timezone.now()
+        aff.save()
 
         return Response({
             "success": True,
             "data": {
-                "id": str(pk),
+                "id": str(aff.id),
                 "status": new_status,
-                "verified_at": timezone.now().isoformat(),
+                "verified_at": aff.reviewed_at.isoformat(),
                 "message": f"Statut étudiant mis à jour ({new_status})."
             },
             "error": None
@@ -452,7 +498,7 @@ class UniversityRoyaltiesView(APIView):
                 "net_royalty_amount": float(r.net_royalty_amount),
                 "currency": r.currency,
                 "status": r.status,
-                "pdf_statement_url": r.pdf_statement_url or f"/documents/bordereau-{r.reference}.pdf",
+                "pdf_statement_url": r.pdf_statement_url or None,
                 "created_at": r.created_at.isoformat() if r.created_at else str(timezone.now())
             })
         avail_bal = float(qs.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
@@ -482,9 +528,26 @@ class UniversityRoyaltyWithdrawView(APIView):
         if not inst:
             return Response({"success": False, "error": "Université introuvable"}, status=400)
 
-        amount = request.data.get("amount", 0)
+        try:
+            amount = Decimal(str(request.data.get("amount", 0)))
+        except (ValueError, TypeError):
+            return Response({"success": False, "error": "Montant invalide."}, status=400)
+
+        if amount <= 0:
+            return Response({"success": False, "error": "Le montant doit être positif."}, status=400)
+
+        available_balance = UniversityRoyaltyStatement.objects.filter(
+            institution=inst, status='available'
+        ).aggregate(s=Sum('net_royalty_amount'))['s'] or Decimal("0.00")
+
+        if amount > available_balance:
+            return Response({
+                "success": False,
+                "error": f"Montant demandé ({amount} XOF) supérieur au solde disponible ({available_balance} XOF)."
+            }, status=400)
+
         ref = f"REQ-ROY-UNIV-2026-{int(timezone.now().timestamp()) % 1000:03d}"
-        
+
         UniversityRoyaltyStatement.objects.create(
             institution=inst,
             reference=ref,
@@ -497,7 +560,7 @@ class UniversityRoyaltyWithdrawView(APIView):
             "success": True,
             "data": {
                 "request_reference": ref,
-                "amount": amount,
+                "amount": float(amount),
                 "currency": "XOF",
                 "status": "processing",
                 "message": "Demande de versement transmise à la Trésorerie & Direction Financière LAHA."
@@ -595,18 +658,26 @@ class ExportBouquetWordView(APIView):
         except UniversityBouquetSubscription.DoesNotExist:
             return Response({"success": False, "error": "Bouquet introuvable."}, status=404)
 
-        # Récupérer les ouvrages correspondants au bouquet
-        ouvrages_qs = Ouvrage.objects.filter(
-            status='published'
-        ).select_related('discipline', 'institution').prefetch_related('authors')
+        from apps.partners.models import BouquetOffering
 
-        if bouquet.bouquet_type == 'discipline' and bouquet.discipline:
-            ouvrages_qs = ouvrages_qs.filter(discipline__name__icontains=bouquet.discipline)
-        elif bouquet.bouquet_type == 'faculty' and bouquet.faculty_code:
-            ouvrages_qs = ouvrages_qs.filter(faculty__icontains=bouquet.faculty_code)
-        
-        if inst:
-            ouvrages_qs = ouvrages_qs.filter(institution=inst)
+        if bouquet.offering_id:
+            try:
+                offering = BouquetOffering.objects.get(id=bouquet.offering_id)
+                ouvrages_qs = offering.get_books_queryset(requesting_institution=inst).select_related(
+                    'discipline', 'institution'
+                ).prefetch_related('authors')
+            except BouquetOffering.DoesNotExist:
+                ouvrages_qs = Ouvrage.objects.none()
+        else:
+            ouvrages_qs = Ouvrage.objects.filter(status='published').select_related(
+                'discipline', 'institution'
+            ).prefetch_related('authors')
+            if bouquet.bouquet_type == 'discipline' and bouquet.discipline:
+                ouvrages_qs = ouvrages_qs.filter(discipline__name__icontains=bouquet.discipline)
+            elif bouquet.bouquet_type == 'faculty' and bouquet.faculty_code:
+                ouvrages_qs = ouvrages_qs.filter(faculty__icontains=bouquet.faculty_code)
+            if inst:
+                ouvrages_qs = ouvrages_qs.filter(institution=inst)
 
         ouvrages = list(ouvrages_qs.order_by('discipline__name', 'title'))
 

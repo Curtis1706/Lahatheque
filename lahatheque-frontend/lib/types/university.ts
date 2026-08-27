@@ -21,6 +21,7 @@ export interface UniversityFacultyData {
 
 export interface UniversityBouquet {
   id: string;
+  offering_id?: string | null;
   title: string;
   bouquet_type: "discipline" | "faculty" | "university" | "custom";
   faculty_code?: string;
@@ -29,10 +30,11 @@ export interface UniversityBouquet {
   annual_price: number;
   currency: string;
   status: "active" | "pending" | "expired" | "available";
+  is_subscribed: boolean;
   start_date?: string;
   end_date?: string;
-  description: string;
-  sample_books: { id: string; title: string; author: string; cover_url?: string }[];
+  description?: string;
+  sample_books?: { id: string; title: string; author: string; cover_url?: string }[];
 }
 
 export interface UniversityBookCatalogItem {

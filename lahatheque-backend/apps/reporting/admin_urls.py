@@ -22,6 +22,8 @@ from apps.reporting.admin_views import (
     AdminValidationViewSet,
     AdminContractViewSet,
     AdminStockViewSet,
+    AdminBouquetOfferingsView,
+    AdminBouquetOfferingDetailView,
 )
 from apps.accounts.admin_views import AdminUserManagementViewSet
 
@@ -45,5 +47,7 @@ urlpatterns = [
     path('finance/global/', AdminGlobalFinanceView.as_view(), name='admin-finance-global'),
     path('finance/author-royalties/', AdminAuthorRoyaltiesReportView.as_view(), name='admin-finance-author-royalties'),
     path('catalog/pricing/role-discounts/', AdminRoleDiscountsView.as_view(), name='admin-pricing-role-discounts'),
+    path('bouquet-offerings/', AdminBouquetOfferingsView.as_view(), name='admin-bouquet-offerings'),
+    path('bouquet-offerings/<str:pk>/', AdminBouquetOfferingDetailView.as_view(), name='admin-bouquet-offering-detail'),
     path('', include(router.urls)),
 ]

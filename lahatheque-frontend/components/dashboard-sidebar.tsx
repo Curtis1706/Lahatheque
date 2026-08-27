@@ -306,6 +306,7 @@ export function DashboardSidebar() {
                 sublinks: [
                   { label: "Tous les Ouvrages", href: "/admin/catalog", icon: <BookOpen className="size-3.5" /> },
                   { label: "Grille & Remises Rôles", href: "/admin/catalog/pricing", icon: <Tag className="size-3.5" /> },
+                  { label: "Bouquets Documentaires", href: "/admin/catalog/bouquets", icon: <Layers className="size-3.5" /> },
                   { label: "Disciplines & Catégories", href: "/admin/catalog/disciplines", icon: <Layers className="size-3.5" /> },
                 ],
               },

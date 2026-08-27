@@ -130,13 +130,21 @@ export default function UniversityRoyaltiesPage() {
       header: "",
       cell: (row) => (
         <div className="flex items-center justify-end">
-          <a
-            href={row.pdf_statement_url || "#"}
-            className="px-2.5 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold text-navy text-[11px] font-bold inline-flex items-center gap-1 transition-colors"
-          >
-            <Download className="w-3.5 h-3.5 text-gold" />
-            <span>Relevé PDF</span>
-          </a>
+          {row.pdf_statement_url ? (
+            <a
+              href={row.pdf_statement_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold text-navy text-[11px] font-bold inline-flex items-center gap-1 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5 text-gold" />
+              <span>Relevé PDF</span>
+            </a>
+          ) : (
+            <span className="text-[11px] text-foreground-muted italic">
+              Relevé PDF non encore disponible
+            </span>
+          )}
         </div>
       ),
     },

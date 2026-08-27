@@ -32,7 +32,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
     if (!onSubscribe) return;
     setLoading(true);
     try {
-      const ok = await onSubscribe(bouquet.id);
+      const ok = await onSubscribe(bouquet.offering_id || bouquet.id);
       if (ok) {
         toast.success(`Souscription activée pour le ${bouquet.title}.`);
       } else {
@@ -57,7 +57,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
     }
   };
 
-  const isActive = bouquet.status === "active";
+  const isActive = bouquet.is_subscribed ?? (bouquet.status === "active");
 
   return (
     <div className="p-6 rounded-3xl bg-background border border-border flex flex-col justify-between gap-5 hover:border-gold/50 transition-all shadow-xs group">

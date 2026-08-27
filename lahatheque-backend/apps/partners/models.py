@@ -141,9 +141,20 @@ class EtudiantInscrit(models.Model):
 
 class UniversityBouquetSubscription(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    offering_id = models.UUIDField(null=True, blank=True)
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='bouquet_subscriptions')
     title = models.CharField(max_length=255, verbose_name="Titre du Bouquet")
-    bouquet_type = models.CharField(max_length=32, choices=[("discipline", "Par Discipline"), ("faculty", "Par Faculté"), ("university", "Intégral Université"), ("custom", "Personnalisé")], default="discipline")
+    bouquet_type = models.CharField(
+        max_length=32,
+        choices=[
+            ("discipline", "Par Discipline"),
+            ("faculty", "Par Faculté"),
+            ("university", "Intégral Université"),
+            ("country", "Par Pays"),
+            ("custom", "Personnalisé"),
+        ],
+        default="discipline"
+    )
     faculty_code = models.CharField(max_length=32, blank=True, default="", verbose_name="Faculté associée")
     discipline = models.CharField(max_length=128, blank=True, default="", verbose_name="Discipline")
     books_count = models.PositiveIntegerField(default=0)
@@ -191,3 +202,83 @@ class UniversityRoyaltyStatement(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class BouquetOffering(models.Model):
+    """
+    Bouquet documentaire proposable aux universités.
+    Types automatiques (discipline/faculty/university/country) : le contenu est calculé en
+    direct depuis le catalogue réel, jamais stocké en dur.
+    Type 'custom' : sélection manuelle de livres par l'Admin.
+    """
+    BOUQUET_TYPE_CHOICES = [
+        ("discipline", "Par Discipline"),
+        ("faculty", "Par Faculté"),
+        ("university", "Intégral Université"),
+        ("country", "Par Pays"),
+        ("custom", "Personnalisé"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=255)
+    bouquet_type = models.CharField(max_length=32, choices=BOUQUET_TYPE_CHOICES, default="discipline")
+
+    discipline = models.CharField(max_length=128, blank=True, default="")
+    faculty_code = models.CharField(max_length=32, blank=True, default="")
+    target_institution = models.ForeignKey(
+        Institution, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="bouquet_offerings_scoped"
+    )
+    country = models.CharField(max_length=2, blank=True, default="")
+
+    custom_books = models.ManyToManyField(
+        'catalog.Ouvrage', blank=True, related_name="custom_bouquet_offerings"
+    )
+
+    annual_price = models.DecimalField(max_digits=12, decimal_places=2, default=500000.00)
+    currency = models.CharField(max_length=10, default="XOF")
+    description = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="bouquet_offerings_created"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+
+    class Meta:
+        ordering = ["title"]
+
+    def get_books_queryset(self, requesting_institution=None):
+        """
+        Calcule le contenu RÉEL du bouquet. Pour les types automatiques, interroge le
+        catalogue en direct — jamais de liste figée. Pour 'custom', renvoie la sélection
+        manuelle de l'Admin.
+        """
+        from apps.catalog.models import Ouvrage
+
+        if self.bouquet_type == "custom":
+            return self.custom_books.filter(status="published")
+
+        qs = Ouvrage.objects.filter(status="published")
+
+        if self.bouquet_type == "discipline" and self.discipline:
+            qs = qs.filter(discipline__name__icontains=self.discipline)
+        elif self.bouquet_type == "faculty" and self.faculty_code:
+            qs = qs.filter(faculty__icontains=self.faculty_code)
+            if self.target_institution:
+                qs = qs.filter(institution=self.target_institution)
+        elif self.bouquet_type == "university":
+            target = self.target_institution or requesting_institution
+            if target:
+                qs = qs.filter(institution=target)
+        elif self.bouquet_type == "country" and self.country:
+            qs = qs.filter(country=self.country)
+
+        return qs
+
+    @property
+    def books_count(self):
+        return self.get_books_queryset().count()
+
+

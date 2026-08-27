@@ -34,7 +34,7 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
         for param, field in [('discipline', 'discipline_id'), ('institution', 'institution_id'),
                              ('language', 'language'), ('country', 'country'), ('format', 'format_type')]:
             val = self.request.query_params.get(param)
-            if val:
+            if val and val.lower() != 'all':
                 qs = qs.filter(**{field: val})
         return qs
 

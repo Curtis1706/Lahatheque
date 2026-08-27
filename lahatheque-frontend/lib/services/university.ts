@@ -96,24 +96,50 @@ export async function subscribeUniversityBouquet(bouquetId: string): Promise<boo
 
 export async function getUniversityCatalog(): Promise<UniversityBookCatalogItem[]> {
   // Le catalogue universitaire est le catalogue global filtré par institution
-  const res = await fetch("/api/bff/catalog/books/?format=all", {
+  const res = await fetch("/api/bff/catalog/books/", {
     credentials: "include",
     cache: "no-store",
   });
   if (!res.ok) throw new Error("Erreur chargement catalogue");
   const json = await res.json();
   const results = Array.isArray(json) ? json : json.results || [];
-  return results.map((b: any) => ({
-    id: b.id,
-    title: b.title,
-    authors: b.authors_names || "",
-    discipline: b.discipline_detail?.name || "",
-    faculty: b.faculty_name || b.faculty || "",
-    format: b.format_type || "pdf",
-    cover_url: b.cover_image || "",
-    consultations: 0,
-    downloads: 0,
-  }));
+  return results.map((b: any) => {
+    let authorsList: string[] = [];
+    if (Array.isArray(b.authors_details) && b.authors_details.length > 0) {
+      authorsList = b.authors_details.map((a: any) =>
+        typeof a === "string" ? a : `${a.first_name || ""} ${a.last_name || ""}`.trim()
+      ).filter(Boolean);
+    } else if (Array.isArray(b.authors) && b.authors.length > 0) {
+      authorsList = b.authors.map((a: any) =>
+        typeof a === "string" ? a : `${a.first_name || ""} ${a.last_name || ""}`.trim()
+      ).filter(Boolean);
+    } else if (typeof b.authors_names === "string" && b.authors_names.trim()) {
+      authorsList = b.authors_names.split(",").map((s: string) => s.trim()).filter(Boolean);
+    } else if (typeof b.authors === "string" && b.authors.trim()) {
+      authorsList = b.authors.split(",").map((s: string) => s.trim()).filter(Boolean);
+    }
+
+    if (authorsList.length === 0) {
+      authorsList = ["Auteur LAHA"];
+    }
+
+    return {
+      id: String(b.id),
+      title: b.title || b.titre || "Sans titre",
+      isbn_digital: b.isbn || b.isbn_digital || "N/A",
+      isbn_print: b.isbn_paper || b.isbn_print || b.isbn || "N/A",
+      authors: authorsList,
+      faculty_code: b.faculty_code || b.faculty || b.faculty_name || "Campus",
+      faculty_name: b.faculty_name || b.faculty || "Faculté Partenaire",
+      discipline: b.discipline_detail?.name || b.discipline_name || b.discipline || "Général",
+      price_digital: Number(b.price_digital) || 0,
+      price_paper: Number(b.price_paper) || 0,
+      currency: b.currency || "XOF",
+      cover_url: b.cover_image || b.cover_url || "",
+      consultations_count: Number(b.consultations_count || b.total_reads || b.views_count || 0),
+      stock_paper_available: Number(b.stock_paper_available || 100),
+    };
+  });
 }
 
 // ─── Affiliations étudiants ──────────────────────────────────────────────────

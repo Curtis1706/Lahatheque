@@ -182,7 +182,7 @@ export default function UniversityStatsPage() {
                     {b.title}
                   </p>
                   <p className="text-[10px] text-foreground-muted">
-                    {b.authors.join(", ")} — <span className="font-semibold text-navy">{b.faculty_code}</span>
+                    {Array.isArray(b.authors) ? b.authors.join(", ") : (b.authors || "Auteur inconnu")} — <span className="font-semibold text-navy">{b.faculty_code}</span>
                   </p>
                 </div>
               </div>

@@ -123,60 +123,29 @@ export default function UniversityOverviewPage() {
         <ProgressMetricCard
           title="Étudiants Affiliés"
           total={kpis.affiliated_students_count.toLocaleString("fr-FR")}
-          percent="+74%"
           delta="Actifs"
-          trend="up"
           accent="navy"
-          data={[
-            { date: "S1", value: 12000 },
-            { date: "S2", value: 13500 },
-            { date: "S3", value: 14200 },
-            { date: "S4", value: 14850 },
-          ]}
         />
 
         <ProgressMetricCard
           title="Bouquets Souscrits"
           total={`${kpis.active_bouquets_count} Packs`}
-          percent="100%"
           delta="Campus"
-          trend="up"
           accent="gold"
-          data={[
-            { date: "T1", value: 2 },
-            { date: "T2", value: 4 },
-            { date: "T3", value: 5 },
-            { date: "T4", value: 6 },
-          ]}
         />
 
         <ProgressMetricCard
           title="Consultations Ce Mois"
           total={kpis.monthly_consultations_count.toLocaleString("fr-FR")}
-          percent="+14.2%"
           delta="Vues"
-          trend="up"
           accent="emerald"
-          data={[
-            { date: "S1", value: 8500 },
-            { date: "S2", value: 9800 },
-            { date: "S3", value: 11200 },
-            { date: "S4", value: 12680 },
-          ]}
         />
 
         <ProgressMetricCard
           title="Redevances 15% (Disponibles)"
           total={`${(kpis.total_royalties_available / 1000).toLocaleString("fr-FR")}k ${kpis.currency}`}
-          percent="15% Net"
           delta="Prêt"
-          trend="up"
           accent="gold"
-          data={[
-            { date: "M1", value: 450000 },
-            { date: "M2", value: 850000 },
-            { date: "M3", value: 1250000 },
-          ]}
         />
       </div>
 

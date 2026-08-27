@@ -1887,4 +1887,117 @@ class AdminRoleDiscountsView(APIView):
         })
 
 
+class AdminBouquetOfferingsView(APIView):
+    """GET/POST /api/v1/admin/bouquet-offerings/ - Liste et création de bouquets."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from apps.partners.models import BouquetOffering
+        offerings = BouquetOffering.objects.all().order_by('title')
+        data = [{
+            "id": str(o.id),
+            "title": o.title,
+            "bouquet_type": o.bouquet_type,
+            "discipline": o.discipline,
+            "faculty_code": o.faculty_code,
+            "target_institution": str(o.target_institution_id) if o.target_institution_id else None,
+            "country": o.country,
+            "books_count": o.books_count,
+            "annual_price": float(o.annual_price),
+            "currency": o.currency,
+            "description": o.description,
+            "is_active": o.is_active,
+            "custom_book_ids": [str(x) for x in o.custom_books.values_list('id', flat=True)] if o.bouquet_type == 'custom' else [],
+        } for o in offerings]
+        return Response({"success": True, "data": data})
+
+    def post(self, request):
+        from apps.partners.models import BouquetOffering
+        from apps.catalog.models import Ouvrage
+        from decimal import Decimal
+
+        d = request.data
+        if not d.get("title"):
+            return Response({"success": False, "error": "Le titre est obligatoire."}, status=400)
+
+        bouquet_type = d.get("bouquet_type", "discipline")
+        if bouquet_type not in dict(BouquetOffering.BOUQUET_TYPE_CHOICES):
+            return Response({"success": False, "error": "Type de bouquet invalide."}, status=400)
+
+        offering = BouquetOffering.objects.create(
+            title=d["title"],
+            bouquet_type=bouquet_type,
+            discipline=d.get("discipline", ""),
+            faculty_code=d.get("faculty_code", ""),
+            target_institution_id=d.get("target_institution") or None,
+            country=d.get("country", ""),
+            annual_price=Decimal(str(d.get("annual_price", 500000))),
+            description=d.get("description", ""),
+            created_by=request.user,
+        )
+
+        if bouquet_type == "custom":
+            book_ids = d.get("custom_book_ids", [])
+            valid_books = Ouvrage.objects.filter(id__in=book_ids)
+            offering.custom_books.set(valid_books)
+
+        return Response({
+            "success": True,
+            "message": f"Bouquet « {offering.title} » créé ({offering.books_count} ouvrage(s)).",
+            "data": {"id": str(offering.id), "books_count": offering.books_count}
+        }, status=201)
+
+
+class AdminBouquetOfferingDetailView(APIView):
+    """PATCH/DELETE /api/v1/admin/bouquet-offerings/<id>/ - Modification et désactivation."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def patch(self, request, pk):
+        from apps.partners.models import BouquetOffering
+        from apps.catalog.models import Ouvrage
+        from decimal import Decimal
+
+        try:
+            offering = BouquetOffering.objects.get(id=pk)
+        except BouquetOffering.DoesNotExist:
+            return Response({"success": False, "error": "Bouquet introuvable."}, status=404)
+
+        d = request.data
+        simple_fields = ["title", "discipline", "faculty_code", "country", "description", "is_active"]
+        for field in simple_fields:
+            if field in d:
+                setattr(offering, field, d[field])
+
+        if "annual_price" in d:
+            offering.annual_price = Decimal(str(d["annual_price"]))
+        if "target_institution" in d:
+            offering.target_institution_id = d["target_institution"] or None
+        if "bouquet_type" in d and d["bouquet_type"] in dict(BouquetOffering.BOUQUET_TYPE_CHOICES):
+            offering.bouquet_type = d["bouquet_type"]
+
+        offering.save()
+
+        if offering.bouquet_type == "custom" and "custom_book_ids" in d:
+            valid_books = Ouvrage.objects.filter(id__in=d["custom_book_ids"])
+            offering.custom_books.set(valid_books)
+
+        return Response({
+            "success": True,
+            "message": "Bouquet mis à jour.",
+            "data": {"id": str(offering.id), "books_count": offering.books_count}
+        })
+
+    def delete(self, request, pk):
+        from apps.partners.models import BouquetOffering
+        try:
+            offering = BouquetOffering.objects.get(id=pk)
+        except BouquetOffering.DoesNotExist:
+            return Response({"success": False, "error": "Bouquet introuvable."}, status=404)
+
+        offering.is_active = False
+        offering.save(update_fields=["is_active"])
+        return Response({"success": True, "message": "Bouquet désactivé."})
+
+
+
 

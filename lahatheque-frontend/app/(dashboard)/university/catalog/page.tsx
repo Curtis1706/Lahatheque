@@ -45,8 +45,10 @@ export default function UniversityCatalogPage() {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = b.title.toLowerCase().includes(q);
-        const matchAuthor = b.authors.some((a) => a.toLowerCase().includes(q));
-        const matchIsbn = b.isbn_digital.toLowerCase().includes(q) || b.isbn_print.toLowerCase().includes(q);
+        const matchAuthor = Array.isArray(b.authors)
+          ? b.authors.some((a) => a.toLowerCase().includes(q))
+          : String(b.authors || "").toLowerCase().includes(q);
+        const matchIsbn = (b.isbn_digital || "").toLowerCase().includes(q) || (b.isbn_print || "").toLowerCase().includes(q);
         if (!matchTitle && !matchAuthor && !matchIsbn) return false;
       }
       return true;
@@ -77,7 +79,9 @@ export default function UniversityCatalogPage() {
             <p className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[240px]">
               {row.title}
             </p>
-            <p className="text-[10px] text-foreground-muted">{row.authors.join(", ")}</p>
+            <p className="text-[10px] text-foreground-muted">
+              {Array.isArray(row.authors) ? row.authors.join(", ") : (row.authors || "Auteur inconnu")}
+            </p>
             <p className="text-[9px] font-mono text-foreground-muted">ISBN : {row.isbn_digital}</p>
           </div>
         </div>

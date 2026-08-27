@@ -785,3 +785,56 @@ export async function getAuthorRoyaltiesReport(): Promise<AuthorRoyaltyReportLin
   const json = await res.json();
   return json.data || [];
 }
+
+// =========================================================================
+// CATALOGUE DES BOUQUETS DOCUMENTAIRES (ADMIN)
+// =========================================================================
+
+export interface BouquetOfferingAdmin {
+  id: string;
+  title: string;
+  bouquet_type: "discipline" | "faculty" | "university" | "country" | "custom";
+  discipline: string;
+  faculty_code: string;
+  target_institution: string | null;
+  country: string;
+  books_count: number;
+  annual_price: number;
+  currency: string;
+  description: string;
+  is_active: boolean;
+  custom_book_ids: string[];
+}
+
+export async function getBouquetOfferings(): Promise<BouquetOfferingAdmin[]> {
+  const res = await fetch("/api/bff/admin/bouquet-offerings/", { credentials: "include", cache: "no-store" });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data || [];
+}
+
+export async function createBouquetOffering(data: Partial<BouquetOfferingAdmin>): Promise<boolean> {
+  const res = await fetch("/api/bff/admin/bouquet-offerings/", {
+    method: "POST", credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return res.ok;
+}
+
+export async function updateBouquetOffering(id: string, data: Partial<BouquetOfferingAdmin>): Promise<boolean> {
+  const res = await fetch(`/api/bff/admin/bouquet-offerings/${id}/`, {
+    method: "PATCH", credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return res.ok;
+}
+
+export async function deleteBouquetOffering(id: string): Promise<boolean> {
+  const res = await fetch(`/api/bff/admin/bouquet-offerings/${id}/`, {
+    method: "DELETE", credentials: "include",
+  });
+  return res.ok;
+}
+
