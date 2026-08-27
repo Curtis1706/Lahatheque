@@ -199,7 +199,40 @@ export default function HostedReaderPage() {
     };
   }, [session]);
 
-  // Synchronisation de progression
+  // Synchronisation au chargement du nombre de pages
+  const handleDocumentLoad = useCallback(
+    (pages: number) => {
+      setTotalPages(pages);
+      if (token && pages > 0) {
+        hostedReaderApi.syncProgress({
+          token,
+          current_page: currentPage,
+          total_pages: pages,
+          reading_time_seconds: 0,
+        });
+      }
+    },
+    [token, currentPage]
+  );
+
+  // Battement périodique de mesure du temps réel de lecture (toutes les 30s si onglet visible)
+  useEffect(() => {
+    if (!token || !session) return;
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        hostedReaderApi.syncProgress({
+          token,
+          current_page: currentPage,
+          total_pages: totalPages,
+          reading_time_seconds: 30,
+        });
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [token, session, currentPage, totalPages]);
+
+  // Synchronisation de progression au changement de page
   const handlePageChange = useCallback(
     (newPage: number) => {
       setCurrentPage(newPage);
@@ -207,27 +240,28 @@ export default function HostedReaderPage() {
         hostedReaderApi.syncProgress({
           token,
           current_page: newPage,
-          reading_time_seconds: 10,
+          total_pages: totalPages,
+          reading_time_seconds: 5,
         });
 
         // Déclenchement automatique du quiz sur la dernière page
         if (
           session.quiz?.enabled &&
           session.quiz?.show_on_last_page &&
-          newPage >= session.book.total_pages &&
+          newPage >= (totalPages || session.book.total_pages) &&
           !session.quiz_completed &&
           !showQuiz
         ) {
           setTimeout(() => {
             setShowQuiz(true);
             toast.info("Quiz disponible", {
-              description: "Vous avez atteint la fin du document. Validez vos connaissances !",
+              description: "Vous avez atteint la fin du document. Validez vos connaissances.",
             });
           }, 800);
         }
       }
     },
-    [session, token, showQuiz]
+    [session, token, totalPages, showQuiz]
   );
 
   // Bascule Plein écran
@@ -749,7 +783,7 @@ export default function HostedReaderPage() {
               email: session.user.email,
               ip: session.user.ip,
             }}
-            onDocumentLoad={(pages) => setTotalPages(pages)}
+            onDocumentLoad={handleDocumentLoad}
             onPageChange={handlePageChange}
             onClose={handleExit}
           />
@@ -767,7 +801,7 @@ export default function HostedReaderPage() {
                   ]}
                   localization={fr_FR_Locale}
                   theme={isNightMode ? "dark" : "light"}
-                  onDocumentLoad={(e) => setTotalPages(e.doc.numPages)}
+                  onDocumentLoad={(e) => handleDocumentLoad(e.doc.numPages)}
                   onPageChange={(e) => handlePageChange(e.currentPage + 1)}
                   initialPage={currentPage - 1}
                   viewMode={ViewMode.SinglePage}
@@ -780,7 +814,7 @@ export default function HostedReaderPage() {
         )}
       </main>
 
-      {/* ❓ Modale Interactive de Quiz */}
+      {/* Modale Interactive de Quiz */}
       <AnimatePresence>
         {showQuiz && (
           <FlipBookQuiz

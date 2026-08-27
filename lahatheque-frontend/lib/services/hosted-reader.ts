@@ -105,6 +105,7 @@ export interface QuizSubmitResponse {
 export interface ProgressSyncPayload {
   token: string;
   current_page: number;
+  total_pages?: number;
   reading_time_seconds?: number;
 }
 

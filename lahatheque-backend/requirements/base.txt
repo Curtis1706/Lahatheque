@@ -13,6 +13,8 @@ stripe>=8.0.0
 django-encrypted-model-fields>=0.6.5
 django-oauth-toolkit>=2.3.0
 djangosaml2>=1.5.5
+pyOpenSSL>=24.3.0
+cryptography>=44.0.0,<45.0.0
 lxml>=5.2.0
 requests==2.32.3
 psycopg2-binary>=2.9.11

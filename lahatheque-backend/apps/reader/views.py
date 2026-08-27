@@ -87,7 +87,7 @@ class ReaderSessionViewSet(ViewSet):
 
         validated_data = serializer.validated_data
         source_type = validated_data.get('source_type', 'catalog_book')
-        ttl_seconds = validated_data.get('ttl_seconds', 3600)
+        ttl_seconds = validated_data.get('ttl_seconds', 14400)
         expires_at = timezone.now() + timedelta(seconds=ttl_seconds)
 
         with transaction.atomic():
@@ -106,6 +106,17 @@ class ReaderSessionViewSet(ViewSet):
                 end_user.display_name = validated_data['external_user_name']
                 end_user.save()
 
+            session_metadata = validated_data.get('metadata', {})
+            if not isinstance(session_metadata, dict):
+                session_metadata = {}
+            
+            # Récupération de l'adresse IP partenaire ou cliente
+            user_ip = validated_data.get('user_ip') or request.data.get('user_ip')
+            if not user_ip:
+                user_ip = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', '127.0.0.1')).split(',')[0].strip()
+            if user_ip:
+                session_metadata['user_ip'] = user_ip
+
             # 2. Création de la session
             session = ReaderSession.objects.create(
                 partner=partner,
@@ -121,7 +132,7 @@ class ReaderSessionViewSet(ViewSet):
                 quiz_config=validated_data.get('quiz', {}),
                 tts_config=validated_data.get('tts_config', {}),
                 permissions=validated_data.get('permissions', {}),
-                metadata=validated_data.get('metadata', {}),
+                metadata=session_metadata,
                 return_url=validated_data['return_url'],
                 expires_at=expires_at,
                 status='created'
@@ -153,11 +164,17 @@ class ReaderSessionViewSet(ViewSet):
         except Exception as wh_err:
             logger.warning(f"Erreur déclenchement webhook session.opened: {wh_err}")
 
+        total_pages_val = (
+            session.ouvrage.nombre_pages
+            if (session.ouvrage and hasattr(session.ouvrage, 'nombre_pages') and session.ouvrage.nombre_pages)
+            else (session.metadata.get('total_pages') if isinstance(session.metadata, dict) and session.metadata.get('total_pages') else 1)
+        )
+
         book_info = {
             "id": str(session.ouvrage_id) if session.ouvrage_id else str(session.id),
             "title": session.ouvrage.titre if session.ouvrage else session.custom_document_title,
             "author_name": session.ouvrage.auteur if session.ouvrage else session.custom_document_author,
-            "total_pages": getattr(session.ouvrage, 'nombre_pages', 0) or 64,
+            "total_pages": total_pages_val,
             "has_audio": bool(session.custom_audio_url or getattr(session.ouvrage, 'fichier_audio', None)),
         }
 
@@ -298,6 +315,13 @@ class ReaderValidateTokenView(APIView):
             derived_hash=session.token_hash[:16] if session.token_hash else "nohash"
         )
 
+        # Mettre à jour l'IP réelle du lecteur si pas encore enregistrée
+        if not isinstance(session.metadata, dict):
+            session.metadata = {}
+        if not session.metadata.get('user_ip'):
+            session.metadata['user_ip'] = ip_addr
+            session.save(update_fields=['metadata'])
+
         # Si le statut était 'created', on le passe à 'opened'
         if session.status == 'created':
             session.status = 'opened'
@@ -305,6 +329,12 @@ class ReaderValidateTokenView(APIView):
 
         doc_cover = getattr(session.ouvrage, 'couverture', None) or getattr(session.ouvrage, 'cover_image', None)
         doc_cover_url = doc_cover.url if (doc_cover and hasattr(doc_cover, 'url')) else None
+
+        total_pages_val = (
+            getattr(session.ouvrage, 'nombre_pages', 0)
+            or getattr(session.ouvrage, 'page_count', 0)
+            or (session.metadata.get('total_pages') if isinstance(session.metadata, dict) and session.metadata.get('total_pages') else 1)
+        )
 
         # Le fichier n'est JAMAIS exposé en direct. Le frontend doit appeler
         # GET /api/v1/reader/sessions/stream/ avec le token de session pour recevoir
@@ -322,7 +352,7 @@ class ReaderValidateTokenView(APIView):
                 "cover_url": doc_cover_url,
                 "file_url": None,  # Intentionnellement vide — utiliser stream_endpoint ci-dessous
                 "stream_endpoint": "/api/v1/reader/sessions/stream/",
-                "total_pages": getattr(session.ouvrage, 'nombre_pages', 0) or getattr(session.ouvrage, 'page_count', 0) or 0,
+                "total_pages": total_pages_val,
                 "has_audio": bool(session.custom_audio_url or getattr(session.ouvrage, 'fichier_audio', None)),
                 "audio_url": session.custom_audio_url or (session.ouvrage.fichier_audio.url if session.ouvrage and hasattr(session.ouvrage, 'fichier_audio') and session.ouvrage.fichier_audio else None),
             },
@@ -339,7 +369,7 @@ class ReaderValidateTokenView(APIView):
                 "name": session.end_user.display_name or "Lecteur Partenaire",
                 "ref": session.end_user.external_ref,
                 "email": session.end_user.email or "partenaire@univ.bj",
-                "ip": ip_addr
+                "ip": session.metadata.get('user_ip') or ip_addr
             }
         }
 
@@ -362,12 +392,25 @@ class ReaderProgressView(APIView):
 
         current_page = serializer.validated_data['current_page']
         reading_time = serializer.validated_data.get('reading_time_seconds', 0)
+        total_pages = serializer.validated_data.get('total_pages')
 
         session.last_page = current_page
         session.reading_time_seconds += reading_time
+
+        if total_pages and total_pages > 0:
+            meta = dict(session.metadata) if isinstance(session.metadata, dict) else {}
+            meta['total_pages'] = total_pages
+            session.metadata = meta
+
         if session.status in ['created', 'opened']:
             session.status = 'in_progress'
-        session.save(update_fields=['last_page', 'reading_time_seconds', 'status', 'updated_at'])
+
+        update_fields = ['last_page', 'reading_time_seconds', 'metadata', 'status', 'updated_at']
+        if session.expires_at and (session.expires_at - timezone.now()).total_seconds() < 3600:
+            session.expires_at = timezone.now() + timedelta(hours=4)
+            update_fields.append('expires_at')
+
+        session.save(update_fields=update_fields)
 
         # Émission webhook de progression
         dispatch_partner_webhook_sync(

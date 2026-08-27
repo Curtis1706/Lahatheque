@@ -540,23 +540,40 @@ class PartnerSessionSupervisionViewSet(viewsets.ViewSet):
                 user_name = s.end_user.display_name if s.end_user else "Étudiant"
                 user_email = s.end_user.email if s.end_user else "etudiant@univ.bj"
                 
-                total_pages = s.ouvrage.nombre_pages if (s.ouvrage and hasattr(s.ouvrage, "nombre_pages") and s.ouvrage.nombre_pages) else 64
+                total_pages = 1
+                if s.ouvrage and hasattr(s.ouvrage, "nombre_pages") and s.ouvrage.nombre_pages:
+                    total_pages = s.ouvrage.nombre_pages
+                elif isinstance(s.metadata, dict) and s.metadata.get("total_pages"):
+                    try:
+                        total_pages = int(s.metadata["total_pages"])
+                    except (ValueError, TypeError):
+                        total_pages = 1
+
                 current_page = s.last_page or 1
+                if total_pages <= 1 and current_page > 1:
+                    total_pages = current_page
+
                 progress_percent = int((current_page / max(total_pages, 1)) * 100)
                 if progress_percent > 100:
                     progress_percent = 100
+
+                student_ip = "127.0.0.1"
+                if isinstance(s.metadata, dict) and s.metadata.get("user_ip"):
+                    student_ip = str(s.metadata["user_ip"])
+
+                duration_minutes = int(s.reading_time_seconds / 60) if s.reading_time_seconds else 0
 
                 results.append({
                     "id": str(s.id),
                     "partnerName": partner_name,
                     "studentName": user_name,
                     "studentEmail": user_email,
-                    "studentIp": "154.68.24.112",
+                    "studentIp": student_ip,
                     "bookTitle": title,
                     "sourceType": s.source_type,
                     "sourceUrl": s.custom_document_url if s.source_type == "external_url" else None,
                     "startedAt": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else timezone.now().strftime("%Y-%m-%d %H:%M"),
-                    "durationMinutes": int(s.reading_time_seconds / 60) if s.reading_time_seconds else 15,
+                    "durationMinutes": duration_minutes,
                     "currentPage": current_page,
                     "totalPages": total_pages,
                     "progressPercent": progress_percent,
