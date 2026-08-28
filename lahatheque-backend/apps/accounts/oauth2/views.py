@@ -16,10 +16,14 @@ from apps.reader.models import PartnerApp
 logger = logging.getLogger(__name__)
 
 
+from apps.reader.auth_utils import verify_secret
+
+
 class OAuthTokenView(APIView):
     """
     POST /api/v1/oauth2/token/
     Échange les identifiants Client ID & Client Secret contre un jeton Bearer JWT.
+    Conforme à la spécification OAuth 2.0 Client Credentials Grant (RFC 6749).
     """
     permission_classes = []
     authentication_classes = []
@@ -27,9 +31,9 @@ class OAuthTokenView(APIView):
     def post(self, request):
         # Récupération des paramètres (form-encoded ou JSON)
         data = request.data or request.POST
-        client_id = data.get("client_id", "").strip()
-        client_secret = data.get("client_secret", "").strip()
-        grant_type = data.get("grant_type", "client_credentials").strip()
+        client_id = str(data.get("client_id", "")).strip()
+        client_secret = str(data.get("client_secret", "")).strip()
+        grant_type = str(data.get("grant_type", "client_credentials")).strip()
 
         if grant_type != "client_credentials":
             return Response(
@@ -37,63 +41,39 @@ class OAuthTokenView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not client_id:
+        if not client_id or not client_secret:
             return Response(
-                {"error": "invalid_request", "error_description": "Le paramètre client_id est obligatoire."},
+                {"error": "invalid_request", "error_description": "Les paramètres client_id et client_secret sont obligatoires."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Recherche de l'application partenaire correspondante
-        partner = None
+        # Recherche stricte de l'application partenaire active
+        partner = PartnerApp.objects.filter(client_id=client_id, is_active=True).first()
         
-        # 1. Recherche par UUID direct
-        try:
-            partner = PartnerApp.objects.filter(id=client_id, is_active=True).first()
-        except Exception:
-            pass
+        # Recherche par UUID si client_id est un UUID valide
+        if not partner:
+            try:
+                partner = PartnerApp.objects.filter(id=client_id, is_active=True).first()
+            except Exception:
+                partner = None
 
-        # 2. Recherche par préfixe client_id (ex: laha_client_5e5c3e06)
-        if not partner and client_id.startswith("laha_client_"):
-            prefix = client_id.replace("laha_client_", "")
-            all_partners = PartnerApp.objects.filter(is_active=True)
-            for p in all_partners:
-                if str(p.id).replace("-", "").startswith(prefix):
-                    partner = p
-                    break
-
-        # 3. Si aucun partenaire n'existe pour cet identifiant de test, création / auto-provisioning
-        if not partner and (client_id == "laha_client_5e5c3e06" or "lahalex" in client_id.lower()):
-            partner, _ = PartnerApp.objects.get_or_create(
-                name="LAHALEX (Partenaire Test BYOD VIP)",
-                defaults={
-                    "webhook_secret": client_secret or "sec_live_xng70u4wnknofh020br",
-                    "allowed_return_origins": ["https://www.lahalex.com/", "http://localhost:4000/"],
-                    "quotas": {
-                        "is_unlimited": True,
-                        "daily_request_limit": -1,
-                        "concurrent_sessions_limit": -1,
-                        "allow_byod": True,
-                        "access_mode": "external_only",
-                        "allowed_document_sources": ["https://lahalex.com/", "http://localhost:4000/", "http://localhost:3000/"],
-                        "max_file_size_mb": 500,
-                    },
-                    "is_active": True
-                }
+        if not partner or not partner.client_secret_hash:
+            return Response(
+                {"error": "invalid_client", "error_description": "Identifiants client ou secret invalides."},
+                status=status.HTTP_401_UNAUTHORIZED
             )
 
-        # Fallback premier partenaire actif si test générique
-        if not partner:
-            partner = PartnerApp.objects.filter(is_active=True).first()
-
-        if not partner:
+        # Vérification cryptographique en temps constant du secret
+        if not verify_secret(client_secret, partner.client_secret_hash):
+            logger.warning(f"[Security] Échec d'authentification OAuth2 pour client_id={client_id[:16]}...")
             return Response(
-                {"error": "invalid_client", "error_description": "Identifiants client inconnus ou inactifs."},
+                {"error": "invalid_client", "error_description": "Identifiants client ou secret invalides."},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
         # Génération du jeton JWT signé
         now = timezone.now()
-        expires_in = 36000 # 10 heures
+        expires_in = 36000  # 10 heures
         exp_ts = int((now + timedelta(seconds=expires_in)).timestamp())
         now_ts = int(now.timestamp())
 
@@ -101,7 +81,7 @@ class OAuthTokenView(APIView):
             "sub": f"partner_{partner.id}",
             "partner_id": str(partner.id),
             "partner_name": partner.name,
-            "client_id": client_id,
+            "client_id": partner.client_id or str(partner.id),
             "scope": "reader:sessions reader:byod catalog:read",
             "type": "partner_access_token",
             "iat": now_ts,

@@ -108,26 +108,6 @@ class IsAuthenticatedPartner(BasePermission):
                 request._request.partner = partner
             return True
 
-        # 3. Fallback DEBUG uniquement, pour le développement local
-        if getattr(settings, "DEBUG", False):
-            partner = PartnerApp.objects.filter(is_active=True).first()
-            if not partner:
-                from .auth_utils import generate_client_id, generate_client_secret, hash_secret
-                secret = generate_client_secret()
-                partner = PartnerApp.objects.create(
-                    name="Partenaire Test (DEBUG uniquement)",
-                    client_id=generate_client_id(),
-                    client_secret_hash=hash_secret(secret),
-                    client_secret_last4=secret[-4:],
-                    webhook_secret="dev-only-secret",
-                    allowed_return_origins=["*"],
-                    is_active=True
-                )
-            request.partner = partner
-            if hasattr(request, "_request"):
-                request._request.partner = partner
-            return True
-
         return False
 
 

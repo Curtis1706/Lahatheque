@@ -61,15 +61,11 @@ class ReaderSessionViewSet(ViewSet):
         Crée une nouvelle session de lecture personnalisée (catalogue ou BYOD).
         """
         partner = getattr(request, 'partner', None)
-        if not partner:
-            partner = PartnerApp.objects.filter(is_active=True).first()
-            if not partner:
-                # Création automatique d'un partenaire démo par défaut si aucun n'existe
-                partner = PartnerApp.objects.create(
-                    name="Partenaire Standard",
-                    webhook_secret="demo-secret-key-12345",
-                    allowed_return_origins=["*"]
-                )
+        if not partner or not partner.is_active:
+            return standard_response(
+                error="Application partenaire non authentifiée ou compte inactif.",
+                status_code=status.HTTP_401_UNAUTHORIZED
+            )
 
         from .throttling import check_and_increment_daily_quota, check_concurrent_sessions_quota, PartnerQuotaError
         try:
