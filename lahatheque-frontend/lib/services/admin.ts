@@ -468,6 +468,24 @@ export async function revokePartnerApiKey(keyId: string): Promise<boolean> {
   return true;
 }
 
+export async function rotatePartnerApiKeySecret(keyId: string): Promise<{ clientSecret: string; secretWarning?: string } | null> {
+  const res = await fetch(`/api/bff/partners/apps/${keyId}/rotate-secret/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Erreur lors de la régénération du secret.");
+  }
+
+  const json = await res.json();
+  if (json && json.success && json.data) {
+    return json.data;
+  }
+  return null;
+}
+
 // =========================================================================
 // SUPERVISION DES SESSIONS DE LECTURE HÉBERGÉES
 // =========================================================================

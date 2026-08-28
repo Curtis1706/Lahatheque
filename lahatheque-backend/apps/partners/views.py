@@ -273,6 +273,32 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                 client_id = app.client_id or f"laha_client_{str(app.id).replace('-', '')[:8]}"
                 client_secret_masked = f"sec_live_{'•' * 28}{app.client_secret_last4}" if app.client_secret_last4 else "Non généré — cliquez sur Régénérer"
 
+                # Calcul réel de la dernière activité à partir des requêtes et sessions réelles
+                last_log = app.request_logs.order_by("-created_at").first()
+                last_session = app.sessions.order_by("-created_at").first()
+                last_dt = None
+                if last_log and last_session:
+                    last_dt = max(last_log.created_at, last_session.created_at)
+                elif last_log:
+                    last_dt = last_log.created_at
+                elif last_session:
+                    last_dt = last_session.created_at
+
+                if last_dt:
+                    diff_sec = int((timezone.now() - last_dt).total_seconds())
+                    if diff_sec < 60:
+                        last_used = "Il y a moins d'une minute"
+                    elif diff_sec < 3600:
+                        mins = diff_sec // 60
+                        last_used = f"Il y a {mins} minute{'s' if mins > 1 else ''}"
+                    elif diff_sec < 86400:
+                        hours = diff_sec // 3600
+                        last_used = f"Il y a {hours} heure{'s' if hours > 1 else ''}"
+                    else:
+                        last_used = last_dt.strftime("%Y-%m-%d %H:%M")
+                else:
+                    last_used = "Jamais"
+
                 scopes = ["reader:sessions"]
                 if allow_byod:
                     scopes.append("reader:byod")
@@ -291,7 +317,7 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                     "scopes": scopes,
                     "created_at": app.created_at.strftime("%Y-%m-%d") if app.created_at else timezone.now().strftime("%Y-%m-%d"),
                     "is_active": app.is_active,
-                    "last_used": "Il y a quelques minutes",
+                    "last_used": last_used,
                     "activeSessionsCount": active_sessions,
                     "isUnlimited": is_unlimited,
                     "dailyRequestLimit": daily_limit,

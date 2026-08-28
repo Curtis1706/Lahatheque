@@ -36,6 +36,7 @@ import {
   updatePartnerApiKey,
   togglePartnerApiKeyStatus,
   revokePartnerApiKey,
+  rotatePartnerApiKeySecret,
 } from "@/lib/services/admin";
 import { PartnerApiKey } from "@/lib/types/admin";
 import { KpiMetricCard } from "@/components/ui/kpi-metric-card";
@@ -53,7 +54,10 @@ export default function AdminApiKeysPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [keyToEdit, setKeyToEdit] = useState<PartnerApiKey | null>(null);
   const [keyToRevoke, setKeyToRevoke] = useState<PartnerApiKey | null>(null);
+  const [keyToRotate, setKeyToRotate] = useState<PartnerApiKey | null>(null);
+  const [rotatedSecretResult, setRotatedSecretResult] = useState<{ clientSecret: string; partnerName: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
 
   // État formulaire création
   const [formData, setFormData] = useState({
@@ -289,6 +293,37 @@ export default function AdminApiKeysPage() {
       setKeyToRevoke(null);
     } catch (err) {
       toast.error("Erreur lors de la révocation de la clé.");
+    }
+  };
+
+  const handleConfirmRotateSecret = async () => {
+    if (!keyToRotate) return;
+    try {
+      setIsRotating(true);
+      const res = await rotatePartnerApiKeySecret(keyToRotate.id);
+      if (res && res.clientSecret) {
+        setRotatedSecretResult({
+          clientSecret: res.clientSecret,
+          partnerName: keyToRotate.name,
+        });
+        setKeys((prev) =>
+          prev.map((k) =>
+            k.id === keyToRotate.id
+              ? {
+                  ...k,
+                  hasSecret: true,
+                  clientSecret: `sec_live_${"•".repeat(28)}${res.clientSecret.slice(-4)}`,
+                }
+              : k
+          )
+        );
+        toast.success("Nouveau Client Secret généré avec succès !");
+      }
+      setKeyToRotate(null);
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors de la régénération du secret.");
+    } finally {
+      setIsRotating(false);
     }
   };
 
@@ -544,6 +579,14 @@ export default function AdminApiKeysPage() {
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0">
                     <button
+                      onClick={() => setKeyToRotate(k)}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-gold/30 bg-gold/10 hover:bg-gold/20 text-gold-dark transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Régénérer une nouvelle clé secrète pour cette application"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-gold" />
+                      <span>Régénérer</span>
+                    </button>
+                    <button
                       onClick={() => openEditModal(k)}
                       className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-navy text-white hover:bg-navy-dark transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
                       title="Modifier les domaines autorisés, quotas et paramètres"
@@ -604,6 +647,13 @@ export default function AdminApiKeysPage() {
                         {showSecretId === k.id ? k.clientSecret : "•".repeat(28)}
                       </span>
                       <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setKeyToRotate(k)}
+                          className="p-1 rounded-lg hover:bg-gold/15 text-gold hover:text-gold-dark transition-colors cursor-pointer"
+                          title="Régénérer le Client Secret"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() =>
                             setShowSecretId(showSecretId === k.id ? null : k.id)
@@ -851,6 +901,14 @@ export default function AdminApiKeysPage() {
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setKeyToRotate(k)}
+                            className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-gold/30 bg-gold/10 hover:bg-gold/20 text-gold-dark transition-all flex items-center gap-1 cursor-pointer"
+                            title="Régénérer une nouvelle clé secrète"
+                          >
+                            <RefreshCw className="w-3 h-3 text-gold" />
+                            <span>Régénérer</span>
+                          </button>
                           <button
                             onClick={() => openEditModal(k)}
                             className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-navy text-white hover:bg-navy-dark transition-all flex items-center gap-1 cursor-pointer shadow-xs"
@@ -1512,6 +1570,99 @@ export default function AdminApiKeysPage() {
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Confirmer la Révocation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modale de Confirmation de Régénération de Secret */}
+      {keyToRotate && !rotatedSecretResult && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-background border border-border rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 mx-auto">
+              <RefreshCw className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-navy">Régénérer le Secret Client ?</h3>
+              <p className="text-xs text-foreground-secondary">
+                Une nouvelle clé secrète sera générée pour <strong className="text-foreground">{keyToRotate.name}</strong> ({keyToRotate.partner}).
+                L'ancien secret sera <strong>immédiatement invalidé</strong> et cessera de fonctionner.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setKeyToRotate(null)}
+                disabled={isRotating}
+                className="px-4 py-2 rounded-xl border border-border hover:bg-background-secondary transition-all cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRotateSecret}
+                disabled={isRotating}
+                className="px-4 py-2 rounded-xl bg-navy text-white hover:bg-navy-dark transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                {isRotating ? (
+                  <InlineLoader size={14} />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5 text-gold" />
+                )}
+                <span>Confirmer et Générer</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale d'Affichage du Nouveau Secret Généré */}
+      {rotatedSecretResult && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-background border border-border rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 mx-auto">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-navy">Nouveau Secret Client Généré</h3>
+              <p className="text-xs text-foreground-secondary">
+                Voici la nouvelle clé secrète pour <strong className="text-foreground">{rotatedSecretResult.partnerName}</strong>. Copiez-la maintenant dans votre configuration.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-background-secondary border border-border space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-foreground-muted">
+                <span>NOUVEAU CLIENT SECRET</span>
+                <span className="text-amber-600 font-bold">À COPIER IMMÉDIATEMENT</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-background border border-border">
+                <span className="font-mono text-xs font-bold text-navy select-all break-all">
+                  {rotatedSecretResult.clientSecret}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(rotatedSecretResult.clientSecret, "Nouveau Client Secret")}
+                  className="px-3 py-1.5 rounded-lg bg-navy text-white hover:bg-navy-dark text-xs font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                >
+                  <Copy className="w-3.5 h-3.5 text-gold" />
+                  <span>Copier</span>
+                </button>
+              </div>
+              <p className="text-[10px] text-foreground-muted">
+                Pour des raisons de sécurité, cette clé secrète ne sera plus jamais affichée en clair.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end pt-2 border-t border-border text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setRotatedSecretResult(null)}
+                className="px-5 py-2 rounded-xl bg-navy text-white hover:bg-navy-dark transition-all cursor-pointer shadow-sm"
+              >
+                J&apos;ai bien copié mon secret
               </button>
             </div>
           </div>

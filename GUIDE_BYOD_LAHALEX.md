@@ -39,20 +39,20 @@ LAHAThèque agit comme un **moteur de rendu et de protection DRM déporté** pou
 
 ## 2. Vos Identifiants Officiels & Paramètres LAHALEX
 
-Ces identifiants sont déjà actifs en base de données sur l'API **`https://api.lahatheque.com`** :
+Ces identifiants sont actifs en base de données sur l'API **`https://api.lahatheque.com`** :
 
 | Paramètre                   | Valeur Exacte                       | Rôle & Permissions                                       |
 | :-------------------------- | :---------------------------------- | :------------------------------------------------------- |
 | **Nom Partenaire**          | `LAHALEX`                           | Compte institutionnel enregistré                         |
 | **Périmètre d'Accès**       | `VIP Illimité (Vos Fichiers Seuls)` | Liseuse dédiée à vos propres PDF distants                |
 | **URL de Base de l'API**    | `https://api.lahatheque.com`        | Serveur API LAHAThèque en production                     |
-| **Client ID**               | `laha_client_5e5c3e06`              | Identifiant public de votre application                  |
-| **Client Secret**           | `sec_live_xng70u4wnknofh020br`      | Clé secrète de signature (à conserver sur votre serveur) |
+| **Client ID**               | `laha_client_720575db89261298870ef529a64285dc` | Identifiant public de votre application |
+| **Client Secret**           | `sec_live_...729f`                  | Clé secrète de signature (ou régénérable sur /admin/api) |
 | **Plafond Requêtes / 24h**  | `Illimité (Sans quota)`             | Zéro restriction d'appels API                            |
 | **Lectures Simultanées**    | `Illimité`                          | Aucune limite sur le nombre d'utilisateurs connectés     |
 | **Taille Max par Document** | `500 Mo`                            | Adapté aux volumineux traités et recueils juridiques     |
-| **Domaines de Redirection** | `https://www.lahalex.com/`          | URL de retour après fermeture du lecteur                 |
-| **Whitelist Serveurs PDF**  | `https://lahalex.com/`              | Domaines où sont stockés vos fichiers PDF                |
+| **Domaines de Redirection** | `Toutes origines acceptées (*)`     | Redirection libre vers n'importe quelle page de votre LMS |
+| **Serveurs PDF Autorisés**  | `Tous hébergements acceptés (*)`    | Hébergement libre de vos PDF (vos serveurs, S3, R2, CDN) |
 
 ---
 
