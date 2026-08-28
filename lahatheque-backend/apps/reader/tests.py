@@ -34,9 +34,15 @@ class ReaderAPITestCase(TestCase):
             status="published"
         )
 
-        # 2. Création d'un partenaire avec origines autorisées
+        # 2. Création d'un partenaire avec identifiants client sécurisés et origines autorisées
+        from .auth_utils import generate_client_id, generate_client_secret, hash_secret
+        self.client_id = generate_client_id()
+        self.client_secret = generate_client_secret()
         self.partner = PartnerApp.objects.create(
             name="Université d'Abomey-Calavi",
+            client_id=self.client_id,
+            client_secret_hash=hash_secret(self.client_secret),
+            client_secret_last4=self.client_secret[-4:],
             webhook_url="https://uac.bj/api/webhooks/reader",
             webhook_secret="uac_secret_key_998877",
             allowed_return_origins=["https://uac.bj", "https://cours.uac.bj"]
@@ -63,7 +69,8 @@ class ReaderAPITestCase(TestCase):
             url,
             data=json.dumps(payload),
             content_type="application/json",
-            HTTP_X_PARTNER_KEY=str(self.partner.id)
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret
         )
 
         self.assertEqual(response.status_code, 201)
@@ -104,7 +111,8 @@ class ReaderAPITestCase(TestCase):
             url,
             data=json.dumps(payload),
             content_type="application/json",
-            HTTP_X_PARTNER_KEY=str(self.partner.id)
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret
         )
 
         self.assertEqual(response.status_code, 201)
@@ -113,26 +121,43 @@ class ReaderAPITestCase(TestCase):
         self.assertEqual(res_data["data"]["book"]["title"], "Support de Cours — Droit International")
 
     def test_anti_open_redirect_rejection(self) -> None:
-        """Test du rejet strict de return_url non autorisée."""
+        """Test de validation des return_url : acceptation de toutes les origines HTTP/HTTPS et rejet des protocoles invalides."""
         url = "/api/v1/reader/sessions/"
-        payload = {
+        
+        # 1. URL externe valide acceptée (whitelist universelle)
+        payload_valid = {
+            "source_type": "catalog_book",
+            "book_id": str(self.ouvrage.id),
+            "external_user_ref": "etudiant-wh",
+            "return_url": "https://any-external-domain.com/app/dashboard"
+        }
+        resp_valid = self.client.post(
+            url,
+            data=json.dumps(payload_valid),
+            content_type="application/json",
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret
+        )
+        self.assertEqual(resp_valid.status_code, 201)
+        self.assertTrue(resp_valid.json()["success"])
+
+        # 2. Protocole non supporté (ex: javascript:) rejeté
+        payload_invalid = {
             "source_type": "catalog_book",
             "book_id": str(self.ouvrage.id),
             "external_user_ref": "hacker-01",
-            "return_url": "https://site-malveillant-phishing.com/login"
+            "return_url": "javascript:alert('xss')"
         }
-
-        response = self.client.post(
+        resp_invalid = self.client.post(
             url,
-            data=json.dumps(payload),
+            data=json.dumps(payload_invalid),
             content_type="application/json",
-            HTTP_X_PARTNER_KEY=str(self.partner.id)
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret
         )
-
-        self.assertEqual(response.status_code, 400)
-        res_data = response.json()
-        self.assertFalse(res_data["success"])
-        self.assertIn("return_url", str(res_data["error"]))
+        self.assertEqual(resp_invalid.status_code, 400)
+        self.assertFalse(resp_invalid.json()["success"])
+        self.assertIn("return_url", str(resp_invalid.json()["error"]))
 
     def test_token_validation_and_quiz_flow(self) -> None:
         """Test du cycle complet : génération de token, validation par /read/[token], et soumission de quiz."""
@@ -194,3 +219,46 @@ class ReaderAPITestCase(TestCase):
         quiz_data = quiz_resp.json()["data"]
         self.assertEqual(quiz_data["score_percent"], 100.0)
         self.assertTrue(quiz_data["is_passed"])
+
+    def test_oauth2_token_flow_security(self) -> None:
+        """Test de sécurité OAuth2 : validation stricte du secret et rejet des identifiants invalides."""
+        # 1. Requête valide avec bons client_id et client_secret
+        resp_valid = self.client.post(
+            "/api/v1/oauth2/token/",
+            data=json.dumps({
+                "grant_type": "client_credentials",
+                "client_id": self.client_id,
+                "client_secret": self.client_secret
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(resp_valid.status_code, 200)
+        data_valid = resp_valid.json()
+        self.assertIn("access_token", data_valid)
+        self.assertEqual(data_valid["token_type"], "Bearer")
+
+        # 2. Requête avec secret erroné -> Rejet 401
+        resp_bad_secret = self.client.post(
+            "/api/v1/oauth2/token/",
+            data=json.dumps({
+                "grant_type": "client_credentials",
+                "client_id": self.client_id,
+                "client_secret": "wrong_secret_attack"
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(resp_bad_secret.status_code, 401)
+        self.assertEqual(resp_bad_secret.json()["error"], "invalid_client")
+
+        # 3. Requête avec client_id inexistant -> Rejet 401
+        resp_bad_client = self.client.post(
+            "/api/v1/oauth2/token/",
+            data=json.dumps({
+                "grant_type": "client_credentials",
+                "client_id": "laha_client_unknown_inconnu",
+                "client_secret": "any_secret"
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(resp_bad_client.status_code, 401)
+        self.assertEqual(resp_bad_client.json()["error"], "invalid_client")

@@ -17,20 +17,38 @@ from .auth_utils import verify_secret
 def _authenticate_by_client_credentials(request) -> PartnerApp | None:
     """
     Authentifie un partenaire par client_id + client_secret.
-    Cherche les identifiants dans les headers (X-Client-Id / X-Client-Secret)
+    Cherche les identifiants dans les headers (X-Client-Id / X-Client-Secret / HTTP_X_CLIENT_ID)
     OU dans le corps JSON (client_id / client_secret). Le secret est TOUJOURS requis.
     """
-    client_id = request.headers.get("X-Client-Id")
-    client_secret = request.headers.get("X-Client-Secret")
+    client_id = (
+        request.headers.get("X-Client-Id")
+        or request.META.get("HTTP_X_CLIENT_ID")
+        or (request.headers.get("x-client-id") if hasattr(request, "headers") else None)
+    )
+    client_secret = (
+        request.headers.get("X-Client-Secret")
+        or request.META.get("HTTP_X_CLIENT_SECRET")
+        or (request.headers.get("x-client-secret") if hasattr(request, "headers") else None)
+    )
 
     if not client_id and hasattr(request, 'data') and isinstance(request.data, dict):
         client_id = request.data.get("client_id")
+    if not client_secret and hasattr(request, 'data') and isinstance(request.data, dict):
         client_secret = request.data.get("client_secret")
 
     if not client_id or not client_secret:
         return None
 
+    client_id = str(client_id).strip()
+    client_secret = str(client_secret).strip()
+
     partner = PartnerApp.objects.filter(client_id=client_id, is_active=True).first()
+    if not partner:
+        try:
+            partner = PartnerApp.objects.filter(id=client_id, is_active=True).first()
+        except Exception:
+            partner = None
+
     if not partner or not partner.client_secret_hash:
         return None
 

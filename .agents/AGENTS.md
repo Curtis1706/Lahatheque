@@ -28,6 +28,10 @@ Utiliser exclusivement les classes de variables sémantiques configurées dans n
 
 Ces règles sont TOUJOURS actives, sur tout écran/composant/page construit pour LAHAThèque (dashboards, catalogue connecté, lecteur, flux achat/abonnement). Elles s'appliquent même si une tâche ne les mentionne pas explicitement.
 
+## 📖 Lecture Intégrale Exhaustive des Fichiers (Règle Absolue et Obligatoire)
+- **Zéro omission, zéro survol, zéro troncature** : Pour tout audit, analyse de sécurité, implémentation, refactoring ou tâche d'ingénierie, **la lecture intégrale de 100% des lignes de chaque fichier concerné est strictement obligatoire**.
+- Il est formellement interdit de sauter des lignes, de supposer du contenu, ou de laisser la moindre lettre de côté. Chaque fichier analysé (Python, TypeScript, configuration, modèle, sérialiseur, permission, vue) doit être lu et inspecté du premier au dernier caractère.
+
 ## 📐 Périmètre
 - On construit uniquement le FRONT (Next.js App Router + TypeScript + Tailwind). Exclus : pages vitrine publiques marketing.
 - Zéro appel réseau réel, zéro wiring vers Django. Toutes les données passent par `lib/mock/*.ts` + `lib/services/*.ts` (async, typés sur les modèles Django réels du plan de specs techniques).
