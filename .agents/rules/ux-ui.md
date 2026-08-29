@@ -71,6 +71,9 @@ Ne bloque pas la réponse pour des détails mineurs — propose et avance.
 - Layout pensé d'abord en colonne unique (~375–390px), puis étendu
 - Breakpoints Tailwind par défaut : `sm:640 md:768 lg:1024 xl:1280`
 - Grille d'espacement 8px
+- Typographie officielle (Google Fonts) :
+  - **Titres, En-têtes & Logo** : `Playfair Display` (`font-serif`, `font-playfair` — Bold 700 / Semi-Bold 600)
+  - **Textes, Menus, Boutons & Prix** : `Poppins` (`font-sans`, `font-poppins` — Regular 400 pour corps, Medium 500 pour menus/boutons)
 - Échelle typographique fluide (clamp() ou classes responsive Tailwind)
 - Zones tactiles ≥ 44px sur mobile
 - Composants clés avec tous leurs états : default, hover, focus, loading, error, disabled

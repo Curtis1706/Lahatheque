@@ -48,6 +48,15 @@ Ces règles sont TOUJOURS actives, sur tout écran/composant/page construit pour
 - **Interdiction des bordures verticales à gauche dans la Sidebar** (pas de `border-l-4 border-gold`, pas de `border-l border-gold/30`). La mise en surbrillance d'un élément actif ou d'une section dépliée se fait uniquement via la couleur d'icône/texte dorée (`text-gold font-bold`) et un fond subtil arrondis (`bg-gold/10`).
 - Le design doit rester extrêmement **chic, sobre et élégant** : utiliser des fonds sémantiques purs (`bg-navy`, `bg-background`, `bg-background-secondary`), des bordures subtiles uniques (`border-border`), et réserver les touches de `gold` pour les accents d'emphase nobles.
 
+## 🔤 Typographie — Règle Absolue (Google Fonts)
+Le contraste entre une police Serif noble et une Sans-Serif géométrique est la clé de l'identité visuelle LAHAThèque sur toutes les pages publiques et interfaces :
+- **Police Principale (Titres, En-têtes, Logo & Noms de section)** : **Playfair Display** (`font-serif`, `font-playfair`)
+  - **Utilisation** : Titre principal ("Accédez au savoir..."), titres de sections ("Meilleures ventes", "Nouveautés"), logo, en-têtes majeurs de dashboards et bannières.
+  - **Graisses** : **Bold (700)** ou **Semi-Bold (600)** pour un impact visuel prestigieux et raffiné.
+- **Police Secondaire (Textes, Menus, Boutons, Prix & Formulaires)** : **Poppins** (`font-sans`, `font-poppins`)
+  - **Utilisation** : Paragraphes de description, barre de navigation, menus, textes dans les boutons, prix des ouvrages, tables de données, badges et champs de saisie.
+  - **Graisses** : **Regular (400)** pour les textes longs et descriptions, **Medium (500)** et **Semi-Bold (600)** pour les menus, filtres, boutons et prix afin de maximiser la lisibilité.
+
 ## 🧩 Composants — 21st.dev avant tout
 - Avant de coder un composant UI (carte, table, stepper, drawer, dropzone, badge, form…), cherche-le via les tools MCP `21st`. N'écris jamais un composant générique from scratch sans être passé par cette recherche.
 - `search` et `get_inspiration` sont gratuits et illimités — les utiliser librement et largement. `get_component` (code d'un composant) et `generate` (génération IA) sont limités par un quota quotidien — les réserver aux candidats déjà présélectionnés via les métadonnées (nom, description, preview), pas à un usage spéculatif sur chaque résultat.

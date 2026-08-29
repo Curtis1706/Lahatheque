@@ -67,6 +67,12 @@ module.exports = {
         book: "var(--ds-shadow-book)",
         "book-border": "var(--ds-shadow-book-border)",
       },
+      fontFamily: {
+        serif: ["var(--font-playfair)", "Playfair Display", "Georgia", "serif"],
+        sans: ["var(--font-poppins)", "Poppins", "system-ui", "sans-serif"],
+        playfair: ["var(--font-playfair)", "Playfair Display", "Georgia", "serif"],
+        poppins: ["var(--font-poppins)", "Poppins", "system-ui", "sans-serif"],
+      },
     },
   },
   plugins: [],

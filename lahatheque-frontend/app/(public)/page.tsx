@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { 
   GraduationCap, 
   ShieldCheck, 
@@ -14,7 +15,6 @@ import {
   BookOpen,
   CheckCircle
 } from "lucide-react";
-import HeroCarousel from "@/components/ui/hero-carousel";
 import { Book } from "@/components/ui/book";
 import { CountingNumber } from "@/components/ui/counting-number";
 import { PanafricanPresenceSection } from "@/components/features/home/panafrican-presence-section";
@@ -122,7 +122,18 @@ export default function HomePage() {
           </div>
 
           <div className="relative z-0 flex justify-center lg:justify-end">
-            <HeroCarousel />
+            <div className="relative w-full max-w-lg lg:max-w-xl">
+              {/* Halot lumineux subtil en arrière-plan */}
+              <div className="w-[110%] h-[110%] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20 bg-gradient-to-tr from-gold to-transparent rounded-full blur-3xl -z-10" />
+              <Image
+                src="/hero-section-img-copy.png"
+                alt="Bibliothèque numérique LAHAThèque — Livres et savoir académique"
+                width={700}
+                height={600}
+                priority
+                className="w-full h-auto object-contain drop-shadow-2xl"
+              />
+            </div>
           </div>
 
         </div>
