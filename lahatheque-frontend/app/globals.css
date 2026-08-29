@@ -5,8 +5,8 @@
 @layer base {
   :root {
     /* Base et Neutres chaleureux */
-    --background: #FDFCFA;           /* Fond principal chaud */
-    --background-secondary: #F5F3EF; /* Cards / Fond secondaire */
+    --background: #FFFFFF;           /* Fond principal pur et lumineux */
+    --background-secondary: #F8F7F4; /* Cards / Fond secondaire subtil */
     --border: #E8E4DC;               /* Séparateurs, bordures */
     --foreground: #3A3A3A;           /* Texte de lecture principal (doux) */
     --foreground-muted: #8B8578;     /* Texte secondaire / désactivé */

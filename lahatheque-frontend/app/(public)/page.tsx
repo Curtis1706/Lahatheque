@@ -88,32 +88,32 @@ export default function HomePage() {
     <div className="w-full">
       
       {/* Hero Section */}
-      <section className="relative pt-12 pb-24 overflow-hidden bg-gradient-to-b from-background-secondary to-background px-6 md:px-10">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <section className="relative pt-10 pb-16 md:pt-14 md:pb-20 overflow-hidden bg-background px-6 md:px-10 lg:px-12">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           
           <div className="z-10 text-center lg:text-left">
-            <p className="text-sm font-bold text-gold uppercase tracking-widest mb-4">
+            <p className="text-xs md:text-sm font-bold text-gold uppercase tracking-widest mb-4 font-sans">
               LA CONNAISSANCE À PORTÉE DE MAIN
             </p>
-            <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl text-navy font-bold leading-tight mb-6">
+            <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-navy font-bold leading-[1.15] mb-6">
               Accédez au savoir.<br />
               <span className="text-gold">Transformez demain.</span>
             </h1>
-            <p className="text-base md:text-lg text-foreground-muted mb-8 max-w-lg mx-auto lg:mx-0">
+            <p className="text-sm md:text-base text-foreground-muted mb-8 max-w-lg mx-auto lg:mx-0 font-sans leading-relaxed">
               Lahathèque est votre bibliothèque universitaire en ligne. Des milliers d'ouvrages, de ressources et d'auteurs africains à portée de clic.
             </p>
             
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
               <Link 
                 href="/catalog" 
-                className="bg-gold hover:bg-gold-dark text-white px-8 py-3.5 rounded font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 group shadow-md"
+                className="bg-gold hover:bg-gold-dark text-white px-7 py-3 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group shadow-sm"
               >
                 Découvrir les livres 
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link 
                 href="/catalog?categories=all" 
-                className="bg-transparent border border-border hover:border-navy text-navy px-8 py-3.5 rounded font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 group"
+                className="bg-transparent border border-border hover:border-gold text-foreground px-7 py-3 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group"
               >
                 Explorer les catégories 
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -121,17 +121,15 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="relative z-0 flex justify-center lg:justify-end">
+          <div className="relative z-0 flex items-center justify-center lg:justify-end w-full">
             <div className="relative w-full max-w-lg lg:max-w-xl">
-              {/* Halot lumineux subtil en arrière-plan */}
-              <div className="w-[110%] h-[110%] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20 bg-gradient-to-tr from-gold to-transparent rounded-full blur-3xl -z-10" />
               <Image
-                src="/hero-section-img-copy.png"
+                src="/hero-section-img.jpg"
                 alt="Bibliothèque numérique LAHAThèque — Livres et savoir académique"
-                width={700}
+                width={800}
                 height={600}
                 priority
-                className="w-full h-auto object-contain drop-shadow-2xl"
+                className="w-full h-auto object-contain block"
               />
             </div>
           </div>
@@ -140,11 +138,11 @@ export default function HomePage() {
       </section>
 
       {/* Réassurance Section */}
-      <section className="border-y border-border bg-background-secondary py-8 px-6 md:px-10">
+      <section className="border-y border-border bg-background py-8 px-6 md:px-10 lg:px-12">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 divide-y md:divide-y-0 md:divide-x divide-border">
           
           <div className="flex items-start gap-4 pt-4 md:pt-0 md:px-4 first:pl-0">
-            <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center shrink-0 shadow-sm">
+            <div className="w-10 h-10 rounded-full bg-background border border-border/80 flex items-center justify-center shrink-0 shadow-sm">
               <GraduationCap className="w-5 h-5 text-navy" />
             </div>
             <div>
@@ -154,7 +152,7 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-start gap-4 pt-4 md:pt-0 md:px-4">
-            <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center shrink-0 shadow-sm">
+            <div className="w-10 h-10 rounded-full bg-background border border-border/80 flex items-center justify-center shrink-0 shadow-sm">
               <ShieldCheck className="w-5 h-5 text-navy" />
             </div>
             <div>
@@ -164,7 +162,7 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-start gap-4 pt-4 md:pt-0 md:px-4">
-            <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center shrink-0 shadow-sm">
+            <div className="w-10 h-10 rounded-full bg-background border border-border/80 flex items-center justify-center shrink-0 shadow-sm">
               <Truck className="w-5 h-5 text-navy" />
             </div>
             <div>
@@ -174,7 +172,7 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-start gap-4 pt-4 md:pt-0 md:px-4">
-            <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center shrink-0 shadow-sm">
+            <div className="w-10 h-10 rounded-full bg-background border border-border/80 flex items-center justify-center shrink-0 shadow-sm">
               <Headphones className="w-5 h-5 text-navy" />
             </div>
             <div>
@@ -186,45 +184,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Bandeau Chiffres Clés */}
-      <section className="bg-navy py-12 px-6 md:px-10 text-white text-center">
-        <div className="max-w-7xl mx-auto mb-8">
-          <h2 className="font-serif text-2xl md:text-3xl font-bold mb-2">Spécialiste du contenu éducatif</h2>
-          <p className="text-sm text-white/80">Le plus grand catalogue d'ouvrages universitaires africains</p>
-        </div>
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div>
-            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
-              +<CountingNumber target={5000} />
-            </span>
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Ouvrages disponibles</span>
-          </div>
-          <div>
-            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
-              +<CountingNumber target={1200} />
-            </span>
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Étudiants inscrits</span>
-          </div>
-          <div>
-            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
-              +<CountingNumber target={180} />
-            </span>
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Universités partenaires</span>
-          </div>
-          <div>
-            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
-              +<CountingNumber target={80} />
-            </span>
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Éditeurs africains</span>
-          </div>
-        </div>
-      </section>
-
       {/* Meilleures Ventes */}
-      <section className="py-16 px-6 md:px-10 max-w-7xl mx-auto">
+      <section className="py-16 px-6 md:px-10 lg:px-12 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-end mb-8 gap-4">
           <h2 className="font-serif text-2xl md:text-3xl font-bold text-navy">Meilleures ventes</h2>
-          <Link href="/catalog" className="text-sm font-bold text-foreground-muted hover:text-navy flex items-center gap-1 group transition-colors">
+          <Link href="/catalog" className="text-sm font-medium text-foreground-muted hover:text-navy flex items-center gap-1 group transition-colors">
             Voir tous les livres 
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
@@ -271,6 +235,40 @@ export default function HomePage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Bandeau Chiffres Clés */}
+      <section className="bg-navy py-12 px-6 md:px-10 text-white text-center">
+        <div className="max-w-7xl mx-auto mb-8">
+          <h2 className="font-serif text-2xl md:text-3xl font-bold mb-2">Spécialiste du contenu éducatif</h2>
+          <p className="text-sm text-white/80 font-sans">Le plus grand catalogue d'ouvrages universitaires africains</p>
+        </div>
+        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div>
+            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+              +<CountingNumber target={4542} />
+            </span>
+            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Ouvrages disponibles</span>
+          </div>
+          <div>
+            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+              +<CountingNumber target={1090} />
+            </span>
+            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Étudiants inscrits</span>
+          </div>
+          <div>
+            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+              +<CountingNumber target={164} />
+            </span>
+            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Universités partenaires</span>
+          </div>
+          <div>
+            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+              +<CountingNumber target={73} />
+            </span>
+            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Éditeurs africains</span>
+          </div>
         </div>
       </section>
 
