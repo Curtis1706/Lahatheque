@@ -32,7 +32,8 @@ const DefaultIllustration = (
 
 export interface BookProps {
   title: string;
-  variant?: "simple" | "stripe";
+  author?: string;
+  variant?: "simple" | "stripe" | "classic" | "lahatheque";
   width?: number | ResponsiveProp<number>;
   color?: string;
   textColor?: string;
@@ -42,16 +43,67 @@ export interface BookProps {
 
 export const Book = ({
   title,
-  variant = "stripe",
+  author,
+  variant = "lahatheque",
   width = 196,
   color,
-  textColor = "var(--ds-gray-1000)",
+  textColor,
   illustration,
-  textured = false
+  textured = true
 }: BookProps) => {
   const _width = useResponsive(width) ?? (typeof width === "number" ? width : 196);
-  const _color = color ? color : variant === "simple" ? "var(--ds-background-200)" : "var(--ds-amber-600)";
-  const _illustration = illustration ? illustration : DefaultIllustration;
+  const _color = color ? color : "var(--navy)";
+  const _textColor = textColor ? textColor : "var(--gold)";
+
+  if (variant === "lahatheque" || variant === "classic") {
+    return (
+      <div className="inline-block w-fit group" style={{ perspective: 1000 }}>
+        <div
+          className="aspect-[2/3] relative rotate-0 duration-300 book-rotate rounded-r-md rounded-l-sm shadow-2xl overflow-hidden flex flex-col justify-between p-4 text-center border-l-4 border-black/25"
+          style={{
+            width: _width,
+            backgroundColor: _color,
+            color: _textColor,
+            boxShadow: "0 15px 35px -5px rgba(0,0,0,0.3), inset 2px 0 4px rgba(255,255,255,0.15)"
+          }}
+        >
+          {/* Subtle leather/paper texture overlay */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/10 pointer-events-none" />
+          
+          {/* Spine crease simulation */}
+          <div className="absolute left-0 top-0 bottom-0 w-2.5 bg-gradient-to-r from-black/40 via-white/10 to-transparent pointer-events-none" />
+
+          {/* Book Header / Title */}
+          <div className="relative z-10 pt-2 px-1">
+            <h4 className="font-serif font-bold text-[11px] sm:text-[12px] leading-snug tracking-wide uppercase line-clamp-3 mb-1" style={{ color: _textColor }}>
+              {title}
+            </h4>
+            {author && (
+              <p className="text-[8px] opacity-75 font-sans font-medium uppercase tracking-wider" style={{ color: _textColor }}>
+                {author}
+              </p>
+            )}
+          </div>
+
+          {/* Golden Tree Logo Silhouette & Brand */}
+          <div className="relative z-10 pb-1 flex flex-col items-center">
+            <svg className="w-5 h-5 mb-1 fill-current opacity-85" viewBox="0 0 24 24" style={{ color: _textColor }}>
+              <path d="M12 2C11.5 4 9 6 9 9c0 1.66 1.34 3 3 3s3-1.34 3-3c0-3-2.5-5-3-7zm0 10c-2.21 0-4 1.79-4 4v5h8v-5c0-2.21-1.79-4-4-4zm0 2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z" />
+            </svg>
+            <span className="text-[7px] font-serif font-bold tracking-widest uppercase opacity-90" style={{ color: _textColor }}>
+              LAHATHÈQUE
+            </span>
+          </div>
+
+          {/* 3D Pages Thickness on the right */}
+          <div
+            className="absolute -right-3 top-1 bottom-1 w-3 bg-gradient-to-r from-[#e6e2d8] to-[#f7f5ef] rounded-r-xs border-r border-[#d4cebe] shadow-inner transform rotate-y-90 origin-left pointer-events-none"
+            style={{ transform: "rotateY(-90deg) translateX(100%)" }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="inline-block w-fit" style={{ perspective: 900 }}>
@@ -72,7 +124,7 @@ export const Book = ({
           >
             {variant === "stripe" && (
               <div className="absolute h-full w-full opacity-60 flex items-center justify-center">
-                {_illustration}
+                {illustration || DefaultIllustration}
               </div>
             )}
             <div className="absolute h-full w-[8.2%] mix-blend-overlay" style={{ background: "var(--ds-book-bind)" }} />
@@ -97,15 +149,15 @@ export const Book = ({
                   "leading-[1.25em] tracking-[-.02em] text-balance font-semibold",
                   variant === "simple" ? "text-[12cqw]" : "text-[10.5cqw]"
                 )}
-                style={{ color: textColor }}
+                style={{ color: textColor || "var(--ds-gray-1000)" }}
               >
                 {title}
               </span>
               {variant === "stripe" ? (
-                <svg className="scale-75 -ml-1 -mb-1" height="24" width="24" style={{ fill: textColor }}>
+                <svg className="scale-75 -ml-1 -mb-1" height="24" width="24" style={{ fill: textColor || "var(--ds-gray-1000)" }}>
                   <path d="M21,21H3L12,3Z" />
                 </svg>
-              ) : _illustration}
+              ) : (illustration || DefaultIllustration)}
             </div>
           </div>
           {textured && (

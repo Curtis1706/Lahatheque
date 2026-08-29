@@ -28,7 +28,7 @@ const bestSellers = [
     category: "Droit",
     price: "15 000 FCFA",
     color: "var(--navy)",
-    textColor: "#FFFFFF",
+    textColor: "var(--gold-light)",
     tag: "Droit"
   },
   {
@@ -37,7 +37,7 @@ const bestSellers = [
     author: "Dr. K. YAO",
     category: "Économie",
     price: "13 000 FCFA",
-    color: "var(--background-secondary)",
+    color: "#F8F5EE",
     textColor: "var(--navy)",
     tag: "Économie"
   },
@@ -48,7 +48,7 @@ const bestSellers = [
     category: "Gestion",
     price: "14 500 FCFA",
     color: "var(--navy-hover)",
-    textColor: "#FFFFFF",
+    textColor: "var(--gold-light)",
     tag: "Gestion"
   },
   {
@@ -57,7 +57,7 @@ const bestSellers = [
     author: "Pr. A. DIALLO",
     category: "Droit",
     price: "11 500 FCFA",
-    color: "var(--background)",
+    color: "#F8F5EE",
     textColor: "var(--navy)",
     tag: "Droit"
   },
@@ -77,7 +77,7 @@ const bestSellers = [
     author: "Pr. J. KOUADIO",
     category: "Finance",
     price: "13 500 FCFA",
-    color: "var(--background-secondary)",
+    color: "#F8F5EE",
     textColor: "var(--gold-dark)",
     tag: "Finance"
   }
@@ -88,10 +88,10 @@ export default function HomePage() {
     <div className="w-full">
       
       {/* Hero Section */}
-      <section className="relative pt-10 pb-16 md:pt-14 md:pb-20 overflow-hidden bg-background px-6 md:px-10 lg:px-12">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+      <section className="relative pt-8 pb-0 md:pt-12 lg:pt-14 overflow-hidden bg-background px-6 md:px-10 lg:px-12">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center lg:items-end">
           
-          <div className="z-10 text-center lg:text-left">
+          <div className="z-10 text-center lg:text-left lg:col-span-5 pb-8 lg:pb-16">
             <p className="text-xs md:text-sm font-bold text-gold uppercase tracking-widest mb-4 font-sans">
               LA CONNAISSANCE À PORTÉE DE MAIN
             </p>
@@ -121,15 +121,15 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="relative z-0 flex items-center justify-center lg:justify-end w-full">
-            <div className="relative w-full max-w-lg lg:max-w-xl">
+          <div className="relative z-0 flex items-end justify-center lg:justify-end w-full lg:col-span-7">
+            <div className="relative w-full max-w-2xl lg:max-w-none flex items-end justify-center lg:justify-end">
               <Image
                 src="/hero-section-img.jpg"
                 alt="Bibliothèque numérique LAHAThèque — Livres et savoir académique"
-                width={800}
-                height={600}
+                width={1200}
+                height={800}
                 priority
-                className="w-full h-auto object-contain block"
+                className="w-full h-auto max-h-[460px] md:max-h-[520px] lg:max-h-[580px] object-contain object-bottom block"
               />
             </div>
           </div>
@@ -208,7 +208,8 @@ export default function HomePage() {
                 
                 <Book 
                   title={book.title} 
-                  variant="stripe" 
+                  author={book.author}
+                  variant="lahatheque" 
                   color={book.color} 
                   textColor={book.textColor} 
                   width={{ sm: 120, md: 130, lg: 135, xl: 125 }}
