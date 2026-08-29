@@ -1,291 +1,335 @@
 "use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { 
-  PenTool, 
-  ShieldCheck, 
-  DollarSign, 
-  Globe, 
-  ArrowRight, 
+  Search, 
+  MapPin, 
   BookOpen, 
-  CheckCircle2, 
-  Users, 
-  Sparkles,
-  FileCheck,
-  Building2,
-  Clock
+  ArrowRight, 
+  Building2, 
+  Sparkles, 
+  GraduationCap,
+  PenTool,
+  CheckCircle2
 } from "lucide-react";
-import { Book as Book3D } from "@/components/ui/book";
 
-const featuredAuthors = [
+interface AuthorItem {
+  id: string;
+  name: string;
+  role: string;
+  institution: string;
+  country: string;
+  countryCode: string;
+  speciality: string;
+  booksCount: number;
+  featuredBook: string;
+  avatarUrl?: string;
+}
+
+const AUTHORS_DATA: AuthorItem[] = [
   {
-    name: "Pr. M. N'DIA",
+    id: "author-1",
+    name: "Pr. M. N'Dia",
     role: "Professeur Titulaire de Droit Privé",
-    institution: "Partenaire Académique Bénin",
+    institution: "Université d'Abomey-Calavi",
+    country: "Bénin",
+    countryCode: "BJ",
     speciality: "Droit des obligations & Droit commercial OHADA",
-    bookTitle: "Droit des obligations",
-    bookCoverColor: "var(--navy)",
-    bookCoverTextColor: "var(--gold)",
-    bookId: "book-001"
+    booksCount: 4,
+    featuredBook: "Droit des obligations : Théorie et Pratique",
   },
   {
-    name: "Dr. K. YAO",
+    id: "author-2",
+    name: "Dr. K. Yao",
     role: "Maître de Conférences en Économie",
-    institution: "Partenaire Académique Côte d'Ivoire",
+    institution: "Université Félix Houphouët-Boigny",
+    country: "Côte d'Ivoire",
+    countryCode: "CI",
     speciality: "Macroéconomie & Politiques Monétaires UEMOA",
-    bookTitle: "Économie monétaire",
-    bookCoverColor: "var(--background-secondary)",
-    bookCoverTextColor: "var(--navy)",
-    bookId: "book-002"
+    booksCount: 3,
+    featuredBook: "Économie monétaire et financière",
   },
   {
-    name: "Pr. E. TRAORÉ",
-    role: "Directeur de Recherche en Gestion",
-    institution: "Partenaire Académique Sénégal",
+    id: "author-3",
+    name: "Pr. E. Traoré",
+    role: "Directeur de Recherche en Sciences de Gestion",
+    institution: "Université Cheikh Anta Diop",
+    country: "Sénégal",
+    countryCode: "SN",
     speciality: "Comptabilité Approfondie & Normes SYSCOHADA",
-    bookTitle: "Comptabilité approfondie",
-    bookCoverColor: "var(--navy)",
-    bookCoverTextColor: "var(--gold)",
-    bookId: "book-003"
+    booksCount: 5,
+    featuredBook: "Comptabilité approfondie SYSCOHADA",
   },
   {
-    name: "Pr. A. DIALLO",
+    id: "author-4",
+    name: "Pr. A. Diallo",
     role: "Doyen Honoraire de Faculté de Droit",
-    institution: "Partenaire Académique Guinée",
+    institution: "Université Gamal Abdel Nasser",
+    country: "Guinée",
+    countryCode: "GN",
     speciality: "Droit Constitutionnel & Institutions Comparées",
-    bookTitle: "Droit constitutionnel",
-    bookCoverColor: "var(--background-secondary)",
-    bookCoverTextColor: "var(--navy)",
-    bookId: "book-004"
+    booksCount: 3,
+    featuredBook: "Droit constitutionnel des États d'Afrique",
+  },
+  {
+    id: "author-5",
+    name: "Dr. S. Diaby",
+    role: "Maître-Assistant en Mathématiques Appliquées",
+    institution: "Université de Lomé",
+    country: "Togo",
+    countryCode: "TG",
+    speciality: "Algèbre Linéaire & Optimisation Numérique",
+    booksCount: 2,
+    featuredBook: "Mathématiques pour l'économie et gestion",
+  },
+  {
+    id: "author-6",
+    name: "Pr. J. Kouadio",
+    role: "Professeur de Sciences Économiques & Gestion",
+    institution: "Université Alassane Ouattara",
+    country: "Côte d'Ivoire",
+    countryCode: "CI",
+    speciality: "Management Stratégique & Gouvernance",
+    booksCount: 4,
+    featuredBook: "Management stratégique des organisations",
+  },
+  {
+    id: "author-7",
+    name: "Pr. A. Kouassi",
+    role: "Agrégé des Facultés de Droit",
+    institution: "Université Nationale d'Agriculture",
+    country: "Bénin",
+    countryCode: "BJ",
+    speciality: "Droit des Affaires & Droit du Travail",
+    booksCount: 6,
+    featuredBook: "Droit des affaires : Théorie et Pratique",
+  },
+  {
+    id: "author-8",
+    name: "Dr. B. Cissé",
+    role: "Chercheur en Sciences de l'Éducation",
+    institution: "Université Abdou Moumouni",
+    country: "Niger",
+    countryCode: "NE",
+    speciality: "Pédagogie Universitaire & Didactique",
+    booksCount: 2,
+    featuredBook: "Didactique et méthodes d'apprentissage",
   }
 ];
 
-const publicationSteps = [
-  {
-    step: "01",
-    title: "Soumission du Manuscrit",
-    desc: "Déposez votre projet d'ouvrage en PDF via notre formulaire dédié. Notre équipe vérifie la conformité académique sous 48h."
-  },
-  {
-    step: "02",
-    title: "Évaluation Scientifique",
-    desc: "Votre texte est examiné en double aveugle par des pairs spécialistes de votre discipline pour garantir l'excellence."
-  },
-  {
-    step: "03",
-    title: "Mise en Page & Contrat",
-    desc: "Nos maquettistes préparent l'édition numérique et imprimée. Un contrat clair formalise vos taux de redevance."
-  },
-  {
-    step: "04",
-    title: "Distribution & Redevances",
-    desc: "Votre ouvrage est diffusé auprès des institutions partenaires. Suivez vos ventes et versements en temps réel sur votre dashboard."
-  }
+const COUNTRY_FILTERS = [
+  { code: "ALL", label: "Tous les pays" },
+  { code: "BJ", label: "Bénin" },
+  { code: "CI", label: "Côte d'Ivoire" },
+  { code: "SN", label: "Sénégal" },
+  { code: "TG", label: "Togo" },
+  { code: "GN", label: "Guinée" },
+  { code: "NE", label: "Niger" }
 ];
 
 export default function AuthorsPublicPage() {
+  const [selectedCountry, setSelectedCountry] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredAuthors = useMemo(() => {
+    return AUTHORS_DATA.filter((author) => {
+      const matchCountry = selectedCountry === "ALL" || author.countryCode === selectedCountry;
+      const matchQuery = 
+        searchQuery.trim() === "" ||
+        author.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        author.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        author.speciality.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        author.institution.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchCountry && matchQuery;
+    });
+  }, [selectedCountry, searchQuery]);
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      
-      {/* Hero Section */}
-      <section className="relative pt-12 pb-16 md:pt-20 md:pb-24 bg-background-secondary border-b border-border overflow-hidden px-6 md:px-12">
-        <div className="max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+    <div className="min-h-screen bg-background text-foreground py-12 md:py-16">
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 space-y-12">
+        
+        {/* Header Centré */}
+        <div className="text-center max-w-3xl mx-auto space-y-4">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold/10 text-navy border border-gold/20 text-xs font-bold uppercase tracking-wider">
+            <GraduationCap className="w-3.5 h-3.5 text-gold" />
+            Corps Professoral &amp; Chercheurs
+          </div>
           
-          <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/10 text-navy border border-gold/20 text-xs font-bold uppercase tracking-wider">
-              <PenTool className="w-3.5 h-3.5 text-gold" />
-              Espace Auteurs &amp; Chercheurs
-            </div>
-            
-            <h1 className="font-serif text-3xl sm:text-4xl lg:text-6xl text-navy font-bold leading-[1.15]">
-              Publiez vos travaux.<br />
-              <span className="text-gold">Rayonnez en Afrique et dans le monde.</span>
-            </h1>
-            
-            <p className="text-base sm:text-lg text-foreground-muted max-w-2xl mx-auto lg:mx-0 leading-relaxed font-sans">
-              Rejoignez la première communauté d'enseignants-chercheurs, professeurs et experts qui font confiance aux Éditions LAHA et à LAHAThèque pour publier, protéger et valoriser leurs ouvrages universitaires.
-            </p>
-
-            <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4 pt-4">
-              <Link
-                href="/submit"
-                className="bg-gold hover:bg-gold-dark text-white px-8 py-3.5 rounded font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md"
-              >
-                Déposer un manuscrit
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
-                href="/login"
-                className="bg-background border border-border hover:border-gold text-foreground hover:text-navy px-8 py-3.5 rounded font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2"
-              >
-                Accéder à mon espace auteur
-              </Link>
-            </div>
-          </div>
-
-          <div className="lg:col-span-5 grid grid-cols-2 gap-4">
-            <div className="bg-background p-6 rounded-2xl border border-border shadow-sm space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-gold/10 text-gold flex items-center justify-center">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <h3 className="font-serif font-bold text-navy text-base">Protection DRM</h3>
-              <p className="text-xs text-foreground-muted leading-relaxed">
-                Tatouage numérique dynamique nominatif contre le piratage et l'extraction.
-              </p>
-            </div>
-
-            <div className="bg-background p-6 rounded-2xl border border-border shadow-sm space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-gold/10 text-gold flex items-center justify-center">
-                <DollarSign className="w-5 h-5" />
-              </div>
-              <h3 className="font-serif font-bold text-navy text-base">Redevances Claires</h3>
-              <p className="text-xs text-foreground-muted leading-relaxed">
-                Suivi transparent des consultations, ventes unitaires et abonnements.
-              </p>
-            </div>
-
-            <div className="bg-background p-6 rounded-2xl border border-border shadow-sm space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-gold/10 text-gold flex items-center justify-center">
-                <Globe className="w-5 h-5" />
-              </div>
-              <h3 className="font-serif font-bold text-navy text-base">Réseau Panafricain</h3>
-              <p className="text-xs text-foreground-muted leading-relaxed">
-                Diffusion dans plus de 160 institutions et bibliothèques partenaires.
-              </p>
-            </div>
-
-            <div className="bg-background p-6 rounded-2xl border border-border shadow-sm space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-gold/10 text-gold flex items-center justify-center">
-                <FileCheck className="w-5 h-5" />
-              </div>
-              <h3 className="font-serif font-bold text-navy text-base">Comité Scientifique</h3>
-              <p className="text-xs text-foreground-muted leading-relaxed">
-                Validation rigoureuse par des professeurs émérites de votre domaine.
-              </p>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* Auteurs à l'honneur */}
-      <section className="py-20 px-6 md:px-12 max-w-[1920px] mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
-          <span className="text-xs font-bold text-gold uppercase tracking-widest">
-            Excellence &amp; Savoir
-          </span>
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-navy">
-            Nos auteurs et chercheurs partenaires
-          </h2>
-          <p className="text-sm text-foreground-muted leading-relaxed">
-            Découvrez quelques-unes des figures académiques majeures qui enrichissent le catalogue LAHAThèque de leurs traités et manuels de référence.
+          <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-navy">
+            Nos Auteurs &amp; Experts
+          </h1>
+          
+          <p className="text-sm sm:text-base text-foreground-muted leading-relaxed">
+            Rencontrez les enseignants-chercheurs et professeurs d'Afrique francophone qui enrichissent la bibliothèque numérique LAHAThèque de leurs traités et manuels de référence.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {featuredAuthors.map((author, index) => (
-            <div 
-              key={index}
-              className="bg-background-secondary rounded-2xl border border-border p-6 flex flex-col justify-between space-y-6 hover:border-gold transition-all duration-300 shadow-sm hover:shadow-md"
-            >
-              <div className="flex justify-center py-2">
-                <Book3D 
-                  title={author.bookTitle}
-                  author={author.name}
-                  variant="lahatheque"
-                  color={author.bookCoverColor}
-                  textColor={author.bookCoverTextColor}
-                  width={{ sm: 110, md: 120, lg: 120, xl: 120 }}
-                  textured
-                />
-              </div>
-
-              <div className="space-y-2 border-t border-border pt-4">
-                <h3 className="font-serif font-bold text-navy text-lg">{author.name}</h3>
-                <p className="text-xs font-semibold text-gold">{author.role}</p>
-                <p className="text-[11px] text-foreground-muted flex items-center gap-1">
-                  <Building2 className="w-3.5 h-3.5 text-gold shrink-0" />
-                  {author.institution}
-                </p>
-                <p className="text-xs text-foreground-muted/90 pt-2 leading-relaxed">
-                  {author.speciality}
-                </p>
-              </div>
-
-              <Link
-                href={`/catalog/${author.bookId}`}
-                className="w-full py-2.5 rounded-lg bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                Découvrir l'ouvrage
-                <ArrowRight className="w-3.5 h-3.5 text-gold" />
-              </Link>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Processus de publication */}
-      <section className="py-20 px-6 md:px-12 bg-background-secondary border-y border-border">
-        <div className="max-w-[1920px] mx-auto">
+        {/* Filtres par Pays & Barre de Recherche */}
+        <div className="space-y-6 max-w-4xl mx-auto">
           
-          <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
-            <span className="text-xs font-bold text-gold uppercase tracking-widest">
-              Processus Éditorial
-            </span>
-            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-navy">
-              Comment publier votre livre sur LAHAThèque ?
-            </h2>
-            <p className="text-sm text-foreground-muted">
-              Un parcours transparent et rigoureux, de la soumission à la distribution internationale.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {publicationSteps.map((s, idx) => (
-              <div key={idx} className="bg-background rounded-2xl border border-border p-6 space-y-4 shadow-sm relative">
-                <span className="text-2xl font-serif font-bold text-gold/60">{s.step}</span>
-                <h3 className="font-serif font-bold text-navy text-lg">{s.title}</h3>
-                <p className="text-xs text-foreground-muted leading-relaxed">{s.desc}</p>
-              </div>
+          {/* Pills Pays */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {COUNTRY_FILTERS.map((f) => (
+              <button
+                key={f.code}
+                onClick={() => setSelectedCountry(f.code)}
+                className={`px-5 py-2 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
+                  selectedCountry === f.code
+                    ? "bg-gold text-white shadow-md ring-2 ring-gold/40"
+                    : "bg-background-secondary border border-border text-foreground hover:border-gold hover:text-navy"
+                }`}
+              >
+                {f.label}
+              </button>
             ))}
           </div>
 
-        </div>
-      </section>
+          {/* Input Search */}
+          <div className="relative max-w-md mx-auto">
+            <Search className="w-4 h-4 text-foreground-muted absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher par nom, spécialité, institution..."
+              className="w-full pl-11 pr-4 py-3 rounded-full border border-border bg-background focus:outline-none focus:border-navy focus:ring-2 focus:ring-gold/30 text-xs sm:text-sm shadow-sm transition-all"
+            />
+          </div>
 
-      {/* CTA Final */}
-      <section className="py-20 px-6 md:px-12 max-w-4xl mx-auto text-center space-y-8">
-        <div className="w-14 h-14 rounded-full bg-gold/10 text-gold flex items-center justify-center mx-auto">
-          <Sparkles className="w-7 h-7" />
-        </div>
-        
-        <div className="space-y-3">
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-navy">
-            Prêt à faire éditer votre manuscrit ?
-          </h2>
-          <p className="text-sm sm:text-base text-foreground-muted max-w-xl mx-auto leading-relaxed">
-            Transmettez-nous votre projet. Notre comité de lecture vous répondra avec un avis éditorial sous 15 jours ouvrés.
-          </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row justify-center gap-4 pt-2">
-          <Link
-            href="/submit"
-            className="bg-gold hover:bg-gold-dark text-white px-8 py-4 rounded font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md"
-          >
-            Déposer mon manuscrit en ligne
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link
-            href="/contact"
-            className="bg-background border border-border hover:border-gold text-foreground hover:text-navy px-8 py-4 rounded font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2"
-          >
-            Poser une question à l'équipe éditoriale
-          </Link>
-        </div>
-      </section>
+        {/* Grille des Cartes Auteurs */}
+        {filteredAuthors.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
+            {filteredAuthors.map((author) => (
+              <article
+                key={author.id}
+                className="bg-background-secondary rounded-3xl border border-border p-6 flex flex-col justify-between space-y-6 hover:border-gold hover:shadow-lg transition-all duration-300 group"
+              >
+                <div className="space-y-4 flex flex-col items-center text-center">
+                  
+                  {/* Avatar / Portrait stylisé */}
+                  <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-background border-2 border-border/80 shadow-md flex items-center justify-center group-hover:border-gold transition-colors">
+                    <div className="w-full h-full bg-gradient-to-br from-navy/10 to-gold/10 flex items-center justify-center text-navy font-serif font-bold text-xl">
+                      {author.name.split(" ").map(n => n[0]).join("")}
+                    </div>
+                  </div>
 
+                  {/* Informations */}
+                  <div className="space-y-1.5 w-full">
+                    <h2 className="font-serif font-bold text-navy text-lg group-hover:text-gold transition-colors">
+                      {author.name}
+                    </h2>
+                    
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-gold">
+                      {author.role}
+                    </p>
+
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-foreground-muted pt-1">
+                      <MapPin className="w-3.5 h-3.5 text-gold shrink-0" />
+                      <span>{author.institution}</span>
+                    </div>
+
+                    <p className="text-xs text-foreground-muted/80 line-clamp-2 pt-2">
+                      {author.speciality}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Footer Carte */}
+                <div className="space-y-3 pt-4 border-t border-border w-full">
+                  <div className="flex items-center justify-between text-[11px] text-foreground-muted">
+                    <span className="flex items-center gap-1 font-medium">
+                      <BookOpen className="w-3.5 h-3.5 text-gold" />
+                      {author.booksCount} {author.booksCount > 1 ? "ouvrages" : "ouvrage"}
+                    </span>
+                    <span className="font-semibold text-navy bg-background px-2 py-0.5 rounded border border-border">
+                      {author.country}
+                    </span>
+                  </div>
+
+                  <Link
+                    href={`/catalog?author=${encodeURIComponent(author.name)}`}
+                    className="w-full py-2.5 rounded-xl bg-background border border-border group-hover:bg-navy group-hover:text-white group-hover:border-navy text-navy text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    Voir les ouvrages
+                    <ArrowRight className="w-3.5 h-3.5 text-gold group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16 bg-background-secondary rounded-3xl border border-border p-8 max-w-xl mx-auto space-y-4">
+            <GraduationCap className="w-12 h-12 text-gold mx-auto opacity-70" />
+            <h3 className="font-serif font-bold text-navy text-lg">Aucun auteur trouvé</h3>
+            <p className="text-xs text-foreground-muted">
+              Aucun enseignant ou chercheur ne correspond à vos critères de recherche.
+            </p>
+            <button
+              onClick={() => { setSelectedCountry("ALL"); setSearchQuery(""); }}
+              className="px-6 py-2 rounded-full bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors"
+            >
+              Réinitialiser les filtres
+            </button>
+          </div>
+        )}
+
+        {/* Section Bento : Devenir Auteur Partenaire */}
+        <section className="bg-background-secondary rounded-3xl border border-border p-8 sm:p-12 mt-16 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+          <div className="md:col-span-8 space-y-4">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy/5 text-navy text-xs font-bold uppercase tracking-wider border border-gold/20">
+              <PenTool className="w-3.5 h-3.5 text-gold" />
+              Édition &amp; Publication
+            </div>
+            
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+              Vous êtes enseignant-chercheur ou auteur académique ?
+            </h2>
+            
+            <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed">
+              Publiez votre manuel, traité ou thèse d'excellence sur LAHAThèque. Bénéficiez d'une protection DRM certifiée, d'une diffusion dans plus de 160 institutions partenaires et de redevances transparentes.
+            </p>
+
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 text-xs text-foreground-muted">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-gold shrink-0" />
+                <span>Revue par un comité scientifique</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-gold shrink-0" />
+                <span>Protection contre le piratage</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-gold shrink-0" />
+                <span>Redevances payées semestriellement</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-gold shrink-0" />
+                <span>Diffusion panafricaine &amp; internationale</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="md:col-span-4 flex flex-col gap-3 justify-center">
+            <Link
+              href="/submit"
+              className="bg-gold hover:bg-gold-dark text-white px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md text-center"
+            >
+              Déposer un manuscrit
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/contact"
+              className="bg-background border border-border hover:border-gold text-foreground hover:text-navy px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 text-center"
+            >
+              Contacter l'équipe éditoriale
+            </Link>
+          </div>
+        </section>
+
+      </div>
     </div>
   );
 }

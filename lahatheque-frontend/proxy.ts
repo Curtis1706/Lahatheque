@@ -118,7 +118,7 @@ export default function proxy(request: NextRequest) {
     '/admin',
     '/super-admin'
   ]
-  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
+  const isProtectedRoute = protectedRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
   
   if (!isLoggedIn && isProtectedRoute && pathname !== '/login') {
     console.log(`[HTTP Auth ${now}] Accès refusé non-authentifié -> Redirection /login pour ${pathname}`)

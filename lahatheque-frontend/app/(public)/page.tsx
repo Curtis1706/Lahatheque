@@ -88,32 +88,32 @@ export default function HomePage() {
     <div className="w-full">
       
       {/* Hero Section Full Width */}
-      <section className="relative pt-6 pb-0 md:pt-10 lg:pt-12 overflow-hidden bg-background w-full">
+      <section className="relative pt-4 pb-0 sm:pt-6 md:pt-8 lg:pt-6 xl:pt-10 overflow-hidden bg-background w-full">
         <div className="w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center lg:items-end">
           
-          <div className="z-10 text-center lg:text-left lg:col-span-5 px-6 sm:px-10 lg:pl-12 xl:pl-16 2xl:pl-24 lg:pr-6 pb-8 lg:pb-16 xl:pb-24">
-            <p className="text-xs md:text-sm font-bold text-gold uppercase tracking-widest mb-4 font-sans">
+          <div className="z-10 text-center lg:text-left lg:col-span-5 px-6 sm:px-10 lg:pl-12 xl:pl-16 2xl:pl-24 lg:pr-4 pb-6 lg:pb-10 xl:pb-16">
+            <p className="text-[11px] sm:text-xs md:text-sm font-bold text-gold uppercase tracking-widest mb-3 sm:mb-4 font-sans">
               LA CONNAISSANCE À PORTÉE DE MAIN
             </p>
-            <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl xl:text-7xl text-navy font-bold leading-[1.12] mb-6">
+            <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl xl:text-6xl text-navy font-bold leading-[1.12] mb-4 sm:mb-5">
               Accédez au savoir.<br />
               <span className="text-gold">Transformez demain.</span>
             </h1>
-            <p className="text-sm md:text-base lg:text-lg text-foreground-muted mb-8 max-w-xl mx-auto lg:mx-0 font-sans leading-relaxed">
+            <p className="text-xs sm:text-sm md:text-base text-foreground-muted mb-6 max-w-xl mx-auto lg:mx-0 font-sans leading-relaxed">
               Lahathèque est votre bibliothèque universitaire en ligne. Des milliers d'ouvrages, de ressources et d'auteurs africains à portée de clic.
             </p>
             
-            <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
+            <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-3.5">
               <Link 
                 href="/submit" 
-                className="bg-gold hover:bg-gold-dark text-white px-8 py-3.5 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group shadow-sm"
+                className="bg-gold hover:bg-gold-dark text-white px-7 py-3 rounded font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 group shadow-sm"
               >
                 Déposer un ouvrage 
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link 
                 href="/catalog?categories=all" 
-                className="bg-transparent border border-border hover:border-gold text-foreground px-8 py-3.5 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group"
+                className="bg-transparent border border-border hover:border-gold text-foreground px-7 py-3 rounded font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 group"
               >
                 Explorer les catégories 
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -129,7 +129,7 @@ export default function HomePage() {
                 width={1600}
                 height={1000}
                 priority
-                className="w-full h-auto max-h-[500px] md:max-h-[600px] lg:max-h-[680px] xl:max-h-[760px] 2xl:max-h-[820px] object-contain object-bottom lg:object-right-bottom block"
+                className="w-full h-auto max-h-[380px] sm:max-h-[440px] md:max-h-[500px] lg:max-h-[520px] xl:max-h-[620px] 2xl:max-h-[720px] object-contain object-bottom lg:object-right-bottom block"
               />
             </div>
           </div>
