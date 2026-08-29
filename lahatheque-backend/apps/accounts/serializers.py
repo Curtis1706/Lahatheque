@@ -122,6 +122,7 @@ class RegisterSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=['student', 'author'], default='student')
     pen_name = serializers.CharField(required=False, allow_blank=True, default='')
     bio = serializers.CharField(required=False, allow_blank=True, default='')
+    avatar = serializers.ImageField(required=False, allow_null=True)
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):

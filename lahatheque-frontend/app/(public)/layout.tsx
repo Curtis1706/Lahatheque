@@ -64,8 +64,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             </Link>
 
             <Link 
-              href="/author" 
-              className={pathname.startsWith("/author") 
+              href="/authors" 
+              className={pathname.startsWith("/authors") 
                 ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap" 
                 : "text-foreground hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
               }
@@ -74,8 +74,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             </Link>
 
             <Link 
-              href="/university" 
-              className={pathname.startsWith("/university") 
+              href="/partners" 
+              className={pathname.startsWith("/partners") 
                 ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap" 
                 : "text-foreground hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
               }
@@ -168,9 +168,9 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             </Link>
 
             <Link 
-              href="/author" 
+              href="/authors" 
               onClick={() => setMobileMenuOpen(false)}
-              className={pathname.startsWith("/author") 
+              className={pathname.startsWith("/authors") 
                 ? "block font-bold text-navy py-2 border-b border-border text-sm" 
                 : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
               }
@@ -179,9 +179,9 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             </Link>
 
             <Link 
-              href="/university" 
+              href="/partners" 
               onClick={() => setMobileMenuOpen(false)}
-              className={pathname.startsWith("/university") 
+              className={pathname.startsWith("/partners") 
                 ? "block font-bold text-navy py-2 border-b border-border text-sm" 
                 : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
               }
@@ -262,10 +262,10 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <h4 className="font-serif font-bold text-navy mb-4 text-base">Espaces &amp; Partenariat</h4>
             <ul className="space-y-3 text-sm text-foreground-muted">
               <li>
-                <Link href="/author" className="hover:text-navy transition-colors">Auteur</Link>
+                <Link href="/authors" className="hover:text-navy transition-colors">Auteur</Link>
               </li>
               <li>
-                <Link href="/university" className="hover:text-navy transition-colors">Partenariat</Link>
+                <Link href="/partners" className="hover:text-navy transition-colors">Partenariat</Link>
               </li>
               <li>
                 <Link href="/contact" className="hover:text-navy transition-colors">Aide &amp; Contact</Link>

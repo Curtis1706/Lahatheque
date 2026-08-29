@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { getBookById } from "@/lib/services/catalog";
 import { BookActionButtons } from "@/components/catalog/book-action-buttons";
+import { Book as Book3D } from "@/components/ui/book";
 
 export default async function BookDetailPage({
   params,
@@ -62,24 +63,28 @@ export default async function BookDetailPage({
         <div className="bg-background-secondary rounded-3xl border border-border overflow-hidden p-6 sm:p-8 lg:p-10 grid grid-cols-1 md:grid-cols-3 gap-8 shadow-sm">
           
           {/* Couverture / Aperçu Visuel */}
-          <div className="space-y-4 text-center">
-            {/* Simulation 3D de reliure de livre premium */}
-            <div className="bg-gradient-to-r from-navy-dark to-navy text-white rounded-r-2xl rounded-l-md p-8 min-h-[340px] flex flex-col justify-between items-center relative border-y border-r border-navy-hover border-l-[6px] border-l-gold shadow-lg transform hover:scale-[1.02] transition-transform duration-300">
-              <div className="w-16 h-16 rounded-full bg-gold/10 text-gold flex items-center justify-center my-auto shadow-inner">
-                <FileText className="w-8 h-8" />
+          <div className="space-y-4 text-center flex flex-col items-center justify-center">
+            {book.cover_url || book.cover_image ? (
+              <div className="relative w-[180px] sm:w-[220px] aspect-[2/3] rounded-r-xl rounded-l-sm overflow-hidden shadow-2xl border-l-4 border-black/30 border-r border-t border-b border-border/80">
+                <img
+                  src={book.cover_url || book.cover_image}
+                  alt={book.title}
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <div className="space-y-2">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-gold block">
-                  {book.discipline_detail.name}
-                </span>
-                <h2 className="font-serif font-bold text-sm leading-snug text-white/90 line-clamp-3 px-2">
-                  {book.title}
-                </h2>
+            ) : (
+              <div className="flex items-center justify-center py-4">
+                <Book3D 
+                  title={book.title}
+                  author={book.authors_details.map((a) => `${a.first_name} ${a.last_name}`).join(", ")}
+                  variant="lahatheque"
+                  color={book.cover_color || "var(--navy)"}
+                  textColor={book.cover_text_color || "var(--gold)"}
+                  width={{ sm: 160, md: 180, lg: 200, xl: 200 }}
+                  textured
+                />
               </div>
-              <span className="absolute top-4 right-4 px-2 py-0.5 rounded bg-background text-gold text-[9px] font-bold uppercase tracking-wider border border-gold/30">
-                {book.format_type.toUpperCase()}
-              </span>
-            </div>
+            )}
 
             {/* Badges de Confiance */}
             <div className="flex items-center justify-center gap-4 text-foreground-muted text-xs pt-2">
@@ -89,7 +94,7 @@ export default async function BookDetailPage({
               </span>
               <span className="flex items-center gap-1">
                 <Award className="w-4 h-4 text-gold" />
-                Accès Institutionnel
+                Accès Partenaire
               </span>
             </div>
           </div>

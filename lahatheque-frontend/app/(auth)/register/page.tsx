@@ -59,6 +59,27 @@ export default function RegisterPage() {
     });
   };
 
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError("La photo ne doit pas dépasser 5 Mo.");
+        return;
+      }
+      setAvatarFile(file);
+      const url = URL.createObjectURL(file);
+      setAvatarPreview(url);
+    }
+  };
+
+  const removeAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -74,7 +95,7 @@ export default function RegisterPage() {
         phone: formData.phone || undefined,
         country: formData.country,
         role: role
-      });
+      }, avatarFile);
 
       if (res.success) {
         setSuccess("Compte créé avec succès ! Redirection...");
@@ -158,7 +179,7 @@ export default function RegisterPage() {
               <UserCheck className={`w-6 h-6 ${role === "author" ? "text-gold" : "text-foreground-muted"}`} />
               <div className="text-center">
                 <span className="font-bold block text-sm">Auteur</span>
-                <span className="text-[10px] text-foreground-muted block font-normal">Dépôt & étude de manuscrits</span>
+                <span className="text-[10px] text-foreground-muted block font-normal">Dépôt &amp; étude de manuscrits</span>
               </div>
             </button>
           </div>
@@ -180,6 +201,59 @@ export default function RegisterPage() {
 
         {/* Formulaire */}
         <form onSubmit={handleSubmit} className="space-y-5">
+          
+          {/* Photo de profil avec prévisualisation */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-navy block text-center sm:text-left">
+              Photo de profil <span className="text-foreground-muted font-normal normal-case">(Optionnel)</span>
+            </label>
+            <div className="flex items-center gap-5 p-3.5 rounded-2xl bg-background-secondary border border-border">
+              <div className="relative group shrink-0">
+                <div className="w-16 h-16 rounded-full bg-background border-2 border-border overflow-hidden flex items-center justify-center shadow-inner">
+                  {avatarPreview ? (
+                    <img 
+                      src={avatarPreview} 
+                      alt="Aperçu profil" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <User className="w-8 h-8 text-foreground-muted" />
+                  )}
+                </div>
+                {avatarPreview && (
+                  <button
+                    type="button"
+                    onClick={removeAvatar}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-navy hover:bg-navy-hover text-white text-[10px] font-bold flex items-center justify-center shadow"
+                    title="Supprimer la photo"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-1">
+                <label 
+                  htmlFor="avatar-upload" 
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-background border border-border hover:border-gold text-xs font-semibold text-navy cursor-pointer transition-colors shadow-sm"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-gold" />
+                  {avatarPreview ? "Changer la photo" : "Importer une photo"}
+                </label>
+                <input 
+                  id="avatar-upload"
+                  type="file" 
+                  accept="image/png, image/jpeg, image/webp" 
+                  onChange={handleAvatarChange}
+                  className="hidden" 
+                />
+                <p className="text-[10px] text-foreground-muted">
+                  Formats JPG, PNG ou WEBP acceptés. Max 5 Mo.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-navy">Prénom *</label>
@@ -261,14 +335,14 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        {/* Bloc d'Accès Institutionnel / Partenaires (Universités, Éditeurs tiers, Grossistes) selon v3.2 */}
+        {/* Bloc d'Accès Institutionnel / Partenaires selon v3.2 */}
         <div className="bg-background-secondary p-4 rounded-2xl border border-border space-y-2 text-xs">
           <div className="flex items-center gap-2 text-navy font-bold">
             <Handshake className="w-4 h-4 text-gold shrink-0" />
-            <span>Universités, Éditeurs Tiers & Grossistes</span>
+            <span>Institutions &amp; Partenaires (Écoles, Éditeurs, Grossistes)</span>
           </div>
           <p className="text-[11px] text-foreground-muted">
-            Les comptes institutionnels (conventions universités 15%, maisons d&apos;édition partenaires et licences grossistes) sont soumis à validation préalable par LAHA Éditions.
+            Les comptes institutionnels (conventions partenaires, maisons d&apos;édition et licences grossistes) sont soumis à validation préalable par LAHA Éditions.
           </p>
           <Link
             href="/contact"

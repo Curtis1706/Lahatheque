@@ -34,12 +34,36 @@ export interface UserProfileData {
   is_verified?: boolean;
 }
 
-export async function registerUser(payload: RegisterPayload): Promise<{ success: boolean; data?: any; error?: string }> {
+export async function registerUser(
+  payload: RegisterPayload, 
+  avatarFile?: File | null
+): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
+    let body: BodyInit;
+    let headers: HeadersInit = {};
+
+    if (avatarFile) {
+      const formData = new FormData();
+      formData.append('email', payload.email);
+      formData.append('password', payload.password);
+      formData.append('first_name', payload.first_name);
+      formData.append('last_name', payload.last_name);
+      if (payload.phone) formData.append('phone', payload.phone);
+      formData.append('country', payload.country);
+      formData.append('role', payload.role);
+      if (payload.pen_name) formData.append('pen_name', payload.pen_name);
+      if (payload.bio) formData.append('bio', payload.bio);
+      formData.append('avatar', avatarFile);
+      body = formData;
+    } else {
+      headers = { 'Content-Type': 'application/json' };
+      body = JSON.stringify(payload);
+    }
+
     const res = await fetch('/api/bff/auth/register/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      headers,
+      body,
     });
 
     const data = await res.json();

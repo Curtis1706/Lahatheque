@@ -631,7 +631,7 @@ def change_password(user: 'User', old_password: str, new_password: str) -> None:
 # Services publics - Registration
 # ─────────────────────────────────────────────────────────────
 
-def _register_user(role_code: str, data: dict) -> dict:
+def _register_user(role_code: str, data: dict, avatar_file=None) -> dict:
     """
     Factory pour créer un utilisateur de tout type.
     Regroupe la validation commune et la création de base.
@@ -674,6 +674,10 @@ def _register_user(role_code: str, data: dict) -> dict:
                 bio=bio,
                 is_verified=True if getattr(settings, 'DEBUG', False) else False,
             )
+
+            if avatar_file:
+                user.avatar = avatar_file
+                user.save(update_fields=['avatar'])
 
             try:
                 send_otp(email, channel='email')

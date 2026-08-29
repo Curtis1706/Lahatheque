@@ -273,34 +273,29 @@ export default function CatalogSearchPage() {
                       key={book.id}
                       className="group bg-background rounded-2xl border border-border overflow-hidden flex flex-col hover:border-gold transition-all duration-300 shadow-sm hover:shadow-md"
                     >
-                      {/* Présentation 3D du Livre */}
-                      <div className="p-6 bg-background-secondary flex items-center justify-center min-h-[220px] border-b border-border relative">
-                        <Link href={`/catalog/${book.id}`} className="transition-transform group-hover:scale-105 duration-300">
-                          <Book3D 
-                            title={book.title}
-                            author={authorName}
-                            variant="lahatheque"
-                            color="var(--navy)"
-                            textColor="var(--gold)"
-                            width={{ sm: 120, md: 130, lg: 135, xl: 130 }}
-                            textured
-                          />
-                        </Link>
-                        
-                        {/* Format Badge */}
-                        <span className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-background border border-border text-navy text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
-                          {book.format_type === "audio" ? (
-                            <>
-                              <Headphones className="w-3 h-3 text-gold" />
-                              Audio
-                            </>
+                      {/* Présentation du Livre : Vraie Couverture ou Fallback 3D */}
+                      <div className="p-6 bg-background-secondary flex items-center justify-center min-h-[230px] border-b border-border relative">
+                        <Link href={`/catalog/${book.id}`} className="transition-transform group-hover:scale-105 duration-300 flex items-center justify-center">
+                          {book.cover_url || book.cover_image ? (
+                            <div className="relative w-[130px] aspect-[2/3] rounded-r-md rounded-l-sm overflow-hidden shadow-xl border-l-4 border-black/20 border-r border-t border-b border-border/60 group-hover:shadow-2xl transition-shadow duration-300">
+                              <img
+                                src={book.cover_url || book.cover_image}
+                                alt={book.title}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
                           ) : (
-                            <>
-                              <FileText className="w-3 h-3 text-gold" />
-                              {book.format_type?.toUpperCase() || "PDF"}
-                            </>
+                            <Book3D 
+                              title={book.title}
+                              author={authorName}
+                              variant="lahatheque"
+                              color={book.cover_color || "var(--navy)"}
+                              textColor={book.cover_text_color || "var(--gold)"}
+                              width={{ sm: 120, md: 130, lg: 135, xl: 130 }}
+                              textured
+                            />
                           )}
-                        </span>
+                        </Link>
                       </div>
 
                       {/* Informations Livre */}

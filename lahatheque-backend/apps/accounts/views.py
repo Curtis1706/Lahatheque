@@ -32,7 +32,8 @@ class RegisterView(APIView):
         
         try:
             role = serializer.validated_data.get('role', 'student')
-            res = _register_user(role_code=role, data=serializer.validated_data)
+            avatar_file = request.FILES.get('avatar', serializer.validated_data.get('avatar', None))
+            res = _register_user(role_code=role, data=serializer.validated_data, avatar_file=avatar_file)
             return Response(res, status=status.HTTP_201_CREATED)
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

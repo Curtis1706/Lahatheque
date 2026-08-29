@@ -26,4 +26,5 @@ export interface Book {
   cover_color?: string;
   cover_text_color?: string;
   cover_image?: string;
+  cover_url?: string;
 }
