@@ -75,13 +75,13 @@ export default function SubscriptionsPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-gold text-xs font-bold uppercase tracking-widest">
                   <Building2 className="w-4 h-4" />
-                  Accès Institutionnel Débloqué
+                  Accès Partenaire Débloqué
                 </div>
                 <h2 className="font-serif text-xl sm:text-2xl font-bold">
-                  Abonnement offert par {instName || "votre Université"}
+                  Abonnement offert par {instName || "votre établissement partenaire"}
                 </h2>
                 <p className="text-xs text-white/80 max-w-xl">
-                  Votre affiliation étudiant a été validée. Vous bénéficiez d'un accès automatique à l'ensemble du bouquet documentaire académique souscrit par votre établissement sans aucuns frais individuels.
+                  Votre affiliation a été validée. Vous bénéficiez d'un accès automatique à l'ensemble du bouquet documentaire académique souscrit par votre établissement partenaire sans aucuns frais individuels.
                 </p>
               </div>
               <Link
@@ -191,15 +191,15 @@ export default function SubscriptionsPage() {
               </Link>
             </div>
 
-            {/* Bouquet Institutionnel */}
+            {/* Bouquet Partenaire */}
             <div className="bg-background border-2 border-border rounded-3xl p-6 space-y-6 flex flex-col justify-between transition-all">
               <div className="space-y-4">
                 <div>
                   <span className="text-[10px] uppercase font-bold text-navy bg-navy/10 px-2.5 py-1 rounded-md border border-navy/20">
-                    Université / Faculté
+                    Établissement Partenaire
                   </span>
-                  <h3 className="font-serif text-xl font-bold text-navy mt-3">Bouquet Université</h3>
-                  <p className="text-xs text-foreground-muted">Pour les bibliothèques et facultés</p>
+                  <h3 className="font-serif text-xl font-bold text-navy mt-3">Bouquet Partenaire</h3>
+                  <p className="text-xs text-foreground-muted">Pour les institutions et bibliothèques partenaires</p>
                 </div>
 
                 <div className="flex items-baseline gap-1 pt-2">
@@ -227,7 +227,7 @@ export default function SubscriptionsPage() {
                 href="/contact"
                 className="w-full py-3.5 rounded-xl bg-background border border-border hover:bg-background-secondary text-navy font-bold text-xs transition-colors flex items-center justify-center gap-2 text-center"
               >
-                Contacter le service institutionnel
+                Contacter le service partenaire
               </Link>
             </div>
 

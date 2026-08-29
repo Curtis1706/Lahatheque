@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { 
   Users, 
   ShieldCheck, 
@@ -260,22 +261,25 @@ export default function SubmitManuscriptPage() {
       </section>
 
       {/* Support Banner */}
-      <section className="bg-[#FDF3F1] py-8 px-6 md:px-12 border-b border-[#F7E1DE] text-[#5A2C26]">
+      <section className="bg-background-secondary py-8 px-6 md:px-12 border-b border-border text-foreground">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           
           <div className="flex items-center gap-4">
-            <div className="bg-white p-3 rounded-full shadow-sm hidden sm:flex shrink-0">
-              <Headphones className="w-6 h-6 text-[#B84B3D]" />
+            <div className="bg-background p-3 rounded-full shadow-sm hidden sm:flex shrink-0 border border-border">
+              <Headphones className="w-6 h-6 text-gold" />
             </div>
-            <p className="text-base md:text-lg font-medium">
+            <p className="text-base md:text-lg font-medium text-navy">
               Notre équipe éditoriale reste à votre disposition pour vous accompagner tout au long du processus de soumission et de publication.
             </p>
           </div>
           
-          <button className="bg-[#B84B3D] hover:bg-[#963C31] text-white text-sm font-bold px-6 py-3.5 rounded whitespace-nowrap flex items-center gap-2 transition-colors shadow-sm shrink-0">
+          <Link 
+            href="/contact"
+            className="bg-gold hover:bg-gold-dark text-white text-sm font-bold px-6 py-3.5 rounded whitespace-nowrap flex items-center gap-2 transition-colors shadow-sm shrink-0"
+          >
             Contactez-nous
             <ArrowRight className="w-4 h-4" />
-          </button>
+          </Link>
 
         </div>
       </section>

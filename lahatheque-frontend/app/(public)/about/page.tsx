@@ -203,7 +203,7 @@ export default function AboutPage() {
             "Notre ambition est claire : faire de la lecture numérique un levier d'égalité, de réussite et de développement intellectuel."
           </p>
           
-          <div className="pt-8 border-t border-white/10 max-w-2xl mx-auto">
+          <div className="pt-8 border-t border-navy-hover max-w-2xl mx-auto">
             <p className="text-sm text-white/80 leading-relaxed mb-8">
               À travers la technologie, nous rapprochons les auteurs, les éditeurs et les lecteurs. Nous contribuons à faire voyager les idées au-delà des frontières, des océans et des barrières économiques.
             </p>
@@ -230,7 +230,7 @@ export default function AboutPage() {
       </section>
 
       {/* Newsletter Section */}
-      <section className="py-16 bg-navy text-white border-t border-white/10">
+      <section className="py-16 bg-navy text-white border-t border-navy-hover">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 px-6 md:px-12">
           <div>
             <h3 className="font-serif text-xl font-bold mb-2">Abonnez-vous à notre newsletter</h3>

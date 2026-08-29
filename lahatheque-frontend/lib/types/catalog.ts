@@ -23,4 +23,7 @@ export interface Book {
   summary: string;
   price?: number;
   currency?: string;
+  cover_color?: string;
+  cover_text_color?: string;
+  cover_image?: string;
 }

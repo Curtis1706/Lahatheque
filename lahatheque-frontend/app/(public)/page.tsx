@@ -105,10 +105,10 @@ export default function HomePage() {
             
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
               <Link 
-                href="/catalog" 
+                href="/submit" 
                 className="bg-gold hover:bg-gold-dark text-white px-8 py-3.5 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group shadow-sm"
               >
-                Découvrir les livres 
+                Déposer un ouvrage 
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link 
@@ -262,7 +262,7 @@ export default function HomePage() {
             <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
               +<CountingNumber target={164} />
             </span>
-            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Universités partenaires</span>
+            <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Partenaires institutionnels</span>
           </div>
           <div>
             <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
@@ -281,10 +281,10 @@ export default function HomePage() {
               La première bibliothèque numérique pour les auteurs africains
             </h2>
             <p className="text-base text-foreground-muted mb-6 leading-relaxed">
-              Notre mission est de démocratiser l'accès au savoir en Afrique en proposant une plateforme innovante regroupant les meilleures ressources universitaires du continent.
+              Notre mission est de démocratiser l'accès au savoir en Afrique en proposant une plateforme innovante regroupant les meilleures ressources académiques du continent.
             </p>
             <p className="text-sm text-foreground-muted mb-8 leading-relaxed">
-              Nous travaillons main dans la main avec les universités, les auteurs et les éditeurs pour bâtir le plus grand catalogue de contenu éducatif d'Afrique francophone.
+              Nous travaillons main dans la main avec nos partenaires institutionnels, les auteurs et les éditeurs pour bâtir le plus grand catalogue de contenu éducatif d'Afrique francophone.
             </p>
             <Link 
               href="/about" 
@@ -339,12 +339,12 @@ export default function HomePage() {
               </ul>
             </div>
 
-            {/* Universités */}
+            {/* Partenaires */}
             <div className="bg-background border border-border p-8 rounded-xl shadow-sm hover:shadow-md transition-shadow">
               <div className="w-12 h-12 rounded bg-gold/10 text-gold flex items-center justify-center mb-6">
                 <Building2 className="w-6 h-6" />
               </div>
-              <h3 className="font-serif text-xl font-bold text-navy mb-4">Universités &amp; Écoles</h3>
+              <h3 className="font-serif text-xl font-bold text-navy mb-4">Institutions &amp; Partenaires</h3>
               <ul className="space-y-3 text-sm text-foreground-muted">
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
