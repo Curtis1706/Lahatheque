@@ -34,7 +34,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       
       {/* TopNavBar */}
       <header className="bg-background border-b border-border sticky top-0 z-50 transition-all duration-300">
-        <div className="flex justify-between items-center w-full px-4 md:px-12 py-4 max-w-[1440px] mx-auto">
+        <div className="flex justify-between items-center w-full px-4 sm:px-6 md:px-10 lg:px-12 xl:px-16 2xl:px-24 py-4 max-w-[1920px] mx-auto">
           
           <div className="flex items-center gap-4 xl:gap-8">
             <Link href="/" className="block w-40 shrink-0">

@@ -87,33 +87,33 @@ export default function HomePage() {
   return (
     <div className="w-full">
       
-      {/* Hero Section */}
-      <section className="relative pt-8 pb-0 md:pt-12 lg:pt-14 overflow-hidden bg-background px-6 md:px-10 lg:px-12">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center lg:items-end">
+      {/* Hero Section Full Width */}
+      <section className="relative pt-6 pb-0 md:pt-10 lg:pt-12 overflow-hidden bg-background w-full">
+        <div className="w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center lg:items-end">
           
-          <div className="z-10 text-center lg:text-left lg:col-span-5 pb-8 lg:pb-16">
+          <div className="z-10 text-center lg:text-left lg:col-span-5 px-6 sm:px-10 lg:pl-12 xl:pl-16 2xl:pl-24 lg:pr-6 pb-8 lg:pb-16 xl:pb-24">
             <p className="text-xs md:text-sm font-bold text-gold uppercase tracking-widest mb-4 font-sans">
               LA CONNAISSANCE À PORTÉE DE MAIN
             </p>
-            <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-navy font-bold leading-[1.15] mb-6">
+            <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl xl:text-7xl text-navy font-bold leading-[1.12] mb-6">
               Accédez au savoir.<br />
               <span className="text-gold">Transformez demain.</span>
             </h1>
-            <p className="text-sm md:text-base text-foreground-muted mb-8 max-w-lg mx-auto lg:mx-0 font-sans leading-relaxed">
+            <p className="text-sm md:text-base lg:text-lg text-foreground-muted mb-8 max-w-xl mx-auto lg:mx-0 font-sans leading-relaxed">
               Lahathèque est votre bibliothèque universitaire en ligne. Des milliers d'ouvrages, de ressources et d'auteurs africains à portée de clic.
             </p>
             
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
               <Link 
                 href="/catalog" 
-                className="bg-gold hover:bg-gold-dark text-white px-7 py-3 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group shadow-sm"
+                className="bg-gold hover:bg-gold-dark text-white px-8 py-3.5 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group shadow-sm"
               >
                 Découvrir les livres 
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link 
                 href="/catalog?categories=all" 
-                className="bg-transparent border border-border hover:border-gold text-foreground px-7 py-3 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group"
+                className="bg-transparent border border-border hover:border-gold text-foreground px-8 py-3.5 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group"
               >
                 Explorer les catégories 
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -121,15 +121,15 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="relative z-0 flex items-end justify-center lg:justify-end w-full lg:col-span-7">
-            <div className="relative w-full max-w-2xl lg:max-w-none flex items-end justify-center lg:justify-end">
+          <div className="relative z-0 flex items-end justify-center lg:justify-end w-full lg:col-span-7 pr-0 mr-0">
+            <div className="relative w-full flex items-end justify-center lg:justify-end">
               <Image
                 src="/hero-section-img.jpg"
                 alt="Bibliothèque numérique LAHAThèque — Livres et savoir académique"
-                width={1200}
-                height={800}
+                width={1600}
+                height={1000}
                 priority
-                className="w-full h-auto max-h-[460px] md:max-h-[520px] lg:max-h-[580px] object-contain object-bottom block"
+                className="w-full h-auto max-h-[500px] md:max-h-[600px] lg:max-h-[680px] xl:max-h-[760px] 2xl:max-h-[820px] object-contain object-bottom lg:object-right-bottom block"
               />
             </div>
           </div>
