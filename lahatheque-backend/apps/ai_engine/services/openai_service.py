@@ -14,9 +14,9 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-def extract_text_sample_from_bytes(file_bytes: bytes, file_ext: str = "pdf", max_pages: int = 15) -> Tuple[str, int]:
+def extract_text_sample_from_bytes(file_bytes: bytes, file_ext: str = "pdf") -> Tuple[str, int]:
     """
-    Extrait un échantillon textuel représentatif (début, sommaire, 4e de couverture)
+    Extrait le texte intégral des 15 premières pages et des 15 dernières pages
     via PyMuPDF (fitz) pour les fichiers PDF et EPUB.
     """
     import fitz # PyMuPDF
@@ -26,21 +26,21 @@ def extract_text_sample_from_bytes(file_bytes: bytes, file_ext: str = "pdf", max
         total_pages = len(doc)
         text_chunks = []
 
-        # 1. Extraire les premières pages (titre, crédits, sommaire, avant-propos)
-        pages_to_read = min(max_pages, total_pages)
-        for i in range(pages_to_read):
-            page_text = doc[i].get_text("text").strip()
-            if page_text:
-                text_chunks.append(f"--- PAGE {i+1} ---\n{page_text[:1500]}")
+        pages_to_extract = set()
+        # 15 premières pages
+        for i in range(min(15, total_pages)):
+            pages_to_extract.add(i)
+        # 15 dernières pages
+        for i in range(max(0, total_pages - 15), total_pages):
+            pages_to_extract.add(i)
 
-        # 2. Extraire la dernière page (souvent la 4e de couverture / résumé)
-        if total_pages > pages_to_read:
-            last_page_text = doc[total_pages - 1].get_text("text").strip()
-            if last_page_text:
-                text_chunks.append(f"--- DERNIÈRE PAGE (4e de couverture) ---\n{last_page_text[:2000]}")
+        for page_idx in sorted(pages_to_extract):
+            page_text = doc[page_idx].get_text("text").strip()
+            if page_text:
+                text_chunks.append(f"--- PAGE {page_idx + 1} / {total_pages} ---\n{page_text}")
 
         full_sample = "\n\n".join(text_chunks)
-        return full_sample[:12000], total_pages
+        return full_sample[:100000], total_pages
     except Exception as e:
         logger.warning(f"[AI Service] Erreur extraction PyMuPDF: {e}")
         return "", 0
@@ -177,58 +177,56 @@ def analyze_document_with_openai(
         logger.warning("[AI Service] OPENAI_API_KEY absente, utilisation du mode heuristique.")
         return _fallback_heuristic_analysis(filename, text_sample, total_pages)
 
-    prompt = f"""Tu es le moteur d'intelligence artificielle expert en catalogage, analyse littéraire et classification documentaire universelle pour la bibliothèque numérique LAHAThèque (Afrique et International).
-La bibliothèque contient TOUS les types d'ouvrages sans restriction :
-- Romans, Nouvelles, Poésie, Théâtre, Essais littéraires
-- Mangas, Bandes Dessinées, Contes et Albums Jeunesse
-- Manuels Scolaires (Primaire, Collège, Lycée)
-- Ouvrages Universitaires & Académiques (Droit, Économie, Gestion, Médecine, Sciences, Philosophie, Sociologie, Histoire, Informatique, Agronomie)
-- Livres pratiques, Développement personnel, Art & Culture.
+    prompt = f"""Tu es le directeur littéraire et éditeur en chef de la prestigieuse maison d'édition LAHAThèque.
+Tu rédiges la quatrième de couverture (summary officiel) des livres du catalogue. Le texte doit être élégant, captivant, fluide et donner immédiatement envie d'acquérir et de lire l'ouvrage.
 
-Analyse l'échantillon de texte suivant extrait du document "{filename}" (Nombre total de pages estimé : {total_pages}) :
+Analyse l'échantillon de texte suivant extrait du manuscrit "{filename}" (Nombre total de pages estimé : {total_pages}) :
 
-=== TEXTE DU DOCUMENT ===
-{text_sample[:8000] if text_sample else f"Fichier: {filename}"}
+=== TEXTE DU DOCUMENT (15 Premières Pages + 15 Dernières Pages) ===
+{text_sample[:60000] if text_sample else f"Fichier: {filename}"}
 === FIN DU TEXTE ===
 
-Instructions détaillées :
-1. Titre & Sous-titre : Détermine le titre exact de l'ouvrage et propose systématiquement un sous-titre percutant, noble et explicatif (champ essentiel pour le catalogage).
-2. Auteurs : Identifie tous les auteurs, co-auteurs ou contributeurs mentionnés.
-3. Résumé éditorial & Pédagogique (Haute Valeur, Captivant & Incitatif à la lecture) :
-   Rédige un résumé éditorial remarquable (2 à 3 paragraphes structurés) en français soigné, respectant strictement cette structure narrative et pédagogique :
-   - Paragraphe 1 (Accroche forte & Enjeu) : Commence par poser le grand enjeu, la question centrale ou le défi intellectuel/technique/littéraire que l'ouvrage aborde. BANNIR FORMELLEMENT les ouvertures plates ou convenues comme "Cet ouvrage explore...", "Ce livre présente...", "Il s'agit d'un ouvrage...", "Dans cet ouvrage...". Utilise une voix active, engageante et vivante qui captive immédiatement l'attention du lecteur.
-   - Paragraphe 2 (La Méthode & Les Apports Clés) : Présente la démarche unique de l'auteur, les œuvres/cas/concepts analysés, et ce qui rend la thèse, la technique ou la pédagogie novatrice et stimulante.
-   - Paragraphe 3 (Bénéfices de lecture & Portée) : Explique clairement ce que le lecteur (étudiant, enseignant, chercheur, praticien ou passionné) va acquérir, maîtriser ou transformer dans sa compréhension ou sa pratique après avoir lu ce livre. Termine par une phrase inspirante sur la portée de l'ouvrage.
-4. Genre & Discipline : Identifie le genre principal (`genre_category`) parmi les disciplines officielles LAHAThèque ("Philosophie, Psychologie & Sciences Humaines", "Droit & Sciences Politiques", "Sciences Économiques & Gestion", "Médecine & Santé", "Musique, Art & Spectacle", "Littérature Africaine & Conte", "Roman & Fiction", "Manga & Bande Dessinée", "Manuel Scolaire & Pédagogie", "Sciences & Technologies", "Histoire & Civilisations", etc.).
-5. Code Dewey : Détermine le code de classification décimale Dewey (3 chiffres, ex: 780 pour Musique, 840 pour Littérature, 340 pour Droit, 330 pour Économie, 610 pour Santé, 100 pour Philosophie, 741.5 pour Manga/BD, etc.).
-6. Langue & Pays : Détecte la langue principale de rédaction ("Français", "Anglais", "Portugais", "Espagnol", "Fon", "Yoruba", "Arabe", etc.) et le pays d'ancrage principal (code ISO 2 lettres ex: "BJ", "SN", "CI", "TG", "BR", "FR", "GLOBAL").
-7. Code ISBN : Cherche méticuleusement dans le texte (page de titre, page d'ours/copyright, mentions légales, 4e de couverture) si un code ISBN à 10 ou 13 chiffres est présent. Si trouvé dans le document, extrais-le fidèlement et formate-le (ex: "978-2-..."). S'il est absent du document, génère une proposition d'ISBN standard LAHA ("978-99919-...") et indique `isbn_found_in_document: false`.
-8. Suggestions académiques & contextuelles :
-   - `institution_suggestion` : Suggère une université ou institution de rattachement pertinente (ex: "Université d'Abomey-Calavi (UAC)", "Université de São Paulo (USP)", "Université Cheikh Anta Diop (UCAD)").
-   - `faculty_suggestion` : Suggère la faculté/UFR correspondante (ex: "Faculté de Musique et Arts", "Faculté de Philosophie", "Faculté de Droit").
-   - `department_suggestion` : Suggère le département d'études spécifique (ex: "Département de Musique", "Département de Philosophie", "Département de Droit Privé").
-   - `target_audience` : Suggère le public cible optimal (ex: "Musiciens, Enseignants & Étudiants en Conservatoire", "Étudiants en Licence & Master", "Chercheurs & Universitaires").
-9. Mots-clés : Propose 6 à 10 mots-clés thématiques riches et pertinents.
-10. Incohérences : Détecte toute anomalie majeure entre le titre et le contenu.
+Directives éditoriales impératives :
+1. Titre & Sous-titre : Détermine le titre exact et propose un sous-titre clair, prestigieux et commercialement valorisant.
+2. Auteurs : Identifie tous les auteurs ou contributeurs.
+3. Quatrième de couverture / Résumé (`summary`) — ADAPTATION PARFAITE AU GENRE DU LIVRE :
+   Rédige une véritable 4e de couverture (exactement 2 paragraphes élégants, environ 130 à 180 mots au total), en adaptant le ton et le registre selon la nature de l'ouvrage :
+   - ROMAN & FICTION LITTÉRAIRE : Ton immersif et évocateur. Présente le protagoniste, le décor, l'élément déclencheur et la tension narrative (sans jamais spoiler la fin).
+   - ROMAN POLICIER / THRILLER : Ton haletant et mystérieux. Pose l'énigme, le crime ou la disparition, l'atmosphère d'investigation et la course contre la montre.
+   - MANUEL SCOLAIRE & ÉDUCATIF : Ton stimulant, clair et structuré. Met en avant le niveau visé, la pédagogie progressive (cours clairs, exercices, cas pratiques) et la garantie de réussite aux examens.
+   - OUVRAGE UNIVERSITAIRE, SCIENTIFIQUE OU ESSAI : Ton noble, incisif et rigoureux. Présente la problématique majeure, la thèse développée, la méthode et les bénéfices pour étudiants et spécialistes.
+   - BANDE DESSINÉE, MANGA & CONTE : Ton vivant, dynamique et graphique. Met en scène le héros, sa quête et l'univers d'aventure.
 
-Renvoie STRICTEMENT un JSON valide au format suivant :
+   - RÈGLES DE VOCABULAIRE STRICTES : Utilise EXCLUSIVEMENT le vocabulaire du livre adapté au genre ("cet ouvrage", "ce roman", "ce polar", "ce thriller", "ce manuel", "ce guide", "ce recueil", "cette œuvre").
+   - INTERDICTION ABSOLUE : Ne jamais écrire "ce travail", "ce mémoire", "cette thèse", "ce document", "cet article", "cette recherche".
+   - Paragraphe 1 : L'Accroche et le Cœur du récit / sujet (sans phrase banale comme "Dans ce livre...").
+   - Paragraphe 2 : Les Apports clés, l'enjeu dramatique ou pédagogique, et le public cible.
+4. Genre & Discipline : Identifie la discipline officielle LAHAThèque ("Philosophie, Psychologie & Sciences Humaines", "Droit & Sciences Politiques", "Sciences Économiques & Gestion", "Médecine & Santé", "Musique, Art & Spectacle", "Littérature Africaine & Conte", "Roman & Fiction", "Manga & Bande Dessinée", "Manuel Scolaire & Pédagogie", "Sciences & Technologies", "Histoire & Civilisations", etc.).
+5. Code Dewey : Détermine le code Dewey (3 chiffres, ex: 510 pour Mathématiques, 780 pour Musique, 340 pour Droit, 330 pour Économie, 610 pour Médecine, 840 pour Littérature, etc.).
+6. Langue & Pays : Langue ("Français", "Portugais", "Anglais", etc.) et code pays ISO ("BJ", "BR", "SN", "CI", "FR", "GLOBAL").
+7. Code ISBN : Recherche méticuleuse d'un ISBN dans le document. S'il est absent, générer une proposition standard LAHA ("978-99919-...").
+8. Suggestions académiques : Université, faculté, département et public cible.
+9. Mots-clés : 6 à 10 mots-clés thématiques riches.
+10. Incohérences : Anomalies éventuelles.
+
+Renvoie STRICTEMENT un JSON valide :
 {{
   "title": "Titre exact de l'ouvrage",
-  "subtitle": "Sous-titre percutant et explicatif",
+  "subtitle": "Sous-titre commercial et explicatif",
   "authors": ["Nom Prénom"],
   "publication_year": 2026,
   "isbn": "978-...",
   "isbn_found_in_document": true,
-  "summary": "Résumé éditorial captivant et structuré...",
+  "summary": "Premier paragraphe de 4e de couverture captivant...\n\nDeuxième paragraphe valorisant le contenu et le public...",
   "genre_category": "Discipline principale",
-  "dewey_code": "780",
+  "dewey_code": "510",
   "language": "Français",
   "language_code": "fre",
   "country": "BJ",
-  "target_audience": "Musiciens, Enseignants & Étudiants",
+  "target_audience": "Enseignants, Étudiants & Professionnels",
   "institution_suggestion": "Université d'Abomey-Calavi (UAC)",
-  "faculty_suggestion": "Faculté des Lettres, Langues, Arts et Communication (FLLAC)",
-  "department_suggestion": "Département des Arts",
+  "faculty_suggestion": "Faculté des Sciences et Techniques (FAST)",
+  "department_suggestion": "Département de Mathématiques",
   "keywords": ["mot-clé 1", "mot-clé 2", "mot-clé 3", "mot-clé 4", "mot-clé 5"],
   "inconsistencies": []
 }}
@@ -240,17 +238,17 @@ Renvoie STRICTEMENT un JSON valide au format suivant :
         print(f"[AI Service] Envoi de la requête à OpenAI gpt-4o-mini (échantillon de {len(text_sample)} caractères)...", flush=True)
         start_t = time.time()
         
-        client = openai.OpenAI(api_key=api_key, timeout=20.0)
+        client = openai.OpenAI(api_key=api_key, timeout=30.0)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Tu es un système de catalogage ONIX et d'analyse bibliographique IA rigoureux. Tu réponds exclusivement en JSON valide."},
+                {"role": "system", "content": "Tu es un directeur éditorial de renom. Tu rédiges de remarquables résumés de quatrième de couverture pour des livres et réponds exclusivement en JSON valide."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            temperature=0.2,
+            temperature=0.3,
             max_tokens=2000,
-            timeout=20.0
+            timeout=30.0
         )
         duration = time.time() - start_t
         print(f"[AI Service] Réponse OpenAI reçue avec succès en {duration:.2f}s !", flush=True)

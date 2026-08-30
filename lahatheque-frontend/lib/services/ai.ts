@@ -47,7 +47,7 @@ export function generateLahaIsbn(seedText: string = ""): string {
   return `${isbnRaw.slice(0, 3)}-${isbnRaw.slice(3, 8)}-${isbnRaw.slice(8, 11)}-${isbnRaw.slice(11, 12)}-${isbnRaw.slice(12)}`;
 }
 
-async function extractTextFromPdfInBrowser(file: File, maxPages = 15): Promise<{ text: string; totalPages: number }> {
+async function extractTextFromPdfInBrowser(file: File): Promise<{ text: string; totalPages: number }> {
   try {
     const pdfjs = await import("pdfjs-dist");
     // Configuration du worker
@@ -59,48 +59,47 @@ async function extractTextFromPdfInBrowser(file: File, maxPages = 15): Promise<{
     const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) });
     const pdfDoc = await loadingTask.promise;
     const totalPages = pdfDoc.numPages;
-    const pagesToRead = Math.min(maxPages, totalPages);
     const chunks: string[] = [];
 
-    for (let i = 1; i <= pagesToRead; i++) {
+    // Définition de l'ensemble des pages à extraire : 15 premières + 15 dernières
+    const pagesToExtract = new Set<number>();
+
+    // 15 premières pages
+    const firstCount = Math.min(15, totalPages);
+    for (let i = 1; i <= firstCount; i++) {
+      pagesToExtract.add(i);
+    }
+
+    // 15 dernières pages
+    const lastStart = Math.max(1, totalPages - 14);
+    for (let i = lastStart; i <= totalPages; i++) {
+      pagesToExtract.add(i);
+    }
+
+    // Extraction séquentielle ordonnée
+    const sortedPages = Array.from(pagesToExtract).sort((a, b) => a - b);
+    for (const pageNum of sortedPages) {
       try {
-        const page = await pdfDoc.getPage(i);
+        const page = await pdfDoc.getPage(pageNum);
         const textContent = await page.getTextContent();
         const pageText = textContent.items
           .map((item: any) => item.str || "")
           .join(" ")
           .trim();
         if (pageText) {
-          chunks.push(`--- PAGE ${i} ---\n${pageText.slice(0, 1500)}`);
+          chunks.push(`--- PAGE ${pageNum} / ${totalPages} ---\n${pageText}`);
         }
       } catch (pageErr) {
-        console.warn(`[PDF.js] Erreur lecture page ${i}:`, pageErr);
-      }
-    }
-
-    // Extraction de la 4e de couverture (dernière page)
-    if (totalPages > pagesToRead) {
-      try {
-        const lastPage = await pdfDoc.getPage(totalPages);
-        const lastTextContent = await lastPage.getTextContent();
-        const lastText = lastTextContent.items
-          .map((item: any) => item.str || "")
-          .join(" ")
-          .trim();
-        if (lastText) {
-          chunks.push(`--- DERNIÈRE PAGE (4e de couverture) ---\n${lastText.slice(0, 2000)}`);
-        }
-      } catch (lastErr) {
-        console.warn("[PDF.js] Erreur lecture dernière page:", lastErr);
+        console.warn(`[PDF.js] Erreur lecture page ${pageNum}:`, pageErr);
       }
     }
 
     return {
-      text: chunks.join("\n\n").slice(0, 15000),
+      text: chunks.join("\n\n").slice(0, 100000),
       totalPages,
     };
   } catch (err) {
-    console.warn("[PDF.js Client Extraction] Erreur:", err);
+    console.warn("[PDF.js] Erreur globale lors de l'extraction locale:", err);
     return { text: "", totalPages: 0 };
   }
 }
@@ -117,8 +116,8 @@ export async function extractBookMetadataWithAi(
 
     // 1. Extraction locale ultra-rapide côté client via PDF.js
     if (file && !extractedText && file.name.toLowerCase().endsWith(".pdf")) {
-      console.log(`[AI Service] Extraction locale PDF.js des 15 premières pages pour '${file.name}'...`);
-      const extracted = await extractTextFromPdfInBrowser(file, 15);
+      console.log(`[AI Service] Extraction locale PDF.js (15 premières + 15 dernières pages) pour '${file.name}'...`);
+      const extracted = await extractTextFromPdfInBrowser(file);
       extractedText = extracted.text;
       totalPages = extracted.totalPages;
       console.log(`[AI Service] Extraction locale réussie : ${totalPages} pages détectées, ${extractedText.length} caractères extraits.`);
