@@ -11,6 +11,7 @@ import {
   Sparkles, 
   GraduationCap,
   PenTool,
+  UploadCloud,
   CheckCircle2
 } from "lucide-react";
 
@@ -147,7 +148,7 @@ export default function AuthorsPublicPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground py-12 md:py-16">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 space-y-12">
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 space-y-10">
         
         {/* Header Centré */}
         <div className="text-center max-w-3xl mx-auto space-y-4">
@@ -165,8 +166,34 @@ export default function AuthorsPublicPage() {
           </p>
         </div>
 
+        {/* Bannière d'appel à la soumission d'ouvrage */}
+        <div className="bg-navy text-white rounded-3xl p-6 sm:p-8 border border-gold/30 shadow-md relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 text-gold text-xs font-bold uppercase tracking-wider">
+              <PenTool className="w-4 h-4" />
+              Espace Auteurs &amp; Chercheurs
+            </div>
+            <h2 className="font-serif text-xl sm:text-2xl font-bold">
+              Vous êtes auteur ou enseignant ? Publiez votre ouvrage
+            </h2>
+            <p className="text-xs sm:text-sm text-white/80 max-w-2xl leading-relaxed">
+              Soumettez votre manuscrit ou traité scientifique à notre comité éditorial pour diffusion sur LAHAThèque avec protection numérique et rétribution garantie.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
+            <Link
+              href="/submit"
+              className="px-6 py-3.5 rounded-xl bg-gold hover:bg-gold-light text-navy font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md min-h-[44px]"
+            >
+              <UploadCloud className="w-4 h-4" />
+              Soumettre un ouvrage
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+
         {/* Filtres par Pays & Barre de Recherche */}
-        <div className="space-y-6 max-w-4xl mx-auto">
+        <div className="space-y-6 max-w-4xl mx-auto pt-2">
           
           {/* Pills Pays */}
           <div className="flex flex-wrap items-center justify-center gap-2">
@@ -315,14 +342,15 @@ export default function AuthorsPublicPage() {
           <div className="md:col-span-4 flex flex-col gap-3 justify-center">
             <Link
               href="/submit"
-              className="bg-gold hover:bg-gold-dark text-white px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md text-center"
+              className="bg-gold hover:bg-gold-light text-navy px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md text-center min-h-[44px]"
             >
-              Déposer un manuscrit
+              <UploadCloud className="w-4 h-4" />
+              Soumettre un ouvrage
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               href="/contact"
-              className="bg-background border border-border hover:border-gold text-foreground hover:text-navy px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 text-center"
+              className="bg-background border border-border hover:border-gold text-foreground hover:text-navy px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 text-center min-h-[44px]"
             >
               Contacter l'équipe éditoriale
             </Link>

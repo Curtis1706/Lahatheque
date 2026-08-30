@@ -19,6 +19,7 @@ import { Book } from "@/components/ui/book";
 import { CountingNumber } from "@/components/ui/counting-number";
 import { PanafricanPresenceSection } from "@/components/features/home/panafrican-presence-section";
 import { WhyChooseSection } from "@/components/features/home/why-choose-section";
+import { PartnerLogoMarquee } from "@/components/ui/partner-logo-marquee";
 
 const bestSellers = [
   {
@@ -427,6 +428,9 @@ export default function HomePage() {
 
       {/* Pourquoi choisir Lahathèque (Composant animé) */}
       <WhyChooseSection />
+
+      {/* Défilement des Logos Partenaires */}
+      <PartnerLogoMarquee />
 
       {/* CTA Final */}
       <section className="py-20 px-6 md:px-10 bg-gradient-to-b from-background-secondary to-background border-t border-border">

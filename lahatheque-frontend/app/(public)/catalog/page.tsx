@@ -15,7 +15,9 @@ import {
   Sparkles,
   UserCheck,
   Tag,
-  ArrowRight
+  ArrowRight,
+  Calendar,
+  School
 } from "lucide-react";
 import { Book } from "@/lib/types/catalog";
 import { searchBooks } from "@/lib/services/catalog";
@@ -32,6 +34,7 @@ export default function CatalogSearchPage() {
   const [selectedLanguage, setSelectedLanguage] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("");
   const [selectedFormat, setSelectedFormat] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   useEffect(() => {
@@ -45,7 +48,8 @@ export default function CatalogSearchPage() {
           institution: selectedInstitution || undefined,
           language: selectedLanguage || undefined,
           country: selectedCountry || undefined,
-          format: selectedFormat || undefined
+          format: selectedFormat || undefined,
+          year: selectedYear || undefined
         });
         setBooks(data);
       } catch (err) {
@@ -56,7 +60,7 @@ export default function CatalogSearchPage() {
     };
 
     fetchBooks();
-  }, [searchQuery, authorQuery, selectedDiscipline, selectedInstitution, selectedLanguage, selectedCountry, selectedFormat]);
+  }, [searchQuery, authorQuery, selectedDiscipline, selectedInstitution, selectedLanguage, selectedCountry, selectedFormat, selectedYear]);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -66,10 +70,11 @@ export default function CatalogSearchPage() {
     setSelectedLanguage("");
     setSelectedCountry("");
     setSelectedFormat("");
+    setSelectedYear("");
   };
 
   const hasActiveFilters = Boolean(
-    searchQuery || authorQuery || selectedDiscipline || selectedInstitution || selectedLanguage || selectedCountry || selectedFormat
+    searchQuery || authorQuery || selectedDiscipline || selectedInstitution || selectedLanguage || selectedCountry || selectedFormat || selectedYear
   );
 
   return (
@@ -160,6 +165,47 @@ export default function CatalogSearchPage() {
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Filtre Université / Établissement Partenaire */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-gold" />
+                Université / Établissement
+              </label>
+              <select
+                value={selectedInstitution}
+                onChange={(e) => setSelectedInstitution(e.target.value)}
+                className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
+              >
+                <option value="">Toutes les universités</option>
+                <option value="Abomey-Calavi">Université d'Abomey-Calavi (Bénin)</option>
+                <option value="Houphouët-Boigny">Université Félix Houphouët-Boigny (Côte d'Ivoire)</option>
+                <option value="Cheikh Anta Diop">Université Cheikh Anta Diop (Sénégal)</option>
+                <option value="Lomé">Université de Lomé (Togo)</option>
+                <option value="Gamal Abdel Nasser">Université Gamal Abdel Nasser (Guinée)</option>
+                <option value="Abdou Moumouni">Université Abdou Moumouni (Niger)</option>
+              </select>
+            </div>
+
+            {/* Filtre Année de Publication */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-gold" />
+                Année de Publication
+              </label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
+              >
+                <option value="">Toutes les années</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022 et antérieur</option>
+              </select>
             </div>
 
             {/* Filtre Discipline Académique */}
@@ -314,12 +360,19 @@ export default function CatalogSearchPage() {
                           <p className="text-xs text-foreground-muted font-medium">
                             Par <span className="text-navy font-semibold">{authorName}</span>
                           </p>
-                          {book.institution_name && (
-                            <p className="text-[11px] text-foreground-muted flex items-center gap-1">
-                              <Building2 className="w-3 h-3 text-gold shrink-0" />
-                              {book.institution_name}
-                            </p>
-                          )}
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            {book.institution_name && (
+                              <span className="text-[11px] text-foreground-muted flex items-center gap-1">
+                                <Building2 className="w-3 h-3 text-gold shrink-0" />
+                                {book.institution_name}
+                              </span>
+                            )}
+                            {book.publication_year && (
+                              <span className="text-[10px] font-semibold text-navy bg-navy/5 px-2 py-0.5 rounded border border-border">
+                                {book.publication_year}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Prix & Action */}

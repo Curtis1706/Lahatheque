@@ -21,6 +21,7 @@ export interface Book {
   language: string;
   country: string;
   summary: string;
+  publication_year?: number;
   price?: number;
   currency?: string;
   cover_color?: string;

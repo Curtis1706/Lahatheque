@@ -9,6 +9,7 @@ export interface SearchFilters {
   language?: string;
   country?: string;
   format?: string;
+  year?: string | number;
 }
 
 export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
@@ -21,6 +22,7 @@ export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
     if (filters.language) params.set("language", filters.language);
     if (filters.country) params.set("country", filters.country);
     if (filters.format) params.set("format", filters.format);
+    if (filters.year) params.set("year", filters.year.toString());
 
     const queryStr = params.toString() ? `?${params.toString()}` : "";
     const res = await fetch(`/api/bff/catalog/books/${queryStr}`, {
@@ -57,11 +59,17 @@ export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
     if (filters.discipline) {
       if (book.discipline_detail.id.toString() !== filters.discipline.toString()) return false;
     }
+    if (filters.institution) {
+      if (!book.institution_name.toLowerCase().includes(filters.institution.toLowerCase())) return false;
+    }
     if (filters.country) {
       if (book.country.toLowerCase() !== filters.country.toLowerCase()) return false;
     }
     if (filters.format) {
       if (book.format_type.toLowerCase() !== filters.format.toLowerCase()) return false;
+    }
+    if (filters.year) {
+      if (book.publication_year?.toString() !== filters.year.toString()) return false;
     }
     return true;
   });
