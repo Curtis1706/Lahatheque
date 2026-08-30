@@ -657,19 +657,22 @@ class ONIXImportView(APIView):
 
 
 class PreEditionSearchView(APIView):
-    """GET /api/v1/catalog/pre-editions/search/?q=... - Recherche pour rattachement au dépôt."""
+    """GET /api/v1/catalog/pre-editions/search/?q=... - Recherche et liste pour rattachement au dépôt."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         from apps.rights.models import PreEditionDossier
+        from django.db.models import Q
 
         query = request.query_params.get('q', '').strip()
         dossiers = PreEditionDossier.objects.filter(
-            status__in=['en_attente_depot', 'maquette_en_cours']
+            status__in=['en_attente_depot', 'maquette_en_cours', 'valide_legalement']
         )
         if query:
             dossiers = dossiers.filter(
-                Q(titre_previsionnel__icontains=query) | Q(auteur_nom__icontains=query)
+                Q(titre_previsionnel__icontains=query) |
+                Q(auteur_nom__icontains=query) |
+                Q(code_dossier__icontains=query)
             )
 
         results = [{
@@ -677,9 +680,10 @@ class PreEditionSearchView(APIView):
             "code_dossier": d.code_dossier,
             "titre_previsionnel": d.titre_previsionnel,
             "auteur_nom": d.auteur_nom,
-            "auteur_email": d.auteur_email,
-            "universite_nom": d.universite_nom,
-            "faculte_nom": d.faculte_nom,
-        } for d in dossiers[:15]]
+            "auteur_email": d.auteur_email or "",
+            "universite_nom": d.universite_nom or "",
+            "faculte_nom": d.faculte_nom or "",
+            "status": d.status,
+        } for d in dossiers.order_by('-created_at')[:50]]
 
         return Response({"success": True, "data": results})

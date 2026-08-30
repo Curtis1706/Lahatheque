@@ -21,7 +21,9 @@ import {
   Check,
   Search,
   FileText,
-  X
+  X,
+  ChevronDown,
+  RotateCcw
 } from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
@@ -33,6 +35,7 @@ import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/
 import type { ClassificationSource } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { cn } from "@/lib/utils";
 
 import { 
   GENRE_CATEGORIES, 
@@ -51,11 +54,12 @@ export default function NewDepositPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
-  // Pre-Edition State
+  // Pre-Edition State (Select Combobox)
   const [preEditionSearch, setPreEditionSearch] = useState("");
-  const [preEditionResults, setPreEditionResults] = useState<PreEditionSearchResult[]>([]);
+  const [allPreEditions, setAllPreEditions] = useState<PreEditionSearchResult[]>([]);
+  const [isPreEditionOpen, setIsPreEditionOpen] = useState(false);
   const [selectedPreEdition, setSelectedPreEdition] = useState<PreEditionSearchResult | null>(null);
-  const [searchingPreEdition, setSearchingPreEdition] = useState(false);
+  const [loadingPreEditions, setLoadingPreEditions] = useState(false);
 
   // Form State
   const [bookFile, setBookFile] = useState<File | null>(null);
@@ -85,17 +89,27 @@ export default function NewDepositPage() {
   const [keywords, setKeywords] = useState<string[]>([]);
   const [onixXml, setOnixXml] = useState<string>("");
 
+  // IA State
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<AiBookAnalysisResult | null>(null);
+  const [hasAppliedAi, setHasAppliedAi] = useState(false);
+
   React.useEffect(() => {
     getDisciplines().then((res) => {
       if (res && res.length > 0) {
         setRealDisciplines(res);
       }
     });
-  }, []);
 
-  // IA State
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState<AiBookAnalysisResult | null>(null);
+    // Préchargement automatique des dossiers de pré-édition disponibles
+    setLoadingPreEditions(true);
+    searchPreEditions("").then((res) => {
+      setAllPreEditions(res || []);
+      setLoadingPreEditions(false);
+    }).catch(() => {
+      setLoadingPreEditions(false);
+    });
+  }, []);
 
   const handleBookFileSelect = async (file: File) => {
     setBookFile(file);
@@ -134,6 +148,7 @@ export default function NewDepositPage() {
         if (res.data.target_audience) setTargetAudience(res.data.target_audience);
         if (res.data.keywords) setKeywords(res.data.keywords);
         if (res.data.onix_3_xml) setOnixXml(res.data.onix_3_xml);
+        setHasAppliedAi(true);
       }
     } catch (e) {
       console.error("[Deposit AI Error]", e);
@@ -164,7 +179,8 @@ export default function NewDepositPage() {
     if (aiResult.target_audience) setTargetAudience(aiResult.target_audience);
     if (aiResult.keywords) setKeywords(aiResult.keywords);
     if (aiResult.onix_3_xml) setOnixXml(aiResult.onix_3_xml);
-    toast.success("Toutes les suggestions IA ont été appliquées avec succès !");
+    setHasAppliedAi(true);
+    toast.success("Suggestions IA réappliquées avec succès sur l'ensemble des champs !");
   };
 
   const handleCoverSelect = (file: File) => {
@@ -172,40 +188,32 @@ export default function NewDepositPage() {
     setCoverPreview(URL.createObjectURL(file));
   };
 
-  const handleSearchPreEditions = async (query: string) => {
-    setPreEditionSearch(query);
-    if (!query.trim()) {
-      setPreEditionResults([]);
-      return;
-    }
-    setSearchingPreEdition(true);
-    try {
-      const results = await searchPreEditions(query);
-      setPreEditionResults(results);
-    } catch {
-      setPreEditionResults([]);
-    } finally {
-      setSearchingPreEdition(false);
-    }
-  };
-
-  const handleSelectPreEdition = (dossier: PreEditionSearchResult) => {
+  const handleSelectPreEdition = (dossier: PreEditionSearchResult | null) => {
     setSelectedPreEdition(dossier);
-    setPreEditionResults([]);
-    setPreEditionSearch(dossier.titre_previsionnel);
-    if (dossier.titre_previsionnel) setTitle(dossier.titre_previsionnel);
-    if (dossier.auteur_nom) setAuthorsStr(dossier.auteur_nom);
-    if (dossier.auteur_email) setAuthorsEmailsStr(dossier.auteur_email);
-    if (dossier.universite_nom) setUniversity(dossier.universite_nom);
-    if (dossier.faculte_nom) setFaculty(dossier.faculte_nom);
-    toast.success(`Dossier ${dossier.code_dossier} rattaché ! Métadonnées pré-remplies.`);
+    setIsPreEditionOpen(false);
+    setPreEditionSearch("");
+    if (dossier) {
+      if (dossier.titre_previsionnel) setTitle(dossier.titre_previsionnel);
+      if (dossier.auteur_nom) setAuthorsStr(dossier.auteur_nom);
+      if (dossier.auteur_email) setAuthorsEmailsStr(dossier.auteur_email);
+      if (dossier.universite_nom) setUniversity(dossier.universite_nom);
+      if (dossier.faculte_nom) setFaculty(dossier.faculte_nom);
+      toast.success(`Dossier ${dossier.code_dossier} rattaché ! Métadonnées pré-remplies.`);
+    } else {
+      toast.info("Rattachement retiré. Saisie libre activée.");
+    }
   };
 
-  const handleClearPreEdition = () => {
-    setSelectedPreEdition(null);
-    setPreEditionSearch("");
-    setPreEditionResults([]);
-  };
+  const filteredPreEditions = allPreEditions.filter((d) => {
+    if (!preEditionSearch.trim()) return true;
+    const q = preEditionSearch.toLowerCase();
+    return (
+      d.code_dossier.toLowerCase().includes(q) ||
+      d.titre_previsionnel.toLowerCase().includes(q) ||
+      d.auteur_nom.toLowerCase().includes(q) ||
+      (d.universite_nom && d.universite_nom.toLowerCase().includes(q))
+    );
+  });
 
   const handleGenreChange = (newGenre: string) => {
     setGenreCategory(newGenre);
@@ -394,13 +402,23 @@ export default function NewDepositPage() {
               </div>
             </div>
 
-            <button
-              onClick={handleApplyAllAiData}
-              className="px-4 py-2 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] cursor-pointer"
-            >
-              <Wand2 className="w-3.5 h-3.5" />
-              Tout Appliquer en 1 Clic
-            </button>
+            {hasAppliedAi ? (
+              <button
+                onClick={handleApplyAllAiData}
+                className="px-4 py-2 rounded-xl bg-gold/20 text-gold hover:bg-gold hover:text-navy border border-gold/40 text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Réappliquer les suggestions IA
+              </button>
+            ) : (
+              <button
+                onClick={handleApplyAllAiData}
+                className="px-4 py-2 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] cursor-pointer"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                Tout Appliquer en 1 Clic
+              </button>
+            )}
           </div>
 
           {aiResult.keywords && aiResult.keywords.length > 0 && (
@@ -491,8 +509,20 @@ export default function NewDepositPage() {
           <div className="space-y-4">
             {/* Rattachement Pré-édition */}
             <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-gold" />
+                  Dossier de pré-édition Juriste (Facultatif)
+                </label>
+                {allPreEditions.length > 0 && (
+                  <span className="text-[11px] font-semibold text-gold">
+                    {allPreEditions.length} dossier{allPreEditions.length > 1 ? "s" : ""} disponible{allPreEditions.length > 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+
               {selectedPreEdition ? (
-                <div className="p-3.5 bg-navy/5 border border-navy/20 rounded-2xl flex items-center justify-between gap-3">
+                <div className="p-3.5 bg-navy/5 border border-gold/30 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-gold/10 text-gold flex items-center justify-center shrink-0">
                       <CheckCircle2 className="w-4 h-4" />
@@ -510,59 +540,101 @@ export default function NewDepositPage() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleClearPreEdition}
-                    className="p-1.5 text-foreground-muted hover:text-red-500 rounded-lg hover:bg-background transition-colors"
-                    title="Détacher le dossier"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsPreEditionOpen(true)}
+                      className="px-2.5 py-1.5 text-[11px] font-bold text-gold bg-gold/10 hover:bg-gold/20 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Changer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPreEdition(null)}
+                      className="p-1.5 text-foreground-muted hover:text-red-500 rounded-lg hover:bg-background transition-colors cursor-pointer"
+                      title="Détacher le dossier"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="relative">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5 mb-1.5">
-                    <FileText className="w-3.5 h-3.5 text-gold" />
-                    Dossier de pré-édition Juriste (Facultatif)
-                  </label>
-                  <div className="relative">
-                    <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Rechercher par titre provisoire ou nom d'auteur pré-enregistré..."
-                      value={preEditionSearch}
-                      onChange={(e) => handleSearchPreEditions(e.target.value)}
-                      className="w-full bg-background-secondary border border-border rounded-xl pl-9 pr-3 py-2.5 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                    />
-                    {searchingPreEdition && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gold">
-                        <InlineLoader size={14} />
+                  {/* Select Trigger Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsPreEditionOpen(!isPreEditionOpen)}
+                    className="w-full bg-background-secondary border border-border rounded-xl px-3.5 py-2.5 text-xs text-left flex items-center justify-between gap-2 hover:border-navy focus:ring-2 focus:ring-navy min-h-[44px] transition-colors cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2 text-foreground-muted truncate">
+                      <Search className="w-4 h-4 text-foreground-muted shrink-0" />
+                      {loadingPreEditions ? "Chargement des dossiers pré-enregistrés..." : "Sélectionner ou rechercher un dossier de pré-édition..."}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0 text-foreground-muted">
+                      {loadingPreEditions && <InlineLoader size={12} />}
+                      <ChevronDown className={cn("w-4 h-4 transition-transform", isPreEditionOpen && "rotate-180")} />
+                    </div>
+                  </button>
+
+                  {/* Dropdown with Search Input & List */}
+                  {isPreEditionOpen && (
+                    <div className="absolute z-30 top-full mt-1.5 left-0 right-0 bg-background border border-border rounded-2xl shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+                      {/* Search Bar inside dropdown */}
+                      <div className="p-2.5 border-b border-border bg-background-secondary">
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Filtrer par titre, nom d'auteur ou code dossier..."
+                            value={preEditionSearch}
+                            onChange={(e) => setPreEditionSearch(e.target.value)}
+                            autoFocus
+                            className="w-full bg-background border border-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[36px]"
+                          />
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  {preEditionResults.length > 0 && (
-                    <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-background border border-border rounded-xl shadow-lg max-h-56 overflow-y-auto divide-y divide-border">
-                      {preEditionResults.map((dossier) => (
+
+                      {/* List */}
+                      <div className="max-h-60 overflow-y-auto divide-y divide-border">
                         <button
-                          key={dossier.id}
                           type="button"
-                          onClick={() => handleSelectPreEdition(dossier)}
-                          className="w-full text-left p-3 hover:bg-navy/5 transition-colors flex items-center justify-between gap-3 text-xs"
+                          onClick={() => handleSelectPreEdition(null)}
+                          className="w-full text-left p-3 hover:bg-navy/5 transition-colors flex items-center justify-between text-xs text-foreground-muted italic cursor-pointer"
                         >
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-[10px] font-bold text-gold px-1.5 py-0.5 bg-gold/10 rounded">
-                                {dossier.code_dossier}
-                              </span>
-                              <span className="font-semibold text-navy">{dossier.titre_previsionnel}</span>
-                            </div>
-                            <p className="text-[11px] text-foreground-muted mt-0.5">
-                              {dossier.auteur_nom} · {dossier.universite_nom}
-                            </p>
-                          </div>
-                          <span className="text-[11px] font-bold text-gold shrink-0">Rattacher →</span>
+                          <span>Aucun dossier (Saisie manuelle libre)</span>
                         </button>
-                      ))}
+
+                        {filteredPreEditions.length > 0 ? (
+                          filteredPreEditions.map((dossier) => (
+                            <button
+                              key={dossier.id}
+                              type="button"
+                              onClick={() => handleSelectPreEdition(dossier)}
+                              className="w-full text-left p-3 hover:bg-navy/5 transition-colors flex items-center justify-between gap-3 text-xs cursor-pointer"
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-[10px] font-bold text-gold px-1.5 py-0.5 bg-gold/10 rounded">
+                                    {dossier.code_dossier}
+                                  </span>
+                                  <span className="font-semibold text-navy">{dossier.titre_previsionnel}</span>
+                                </div>
+                                <p className="text-[11px] text-foreground-muted mt-0.5">
+                                  Auteur : <strong className="text-foreground">{dossier.auteur_nom}</strong>
+                                  {dossier.universite_nom ? ` · ${dossier.universite_nom}` : ""}
+                                </p>
+                              </div>
+                              <span className="text-[11px] font-bold text-gold shrink-0 bg-gold/10 hover:bg-gold hover:text-navy px-2.5 py-1 rounded-lg transition-colors">
+                                Rattacher →
+                              </span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-xs text-foreground-muted">
+                            Aucun dossier trouvé pour &quot;{preEditionSearch}&quot;.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

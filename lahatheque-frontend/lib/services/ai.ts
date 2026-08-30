@@ -65,25 +65,34 @@ export async function extractBookMetadataWithAi(
       formData.append("text", textSample);
     }
 
-    // Timeout de 45s adapté à l'extraction approfondie des 15 pages par PyMuPDF + OpenAI
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    console.log(`[AI Service] Début de l'analyse pour '${filename || file?.name}' (${file ? (file.size / 1024 / 1024).toFixed(2) + ' Mo' : 'texte'})`);
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 60000) : null;
 
     const res = await fetch("/api/bff/ai/extract-metadata/", {
       method: "POST",
       body: formData,
-      signal: controller.signal,
+      credentials: "include",
+      signal: controller ? controller.signal : undefined,
     });
-    clearTimeout(timeoutId);
+    
+    if (timeoutId) clearTimeout(timeoutId);
+
+    console.log(`[AI Service] Statut HTTP reçu : ${res.status} ${res.statusText}`);
 
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.data) {
+        console.log("[AI Service] Données IA récupérées avec succès :", data.data.title);
         return { success: true, data: data.data };
       }
+    } else {
+      const errorText = await res.text().catch(() => "");
+      console.warn(`[AI Service] Erreur backend (${res.status}):`, errorText);
     }
   } catch (err) {
-    console.warn("[AI Service] Fallback immédiat vers l'analyse contextuelle locale:", err);
+    console.warn("[AI Service] Exception réseau / Timeout -> Fallback contextuel:", err);
   }
 
   // Simulation intelligente contextuelle immédiate
