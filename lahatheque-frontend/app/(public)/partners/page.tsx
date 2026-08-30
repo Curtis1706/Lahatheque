@@ -111,8 +111,7 @@ const PARTNER_PROFILES = [
     stats: [
       { value: "Jusqu'à -35%", label: "Remises Distributeur & Volume" },
       { value: "48h / 72h", label: "Réassort Logistique Régional" },
-      { value: "+500", label: "Titres Scolaires & Supérieurs" },
-      { value: "4 Hubs", label: "Dépôts Bénin, Togo, Gabon, RDC" }
+      { value: "+500", label: "Titres Scolaires & Supérieurs" }
     ],
     features: [
       {
@@ -123,7 +122,7 @@ const PARTNER_PROFILES = [
       {
         icon: Truck,
         title: "Logistique & Réassort Rapide",
-        description: "Dépôts et hubs logistiques locaux (Cotonou, Lomé, Libreville, Kinshasa) pour un approvisionnement continu sans rupture."
+        description: "Réseau logistique optimisé pour un approvisionnement continu sans rupture dans tout le réseau partenaire."
       },
       {
         icon: Layers,
@@ -136,57 +135,6 @@ const PARTNER_PROFILES = [
         description: "Espace en ligne pour suivre vos bons de commande, bordereaux de livraison et délais de paiement négociés."
       }
     ]
-  }
-];
-
-const INSTITUTIONS_LIST = [
-  {
-    name: "Université d'Abomey-Calavi (UAC)",
-    country: "Bénin",
-    tag: "UAC",
-    faculties: "FADESP, FASEG, FSS, FAST",
-    students: "+45 000 étudiants",
-    description: "Convention globale pour les facultés de droit, sciences économiques et sciences de la santé."
-  },
-  {
-    name: "Université Félix Houphouët-Boigny (UFHB)",
-    country: "Côte d'Ivoire",
-    tag: "UFHB",
-    faculties: "Sciences Éco, Droit, Médecine, SHS",
-    students: "+55 000 étudiants",
-    description: "Accès simultané sur les campus de Cocody avec intégration aux portails documentaires."
-  },
-  {
-    name: "Université Cheikh Anta Diop (UCAD)",
-    country: "Sénégal",
-    tag: "UCAD",
-    faculties: "FSJP, FASEG, FMPO, ESP",
-    students: "+60 000 étudiants",
-    description: "Bouquets spécialisés en droit OHADA, politiques publiques et sciences médicales."
-  },
-  {
-    name: "Université de Lomé (UL)",
-    country: "Togo",
-    tag: "UL",
-    faculties: "FDD, FASEG, FDS, FSS",
-    students: "+30 000 étudiants",
-    description: "Déploiement complet des manuels de référence SYSCOHADA et droit des affaires."
-  },
-  {
-    name: "Université Abdou Moumouni (UAM)",
-    country: "Niger",
-    tag: "UAM",
-    faculties: "FSEJ, FAST, FSS",
-    students: "+25 000 étudiants",
-    description: "Accès numérique sécurisé aux cours magistraux et thèses de doctorat."
-  },
-  {
-    name: "Université Gamal Abdel Nasser (UGANC)",
-    country: "Guinée",
-    tag: "UGANC",
-    faculties: "Médecine, Droit, Sciences Éco",
-    students: "+20 000 étudiants",
-    description: "Programme d'enrichissement documentaire pour les cycles Licence et Master LMD."
   }
 ];
 
@@ -273,7 +221,7 @@ export default function PartnersPublicPage() {
             </div>
 
             {/* Statistiques Profil */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border">
+            <div className={`grid grid-cols-2 ${currentProfile.stats.length === 3 ? "md:grid-cols-3" : "md:grid-cols-4"} gap-4 pt-4 border-t border-border`}>
               {currentProfile.stats.map((st, sIdx) => (
                 <div key={sIdx} className="bg-background p-4 rounded-2xl border border-border text-center space-y-1">
                   <span className="font-serif text-2xl sm:text-3xl font-bold text-navy block">{st.value}</span>
@@ -324,59 +272,6 @@ export default function PartnersPublicPage() {
           </div>
 
         </div>
-
-        {/* Grille des Établissements Partenaires si onglet Université */}
-        {activeTab === "university" && (
-          <div className="space-y-8 max-w-6xl mx-auto pt-6">
-            <div className="text-center space-y-2 max-w-2xl mx-auto">
-              <span className="text-xs font-bold uppercase tracking-widest text-gold">
-                Réseau Académique
-              </span>
-              <h3 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-                Ils font confiance à LAHAThèque
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {INSTITUTIONS_LIST.map((inst, i) => (
-                <div 
-                  key={i}
-                  className="bg-background-secondary p-6 rounded-3xl border border-border space-y-4 shadow-sm hover:border-gold transition-all duration-300 flex flex-col justify-between"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-navy bg-gold/10 px-2.5 py-0.5 rounded-md border border-gold/20">
-                        {inst.tag}
-                      </span>
-                      <span className="text-xs font-semibold text-foreground-muted">
-                        {inst.country}
-                      </span>
-                    </div>
-
-                    <h4 className="font-serif font-bold text-navy text-base leading-snug">
-                      {inst.name}
-                    </h4>
-
-                    <p className="text-xs text-foreground-muted leading-relaxed">
-                      {inst.description}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 pt-4 border-t border-border text-xs">
-                    <div className="flex items-center justify-between text-foreground-muted">
-                      <span>Facultés :</span>
-                      <span className="font-semibold text-navy">{inst.faculties}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-foreground-muted">
-                      <span>Effectif :</span>
-                      <span className="font-bold text-gold">{inst.students}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Défilement des Logos Universités & Institutions Partenaires */}
         <PartnerLogoMarquee 

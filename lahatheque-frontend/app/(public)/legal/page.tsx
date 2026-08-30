@@ -44,40 +44,40 @@ export default function LegalPage() {
               <h2>1. Éditeur de la Plateforme</h2>
             </div>
             <p>
-              La plateforme numérique <strong>LAHAThèque</strong> est éditée par les Éditions LAHA, société spécialisée dans l'édition et la diffusion d'ouvrages scolaires, universitaires et scientifiques.
+              La plateforme numérique <strong>LAHAThèque</strong> est éditée par <strong>Laha Éditions SA</strong>, société spécialisée dans l'édition et la diffusion d'ouvrages scolaires, universitaires et scientifiques.
             </p>
             <ul className="space-y-1.5 text-foreground-muted list-disc list-inside">
-              <li><strong>Raison sociale :</strong> Éditions LAHA SARL</li>
+              <li><strong>Raison sociale :</strong> Laha Éditions SA</li>
               <li><strong>Siège social :</strong> Cotonou, République du Bénin</li>
               <li><strong>Courriel de contact :</strong> contact@lahatheque.com</li>
-              <li><strong>Directeur de la publication :</strong> Direction Générale des Éditions LAHA</li>
+              <li><strong>Directeur de la publication :</strong> Direction Générale de Laha Éditions SA</li>
             </ul>
           </section>
 
           <section className="bg-background-secondary p-6 rounded-xl border border-border space-y-4">
             <div className="flex items-center gap-3 text-navy font-bold font-serif text-lg">
               <Globe className="w-5 h-5 text-gold shrink-0" />
-              <h2>2. Hébergement & Sécurité des Données</h2>
+              <h2>2. Hébergement &amp; Sécurité des Données</h2>
             </div>
             <p>
               L'infrastructure et les serveurs de stockage sécurisés sont hébergés conformément aux normes internationales de disponibilité et de protection des données :
             </p>
             <ul className="space-y-1.5 text-foreground-muted list-disc list-inside">
               <li><strong>Infrastructure Cloud :</strong> Environnement haute disponibilité avec chiffrement au repos (AES-256) et en transit (TLS 1.3).</li>
-              <li><strong>Protection DRM & Filigrane dynamique :</strong> Tous les flux de lecture sont protégés par le module de sécurité propriétaire LAHA DRM empêchant toute capture ou extraction non autorisée.</li>
+              <li><strong>Protection DRM &amp; Filigrane dynamique :</strong> Tous les flux de lecture sont protégés par le module de sécurité propriétaire LAHA DRM empêchant toute capture ou extraction non autorisée.</li>
             </ul>
           </section>
 
           <section className="bg-background-secondary p-6 rounded-xl border border-border space-y-4">
             <div className="flex items-center gap-3 text-navy font-bold font-serif text-lg">
               <ShieldCheck className="w-5 h-5 text-gold shrink-0" />
-              <h2>3. Propriété Intellectuelle & Droits d'Auteur</h2>
+              <h2>3. Propriété Intellectuelle &amp; Droits d'Auteur</h2>
             </div>
             <p>
               L'ensemble des contenus présents sur LAHAThèque (textes, manuscrits, thèses, ouvrages, illustrations, logos, interfaces et architectures logicielles) est protégé par le Code de la propriété intellectuelle et les traités internationaux relatifs aux droits d'auteur (OAPI, OMPI, Convention de Berne).
             </p>
             <p className="text-foreground-muted">
-              Toute reproduction, représentation, modification, publication, adaptation totale ou partielle des éléments de la plateforme, quel que soit le moyen ou le procédé utilisé, est strictement interdite sans autorisation écrite préalable des Éditions LAHA ou des titulaires de droits respectifs.
+              Toute reproduction, représentation, modification, publication, adaptation totale ou partielle des éléments de la plateforme, quel que soit le moyen ou le procédé utilisé, est strictement interdite sans autorisation écrite préalable de <strong>Laha Éditions SA</strong> ou des titulaires de droits respectifs.
             </p>
           </section>
 

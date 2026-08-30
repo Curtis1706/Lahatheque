@@ -1,10 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Mail, ArrowRight } from "lucide-react";
 
-export default function ContactPage() {
+function ContactFormContent() {
+  const searchParams = useSearchParams();
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const needParam = searchParams.get("need");
+    if (needParam) {
+      const match = needsList.find(n => n.toLowerCase().includes(needParam.toLowerCase()) || needParam.toLowerCase().includes(n.toLowerCase()));
+      if (match && !selectedNeeds.includes(match)) {
+        setSelectedNeeds([match]);
+      }
+    }
+  }, [searchParams]);
 
   const handleCheckboxChange = (need: string) => {
     setSelectedNeeds((prev) => 
@@ -239,5 +251,13 @@ export default function ContactPage() {
       </section>
 
     </div>
+  );
+}
+
+export default function ContactPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background py-20 text-center text-sm text-foreground-muted">Chargement du formulaire...</div>}>
+      <ContactFormContent />
+    </Suspense>
   );
 }

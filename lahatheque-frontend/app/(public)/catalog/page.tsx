@@ -7,7 +7,6 @@ import {
   BookOpen, 
   Building2, 
   GraduationCap, 
-  Globe, 
   FileText, 
   Headphones, 
   Filter, 
@@ -32,7 +31,6 @@ export default function CatalogSearchPage() {
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
   const [selectedInstitution, setSelectedInstitution] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState("");
   const [selectedFormat, setSelectedFormat] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -47,7 +45,6 @@ export default function CatalogSearchPage() {
           discipline: selectedDiscipline || undefined,
           institution: selectedInstitution || undefined,
           language: selectedLanguage || undefined,
-          country: selectedCountry || undefined,
           format: selectedFormat || undefined,
           year: selectedYear || undefined
         });
@@ -60,7 +57,7 @@ export default function CatalogSearchPage() {
     };
 
     fetchBooks();
-  }, [searchQuery, authorQuery, selectedDiscipline, selectedInstitution, selectedLanguage, selectedCountry, selectedFormat, selectedYear]);
+  }, [searchQuery, authorQuery, selectedDiscipline, selectedInstitution, selectedLanguage, selectedFormat, selectedYear]);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -68,13 +65,12 @@ export default function CatalogSearchPage() {
     setSelectedDiscipline("");
     setSelectedInstitution("");
     setSelectedLanguage("");
-    setSelectedCountry("");
     setSelectedFormat("");
     setSelectedYear("");
   };
 
   const hasActiveFilters = Boolean(
-    searchQuery || authorQuery || selectedDiscipline || selectedInstitution || selectedLanguage || selectedCountry || selectedFormat || selectedYear
+    searchQuery || authorQuery || selectedDiscipline || selectedInstitution || selectedLanguage || selectedFormat || selectedYear
   );
 
   return (
@@ -179,12 +175,10 @@ export default function CatalogSearchPage() {
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
                 <option value="">Toutes les universités</option>
-                <option value="Abomey-Calavi">Université d'Abomey-Calavi (Bénin)</option>
-                <option value="Houphouët-Boigny">Université Félix Houphouët-Boigny (Côte d'Ivoire)</option>
-                <option value="Cheikh Anta Diop">Université Cheikh Anta Diop (Sénégal)</option>
-                <option value="Lomé">Université de Lomé (Togo)</option>
-                <option value="Gamal Abdel Nasser">Université Gamal Abdel Nasser (Guinée)</option>
-                <option value="Abdou Moumouni">Université Abdou Moumouni (Niger)</option>
+                <option value="UAC">Université d'Abomey-Calavi (UAC)</option>
+                <option value="UP">Université de Parakou (UP)</option>
+                <option value="UNSTIM">Université Nationale des Sciences, Technologies, Ingénierie et Mathématiques (UNSTIM)</option>
+                <option value="UNA">Université Nationale d'Agriculture (UNA)</option>
               </select>
             </div>
 
@@ -208,11 +202,11 @@ export default function CatalogSearchPage() {
               </select>
             </div>
 
-            {/* Filtre Discipline Académique */}
+            {/* Filtre Discipline Académique & Matières */}
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
                 <GraduationCap className="w-3.5 h-3.5 text-gold" />
-                Discipline Académique
+                Discipline &amp; Matière
               </label>
               <select
                 value={selectedDiscipline}
@@ -220,10 +214,50 @@ export default function CatalogSearchPage() {
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
                 <option value="">Toutes les disciplines</option>
-                <option value="1">Droit &amp; Sciences Politiques</option>
-                <option value="2">Économie &amp; Gestion</option>
-                <option value="3">Médecine &amp; Santé</option>
-                <option value="4">Sciences Humaines &amp; Lettres</option>
+
+                <optgroup label="Enseignement Supérieur &amp; Recherche">
+                  <option value="Agriculture">Agriculture, Agronomie &amp; Élevage</option>
+                  <option value="Droit">Droit &amp; Sciences Politiques</option>
+                  <option value="Économie">Sciences Économiques &amp; Gestion</option>
+                  <option value="Comptabilité">Comptabilité, Audit &amp; Finance (SYSCOHADA)</option>
+                  <option value="Médecine">Médecine, Pharmacie &amp; Santé Publique</option>
+                  <option value="Informatique">Informatique, Télécoms &amp; IA</option>
+                  <option value="Ingénierie">Sciences de l'Ingénieur &amp; BTP</option>
+                  <option value="Sciences Exactes">Mathématiques &amp; Physique-Chimie (Univ)</option>
+                  <option value="Sciences Humaines">Philosophie, Sociologie &amp; Psychologie</option>
+                  <option value="Lettres">Lettres Modernes, Langues &amp; Communication</option>
+                  <option value="Histoire">Histoire, Civilisations &amp; Anthropologie</option>
+                  <option value="Pédagogie">Sciences de l'Éducation &amp; Didactique</option>
+                </optgroup>
+
+                <optgroup label="Secondaire (Collège &amp; Lycée)">
+                  <option value="Mathématiques">Mathématiques</option>
+                  <option value="PCT">Physique, Chimie &amp; Technologie (PCT)</option>
+                  <option value="SVT">Sciences de la Vie et de la Terre (SVT)</option>
+                  <option value="Français">Français &amp; Littérature</option>
+                  <option value="Histoire-Géo">Histoire &amp; Géographie</option>
+                  <option value="Philosophie">Philosophie (Terminale)</option>
+                  <option value="Anglais">Anglais &amp; Langues Vivantes</option>
+                  <option value="Langues Nationales">Langues Nationales Africaines</option>
+                  <option value="Éducation Civique">Éducation Civique &amp; Citoyenneté</option>
+                  <option value="Éducation Artistique">Arts Plastiques &amp; Musique</option>
+                  <option value="EPS">Éducation Physique &amp; Sportive (EPS)</option>
+                </optgroup>
+
+                <optgroup label="Primaire &amp; Préscolaire">
+                  <option value="Lecture">Lecture, Écriture &amp; Vocabulaire</option>
+                  <option value="Calcul">Calcul &amp; Mathématiques Élémentaires</option>
+                  <option value="Éveil">Éveil Scientifique &amp; Environnement</option>
+                  <option value="Contes">Contes, Récits &amp; Éveil Culturel</option>
+                </optgroup>
+
+                <optgroup label="Culture &amp; Grand Public">
+                  <option value="Romans">Romans, Récits &amp; Nouvelles</option>
+                  <option value="Littérature Africaine">Littérature Africaine &amp; Poésie</option>
+                  <option value="BD">Bandes Dessinées, Mangas &amp; Jeunesse</option>
+                  <option value="Développement Personnel">Développement Personnel &amp; Société</option>
+                  <option value="Arts">Arts, Culture &amp; Cuisine</option>
+                </optgroup>
               </select>
             </div>
 
@@ -242,25 +276,6 @@ export default function CatalogSearchPage() {
                 <option value="pdf">Livre Numérique (PDF DRM)</option>
                 <option value="epub">Livre Numérique (EPUB)</option>
                 <option value="audio">Livre Audio (Streaming)</option>
-              </select>
-            </div>
-
-            {/* Filtre Pays */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-gold" />
-                Zone &amp; Pays Partenaire
-              </label>
-              <select
-                value={selectedCountry}
-                onChange={(e) => setSelectedCountry(e.target.value)}
-                className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
-              >
-                <option value="">Tous les pays</option>
-                <option value="BJ">Bénin (BJ)</option>
-                <option value="CI">Côte d'Ivoire (CI)</option>
-                <option value="SN">Sénégal (SN)</option>
-                <option value="TG">Togo (TG)</option>
               </select>
             </div>
           </aside>
