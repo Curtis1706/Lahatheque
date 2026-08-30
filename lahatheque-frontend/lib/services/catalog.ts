@@ -57,7 +57,10 @@ export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
       if (!matchAuthor) return false;
     }
     if (filters.discipline) {
-      if (book.discipline_detail.id.toString() !== filters.discipline.toString()) return false;
+      const discQuery = filters.discipline.toLowerCase();
+      const matchId = book.discipline_detail?.id?.toString() === filters.discipline.toString();
+      const matchName = book.discipline_detail?.name?.toLowerCase().includes(discQuery);
+      if (!matchId && !matchName) return false;
     }
     if (filters.institution) {
       if (!book.institution_name.toLowerCase().includes(filters.institution.toLowerCase())) return false;
