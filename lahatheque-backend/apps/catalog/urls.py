@@ -8,6 +8,7 @@ from .views import (
     ChiefLayoutValidationViewSet,
     ONIXImportView,
     PreEditionSearchView,
+    AuthorSearchView,
 )
 from .stream_views import BookStreamView
 
@@ -26,6 +27,8 @@ router.register(r'deposits', ChiefLayoutValidationViewSet, basename='deposits')
 
 urlpatterns = [
     path('pre-editions/search/', PreEditionSearchView.as_view(), name='pre-edition-search'),
+    path('authors/search/', AuthorSearchView.as_view(), name='catalog-authors-search'),
     path('onix/import/', ONIXImportView.as_view(), name='onix-import'),
     path('books/<str:book_id>/stream/', BookStreamView.as_view(), name='book-stream'),
 ] + router.urls
+

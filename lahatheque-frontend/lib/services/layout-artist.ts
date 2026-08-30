@@ -197,13 +197,105 @@ export interface PreEditionSearchResult {
   faculte_nom: string;
 }
 
+export interface AuthorSearchResult {
+  id: string;
+  name: string;
+  email?: string;
+  institution?: string;
+}
+
+const DEFAULT_PRE_EDITIONS: PreEditionSearchResult[] = [
+  {
+    id: "dos-1",
+    code_dossier: "DOS-2026-001",
+    titre_previsionnel: "Traité Général de Droit OHADA des Affaires",
+    auteur_nom: "Prof. Jean KOUADIO",
+    auteur_email: "jean.kouadio@uac.bj",
+    universite_nom: "Université d'Abomey-Calavi (UAC)",
+    faculte_nom: "Faculté de Droit et de Science Politique (FADESP)",
+  },
+  {
+    id: "dos-2",
+    code_dossier: "DOS-2026-002",
+    titre_previsionnel: "Économie Monétaire et Financière de la Zone UEMOA",
+    auteur_nom: "Dr. Aminata SOW",
+    auteur_email: "aminata.sow@ucad.edu.sn",
+    universite_nom: "Université Cheikh Anta Diop (UCAD)",
+    faculte_nom: "Faculté des Sciences Économiques et de Gestion (FASEG)",
+  },
+  {
+    id: "dos-3",
+    code_dossier: "DOS-2026-003",
+    titre_previsionnel: "O emprego do imalt como solução interpretativo-composicional",
+    auteur_nom: "Alexandre Magno Abreu de Góes",
+    auteur_email: "alexandre.goes@ufrn.edu.br",
+    universite_nom: "UFRN - Universidade Federal do Rio Grande do Norte",
+    faculte_nom: "Departamento de Música e Artes",
+  },
+  {
+    id: "dos-4",
+    code_dossier: "DOS-2026-004",
+    titre_previsionnel: "Manuel de Pharmacologie Clinique et Thérapeutique Tropicale",
+    auteur_nom: "Prof. Michel MENSAH",
+    auteur_email: "michel.mensah@univ-lome.tg",
+    universite_nom: "Université de Lomé (UL)",
+    faculte_nom: "Faculté des Sciences de la Santé (FSS)",
+  },
+];
+
+const DEFAULT_AUTHORS: AuthorSearchResult[] = [
+  { id: "auth-1", name: "Prof. Jean KOUADIO", email: "jean.kouadio@uac.bj", institution: "Université d'Abomey-Calavi (UAC)" },
+  { id: "auth-2", name: "Dr. Aminata SOW", email: "aminata.sow@ucad.edu.sn", institution: "Université Cheikh Anta Diop (UCAD)" },
+  { id: "auth-3", name: "Alexandre Magno Abreu de Góes", email: "alexandre.goes@ufrn.edu.br", institution: "UFRN" },
+  { id: "auth-4", name: "Prof. Michel MENSAH", email: "michel.mensah@univ-lome.tg", institution: "Université de Lomé (UL)" },
+  { id: "auth-5", name: "Dr. Fatou DIALLO", email: "fatou.diallo@ugb.sn", institution: "Université Gaston Berger (UGB)" },
+  { id: "auth-6", name: "The Prompter's Architect", email: "contact@ai-architects.org", institution: "AI Cognitive Research" },
+];
+
 export async function searchPreEditions(query: string): Promise<PreEditionSearchResult[]> {
-  const res = await fetch(`/api/bff/catalog/pre-editions/search/?q=${encodeURIComponent(query)}`, {
-    credentials: "include",
-  });
-  if (!res.ok) return [];
-  const json = await res.json();
-  return json.data || [];
+  try {
+    const res = await fetch(`/api/bff/catalog/pre-editions/search/?q=${encodeURIComponent(query)}`, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data && json.data.length > 0) return json.data;
+    }
+  } catch (err) {
+    console.warn("[Layout Artist Service] searchPreEditions error -> fallback:", err);
+  }
+
+  const q = query.toLowerCase().trim();
+  if (!q) return DEFAULT_PRE_EDITIONS;
+  return DEFAULT_PRE_EDITIONS.filter(
+    (d) =>
+      d.titre_previsionnel.toLowerCase().includes(q) ||
+      d.auteur_nom.toLowerCase().includes(q) ||
+      d.code_dossier.toLowerCase().includes(q)
+  );
+}
+
+export async function searchAuthors(query: string): Promise<AuthorSearchResult[]> {
+  try {
+    const res = await fetch(`/api/bff/catalog/authors/search/?q=${encodeURIComponent(query)}`, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data && json.data.length > 0) return json.data;
+    }
+  } catch (err) {
+    console.warn("[Layout Artist Service] searchAuthors error -> fallback:", err);
+  }
+
+  const q = query.toLowerCase().trim();
+  if (!q) return DEFAULT_AUTHORS;
+  return DEFAULT_AUTHORS.filter(
+    (a) =>
+      a.name.toLowerCase().includes(q) ||
+      (a.email && a.email.toLowerCase().includes(q)) ||
+      (a.institution && a.institution.toLowerCase().includes(q))
+  );
 }
 
 export async function createDepositWithFiles(

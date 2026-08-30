@@ -192,39 +192,43 @@ Analyse l'échantillon de texte suivant extrait du document "{filename}" (Nombre
 === FIN DU TEXTE ===
 
 Instructions détaillées :
-1. Titre & Sous-titre : Détermine le titre exact de l'ouvrage et propose systématiquement un sous-titre pertinent (champ optionnel très utile pour le catalogage).
-2. Auteurs : Identifie tous les auteurs, co-auteurs ou noms de plume mentionnés.
-3. Résumé éditorial : Rédige un résumé accrocheur et fidèle de 2 à 3 paragraphes en français soigné, mettant en valeur l'intérêt de l'ouvrage.
-4. Genre & Discipline : Identifie le genre principal (`genre_category`) parmi les disciplines officielles LAHAThèque ("Philosophie, Psychologie & Sciences Humaines", "Droit & Sciences Politiques", "Sciences Économiques & Gestion", "Médecine & Santé", "Littérature Africaine & Conte", "Roman & Fiction", "Manga & Bande Dessinée", "Manuel Scolaire & Pédagogie", "Sciences & Technologies", "Histoire & Civilisations", etc.).
-5. Code Dewey : Détermine le code de classification décimale Dewey (3 chiffres, ex: 840, 741.5, 340, 330, 610, 100, 500, etc.).
+1. Titre & Sous-titre : Détermine le titre exact de l'ouvrage et propose systématiquement un sous-titre percutant, noble et explicatif (champ essentiel pour le catalogage).
+2. Auteurs : Identifie tous les auteurs, co-auteurs ou contributeurs mentionnés.
+3. Résumé éditorial & Pédagogique (Haute Valeur, Captivant & Incitatif à la lecture) :
+   Rédige un résumé éditorial remarquable (2 à 3 paragraphes structurés) en français soigné, respectant strictement cette structure narrative et pédagogique :
+   - Paragraphe 1 (Accroche forte & Enjeu) : Commence par poser le grand enjeu, la question centrale ou le défi intellectuel/technique/littéraire que l'ouvrage aborde. BANNIR FORMELLEMENT les ouvertures plates ou convenues comme "Cet ouvrage explore...", "Ce livre présente...", "Il s'agit d'un ouvrage...", "Dans cet ouvrage...". Utilise une voix active, engageante et vivante qui captive immédiatement l'attention du lecteur.
+   - Paragraphe 2 (La Méthode & Les Apports Clés) : Présente la démarche unique de l'auteur, les œuvres/cas/concepts analysés, et ce qui rend la thèse, la technique ou la pédagogie novatrice et stimulante.
+   - Paragraphe 3 (Bénéfices de lecture & Portée) : Explique clairement ce que le lecteur (étudiant, enseignant, chercheur, praticien ou passionné) va acquérir, maîtriser ou transformer dans sa compréhension ou sa pratique après avoir lu ce livre. Termine par une phrase inspirante sur la portée de l'ouvrage.
+4. Genre & Discipline : Identifie le genre principal (`genre_category`) parmi les disciplines officielles LAHAThèque ("Philosophie, Psychologie & Sciences Humaines", "Droit & Sciences Politiques", "Sciences Économiques & Gestion", "Médecine & Santé", "Musique, Art & Spectacle", "Littérature Africaine & Conte", "Roman & Fiction", "Manga & Bande Dessinée", "Manuel Scolaire & Pédagogie", "Sciences & Technologies", "Histoire & Civilisations", etc.).
+5. Code Dewey : Détermine le code de classification décimale Dewey (3 chiffres, ex: 780 pour Musique, 840 pour Littérature, 340 pour Droit, 330 pour Économie, 610 pour Santé, 100 pour Philosophie, 741.5 pour Manga/BD, etc.).
 6. Langue & Pays : Détecte la langue principale de rédaction ("Français", "Anglais", "Portugais", "Espagnol", "Fon", "Yoruba", "Arabe", etc.) et le pays d'ancrage principal (code ISO 2 lettres ex: "BJ", "SN", "CI", "TG", "BR", "FR", "GLOBAL").
 7. Code ISBN : Cherche méticuleusement dans le texte (page de titre, page d'ours/copyright, mentions légales, 4e de couverture) si un code ISBN à 10 ou 13 chiffres est présent. Si trouvé dans le document, extrais-le fidèlement et formate-le (ex: "978-2-..."). S'il est absent du document, génère une proposition d'ISBN standard LAHA ("978-99919-...") et indique `isbn_found_in_document: false`.
 8. Suggestions académiques & contextuelles :
    - `institution_suggestion` : Suggère une université ou institution de rattachement pertinente (ex: "Université d'Abomey-Calavi (UAC)", "Université de São Paulo (USP)", "Université Cheikh Anta Diop (UCAD)").
-   - `faculty_suggestion` : Suggère la faculté/UFR correspondante (ex: "Faculté de Philosophie", "Faculté de Droit", "Faculté des Sciences Économiques").
-   - `department_suggestion` : Suggère le département d'études spécifique (ex: "Département de Philosophie", "Département de Droit Privé", "Département de Linguistique").
-   - `target_audience` : Suggère le public cible optimal (ex: "Étudiants en Licence & Master", "Chercheurs & Universitaires", "Lycéens & Candidats", "Grand Public Amateur de Philosophie").
+   - `faculty_suggestion` : Suggère la faculté/UFR correspondante (ex: "Faculté de Musique et Arts", "Faculté de Philosophie", "Faculté de Droit").
+   - `department_suggestion` : Suggère le département d'études spécifique (ex: "Département de Musique", "Département de Philosophie", "Département de Droit Privé").
+   - `target_audience` : Suggère le public cible optimal (ex: "Musiciens, Enseignants & Étudiants en Conservatoire", "Étudiants en Licence & Master", "Chercheurs & Universitaires").
 9. Mots-clés : Propose 6 à 10 mots-clés thématiques riches et pertinents.
 10. Incohérences : Détecte toute anomalie majeure entre le titre et le contenu.
 
 Renvoie STRICTEMENT un JSON valide au format suivant :
 {{
   "title": "Titre exact de l'ouvrage",
-  "subtitle": "Sous-titre explicatif ou contextuel",
+  "subtitle": "Sous-titre percutant et explicatif",
   "authors": ["Nom Prénom"],
   "publication_year": 2026,
   "isbn": "978-...",
   "isbn_found_in_document": true,
-  "summary": "Résumé éditorial structuré...",
+  "summary": "Résumé éditorial captivant et structuré...",
   "genre_category": "Discipline principale",
-  "dewey_code": "100",
+  "dewey_code": "780",
   "language": "Français",
   "language_code": "fre",
   "country": "BJ",
-  "target_audience": "Étudiants en Licence & Master",
+  "target_audience": "Musiciens, Enseignants & Étudiants",
   "institution_suggestion": "Université d'Abomey-Calavi (UAC)",
-  "faculty_suggestion": "Faculté des Lettres et Sciences Humaines",
-  "department_suggestion": "Département de Philosophie",
+  "faculty_suggestion": "Faculté des Lettres, Langues, Arts et Communication (FLLAC)",
+  "department_suggestion": "Département des Arts",
   "keywords": ["mot-clé 1", "mot-clé 2", "mot-clé 3", "mot-clé 4", "mot-clé 5"],
   "inconsistencies": []
 }}
@@ -367,7 +371,12 @@ def _fallback_heuristic_analysis(filename: str, text_sample: str, total_pages: i
         "publication_year": 2026,
         "isbn": extracted_isbn,
         "isbn_found_in_document": isbn_found,
-        "summary": f"Ouvrage de référence « {clean_name.title()} » publié dans le catalogue LAHAThèque. Analyse détaillée, contextualisation rigoureuse et contenu exhaustif destiné aux lecteurs et apprenants.",
+        "summary": (
+            f"Plongez au cœur de « {clean_name.title()} », un travail de référence en {genre} publié sur LAHAThèque.\n\n"
+            f"À travers une étude rigoureuse et des analyses approfondies, cet ouvrage explore les enjeux fondamentaux de la discipline "
+            f"et propose une méthodologie claire pour enrichir la réflexion et la pratique.\n\n"
+            f"Une ressource essentielle conçue pour les {target.lower()}, offrant des perspectives novatrices et des clés d'application concrètes."
+        ),
         "genre_category": genre,
         "dewey_code": dewey,
         "language": "Portugais" if ("linguagem" in lower_name or "produtora" in lower_name) else "Français",

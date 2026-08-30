@@ -47,31 +47,96 @@ export function generateLahaIsbn(seedText: string = ""): string {
   return `${isbnRaw.slice(0, 3)}-${isbnRaw.slice(3, 8)}-${isbnRaw.slice(8, 11)}-${isbnRaw.slice(11, 12)}-${isbnRaw.slice(12)}`;
 }
 
+async function extractTextFromPdfInBrowser(file: File, maxPages = 15): Promise<{ text: string; totalPages: number }> {
+  try {
+    const pdfjs = await import("pdfjs-dist");
+    // Configuration du worker
+    if (!pdfjs.GlobalWorkerOptions.workerSrc && typeof window !== "undefined") {
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) });
+    const pdfDoc = await loadingTask.promise;
+    const totalPages = pdfDoc.numPages;
+    const pagesToRead = Math.min(maxPages, totalPages);
+    const chunks: string[] = [];
+
+    for (let i = 1; i <= pagesToRead; i++) {
+      try {
+        const page = await pdfDoc.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str || "")
+          .join(" ")
+          .trim();
+        if (pageText) {
+          chunks.push(`--- PAGE ${i} ---\n${pageText.slice(0, 1500)}`);
+        }
+      } catch (pageErr) {
+        console.warn(`[PDF.js] Erreur lecture page ${i}:`, pageErr);
+      }
+    }
+
+    // Extraction de la 4e de couverture (dernière page)
+    if (totalPages > pagesToRead) {
+      try {
+        const lastPage = await pdfDoc.getPage(totalPages);
+        const lastTextContent = await lastPage.getTextContent();
+        const lastText = lastTextContent.items
+          .map((item: any) => item.str || "")
+          .join(" ")
+          .trim();
+        if (lastText) {
+          chunks.push(`--- DERNIÈRE PAGE (4e de couverture) ---\n${lastText.slice(0, 2000)}`);
+        }
+      } catch (lastErr) {
+        console.warn("[PDF.js] Erreur lecture dernière page:", lastErr);
+      }
+    }
+
+    return {
+      text: chunks.join("\n\n").slice(0, 15000),
+      totalPages,
+    };
+  } catch (err) {
+    console.warn("[PDF.js Client Extraction] Erreur:", err);
+    return { text: "", totalPages: 0 };
+  }
+}
+
 export async function extractBookMetadataWithAi(
   file?: File,
   filename?: string,
   textSample?: string
 ): Promise<{ success: boolean; data?: AiBookAnalysisResult; error?: string }> {
   try {
-    const formData = new FormData();
-    if (file) {
-      // Pour les fichiers volumineux (> 15 Mo, jusqu'à 800 Mo), n'envoyer que l'échantillon des 10 premiers Mo (pages 1 à 25)
-      // pour une analyse IA instantanée (< 2s) sans surcharger la mémoire vive du navigateur.
-      const targetBlob = file.size > 15 * 1024 * 1024 ? file.slice(0, 10 * 1024 * 1024) : file;
-      formData.append("file", targetBlob, filename || file.name);
-    }
-    if (filename) {
-      formData.append("filename", filename);
-    }
-    if (textSample) {
-      formData.append("text", textSample);
+    let extractedText = textSample || "";
+    let totalPages = 0;
+    const targetName = filename || file?.name || "Ouvrage.pdf";
+
+    // 1. Extraction locale ultra-rapide côté client via PDF.js
+    if (file && !extractedText && file.name.toLowerCase().endsWith(".pdf")) {
+      console.log(`[AI Service] Extraction locale PDF.js des 15 premières pages pour '${file.name}'...`);
+      const extracted = await extractTextFromPdfInBrowser(file, 15);
+      extractedText = extracted.text;
+      totalPages = extracted.totalPages;
+      console.log(`[AI Service] Extraction locale réussie : ${totalPages} pages détectées, ${extractedText.length} caractères extraits.`);
     }
 
-    console.log(`[AI Service] Début de l'analyse pour '${filename || file?.name}' (${file ? (file.size / 1024 / 1024).toFixed(2) + ' Mo' : 'texte'})`);
+    console.log(`[AI Service] Envoi du payload JSON à l'IA pour '${targetName}' (${extractedText.length} caractères de texte extrait)`);
 
+    // 2. Envoi direct en JSON léger (quelques Ko) -> Résout tout problème de proxy/multipart
     const res = await fetch("/api/bff/ai/extract-metadata/", {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filename: targetName,
+        text: extractedText || undefined,
+        page_count: totalPages || undefined,
+      }),
       credentials: "include",
     });
 
@@ -161,7 +226,7 @@ export async function extractBookMetadataWithAi(
       publication_year: 2026,
       isbn: generateLahaIsbn(name),
       isbn_found_in_document: false,
-      summary: `Ouvrage de référence « ${name} » préparé pour la bibliothèque numérique LAHAThèque. Analyse approfondie, chapitres structurés et rédaction de référence destinée aux lecteurs et chercheurs.`,
+      summary: `Plongez au cœur de « ${name.charAt(0).toUpperCase() + name.slice(1)} », une contribution majeure en ${genre} publiée sur LAHAThèque.\n\nÀ travers une étude rigoureuse et des analyses détaillées, cet ouvrage explore les enjeux fondamentaux de la discipline et propose des perspectives novatrices adaptées aux défis contemporains.\n\nUne ressource indispensable conçue pour les ${target.toLowerCase()}, offrant des outils concrets et une vision approfondie pour enrichir vos connaissances et votre pratique.`,
       genre_category: genre,
       dewey_code: dewey,
       language: isPortuguese ? "Portugais" : "Français",

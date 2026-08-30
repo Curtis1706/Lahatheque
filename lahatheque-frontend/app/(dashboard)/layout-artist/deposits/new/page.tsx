@@ -23,14 +23,15 @@ import {
   FileText,
   X,
   ChevronDown,
-  RotateCcw
+  RotateCcw,
+  Users
 } from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper, DEPOSIT_STEPS } from "@/components/features/layout-artist/deposit-wizard-stepper";
 import { AIAnalysisProgressCard } from "@/components/features/layout-artist/ai-analysis-progress-card";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
-import { createDeposit, createDepositWithFiles, searchPreEditions, type PreEditionSearchResult } from "@/lib/services/layout-artist";
+import { createDeposit, createDepositWithFiles, searchPreEditions, searchAuthors, type PreEditionSearchResult, type AuthorSearchResult } from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/ai";
 import type { ClassificationSource } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
@@ -60,6 +61,13 @@ export default function NewDepositPage() {
   const [isPreEditionOpen, setIsPreEditionOpen] = useState(false);
   const [selectedPreEdition, setSelectedPreEdition] = useState<PreEditionSearchResult | null>(null);
   const [loadingPreEditions, setLoadingPreEditions] = useState(false);
+
+  // Authors State (Searchable Combobox & Tags)
+  const [authorSearch, setAuthorSearch] = useState("");
+  const [allAuthors, setAllAuthors] = useState<AuthorSearchResult[]>([]);
+  const [selectedAuthors, setSelectedAuthors] = useState<string[]>([]);
+  const [isAuthorOpen, setIsAuthorOpen] = useState(false);
+  const [loadingAuthors, setLoadingAuthors] = useState(false);
 
   // Form State
   const [bookFile, setBookFile] = useState<File | null>(null);
@@ -109,7 +117,39 @@ export default function NewDepositPage() {
     }).catch(() => {
       setLoadingPreEditions(false);
     });
+
+    // Préchargement automatique de la liste des auteurs certifiés
+    setLoadingAuthors(true);
+    searchAuthors("").then((res) => {
+      setAllAuthors(res || []);
+      setLoadingAuthors(false);
+    }).catch(() => {
+      setLoadingAuthors(false);
+    });
   }, []);
+
+  const handleAddAuthor = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (!selectedAuthors.includes(trimmed)) {
+      const updated = [...selectedAuthors, trimmed];
+      setSelectedAuthors(updated);
+      setAuthorsStr(updated.join(", "));
+    }
+    setAuthorSearch("");
+  };
+
+  const handleRemoveAuthor = (nameToRemove: string) => {
+    const updated = selectedAuthors.filter((a) => a !== nameToRemove);
+    setSelectedAuthors(updated);
+    setAuthorsStr(updated.join(", "));
+  };
+
+  const handleAuthorsStrChange = (val: string) => {
+    setAuthorsStr(val);
+    const parsed = val.split(",").map((s) => s.trim()).filter(Boolean);
+    setSelectedAuthors(parsed);
+  };
 
   const handleBookFileSelect = async (file: File) => {
     setBookFile(file);
@@ -136,7 +176,10 @@ export default function NewDepositPage() {
         // Auto-application initiale intelligente
         if (!title || title === file.name.replace(/\.[^/.]+$/, "")) setTitle(res.data.title);
         if (!subtitle && res.data.subtitle) setSubtitle(res.data.subtitle);
-        if (!authorsStr) setAuthorsStr(res.data.authors.join(", "));
+        if (res.data.authors && res.data.authors.length > 0) {
+          setSelectedAuthors(res.data.authors);
+          setAuthorsStr(res.data.authors.join(", "));
+        }
         if (!summary) setSummary(res.data.summary);
         if (res.data.isbn) setIsbn(res.data.isbn);
         setDeweyCode(res.data.dewey_code || matchedGenre.dewey);
@@ -162,7 +205,10 @@ export default function NewDepositPage() {
     if (!aiResult) return;
     setTitle(aiResult.title);
     if (aiResult.subtitle) setSubtitle(aiResult.subtitle);
-    setAuthorsStr(aiResult.authors.join(", "));
+    if (aiResult.authors && aiResult.authors.length > 0) {
+      setSelectedAuthors(aiResult.authors);
+      setAuthorsStr(aiResult.authors.join(", "));
+    }
     setSummary(aiResult.summary);
     setIsbn(aiResult.isbn);
 
@@ -194,7 +240,10 @@ export default function NewDepositPage() {
     setPreEditionSearch("");
     if (dossier) {
       if (dossier.titre_previsionnel) setTitle(dossier.titre_previsionnel);
-      if (dossier.auteur_nom) setAuthorsStr(dossier.auteur_nom);
+      if (dossier.auteur_nom) {
+        setSelectedAuthors([dossier.auteur_nom]);
+        setAuthorsStr(dossier.auteur_nom);
+      }
       if (dossier.auteur_email) setAuthorsEmailsStr(dossier.auteur_email);
       if (dossier.universite_nom) setUniversity(dossier.universite_nom);
       if (dossier.faculte_nom) setFaculty(dossier.faculte_nom);
@@ -212,6 +261,17 @@ export default function NewDepositPage() {
       d.titre_previsionnel.toLowerCase().includes(q) ||
       d.auteur_nom.toLowerCase().includes(q) ||
       (d.universite_nom && d.universite_nom.toLowerCase().includes(q))
+    );
+  });
+
+  const filteredAuthors = allAuthors.filter((a) => {
+    if (selectedAuthors.includes(a.name)) return false;
+    if (!authorSearch.trim()) return true;
+    const q = authorSearch.toLowerCase();
+    return (
+      a.name.toLowerCase().includes(q) ||
+      (a.institution && a.institution.toLowerCase().includes(q)) ||
+      (a.email && a.email.toLowerCase().includes(q))
     );
   });
 
@@ -693,28 +753,139 @@ export default function NewDepositPage() {
             {/* Auteurs, ISBN, Année */}
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
+                {/* Auteur(s) Combobox avec recherche et tags */}
+                <div className="space-y-1.5 sm:col-span-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-navy">Auteur(s) *</label>
-                    {aiResult?.authors && (
+                    <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-gold" />
+                      Auteur(s) *
+                    </label>
+                    {aiResult?.authors && aiResult.authors.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => setAuthorsStr(aiResult.authors.join(", "))}
+                        onClick={() => {
+                          setSelectedAuthors(aiResult.authors);
+                          setAuthorsStr(aiResult.authors.join(", "));
+                        }}
                         className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
                       >
                         <Wand2 className="w-2.5 h-2.5" />
-                        IA
+                        IA ({aiResult.authors.length})
                       </button>
                     )}
                   </div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Pr. Jean KOUADIO, Dr. Aminata SOW"
-                    value={authorsStr}
-                    onChange={(e) => setAuthorsStr(e.target.value)}
-                    className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                  />
+
+                  {/* Badges d'auteurs sélectionnés */}
+                  {selectedAuthors.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pb-1">
+                      {selectedAuthors.map((authorName) => (
+                        <span
+                          key={authorName}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-navy/10 text-navy font-semibold text-xs rounded-xl border border-navy/20"
+                        >
+                          <span className="truncate max-w-[150px]">{authorName}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAuthor(authorName)}
+                            className="text-foreground-muted hover:text-red-500 transition-colors cursor-pointer"
+                            title="Retirer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Champ Combobox de recherche et ajout */}
+                  <div className="relative">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Rechercher ou saisir un auteur..."
+                        value={authorSearch}
+                        onChange={(e) => {
+                          setAuthorSearch(e.target.value);
+                          setIsAuthorOpen(true);
+                        }}
+                        onFocus={() => setIsAuthorOpen(true)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && authorSearch.trim()) {
+                            e.preventDefault();
+                            handleAddAuthor(authorSearch);
+                          }
+                        }}
+                        className="w-full bg-background border border-border rounded-xl pl-8 pr-8 py-2.5 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsAuthorOpen(!isAuthorOpen)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted p-1 hover:text-navy cursor-pointer"
+                      >
+                        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", isAuthorOpen && "rotate-180")} />
+                      </button>
+                    </div>
+
+                    {/* Input caché requis pour la validation HTML du formulaire */}
+                    <input
+                      type="text"
+                      required
+                      value={authorsStr}
+                      onChange={(e) => handleAuthorsStrChange(e.target.value)}
+                      className="sr-only"
+                      tabIndex={-1}
+                    />
+
+                    {/* Liste déroulante des auteurs trouvés */}
+                    {isAuthorOpen && (
+                      <div className="absolute z-30 top-full mt-1.5 left-0 right-0 bg-background border border-border rounded-2xl shadow-xl overflow-hidden max-h-56 overflow-y-auto divide-y divide-border animate-in fade-in-0 zoom-in-95 duration-150">
+                        {authorSearch.trim() && !allAuthors.some((a) => a.name.toLowerCase() === authorSearch.toLowerCase().trim()) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleAddAuthor(authorSearch);
+                              setIsAuthorOpen(false);
+                            }}
+                            className="w-full text-left p-3 hover:bg-gold/10 transition-colors flex items-center justify-between text-xs text-gold font-bold cursor-pointer"
+                          >
+                            <span>+ Ajouter « {authorSearch.trim()} »</span>
+                            <span className="text-[10px] bg-gold/20 px-2 py-0.5 rounded">Entrée ↵</span>
+                          </button>
+                        )}
+
+                        {filteredAuthors.length > 0 ? (
+                          filteredAuthors.map((author) => (
+                            <button
+                              key={author.id || author.name}
+                              type="button"
+                              onClick={() => {
+                                handleAddAuthor(author.name);
+                                setIsAuthorOpen(false);
+                              }}
+                              className="w-full text-left p-3 hover:bg-navy/5 transition-colors flex items-center justify-between gap-2 text-xs cursor-pointer"
+                            >
+                              <div>
+                                <p className="font-semibold text-navy">{author.name}</p>
+                                <p className="text-[11px] text-foreground-muted">
+                                  {author.institution || author.email || "Auteur certifié LAHA"}
+                                </p>
+                              </div>
+                              <span className="text-[10px] font-bold text-gold bg-gold/10 px-2 py-0.5 rounded-md">
+                                Choisir
+                              </span>
+                            </button>
+                          ))
+                        ) : (
+                          !authorSearch.trim() && (
+                            <div className="p-3 text-center text-xs text-foreground-muted">
+                              {loadingAuthors ? "Chargement des auteurs..." : "Tapez un nom pour ajouter un auteur."}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
