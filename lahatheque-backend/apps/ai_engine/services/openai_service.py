@@ -162,6 +162,43 @@ def generate_onix_3_xml(data: Dict[str, Any]) -> str:
     return onix_template.strip()
 
 
+def detect_dominant_language(text: str) -> Tuple[str, str, str]:
+    """
+    Détecte avec certitude statistique la langue dominante du texte basée sur les marqueurs linguistiques.
+    Retourne (nom_langue, code_iso_639_2, code_pays_defaut).
+    """
+    text_lower = text.lower()
+    words = re.findall(r'\b[a-zà-ÿ]+\b', text_lower)
+    if not words:
+        return "Français", "fre", "BJ"
+
+    portuguese_words = {'o', 'a', 'os', 'as', 'um', 'uma', 'do', 'da', 'dos', 'das', 'no', 'na', 'nos', 'nas', 'em', 'para', 'por', 'com', 'não', 'são', 'como', 'mais', 'este', 'esta', 'esse', 'essa', 'isso', 'isto', 'sua', 'seu', 'suas', 'seus', 'professores', 'ensino', 'criação', 'pesquisa', 'sala', 'aula', 'identidade', 'literatura', 'trabalho', 'livro'}
+    english_words = {'the', 'and', 'to', 'of', 'in', 'is', 'that', 'for', 'it', 'as', 'was', 'with', 'be', 'by', 'on', 'not', 'he', 'i', 'this', 'have', 'from', 'at', 'which', 'or', 'an', 'they', 'you', 'were', 'their', 'education', 'school', 'research', 'book'}
+    spanish_words = {'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'del', 'al', 'en', 'para', 'por', 'con', 'no', 'es', 'son', 'como', 'más', 'este', 'esta', 'su', 'sus', 'investigación', 'educación', 'escuela', 'libro'}
+    french_words = {'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'dans', 'pour', 'avec', 'sur', 'en', 'par', 'est', 'sont', 'comme', 'plus', 'ce', 'cette', 'ces', 'son', 'sa', 'ses', 'leur', 'leurs', 'recherche', 'enseignement', 'école', 'livre', 'ouvrage'}
+
+    counts = {
+        'Portugais': sum(1 for w in words if w in portuguese_words),
+        'Anglais': sum(1 for w in words if w in english_words),
+        'Espagnol': sum(1 for w in words if w in spanish_words),
+        'Français': sum(1 for w in words if w in french_words),
+    }
+
+    best_lang, best_count = max(counts.items(), key=lambda item: item[1])
+
+    if best_count >= 8:
+        if best_lang == 'Portugais':
+            return "Portugais", "por", "BR"
+        elif best_lang == 'Anglais':
+            return "Anglais", "eng", "GLOBAL"
+        elif best_lang == 'Espagnol':
+            return "Espagnol", "spa", "GLOBAL"
+        elif best_lang == 'Français':
+            return "Français", "fre", "BJ"
+
+    return "Français", "fre", "BJ"
+
+
 def analyze_document_with_openai(
     text_sample: str,
     filename: str,
@@ -203,7 +240,13 @@ Directives éditoriales impératives :
    - Paragraphe 2 : Les Apports clés, l'enjeu dramatique ou pédagogique, et le public cible.
 4. Genre & Discipline : Identifie la discipline officielle LAHAThèque ("Philosophie, Psychologie & Sciences Humaines", "Droit & Sciences Politiques", "Sciences Économiques & Gestion", "Médecine & Santé", "Musique, Art & Spectacle", "Littérature Africaine & Conte", "Roman & Fiction", "Manga & Bande Dessinée", "Manuel Scolaire & Pédagogie", "Sciences & Technologies", "Histoire & Civilisations", etc.).
 5. Code Dewey : Détermine le code Dewey (3 chiffres, ex: 510 pour Mathématiques, 780 pour Musique, 340 pour Droit, 330 pour Économie, 610 pour Médecine, 840 pour Littérature, etc.).
-6. Langue & Pays : Langue ("Français", "Portugais", "Anglais", etc.) et code pays ISO ("BJ", "BR", "SN", "CI", "FR", "GLOBAL").
+6. Langue & Pays (ANALYSE LINGUISTIQUE DU MANUSCRIT OBLIGATOIRE) :
+   Identifie avec précision la langue réelle du texte fourni dans l'échantillon. Ne présume JAMAIS que la langue est le Français par défaut :
+   - Si le texte du livre est en Portugais (ex: 'da', 'do', 'criação', 'sala de aula', 'professores', 'ensino') -> language: "Portugais", language_code: "por", country: "BR" ou "PT".
+   - Si le texte du livre est en Anglais -> language: "Anglais", language_code: "eng", country: "US" / "GB" / "GLOBAL".
+   - Si le texte du livre est en Espagnol -> language: "Espagnol", language_code: "spa", country: "ES" / "GLOBAL".
+   - Si le texte du livre est en Français -> language: "Français", language_code: "fre", country: "BJ" ou pays identifié.
+   - Si langue nationale africaine (Fon, Yoruba, Wolof, Swahili, etc.) -> renseigner la langue exacte.
 7. Code ISBN : Recherche méticuleuse d'un ISBN dans le document. S'il est absent, générer une proposition standard LAHA ("978-99919-...").
 8. Suggestions académiques : Université, faculté, département et public cible.
 9. Mots-clés : 6 à 10 mots-clés thématiques riches.
@@ -220,9 +263,9 @@ Renvoie STRICTEMENT un JSON valide :
   "summary": "Premier paragraphe de 4e de couverture captivant...\n\nDeuxième paragraphe valorisant le contenu et le public...",
   "genre_category": "Discipline principale",
   "dewey_code": "510",
-  "language": "Français",
-  "language_code": "fre",
-  "country": "BJ",
+  "language": "Portugais",
+  "language_code": "por",
+  "country": "BR",
   "target_audience": "Enseignants, Étudiants & Professionnels",
   "institution_suggestion": "Université d'Abomey-Calavi (UAC)",
   "faculty_suggestion": "Faculté des Sciences et Techniques (FAST)",
@@ -246,7 +289,7 @@ Renvoie STRICTEMENT un JSON valide :
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            temperature=0.3,
+            temperature=0.2,
             max_tokens=2000,
             timeout=30.0
         )
@@ -255,6 +298,18 @@ Renvoie STRICTEMENT un JSON valide :
 
         content = response.choices[0].message.content or "{}"
         parsed_data = json.loads(content)
+
+        # Contrôle & Correction Linguistique Automatique
+        auto_lang, auto_code, auto_country = detect_dominant_language(text_sample)
+        ai_lang = str(parsed_data.get("language") or "")
+
+        # Si les mots-clés du texte indiquent formellement une autre langue que celle renvoyée par l'IA
+        if auto_lang != "Français" and ("franc" in ai_lang.lower() or not ai_lang):
+            print(f"[AI Service LINGUISTIC CORRECTION] Langue corrigée : '{ai_lang}' -> '{auto_lang}' ({auto_code})", flush=True)
+            parsed_data["language"] = auto_lang
+            parsed_data["language_code"] = auto_code
+            if parsed_data.get("country") in ("BJ", "", None):
+                parsed_data["country"] = auto_country
 
         # Normalisation rigoureuse de l'ISBN
         isbn_val = str(parsed_data.get("isbn") or "")
