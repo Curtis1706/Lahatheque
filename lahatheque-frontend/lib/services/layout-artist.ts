@@ -336,7 +336,57 @@ export async function createDepositWithFiles(
     }
   }
 
-  // 2. Enregistrement des métadonnées vers Django
+  // 2. Enregistrement des métadonnées vers Django (JSON direct ultra-rapide si R2)
+  if (fileKey) {
+    const payload = {
+      title: data.metadata?.title || "Nouveau Titre",
+      authors_names: data.metadata?.authors?.join(", ") || "",
+      authors_emails: extra?.authors_emails || "",
+      pre_edition_dossier_id: extra?.pre_edition_dossier_id || "",
+      isbn: data.metadata?.isbn || "",
+      summary: data.metadata?.summary || "",
+      language: data.metadata?.language || "fr",
+      format_type: (data.files?.format || "pdf").toLowerCase(),
+      price_digital: data.default_price || 5000,
+      price_paper: data.admin_price || 7500,
+      is_paper_available: data.is_paper_available ?? false,
+      status: data.status || "draft",
+      country: data.classification?.country || "BJ",
+      institution_name: data.classification?.university || "",
+      faculty: data.classification?.faculty || "",
+      discipline_name: data.classification?.discipline || "",
+      classification_source: data.classification?.source || "ai_suggested",
+      language_source: data.metadata?.language_source || "ai_suggested",
+      summary_source: data.metadata?.summary_source || "ai_suggested",
+      file_key: fileKey,
+      cover_key: coverKey || "",
+      file_size_bytes: bookFile ? bookFile.size : 0,
+    };
+
+    console.log(`[Deposit Service] Envoi du JSON direct au backend :`, payload);
+
+    const res = await fetch("/api/bff/catalog/my-deposits/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+
+    console.log(`[Deposit Service] Statut HTTP reçu : ${res.status} ${res.statusText}`);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detailMsg = err.details
+        ? Object.entries(err.details).map(([k, v]) => `${k}: ${v}`).join(", ")
+        : err.error || "Erreur lors du dépôt";
+      throw new Error(`Échec du serveur (${res.status}): ${detailMsg}`);
+    }
+
+    const json = await res.json();
+    return json.data || json;
+  }
+
+  // Fallback FormData si téléversement standard
   const formData = new FormData();
 
   formData.append("title", data.metadata?.title || "Nouveau Titre");
@@ -372,18 +422,8 @@ export async function createDepositWithFiles(
     formData.append("summary_source", data.metadata.summary_source);
   }
 
-  if (fileKey) {
-    formData.append("file_key", fileKey);
-    formData.append("file_size_bytes", String(bookFile ? bookFile.size : 0));
-  } else if (bookFile) {
-    formData.append("book_file", bookFile);
-  }
-
-  if (coverKey) {
-    formData.append("cover_key", coverKey);
-  } else if (coverFile) {
-    formData.append("cover_image", coverFile);
-  }
+  if (bookFile) formData.append("book_file", bookFile);
+  if (coverFile) formData.append("cover_image", coverFile);
 
   const fileSizeMb = bookFile ? (bookFile.size / (1024 * 1024)).toFixed(2) : "0";
   console.log(`[Deposit Service] Envoi de la maquette vers le serveur :`, {
