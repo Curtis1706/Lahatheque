@@ -58,13 +58,7 @@ export async function extractBookMetadataWithAi(
       // Pour les fichiers volumineux (> 15 Mo, jusqu'à 800 Mo), n'envoyer que l'échantillon des 10 premiers Mo (pages 1 à 25)
       // pour une analyse IA instantanée (< 2s) sans surcharger la mémoire vive du navigateur.
       const targetBlob = file.size > 15 * 1024 * 1024 ? file.slice(0, 10 * 1024 * 1024) : file;
-      try {
-        const buffer = await targetBlob.arrayBuffer();
-        const fileBlob = new Blob([buffer], { type: file.type || "application/pdf" });
-        formData.append("file", fileBlob, filename || file.name);
-      } catch {
-        formData.append("file", targetBlob, filename || file.name);
-      }
+      formData.append("file", targetBlob, filename || file.name);
     }
     if (filename) {
       formData.append("filename", filename);
@@ -75,17 +69,11 @@ export async function extractBookMetadataWithAi(
 
     console.log(`[AI Service] Début de l'analyse pour '${filename || file?.name}' (${file ? (file.size / 1024 / 1024).toFixed(2) + ' Mo' : 'texte'})`);
 
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 60000) : null;
-
     const res = await fetch("/api/bff/ai/extract-metadata/", {
       method: "POST",
       body: formData,
       credentials: "include",
-      signal: controller ? controller.signal : undefined,
     });
-    
-    if (timeoutId) clearTimeout(timeoutId);
 
     console.log(`[AI Service] Statut HTTP reçu : ${res.status} ${res.statusText}`);
 
@@ -100,7 +88,7 @@ export async function extractBookMetadataWithAi(
       console.warn(`[AI Service] Erreur backend (${res.status}):`, errorText);
     }
   } catch (err) {
-    console.warn("[AI Service] Exception réseau / Timeout -> Fallback contextuel:", err);
+    console.warn("[AI Service] Exception réseau -> Fallback contextuel:", err);
   }
 
   // Simulation intelligente contextuelle immédiate

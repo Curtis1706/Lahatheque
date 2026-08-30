@@ -75,6 +75,13 @@ export function FileDropzone({
     return `${(bytes / 1024).toFixed(0)} Ko`;
   };
 
+  const handlePickerClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  };
+
   return (
     <div className={cn("space-y-2", className)}>
       {/* Input file toujours monté dans le DOM pour garantir la persistance du flux binaire */}
@@ -83,10 +90,7 @@ export function FileDropzone({
         type="file"
         accept={acceptTypes.join(",")}
         className="hidden"
-        onChange={(e) => {
-          handleFiles(e.target.files);
-          e.target.value = "";
-        }}
+        onChange={(e) => handleFiles(e.target.files)}
       />
 
       <label className="block text-xs font-bold text-navy uppercase tracking-wider">{label}</label>
@@ -124,7 +128,10 @@ export function FileDropzone({
           {onFileRemove && (
             <button
               type="button"
-              onClick={onFileRemove}
+              onClick={() => {
+                if (fileInputRef.current) fileInputRef.current.value = "";
+                onFileRemove();
+              }}
               disabled={isLoading}
               className="p-2 rounded-xl border border-border bg-background hover:bg-error/10 hover:text-error hover:border-error/30 transition-colors text-foreground-muted shrink-0 disabled:opacity-50 cursor-pointer"
               title="Supprimer ou remplacer"
@@ -138,7 +145,7 @@ export function FileDropzone({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={handlePickerClick}
           className={cn(
             "p-6 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-3 min-h-[140px]",
             isDragOver
