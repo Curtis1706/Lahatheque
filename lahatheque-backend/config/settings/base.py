@@ -326,6 +326,13 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_BROKER_CONNECTION_TIMEOUT = 1.0  # Max 1s de connexion au broker
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = False
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'socket_timeout': 1.0,
+    'socket_connect_timeout': 1.0,
+    'visibility_timeout': 3600,
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

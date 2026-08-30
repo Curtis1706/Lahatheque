@@ -59,18 +59,31 @@ def notify_user(
             resource_id=resource_id
         )
 
-    # B. Email (Purement asynchrone non-bloquant)
+    # B. Email (Purement asynchrone non-bloquant via thread d'arrière-plan)
     if prefs.email_enabled and getattr(user, "email", None):
-        try:
-            from .tasks import send_email_task
-            send_email_task.delay(
-                recipient_list=[user.email], 
-                subject=title, 
-                html_content=f"<h3>{title}</h3><p>{message}</p>"
-            )
-        except Exception as celery_err:
-            import logging
-            logging.getLogger(__name__).warning(f"[NOTIFY] Celery non disponible pour email direct: {celery_err}")
+        import threading
+        def _async_email_dispatch(recipient_email, notif_title, notif_msg):
+            try:
+                from .tasks import send_email_task
+                send_email_task.apply_async(
+                    kwargs={
+                        'recipient_list': [recipient_email], 
+                        'subject': notif_title, 
+                        'html_content': f"<h3>{notif_title}</h3><p>{notif_msg}</p>"
+                    },
+                    retry=False,
+                    expires=30,
+                )
+            except Exception as celery_err:
+                import logging
+                logging.getLogger(__name__).warning(f"[NOTIFY] Celery non disponible pour email direct: {celery_err}")
+
+        # Lancement en thread daemon détaché pour un retour HTTP instantané (0ms)
+        threading.Thread(
+            target=_async_email_dispatch,
+            args=(user.email, title, message),
+            daemon=True
+        ).start()
 
     # C. WhatsApp 
     if prefs.whatsapp_enabled and user.phone:
