@@ -160,32 +160,83 @@ class OuvrageCreateSerializer(serializers.Serializer):
         else:
             keywords_list = []
 
-        ouvrage = Ouvrage.objects.create(
-            title=validated_data['title'],
-            subtitle=validated_data.get('subtitle', ''),
-            isbn=validated_data.get('isbn', '')[:17],
-            summary=validated_data.get('summary', ''),
-            language=validated_data.get('language', 'fr')[:10],
-            format_type=validated_data.get('format_type', 'pdf').lower()[:20],
-            country=country_code,
-            publication_date=validated_data.get('publication_date'),
-            price_digital=validated_data.get('price_digital', 5000.00),
-            price_paper=validated_data.get('price_paper', 7500.00),
-            is_paper_available=validated_data.get('is_paper_available', False),
-            faculty=validated_data.get('faculty', ''),
-            department=validated_data.get('department', ''),
-            keywords=keywords_list,
-            target_audience=validated_data.get('target_audience', ''),
-            dewey_code=validated_data.get('dewey_code', ''),
-            classification_source=validated_data.get('classification_source', 'ai_suggested'),
-            language_source=validated_data.get('language_source', 'ai_suggested'),
-            summary_source=validated_data.get('summary_source', 'ai_suggested'),
-            discipline=discipline_obj,
-            institution=institution_obj,
-            pre_edition_dossier=dossier,
-            created_by=user,
-            status='draft',
-        )
+        # Recherche d'un dépôt existant en cours de traitement pour éviter les doublons
+        existing_ouvrage = None
+        if dossier:
+            existing_ouvrage = Ouvrage.objects.filter(
+                created_by=user,
+                pre_edition_dossier=dossier,
+                status__in=['draft', 'submitted', 'pending_validation', 'revision_requested']
+            ).first()
+
+        if not existing_ouvrage and validated_data.get('isbn'):
+            clean_isbn = validated_data.get('isbn', '').strip()
+            if clean_isbn and not clean_isbn.startswith('0000'):
+                existing_ouvrage = Ouvrage.objects.filter(
+                    created_by=user,
+                    isbn=clean_isbn,
+                    status__in=['draft', 'submitted', 'pending_validation', 'revision_requested']
+                ).first()
+
+        if not existing_ouvrage:
+            existing_ouvrage = Ouvrage.objects.filter(
+                created_by=user,
+                title__iexact=validated_data['title'].strip(),
+                status__in=['draft', 'submitted', 'pending_validation', 'revision_requested']
+            ).first()
+
+        if existing_ouvrage:
+            ouvrage = existing_ouvrage
+            ouvrage.title = validated_data['title']
+            ouvrage.subtitle = validated_data.get('subtitle', '')
+            ouvrage.isbn = validated_data.get('isbn', '')[:17]
+            ouvrage.summary = validated_data.get('summary', '')
+            ouvrage.language = validated_data.get('language', 'fr')[:10]
+            ouvrage.format_type = validated_data.get('format_type', 'pdf').lower()[:20]
+            ouvrage.country = country_code
+            ouvrage.publication_date = validated_data.get('publication_date')
+            ouvrage.price_digital = validated_data.get('price_digital', 5000.00)
+            ouvrage.price_paper = validated_data.get('price_paper', 7500.00)
+            ouvrage.is_paper_available = validated_data.get('is_paper_available', False)
+            ouvrage.faculty = validated_data.get('faculty', '')
+            ouvrage.department = validated_data.get('department', '')
+            ouvrage.keywords = keywords_list
+            ouvrage.target_audience = validated_data.get('target_audience', '')
+            ouvrage.dewey_code = validated_data.get('dewey_code', '')
+            ouvrage.classification_source = validated_data.get('classification_source', 'ai_suggested')
+            ouvrage.language_source = validated_data.get('language_source', 'ai_suggested')
+            ouvrage.summary_source = validated_data.get('summary_source', 'ai_suggested')
+            ouvrage.discipline = discipline_obj
+            ouvrage.institution = institution_obj
+            ouvrage.pre_edition_dossier = dossier
+            ouvrage.rejection_reason = ''  # Réinitialiser le motif de rejet lors d'une nouvelle soumission
+        else:
+            ouvrage = Ouvrage.objects.create(
+                title=validated_data['title'],
+                subtitle=validated_data.get('subtitle', ''),
+                isbn=validated_data.get('isbn', '')[:17],
+                summary=validated_data.get('summary', ''),
+                language=validated_data.get('language', 'fr')[:10],
+                format_type=validated_data.get('format_type', 'pdf').lower()[:20],
+                country=country_code,
+                publication_date=validated_data.get('publication_date'),
+                price_digital=validated_data.get('price_digital', 5000.00),
+                price_paper=validated_data.get('price_paper', 7500.00),
+                is_paper_available=validated_data.get('is_paper_available', False),
+                faculty=validated_data.get('faculty', ''),
+                department=validated_data.get('department', ''),
+                keywords=keywords_list,
+                target_audience=validated_data.get('target_audience', ''),
+                dewey_code=validated_data.get('dewey_code', ''),
+                classification_source=validated_data.get('classification_source', 'ai_suggested'),
+                language_source=validated_data.get('language_source', 'ai_suggested'),
+                summary_source=validated_data.get('summary_source', 'ai_suggested'),
+                discipline=discipline_obj,
+                institution=institution_obj,
+                pre_edition_dossier=dossier,
+                created_by=user,
+                status='draft',
+            )
 
         # Attribution de la clé R2 ou du fichier joint
         if file_key:
@@ -212,6 +263,10 @@ class OuvrageCreateSerializer(serializers.Serializer):
             ouvrage.cover_image = cover_image
 
         ouvrage.save()
+
+        # Réinitialiser les auteurs si mise à jour
+        if existing_ouvrage and authors_names:
+            ouvrage.authors.clear()
 
         # Créer les BookAuthor à partir des noms et lier les comptes auteurs si fournis
         if authors_names:

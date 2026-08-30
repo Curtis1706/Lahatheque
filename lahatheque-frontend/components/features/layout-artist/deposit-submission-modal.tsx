@@ -65,22 +65,27 @@ export function DepositSubmissionModal({
       return;
     }
 
-    if (realProgress !== undefined && realProgress > 0) {
-      setCurrentStepIndex(1);
-      // Échelle 0-100% de l'upload mappée sur 15% à 75% du flux global
-      const mapped = Math.min(75, Math.max(15, Math.round(realProgress * 0.75)));
-      setProgress(mapped);
+    if (status === "uploading") {
+      if (realProgress !== undefined && realProgress > 0) {
+        if (realProgress >= 100) {
+          setCurrentStepIndex(2);
+          setProgress(80);
+        } else {
+          setCurrentStepIndex(1);
+          // Échelle 0-100% de l'upload mappée sur 15% à 75% du flux global
+          const mapped = Math.min(75, Math.max(15, Math.round(realProgress * 0.75)));
+          setProgress(mapped);
+        }
+      } else {
+        setCurrentStepIndex(1);
+        setProgress(40);
+      }
       return;
     }
 
-    let interval: NodeJS.Timeout;
+    let interval: NodeJS.Timeout | undefined = undefined;
 
-    if (status === "uploading") {
-      setCurrentStepIndex(1);
-      interval = setInterval(() => {
-        setProgress((prev) => (prev < 65 ? prev + Math.floor(Math.random() * 8) + 3 : prev));
-      }, 400);
-    } else if (status === "processing") {
+    if (status === "processing") {
       setCurrentStepIndex(2);
       setProgress(85);
     } else if (status === "registering") {

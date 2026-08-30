@@ -421,12 +421,12 @@ export default function NewDepositPage() {
 
       // 3. Confirmation de succès
       setSubmissionStatus("success");
-      console.log(`[Deposit Page SUCCESS] Transmission terminée avec succès ! Redirection en cours...`);
+      console.log(`[Deposit Page SUCCESS] Transmission terminée avec succès ! Redirection vers la liste...`);
       toast.success("Maquette transmise avec succès au Chef Maquettiste !");
 
       setTimeout(() => {
-        router.push("/layout-artist/deposits");
-      }, 1200);
+        window.location.href = "/layout-artist/deposits";
+      }, 1000);
     } catch (err: any) {
       console.error(`[Deposit Page ERROR] Échec lors de la transmission :`, err);
       setSubmissionStatus("error");
@@ -473,23 +473,24 @@ export default function NewDepositPage() {
             ) : (
               <Save className="w-4 h-4 text-foreground-muted" />
             )}
-            Sauvegarder Brouillon
+            <span className="hidden sm:inline">Sauvegarder Brouillon</span>
+            <span className="sm:hidden">Brouillon</span>
           </button>
 
           <button
             onClick={handleSubmitValidation}
             disabled={saving || !bookFile}
-            className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors min-h-[44px] cursor-pointer disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors min-h-[44px] cursor-pointer disabled:opacity-50 shrink-0"
           >
             {saving ? (
               <>
                 <Loader2 className="w-4 h-4 text-gold animate-spin" />
-                Transmission en cours...
+                <span>Transmission...</span>
               </>
             ) : (
               <>
                 <Send className="w-4 h-4 text-gold" />
-                Soumettre pour Validation
+                <span>Soumettre</span>
               </>
             )}
           </button>
