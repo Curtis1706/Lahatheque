@@ -55,8 +55,16 @@ export async function extractBookMetadataWithAi(
   try {
     const formData = new FormData();
     if (file) {
-      // Transmission du fichier complet pour permettre l'extraction intégrale des 15 premières pages et de la 4e de couverture
-      formData.append("file", file, filename || file.name);
+      // Pour les fichiers volumineux (> 15 Mo, jusqu'à 800 Mo), n'envoyer que l'échantillon des 10 premiers Mo (pages 1 à 25)
+      // pour une analyse IA instantanée (< 2s) sans surcharger la mémoire vive du navigateur.
+      const targetBlob = file.size > 15 * 1024 * 1024 ? file.slice(0, 10 * 1024 * 1024) : file;
+      try {
+        const buffer = await targetBlob.arrayBuffer();
+        const fileBlob = new Blob([buffer], { type: file.type || "application/pdf" });
+        formData.append("file", fileBlob, filename || file.name);
+      } catch {
+        formData.append("file", targetBlob, filename || file.name);
+      }
     }
     if (filename) {
       formData.append("filename", filename);

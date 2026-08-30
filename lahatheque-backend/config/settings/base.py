@@ -290,9 +290,10 @@ if CLOUDFLARE_R2_ENDPOINT and CLOUDFLARE_R2_ACCESS_KEY_ID:
     }
 
 # ── Uploads & Files Size Limit (800 Mo) ───────────────────────────────────────
-DATA_UPLOAD_MAX_MEMORY_SIZE = 838860800  # 800 Mo
-FILE_UPLOAD_MAX_MEMORY_SIZE = 838860800  # 800 Mo
+DATA_UPLOAD_MAX_MEMORY_SIZE = 838860800  # 800 Mo (Taille max de payload autorisée)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880    # 5 Mo en RAM, au-delà Django stream directement sur disque temporaire
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+FILE_UPLOAD_PERMISSIONS = 0o644
 
 # ── DRM & Protection Configuration ───────────────────────────────────────────
 FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')

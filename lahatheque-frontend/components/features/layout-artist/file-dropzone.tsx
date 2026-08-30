@@ -77,6 +77,18 @@ export function FileDropzone({
 
   return (
     <div className={cn("space-y-2", className)}>
+      {/* Input file toujours monté dans le DOM pour garantir la persistance du flux binaire */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={acceptTypes.join(",")}
+        className="hidden"
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
       <label className="block text-xs font-bold text-navy uppercase tracking-wider">{label}</label>
 
       {selectedFileName ? (
@@ -114,7 +126,7 @@ export function FileDropzone({
               type="button"
               onClick={onFileRemove}
               disabled={isLoading}
-              className="p-2 rounded-xl border border-border bg-background hover:bg-error/10 hover:text-error hover:border-error/30 transition-colors text-foreground-muted shrink-0 disabled:opacity-50"
+              className="p-2 rounded-xl border border-border bg-background hover:bg-error/10 hover:text-error hover:border-error/30 transition-colors text-foreground-muted shrink-0 disabled:opacity-50 cursor-pointer"
               title="Supprimer ou remplacer"
             >
               <X className="w-4 h-4" />
@@ -134,14 +146,6 @@ export function FileDropzone({
               : "border-border bg-background-secondary hover:border-gold/50"
           )}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={acceptTypes.join(",")}
-            className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-
           <div className="p-3 rounded-full bg-navy-light text-navy">
             <UploadCloud className="w-6 h-6 text-gold" />
           </div>
