@@ -408,6 +408,78 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             "message": f"L'ouvrage « {ouvrage.title} » a été soumis au Chef Maquettiste."
         })
 
+    @action(detail=False, methods=['post'], url_path='presigned-upload-url')
+    def get_presigned_upload_url(self, request):
+        """
+        POST /api/v1/catalog/my-deposits/presigned-upload-url/
+        Génère une URL signée S3/R2 pour téléverser directement depuis le navigateur du maquettiste
+        vers Cloudflare R2 sans saturer la mémoire du serveur Django / Next.js.
+        """
+        import uuid
+        import re
+        from django.conf import settings
+
+        filename = request.data.get('filename', 'manuscrit.pdf')
+        content_type = request.data.get('content_type', 'application/pdf')
+        file_type = request.data.get('file_type', 'book')
+
+        bucket_name = getattr(settings, 'CLOUDFLARE_R2_BUCKET_NAME', 'lahatheque')
+        endpoint_url = getattr(settings, 'CLOUDFLARE_R2_ENDPOINT', '')
+        access_key = getattr(settings, 'CLOUDFLARE_R2_ACCESS_KEY_ID', '')
+        secret_key = getattr(settings, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY', '')
+
+        # Si R2 est configuré, générer une URL signée PUT directe
+        if endpoint_url and access_key and secret_key:
+            try:
+                import boto3
+                from botocore.client import Config
+
+                clean_name = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', filename)
+                unique_id = uuid.uuid4().hex[:12]
+                folder = 'covers' if file_type == 'cover' else 'books'
+                key = f"{folder}/{unique_id}_{clean_name}"
+
+                s3_client = boto3.client(
+                    's3',
+                    endpoint_url=endpoint_url,
+                    aws_access_key_id=access_key,
+                    aws_secret_access_key=secret_key,
+                    region_name='auto',
+                    config=Config(signature_version='s3v4', s3={'addressing_style': 'path'})
+                )
+
+                upload_url = s3_client.generate_presigned_url(
+                    'put_object',
+                    Params={
+                        'Bucket': bucket_name,
+                        'Key': key,
+                        'ContentType': content_type or ('image/jpeg' if file_type == 'cover' else 'application/pdf')
+                    },
+                    ExpiresIn=3600
+                )
+
+                print(f"[R2 STORAGE] Presigned URL générée avec succès pour '{key}' ({content_type})", flush=True)
+                return Response({
+                    "success": True,
+                    "data": {
+                        "direct_to_r2": True,
+                        "upload_url": upload_url,
+                        "file_key": key,
+                        "bucket": bucket_name
+                    }
+                })
+            except Exception as r2_err:
+                logger.error(f"[R2 STORAGE ERROR] Échec génération Presigned URL: {r2_err}")
+                print(f"[R2 STORAGE ERROR] Erreur S3/R2 presigned URL: {r2_err}", flush=True)
+
+        return Response({
+            "success": True,
+            "data": {
+                "direct_to_r2": False,
+                "message": "Stockage local ou R2 non configuré, repli vers multipart standard."
+            }
+        })
+
     @action(detail=False, methods=['get'], url_path='kpis')
     def get_maquettiste_kpis(self, request):
         """GET /api/v1/catalog/my-deposits/kpis/ — KPIs du maquettiste connecté."""

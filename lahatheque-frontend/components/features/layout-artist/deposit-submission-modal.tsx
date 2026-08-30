@@ -17,6 +17,7 @@ export interface DepositSubmissionModalProps {
   fileSizeMb?: number;
   status: "idle" | "uploading" | "processing" | "registering" | "success" | "error";
   errorMessage?: string;
+  realProgress?: number;
 }
 
 const STEPS = [
@@ -28,8 +29,8 @@ const STEPS = [
   },
   {
     id: "upload",
-    title: "Téléversement vers Cloudflare R2",
-    description: "Envoi sécurisé haute vitesse vers l'infrastructure de stockage",
+    title: "Téléversement direct vers Cloudflare R2",
+    description: "Transfert sécurisé haute vitesse sans passer par le serveur Web",
     icon: UploadCloud,
   },
   {
@@ -52,6 +53,7 @@ export function DepositSubmissionModal({
   fileSizeMb,
   status,
   errorMessage,
+  realProgress,
 }: DepositSubmissionModalProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [progress, setProgress] = useState(10);
@@ -60,6 +62,14 @@ export function DepositSubmissionModal({
     if (!isOpen) {
       setCurrentStepIndex(0);
       setProgress(10);
+      return;
+    }
+
+    if (realProgress !== undefined && realProgress > 0) {
+      setCurrentStepIndex(1);
+      // Échelle 0-100% de l'upload mappée sur 15% à 75% du flux global
+      const mapped = Math.min(75, Math.max(15, Math.round(realProgress * 0.75)));
+      setProgress(mapped);
       return;
     }
 
@@ -72,7 +82,7 @@ export function DepositSubmissionModal({
       }, 400);
     } else if (status === "processing") {
       setCurrentStepIndex(2);
-      setProgress(80);
+      setProgress(85);
     } else if (status === "registering") {
       setCurrentStepIndex(3);
       setProgress(95);
@@ -84,7 +94,7 @@ export function DepositSubmissionModal({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isOpen, status]);
+  }, [isOpen, status, realProgress]);
 
   if (!isOpen) return null;
 

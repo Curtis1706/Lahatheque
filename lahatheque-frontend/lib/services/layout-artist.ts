@@ -298,12 +298,45 @@ export async function searchAuthors(query: string): Promise<AuthorSearchResult[]
   );
 }
 
+import { uploadFileDirectlyToR2 } from "./storage";
+
 export async function createDepositWithFiles(
   data: Partial<LayoutDeposit>,
   bookFile?: File | null,
   coverFile?: File | null,
-  extra?: { pre_edition_dossier_id?: string; authors_emails?: string }
+  extra?: { 
+    pre_edition_dossier_id?: string; 
+    authors_emails?: string;
+    onUploadProgress?: (percent: number, loaded: number, total: number) => void;
+  }
 ): Promise<LayoutDeposit> {
+  let fileKey: string | undefined = undefined;
+  let coverKey: string | undefined = undefined;
+
+  // 1. Téléversement direct ultra-rapide vers Cloudflare R2 si disponible
+  if (bookFile) {
+    try {
+      const uploadRes = await uploadFileDirectlyToR2(bookFile, "book", extra?.onUploadProgress);
+      if (uploadRes.directToR2 && uploadRes.fileKey) {
+        fileKey = uploadRes.fileKey;
+      }
+    } catch (r2Err) {
+      console.warn("[Deposit Service] Échec R2 direct, repli sur transmission standard:", r2Err);
+    }
+  }
+
+  if (coverFile) {
+    try {
+      const coverRes = await uploadFileDirectlyToR2(coverFile, "cover");
+      if (coverRes.directToR2 && coverRes.fileKey) {
+        coverKey = coverRes.fileKey;
+      }
+    } catch (covErr) {
+      console.warn("[Deposit Service] Échec couverture R2 direct:", covErr);
+    }
+  }
+
+  // 2. Enregistrement des métadonnées vers Django
   const formData = new FormData();
 
   formData.append("title", data.metadata?.title || "Nouveau Titre");
@@ -339,8 +372,18 @@ export async function createDepositWithFiles(
     formData.append("summary_source", data.metadata.summary_source);
   }
 
-  if (bookFile) formData.append("book_file", bookFile);
-  if (coverFile) formData.append("cover_image", coverFile);
+  if (fileKey) {
+    formData.append("file_key", fileKey);
+    formData.append("file_size_bytes", String(bookFile ? bookFile.size : 0));
+  } else if (bookFile) {
+    formData.append("book_file", bookFile);
+  }
+
+  if (coverKey) {
+    formData.append("cover_key", coverKey);
+  } else if (coverFile) {
+    formData.append("cover_image", coverFile);
+  }
 
   const fileSizeMb = bookFile ? (bookFile.size / (1024 * 1024)).toFixed(2) : "0";
   console.log(`[Deposit Service] Envoi de la maquette vers le serveur :`, {

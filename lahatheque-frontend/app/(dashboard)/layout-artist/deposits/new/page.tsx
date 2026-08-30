@@ -61,6 +61,7 @@ export default function NewDepositPage() {
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<"idle" | "uploading" | "processing" | "registering" | "success" | "error">("idle");
   const [submissionError, setSubmissionError] = useState<string | undefined>(undefined);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   // Pre-Edition State (Select Combobox)
   const [preEditionSearch, setPreEditionSearch] = useState("");
@@ -402,6 +403,7 @@ export default function NewDepositPage() {
         {
           pre_edition_dossier_id: selectedPreEdition?.id,
           authors_emails: authorsEmailsStr,
+          onUploadProgress: (percent) => setUploadProgress(percent),
         }
       );
 
@@ -1398,6 +1400,7 @@ export default function NewDepositPage() {
         fileSizeMb={bookFile ? bookFile.size / (1024 * 1024) : undefined}
         status={submissionStatus}
         errorMessage={submissionError}
+        realProgress={uploadProgress}
       />
     </div>
   );

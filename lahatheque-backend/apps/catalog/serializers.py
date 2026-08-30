@@ -100,7 +100,12 @@ class OuvrageCreateSerializer(serializers.Serializer):
     language_source = serializers.CharField(max_length=30, required=False, allow_blank=True, default='ai_suggested')
     summary_source = serializers.CharField(max_length=30, required=False, allow_blank=True, default='ai_suggested')
 
-    # Fichiers (optionnels — envoyés en multipart)
+    # Support Direct-to-R2 (Presigned upload)
+    file_key = serializers.CharField(required=False, allow_blank=True, default='')
+    cover_key = serializers.CharField(required=False, allow_blank=True, default='')
+    file_size_bytes = serializers.IntegerField(required=False, default=0)
+
+    # Fichiers (optionnels — fallback multipart)
     book_file = serializers.FileField(required=False, allow_null=True)
     cover_image = serializers.FileField(required=False, allow_null=True)
 
@@ -137,6 +142,9 @@ class OuvrageCreateSerializer(serializers.Serializer):
         # Extraction des noms et emails d'auteurs
         authors_names = validated_data.pop('authors_names', '')
         authors_emails = validated_data.pop('authors_emails', '')
+        file_key = validated_data.pop('file_key', '')
+        cover_key = validated_data.pop('cover_key', '')
+        file_size_bytes = validated_data.pop('file_size_bytes', 0)
         book_file = validated_data.pop('book_file', None)
         cover_image = validated_data.pop('cover_image', None)
         validated_data.pop('dewey_code_field', None)
@@ -171,9 +179,19 @@ class OuvrageCreateSerializer(serializers.Serializer):
             status='draft',
         )
 
-        if book_file:
+        # Attribution directe de la clé R2 ou du fichier
+        if file_key:
+            ouvrage.file.name = file_key
+            if file_size_bytes > 0:
+                ouvrage.file_size_bytes = file_size_bytes
+        elif book_file:
             ouvrage.file = book_file
             ouvrage.file_size_bytes = book_file.size
+
+        if cover_key:
+            ouvrage.cover_image.name = cover_key
+        elif cover_image:
+            ouvrage.cover_image = cover_image
 
             # Calcul du nombre de pages réel pour les fichiers PDF
             page_count = 0
