@@ -1656,7 +1656,7 @@ class LegalPreEditionDetailView(APIView):
 
 class LegalRelancesListView(APIView):
     """GET/POST /api/v1/rights/legal/relances/ - Rapports auteurs & relances impayés RÉELS."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request):
         from apps.accounts.models import User
@@ -1843,7 +1843,7 @@ class LegalRelancesListView(APIView):
 
 class DebtReminderConfigView(APIView):
     """GET/POST /api/v1/rights/legal/relances/config/"""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request):
         from .models import DebtReminderConfig
