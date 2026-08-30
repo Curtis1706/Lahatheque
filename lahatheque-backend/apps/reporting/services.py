@@ -59,7 +59,7 @@ def notify_user(
             resource_id=resource_id
         )
 
-    # B. Email
+    # B. Email (Purement asynchrone non-bloquant)
     if prefs.email_enabled and getattr(user, "email", None):
         try:
             from .tasks import send_email_task
@@ -68,17 +68,9 @@ def notify_user(
                 subject=title, 
                 html_content=f"<h3>{title}</h3><p>{message}</p>"
             )
-        except Exception:
-            try:
-                from .tasks import send_email_task
-                send_email_task.apply(args=[
-                    [user.email],
-                    title,
-                    f"<h3>{title}</h3><p>{message}</p>"
-                ])
-            except Exception as sync_err:
-                import logging
-                logging.getLogger(__name__).warning(f"Email non expédié: {sync_err}")
+        except Exception as celery_err:
+            import logging
+            logging.getLogger(__name__).warning(f"[NOTIFY] Celery non disponible pour email direct: {celery_err}")
 
     # C. WhatsApp 
     if prefs.whatsapp_enabled and user.phone:

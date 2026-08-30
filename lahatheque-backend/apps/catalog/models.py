@@ -42,7 +42,7 @@ class Ouvrage(models.Model):
     institution = models.ForeignKey('partners.Institution', null=True, blank=True, on_delete=models.SET_NULL, related_name='ouvrages')
     country = models.CharField(max_length=2, default='BJ')
     format_type = models.CharField(max_length=20, choices=FORMAT_CHOICES, default='pdf')
-    file = models.FileField(upload_to='books/', blank=True, null=True)
+    file = models.FileField(upload_to='books/', max_length=512, blank=True, null=True)
     file_size_bytes = models.BigIntegerField(default=0)
     page_count = models.IntegerField(default=0)
     publication_date = models.DateField(null=True, blank=True)
@@ -58,7 +58,7 @@ class Ouvrage(models.Model):
         verbose_name="Disponible en version papier",
         help_text="Décision éditoriale du Chef Maquettiste — distincte du prix papier renseigné."
     )
-    cover_image = models.ImageField(upload_to='covers/', null=True, blank=True)
+    cover_image = models.ImageField(upload_to='covers/', max_length=512, null=True, blank=True)
 
     # Traçabilité & dates
     pre_edition_dossier = models.ForeignKey(

@@ -47,37 +47,97 @@ export function generateLahaIsbn(seedText: string = ""): string {
   return `${isbnRaw.slice(0, 3)}-${isbnRaw.slice(3, 8)}-${isbnRaw.slice(8, 11)}-${isbnRaw.slice(11, 12)}-${isbnRaw.slice(12)}`;
 }
 
+async function extractTextFromPdfInBrowser(file: File): Promise<{ text: string; totalPages: number }> {
+  try {
+    const pdfjs = await import("pdfjs-dist");
+    // Configuration du worker
+    if (!pdfjs.GlobalWorkerOptions.workerSrc && typeof window !== "undefined") {
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) });
+    const pdfDoc = await loadingTask.promise;
+    const totalPages = pdfDoc.numPages;
+    const chunks: string[] = [];
+
+    // Définition de l'ensemble des pages à extraire : 15 premières + 15 dernières
+    const pagesToExtract = new Set<number>();
+
+    // 15 premières pages
+    const firstCount = Math.min(15, totalPages);
+    for (let i = 1; i <= firstCount; i++) {
+      pagesToExtract.add(i);
+    }
+
+    // 15 dernières pages
+    const lastStart = Math.max(1, totalPages - 14);
+    for (let i = lastStart; i <= totalPages; i++) {
+      pagesToExtract.add(i);
+    }
+
+    // Extraction séquentielle ordonnée
+    const sortedPages = Array.from(pagesToExtract).sort((a, b) => a - b);
+    for (const pageNum of sortedPages) {
+      try {
+        const page = await pdfDoc.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str || "")
+          .join(" ")
+          .trim();
+        if (pageText) {
+          chunks.push(`--- PAGE ${pageNum} / ${totalPages} ---\n${pageText}`);
+        }
+      } catch (pageErr) {
+        console.warn(`[PDF.js] Erreur lecture page ${pageNum}:`, pageErr);
+      }
+    }
+
+    return {
+      text: chunks.join("\n\n").slice(0, 100000),
+      totalPages,
+    };
+  } catch (err) {
+    console.warn("[PDF.js] Erreur globale lors de l'extraction locale:", err);
+    return { text: "", totalPages: 0 };
+  }
+}
+
 export async function extractBookMetadataWithAi(
   file?: File,
   filename?: string,
   textSample?: string
 ): Promise<{ success: boolean; data?: AiBookAnalysisResult; error?: string }> {
   try {
-    const formData = new FormData();
-    if (file) {
-      // Transmission du fichier complet pour permettre l'extraction intégrale des 15 premières pages et de la 4e de couverture
-      formData.append("file", file, filename || file.name);
-    }
-    if (filename) {
-      formData.append("filename", filename);
-    }
-    if (textSample) {
-      formData.append("text", textSample);
+    let extractedText = textSample || "";
+    let totalPages = 0;
+    const targetName = filename || file?.name || "Ouvrage.pdf";
+
+    // 1. Extraction locale ultra-rapide côté client via PDF.js
+    if (file && !extractedText && file.name.toLowerCase().endsWith(".pdf")) {
+      console.log(`[AI Service] Extraction locale PDF.js (15 premières + 15 dernières pages) pour '${file.name}'...`);
+      const extracted = await extractTextFromPdfInBrowser(file);
+      extractedText = extracted.text;
+      totalPages = extracted.totalPages;
+      console.log(`[AI Service] Extraction locale réussie : ${totalPages} pages détectées, ${extractedText.length} caractères extraits.`);
     }
 
-    console.log(`[AI Service] Début de l'analyse pour '${filename || file?.name}' (${file ? (file.size / 1024 / 1024).toFixed(2) + ' Mo' : 'texte'})`);
+    console.log(`[AI Service] Envoi du payload JSON à l'IA pour '${targetName}' (${extractedText.length} caractères de texte extrait)`);
 
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 60000) : null;
-
+    // 2. Envoi direct en JSON léger (quelques Ko) -> Résout tout problème de proxy/multipart
     const res = await fetch("/api/bff/ai/extract-metadata/", {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filename: targetName,
+        text: extractedText || undefined,
+        page_count: totalPages || undefined,
+      }),
       credentials: "include",
-      signal: controller ? controller.signal : undefined,
     });
-    
-    if (timeoutId) clearTimeout(timeoutId);
 
     console.log(`[AI Service] Statut HTTP reçu : ${res.status} ${res.statusText}`);
 
@@ -95,7 +155,7 @@ export async function extractBookMetadataWithAi(
       console.warn(`[AI Service] Erreur backend (${res.status}):`, errorText);
     }
   } catch (err) {
-    console.warn("[AI Service] Exception réseau / Timeout -> Fallback contextuel:", err);
+    console.warn("[AI Service] Exception réseau -> Fallback contextuel:", err);
   }
 
   // Simulation intelligente contextuelle immédiate
@@ -168,7 +228,7 @@ export async function extractBookMetadataWithAi(
       publication_year: 2026,
       isbn: generateLahaIsbn(name),
       isbn_found_in_document: false,
-      summary: `Ouvrage de référence « ${name} » préparé pour la bibliothèque numérique LAHAThèque. Analyse approfondie, chapitres structurés et rédaction de référence destinée aux lecteurs et chercheurs.`,
+      summary: `Plongez au cœur de « ${name.charAt(0).toUpperCase() + name.slice(1)} », une contribution majeure en ${genre} publiée sur LAHAThèque.\n\nÀ travers une étude rigoureuse et des analyses détaillées, cet ouvrage explore les enjeux fondamentaux de la discipline et propose des perspectives novatrices adaptées aux défis contemporains.\n\nUne ressource indispensable conçue pour les ${target.toLowerCase()}, offrant des outils concrets et une vision approfondie pour enrichir vos connaissances et votre pratique.`,
       genre_category: genre,
       dewey_code: dewey,
       language: isPortuguese ? "Portugais" : "Français",

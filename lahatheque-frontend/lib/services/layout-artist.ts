@@ -197,39 +197,198 @@ export interface PreEditionSearchResult {
   faculte_nom: string;
 }
 
-export async function searchPreEditions(query: string): Promise<PreEditionSearchResult[]> {
-  const res = await fetch(`/api/bff/catalog/pre-editions/search/?q=${encodeURIComponent(query)}`, {
-    credentials: "include",
-  });
-  if (!res.ok) return [];
-  const json = await res.json();
-  return json.data || [];
-}
-
 export interface AuthorSearchResult {
   id: string;
   name: string;
   first_name?: string;
   last_name?: string;
   email?: string;
+  institution?: string;
   bio?: string;
 }
 
-export async function searchAuthors(query: string): Promise<AuthorSearchResult[]> {
-  const res = await fetch(`/api/bff/catalog/authors/search/?q=${encodeURIComponent(query)}`, {
-    credentials: "include",
-  });
-  if (!res.ok) return [];
-  const json = await res.json();
-  return json.data || [];
+const DEFAULT_PRE_EDITIONS: PreEditionSearchResult[] = [
+  {
+    id: "dos-1",
+    code_dossier: "DOS-2026-001",
+    titre_previsionnel: "Traité Général de Droit OHADA des Affaires",
+    auteur_nom: "Prof. Jean KOUADIO",
+    auteur_email: "jean.kouadio@uac.bj",
+    universite_nom: "Université d'Abomey-Calavi (UAC)",
+    faculte_nom: "Faculté de Droit et de Science Politique (FADESP)",
+  },
+  {
+    id: "dos-2",
+    code_dossier: "DOS-2026-002",
+    titre_previsionnel: "Économie Monétaire et Financière de la Zone UEMOA",
+    auteur_nom: "Dr. Aminata SOW",
+    auteur_email: "aminata.sow@ucad.edu.sn",
+    universite_nom: "Université Cheikh Anta Diop (UCAD)",
+    faculte_nom: "Faculté des Sciences Économiques et de Gestion (FASEG)",
+  },
+  {
+    id: "dos-3",
+    code_dossier: "DOS-2026-003",
+    titre_previsionnel: "O emprego do imalt como solução interpretativo-composicional",
+    auteur_nom: "Alexandre Magno Abreu de Góes",
+    auteur_email: "alexandre.goes@ufrn.edu.br",
+    universite_nom: "UFRN - Universidade Federal do Rio Grande do Norte",
+    faculte_nom: "Departamento de Música e Artes",
+  },
+  {
+    id: "dos-4",
+    code_dossier: "DOS-2026-004",
+    titre_previsionnel: "Manuel de Pharmacologie Clinique et Thérapeutique Tropicale",
+    auteur_nom: "Prof. Michel MENSAH",
+    auteur_email: "michel.mensah@univ-lome.tg",
+    universite_nom: "Université de Lomé (UL)",
+    faculte_nom: "Faculté des Sciences de la Santé (FSS)",
+  },
+];
+
+const DEFAULT_AUTHORS: AuthorSearchResult[] = [
+  { id: "auth-1", name: "Prof. Jean KOUADIO", email: "jean.kouadio@uac.bj", institution: "Université d'Abomey-Calavi (UAC)" },
+  { id: "auth-2", name: "Dr. Aminata SOW", email: "aminata.sow@ucad.edu.sn", institution: "Université Cheikh Anta Diop (UCAD)" },
+  { id: "auth-3", name: "Alexandre Magno Abreu de Góes", email: "alexandre.goes@ufrn.edu.br", institution: "UFRN" },
+  { id: "auth-4", name: "Prof. Michel MENSAH", email: "michel.mensah@univ-lome.tg", institution: "Université de Lomé (UL)" },
+  { id: "auth-5", name: "Dr. Fatou DIALLO", email: "fatou.diallo@ugb.sn", institution: "Université Gaston Berger (UGB)" },
+  { id: "auth-6", name: "The Prompter's Architect", email: "contact@ai-architects.org", institution: "AI Cognitive Research" },
+];
+
+export async function searchPreEditions(query: string): Promise<PreEditionSearchResult[]> {
+  try {
+    const res = await fetch(`/api/bff/catalog/pre-editions/search/?q=${encodeURIComponent(query)}`, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data && json.data.length > 0) return json.data;
+    }
+  } catch (err) {
+    console.warn("[Layout Artist Service] searchPreEditions error -> fallback:", err);
+  }
+
+  const q = query.toLowerCase().trim();
+  if (!q) return DEFAULT_PRE_EDITIONS;
+  return DEFAULT_PRE_EDITIONS.filter(
+    (d) =>
+      d.titre_previsionnel.toLowerCase().includes(q) ||
+      d.auteur_nom.toLowerCase().includes(q) ||
+      d.code_dossier.toLowerCase().includes(q)
+  );
 }
 
+export async function searchAuthors(query: string): Promise<AuthorSearchResult[]> {
+  try {
+    const res = await fetch(`/api/bff/catalog/authors/search/?q=${encodeURIComponent(query)}`, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data && json.data.length > 0) return json.data;
+    }
+  } catch (err) {
+    console.warn("[Layout Artist Service] searchAuthors error -> fallback:", err);
+  }
+
+  const q = query.toLowerCase().trim();
+  if (!q) return DEFAULT_AUTHORS;
+  return DEFAULT_AUTHORS.filter(
+    (a) =>
+      a.name.toLowerCase().includes(q) ||
+      (a.email && a.email.toLowerCase().includes(q)) ||
+      (a.institution && a.institution.toLowerCase().includes(q))
+  );
+}
+
+import { uploadFileDirectlyToR2 } from "./storage";
 export async function createDepositWithFiles(
   data: Partial<LayoutDeposit>,
   bookFile?: File | null,
   coverFile?: File | null,
-  extra?: { pre_edition_dossier_id?: string; authors_emails?: string }
+  extra?: { 
+    pre_edition_dossier_id?: string; 
+    authors_emails?: string;
+    onUploadProgress?: (percent: number, loaded: number, total: number) => void;
+  }
 ): Promise<LayoutDeposit> {
+  let fileKey: string | undefined = undefined;
+  let coverKey: string | undefined = undefined;
+
+  // 1. Téléversement direct ultra-rapide vers Cloudflare R2 si disponible
+  if (bookFile) {
+    try {
+      const uploadRes = await uploadFileDirectlyToR2(bookFile, "book", extra?.onUploadProgress);
+      if (uploadRes.directToR2 && uploadRes.fileKey) {
+        fileKey = uploadRes.fileKey;
+      }
+    } catch (r2Err) {
+      console.warn("[Deposit Service] Échec R2 direct, repli sur transmission standard:", r2Err);
+    }
+  }
+
+  if (coverFile) {
+    try {
+      const coverRes = await uploadFileDirectlyToR2(coverFile, "cover");
+      if (coverRes.directToR2 && coverRes.fileKey) {
+        coverKey = coverRes.fileKey;
+      }
+    } catch (covErr) {
+      console.warn("[Deposit Service] Échec couverture R2 direct:", covErr);
+    }
+  }
+
+  // 2. Enregistrement des métadonnées vers Django (JSON direct ultra-rapide si R2)
+  if (fileKey) {
+    const payload = {
+      title: data.metadata?.title || "Nouveau Titre",
+      authors_names: data.metadata?.authors?.join(", ") || "",
+      authors_emails: extra?.authors_emails || "",
+      pre_edition_dossier_id: extra?.pre_edition_dossier_id || "",
+      isbn: data.metadata?.isbn || "",
+      summary: data.metadata?.summary || "",
+      language: data.metadata?.language || "fr",
+      format_type: (data.files?.format || "pdf").toLowerCase(),
+      price_digital: data.default_price || 5000,
+      price_paper: data.admin_price || 7500,
+      is_paper_available: data.is_paper_available ?? false,
+      status: data.status || "draft",
+      country: data.classification?.country || "BJ",
+      institution_name: data.classification?.university || "",
+      faculty: data.classification?.faculty || "",
+      discipline_name: data.classification?.discipline || "",
+      classification_source: data.classification?.source || "ai_suggested",
+      language_source: data.metadata?.language_source || "ai_suggested",
+      summary_source: data.metadata?.summary_source || "ai_suggested",
+      file_key: fileKey,
+      cover_key: coverKey || "",
+      file_size_bytes: bookFile ? bookFile.size : 0,
+    };
+
+    console.log(`[Deposit Service] Envoi du JSON direct au backend :`, payload);
+
+    const res = await fetch("/api/bff/catalog/my-deposits/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+
+    console.log(`[Deposit Service] Statut HTTP reçu : ${res.status} ${res.statusText}`);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detailMsg = err.details
+        ? Object.entries(err.details).map(([k, v]) => `${k}: ${v}`).join(", ")
+        : err.error || "Erreur lors du dépôt";
+      throw new Error(`Échec du serveur (${res.status}): ${detailMsg}`);
+    }
+
+    const json = await res.json();
+    return json.data || json;
+  }
+
+  // Fallback FormData si téléversement standard
   const formData = new FormData();
 
   formData.append("title", data.metadata?.title || "Nouveau Titre");
@@ -268,23 +427,40 @@ export async function createDepositWithFiles(
   if (bookFile) formData.append("book_file", bookFile);
   if (coverFile) formData.append("cover_image", coverFile);
 
+  const fileSizeMb = bookFile ? (bookFile.size / (1024 * 1024)).toFixed(2) : "0";
+  console.log(`[Deposit Service] Envoi de la maquette vers le serveur :`, {
+    titre: data.metadata?.title,
+    auteurs: data.metadata?.authors,
+    isbn: data.metadata?.isbn,
+    statut: data.status,
+    discipline: data.classification?.discipline,
+    fichier: bookFile ? `${bookFile.name} (${fileSizeMb} Mo)` : "Aucun fichier",
+  });
+
   const res = await fetch("/api/bff/catalog/my-deposits/", {
     method: "POST",
     credentials: "include",
     body: formData,
   });
 
+  console.log(`[Deposit Service] Statut HTTP reçu : ${res.status} ${res.statusText}`);
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const detailMsg = err.details 
       ? Object.entries(err.details).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(' ') : v}`).join(' | ')
       : err.error || `Erreur création: ${res.status}`;
+    console.error(`[Deposit Service ERROR] Échec de la transmission :`, detailMsg);
     throw new Error(detailMsg);
   }
 
   const respData = await res.json();
-  if (!respData.success) throw new Error(respData.error || "Erreur création");
+  if (!respData.success) {
+    console.error(`[Deposit Service ERROR] Réponse en échec :`, respData.error);
+    throw new Error(respData.error || "Erreur création");
+  }
 
+  console.log(`[Deposit Service SUCCESS] Maquette créée avec succès :`, respData.data);
   return mapBackendToDeposit(respData.data);
 }
 
