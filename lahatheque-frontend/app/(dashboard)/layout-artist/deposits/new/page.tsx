@@ -410,21 +410,29 @@ export default function NewDepositPage() {
         {
           pre_edition_dossier_id: selectedPreEdition?.id,
           authors_emails: authorsEmailsStr,
-          onUploadProgress: (percent) => setUploadProgress(percent),
+          onUploadProgress: (percent) => {
+            setUploadProgress(percent);
+            // Dès que l'upload R2 est terminé, on passe visuellement à l'étape ONIX
+            // sans attendre la réponse du POST Django (qui peut prendre du temps en prod)
+            if (percent >= 100) {
+              setSubmissionStatus("processing");
+            }
+          },
         }
       );
 
       const dep = await depPromise;
       console.log(`[Deposit Page] Réponse backend reçue pour le dépôt #${dep.id}.`);
 
-      // 2. Traitement ONIX et enregistrement
+      // 2. Enregistrement (l'étape ONIX est déjà affichée via onUploadProgress si R2 a réussi,
+      // sinon on la force ici pour le chemin sans R2)
       setSubmissionStatus("processing");
       console.log(`[Deposit Page] Structuration de la notice ONIX 3.0 et classification Dewey...`);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       setSubmissionStatus("registering");
       console.log(`[Deposit Page] Inscription au registre de validation du Chef Maquettiste...`);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
       // 3. Confirmation de succès
       setSubmissionStatus("success");
@@ -436,6 +444,20 @@ export default function NewDepositPage() {
       }, 1000);
     } catch (err: any) {
       console.error(`[Deposit Page ERROR] Échec lors de la transmission :`, err);
+
+      // Cas particulier : 502 Bad Gateway en prod = timeout BFF/Gunicorn
+      // Le dépôt a probablement été créé côté Django mais la réponse n'est pas revenue à temps.
+      // On redirige vers la liste plutôt que de bloquer sur erreur.
+      const is502 = err.message?.includes('502') || err.message?.includes('Impossible de contacter');
+      if (is502) {
+        console.warn(`[Deposit Page] 502 détecté — le dépôt a probablement été créé. Redirection vers la liste...`);
+        toast.info("Transmission envoyée. Si votre dépôt n'apparaît pas, patientez quelques secondes et actualisez.");
+        setTimeout(() => {
+          window.location.href = "/layout-artist/deposits";
+        }, 2500);
+        return;
+      }
+
       setSubmissionStatus("error");
       setSubmissionError(err.message || "Erreur lors de la transmission de la maquette.");
       toast.error(err.message || "Erreur lors de la transmission de la maquette.");

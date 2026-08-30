@@ -216,10 +216,13 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                         logger.warning(f"Impossible d'initialiser le stock pour l'ouvrage {ouvrage.id}: {stock_err}")
 
                 print(f"[DEPOSIT CREATE SUCCESS] Ouvrage #{ouvrage.id} « {ouvrage.title} » validé et publié directement.", flush=True)
+                ouvrage_optimized = Ouvrage.objects.prefetch_related('authors').select_related(
+                    'discipline', 'institution', 'publisher', 'pre_edition_dossier'
+                ).get(pk=ouvrage.pk)
                 return Response({
                     "success": True,
                     "message": f"L'ouvrage « {ouvrage.title} » a été déposé et validé directement. Il est publié sur le catalogue officiel.",
-                    "data": OuvrageReadSerializer(ouvrage).data
+                    "data": OuvrageReadSerializer(ouvrage_optimized, context={'request': request}).data
                 }, status=status.HTTP_201_CREATED)
 
             elif requested_status in ('submitted', 'pending_validation'):
@@ -231,8 +234,9 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                     from apps.accounts.models import User
                     from apps.reporting.services import notify_user
                     from apps.reporting.models import Notification
-                    chiefs = User.objects.filter(role__in=['chief_layout', 'admin', 'super_admin'], is_active=True)
-                    for chief in chiefs:
+                    # Récupérer les chiefs une seule fois pour éviter le double count()
+                    chiefs_list = list(User.objects.filter(role__in=['chief_layout', 'admin', 'super_admin'], is_active=True))
+                    for chief in chiefs_list:
                         notify_user(
                             user=chief,
                             notification_type=Notification.NotificationType.SYSTEM,
@@ -241,16 +245,20 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                             action_url="/chief-layout/validation",
                             resource_id=str(ouvrage.id),
                         )
-                    print(f"[DEPOSIT CREATE] {chiefs.count()} notification(s) envoyée(s) au Chef Maquettiste.", flush=True)
+                    print(f"[DEPOSIT CREATE] {len(chiefs_list)} notification(s) envoyée(s) au Chef Maquettiste.", flush=True)
                 except Exception as notif_err:
                     logger.warning(f"Erreur notification chef maquettiste: {notif_err}")
 
+            # Sérialisation optimisée : prefetch pour éviter N+1 et timeout en prod
+            ouvrage_optimized = Ouvrage.objects.prefetch_related('authors').select_related(
+                'discipline', 'institution', 'publisher', 'pre_edition_dossier'
+            ).get(pk=ouvrage.pk)
             print(f"[DEPOSIT CREATE SUCCESS] Ouvrage #{ouvrage.id} « {ouvrage.title} » enregistré avec succès (statut: {ouvrage.status})", flush=True)
             return Response({
                 "success": True,
                 "message": "Maquette déposée avec succès." if ouvrage.status == 'draft'
                            else "Maquette soumise au Chef Maquettiste pour validation.",
-                "data": OuvrageReadSerializer(ouvrage).data
+                "data": OuvrageReadSerializer(ouvrage_optimized, context={'request': request}).data
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:

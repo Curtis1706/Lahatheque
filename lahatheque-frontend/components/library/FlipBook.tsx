@@ -442,7 +442,13 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             ? fileUrl
             : `${origin}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
           try {
-            const res = await fetch(absoluteUrl, { headers: { Accept: 'application/pdf' } });
+            // Utiliser Accept: application/octet-stream pour éviter qu'IDM
+            // n'intercepte la requête (il cible les requêtes avec Accept: application/pdf).
+            // pdf.js lit l'ArrayBuffer directement peu importe le Content-Type.
+            const res = await fetch(absoluteUrl, {
+              headers: { Accept: 'application/octet-stream' },
+              credentials: 'include',
+            });
             if (res.ok) {
               const contentType = res.headers.get('content-type') || '';
               if (!contentType.includes('json') && !contentType.includes('html')) {

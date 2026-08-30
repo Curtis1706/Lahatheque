@@ -385,7 +385,12 @@ export async function createDepositWithFiles(
     }
 
     const json = await res.json();
-    return json.data || json;
+    if (!json.success) {
+      console.error(`[Deposit Service ERROR] Réponse en échec :`, json.error);
+      throw new Error(json.error || "Erreur création");
+    }
+    console.log(`[Deposit Service SUCCESS] Maquette créée avec succès (R2) :`, json.data);
+    return mapBackendToDeposit(json.data);
   }
 
   // Fallback FormData si téléversement standard

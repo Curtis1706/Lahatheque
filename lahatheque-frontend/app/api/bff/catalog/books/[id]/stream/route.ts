@@ -47,7 +47,13 @@ export async function GET(
     if (backendRes.status === 200 || backendRes.status === 206) {
 
       const responseHeaders = new Headers();
-      responseHeaders.set('Content-Type', backendRes.headers.get('content-type') || 'application/pdf');
+      // Utiliser application/octet-stream au lieu de application/pdf pour éviter
+      // qu'IDM (Internet Download Manager) et autres gestionnaires de téléchargement
+      // n'interceptent la réponse. pdf.js lit l'ArrayBuffer directement peu importe
+      // le Content-Type. Content-Disposition: inline indique au navigateur de ne pas
+      // déclencher un téléchargement.
+      responseHeaders.set('Content-Type', 'application/octet-stream');
+      responseHeaders.set('Content-Disposition', 'inline; filename="document.bin"');
       responseHeaders.set('Accept-Ranges', 'bytes');
       responseHeaders.set('Cache-Control', 'private, no-store, must-revalidate');
       responseHeaders.set('X-Content-Type-Options', 'nosniff');
