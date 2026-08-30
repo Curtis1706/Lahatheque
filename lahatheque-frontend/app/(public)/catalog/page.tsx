@@ -23,6 +23,13 @@ import { searchBooks } from "@/lib/services/catalog";
 import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import { Book as Book3D } from "@/components/ui/book";
 
+// Liste dynamique des années de publication : de l'année en cours jusqu'à 1950
+const CURRENT_YEAR = new Date().getFullYear();
+const PUBLICATION_YEARS = Array.from(
+  { length: CURRENT_YEAR - 1950 + 1 },
+  (_, i) => CURRENT_YEAR - i
+);
+
 export default function CatalogSearchPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
@@ -194,11 +201,11 @@ export default function CatalogSearchPage() {
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
                 <option value="">Toutes les années</option>
-                <option value="2026">2026</option>
-                <option value="2025">2025</option>
-                <option value="2024">2024</option>
-                <option value="2023">2023</option>
-                <option value="2022">2022 et antérieur</option>
+                {PUBLICATION_YEARS.map((year) => (
+                  <option key={year} value={year.toString()}>
+                    {year}
+                  </option>
+                ))}
               </select>
             </div>
 

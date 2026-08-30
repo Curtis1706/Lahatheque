@@ -91,6 +91,28 @@ const PAPER_PACKS = [
       "Livraison suivie sécurisée garantie sous 48h",
       "Assistance méthodologique et annales d'examens"
     ]
+  },
+  {
+    id: "pack-institution",
+    badge: "Institution & Librairie",
+    isInstitutional: true,
+    discount: "Sur Devis",
+    title: "Bouquet Établissement & Bibliothèque",
+    subtitle: "Dotation d'ouvrages papier pour institutions, universités, librairies et bibliothèques",
+    books: [
+      "Fonds documentaire complet pluridisciplinaire",
+      "Manuels universitaires et scolaires au choix",
+      "Volumes de recherche, codes et traités",
+      "Réassort flexible selon vos effectifs"
+    ],
+    originalPrice: 0,
+    packPrice: 0,
+    features: [
+      "Facturation pro & bon de commande administratif",
+      "Remise dégressive selon le volume (jusqu'à -35%)",
+      "Livraison groupée sur site ou campus sous 48-72h",
+      "Accompagnement dédié par un chargé de compte"
+    ]
   }
 ];
 
@@ -346,30 +368,38 @@ export default function SubscriptionsPage() {
         {activeType === "paper" && (
           <div className="space-y-10 animate-in fade-in duration-300">
             
-            {/* Grille des Packs Papier */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
+            {/* Grille des 4 Packs Papier (2 colonnes x 2 lignes) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto pt-2">
               {PAPER_PACKS.map((pack) => (
                 <div
                   key={pack.id}
-                  className={`bg-background rounded-3xl p-6 sm:p-7 space-y-6 flex flex-col justify-between transition-all relative ${
+                  className={`bg-background rounded-3xl p-6 space-y-6 flex flex-col justify-between transition-all relative ${
                     pack.popular
                       ? "border-2 border-gold shadow-lg ring-1 ring-gold/30"
+                      : pack.isInstitutional
+                      ? "border-2 border-navy/30 bg-background-secondary/30 hover:border-gold hover:shadow-md"
                       : "border-2 border-border hover:border-gold hover:shadow-md"
                   }`}
                 >
                   {/* Badge Réduction & Popularité */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] uppercase font-bold text-navy bg-gold/20 px-2.5 py-1 rounded-md border border-gold/30">
+                    <span className={`text-[10px] uppercase font-bold px-2.5 py-1 rounded-md border ${
+                      pack.isInstitutional
+                        ? "text-navy bg-navy/10 border-navy/20"
+                        : "text-navy bg-gold/20 border-gold/30"
+                    }`}>
                       {pack.badge}
                     </span>
-                    <span className="bg-rose-500 text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full shadow-sm">
+                    <span className={`text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full shadow-sm ${
+                      pack.isInstitutional ? "bg-navy" : "bg-rose-500"
+                    }`}>
                       {pack.discount}
                     </span>
                   </div>
 
                   <div className="space-y-4">
                     <div>
-                      <h3 className="font-serif text-xl font-bold text-navy">
+                      <h3 className="font-serif text-lg sm:text-xl font-bold text-navy">
                         {pack.title}
                       </h3>
                       <p className="text-xs text-foreground-muted mt-1 leading-relaxed">
@@ -378,11 +408,11 @@ export default function SubscriptionsPage() {
                     </div>
 
                     {/* Liste des Livres Inclus */}
-                    <div className="bg-background-secondary p-3.5 rounded-xl border border-border space-y-1.5">
+                    <div className="bg-background-secondary p-3 rounded-xl border border-border space-y-1.5">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-gold block">
                         Ouvrages inclus dans ce pack :
                       </span>
-                      <ul className="space-y-1 text-xs text-foreground/80 font-medium">
+                      <ul className="space-y-1 text-[11px] text-foreground/80 font-medium">
                         {pack.books.map((b, bIdx) => (
                           <li key={bIdx} className="flex items-start gap-1.5">
                             <span className="text-gold font-bold">•</span>
@@ -394,20 +424,36 @@ export default function SubscriptionsPage() {
 
                     {/* Prix avec réduction */}
                     <div className="pt-2 border-t border-border">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-foreground-muted line-through font-semibold">
-                          {pack.originalPrice.toLocaleString("fr-FR")} FCFA
-                        </span>
-                        <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
-                          Économisez {(pack.originalPrice - pack.packPrice).toLocaleString("fr-FR")} FCFA
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-1 mt-1">
-                        <span className="font-serif text-3xl font-bold text-navy">
-                          {pack.packPrice.toLocaleString("fr-FR")}
-                        </span>
-                        <span className="text-xs font-bold text-gold-dark">FCFA le pack</span>
-                      </div>
+                      {pack.isInstitutional ? (
+                        <div>
+                          <span className="text-[10px] font-bold text-navy bg-navy/5 px-2 py-0.5 rounded block mb-1">
+                            Tarification dégressive au volume
+                          </span>
+                          <div className="flex items-baseline gap-1 mt-1">
+                            <span className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+                              Sur Devis
+                            </span>
+                            <span className="text-xs font-bold text-foreground-muted">/ établissement</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-foreground-muted line-through font-semibold">
+                              {pack.originalPrice.toLocaleString("fr-FR")} FCFA
+                            </span>
+                            <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
+                              Économisez {(pack.originalPrice - pack.packPrice).toLocaleString("fr-FR")} FCFA
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-1 mt-1">
+                            <span className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+                              {pack.packPrice.toLocaleString("fr-FR")}
+                            </span>
+                            <span className="text-xs font-bold text-gold-dark">FCFA le pack</span>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {/* Avantages */}
@@ -422,15 +468,26 @@ export default function SubscriptionsPage() {
                   </div>
 
                   <Link
-                    href="/cart"
+                    href={pack.isInstitutional ? "/partners" : "/cart"}
                     className={`w-full py-3.5 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-2 text-center shadow min-h-[44px] ${
                       pack.popular
                         ? "bg-gold hover:bg-gold-hover text-navy shadow-md"
+                        : pack.isInstitutional
+                        ? "bg-navy hover:bg-navy-hover text-white"
                         : "bg-navy hover:bg-navy-hover text-white"
                     }`}
                   >
-                    <Package className="w-4 h-4" />
-                    Commander ce Pack Papier
+                    {pack.isInstitutional ? (
+                      <>
+                        <Building2 className="w-4 h-4 text-gold" />
+                        Demander un Devis Pro
+                      </>
+                    ) : (
+                      <>
+                        <Package className="w-4 h-4" />
+                        Commander ce Pack
+                      </>
+                    )}
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
