@@ -342,23 +342,40 @@ export async function createDepositWithFiles(
   if (bookFile) formData.append("book_file", bookFile);
   if (coverFile) formData.append("cover_image", coverFile);
 
+  const fileSizeMb = bookFile ? (bookFile.size / (1024 * 1024)).toFixed(2) : "0";
+  console.log(`[Deposit Service] Envoi de la maquette vers le serveur :`, {
+    titre: data.metadata?.title,
+    auteurs: data.metadata?.authors,
+    isbn: data.metadata?.isbn,
+    statut: data.status,
+    discipline: data.classification?.discipline,
+    fichier: bookFile ? `${bookFile.name} (${fileSizeMb} Mo)` : "Aucun fichier",
+  });
+
   const res = await fetch("/api/bff/catalog/my-deposits/", {
     method: "POST",
     credentials: "include",
     body: formData,
   });
 
+  console.log(`[Deposit Service] Statut HTTP reçu : ${res.status} ${res.statusText}`);
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const detailMsg = err.details 
       ? Object.entries(err.details).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(' ') : v}`).join(' | ')
       : err.error || `Erreur création: ${res.status}`;
+    console.error(`[Deposit Service ERROR] Échec de la transmission :`, detailMsg);
     throw new Error(detailMsg);
   }
 
   const respData = await res.json();
-  if (!respData.success) throw new Error(respData.error || "Erreur création");
+  if (!respData.success) {
+    console.error(`[Deposit Service ERROR] Réponse en échec :`, respData.error);
+    throw new Error(respData.error || "Erreur création");
+  }
 
+  console.log(`[Deposit Service SUCCESS] Maquette créée avec succès :`, respData.data);
   return mapBackendToDeposit(respData.data);
 }
 

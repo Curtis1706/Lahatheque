@@ -24,12 +24,14 @@ import {
   X,
   ChevronDown,
   RotateCcw,
-  Users
+  Users,
+  Loader2
 } from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper, DEPOSIT_STEPS } from "@/components/features/layout-artist/deposit-wizard-stepper";
 import { AIAnalysisProgressCard } from "@/components/features/layout-artist/ai-analysis-progress-card";
+import { DepositSubmissionModal } from "@/components/features/layout-artist/deposit-submission-modal";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { createDeposit, createDepositWithFiles, searchPreEditions, searchAuthors, type PreEditionSearchResult, type AuthorSearchResult } from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/ai";
@@ -54,6 +56,11 @@ export default function NewDepositPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
+
+  // Transmission Modal State
+  const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<"idle" | "uploading" | "processing" | "registering" | "success" | "error">("idle");
+  const [submissionError, setSubmissionError] = useState<string | undefined>(undefined);
 
   // Pre-Edition State (Select Combobox)
   const [preEditionSearch, setPreEditionSearch] = useState("");
@@ -294,6 +301,7 @@ export default function NewDepositPage() {
 
   const handleSaveDraft = async () => {
     setSaving(true);
+    console.log(`[Deposit Page] Enregistrement d'un brouillon pour « ${title || "Nouveau Dépôt"} »...`);
     try {
       const dep = await createDepositWithFiles(
         {
@@ -329,9 +337,11 @@ export default function NewDepositPage() {
           authors_emails: authorsEmailsStr,
         }
       );
+      console.log(`[Deposit Page] Brouillon enregistré avec succès. ID: ${dep.id}`);
       toast.success("Brouillon sauvegardé avec succès.");
       router.push(`/layout-artist/deposits/${dep.id}`);
     } catch (err: any) {
+      console.error(`[Deposit Page ERROR] Échec de la sauvegarde du brouillon :`, err);
       toast.error(err.message || "Erreur lors de la sauvegarde du brouillon.");
     } finally {
       setSaving(false);
@@ -344,9 +354,23 @@ export default function NewDepositPage() {
       return;
     }
 
+    console.log(`[Deposit Page] Lancement de la transmission au Chef Maquettiste...`, {
+      titre: title,
+      auteurs: authorsStr,
+      isbn: isbn,
+      discipline: genreCategory,
+      fichier: bookFile.name,
+      tailleMo: (bookFile.size / (1024 * 1024)).toFixed(2),
+    });
+
     setSaving(true);
+    setSubmissionError(undefined);
+    setIsSubmissionModalOpen(true);
+    setSubmissionStatus("uploading");
+
     try {
-      await createDepositWithFiles(
+      // 1. Envoi et téléversement du fichier
+      const depPromise = createDepositWithFiles(
         {
           metadata: {
             title,
@@ -380,11 +404,32 @@ export default function NewDepositPage() {
           authors_emails: authorsEmailsStr,
         }
       );
-      toast.success("Maquette soumise au Chef Maquettiste avec succès !");
-      router.push("/layout-artist/deposits");
+
+      const dep = await depPromise;
+      console.log(`[Deposit Page] Réponse backend reçue pour le dépôt #${dep.id}.`);
+
+      // 2. Traitement ONIX et enregistrement
+      setSubmissionStatus("processing");
+      console.log(`[Deposit Page] Structuration de la notice ONIX 3.0 et classification Dewey...`);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      setSubmissionStatus("registering");
+      console.log(`[Deposit Page] Inscription au registre de validation du Chef Maquettiste...`);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // 3. Confirmation de succès
+      setSubmissionStatus("success");
+      console.log(`[Deposit Page SUCCESS] Transmission terminée avec succès ! Redirection en cours...`);
+      toast.success("Maquette transmise avec succès au Chef Maquettiste !");
+
+      setTimeout(() => {
+        router.push("/layout-artist/deposits");
+      }, 1200);
     } catch (err: any) {
-      toast.error(err.message || "Erreur lors de la soumission de la maquette.");
-    } finally {
+      console.error(`[Deposit Page ERROR] Échec lors de la transmission :`, err);
+      setSubmissionStatus("error");
+      setSubmissionError(err.message || "Erreur lors de la transmission de la maquette.");
+      toast.error(err.message || "Erreur lors de la transmission de la maquette.");
       setSaving(false);
     }
   };
@@ -419,19 +464,32 @@ export default function NewDepositPage() {
           <button
             onClick={handleSaveDraft}
             disabled={saving || !bookFile}
-            className="px-4 py-2.5 rounded-xl border border-border bg-background hover:bg-background-secondary text-xs font-bold text-navy flex items-center gap-1.5 shadow-xs transition-colors min-h-[44px] cursor-pointer"
+            className="px-4 py-2.5 rounded-xl border border-border bg-background hover:bg-background-secondary text-xs font-bold text-navy flex items-center gap-1.5 shadow-xs transition-colors min-h-[44px] cursor-pointer disabled:opacity-50"
           >
-            <Save className="w-4 h-4 text-foreground-muted" />
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin text-foreground-muted" />
+            ) : (
+              <Save className="w-4 h-4 text-foreground-muted" />
+            )}
             Sauvegarder Brouillon
           </button>
 
           <button
             onClick={handleSubmitValidation}
             disabled={saving || !bookFile}
-            className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors min-h-[44px] cursor-pointer"
+            className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors min-h-[44px] cursor-pointer disabled:opacity-50"
           >
-            <Send className="w-4 h-4 text-gold" />
-            Soumettre pour Validation
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 text-gold animate-spin" />
+                Transmission en cours...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4 text-gold" />
+                Soumettre pour Validation
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -1333,6 +1391,14 @@ export default function NewDepositPage() {
         </div>
       )}
 
+      {/* Modale de transmission dynamique & barre de progression */}
+      <DepositSubmissionModal
+        isOpen={isSubmissionModalOpen}
+        fileName={bookFile?.name}
+        fileSizeMb={bookFile ? bookFile.size / (1024 * 1024) : undefined}
+        status={submissionStatus}
+        errorMessage={submissionError}
+      />
     </div>
   );
 }

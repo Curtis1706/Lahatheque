@@ -125,9 +125,31 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """Dépôt d'une nouvelle maquette par un maquettiste ou publication directe par le Chef Maquettiste."""
+        requested_status = request.data.get('status', 'draft')
+        user_email = getattr(request.user, 'email', 'Anonyme')
+        user_role = getattr(request.user, 'role', 'maquettiste')
+        book_f = request.FILES.get('book_file')
+        cover_f = request.FILES.get('cover_image')
+        book_size_mb = (book_f.size / (1024 * 1024)) if book_f else 0
+
+        print(f"=======================================================", flush=True)
+        print(f"[DEPOSIT CREATE] Réception d'un dépôt de maquette", flush=True)
+        print(f"   -> Dépositaire : {user_email} (Rôle: {user_role})", flush=True)
+        print(f"   -> Titre       : {request.data.get('title')}", flush=True)
+        print(f"   -> Auteurs     : {request.data.get('authors_names')}", flush=True)
+        print(f"   -> ISBN        : {request.data.get('isbn')}", flush=True)
+        print(f"   -> Discipline  : {request.data.get('discipline_name')}", flush=True)
+        print(f"   -> Statut visé : {requested_status}", flush=True)
+        if book_f:
+            print(f"   -> Fichier PDF : {book_f.name} ({book_size_mb:.2f} Mo)", flush=True)
+        if cover_f:
+            print(f"   -> Couverture  : {cover_f.name}", flush=True)
+        print(f"=======================================================", flush=True)
+
         serializer = OuvrageCreateSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
-            logger.error(f"[MaquettisteDepositViewSet Create Error] Validation errors: {serializer.errors} | Data: {request.data}")
+            logger.error(f"[DEPOSIT CREATE ERROR] Validation échouée: {serializer.errors} | Data: {request.data}")
+            print(f"[DEPOSIT CREATE ERROR] Échec validation du dépôt : {serializer.errors}", flush=True)
             return Response({
                 "success": False,
                 "error": "Données de dépôt invalides",
@@ -135,11 +157,7 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         ouvrage = serializer.save()
-
-        user_role = getattr(request.user, 'role', '')
         is_chief_or_admin = user_role in ('chief_layout', 'admin', 'super_admin') or request.user.is_superuser or request.user.is_staff
-
-        requested_status = request.data.get('status', 'draft')
 
         # Si l'utilisateur est Chef Maquettiste (ou admin) et soumet l'ouvrage -> validation directe
         if is_chief_or_admin and requested_status in ('submitted', 'published', 'pending_validation'):
@@ -196,6 +214,7 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                 except Exception as stock_err:
                     logger.warning(f"Impossible d'initialiser le stock pour l'ouvrage {ouvrage.id}: {stock_err}")
 
+            print(f"[DEPOSIT CREATE SUCCESS] Ouvrage #{ouvrage.id} « {ouvrage.title} » validé et publié directement.", flush=True)
             return Response({
                 "success": True,
                 "message": f"L'ouvrage « {ouvrage.title} » a été déposé et validé directement. Il est publié sur le catalogue officiel.",
@@ -206,6 +225,26 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             ouvrage.status = 'submitted'
             ouvrage.save(update_fields=['status'])
 
+            # Notification au Chef Maquettiste
+            try:
+                from apps.accounts.models import User
+                from apps.reporting.services import notify_user
+                from apps.reporting.models import Notification
+                chiefs = User.objects.filter(role__in=['chief_layout', 'admin', 'super_admin'], is_active=True)
+                for chief in chiefs:
+                    notify_user(
+                        user=chief,
+                        notification_type=Notification.NotificationType.SYSTEM,
+                        title="Nouvelle maquette à valider",
+                        message=f"« {ouvrage.title} » a été soumis par {request.user.get_full_name() or request.user.email}.",
+                        action_url="/chief-layout/validation",
+                        resource_id=str(ouvrage.id),
+                    )
+                print(f"[DEPOSIT CREATE] {chiefs.count()} notification(s) envoyée(s) au Chef Maquettiste.", flush=True)
+            except Exception as notif_err:
+                logger.warning(f"Erreur notification chef maquettiste: {notif_err}")
+
+        print(f"[DEPOSIT CREATE SUCCESS] Ouvrage #{ouvrage.id} « {ouvrage.title} » enregistré avec succès (statut: {ouvrage.status})", flush=True)
         return Response({
             "success": True,
             "message": "Maquette déposée avec succès." if ouvrage.status == 'draft'
