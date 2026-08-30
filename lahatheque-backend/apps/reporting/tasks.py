@@ -484,3 +484,95 @@ def task_check_legal_alerts():
     sent = check_and_generate_legal_notifications()
     return {"legal_alerts_sent": sent}
 
+
+@shared_task
+def task_distribute_bouquet_revenue():
+    """
+    Répartition mensuelle des revenus des bouquets partagés entre plusieurs universités,
+    au prorata de l'utilisation réelle (CDC section 11).
+    """
+    from apps.partners.models import (
+        BouquetOffering, UniversityBouquetSubscription, UniversityRoyaltyStatement
+    )
+    from apps.protection.models import TraceAcces
+    from django.db.models import Count
+    from django.utils import timezone
+    from datetime import timedelta
+    import uuid as uuid_lib
+
+    now = timezone.now()
+    period_start = (now.replace(day=1) - timedelta(days=1)).replace(day=1)
+    period_end = now.replace(day=1) - timedelta(days=1)
+    period_label = period_start.strftime("%Y-%m")
+
+    shared_offering_ids = (
+        UniversityBouquetSubscription.objects
+        .filter(status="active", offering_id__isnull=False)
+        .values("offering_id")
+        .annotate(n=Count("institution", distinct=True))
+        .filter(n__gte=2)
+        .values_list("offering_id", flat=True)
+    )
+
+    statements_created = 0
+
+    for offering_id in shared_offering_ids:
+        subs = UniversityBouquetSubscription.objects.filter(
+            offering_id=offering_id, status="active"
+        ).select_related("institution")
+
+        total_pool = sum(float(s.annual_price) for s in subs) / 12
+
+        if total_pool <= 0:
+            continue
+
+        usage_by_institution = {}
+        total_usage = 0
+
+        for sub in subs:
+            count = TraceAcces.objects.filter(
+                bouquet_subscription=sub,
+                timestamp__gte=period_start,
+                timestamp__lte=period_end,
+            ).count()
+
+            usage_by_institution[sub.institution_id] = usage_by_institution.get(sub.institution_id, 0) + count
+            total_usage += count
+
+        if total_usage == 0:
+            n_inst = len(set(s.institution_id for s in subs))
+            usage_by_institution = {s.institution_id: 1 for s in subs}
+            total_usage = n_inst
+
+        for sub in subs:
+            part_utilisation = usage_by_institution.get(sub.institution_id, 0) / total_usage
+            ca_institution = total_pool * part_utilisation
+            taux = float(sub.institution.royalty_rate) if hasattr(sub.institution, 'royalty_rate') else 15.0
+            redevance = ca_institution * (taux / 100)
+
+            if redevance <= 0:
+                continue
+
+            ref = f"REP-BOUQ-{period_label}-{str(uuid_lib.uuid4())[:6].upper()}"
+
+            UniversityRoyaltyStatement.objects.get_or_create(
+                institution=sub.institution,
+                period=f"{period_label}-bouquet-{str(offering_id)[:8]}",
+                defaults={
+                    "reference": ref,
+                    "total_sales_catalog": ca_institution,
+                    "royalty_rate": taux,
+                    "net_royalty_amount": redevance,
+                    "currency": sub.currency,
+                    "status": "available",
+                }
+            )
+            statements_created += 1
+
+    return {
+        "period": period_label,
+        "shared_bouquets_processed": len(list(shared_offering_ids)),
+        "statements_created": statements_created,
+    }
+
+

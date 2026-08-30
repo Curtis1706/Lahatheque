@@ -19,6 +19,10 @@ app.conf.beat_schedule = {
         'task': 'apps.reporting.tasks.task_check_stock_alerts',
         'schedule': crontab(minute='0', hour='*/6'),
     },
+    'bouquet-revenue-distribution': {
+        'task': 'apps.reporting.tasks.task_distribute_bouquet_revenue',
+        'schedule': crontab(day_of_month='2', hour='4', minute='0'),
+    },
 }
 
 @app.task(bind=True)

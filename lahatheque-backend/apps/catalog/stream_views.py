@@ -134,6 +134,16 @@ class BookStreamView(APIView):
 
         # 6. Journalisation légale immuable dans TraceAcces
         try:
+            bouquet_sub_id = access_result.get("bouquet_subscription_id")
+            institution_obj = None
+            bouquet_sub_obj = None
+
+            if bouquet_sub_id:
+                from apps.partners.models import UniversityBouquetSubscription
+                bouquet_sub_obj = UniversityBouquetSubscription.objects.filter(id=bouquet_sub_id).first()
+                if bouquet_sub_obj:
+                    institution_obj = bouquet_sub_obj.institution
+
             TraceAcces.objects.create(
                 user=request.user,
                 ouvrage=ouvrage,
@@ -143,6 +153,8 @@ class BookStreamView(APIView):
                 user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
                 device_fingerprint=user_info["device_fingerprint"][:255],
                 access_type="read_chunk",
+                institution=institution_obj,
+                bouquet_subscription=bouquet_sub_obj,
             )
         except Exception as log_err:
             logger.warning(f"Erreur enregistrement TraceAcces: {log_err}")

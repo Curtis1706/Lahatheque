@@ -89,6 +89,14 @@ class TraceAcces(models.Model):
     access_type = models.CharField(max_length=32, choices=ACCESS_TYPE_CHOICES, default="read_chunk", db_index=True)
     page_number = models.IntegerField(null=True, blank=True)
     derived_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    institution = models.ForeignKey(
+        'partners.Institution', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='traces_acces'
+    )
+    bouquet_subscription = models.ForeignKey(
+        'partners.UniversityBouquetSubscription', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='traces_acces'
+    )
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:

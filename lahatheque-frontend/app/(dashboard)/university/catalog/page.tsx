@@ -144,7 +144,7 @@ export default function UniversityCatalogPage() {
             className="px-3 py-1.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-[11px] font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
           >
             <ShoppingBag className="w-3.5 h-3.5 text-gold" />
-            <span>Papier</span>
+            <span>Commander</span>
           </Link>
         </div>
       ),

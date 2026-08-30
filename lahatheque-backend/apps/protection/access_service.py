@@ -8,6 +8,37 @@ from apps.partners.models import StudentAffiliation
 
 class AccessService:
     @staticmethod
+    def check_bouquet_access(institution, book_id):
+        """
+        Vérifie si book_id est inclus dans un bouquet actuellement souscrit et actif par
+        cette institution. Retourne la UniversityBouquetSubscription correspondante si oui,
+        None sinon. Ne débloque QUE les livres réellement dans le périmètre du bouquet.
+        """
+        from apps.partners.models import UniversityBouquetSubscription, BouquetOffering
+        from django.utils import timezone
+
+        today = timezone.now().date()
+        active_subs = UniversityBouquetSubscription.objects.filter(
+            institution=institution,
+            status="active",
+            start_date__lte=today,
+            end_date__gte=today,
+        )
+
+        for sub in active_subs:
+            if not sub.offering_id:
+                continue
+            try:
+                offering = BouquetOffering.objects.get(id=sub.offering_id, is_active=True)
+            except BouquetOffering.DoesNotExist:
+                continue
+
+            if offering.get_books_queryset(requesting_institution=institution).filter(id=book_id).exists():
+                return sub
+
+        return None
+
+    @staticmethod
     def check_user_book_access(user, book_id) -> dict:
         """
         Vérifie si un utilisateur a le droit de consulter un ouvrage donné.
@@ -75,6 +106,16 @@ class AccessService:
                     "access_granted": True,
                     "reason": "institutional_subscription",
                     "institution_name": student_aff.institution.name,
+                    "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
+                }
+
+            bouquet_access = AccessService.check_bouquet_access(student_aff.institution, book_id)
+            if bouquet_access:
+                return {
+                    "access_granted": True,
+                    "reason": "bouquet_access",
+                    "institution_name": student_aff.institution.name,
+                    "bouquet_subscription_id": str(bouquet_access.id),
                     "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
                 }
 

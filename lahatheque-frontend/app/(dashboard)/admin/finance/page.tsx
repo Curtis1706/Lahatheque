@@ -54,7 +54,7 @@ export default function AdminFinancePage() {
   });
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-12 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
