@@ -446,6 +446,11 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                 from botocore.client import Config
 
                 clean_name = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', filename)
+                name_parts = clean_name.rsplit('.', 1)
+                base_part = name_parts[0][:40]
+                ext_part = f".{name_parts[1]}" if len(name_parts) > 1 else ""
+                clean_name = f"{base_part}{ext_part}"
+
                 unique_id = uuid.uuid4().hex[:12]
                 folder = 'covers' if file_type == 'cover' else 'books'
                 key = f"{folder}/{unique_id}_{clean_name}"
