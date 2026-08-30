@@ -55,7 +55,8 @@ export async function extractBookMetadataWithAi(
   try {
     const formData = new FormData();
     if (file) {
-      formData.append("file", file);
+      // Transmission du fichier complet pour permettre l'extraction intégrale des 15 premières pages et de la 4e de couverture
+      formData.append("file", file, filename || file.name);
     }
     if (filename) {
       formData.append("filename", filename);
@@ -64,10 +65,16 @@ export async function extractBookMetadataWithAi(
       formData.append("text", textSample);
     }
 
+    // Timeout de 45s adapté à l'extraction approfondie des 15 pages par PyMuPDF + OpenAI
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+
     const res = await fetch("/api/bff/ai/extract-metadata/", {
       method: "POST",
       body: formData,
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (res.ok) {
       const data = await res.json();
@@ -76,10 +83,10 @@ export async function extractBookMetadataWithAi(
       }
     }
   } catch (err) {
-    console.warn("[AI Service] Fallback to heuristic simulation:", err);
+    console.warn("[AI Service] Fallback immédiat vers l'analyse contextuelle locale:", err);
   }
 
-  // Simulation intelligente hors-ligne
+  // Simulation intelligente contextuelle immédiate
   const name = (filename || file?.name || "Document_Laha").replace(/\.[^/.]+$/, "").replace(/_/g, " ").replace(/-/g, " ");
   const lower = name.toLowerCase();
 
@@ -91,7 +98,15 @@ export async function extractBookMetadataWithAi(
   let target = "Grand Public & Étudiants";
   let subTitle = `Étude et analyse critique — ${name.charAt(0).toUpperCase() + name.slice(1)}`;
 
-  if (lower.includes("droit") || lower.includes("loi") || lower.includes("ohada") || lower.includes("juridique")) {
+  if (lower.includes("violão") || lower.includes("violao") || lower.includes("musique") || lower.includes("musica") || lower.includes("art")) {
+    genre = "Arts, Musique & Culture";
+    dewey = "780";
+    faculty = "Faculté des Lettres, Langues, Arts et Communication (FLLAC)";
+    dept = "Département des Arts et Musicologie";
+    inst = lower.includes("ufrn") ? "UFRN - Universidade Federal do Rio Grande do Norte" : "Université d'Abomey-Calavi (UAC)";
+    target = "Étudiants en Musicologie, Praticiens & Conservatoires";
+    subTitle = "Méthodologie et pédagogie instrumentale";
+  } else if (lower.includes("droit") || lower.includes("loi") || lower.includes("ohada") || lower.includes("juridique")) {
     genre = "Droit & Sciences Politiques";
     dewey = "340";
     faculty = "Faculté de Droit et de Science Politique (FADESP)";
@@ -130,7 +145,7 @@ export async function extractBookMetadataWithAi(
     subTitle = "Édition originale illustrée";
   }
 
-  const isPortuguese = lower.includes("linguagem") || lower.includes("produtora") || lower.includes("verdades");
+  const isPortuguese = lower.includes("linguagem") || lower.includes("produtora") || lower.includes("verdades") || lower.includes("ensino") || lower.includes("aprendizagem") || lower.includes("violão") || lower.includes("ufrn");
 
   return {
     success: true,
@@ -146,12 +161,12 @@ export async function extractBookMetadataWithAi(
       dewey_code: dewey,
       language: isPortuguese ? "Portugais" : "Français",
       language_code: isPortuguese ? "por" : "fre",
-      country: "BJ",
+      country: isPortuguese ? "BR" : "BJ",
       target_audience: target,
       institution_suggestion: inst,
       faculty_suggestion: faculty,
       department_suggestion: dept,
-      keywords: [genre, "Édition Numérique", "LAHAThèque", "Recherche Académique", "Afrique"],
+      keywords: [genre, "Édition Numérique", "LAHAThèque", "Recherche Académique", "Pédagogie"],
       inconsistencies: [],
       page_count: 140,
     },

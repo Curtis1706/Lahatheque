@@ -106,34 +106,40 @@ export default function NewDepositPage() {
 
     // Déclencher l'analyse IA automatique
     setAiLoading(true);
-    toast.info("Analyse IA du document en cours (OpenAI & PyMuPDF)...");
+    toast.info("Analyse documentaire du manuscrit en cours...");
     
-    const res = await extractBookMetadataWithAi(file, file.name);
-    setAiLoading(false);
+    try {
+      const res = await extractBookMetadataWithAi(file, file.name);
 
-    if (res.success && res.data) {
-      setAiResult(res.data);
-      toast.success("Suggestions IA générées ! Vous pouvez tout appliquer ou choisir champ par champ.");
-      
-      const matchedGenre = matchGenreCategory(res.data.genre_category, res.data.dewey_code);
-      const matchedLang = matchLanguage(res.data.language || res.data.language_code);
-      const matchedCountry = matchCountry(res.data.country);
+      if (res.success && res.data) {
+        setAiResult(res.data);
+        toast.success("Suggestions documentaires générées avec succès.");
+        
+        const matchedGenre = matchGenreCategory(res.data.genre_category, res.data.dewey_code);
+        const matchedLang = matchLanguage(res.data.language || res.data.language_code);
+        const matchedCountry = matchCountry(res.data.country);
 
-      // Auto-application initiale intelligente
-      if (!title || title === file.name.replace(/\.[^/.]+$/, "")) setTitle(res.data.title);
-      if (!subtitle && res.data.subtitle) setSubtitle(res.data.subtitle);
-      if (!authorsStr) setAuthorsStr(res.data.authors.join(", "));
-      if (!summary) setSummary(res.data.summary);
-      if (res.data.isbn) setIsbn(res.data.isbn);
-      setDeweyCode(res.data.dewey_code || matchedGenre.dewey);
-      setGenreCategory(matchedGenre.label);
-      setLanguage(matchedLang);
-      setCountry(matchedCountry);
-      if (res.data.institution_suggestion) setUniversity(res.data.institution_suggestion);
-      if (res.data.faculty_suggestion || matchedGenre.faculty) setFaculty(res.data.faculty_suggestion || matchedGenre.faculty || "");
-      if (res.data.target_audience) setTargetAudience(res.data.target_audience);
-      if (res.data.keywords) setKeywords(res.data.keywords);
-      if (res.data.onix_3_xml) setOnixXml(res.data.onix_3_xml);
+        // Auto-application initiale intelligente
+        if (!title || title === file.name.replace(/\.[^/.]+$/, "")) setTitle(res.data.title);
+        if (!subtitle && res.data.subtitle) setSubtitle(res.data.subtitle);
+        if (!authorsStr) setAuthorsStr(res.data.authors.join(", "));
+        if (!summary) setSummary(res.data.summary);
+        if (res.data.isbn) setIsbn(res.data.isbn);
+        setDeweyCode(res.data.dewey_code || matchedGenre.dewey);
+        setGenreCategory(matchedGenre.label);
+        setLanguage(matchedLang);
+        setCountry(matchedCountry);
+        if (res.data.institution_suggestion) setUniversity(res.data.institution_suggestion);
+        if (res.data.faculty_suggestion || matchedGenre.faculty) setFaculty(res.data.faculty_suggestion || matchedGenre.faculty || "");
+        if (res.data.target_audience) setTargetAudience(res.data.target_audience);
+        if (res.data.keywords) setKeywords(res.data.keywords);
+        if (res.data.onix_3_xml) setOnixXml(res.data.onix_3_xml);
+      }
+    } catch (e) {
+      console.error("[Deposit AI Error]", e);
+      toast.error("Erreur lors de l'analyse IA, basculement en mode manuel.");
+    } finally {
+      setAiLoading(false);
     }
   };
 

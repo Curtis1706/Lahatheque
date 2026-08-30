@@ -54,8 +54,10 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
     try {
       if (contentType && contentType.includes('multipart/form-data')) {
         body = await request.arrayBuffer()
+        headers.set('content-length', String(body.byteLength))
       } else {
         body = await request.text()
+        headers.set('content-length', String(Buffer.byteLength(body, 'utf-8')))
       }
     } catch {
       body = undefined

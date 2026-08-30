@@ -22,49 +22,65 @@ interface AIAnalysisProgressCardProps {
 const AI_STEPS = [
   {
     icon: FileSearch,
-    title: "Extraction du document",
-    desc: "Lecture des pages de garde, sommaire et 4e de couverture via PyMuPDF...",
-    tag: "PyMuPDF",
+    title: "1. Réception et sécurisation du fichier",
+    desc: "Vérification de l'intégrité du document et préparation de la lecture...",
+    tag: "Préparation",
+    minProgress: 10,
+    maxProgress: 30,
+  },
+  {
+    icon: ScanLine,
+    title: "2. Lecture des 15 premières pages & sommaire",
+    desc: "Examen des pages de titre, mentions légales, table des matières et 4e de couverture...",
+    tag: "Lecture approfondie",
+    minProgress: 30,
+    maxProgress: 60,
   },
   {
     icon: Cpu,
-    title: "Analyse sémantique IA",
-    desc: "Interrogation du modèle OpenAI gpt-4o-mini pour l'analyse littéraire...",
-    tag: "OpenAI gpt-4o-mini",
-  },
-  {
-    icon: BookOpen,
-    title: "Classification & Indice Dewey",
-    desc: "Détection du genre, public cible et attribution de la cote Dewey...",
-    tag: "Dewey & Facultés",
+    title: "3. Détection du titre, des auteurs & de la discipline",
+    desc: "Analyse sémantique pour identifier le domaine, le public cible et la faculté de rattachement...",
+    tag: "Analyse documentaire",
+    minProgress: 60,
+    maxProgress: 85,
   },
   {
     icon: FileCode,
-    title: "Notice ONIX 3.0 & Résumé",
-    desc: "Génération automatique de la notice normalisée et des mots-clés...",
-    tag: "ONIX 3.0",
+    title: "4. Rédaction du résumé & notice bibliographique",
+    desc: "Génération de la notice d'échange ONIX 3.0, attribution de la cote Dewey et mots-clés...",
+    tag: "Classification & Notice",
+    minProgress: 85,
+    maxProgress: 98,
   },
 ];
 
 export function AIAnalysisProgressCard({ fileName, className }: AIAnalysisProgressCardProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [progress, setProgress] = useState(15);
+  const [progress, setProgress] = useState(12);
 
   useEffect(() => {
-    // Rotation des étapes d'analyse toutes les 1.8s
-    const stepInterval = setInterval(() => {
-      setCurrentStepIndex((prev) => (prev + 1) % AI_STEPS.length);
-    }, 1800);
+    const startTime = Date.now();
 
-    // Progression fluide simulée jusqu'à 92% pendant l'attente
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => (prev < 90 ? prev + Math.floor(Math.random() * 8 + 3) : prev));
-    }, 500);
+    // Progression continue calée sur le temps moyen d'analyse (environ 6 à 12s)
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      
+      if (elapsed < 1.5) {
+        setCurrentStepIndex(0);
+        setProgress(Math.min(28, Math.floor(12 + elapsed * 10)));
+      } else if (elapsed < 4.0) {
+        setCurrentStepIndex(1);
+        setProgress(Math.min(58, Math.floor(28 + (elapsed - 1.5) * 12)));
+      } else if (elapsed < 8.0) {
+        setCurrentStepIndex(2);
+        setProgress(Math.min(84, Math.floor(58 + (elapsed - 4.0) * 7)));
+      } else {
+        setCurrentStepIndex(3);
+        setProgress((prev) => (prev < 97 ? Math.min(97, prev + 1) : 97));
+      }
+    }, 300);
 
-    return () => {
-      clearInterval(stepInterval);
-      clearInterval(progressInterval);
-    };
+    return () => clearInterval(interval);
   }, []);
 
   const activeStep = AI_STEPS[currentStepIndex];

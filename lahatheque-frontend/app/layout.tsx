@@ -35,7 +35,29 @@ export default function RootLayout({
         <AuthProvider>
           <CartProvider>{children}</CartProvider>
         </AuthProvider>
-        <Toaster position="top-right" richColors />
+        <Toaster 
+          position="top-right" 
+          toastOptions={{
+            style: {
+              background: 'var(--navy)',
+              color: '#FFFFFF',
+              border: '1px solid rgba(176, 141, 66, 0.4)',
+              borderRadius: '1rem',
+              boxShadow: '0 10px 25px -5px rgba(15, 26, 51, 0.3)',
+              fontFamily: 'var(--font-poppins)',
+              fontSize: '0.8125rem',
+            },
+            classNames: {
+              toast: 'bg-navy text-white border border-gold/40 shadow-xl',
+              title: 'text-white font-semibold',
+              description: 'text-white/80',
+              info: '!bg-navy !text-white !border-gold/40',
+              success: '!bg-navy !text-white !border-success/60',
+              error: '!bg-navy !text-white !border-error/60',
+              warning: '!bg-navy !text-white !border-gold/60',
+            }
+          }}
+        />
       </body>
     </html>
   );

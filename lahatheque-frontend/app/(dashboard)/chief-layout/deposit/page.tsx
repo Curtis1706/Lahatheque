@@ -93,7 +93,7 @@ export default function ChiefLayoutDepositPage() {
     // Auto-détection IA des métadonnées
     setAiLoading(true);
     try {
-      toast.info("Analyse IA en cours (métadonnées, classification Dewey, résumé)...");
+      toast.info("Analyse documentaire du manuscrit en cours...");
       const result = await extractBookMetadataWithAi(file);
       if (result.success && result.data) {
         setAiResult(result.data);

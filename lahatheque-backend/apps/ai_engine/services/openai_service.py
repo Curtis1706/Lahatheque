@@ -173,6 +173,7 @@ def analyze_document_with_openai(
     """
     api_key = getattr(settings, "OPENAI_API_KEY", None)
     if not api_key:
+        print("[AI Service] ⚠️ OPENAI_API_KEY absente dans l'environnement Django -> Basculement mode heuristique", flush=True)
         logger.warning("[AI Service] OPENAI_API_KEY absente, utilisation du mode heuristique.")
         return _fallback_heuristic_analysis(filename, text_sample, total_pages)
 
@@ -230,8 +231,12 @@ Renvoie STRICTEMENT un JSON valide au format suivant :
 """
 
     try:
+        import time
         import openai
-        client = openai.OpenAI(api_key=api_key)
+        print(f"[AI Service] Envoi de la requête à OpenAI gpt-4o-mini (échantillon de {len(text_sample)} caractères)...", flush=True)
+        start_t = time.time()
+        
+        client = openai.OpenAI(api_key=api_key, timeout=20.0)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -240,8 +245,11 @@ Renvoie STRICTEMENT un JSON valide au format suivant :
             ],
             response_format={"type": "json_object"},
             temperature=0.2,
-            max_tokens=2000
+            max_tokens=2000,
+            timeout=20.0
         )
+        duration = time.time() - start_t
+        print(f"[AI Service] Réponse OpenAI reçue avec succès en {duration:.2f}s !", flush=True)
 
         content = response.choices[0].message.content or "{}"
         parsed_data = json.loads(content)
@@ -254,18 +262,22 @@ Renvoie STRICTEMENT un JSON valide au format suivant :
 
         if is_found_in_doc and not is_placeholder and (len(raw_digits) == 13 or len(raw_digits) == 10):
             parsed_data["isbn_found_in_document"] = True
+            print(f"[AI Service] ISBN extrait du document : {isbn_val}", flush=True)
         else:
             # Génération dynamique d'un ISBN officiel LAHA 978-99919-XXX-X-X avec clé EAN-13
             seed = parsed_data.get("title") or filename
             parsed_data["isbn"] = generate_laha_isbn(seed)
             parsed_data["isbn_found_in_document"] = False
+            print(f"[AI Service] ISBN généré (LAHA officiel) : {parsed_data['isbn']}", flush=True)
 
         # Générer le document ONIX 3.0 correspondant
         parsed_data["onix_3_xml"] = generate_onix_3_xml(parsed_data)
         parsed_data["page_count"] = total_pages
+        print(f"[AI Service] Notice ONIX 3.0 XML générée ({len(parsed_data['onix_3_xml'])} octets).", flush=True)
         return parsed_data
 
     except Exception as e:
+        print(f"[AI Service ERROR] Échec de l'appel OpenAI ({type(e).__name__}: {e}) -> Basculement heuristique.", flush=True)
         logger.error(f"[AI Service] Erreur appel OpenAI: {e}")
         return _fallback_heuristic_analysis(filename, text_sample, total_pages)
 

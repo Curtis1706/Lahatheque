@@ -121,7 +121,7 @@ export default function DepositDetailPage() {
 
   const handleRunAiAnalysis = async (customFile?: File) => {
     setAiLoading(true);
-    toast.info("Analyse IA en cours (OpenAI & PyMuPDF)...");
+    toast.info("Analyse documentaire du manuscrit en cours...");
     try {
       const fileToAnalyze = customFile || newBookFile || undefined;
       const filenameToAnalyze = fileToAnalyze?.name || deposit?.files.book_file_name || deposit?.metadata.title || "ouvrage.pdf";
@@ -129,7 +129,7 @@ export default function DepositDetailPage() {
       
       if (res.success && res.data) {
         setAiResult(res.data);
-        toast.success("Suggestions IA générées avec succès ! Vous pouvez appliquer champ par champ ou tout appliquer.");
+        toast.success("Suggestions documentaires générées avec succès.");
       } else {
         toast.error(res.error || "Erreur lors de l'analyse IA.");
       }
