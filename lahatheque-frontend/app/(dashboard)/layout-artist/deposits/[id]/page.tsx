@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { 
   ArrowLeft, 
@@ -22,12 +22,24 @@ import {
   Search,
   Layers,
   HelpCircle,
-  Hash
+  Hash,
+  Edit3,
+  Eye,
+  UserCheck
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
-import { getDepositDetail, updateDeposit, submitDepositForValidation } from "@/lib/services/layout-artist";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
+import { 
+  getDepositDetail, 
+  updateDeposit, 
+  submitDepositForValidation,
+  searchPreEditions,
+  searchAuthors,
+  type PreEditionSearchResult,
+  type AuthorSearchResult
+} from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, type AiBookAnalysisResult } from "@/lib/services/ai";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 import { InlineLoader } from "@/components/ui/page-loader";
@@ -37,12 +49,18 @@ import { toast } from "sonner";
 export default function DepositDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
 
   const [deposit, setDeposit] = useState<LayoutDeposit | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingCover, setSavingCover] = useState(false);
+
+  // Pre-editions & Authors search state
+  const [preEditionsList, setPreEditionsList] = useState<PreEditionSearchResult[]>([]);
+  const [selectedPreEditionId, setSelectedPreEditionId] = useState<string>("");
+  const [authorsList, setAuthorsList] = useState<AuthorSearchResult[]>([]);
 
   // IA State
   const [aiLoading, setAiLoading] = useState(false);
@@ -85,8 +103,16 @@ export default function DepositDetailPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const data = await getDepositDetail(id);
+        const [data, preEditions, authors] = await Promise.all([
+          getDepositDetail(id),
+          searchPreEditions("").catch(() => []),
+          searchAuthors("").catch(() => []),
+        ]);
+        
         setDeposit(data);
+        setPreEditionsList(preEditions || []);
+        setAuthorsList(authors || []);
+
         if (data) {
           setTitle(data.metadata.title || "");
           setSubtitle(data.metadata.subtitle || "");
@@ -109,6 +135,10 @@ export default function DepositDetailPage() {
           setPriceDigital(data.default_price || 5000);
           setIsPaperAvailable(Boolean(data.is_paper_available));
           setPricePaper(data.admin_price || 7500);
+
+          if (data.pre_edition_dossier?.id) {
+            setSelectedPreEditionId(String(data.pre_edition_dossier.id));
+          }
         }
       } catch (err) {
         toast.error("Impossible de charger le dépôt.");
@@ -118,6 +148,52 @@ export default function DepositDetailPage() {
     }
     loadData();
   }, [id]);
+
+  const canEdit = deposit?.status === "draft" || deposit?.status === "revision_requested";
+  const isEditing = Boolean(canEdit && searchParams.get("mode") === "edit");
+
+  // Options pour le SearchableSelect de Pré-Édition
+  const preEditionOptions: SearchableOption[] = [
+    {
+      value: "",
+      label: "Aucun dossier lié (Saisie manuelle libre)",
+      subtitle: "Dépôt indépendant hors circuit pré-édition",
+    },
+    ...preEditionsList.map((pe) => ({
+      value: pe.id,
+      label: pe.titre_previsionnel,
+      subtitle: `${pe.auteur_nom}${pe.universite_nom ? ` • ${pe.universite_nom}` : ""}`,
+      badge: pe.code_dossier,
+    })),
+  ];
+
+  // Options pour le SearchableSelect d'Auteurs
+  const authorOptions: SearchableOption[] = authorsList.map((a) => ({
+    value: a.name,
+    label: a.name,
+    subtitle: a.email || a.bio || "Auteur enregistré",
+  }));
+
+  const handlePreEditionSelect = (selectedId: string) => {
+    setSelectedPreEditionId(selectedId);
+    if (!selectedId) return;
+    const found = preEditionsList.find((p) => p.id === selectedId);
+    if (found) {
+      if (found.titre_previsionnel && !title) setTitle(found.titre_previsionnel);
+      if (found.auteur_nom && !authorsStr) setAuthorsStr(found.auteur_nom);
+      if (found.universite_nom && !university) setUniversity(found.universite_nom);
+      if (found.faculte_nom && !faculty) setFaculty(found.faculte_nom);
+      toast.info(`Informations du dossier ${found.code_dossier} appliquées.`);
+    }
+  };
+
+  const handleAuthorSelect = (authorName: string) => {
+    if (!authorsStr) {
+      setAuthorsStr(authorName);
+    } else if (!authorsStr.includes(authorName)) {
+      setAuthorsStr(`${authorsStr}, ${authorName}`);
+    }
+  };
 
   const handleRunAiAnalysis = async (customFile?: File) => {
     setAiLoading(true);
@@ -250,9 +326,9 @@ export default function DepositDetailPage() {
         setNewBookFile(null);
         setNewCoverFile(null);
         setNewCoverPreview(null);
-        toast.success("Modifications enregistrées avec succès.");
+        toast.success("Modifications enregistrées avec succès !");
       } else {
-        toast.error("Erreur lors de la sauvegarde. Veuillez réessayer.");
+        toast.error("Erreur lors de l'enregistrement.");
       }
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de la sauvegarde.");
@@ -265,56 +341,12 @@ export default function DepositDetailPage() {
     if (!deposit) return;
     setSaving(true);
     try {
-      const keywordsArray = keywordsStr
-        .split(",")
-        .map((k) => k.trim())
-        .filter(Boolean);
-
-      const updated = await updateDeposit(
-        deposit.id,
-        {
-          metadata: {
-            ...deposit.metadata,
-            title,
-            subtitle,
-            authors: authorsStr.split(",").map((a) => a.trim()).filter(Boolean),
-            publication_year: Number(year),
-            language,
-            summary,
-            isbn,
-            keywords: keywordsArray,
-          },
-          classification: {
-            ...deposit.classification,
-            discipline,
-            dewey_code: deweyCode,
-            country,
-            university,
-            faculty,
-            department,
-            target_audience: targetAudience,
-          },
-          files: {
-            ...deposit.files,
-            format,
-          },
-          default_price: Number(priceDigital),
-          admin_price: Number(pricePaper),
-          is_paper_available: isPaperAvailable,
-        },
-        newBookFile,
-        newCoverFile
-      );
-
-      if (updated) {
-        const submitted = await submitDepositForValidation(deposit.id);
-        if (submitted) {
-          toast.success("Corrections soumises au Chef Maquettiste avec succès !");
-          router.push("/layout-artist/deposits");
-          return;
-        }
+      await handleSave();
+      const res = await submitDepositForValidation(deposit.id);
+      if (res) {
+        toast.success("Corrections soumises au Chef Maquettiste avec succès !");
+        router.push("/layout-artist/deposits");
       }
-      toast.error("Erreur lors de la resoumission. Veuillez réessayer.");
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de la resoumission.");
     } finally {
@@ -324,28 +356,38 @@ export default function DepositDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 md:p-8 w-full max-w-5xl mx-auto space-y-6 animate-pulse">
-        <div className="h-8 w-48 bg-background-secondary rounded-xl" />
-        <div className="h-40 bg-background-secondary rounded-2xl" />
-        <div className="h-64 bg-background-secondary rounded-2xl" />
+      <div className="p-8 flex flex-col items-center justify-center min-h-[400px] space-y-3">
+        <InlineLoader size={32} />
+        <p className="text-xs font-semibold text-foreground-muted">Chargement du dossier maquette...</p>
       </div>
     );
   }
 
   if (!deposit) {
     return (
-      <div className="p-4 sm:p-6 md:p-8 w-full max-w-5xl mx-auto text-center space-y-4">
-        <BookOpen className="w-12 h-12 text-foreground-muted mx-auto" />
-        <h2 className="font-serif font-bold text-navy text-xl">Dépôt introuvable</h2>
-        <Link href="/layout-artist/deposits" className="text-xs text-gold font-bold hover:underline">
-          Retour à mes dépôts
+      <div className="p-8 text-center space-y-4">
+        <AlertCircle className="w-12 h-12 text-error mx-auto" />
+        <h2 className="text-xl font-bold text-navy">Dépôt introuvable</h2>
+        <p className="text-xs text-foreground-muted">Ce dépôt n&apos;existe pas ou a été retiré.</p>
+        <Link
+          href="/layout-artist/deposits"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Retour aux dépôts
         </Link>
       </div>
     );
   }
 
+  const inputClass = `w-full px-3.5 py-2.5 rounded-xl border border-border text-xs sm:text-sm min-h-[42px] transition-colors ${
+    !isEditing 
+      ? "bg-background-secondary/50 text-foreground cursor-not-allowed border-border" 
+      : "bg-background text-foreground focus:ring-2 focus:ring-navy"
+  }`;
+
   return (
-    <div className="p-3.5 sm:p-6 md:p-8 w-full max-w-5xl mx-auto space-y-6">
+    <div className="p-3.5 sm:p-6 md:p-8 w-full max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/layout-artist" className="hover:text-navy">Vue d&apos;ensemble</Link>
@@ -364,27 +406,54 @@ export default function DepositDetailPage() {
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                isEditing ? "bg-gold/15 text-gold border border-gold/30" : "bg-navy/10 text-navy border border-navy/20"
+              }`}>
+                {isEditing ? "Mode Édition / Correction" : "Mode Consultation (Lecture seule)"}
+              </span>
+            </div>
             <h1 className="font-serif text-xl sm:text-2xl font-bold text-navy">{deposit.metadata.title}</h1>
             <p className="text-xs text-foreground-muted mt-0.5">
               Déposé le {new Date(deposit.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
             </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Bouton Lancer Analyse IA */}
-            <button
-              type="button"
-              onClick={() => handleRunAiAnalysis()}
-              disabled={aiLoading}
-              className="px-3.5 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 border border-gold/40 text-gold text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer min-h-[40px]"
-              title="Analyser le document avec l'Intelligence Artificielle pour extraire et suggérer des métadonnées"
-            >
-              {aiLoading ? (
-                <InlineLoader size={14} />
+            {/* Bascule Mode Consultation <-> Mode Édition */}
+            {canEdit && (
+              isEditing ? (
+                <Link
+                  href={`/layout-artist/deposits/${deposit.id}`}
+                  className="px-3.5 py-2 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[40px]"
+                >
+                  <Eye className="w-3.5 h-3.5 text-navy" />
+                  <span>Mode Consultation</span>
+                </Link>
               ) : (
-                <Sparkles className="w-3.5 h-3.5 text-gold" />
-              )}
-              <span>{aiLoading ? "Analyse en cours..." : "Assistant IA"}</span>
-            </button>
+                <Link
+                  href={`/layout-artist/deposits/${deposit.id}?mode=edit`}
+                  className="px-3.5 py-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold hover:text-navy text-gold text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[40px]"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>{deposit.status === "revision_requested" ? "Corriger l'épreuve" : "Modifier le dépôt"}</span>
+                </Link>
+              )
+            )}
+
+            {/* Bouton Assistant IA (actif en mode édition) */}
+            {isEditing && (
+              <button
+                type="button"
+                onClick={() => handleRunAiAnalysis()}
+                disabled={aiLoading}
+                className="px-3.5 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 border border-gold/40 text-gold text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer min-h-[40px]"
+                title="Analyser le document avec l'Intelligence Artificielle"
+              >
+                {aiLoading ? <InlineLoader size={14} /> : <Sparkles className="w-3.5 h-3.5 text-gold" />}
+                <span>{aiLoading ? "Analyse en cours..." : "Assistant IA"}</span>
+              </button>
+            )}
 
             <Link
               href={`/catalog/reader/${deposit.id}`}
@@ -400,7 +469,7 @@ export default function DepositDetailPage() {
       </div>
 
       {/* Bannière Suggestions IA globales si générées */}
-      {aiResult && (
+      {isEditing && aiResult && (
         <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gold/20 text-gold flex items-center justify-center shrink-0">
@@ -436,9 +505,15 @@ export default function DepositDetailPage() {
           <p className="text-xs text-foreground bg-background p-3.5 rounded-2xl border border-border italic font-medium">
             &ldquo;{deposit.chef_comment || "Veuillez vérifier et corriger les métadonnées et fichiers de l'ouvrage."}&rdquo;
           </p>
-          <p className="text-[11px] text-foreground-muted">
-            Apportez les modifications requises ci-dessous sur chaque bloc puis cliquez sur &quot;Soumettre les corrections au Chef Maquettiste&quot;.
-          </p>
+          {isEditing ? (
+            <p className="text-[11px] text-foreground-muted">
+              Apportez les modifications requises ci-dessous puis cliquez sur &quot;Soumettre les corrections au Chef Maquettiste&quot;.
+            </p>
+          ) : (
+            <p className="text-[11px] text-foreground-muted">
+              Cliquez sur le bouton &quot;Corriger l&apos;épreuve&quot; ci-dessus pour déverrouiller le formulaire et appliquer les corrections.
+            </p>
+          )}
         </div>
       )}
 
@@ -448,19 +523,21 @@ export default function DepositDetailPage() {
         <div className="p-5 sm:p-6 rounded-3xl bg-background-secondary border border-border space-y-4">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <h3 className="font-serif font-bold text-navy text-sm sm:text-base flex items-center gap-2">
-              <Upload className="w-4 h-4 text-gold" />
-              1. Fichiers de l&apos;Épreuve &amp; Couverture
+              <FileText className="w-4 h-4 text-gold" />
+              1. Fichiers &amp; Rendu Vitrine 3D
             </h3>
-            <span className="text-[11px] text-foreground-muted font-mono">Format actuel : {format}</span>
+            <span className="text-[11px] text-foreground-muted font-semibold">
+              Format {format}
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Fichier Ouvrage */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Fichier de l'ouvrage */}
             <div className="p-4 rounded-2xl bg-background border border-border space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-navy flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-gold" />
-                  Document original de l&apos;ouvrage
+                  Manuscrit / Épreuve numérique
                 </span>
                 {newBookFile && (
                   <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
@@ -469,42 +546,36 @@ export default function DepositDetailPage() {
                 )}
               </div>
 
-              <div className="p-3 rounded-xl bg-background-secondary border border-border text-xs">
-                <p className="font-bold text-navy truncate">
-                  {newBookFile ? newBookFile.name : (deposit.files.book_file_name || `${deposit.metadata.title}.pdf`)}
+              <div className="p-3 bg-background-secondary rounded-xl border border-border space-y-1">
+                <p className="text-xs font-semibold text-navy truncate">
+                  {newBookFile ? newBookFile.name : (deposit.files.book_file_name || "ouvrage.pdf")}
                 </p>
-                <p className="text-[11px] text-foreground-muted mt-0.5">
-                  {newBookFile
-                    ? `${(newBookFile.size / (1024 * 1024)).toFixed(2)} Mo`
-                    : deposit.files.book_file_size
-                      ? `${(deposit.files.book_file_size / (1024 * 1024)).toFixed(2)} Mo`
-                      : "Document chargé"}
+                <p className="text-[11px] text-foreground-muted">
+                  Taille : {newBookFile ? `${(newBookFile.size / 1024 / 1024).toFixed(2)} Mo` : "Enregistré sur Cloudflare R2"}
                 </p>
               </div>
 
-              <div>
-                <input
-                  ref={bookFileInputRef}
-                  type="file"
-                  accept=".pdf,.epub"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) {
-                      const f = e.target.files[0];
-                      setNewBookFile(f);
-                      handleRunAiAnalysis(f);
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => bookFileInputRef.current?.click()}
-                  className="w-full py-2 px-3 rounded-xl border border-border bg-background hover:bg-background-secondary text-xs font-bold text-navy flex items-center justify-center gap-2 transition-colors cursor-pointer min-h-[38px]"
-                >
-                  <Upload className="w-3.5 h-3.5 text-gold" />
-                  {newBookFile ? "Changer le fichier sélectionné" : "Remplacer le fichier PDF / EPUB"}
-                </button>
-              </div>
+              {isEditing && (
+                <div className="space-y-2">
+                  <input
+                    ref={bookFileInputRef}
+                    type="file"
+                    accept=".pdf,.epub"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) setNewBookFile(e.target.files[0]);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => bookFileInputRef.current?.click()}
+                    className="w-full py-2 px-3 rounded-xl border border-border bg-background hover:bg-background-secondary text-xs font-bold text-navy flex items-center justify-center gap-2 transition-colors cursor-pointer min-h-[38px]"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-gold" />
+                    {newBookFile ? "Changer le fichier sélectionné" : "Remplacer le fichier PDF / EPUB"}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Couverture */}
@@ -537,43 +608,43 @@ export default function DepositDetailPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <input
-                  ref={coverFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) handleCoverSelect(e.target.files[0]);
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => coverFileInputRef.current?.click()}
-                  className="w-full py-2 px-3 rounded-xl border border-border bg-background hover:bg-background-secondary text-xs font-bold text-navy flex items-center justify-center gap-2 transition-colors cursor-pointer min-h-[38px]"
-                >
-                  <Upload className="w-3.5 h-3.5 text-gold" />
-                  {newCoverFile ? "Changer la couverture sélectionnée" : "Remplacer l'image de couverture"}
-                </button>
-
-                {newCoverFile && (
+              {isEditing && (
+                <div className="space-y-2">
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) handleCoverSelect(e.target.files[0]);
+                    }}
+                  />
                   <button
                     type="button"
-                    onClick={handleSaveCoverOnly}
-                    disabled={savingCover}
-                    className="w-full py-2 px-3 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center justify-center gap-2 cursor-pointer min-h-[38px] shadow-sm"
+                    onClick={() => coverFileInputRef.current?.click()}
+                    className="w-full py-2 px-3 rounded-xl border border-border bg-background hover:bg-background-secondary text-xs font-bold text-navy flex items-center justify-center gap-2 transition-colors cursor-pointer min-h-[38px]"
                   >
-                    {savingCover ? (
-                      <InlineLoader size={16} />
-                    ) : (
-                      <>
-                        <Save className="w-3.5 h-3.5" />
-                        Enregistrer la nouvelle image de couverture
-                      </>
-                    )}
+                    <Upload className="w-3.5 h-3.5 text-gold" />
+                    {newCoverFile ? "Changer la couverture sélectionnée" : "Remplacer l'image de couverture"}
                   </button>
-                )}
-              </div>
+
+                  {newCoverFile && (
+                    <button
+                      type="button"
+                      onClick={handleSaveCoverOnly}
+                      disabled={savingCover}
+                      className="w-full py-2 px-3 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center justify-center gap-2 cursor-pointer min-h-[38px] shadow-sm"
+                    >
+                      {savingCover ? <InlineLoader size={16} /> : (
+                        <>
+                          <Save className="w-3.5 h-3.5" />
+                          Enregistrer la nouvelle image de couverture
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -588,22 +659,33 @@ export default function DepositDetailPage() {
             <AISuggestionBadge source={aiResult ? "ai_suggested" : deposit.metadata.language_source} />
           </div>
 
-          {/* Pré-édition liée */}
-          {(deposit.metadata.pre_edition_code || deposit.pre_edition_dossier) && (
-            <div className="p-3.5 bg-background border border-border rounded-2xl flex items-center gap-3 text-xs">
-              <div className="w-7 h-7 rounded-lg bg-gold/10 text-gold flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-4 h-4" />
+          {/* Dossier de Pré-édition avec SearchableSelect */}
+          <div className="space-y-1.5 text-xs">
+            <label className="block font-semibold text-navy">Dossier de Pré-édition associé</label>
+            {isEditing ? (
+              <SearchableSelect
+                options={preEditionOptions}
+                value={selectedPreEditionId}
+                onChange={handlePreEditionSelect}
+                placeholder="Sélectionner ou rechercher un dossier de pré-édition..."
+                searchPlaceholder="Filtrer par titre, nom d'auteur ou code..."
+                icon={<FileText className="w-4 h-4 text-gold" />}
+              />
+            ) : (
+              <div className="p-3 bg-background border border-border rounded-xl flex items-center justify-between">
+                <span className="font-semibold text-navy">
+                  {deposit.metadata.pre_edition_code 
+                    ? `${deposit.metadata.pre_edition_code} • ${deposit.metadata.pre_edition_title || "Dossier pré-édition"}`
+                    : (deposit.pre_edition_dossier ? `${deposit.pre_edition_dossier.code_dossier} • ${deposit.pre_edition_dossier.titre_previsionnel}` : "Aucun dossier pré-édition rattaché")}
+                </span>
+                {deposit.metadata.pre_edition_code && (
+                  <span className="text-[10px] font-mono font-bold text-gold px-1.5 py-0.5 bg-gold/10 rounded">
+                    {deposit.metadata.pre_edition_code}
+                  </span>
+                )}
               </div>
-              <div className="min-w-0">
-                <p className="font-bold text-navy">
-                  Rattaché au dossier pré-édition : <span className="font-mono text-gold">{deposit.metadata.pre_edition_code || deposit.pre_edition_dossier?.code_dossier}</span>
-                </p>
-                <p className="text-[11px] text-foreground-muted truncate">
-                  {deposit.metadata.pre_edition_title || deposit.pre_edition_dossier?.titre_previsionnel}
-                </p>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="space-y-3.5 text-xs">
             {/* Titre & Sous-titre */}
@@ -611,7 +693,7 @@ export default function DepositDetailPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="block font-semibold text-navy">Titre de l&apos;ouvrage *</label>
-                  {aiResult?.title && aiResult.title !== title && (
+                  {isEditing && aiResult?.title && aiResult.title !== title && (
                     <button
                       type="button"
                       onClick={() => setTitle(aiResult.title)}
@@ -625,16 +707,17 @@ export default function DepositDetailPage() {
                 </div>
                 <input
                   type="text"
+                  disabled={!isEditing}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px] font-semibold"
+                  className={inputClass}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="block font-semibold text-navy">Sous-titre (Optionnel)</label>
-                  {aiResult?.subtitle && aiResult.subtitle !== subtitle && (
+                  {isEditing && aiResult?.subtitle && aiResult.subtitle !== subtitle && (
                     <button
                       type="button"
                       onClick={() => setSubtitle(aiResult.subtitle || "")}
@@ -648,10 +731,11 @@ export default function DepositDetailPage() {
                 </div>
                 <input
                   type="text"
+                  disabled={!isEditing}
                   value={subtitle}
                   onChange={(e) => setSubtitle(e.target.value)}
                   placeholder="Ex : Manuel pratique et analyse critique"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px]"
+                  className={inputClass}
                 />
               </div>
             </div>
@@ -661,7 +745,7 @@ export default function DepositDetailPage() {
               <div className="sm:col-span-1 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="block font-semibold text-navy">Auteur(s) *</label>
-                  {aiResult?.authors?.length && (
+                  {isEditing && aiResult?.authors?.length && (
                     <button
                       type="button"
                       onClick={() => setAuthorsStr(aiResult.authors.join(", "))}
@@ -674,16 +758,30 @@ export default function DepositDetailPage() {
                 </div>
                 <input
                   type="text"
+                  disabled={!isEditing}
                   value={authorsStr}
                   onChange={(e) => setAuthorsStr(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px]"
+                  placeholder="Pr. Jean KOUADIO, Dr. Aminata SOW"
+                  className={inputClass}
                 />
+                {isEditing && authorOptions.length > 0 && (
+                  <div className="pt-1">
+                    <SearchableSelect
+                      options={authorOptions}
+                      value=""
+                      onChange={handleAuthorSelect}
+                      placeholder="Ajouter un auteur enregistré..."
+                      searchPlaceholder="Rechercher par nom..."
+                      icon={<UserCheck className="w-3.5 h-3.5 text-gold" />}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="block font-semibold text-navy">Année de publication</label>
-                  {aiResult?.publication_year && (
+                  {isEditing && aiResult?.publication_year && (
                     <button
                       type="button"
                       onClick={() => setYear(aiResult.publication_year)}
@@ -696,16 +794,17 @@ export default function DepositDetailPage() {
                 </div>
                 <input
                   type="number"
+                  disabled={!isEditing}
                   value={year}
                   onChange={(e) => setYear(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px]"
+                  className={inputClass}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Langue de l&apos;ouvrage</label>
-                  {aiResult?.language && (
+                  <label className="block font-semibold text-navy">Langue de rédaction</label>
+                  {isEditing && aiResult?.language && (
                     <button
                       type="button"
                       onClick={() => setLanguage(aiResult.language)}
@@ -716,106 +815,111 @@ export default function DepositDetailPage() {
                     </button>
                   )}
                 </div>
-                <input
-                  type="text"
+                <select
+                  disabled={!isEditing}
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px]"
-                />
-              </div>
-            </div>
-
-            {/* Code ISBN & Mots-clés */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <label className="block font-semibold text-navy">Code ISBN</label>
-                    {aiResult?.isbn && (
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
-                        aiResult.isbn_found_in_document
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-gold/15 text-gold"
-                      }`}>
-                        {aiResult.isbn_found_in_document ? "Extrait du PDF" : "Proposition IA"}
-                      </span>
-                    )}
-                  </div>
-                  {aiResult?.isbn && (
-                    <button
-                      type="button"
-                      onClick={() => setIsbn(aiResult.isbn)}
-                      className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      Appliquer : {aiResult.isbn}
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={isbn}
-                  onChange={(e) => setIsbn(e.target.value)}
-                  placeholder="978-..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px] font-mono"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Mots-clés (Optionnel)</label>
-                  {aiResult?.keywords?.length && (
-                    <button
-                      type="button"
-                      onClick={() => setKeywordsStr(aiResult.keywords.join(", "))}
-                      className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      Insérer tags IA
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={keywordsStr}
-                  onChange={(e) => setKeywordsStr(e.target.value)}
-                  placeholder="Ex : Droit, Obligations, Contrat, Philosophie"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px]"
-                />
+                  className={inputClass}
+                >
+                  <option value="Français">Français</option>
+                  <option value="Anglais">Anglais</option>
+                  <option value="Portugais">Portugais</option>
+                  <option value="Espagnol">Espagnol</option>
+                  <option value="Arabe">Arabe</option>
+                  <option value="Fon">Fon</option>
+                  <option value="Yoruba">Yoruba</option>
+                </select>
               </div>
             </div>
 
             {/* Résumé */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block font-semibold text-navy">Résumé éditorial</label>
-                {aiResult?.summary && (
+                <label className="block font-semibold text-navy">Résumé éditorial (Synopsis) *</label>
+                {isEditing && aiResult?.summary && (
                   <button
                     type="button"
                     onClick={() => setSummary(aiResult.summary)}
                     className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
                   >
                     <Wand2 className="w-3 h-3" />
-                    Remplacer par le résumé IA
+                    Insérer le résumé généré par l&apos;IA
                   </button>
                 )}
               </div>
               <textarea
+                rows={4}
+                disabled={!isEditing}
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                rows={4}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground resize-none leading-relaxed"
+                placeholder="Rédigez ou collez le résumé de l'ouvrage..."
+                className={`w-full p-3.5 rounded-xl border border-border text-xs sm:text-sm resize-y min-h-[90px] ${
+                  !isEditing 
+                    ? "bg-background-secondary/50 text-foreground cursor-not-allowed border-border" 
+                    : "bg-background text-foreground focus:ring-2 focus:ring-navy"
+                }`}
               />
+            </div>
+
+            {/* ISBN & Mots-clés */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block font-semibold text-navy">Code ISBN-13</label>
+                  {isEditing && aiResult?.isbn && (
+                    <button
+                      type="button"
+                      onClick={() => setIsbn(aiResult.isbn)}
+                      className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.isbn}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  disabled={!isEditing}
+                  value={isbn}
+                  onChange={(e) => setIsbn(e.target.value)}
+                  placeholder="978-99919-X-XXX-X"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block font-semibold text-navy">Mots-clés (séparés par des virgules)</label>
+                  {isEditing && aiResult?.keywords?.length && (
+                    <button
+                      type="button"
+                      onClick={() => setKeywordsStr(aiResult.keywords.join(", "))}
+                      className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  disabled={!isEditing}
+                  value={keywordsStr}
+                  onChange={(e) => setKeywordsStr(e.target.value)}
+                  placeholder="Droit, Commerce, OHADA, Afrique, Traité"
+                  className={inputClass}
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* BLOC 3 : CLASSIFICATION ACADÉMIQUE */}
+        {/* BLOC 3 : CLASSIFICATION DOCUMENTAIRE */}
         <div className="p-5 sm:p-6 rounded-3xl bg-background-secondary border border-border space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
             <h3 className="font-serif font-bold text-navy text-sm sm:text-base flex items-center gap-2">
-              <GraduationCap className="w-4 h-4 text-gold" />
-              3. Classification Académique &amp; Structurelle
+              <Layers className="w-4 h-4 text-gold" />
+              3. Classification Documentaire &amp; Rattachement Académique
             </h3>
             <AISuggestionBadge source={aiResult ? "ai_suggested" : deposit.classification.source} />
           </div>
@@ -825,8 +929,8 @@ export default function DepositDetailPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Discipline académique *</label>
-                  {aiResult?.genre_category && (
+                  <label className="block font-semibold text-navy">Discipline / Genre *</label>
+                  {isEditing && aiResult?.genre_category && (
                     <button
                       type="button"
                       onClick={() => setDiscipline(aiResult.genre_category)}
@@ -839,16 +943,18 @@ export default function DepositDetailPage() {
                 </div>
                 <input
                   type="text"
+                  disabled={!isEditing}
                   value={discipline}
                   onChange={(e) => setDiscipline(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-semibold min-h-[42px]"
+                  placeholder="Droit & Sciences Politiques, Littérature..."
+                  className={inputClass}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Indice / Code Dewey (Optionnel)</label>
-                  {aiResult?.dewey_code && (
+                  <label className="block font-semibold text-navy">Code Dewey</label>
+                  {isEditing && aiResult?.dewey_code && (
                     <button
                       type="button"
                       onClick={() => setDeweyCode(aiResult.dewey_code)}
@@ -861,69 +967,69 @@ export default function DepositDetailPage() {
                 </div>
                 <input
                   type="text"
+                  disabled={!isEditing}
                   value={deweyCode}
                   onChange={(e) => setDeweyCode(e.target.value)}
-                  placeholder="Ex : 340 (Droit), 100 (Philosophie)"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-mono min-h-[42px]"
+                  placeholder="340, 800, 100, etc."
+                  className={inputClass}
                 />
               </div>
             </div>
 
-            {/* Université & Faculté */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Université, Faculté & Département */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Université / Établissement (Optionnel)</label>
-                  {aiResult?.institution_suggestion && (
+                  <label className="block font-semibold text-navy">Université / Institution</label>
+                  {isEditing && aiResult?.institution_suggestion && (
                     <button
                       type="button"
                       onClick={() => setUniversity(aiResult.institution_suggestion || "")}
                       className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
                     >
                       <Wand2 className="w-2.5 h-2.5" />
-                      IA : {aiResult.institution_suggestion.length > 25 ? `${aiResult.institution_suggestion.slice(0, 25)}...` : aiResult.institution_suggestion}
+                      IA
                     </button>
                   )}
                 </div>
                 <input
                   type="text"
+                  disabled={!isEditing}
                   value={university}
                   onChange={(e) => setUniversity(e.target.value)}
-                  placeholder="Ex : Université d'Abomey-Calavi (UAC)"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px]"
+                  placeholder="Université d'Abomey-Calavi (UAC)"
+                  className={inputClass}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Faculté / UFR (Optionnel)</label>
-                  {aiResult?.faculty_suggestion && (
+                  <label className="block font-semibold text-navy">Faculté / UFR</label>
+                  {isEditing && aiResult?.faculty_suggestion && (
                     <button
                       type="button"
                       onClick={() => setFaculty(aiResult.faculty_suggestion || "")}
                       className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
                     >
                       <Wand2 className="w-2.5 h-2.5" />
-                      IA : {aiResult.faculty_suggestion.length > 25 ? `${aiResult.faculty_suggestion.slice(0, 25)}...` : aiResult.faculty_suggestion}
+                      IA
                     </button>
                   )}
                 </div>
                 <input
                   type="text"
+                  disabled={!isEditing}
                   value={faculty}
                   onChange={(e) => setFaculty(e.target.value)}
-                  placeholder="Ex : Faculté de Droit et de Science Politique (FADESP)"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px]"
+                  placeholder="Faculté de Droit (FADESP)"
+                  className={inputClass}
                 />
               </div>
-            </div>
 
-            {/* Département, Public Cible & Pays */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Département (Optionnel)</label>
-                  {aiResult?.department_suggestion && (
+                  <label className="block font-semibold text-navy">Département d&apos;études</label>
+                  {isEditing && aiResult?.department_suggestion && (
                     <button
                       type="button"
                       onClick={() => setDepartment(aiResult.department_suggestion || "")}
@@ -936,17 +1042,21 @@ export default function DepositDetailPage() {
                 </div>
                 <input
                   type="text"
+                  disabled={!isEditing}
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="Ex : Droit Privé, Philosophie"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px]"
+                  placeholder="Département de Droit Privé"
+                  className={inputClass}
                 />
               </div>
+            </div>
 
+            {/* Public Cible & Code Pays */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Public Cible (Optionnel)</label>
-                  {aiResult?.target_audience && (
+                  <label className="block font-semibold text-navy">Public Cible</label>
+                  {isEditing && aiResult?.target_audience && (
                     <button
                       type="button"
                       onClick={() => setTargetAudience(aiResult.target_audience)}
@@ -959,10 +1069,11 @@ export default function DepositDetailPage() {
                 </div>
                 <input
                   type="text"
+                  disabled={!isEditing}
                   value={targetAudience}
                   onChange={(e) => setTargetAudience(e.target.value)}
                   placeholder="Ex : Licence, Master, Doctorat, Grand Public"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground min-h-[42px]"
+                  className={inputClass}
                 />
               </div>
 
@@ -970,10 +1081,11 @@ export default function DepositDetailPage() {
                 <label className="block font-semibold text-navy">Code Pays (ISO)</label>
                 <input
                   type="text"
+                  disabled={!isEditing}
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
                   placeholder="BJ, CI, SN, BR, etc."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-mono min-h-[42px]"
+                  className={inputClass}
                 />
               </div>
             </div>
@@ -998,9 +1110,10 @@ export default function DepositDetailPage() {
               <div>
                 <label className="block font-semibold text-navy mb-1">Format de publication</label>
                 <select
+                  disabled={!isEditing}
                   value={format}
                   onChange={(e) => setFormat(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-semibold min-h-[42px]"
+                  className={inputClass}
                 >
                   <option value="PDF">PDF (Mise en page fixe sécurisée)</option>
                   <option value="EPUB">EPUB (Texte recomposable)</option>
@@ -1012,23 +1125,25 @@ export default function DepositDetailPage() {
                 <label className="block font-semibold text-navy mb-1">Prix Numérique (FCFA) *</label>
                 <input
                   type="number"
+                  disabled={!isEditing}
                   value={priceDigital}
                   onChange={(e) => setPriceDigital(Number(e.target.value))}
                   min={0}
                   step={500}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-bold min-h-[42px]"
+                  className={inputClass}
                 />
               </div>
             </div>
 
             {/* Option Papier */}
             <div className="p-4 rounded-2xl bg-background border border-border space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer select-none">
+              <label className={`flex items-center gap-3 select-none ${isEditing ? "cursor-pointer" : "cursor-not-allowed"}`}>
                 <input
                   type="checkbox"
+                  disabled={!isEditing}
                   checked={isPaperAvailable}
                   onChange={(e) => setIsPaperAvailable(e.target.checked)}
-                  className="w-4 h-4 rounded border-border text-navy focus:ring-navy cursor-pointer"
+                  className="w-4 h-4 rounded border-border text-navy focus:ring-navy cursor-pointer disabled:cursor-not-allowed"
                 />
                 <span className="font-bold text-navy text-xs">
                   Disponible également en version imprimée (Livre Papier)
@@ -1040,11 +1155,12 @@ export default function DepositDetailPage() {
                   <label className="block font-semibold text-navy mb-1">Prix Version Papier (FCFA)</label>
                   <input
                     type="number"
+                    disabled={!isEditing}
                     value={pricePaper}
                     onChange={(e) => setPricePaper(Number(e.target.value))}
                     min={0}
                     step={500}
-                    className="w-full max-w-xs px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-bold min-h-[42px]"
+                    className={`w-full max-w-xs ${inputClass}`}
                   />
                 </div>
               )}
@@ -1053,36 +1169,38 @@ export default function DepositDetailPage() {
         </div>
       </div>
 
-      {/* Actions de sauvegarde & resoumission */}
-      <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-border">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-border bg-background text-navy text-xs font-bold hover:bg-background-secondary transition-colors flex items-center justify-center gap-2 min-h-[44px] cursor-pointer"
-        >
-          <Save className="w-4 h-4 text-gold" />
-          Enregistrer les modifications
-        </button>
-
-        {deposit.status === "revision_requested" && (
+      {/* Actions de sauvegarde & resoumission (visibles en mode édition) */}
+      {isEditing && (
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-border">
           <button
             type="button"
-            onClick={handleResubmit}
+            onClick={handleSave}
             disabled={saving}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-border bg-background text-navy text-xs font-bold hover:bg-background-secondary transition-colors flex items-center justify-center gap-2 min-h-[44px] cursor-pointer"
           >
-            {saving ? (
-              <InlineLoader size={16} />
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                Soumettre les corrections au Chef Maquettiste
-              </>
-            )}
+            <Save className="w-4 h-4 text-gold" />
+            Enregistrer les modifications
           </button>
-        )}
-      </div>
+
+          {deposit.status === "revision_requested" && (
+            <button
+              type="button"
+              onClick={handleResubmit}
+              disabled={saving}
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
+            >
+              {saving ? (
+                <InlineLoader size={16} />
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Soumettre les corrections au Chef Maquettiste
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

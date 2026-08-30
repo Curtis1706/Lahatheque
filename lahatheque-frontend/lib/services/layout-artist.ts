@@ -206,6 +206,24 @@ export async function searchPreEditions(query: string): Promise<PreEditionSearch
   return json.data || [];
 }
 
+export interface AuthorSearchResult {
+  id: string;
+  name: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  bio?: string;
+}
+
+export async function searchAuthors(query: string): Promise<AuthorSearchResult[]> {
+  const res = await fetch(`/api/bff/catalog/authors/search/?q=${encodeURIComponent(query)}`, {
+    credentials: "include",
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data || [];
+}
+
 export async function createDepositWithFiles(
   data: Partial<LayoutDeposit>,
   bookFile?: File | null,

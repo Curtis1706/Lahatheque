@@ -84,7 +84,10 @@ export async function extractBookMetadataWithAi(
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.data) {
-        console.log("[AI Service] Données IA récupérées avec succès :", data.data.title);
+        if (data.data.summary && typeof data.data.summary === "string") {
+          data.data.summary = data.data.summary.trim().slice(0, 512);
+        }
+        console.log(`[AI Service] Données IA récupérées avec succès pour « ${data.data.title} » (Langue: ${data.data.language}, Discipline: ${data.data.genre_category}, Résumé: ${data.data.summary?.length || 0} car.)`);
         return { success: true, data: data.data };
       }
     } else {

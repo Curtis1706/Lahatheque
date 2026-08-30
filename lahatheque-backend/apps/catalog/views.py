@@ -687,3 +687,64 @@ class PreEditionSearchView(APIView):
         } for d in dossiers.order_by('-created_at')[:50]]
 
         return Response({"success": True, "data": results})
+
+
+class AuthorSearchView(APIView):
+    """GET /api/v1/catalog/authors/search/?q=... - Recherche d'auteurs enregistrés."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from .models import BookAuthor
+        from apps.accounts.models import User
+        from django.db.models import Q
+
+        query = request.query_params.get('q', '').strip()
+        results = []
+        seen_names = set()
+
+        # 1. Auteurs issus de la table BookAuthor
+        authors = BookAuthor.objects.all()
+        if query:
+            authors = authors.filter(
+                Q(first_name__icontains=query) |
+                Q(last_name__icontains=query) |
+                Q(email__icontains=query)
+            )
+
+        for a in authors.order_by('last_name', 'first_name')[:50]:
+            name = f"{a.first_name} {a.last_name}".strip()
+            if name and name not in seen_names:
+                seen_names.add(name)
+                results.append({
+                    "id": str(a.id),
+                    "name": name,
+                    "first_name": a.first_name,
+                    "last_name": a.last_name,
+                    "email": a.email or "",
+                    "bio": getattr(a, 'biography', '') or "",
+                })
+
+        # 2. Utilisateurs avec rôle auteur ou professeur
+        author_users = User.objects.filter(role__in=['author', 'teacher', 'admin', 'super_admin'])
+        if query:
+            author_users = author_users.filter(
+                Q(first_name__icontains=query) |
+                Q(last_name__icontains=query) |
+                Q(email__icontains=query)
+            )
+
+        for u in author_users.order_by('last_name', 'first_name')[:50]:
+            name = f"{u.first_name} {u.last_name}".strip() or u.email
+            if name and name not in seen_names:
+                seen_names.add(name)
+                results.append({
+                    "id": str(u.id),
+                    "name": name,
+                    "first_name": u.first_name,
+                    "last_name": u.last_name,
+                    "email": u.email or "",
+                    "bio": getattr(u, 'bio', '') or getattr(u, 'biography', '') or "",
+                })
+
+        return Response({"success": True, "data": results})
+

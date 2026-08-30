@@ -283,7 +283,7 @@ export default function MaquettisteDepositsPage() {
                     {/* 2. Modifier / Corriger */}
                     {canEdit && (
                       <Link
-                        href={`/layout-artist/deposits/${row.id}`}
+                        href={`/layout-artist/deposits/${row.id}?mode=edit`}
                         className="px-2.5 py-2.5 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold hover:text-navy text-gold text-xs font-bold flex items-center justify-center gap-1.5 transition-colors min-h-[44px] cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
@@ -386,7 +386,7 @@ export default function MaquettisteDepositsPage() {
                           {/* 2. Modifier / Corriger */}
                           {canEdit && (
                             <Link
-                              href={`/layout-artist/deposits/${row.id}`}
+                              href={`/layout-artist/deposits/${row.id}?mode=edit`}
                               className="p-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold hover:text-navy text-gold transition-colors inline-flex items-center justify-center min-h-[36px] min-w-[36px] cursor-pointer"
                               title={row.status === "revision_requested" ? "Corriger l'épreuve demandée" : "Modifier l'ouvrage"}
                             >

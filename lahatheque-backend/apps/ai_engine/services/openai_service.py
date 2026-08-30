@@ -194,7 +194,7 @@ Analyse l'échantillon de texte suivant extrait du document "{filename}" (Nombre
 Instructions détaillées :
 1. Titre & Sous-titre : Détermine le titre exact de l'ouvrage et propose systématiquement un sous-titre pertinent (champ optionnel très utile pour le catalogage).
 2. Auteurs : Identifie tous les auteurs, co-auteurs ou noms de plume mentionnés.
-3. Résumé éditorial : Rédige un résumé accrocheur et fidèle de 2 à 3 paragraphes en français soigné, mettant en valeur l'intérêt de l'ouvrage.
+3. Résumé éditorial : Rédige un résumé accrocheur et fidèle de 2 à 3 paragraphes en français soigné, mettant en valeur l'intérêt de l'ouvrage (512 caractères maximum).
 4. Genre & Discipline : Identifie le genre principal (`genre_category`) parmi les disciplines officielles LAHAThèque ("Philosophie, Psychologie & Sciences Humaines", "Droit & Sciences Politiques", "Sciences Économiques & Gestion", "Médecine & Santé", "Littérature Africaine & Conte", "Roman & Fiction", "Manga & Bande Dessinée", "Manuel Scolaire & Pédagogie", "Sciences & Technologies", "Histoire & Civilisations", etc.).
 5. Code Dewey : Détermine le code de classification décimale Dewey (3 chiffres, ex: 840, 741.5, 340, 330, 610, 100, 500, etc.).
 6. Langue & Pays : Détecte la langue principale de rédaction ("Français", "Anglais", "Portugais", "Espagnol", "Fon", "Yoruba", "Arabe", etc.) et le pays d'ancrage principal (code ISO 2 lettres ex: "BJ", "SN", "CI", "TG", "BR", "FR", "GLOBAL").
@@ -215,7 +215,7 @@ Renvoie STRICTEMENT un JSON valide au format suivant :
   "publication_year": 2026,
   "isbn": "978-...",
   "isbn_found_in_document": true,
-  "summary": "Résumé éditorial structuré...",
+  "summary": "Résumé éditorial de 512 caractères maximum...",
   "genre_category": "Discipline principale",
   "dewey_code": "100",
   "language": "Français",
@@ -254,6 +254,10 @@ Renvoie STRICTEMENT un JSON valide au format suivant :
         content = response.choices[0].message.content or "{}"
         parsed_data = json.loads(content)
 
+        # Troncature stricte du résumé à 512 caractères
+        if "summary" in parsed_data and isinstance(parsed_data["summary"], str):
+            parsed_data["summary"] = parsed_data["summary"].strip()[:512]
+
         # Normalisation rigoureuse de l'ISBN
         isbn_val = str(parsed_data.get("isbn") or "")
         raw_digits = re.sub(r"[^\dX]", "", isbn_val)
@@ -269,6 +273,8 @@ Renvoie STRICTEMENT un JSON valide au format suivant :
             parsed_data["isbn"] = generate_laha_isbn(seed)
             parsed_data["isbn_found_in_document"] = False
             print(f"[AI Service] ISBN généré (LAHA officiel) : {parsed_data['isbn']}", flush=True)
+
+        print(f"[AI Service] Métadonnées extraites : Titre='{parsed_data.get('title')}', Auteurs={parsed_data.get('authors')}, Langue='{parsed_data.get('language')}', Discipline='{parsed_data.get('genre_category')}', Dewey={parsed_data.get('dewey_code')}, Résumé={len(parsed_data.get('summary', ''))} car.", flush=True)
 
         # Générer le document ONIX 3.0 correspondant
         parsed_data["onix_3_xml"] = generate_onix_3_xml(parsed_data)

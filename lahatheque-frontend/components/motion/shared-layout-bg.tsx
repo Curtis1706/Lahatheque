@@ -13,7 +13,15 @@ export interface SharedLayoutBgProps extends HTMLAttributes<HTMLElement> {
 
 export const SharedLayoutBg = forwardRef<HTMLElement, SharedLayoutBgProps>(
   function SharedLayoutBg(
-    { as: Component = "div", children, className, ...props },
+    { 
+      as: Component = "div", 
+      children, 
+      className, 
+      inset, 
+      pillClassName, 
+      pillContainerClassName, 
+      ...props 
+    },
     ref
   ) {
     return (

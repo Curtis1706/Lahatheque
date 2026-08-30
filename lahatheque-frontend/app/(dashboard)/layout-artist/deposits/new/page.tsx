@@ -23,14 +23,16 @@ import {
   FileText,
   X,
   ChevronDown,
-  RotateCcw
+  RotateCcw,
+  UserCheck
 } from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper, DEPOSIT_STEPS } from "@/components/features/layout-artist/deposit-wizard-stepper";
 import { AIAnalysisProgressCard } from "@/components/features/layout-artist/ai-analysis-progress-card";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
-import { createDeposit, createDepositWithFiles, searchPreEditions, type PreEditionSearchResult } from "@/lib/services/layout-artist";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
+import { createDeposit, createDepositWithFiles, searchPreEditions, searchAuthors, type PreEditionSearchResult, type AuthorSearchResult } from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/ai";
 import type { ClassificationSource } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
@@ -60,6 +62,7 @@ export default function NewDepositPage() {
   const [isPreEditionOpen, setIsPreEditionOpen] = useState(false);
   const [selectedPreEdition, setSelectedPreEdition] = useState<PreEditionSearchResult | null>(null);
   const [loadingPreEditions, setLoadingPreEditions] = useState(false);
+  const [authorsList, setAuthorsList] = useState<AuthorSearchResult[]>([]);
 
   // Form State
   const [bookFile, setBookFile] = useState<File | null>(null);
@@ -101,10 +104,14 @@ export default function NewDepositPage() {
       }
     });
 
-    // Préchargement automatique des dossiers de pré-édition disponibles
+    // Préchargement automatique des dossiers de pré-édition et auteurs
     setLoadingPreEditions(true);
-    searchPreEditions("").then((res) => {
-      setAllPreEditions(res || []);
+    Promise.all([
+      searchPreEditions("").catch(() => []),
+      searchAuthors("").catch(() => [])
+    ]).then(([preEditions, authors]) => {
+      setAllPreEditions(preEditions || []);
+      setAuthorsList(authors || []);
       setLoadingPreEditions(false);
     }).catch(() => {
       setLoadingPreEditions(false);
@@ -715,6 +722,28 @@ export default function NewDepositPage() {
                     onChange={(e) => setAuthorsStr(e.target.value)}
                     className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                   />
+                  {authorsList.length > 0 && (
+                    <div className="pt-1">
+                      <SearchableSelect
+                        options={authorsList.map((a) => ({
+                          value: a.name,
+                          label: a.name,
+                          subtitle: a.email || a.bio || "Auteur enregistré",
+                        }))}
+                        value=""
+                        onChange={(authorName) => {
+                          if (!authorsStr) {
+                            setAuthorsStr(authorName);
+                          } else if (!authorsStr.includes(authorName)) {
+                            setAuthorsStr(`${authorsStr}, ${authorName}`);
+                          }
+                        }}
+                        placeholder="Ajouter un auteur enregistré..."
+                        searchPlaceholder="Rechercher par nom..."
+                        icon={<UserCheck className="w-3.5 h-3.5 text-gold" />}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
