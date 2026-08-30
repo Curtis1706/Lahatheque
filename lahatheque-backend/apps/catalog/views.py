@@ -146,111 +146,122 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             print(f"   -> Couverture  : {cover_f.name}", flush=True)
         print(f"=======================================================", flush=True)
 
-        serializer = OuvrageCreateSerializer(data=request.data, context={'request': request})
-        if not serializer.is_valid():
-            logger.error(f"[DEPOSIT CREATE ERROR] Validation échouée: {serializer.errors} | Data: {request.data}")
-            print(f"[DEPOSIT CREATE ERROR] Échec validation du dépôt : {serializer.errors}", flush=True)
-            return Response({
-                "success": False,
-                "error": "Données de dépôt invalides",
-                "details": serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer = OuvrageCreateSerializer(data=request.data, context={'request': request})
+            if not serializer.is_valid():
+                logger.error(f"[DEPOSIT CREATE ERROR] Validation échouée: {serializer.errors} | Data: {request.data}")
+                print(f"[DEPOSIT CREATE ERROR] Échec validation du dépôt : {serializer.errors}", flush=True)
+                return Response({
+                    "success": False,
+                    "error": "Données de dépôt invalides",
+                    "details": serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-        ouvrage = serializer.save()
-        is_chief_or_admin = user_role in ('chief_layout', 'admin', 'super_admin') or request.user.is_superuser or request.user.is_staff
+            ouvrage = serializer.save()
+            is_chief_or_admin = user_role in ('chief_layout', 'admin', 'super_admin') or request.user.is_superuser or request.user.is_staff
 
-        # Si l'utilisateur est Chef Maquettiste (ou admin) et soumet l'ouvrage -> validation directe
-        if is_chief_or_admin and requested_status in ('submitted', 'published', 'pending_validation'):
-            ouvrage.status = 'published'
-            if 'is_paper_available' in request.data:
-                val = str(request.data.get('is_paper_available')).lower()
-                ouvrage.is_paper_available = val in ('true', '1', 'yes')
-            if 'price_paper' in request.data and request.data['price_paper'] is not None:
+            # Si l'utilisateur est Chef Maquettiste (ou admin) et soumet l'ouvrage -> validation directe
+            if is_chief_or_admin and requested_status in ('submitted', 'published', 'pending_validation'):
+                ouvrage.status = 'published'
+                if 'is_paper_available' in request.data:
+                    val = str(request.data.get('is_paper_available')).lower()
+                    ouvrage.is_paper_available = val in ('true', '1', 'yes')
+                if 'price_paper' in request.data and request.data['price_paper'] is not None:
+                    try:
+                        ouvrage.price_paper = float(request.data['price_paper'])
+                    except (ValueError, TypeError):
+                        pass
+                ouvrage.save()
+
+                # Protection DRM
                 try:
-                    ouvrage.price_paper = float(request.data['price_paper'])
-                except (ValueError, TypeError):
-                    pass
-            ouvrage.save()
-
-            # Protection DRM
-            try:
-                from apps.protection.models import ProtectionConfig
-                ProtectionConfig.objects.get_or_create(
-                    ouvrage=ouvrage,
-                    defaults={
-                        'watermark_visible': True,
-                        'invisible_watermark_enabled': True,
-                        'allow_print': False,
-                        'allow_copy': False,
-                        'allow_download': False,
-                    }
-                )
-            except Exception as prot_err:
-                logger.warning(f"Erreur init protection: {prot_err}")
-
-            # Initialisation stock si version papier
-            if ouvrage.is_paper_available:
-                try:
-                    from apps.commerce.models import Entrepot, StockOuvrage
-                    entrepot = Entrepot.objects.first()
-                    if not entrepot:
-                        entrepot = Entrepot.objects.create(
-                            nom="Entrepôt Principal LAHA Cotonou",
-                            code="WAR-CTN-01",
-                            pays="Bénin",
-                            ville="Cotonou",
-                            adresse="Siège LAHA Éditions, Cotonou",
-                            is_active=True
-                        )
-                    StockOuvrage.objects.get_or_create(
+                    from apps.protection.models import ProtectionConfig
+                    ProtectionConfig.objects.get_or_create(
                         ouvrage=ouvrage,
-                        entrepot=entrepot,
                         defaults={
-                            'quantite_reelle': 0,
-                            'quantite_reservee': 0,
-                            'seuil_alerte': 10
+                            'watermark_visible': True,
+                            'invisible_watermark_enabled': True,
+                            'allow_print': False,
+                            'allow_copy': False,
+                            'allow_download': False,
                         }
                     )
-                except Exception as stock_err:
-                    logger.warning(f"Impossible d'initialiser le stock pour l'ouvrage {ouvrage.id}: {stock_err}")
+                except Exception as prot_err:
+                    logger.warning(f"Erreur init protection: {prot_err}")
 
-            print(f"[DEPOSIT CREATE SUCCESS] Ouvrage #{ouvrage.id} « {ouvrage.title} » validé et publié directement.", flush=True)
+                # Initialisation stock si version papier
+                if ouvrage.is_paper_available:
+                    try:
+                        from apps.commerce.models import Entrepot, StockOuvrage
+                        entrepot = Entrepot.objects.first()
+                        if not entrepot:
+                            entrepot = Entrepot.objects.create(
+                                nom="Entrepôt Principal LAHA Cotonou",
+                                code="WAR-CTN-01",
+                                pays="Bénin",
+                                ville="Cotonou",
+                                adresse="Siège LAHA Éditions, Cotonou",
+                                is_active=True
+                            )
+                        StockOuvrage.objects.get_or_create(
+                            ouvrage=ouvrage,
+                            entrepot=entrepot,
+                            defaults={
+                                'quantite_reelle': 0,
+                                'quantite_reservee': 0,
+                                'seuil_alerte': 10
+                            }
+                        )
+                    except Exception as stock_err:
+                        logger.warning(f"Impossible d'initialiser le stock pour l'ouvrage {ouvrage.id}: {stock_err}")
+
+                print(f"[DEPOSIT CREATE SUCCESS] Ouvrage #{ouvrage.id} « {ouvrage.title} » validé et publié directement.", flush=True)
+                return Response({
+                    "success": True,
+                    "message": f"L'ouvrage « {ouvrage.title} » a été déposé et validé directement. Il est publié sur le catalogue officiel.",
+                    "data": OuvrageReadSerializer(ouvrage).data
+                }, status=status.HTTP_201_CREATED)
+
+            elif requested_status in ('submitted', 'pending_validation'):
+                ouvrage.status = 'submitted'
+                ouvrage.save(update_fields=['status'])
+
+                # Notification au Chef Maquettiste
+                try:
+                    from apps.accounts.models import User
+                    from apps.reporting.services import notify_user
+                    from apps.reporting.models import Notification
+                    chiefs = User.objects.filter(role__in=['chief_layout', 'admin', 'super_admin'], is_active=True)
+                    for chief in chiefs:
+                        notify_user(
+                            user=chief,
+                            notification_type=Notification.NotificationType.SYSTEM,
+                            title="Nouvelle maquette à valider",
+                            message=f"« {ouvrage.title} » a été soumis par {request.user.get_full_name() or request.user.email}.",
+                            action_url="/chief-layout/validation",
+                            resource_id=str(ouvrage.id),
+                        )
+                    print(f"[DEPOSIT CREATE] {chiefs.count()} notification(s) envoyée(s) au Chef Maquettiste.", flush=True)
+                except Exception as notif_err:
+                    logger.warning(f"Erreur notification chef maquettiste: {notif_err}")
+
+            print(f"[DEPOSIT CREATE SUCCESS] Ouvrage #{ouvrage.id} « {ouvrage.title} » enregistré avec succès (statut: {ouvrage.status})", flush=True)
             return Response({
                 "success": True,
-                "message": f"L'ouvrage « {ouvrage.title} » a été déposé et validé directement. Il est publié sur le catalogue officiel.",
+                "message": "Maquette déposée avec succès." if ouvrage.status == 'draft'
+                           else "Maquette soumise au Chef Maquettiste pour validation.",
                 "data": OuvrageReadSerializer(ouvrage).data
             }, status=status.HTTP_201_CREATED)
 
-        elif requested_status in ('submitted', 'pending_validation'):
-            ouvrage.status = 'submitted'
-            ouvrage.save(update_fields=['status'])
-
-            # Notification au Chef Maquettiste
-            try:
-                from apps.accounts.models import User
-                from apps.reporting.services import notify_user
-                from apps.reporting.models import Notification
-                chiefs = User.objects.filter(role__in=['chief_layout', 'admin', 'super_admin'], is_active=True)
-                for chief in chiefs:
-                    notify_user(
-                        user=chief,
-                        notification_type=Notification.NotificationType.SYSTEM,
-                        title="Nouvelle maquette à valider",
-                        message=f"« {ouvrage.title} » a été soumis par {request.user.get_full_name() or request.user.email}.",
-                        action_url="/chief-layout/validation",
-                        resource_id=str(ouvrage.id),
-                    )
-                print(f"[DEPOSIT CREATE] {chiefs.count()} notification(s) envoyée(s) au Chef Maquettiste.", flush=True)
-            except Exception as notif_err:
-                logger.warning(f"Erreur notification chef maquettiste: {notif_err}")
-
-        print(f"[DEPOSIT CREATE SUCCESS] Ouvrage #{ouvrage.id} « {ouvrage.title} » enregistré avec succès (statut: {ouvrage.status})", flush=True)
-        return Response({
-            "success": True,
-            "message": "Maquette déposée avec succès." if ouvrage.status == 'draft'
-                       else "Maquette soumise au Chef Maquettiste pour validation.",
-            "data": OuvrageReadSerializer(ouvrage).data
-        }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            logger.error(f"[DEPOSIT CREATE EXCEPTION] {e}", exc_info=True)
+            print(f"[DEPOSIT CREATE EXCEPTION] {e}", flush=True)
+            return Response({
+                "success": False,
+                "error": f"Erreur interne lors de l'enregistrement de la maquette: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def update(self, request, *args, **kwargs):
         """Mise à jour d'un brouillon par un maquettiste ou modification complète d'un ouvrage par le Chef Maquettiste."""

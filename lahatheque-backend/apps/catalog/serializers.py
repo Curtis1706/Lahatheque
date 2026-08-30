@@ -152,6 +152,14 @@ class OuvrageCreateSerializer(serializers.Serializer):
         raw_country = validated_data.get('country', 'BJ') or 'BJ'
         country_code = 'GL' if raw_country.upper() in ('GLOBAL', 'INTERNATIONAL') else raw_country[:2].upper()
 
+        raw_keywords = validated_data.get('keywords', '')
+        if isinstance(raw_keywords, str):
+            keywords_list = [k.strip() for k in raw_keywords.split(',') if k.strip()] if raw_keywords.strip() else []
+        elif isinstance(raw_keywords, list):
+            keywords_list = raw_keywords
+        else:
+            keywords_list = []
+
         ouvrage = Ouvrage.objects.create(
             title=validated_data['title'],
             subtitle=validated_data.get('subtitle', ''),
@@ -166,7 +174,7 @@ class OuvrageCreateSerializer(serializers.Serializer):
             is_paper_available=validated_data.get('is_paper_available', False),
             faculty=validated_data.get('faculty', ''),
             department=validated_data.get('department', ''),
-            keywords=validated_data.get('keywords', []),
+            keywords=keywords_list,
             target_audience=validated_data.get('target_audience', ''),
             dewey_code=validated_data.get('dewey_code', ''),
             classification_source=validated_data.get('classification_source', 'ai_suggested'),
@@ -179,7 +187,7 @@ class OuvrageCreateSerializer(serializers.Serializer):
             status='draft',
         )
 
-        # Attribution directe de la clé R2 ou du fichier
+        # Attribution de la clé R2 ou du fichier joint
         if file_key:
             ouvrage.file.name = file_key
             if file_size_bytes > 0:
@@ -187,14 +195,6 @@ class OuvrageCreateSerializer(serializers.Serializer):
         elif book_file:
             ouvrage.file = book_file
             ouvrage.file_size_bytes = book_file.size
-
-        if cover_key:
-            ouvrage.cover_image.name = cover_key
-        elif cover_image:
-            ouvrage.cover_image = cover_image
-
-            # Calcul du nombre de pages réel pour les fichiers PDF
-            page_count = 0
             try:
                 if book_file.name.lower().endswith('.pdf'):
                     import fitz  # PyMuPDF
@@ -202,16 +202,16 @@ class OuvrageCreateSerializer(serializers.Serializer):
                     file_bytes = book_file.read()
                     book_file.seek(0)
                     with fitz.open(stream=file_bytes, filetype="pdf") as doc:
-                        page_count = doc.page_count
+                        ouvrage.page_count = doc.page_count
             except Exception:
-                page_count = 0  # Ne bloque jamais la création si l'extraction échoue
+                pass
 
-            ouvrage.page_count = page_count
-            ouvrage.save(update_fields=['file', 'file_size_bytes', 'page_count'])
-
-        if cover_image:
+        if cover_key:
+            ouvrage.cover_image.name = cover_key
+        elif cover_image:
             ouvrage.cover_image = cover_image
-            ouvrage.save(update_fields=['cover_image'])
+
+        ouvrage.save()
 
         # Créer les BookAuthor à partir des noms et lier les comptes auteurs si fournis
         if authors_names:
