@@ -73,7 +73,7 @@ export default function NewPublisherBookPage() {
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Analyse et complétion par IA
+  // Analyse et complétion par IA (OpenAI / Heuristique)
   const handleAiSuggest = async () => {
     if (!title.trim() && !manuscriptFile) {
       toast.info("Veuillez d'abord saisir le titre ou sélectionner le fichier manuscrit.");
@@ -82,22 +82,30 @@ export default function NewPublisherBookPage() {
     setAiAnalyzing(true);
     try {
       const res = await extractBookMetadataWithAi({
-        title: title.trim(),
+        title: title.trim() || undefined,
         filename: manuscriptFile?.name,
+        file: manuscriptFile || undefined,
       });
-      setDiscipline(res.discipline);
-      setLanguage(res.language);
-      setKeywords(res.suggested_keywords.join(", "));
-      if (!summary.trim()) {
+      if (res.discipline) setDiscipline(res.discipline);
+      if (res.language) setLanguage(res.language);
+      if (res.suggested_keywords && res.suggested_keywords.length > 0) {
+        setKeywords(res.suggested_keywords.join(", "));
+      }
+      if (res.summary) {
         setSummary(res.summary);
       }
-      toast.success("Classification thématique et métadonnées suggérées par l'IA.");
+      if (res.target_audience) {
+        setTargetAudience(res.target_audience);
+      }
+      const modeLabel = res.analysis_mode === "openai" ? "Analyse IA (OpenAI)" : "Classification thématique";
+      toast.success(`${modeLabel} : métadonnées et résumé appliqués avec succès.`);
     } catch {
       toast.error("Erreur lors de l'analyse IA. Les champs par défaut sont conservés.");
     } finally {
       setAiAnalyzing(false);
     }
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

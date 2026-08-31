@@ -11,6 +11,7 @@ from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
+from django.conf import settings
 from .models import (
     PublisherProfile,
     PublisherEntityType,
@@ -81,8 +82,12 @@ class PublisherKpisView(APIView):
                     real_r = float(
                         lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0
                     )
-            total_consultations_acc += (real_c or b.consultations_count)
-            total_revenue_acc += (real_r or float(b.revenue_generated))
+            if b.status == PublisherDepositStatus.PUBLISHED:
+                total_consultations_acc += real_c
+                total_revenue_acc += real_r
+            else:
+                total_consultations_acc += 0
+                total_revenue_acc += 0.0
 
         rate = float(prof.contractual_royalty_rate)
         pending_royalties = (total_revenue_acc * rate) / 100
@@ -147,8 +152,12 @@ class PublisherCatalogListView(APIView):
                         lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0
                     )
 
-            consultations_final = real_consultations or b.consultations_count
-            revenue_final = real_revenue or float(b.revenue_generated)
+            if b.status == PublisherDepositStatus.PUBLISHED:
+                consultations_final = real_consultations
+                revenue_final = real_revenue
+            else:
+                consultations_final = 0
+                revenue_final = 0.0
 
             data.append({
                 "id": str(b.id),
@@ -230,8 +239,12 @@ class PublisherCatalogDetailView(APIView):
                         lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0
                     )
 
-            consultations_final = real_consultations or b.consultations_count
-            revenue_final = real_revenue or float(b.revenue_generated)
+            if b.status == PublisherDepositStatus.PUBLISHED:
+                consultations_final = real_consultations
+                revenue_final = real_revenue
+            else:
+                consultations_final = 0
+                revenue_final = 0.0
 
             return Response({
                 "success": True,
@@ -294,50 +307,52 @@ class PublisherCatalogDetailView(APIView):
 
 
 class PublisherAiMetadataExtractView(APIView):
-    """Extraction automatique assistée par IA (Section 5.3 & 4.1.C)."""
+    """Extraction assistée par IA (Section 5.3 & 4.1.C) — réutilise le vrai service OpenAI
+    déjà utilisé par le flux Maquettiste, pas une simulation dédiée."""
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
+        from apps.ai_engine.services.openai_service import (
+            analyze_document_with_openai,
+            extract_text_sample_from_bytes,
+        )
+
         title = request.data.get("title", "").strip()
-        filename = request.data.get("filename", "").strip()
+        filename = request.data.get("filename", "").strip() or title or "document"
+        uploaded_file = request.FILES.get("file")
 
-        # Heuristique IA contextuelle pour le catalogue universitaire
-        title_lower = (title + " " + filename).lower()
+        text_sample = ""
+        total_pages = 0
 
-        if "droit" in title_lower or "jurisprudence" in title_lower or "constitution" in title_lower:
-            discipline = "Droit Public & Administration"
-            summary = f"Ouvrage juridique approfondi analysant les principes fondamentaux de {title or 'la matière'}, avec étude comparée des jurisprudences ouest-africaines et internationales."
-            keywords = ["droit", "jurisprudence", "cours magistral", "afrique de l'ouest", "uac"]
-        elif "economie" in title_lower or "finance" in title_lower or "gestion" in title_lower or "monnaie" in title_lower:
-            discipline = "Sciences Économiques & Gestion"
-            summary = f"Manuel universitaire de référence traitant des théories économiques contemporaines appliquées aux marchés émergents et aux politiques monétaires régionales."
-            keywords = ["économie", "finance", "macroéconomie", "uemoa", "croissance"]
-        elif "sante" in title_lower or "medecine" in title_lower or "clinique" in title_lower:
-            discipline = "Médecine & Santé Publique"
-            summary = f"Guide clinique et académique destiné aux praticiens et étudiants en sciences de la santé, couvrant les protocoles thérapeutiques et la prévention épidémiologique."
-            keywords = ["santé", "médecine", "clinique", "épidémiologie", "diagnostic"]
-        elif "agronomie" in title_lower or "environnement" in title_lower or "climat" in title_lower:
-            discipline = "Agronomie & Environnement"
-            summary = f"Étude scientifique sur les pratiques agricoles durables, la résilience climatique et la valorisation des écosystèmes tropicaux."
-            keywords = ["agronomie", "climat", "agriculture durable", "écosystèmes", "bénin"]
-        else:
-            discipline = "Sciences Humaines & Sociales"
-            summary = f"Ouvrage académique de recherche explorant les dynamiques structurelles, théoriques et pratiques de {title or 'cette discipline'}."
-            keywords = ["recherche", "université", "théorie", "académique", "afrique"]
+        if uploaded_file:
+            file_bytes = uploaded_file.read()
+            file_ext = uploaded_file.name.rsplit(".", 1)[-1].lower() if "." in uploaded_file.name else "pdf"
+            try:
+                text_sample, total_pages = extract_text_sample_from_bytes(file_bytes, file_ext)
+            except Exception:
+                text_sample, total_pages = "", 0
+
+        result = analyze_document_with_openai(
+            text_sample=text_sample,
+            filename=filename,
+            total_pages=total_pages,
+        )
 
         return Response({
             "success": True,
             "data": {
-                "summary": summary,
-                "discipline": discipline,
-                "language": "fr",
-                "country": "BJ",
-                "suggested_keywords": keywords,
-                "target_audience": "universitaire",
-                "confidence_score": 0.94,
+                "summary": result.get("summary", ""),
+                "discipline": result.get("genre_category") or result.get("discipline_suggestion") or result.get("discipline", ""),
+                "language": result.get("language_code") or result.get("language", "fr"),
+                "country": result.get("country", "BJ"),
+                "suggested_keywords": result.get("keywords", []),
+                "target_audience": result.get("target_audience", "universitaire"),
+                "analysis_mode": "openai" if getattr(settings, "OPENAI_API_KEY", None) else "heuristic",
             },
             "error": None,
         })
+
 
 
 class PublisherDepositsView(APIView):

@@ -74,11 +74,13 @@ export interface PublisherAiMetadataSuggestion {
   summary: string;
   discipline: string;
   language: string;
-  country: string;
+  country?: string;
   suggested_keywords: string[];
   target_audience: "universitaire" | "professionnel" | "grand_public";
-  confidence_score: number;
+  confidence_score?: number;
+  analysis_mode?: "openai" | "heuristic";
 }
+
 
 export interface PublisherProfileData {
   id: string;

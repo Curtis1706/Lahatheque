@@ -304,3 +304,81 @@ class PublisherPortalFichesYTestCase(TestCase):
         # 4. Deuxième retrait (5 000 > 4 000 restant) -> rejet
         res_second = self.client.post("/api/v1/publishers/royalties/withdraw/", {"amount": 5000}, format="json")
         self.assertEqual(res_second.status_code, 400)
+
+    def test_z1_ai_metadata_extraction(self):
+        """Fiche Z1 : Vérifie que l'endpoint IA utilise le vrai service OpenAI et gère les fichiers."""
+        self.client.force_authenticate(user=self.publisher_user)
+
+        # 1. Sans fichier (titre uniquement)
+        res = self.client.post(
+            "/api/v1/publishers/ai/extract-metadata/",
+            {"title": "Traité de Droit Administratif Béninois"},
+            format="json"
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.data["success"])
+        data = res.data["data"]
+        self.assertIn("summary", data)
+        self.assertIn("discipline", data)
+        self.assertIn("language", data)
+        self.assertIn("suggested_keywords", data)
+        self.assertIn("target_audience", data)
+        self.assertIn("analysis_mode", data)
+        self.assertIn(data["analysis_mode"], ["openai", "heuristic"])
+
+        # 2. Avec fichier joint
+        dummy_file = SimpleUploadedFile("manuscrit.pdf", b"%PDF-1.4 dummy pdf bytes", content_type="application/pdf")
+        res_file = self.client.post(
+            "/api/v1/publishers/ai/extract-metadata/",
+            {"title": "Économie du Développement", "file": dummy_file},
+            format="multipart"
+        )
+        self.assertEqual(res_file.status_code, 200)
+        self.assertTrue(res_file.data["success"])
+        self.assertIsNotNone(res_file.data["data"]["summary"])
+
+    def test_z2_honest_zero_statistics(self):
+        """Fiche Z2 : Un livre sans activité réelle affiche honnêtement 0 consultation et 0 revenu."""
+        discipline = Discipline.objects.create(name="Droit des Affaires")
+        ouvrage_zero = Ouvrage.objects.create(
+            title="Droit des Sociétés",
+            isbn="978-2-ZERO-001",
+            publisher=self.publisher_profile,
+            discipline=discipline,
+            price_digital=6000,
+            status="published",
+        )
+        PublisherBookDeposit.objects.create(
+            publisher=self.publisher_profile,
+            title="Droit des Sociétés",
+            isbn_digital="978-2-ZERO-001",
+            discipline="Droit des Affaires",
+            price=Decimal("6000.00"),
+            status=PublisherDepositStatus.PUBLISHED,
+            consultations_count=0,
+            revenue_generated=Decimal("0.00"),
+        )
+        PublisherBookDeposit.objects.create(
+            publisher=self.publisher_profile,
+            title="Ouvrage En Attente",
+            isbn_digital="978-2-PENDING-001",
+            discipline="Droit des Affaires",
+            price=Decimal("6000.00"),
+            status=PublisherDepositStatus.PENDING,
+            consultations_count=0,
+            revenue_generated=Decimal("0.00"),
+        )
+
+        self.client.force_authenticate(user=self.publisher_user)
+
+        res_kpis = self.client.get("/api/v1/publishers/kpis/")
+        self.assertEqual(res_kpis.status_code, 200)
+        self.assertEqual(res_kpis.data["data"]["totalConsultations"], 0)
+        self.assertEqual(res_kpis.data["data"]["totalRevenue"], 0.0)
+
+        res_catalog = self.client.get("/api/v1/publishers/catalog/")
+        self.assertEqual(res_catalog.status_code, 200)
+        for b in res_catalog.data["data"]:
+            self.assertEqual(b["consultations_count"], 0)
+            self.assertEqual(b["revenue_generated"], 0.0)
+

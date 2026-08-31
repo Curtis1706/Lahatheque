@@ -94,9 +94,25 @@ export async function getPublisherBookDetail(id: string): Promise<PublisherBook 
 export async function extractBookMetadataWithAi(payload: {
   title?: string;
   filename?: string;
+  file?: File | null;
 }): Promise<PublisherAiMetadataSuggestion> {
+  if (payload.file) {
+    const formData = new FormData();
+    formData.append("title", payload.title || "");
+    formData.append("filename", payload.filename || payload.file.name);
+    formData.append("file", payload.file);
+    const res = await fetch(`${BFF}/ai/extract-metadata/`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Erreur serveur");
+    return json.data as PublisherAiMetadataSuggestion;
+  }
   return bffPost<PublisherAiMetadataSuggestion>("/ai/extract-metadata/", payload);
 }
+
 
 // ─── Dépôt Unitaire ──────────────────────────────────────────────────────────
 

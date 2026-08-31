@@ -10,6 +10,7 @@ import { InlineLoader } from "@/components/ui/page-loader";
 interface AiMetadataAssistantProps {
   currentTitle: string;
   filename?: string;
+  file?: File | null;
   onApplySuggestions: (suggestions: PublisherAiMetadataSuggestion) => void;
   className?: string;
 }
@@ -17,6 +18,7 @@ interface AiMetadataAssistantProps {
 export function AiMetadataAssistant({
   currentTitle,
   filename,
+  file,
   onApplySuggestions,
   className = "",
 }: AiMetadataAssistantProps) {
@@ -24,16 +26,24 @@ export function AiMetadataAssistant({
   const [suggestion, setSuggestion] = useState<PublisherAiMetadataSuggestion | null>(null);
 
   const handleAnalyze = async () => {
-    if (!currentTitle && !filename) {
+    if (!currentTitle && !filename && !file) {
       toast.info("Veuillez d'abord renseigner le titre ou téléverser le fichier d'ouvrage.");
       return;
     }
 
     setAnalyzing(true);
     try {
-      const res = await extractBookMetadataWithAi({ title: currentTitle, filename });
+      const res = await extractBookMetadataWithAi({
+        title: currentTitle,
+        filename,
+        file: file || undefined,
+      });
       setSuggestion(res);
-      toast.success("Suggestions de métadonnées générées par l'IA.");
+      toast.success(
+        res.analysis_mode === "openai"
+          ? "Analyse OpenAI complétée avec succès."
+          : "Suggestions thématiques générées."
+      );
     } catch {
       toast.error("Échec de l'analyse IA. Veuillez vérifier vos entrées.");
     } finally {
@@ -92,7 +102,7 @@ export function AiMetadataAssistant({
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-navy flex items-center gap-1.5">
               <Check className="w-4 h-4 text-emerald-600" />
-              Suggestions générées (Indice de confiance : {Math.round(suggestion.confidence_score * 100)}%)
+              Suggestions générées {suggestion.analysis_mode === "openai" ? "(Analyse OpenAI)" : "(Classification Thématique)"}
             </span>
             <button
               type="button"
@@ -103,6 +113,7 @@ export function AiMetadataAssistant({
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
+
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div className="p-2.5 rounded-xl bg-background-secondary border border-border">
