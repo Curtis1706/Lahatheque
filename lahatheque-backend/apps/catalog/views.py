@@ -6,8 +6,8 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
-from .models import Ouvrage, Discipline, Domain
-from .serializers import OuvrageReadSerializer, OuvrageCreateSerializer, DisciplineSerializer, DomainSerializer
+from .models import Ouvrage, Discipline, Domain, Country
+from .serializers import OuvrageReadSerializer, OuvrageCreateSerializer, DisciplineSerializer, DomainSerializer, CountrySerializer
 from .permissions import IsLayoutArtistOrAbove, IsChiefLayoutOnly, IsManagerOrAdmin
 
 logger = logging.getLogger(__name__)
@@ -169,6 +169,24 @@ class DomainViewSet(viewsets.ModelViewSet):
         discipline_id = self.request.query_params.get('discipline')
         if discipline_id:
             qs = qs.filter(discipline_id=discipline_id)
+        return qs
+
+
+class CountryViewSet(viewsets.ModelViewSet):
+    """CRUD des pays — lecture publique (avec filtrage actif), écriture réservée Admin/Gestionnaire."""
+    queryset = Country.objects.all().order_by('name')
+    serializer_class = CountrySerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), IsManagerOrAdmin()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        active_only = self.request.query_params.get('active_only')
+        if active_only in ('true', '1', 'True'):
+            qs = qs.filter(is_active=True)
         return qs
 
 

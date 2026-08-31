@@ -3,6 +3,7 @@ export interface DisciplineItem {
   name: string;
   code_dewey: string;
   description: string;
+  is_active?: boolean;
 }
 
 export interface DomainItem {
@@ -10,6 +11,7 @@ export interface DomainItem {
   discipline: number;
   discipline_name: string;
   name: string;
+  is_active?: boolean;
 }
 
 const BASE = "/api/bff/catalog";
@@ -25,6 +27,7 @@ export async function createDiscipline(data: {
   name: string;
   code_dewey?: string;
   description?: string;
+  is_active?: boolean;
 }): Promise<DisciplineItem | null> {
   const res = await fetch(`${BASE}/disciplines/`, {
     method: "POST",
@@ -41,7 +44,7 @@ export async function createDiscipline(data: {
 
 export async function updateDiscipline(
   id: number,
-  data: Partial<{ name: string; code_dewey: string; description: string }>
+  data: Partial<{ name: string; code_dewey: string; description: string; is_active: boolean }>
 ): Promise<DisciplineItem | null> {
   const res = await fetch(`${BASE}/disciplines/${id}/`, {
     method: "PATCH",
@@ -75,7 +78,7 @@ export async function getDomains(disciplineId?: number): Promise<DomainItem[]> {
   return Array.isArray(json) ? json : json.results || [];
 }
 
-export async function createDomain(data: { discipline: number; name: string }): Promise<DomainItem | null> {
+export async function createDomain(data: { discipline: number; name: string; is_active?: boolean }): Promise<DomainItem | null> {
   const res = await fetch(`${BASE}/domains/`, {
     method: "POST",
     credentials: "include",
@@ -85,6 +88,23 @@ export async function createDomain(data: { discipline: number; name: string }): 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
     throw new Error(errData.error || errData.name?.[0] || "Erreur création sous-catégorie.");
+  }
+  return await res.json();
+}
+
+export async function updateDomain(
+  id: number,
+  data: Partial<{ name: string; is_active: boolean }>
+): Promise<DomainItem | null> {
+  const res = await fetch(`${BASE}/domains/${id}/`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || errData.name?.[0] || "Erreur modification sous-catégorie.");
   }
   return await res.json();
 }

@@ -69,6 +69,7 @@ import {
   Layers,
   Tag,
   PanelLeft,
+  Globe,
 } from "lucide-react";
 
 interface SubLinkItem {
@@ -315,6 +316,7 @@ export function DashboardSidebar() {
                   { label: "Grille & Remises Rôles", href: "/admin/catalog/pricing", icon: <Tag className="size-3.5" /> },
                   { label: "Bouquets Documentaires", href: "/admin/catalog/bouquets", icon: <Layers className="size-3.5" /> },
                   { label: "Disciplines & Catégories", href: "/admin/catalog/disciplines", icon: <Layers className="size-3.5" /> },
+                  { label: "Gestion des Pays", href: "/admin/catalog/countries", icon: <Globe className="size-3.5" /> },
                 ],
               },
               { label: "Validation BAT & Maquettes", href: "/admin/validation", icon: <FileCheck2 className="size-4" /> },

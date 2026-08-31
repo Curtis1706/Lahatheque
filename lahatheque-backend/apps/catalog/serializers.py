@@ -1,5 +1,11 @@
 from rest_framework import serializers
-from .models import Ouvrage, BookAuthor, Discipline, Domain, MetadataONIX
+from .models import Ouvrage, BookAuthor, Discipline, Domain, MetadataONIX, Country
+
+
+class CountrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Country
+        fields = '__all__'
 
 
 class BookAuthorSerializer(serializers.ModelSerializer):
@@ -19,7 +25,7 @@ class DomainSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Domain
-        fields = ['id', 'discipline', 'discipline_name', 'name']
+        fields = ['id', 'discipline', 'discipline_name', 'name', 'is_active']
 
 
 class OuvrageReadSerializer(serializers.ModelSerializer):
