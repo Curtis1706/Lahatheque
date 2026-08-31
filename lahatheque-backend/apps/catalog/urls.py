@@ -4,6 +4,7 @@ from .views import (
     OuvrageViewSet,
     DisciplineViewSet,
     DomainViewSet,
+    CountryViewSet,
     MaquettisteDepositViewSet,
     ChiefLayoutValidationViewSet,
     ONIXImportView,
@@ -18,6 +19,7 @@ router = DefaultRouter()
 router.register(r'books', OuvrageViewSet, basename='ouvrage')
 router.register(r'disciplines', DisciplineViewSet, basename='discipline')
 router.register(r'domains', DomainViewSet, basename='domain')
+router.register(r'countries', CountryViewSet, basename='country')
 
 # Espace Maquettiste : CRUD sur ses propres dépôts
 router.register(r'my-deposits', MaquettisteDepositViewSet, basename='my-deposits')

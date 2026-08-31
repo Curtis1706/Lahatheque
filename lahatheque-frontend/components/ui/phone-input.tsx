@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { Phone } from "lucide-react";
+import { CountryFlag } from "@/components/ui/country-flag";
+import { getCountries, AFRICAN_COUNTRIES_PRESET, type CountryItem } from "@/lib/services/countries";
 
 interface PhoneInputProps {
   value: string;
@@ -10,46 +12,53 @@ interface PhoneInputProps {
   disabled?: boolean;
 }
 
-const countries = [
-  { code: "BJ", name: "Bénin", phoneCode: "+229" },
-  { code: "CI", name: "Côte d'Ivoire", phoneCode: "+225" },
-  { code: "SN", name: "Sénégal", phoneCode: "+221" },
-  { code: "TG", name: "Togo", phoneCode: "+228" },
-  { code: "NE", name: "Niger", phoneCode: "+227" },
-  { code: "CD", name: "RDC", phoneCode: "+243" },
-  { code: "ML", name: "Mali", phoneCode: "+223" },
-  { code: "BF", name: "Burkina Faso", phoneCode: "+226" },
-  { code: "CM", name: "Cameroun", phoneCode: "+237" },
-  { code: "GA", name: "Gabon", phoneCode: "+241" },
-  { code: "GN", name: "Guinée", phoneCode: "+224" },
-  { code: "CG", name: "Congo", phoneCode: "+242" },
-  { code: "TD", name: "Tchad", phoneCode: "+235" },
-  { code: "FR", name: "France", phoneCode: "+33" },
-  { code: "CA", name: "Canada", phoneCode: "+1" },
-  { code: "US", name: "États-Unis", phoneCode: "+1" },
-];
-
 export function PhoneInput({ value, onChange, className = "", disabled = false }: PhoneInputProps) {
-  const [selectedCountry, setSelectedCountry] = React.useState(countries[0]);
+  const [countriesList, setCountriesList] = React.useState<Array<{ code: string; name: string; phoneCode: string }>>(
+    AFRICAN_COUNTRIES_PRESET.map((c) => ({ code: c.code, name: c.name, phoneCode: c.phone_code }))
+  );
+  const [selectedCountry, setSelectedCountry] = React.useState(countriesList[0]);
   const [localNumber, setLocalNumber] = React.useState("");
+
+  // Charger les pays actifs du backend s'ils existent
+  React.useEffect(() => {
+    async function loadActiveCountries() {
+      try {
+        const data = await getCountries(true);
+        if (data && data.length > 0) {
+          const formatted = data.map((c) => ({
+            code: c.code,
+            name: c.name,
+            phoneCode: c.phone_code || "+229",
+          }));
+          setCountriesList(formatted);
+          if (!value) {
+            setSelectedCountry(formatted[0]);
+            onChange(formatted[0].phoneCode);
+          }
+        }
+      } catch {
+        // Fallback silently
+      }
+    }
+    loadActiveCountries();
+  }, []);
 
   React.useEffect(() => {
     if (value) {
-      // Trouver le pays correspondant à partir de l'indicatif
-      const countryMatch = countries.find(c => value.startsWith(c.phoneCode));
+      const countryMatch = countriesList.find((c) => value.startsWith(c.phoneCode));
       if (countryMatch) {
         setSelectedCountry(countryMatch);
         setLocalNumber(value.replace(countryMatch.phoneCode, "").trim());
       } else {
         setLocalNumber(value);
       }
-    } else {
-      onChange(countries[0].phoneCode);
+    } else if (countriesList.length > 0) {
+      onChange(countriesList[0].phoneCode);
     }
-  }, [value]);
+  }, [value, countriesList]);
 
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const country = countries.find(c => c.code === e.target.value);
+    const country = countriesList.find((c) => c.code === e.target.value);
     if (country) {
       setSelectedCountry(country);
       onChange(`${country.phoneCode} ${localNumber.trim()}`.trim());
@@ -57,18 +66,18 @@ export function PhoneInput({ value, onChange, className = "", disabled = false }
   };
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const num = e.target.value.replace(/[^\d\s]/g, ""); // Autoriser chiffres et espaces
+    const num = e.target.value.replace(/[^\d\s]/g, "");
     setLocalNumber(num);
     onChange(`${selectedCountry.phoneCode} ${num}`.trim());
   };
 
   return (
-    <div className={`flex items-center gap-2 w-full bg-background border border-border rounded-xl px-3 py-1 focus-within:ring-2 focus-within:ring-navy transition-all ${className}`}>
-      {/* Icon Phone */}
-      <Phone className="w-4 h-4 text-foreground-muted shrink-0" />
-
-      {/* Select country drop code */}
-      <div className="flex items-center border-r border-border pr-2 shrink-0">
+    <div
+      className={`flex items-center gap-2 w-full bg-background border border-border rounded-xl px-3 py-1 focus-within:ring-2 focus-within:ring-navy transition-all ${className}`}
+    >
+      {/* Drapeau & Sélecteur pays */}
+      <div className="flex items-center gap-1.5 border-r border-border pr-2 shrink-0">
+        <CountryFlag code={selectedCountry.code} title={selectedCountry.name} className="w-5 h-3.5 rounded-xs" />
         <select
           value={selectedCountry.code}
           onChange={handleCountryChange}
@@ -76,7 +85,7 @@ export function PhoneInput({ value, onChange, className = "", disabled = false }
           className="bg-transparent text-xs font-bold text-navy focus:outline-none cursor-pointer pr-1 py-1.5"
           aria-label="Indicatif téléphonique"
         >
-          {countries.map((c) => (
+          {countriesList.map((c) => (
             <option key={c.code} value={c.code} className="bg-background text-navy">
               {c.code} ({c.phoneCode})
             </option>
@@ -97,3 +106,5 @@ export function PhoneInput({ value, onChange, className = "", disabled = false }
     </div>
   );
 }
+
+export default PhoneInput;
