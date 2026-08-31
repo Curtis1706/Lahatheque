@@ -108,38 +108,42 @@ export default function NewPublisherBookPage() {
 
     setSubmitting(true);
     try {
-      await createPublisherBook({
-        title,
-        subtitle: subtitle || undefined,
-        isbn_digital: isbnDigital,
-        isbn_print: isbnPrint || undefined,
-        doi: doi || undefined,
-        authors: authors.split(",").map((a) => a.trim()).filter(Boolean),
-        discipline,
-        language,
-        keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
-        target_audience: targetAudience,
-        price,
-        currency,
-        sales_model: salesModel,
-        allowed_territories: territories.split(",").map((t) => t.trim()).filter(Boolean),
-        summary: summary || "Ouvrage déposé pour examen éditorial.",
-        authors_bio: authorsBio,
-        licence_type: licenceType,
-        protection_config: {
-          watermark_enabled: watermarkEnabled,
-          watermark_position: "bottom-right",
-          watermark_opacity: 30,
-          user_watermarking: true,
-          lcp_drm_enabled: true,
-          max_allowed_devices: 3,
-          max_loan_days: 14,
-          disable_copy_paste: true,
-          disable_print: false,
-          audio_encryption_auto: true,
-          access_tracing_auto: true,
+      await createPublisherBook(
+        {
+          title,
+          subtitle: subtitle || undefined,
+          isbn_digital: isbnDigital,
+          isbn_print: isbnPrint || undefined,
+          doi: doi || undefined,
+          authors: authors.split(",").map((a) => a.trim()).filter(Boolean),
+          discipline,
+          language,
+          keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
+          target_audience: targetAudience,
+          price,
+          currency,
+          sales_model: salesModel,
+          allowed_territories: territories.split(",").map((t) => t.trim()).filter(Boolean),
+          summary: summary || "Ouvrage déposé pour examen éditorial.",
+          authors_bio: authorsBio,
+          licence_type: licenceType,
+          protection_config: {
+            watermark_enabled: watermarkEnabled,
+            watermark_position: "bottom-right",
+            watermark_opacity: 30,
+            user_watermarking: true,
+            lcp_drm_enabled: true,
+            max_allowed_devices: 3,
+            max_loan_days: 14,
+            disable_copy_paste: true,
+            disable_print: false,
+            audio_encryption_auto: true,
+            access_tracing_auto: true,
+          },
         },
-      });
+        manuscriptFile
+      );
+
 
       toast.success("L'ouvrage a été transmis avec succès au comité de validation.");
       router.push("/publisher/catalog");

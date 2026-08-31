@@ -101,10 +101,33 @@ export async function extractBookMetadataWithAi(payload: {
 // ─── Dépôt Unitaire ──────────────────────────────────────────────────────────
 
 export async function createPublisherBook(
-  data: Partial<PublisherBook>
+  data: Partial<PublisherBook>,
+  file?: File | null
 ): Promise<PublisherBook> {
+  if (file) {
+    const formData = new FormData();
+    formData.append("file", file, file.name);
+    Object.entries(data).forEach(([key, val]) => {
+      if (val !== undefined && val !== null) {
+        if (typeof val === "object") {
+          formData.append(key, JSON.stringify(val));
+        } else {
+          formData.append(key, String(val));
+        }
+      }
+    });
+    const res = await fetch(`${BFF}/deposits/`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Erreur lors de la création du dépôt");
+    return json.data as PublisherBook;
+  }
   return bffPost<PublisherBook>("/deposits/", data);
 }
+
 
 // ─── Import par Lots (ONIX 3.0 / CSV) ────────────────────────────────────────
 

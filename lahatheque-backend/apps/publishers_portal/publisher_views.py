@@ -356,6 +356,7 @@ class PublisherDepositsView(APIView):
             return ""
 
     def post(self, request):
+        import json as json_lib
         user = request.user
         prof = get_or_create_publisher_profile(user)
         data = request.data
@@ -369,6 +370,43 @@ class PublisherDepositsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        authors = data.get("authors")
+        if isinstance(authors, str):
+            try:
+                authors = json_lib.loads(authors)
+            except Exception:
+                authors = [a.strip() for a in authors.split(",") if a.strip()]
+        if not authors or not isinstance(authors, list):
+            authors = [f"{user.first_name} {user.last_name}".strip() or "Auteur Partenaire"]
+
+        contributors = data.get("contributors", [])
+        if isinstance(contributors, str):
+            try:
+                contributors = json_lib.loads(contributors)
+            except Exception:
+                contributors = []
+
+        keywords = data.get("keywords", [])
+        if isinstance(keywords, str):
+            try:
+                keywords = json_lib.loads(keywords)
+            except Exception:
+                keywords = [k.strip() for k in keywords.split(",") if k.strip()]
+
+        allowed_territories = data.get("allowed_territories", ["Bénin", "Sénégal", "Togo", "Côte d'Ivoire"])
+        if isinstance(allowed_territories, str):
+            try:
+                allowed_territories = json_lib.loads(allowed_territories)
+            except Exception:
+                allowed_territories = [t.strip() for t in allowed_territories.split(",") if t.strip()]
+
+        protection_config = data.get("protection_config", {})
+        if isinstance(protection_config, str):
+            try:
+                protection_config = json_lib.loads(protection_config)
+            except Exception:
+                protection_config = {}
+
         deposit = PublisherBookDeposit.objects.create(
             publisher=prof,
             title=title,
@@ -376,16 +414,16 @@ class PublisherDepositsView(APIView):
             isbn_digital=isbn_digital,
             isbn_print=data.get("isbn_print", ""),
             doi=data.get("doi", ""),
-            authors=data.get("authors", [f"{user.first_name} {user.last_name}".strip() or "Auteur Partenaire"]),
-            contributors=data.get("contributors", []),
+            authors=authors,
+            contributors=contributors,
             discipline=data.get("discipline", "Sciences Générales"),
             language=data.get("language", "fr"),
-            keywords=data.get("keywords", []),
+            keywords=keywords,
             target_audience=data.get("target_audience", "universitaire"),
             price=Decimal(str(data.get("price", 5000))),
             currency="XOF",
             sales_model=data.get("sales_model", "purchase"),
-            allowed_territories=data.get("allowed_territories", ["Bénin", "Sénégal", "Togo", "Côte d'Ivoire"]),
+            allowed_territories=allowed_territories,
             summary=data.get("summary", "Ouvrage déposé pour examen par le comité éditorial."),
             authors_bio=data.get("authors_bio", ""),
             cover_url=data.get("cover_url", "/placeholder-cover.jpg"),
@@ -394,13 +432,14 @@ class PublisherDepositsView(APIView):
             licence_type=data.get("licence_type", "tous_droits_reserves"),
             status=PublisherDepositStatus.PENDING,
             validation_step=PublisherValidationStep.STEP_1,
-            watermark_enabled=data.get("protection_config", {}).get("watermark_enabled", True),
-            watermark_position=data.get("protection_config", {}).get("watermark_position", "bottom-right"),
-            watermark_opacity=data.get("protection_config", {}).get("watermark_opacity", 30),
-            lcp_drm_enabled=data.get("protection_config", {}).get("lcp_drm_enabled", True),
-            disable_copy_paste=data.get("protection_config", {}).get("disable_copy_paste", True),
-            disable_print=data.get("protection_config", {}).get("disable_print", False),
+            watermark_enabled=protection_config.get("watermark_enabled", True),
+            watermark_position=protection_config.get("watermark_position", "bottom-right"),
+            watermark_opacity=protection_config.get("watermark_opacity", 30),
+            lcp_drm_enabled=protection_config.get("lcp_drm_enabled", True),
+            disable_copy_paste=protection_config.get("disable_copy_paste", True),
+            disable_print=protection_config.get("disable_print", False),
         )
+
 
         return Response(
             {

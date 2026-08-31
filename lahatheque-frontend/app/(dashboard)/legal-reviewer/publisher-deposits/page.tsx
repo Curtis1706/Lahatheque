@@ -11,6 +11,8 @@ import {
   BookOpen,
   FileCheck2,
   AlertTriangle,
+  Download,
+  FileText,
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
@@ -136,14 +138,38 @@ export default function LegalReviewerPublisherDepositsPage() {
       key: "actions" as keyof PublisherDepositForReview,
       header: "Action",
       cell: (row) => (
-        <button
-          type="button"
-          onClick={() => openModal(row)}
-          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 shadow-xs"
-        >
-          <Scale className="w-3.5 h-3.5 text-gold" />
-          Décision juridique
-        </button>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {row.file_url ? (
+            <a
+              href={row.file_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+              className="p-2 rounded-xl bg-background border border-border hover:border-gold hover:text-navy text-foreground-muted transition-colors inline-flex items-center gap-1 text-xs font-semibold"
+              title="Télécharger le PDF soumis"
+            >
+              <Download className="w-3.5 h-3.5 text-gold" />
+              <span className="hidden sm:inline">PDF</span>
+            </a>
+          ) : (
+            <span
+              className="p-2 rounded-xl bg-background/50 border border-border/50 text-foreground-muted/50 inline-flex items-center gap-1 text-xs cursor-not-allowed"
+              title="Aucun fichier PDF joint"
+            >
+              <Download className="w-3.5 h-3.5 text-foreground-muted/40" />
+              <span className="hidden sm:inline text-[10px]">Sans PDF</span>
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => openModal(row)}
+            className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 shadow-xs"
+          >
+            <Scale className="w-3.5 h-3.5 text-gold" />
+            Décision juridique
+          </button>
+        </div>
       ),
     },
   ];
@@ -163,7 +189,7 @@ export default function LegalReviewerPublisherDepositsPage() {
             Vérification des Droits — Éditeurs Tiers
           </h1>
           <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">
-            Votre rôle : vérifier les droits d'auteur et les cessions de droits pour chaque dépôt éditeur partenaire. La publication requiert également la validation éditoriale du Chef Maquettiste.
+            Votre rôle : vérifier les droits d'auteur et les cessions de droits pour chaque dépôt éditeur partenaire. Téléchargez le manuscrit PDF pour inspecter les mentions légales avant décision.
           </p>
         </div>
       </div>
@@ -223,6 +249,42 @@ export default function LegalReviewerPublisherDepositsPage() {
               <p className="text-[10px] text-foreground-muted">{selected?.publisher_name} — {selected?.discipline}</p>
             </div>
           </div>
+
+          {/* Manuscrit PDF & Téléchargement */}
+          <div className="p-3.5 rounded-2xl bg-background border border-border space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-gold" />
+                <span className="text-xs font-bold text-navy">Manuscrit & Épreuve PDF</span>
+              </div>
+              {selected?.file_url ? (
+                <a
+                  href={selected.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="px-3 py-1.5 rounded-xl bg-gold/15 text-navy hover:bg-gold/25 font-bold text-xs border border-gold/30 transition-all inline-flex items-center gap-1.5 shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5 text-gold" />
+                  <span>Télécharger le PDF</span>
+                </a>
+              ) : (
+                <span className="text-[11px] text-foreground-muted font-medium italic">
+                  Aucun fichier joint
+                </span>
+              )}
+            </div>
+            {selected?.file_url ? (
+              <p className="text-[11px] text-foreground-muted">
+                Vérifiez les mentions légales, la page de garde et les cessions de droits sur le manuscrit.
+              </p>
+            ) : (
+              <p className="text-[11px] text-error/80">
+                L'éditeur n'a pas joint de fichier PDF lors du dépôt initial.
+              </p>
+            )}
+          </div>
+
           {selected?.editorial_status !== "approved" && (
             <div className="flex items-start gap-2 p-3 rounded-xl bg-warning/10 border border-warning/20">
               <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
@@ -286,3 +348,4 @@ export default function LegalReviewerPublisherDepositsPage() {
     </div>
   );
 }
+
