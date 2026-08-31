@@ -56,7 +56,7 @@ class AccessService:
             user.is_superuser
             or user.is_staff
             or getattr(user, 'role', '') in privileged_roles
-            or getattr(settings, 'DEBUG', False)
+            or getattr(settings, 'DEV_UNLOCK_ALL_BOOKS', False)
         )
 
         if is_privileged:

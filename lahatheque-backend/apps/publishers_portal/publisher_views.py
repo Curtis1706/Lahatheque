@@ -7,7 +7,7 @@ from django.db.models import Sum, Q
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
@@ -22,6 +22,7 @@ from .models import (
     PublisherRoyaltyPayment,
     PublisherAuditLog,
 )
+from .permissions import HasValidPublisherApiKey
 
 
 def get_or_create_publisher_profile(user) -> PublisherProfile:
@@ -45,6 +46,11 @@ class PublisherKpisView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from apps.protection.models import TraceAcces
+        from apps.commerce.models import LigneCommande
+        from apps.catalog.models import Ouvrage
+        from django.db.models import F
+
         user = request.user
         prof = get_or_create_publisher_profile(user)
         deposits_qs = PublisherBookDeposit.objects.filter(publisher=prof)
@@ -59,9 +65,27 @@ class PublisherKpisView(APIView):
             total_revenue=Sum("revenue_generated"),
         )
 
-        rev = float(totals["total_revenue"] or 0)
+        total_consultations_acc = 0
+        total_revenue_acc = 0.0
+
+        for b in deposits_qs:
+            real_c = 0
+            real_r = 0.0
+            if b.status == PublisherDepositStatus.PUBLISHED:
+                linked_ouvrage = Ouvrage.objects.filter(isbn=b.isbn_digital).first()
+                if linked_ouvrage:
+                    real_c = TraceAcces.objects.filter(ouvrage=linked_ouvrage).count()
+                    lignes = LigneCommande.objects.filter(
+                        ouvrage=linked_ouvrage, commande__statut_paiement='paid'
+                    )
+                    real_r = float(
+                        lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0
+                    )
+            total_consultations_acc += (real_c or b.consultations_count)
+            total_revenue_acc += (real_r or float(b.revenue_generated))
+
         rate = float(prof.contractual_royalty_rate)
-        pending_royalties = (rev * rate) / 100
+        pending_royalties = (total_revenue_acc * rate) / 100
 
         return Response({
             "success": True,
@@ -69,9 +93,9 @@ class PublisherKpisView(APIView):
                 "totalBooks": total_books,
                 "pendingValidations": pending_validations,
                 "publishedBooks": published_books,
-                "totalConsultations": totals["total_consultations"] or 0,
+                "totalConsultations": total_consultations_acc,
                 "totalDownloads": totals["total_downloads"] or 0,
-                "totalRevenue": rev,
+                "totalRevenue": total_revenue_acc,
                 "pendingRoyalties": pending_royalties,
                 "contractualRoyaltyRate": rate,
             },
@@ -83,6 +107,11 @@ class PublisherCatalogListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from apps.protection.models import TraceAcces
+        from apps.commerce.models import LigneCommande
+        from apps.catalog.models import Ouvrage
+        from django.db.models import F
+
         user = request.user
         prof = get_or_create_publisher_profile(user)
         qs = PublisherBookDeposit.objects.filter(publisher=prof)
@@ -105,6 +134,22 @@ class PublisherCatalogListView(APIView):
 
         data = []
         for b in qs:
+            real_consultations = 0
+            real_revenue = 0.0
+            if b.status == PublisherDepositStatus.PUBLISHED:
+                linked_ouvrage = Ouvrage.objects.filter(isbn=b.isbn_digital).first()
+                if linked_ouvrage:
+                    real_consultations = TraceAcces.objects.filter(ouvrage=linked_ouvrage).count()
+                    lignes = LigneCommande.objects.filter(
+                        ouvrage=linked_ouvrage, commande__statut_paiement='paid'
+                    )
+                    real_revenue = float(
+                        lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0
+                    )
+
+            consultations_final = real_consultations or b.consultations_count
+            revenue_final = real_revenue or float(b.revenue_generated)
+
             data.append({
                 "id": str(b.id),
                 "publisher_id": str(prof.id),
@@ -136,9 +181,9 @@ class PublisherCatalogListView(APIView):
                 "status": b.status,
                 "validation_step": b.validation_step,
                 "editorial_comment": b.editorial_comment,
-                "consultations_count": b.consultations_count,
+                "consultations_count": consultations_final,
                 "downloads_count": b.downloads_count,
-                "revenue_generated": float(b.revenue_generated),
+                "revenue_generated": revenue_final,
                 "created_at": b.created_at.isoformat(),
                 "protection_config": {
                     "watermark_enabled": b.watermark_enabled,
@@ -166,6 +211,28 @@ class PublisherCatalogDetailView(APIView):
         prof = get_or_create_publisher_profile(user)
         try:
             b = PublisherBookDeposit.objects.get(Q(id=pk) | Q(isbn_digital=pk), publisher=prof)
+
+            from apps.protection.models import TraceAcces
+            from apps.commerce.models import LigneCommande
+            from apps.catalog.models import Ouvrage
+            from django.db.models import F
+
+            real_consultations = 0
+            real_revenue = 0.0
+            if b.status == PublisherDepositStatus.PUBLISHED:
+                linked_ouvrage = Ouvrage.objects.filter(isbn=b.isbn_digital).first()
+                if linked_ouvrage:
+                    real_consultations = TraceAcces.objects.filter(ouvrage=linked_ouvrage).count()
+                    lignes = LigneCommande.objects.filter(
+                        ouvrage=linked_ouvrage, commande__statut_paiement='paid'
+                    )
+                    real_revenue = float(
+                        lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0
+                    )
+
+            consultations_final = real_consultations or b.consultations_count
+            revenue_final = real_revenue or float(b.revenue_generated)
+
             return Response({
                 "success": True,
                 "data": {
@@ -199,9 +266,9 @@ class PublisherCatalogDetailView(APIView):
                     "status": b.status,
                     "validation_step": b.validation_step,
                     "editorial_comment": b.editorial_comment,
-                    "consultations_count": b.consultations_count,
+                    "consultations_count": consultations_final,
                     "downloads_count": b.downloads_count,
-                    "revenue_generated": float(b.revenue_generated),
+                    "revenue_generated": revenue_final,
                     "created_at": b.created_at.isoformat(),
                     "protection_config": {
                         "watermark_enabled": b.watermark_enabled,
@@ -351,29 +418,137 @@ class PublisherDepositsView(APIView):
 
 
 class PublisherBatchImportView(APIView):
+    """POST /api/v1/publishers/catalog/batch-import/ - Import réel CSV/JSON/ONIX 3.0."""
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
+        import csv
+        import io
+        import json as json_lib
+        import xml.etree.ElementTree as ET
+
         user = request.user
         prof = get_or_create_publisher_profile(user)
-        filename = request.data.get("filename", "lot_ouvrages_onix.xml")
-        format_type = request.data.get("format", "onix_3")
+
+        uploaded_file = request.FILES.get("file")
+        format_type = request.data.get("format", "csv").lower()
+
+        if not uploaded_file:
+            return Response({
+                "success": False, "error": "Aucun fichier fourni pour l'import."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        filename = uploaded_file.name
+        raw_bytes = uploaded_file.read()
+
+        records = []
+        parse_errors = []
+
+        try:
+            if format_type == "csv":
+                text = raw_bytes.decode("utf-8-sig")
+                reader = csv.DictReader(io.StringIO(text))
+                for idx, row in enumerate(reader, start=2):
+                    records.append((idx, {
+                        "title": row.get("title", "").strip(),
+                        "isbn_digital": row.get("isbn_digital", "").strip(),
+                        "discipline": row.get("discipline", "Sciences Générales").strip(),
+                        "price": row.get("price", "5000").strip(),
+                        "language": row.get("language", "fr").strip(),
+                        "summary": row.get("summary", "").strip(),
+                        "authors": [a.strip() for a in row.get("authors", "").split(";") if a.strip()],
+                    }))
+
+            elif format_type == "json":
+                data = json_lib.loads(raw_bytes.decode("utf-8"))
+                items = data if isinstance(data, list) else data.get("books", [])
+                for idx, item in enumerate(items, start=1):
+                    records.append((idx, {
+                        "title": item.get("title", "").strip(),
+                        "isbn_digital": item.get("isbn_digital", ""),
+                        "discipline": item.get("discipline", "Sciences Générales"),
+                        "price": str(item.get("price", 5000)),
+                        "language": item.get("language", "fr"),
+                        "summary": item.get("summary", ""),
+                        "authors": item.get("authors", []),
+                    }))
+
+            elif format_type in ("onix_3", "onix", "xml"):
+                root = ET.fromstring(raw_bytes)
+                ns = {"o": "http://ns.editeur.org/onix/3.0/reference"}
+                products = root.findall(".//Product") or root.findall(".//o:Product", ns)
+                for idx, product in enumerate(products, start=1):
+                    def _find_text(tag):
+                        el = product.find(f".//{tag}")
+                        return el.text.strip() if el is not None and el.text else ""
+
+                    isbn = _find_text("ProductIdentifier/IDValue") or _find_text("IDValue")
+                    title = _find_text("TitleText") or _find_text("Title")
+                    if not isbn or not title:
+                        parse_errors.append({
+                            "line_number": idx,
+                            "isbn_or_title": title or "Titre manquant",
+                            "error_message": "Balise <ProductIdentifier> ou <TitleText> manquante/non conforme ONIX 3.0."
+                        })
+                        continue
+
+                    records.append((idx, {
+                        "title": title, "isbn_digital": isbn,
+                        "discipline": _find_text("Subject/SubjectHeadingText") or "Sciences Générales",
+                        "price": _find_text("Price/PriceAmount") or "5000",
+                        "language": _find_text("Language/LanguageCode") or "fr",
+                        "summary": _find_text("TextContent/Text") or "",
+                        "authors": [_find_text("Contributor/PersonName")] if _find_text("Contributor/PersonName") else [],
+                    }))
+            else:
+                return Response({
+                    "success": False, "error": f"Format non supporté : {format_type}. Utilisez csv, json ou onix_3."
+                }, status=400)
+
+        except Exception as parse_err:
+            return Response({
+                "success": False,
+                "error": f"Impossible de lire le fichier ({format_type.upper()}) : {parse_err}"
+            }, status=400)
+
+        success_count = 0
+        for line_number, rec in records:
+            if not rec.get("title"):
+                parse_errors.append({
+                    "line_number": line_number, "isbn_or_title": rec.get("isbn_digital", "—"),
+                    "error_message": "Titre manquant — ligne ignorée."
+                })
+                continue
+            try:
+                PublisherBookDeposit.objects.create(
+                    publisher=prof,
+                    title=rec["title"],
+                    isbn_digital=rec.get("isbn_digital") or f"978-2-{secrets.token_hex(4).upper()}",
+                    discipline=rec.get("discipline") or "Sciences Générales",
+                    language=rec.get("language") or "fr",
+                    authors=rec.get("authors") or [],
+                    price=Decimal(str(rec.get("price") or "5000")),
+                    summary=rec.get("summary") or "Ouvrage importé par lot — en attente de complément.",
+                    status=PublisherDepositStatus.PENDING,
+                    validation_step=PublisherValidationStep.STEP_1,
+                )
+                success_count += 1
+            except Exception as create_err:
+                parse_errors.append({
+                    "line_number": line_number, "isbn_or_title": rec.get("title", "—"),
+                    "error_message": str(create_err)
+                })
 
         log = PublisherBatchImportLog.objects.create(
             publisher=prof,
             file_name=filename,
             format=format_type,
-            total_records=25,
-            success_count=24,
-            error_count=1,
-            errors=[
-                {
-                    "line_number": 142,
-                    "isbn_or_title": "Ouvrage 14 - ISBN Invalide",
-                    "error_message": "Balise <ProductIdentifier> non conforme ONIX 3.0 (clé de contrôle ISBN-13 manquante)."
-                }
-            ],
-            status="completed_with_errors"
+            total_records=success_count + len(parse_errors),
+            success_count=success_count,
+            error_count=len(parse_errors),
+            errors=parse_errors[:50],
+            status="completed_with_errors" if parse_errors else "completed"
         )
 
         return Response({
@@ -393,6 +568,7 @@ class PublisherBatchImportView(APIView):
         })
 
 
+
 class PublisherRoyaltiesListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -410,7 +586,7 @@ class PublisherRoyaltiesListView(APIView):
                 "net_royalty_amount": float(p.net_royalty_amount),
                 "currency": p.currency,
                 "status": p.status,
-                "pdf_statement_url": p.pdf_statement_url or f"/statements/{p.reference}.pdf",
+                "pdf_statement_url": p.pdf_statement_url or None,
                 "paid_at": p.paid_at.isoformat() if p.paid_at else None,
             }
             for p in payments
@@ -424,7 +600,30 @@ class PublisherRoyaltiesWithdrawView(APIView):
     def post(self, request):
         user = request.user
         prof = get_or_create_publisher_profile(user)
-        amount = request.data.get("amount", 0)
+
+        try:
+            amount = Decimal(str(request.data.get("amount", 0)))
+        except (ValueError, TypeError):
+            return Response({"success": False, "error": "Montant invalide."}, status=400)
+
+        if amount <= 0:
+            return Response({"success": False, "error": "Le montant doit être positif."}, status=400)
+
+        deposits_qs = PublisherBookDeposit.objects.filter(publisher=prof)
+        rev = float(deposits_qs.aggregate(t=Sum("revenue_generated"))["t"] or 0)
+        rate = float(prof.contractual_royalty_rate)
+        already_withdrawn = float(
+            PublisherRoyaltyPayment.objects.filter(
+                publisher=prof, status__in=["pending", "paid"]
+            ).aggregate(t=Sum("net_royalty_amount"))["t"] or 0
+        )
+        available_balance = (rev * rate / 100) - already_withdrawn
+
+        if float(amount) > available_balance:
+            return Response({
+                "success": False,
+                "error": f"Montant demandé ({amount} XOF) supérieur au solde disponible ({available_balance:.2f} XOF)."
+            }, status=400)
 
         ref = f"VIR-EDT-{timezone.now().strftime('%Y%m')}-{secrets.token_hex(3).upper()}"
         payment = PublisherRoyaltyPayment.objects.create(
@@ -436,7 +635,7 @@ class PublisherRoyaltiesWithdrawView(APIView):
             net_royalty_amount=Decimal(str(amount)),
             currency="XOF",
             status="pending",
-            pdf_statement_url=f"/statements/{ref}.pdf"
+            pdf_statement_url=None
         )
 
         return Response({
@@ -642,3 +841,261 @@ class PublisherBookProtectionView(APIView):
                 "disable_print": deposit.disable_print,
             }
         })
+
+
+class PublisherExternalDepositView(APIView):
+    """POST /api/v1/publishers/external/deposits/ - Dépôt programmatique authentifié par clé API."""
+    permission_classes = [HasValidPublisherApiKey]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def post(self, request):
+        prof = request.publisher_profile
+        data = request.data
+
+        title = data.get("title", "").strip()
+        if not title:
+            return Response({"success": False, "error": "Le titre est obligatoire."}, status=400)
+
+        deposit = PublisherBookDeposit.objects.create(
+            publisher=prof,
+            title=title,
+            isbn_digital=data.get("isbn_digital", "") or f"978-2-{secrets.token_hex(4).upper()}",
+            discipline=data.get("discipline", "Sciences Générales"),
+            language=data.get("language", "fr"),
+            authors=data.get("authors", []),
+            price=Decimal(str(data.get("price", 5000))),
+            summary=data.get("summary", "Ouvrage déposé via API externe."),
+            status=PublisherDepositStatus.PENDING,
+            validation_step=PublisherValidationStep.STEP_1,
+        )
+
+        return Response({
+            "success": True,
+            "data": {"id": str(deposit.id), "title": deposit.title, "status": deposit.status},
+        }, status=status.HTTP_201_CREATED)
+
+
+class PublisherExternalDepositStatusView(APIView):
+    """GET /api/v1/publishers/external/deposits/<id>/ - Statut d'un dépôt, via clé API."""
+    permission_classes = [HasValidPublisherApiKey]
+
+    def get(self, request, pk):
+        prof = request.publisher_profile
+        try:
+            deposit = PublisherBookDeposit.objects.get(id=pk, publisher=prof)
+        except PublisherBookDeposit.DoesNotExist:
+            return Response({"success": False, "error": "Dépôt introuvable."}, status=404)
+
+        return Response({
+            "success": True,
+            "data": {
+                "id": str(deposit.id), "title": deposit.title, "status": deposit.status,
+                "validation_step": deposit.validation_step,
+                "consultations_count": deposit.consultations_count,
+                "downloads_count": deposit.downloads_count,
+            }
+        })
+
+
+class PublisherDepositEditorialReviewPermission(permissions.BasePermission):
+    """Conformité éditoriale — rôle explicitement attribué au Chef Maquettiste par le CDC
+    ("Chef Maquettiste (validateur) — Validation des livres mis en ligne"), avec supervision
+    de l'Admin ("Vision globale & statistiques — Accès à tous les tableaux de bord")."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return request.user.role in ('chief_layout', 'admin', 'super_admin')
+
+
+class PublisherDepositRightsReviewPermission(permissions.BasePermission):
+    """Vérification des droits — rôle explicitement attribué au Juriste par le CDC
+    ("Droits d'auteur & pourcentages — Définition et enregistrement des pourcentages de
+    droits d'auteur pour chaque livre"), avec supervision de l'Admin."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return request.user.role in ('legal_reviewer', 'admin', 'super_admin')
+
+
+class PublisherDepositReviewListView(APIView):
+    """GET /api/v1/publishers/admin/deposits/ - File d'examen des dépôts éditeurs tiers.
+    Accessible en lecture au Chef Maquettiste, au Juriste, et à l'Admin — chacun y voit
+    l'état des deux volets, mais ne peut agir que sur le sien (vues suivantes)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role not in ('chief_layout', 'legal_reviewer', 'admin', 'super_admin'):
+            return Response({"success": False, "error": "Accès réservé au Chef Maquettiste, au Juriste ou à l'Admin."}, status=403)
+
+        status_filter = request.query_params.get('status', '')
+        qs = PublisherBookDeposit.objects.select_related('publisher').order_by('-created_at')
+        if status_filter and status_filter != 'all':
+            qs = qs.filter(status=status_filter)
+
+        data = [{
+            "id": str(d.id),
+            "title": d.title,
+            "publisher_name": d.publisher.company_name,
+            "isbn_digital": d.isbn_digital,
+            "discipline": d.discipline,
+            "price": float(d.price),
+            "status": d.status,
+            "editorial_status": d.editorial_status,
+            "editorial_comment": d.editorial_comment,
+            "rights_status": d.rights_status,
+            "rights_comment": d.rights_comment,
+            "file_url": d.file_url,
+            "created_at": d.created_at.isoformat(),
+        } for d in qs]
+        return Response({"success": True, "data": data})
+
+
+class PublisherDepositEditorialDecisionView(APIView):
+    """POST /api/v1/publishers/admin/deposits/<id>/editorial-decision/
+    Décision de conformité éditoriale — Chef Maquettiste (+ Admin en supervision)."""
+    permission_classes = [permissions.IsAuthenticated, PublisherDepositEditorialReviewPermission]
+
+    def post(self, request, id):
+        decision = request.data.get("decision")
+        comment = request.data.get("comment", "").strip()
+
+        try:
+            deposit = PublisherBookDeposit.objects.get(id=id)
+        except PublisherBookDeposit.DoesNotExist:
+            return Response({"success": False, "error": "Dépôt introuvable."}, status=404)
+
+        if decision not in ("approved", "revision_requested"):
+            return Response({"success": False, "error": "decision doit être 'approved' ou 'revision_requested'."}, status=400)
+
+        deposit.editorial_status = decision
+        deposit.editorial_comment = comment
+        deposit.save(update_fields=["editorial_status", "editorial_comment"])
+
+        _notify_publisher_of_review(deposit, "conformité éditoriale", decision, comment)
+
+        return Response({
+            "success": True,
+            "message": f"Conformité éditoriale : {deposit.get_editorial_status_display()}.",
+            "data": {"id": str(deposit.id), "editorial_status": deposit.editorial_status}
+        })
+
+
+class PublisherDepositRightsDecisionView(APIView):
+    """POST /api/v1/publishers/admin/deposits/<id>/rights-decision/
+    Décision de vérification des droits — Juriste (+ Admin en supervision)."""
+    permission_classes = [permissions.IsAuthenticated, PublisherDepositRightsReviewPermission]
+
+    def post(self, request, id):
+        decision = request.data.get("decision")
+        comment = request.data.get("comment", "").strip()
+
+        try:
+            deposit = PublisherBookDeposit.objects.get(id=id)
+        except PublisherBookDeposit.DoesNotExist:
+            return Response({"success": False, "error": "Dépôt introuvable."}, status=404)
+
+        if decision not in ("approved", "revision_requested"):
+            return Response({"success": False, "error": "decision doit être 'approved' ou 'revision_requested'."}, status=400)
+
+        deposit.rights_status = decision
+        deposit.rights_comment = comment
+        deposit.save(update_fields=["rights_status", "rights_comment"])
+
+        _notify_publisher_of_review(deposit, "vérification des droits", decision, comment)
+
+        return Response({
+            "success": True,
+            "message": f"Vérification des droits : {deposit.get_rights_status_display()}.",
+            "data": {"id": str(deposit.id), "rights_status": deposit.rights_status}
+        })
+
+
+class PublisherDepositPublishView(APIView):
+    """
+    POST /api/v1/publishers/admin/deposits/<id>/publish/ - Publication finale.
+    N'est possible QUE si editorial_status ET rights_status sont tous deux 'approved'
+    (CDC 5.5 : "conformité éditoriale ET vérification des droits").
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        if request.user.role not in ('chief_layout', 'legal_reviewer', 'admin', 'super_admin'):
+            return Response({"success": False, "error": "Accès refusé."}, status=403)
+
+        from apps.catalog.models import Ouvrage, Discipline, BookAuthor
+
+        try:
+            deposit = PublisherBookDeposit.objects.select_related('publisher').get(id=id)
+        except PublisherBookDeposit.DoesNotExist:
+            return Response({"success": False, "error": "Dépôt introuvable."}, status=404)
+
+        if deposit.editorial_status != "approved" or deposit.rights_status != "approved":
+            return Response({
+                "success": False,
+                "error": (
+                    "Publication impossible : conformité éditoriale et vérification des droits "
+                    "doivent toutes deux être validées. État actuel — Éditorial : "
+                    f"{deposit.get_editorial_status_display()}, Droits : {deposit.get_rights_status_display()}."
+                )
+            }, status=400)
+
+        discipline_obj, _ = Discipline.objects.get_or_create(name=deposit.discipline)
+
+        ouvrage = Ouvrage.objects.create(
+            title=deposit.title,
+            subtitle=deposit.subtitle,
+            isbn=deposit.isbn_digital,
+            publisher=deposit.publisher,
+            discipline=discipline_obj,
+            language=deposit.language,
+            summary=deposit.summary,
+            format_type=deposit.file_format,
+            file=deposit.file_url,
+            price_digital=deposit.price,
+            status="published",
+        )
+
+        if isinstance(deposit.authors, list):
+            for author_name in deposit.authors:
+                if author_name and isinstance(author_name, str):
+                    parts = author_name.strip().split(maxsplit=1)
+                    first_name = parts[0] if parts else "Auteur"
+                    last_name = parts[1] if len(parts) > 1 else ""
+                    author_obj, _ = BookAuthor.objects.get_or_create(
+                        first_name=first_name,
+                        last_name=last_name,
+                        defaults={"biography": ""}
+                    )
+                    ouvrage.authors.add(author_obj)
+
+        deposit.status = PublisherDepositStatus.PUBLISHED
+        deposit.save(update_fields=["status"])
+
+        _notify_publisher_of_review(deposit, "publication", "approved", "Votre ouvrage est désormais publié sur la vitrine LAHAThèque.")
+
+        return Response({
+            "success": True,
+            "message": f"« {deposit.title} » publié avec succès.",
+            "data": {"id": str(deposit.id), "status": deposit.status}
+        })
+
+
+def _notify_publisher_of_review(deposit, volet, decision, comment):
+    try:
+        from apps.reporting.services import notify_user
+        from apps.reporting.models import Notification
+        if deposit.publisher.user:
+            label = "Validé" if decision == "approved" else "Corrections demandées"
+            notify_user(
+                user=deposit.publisher.user,
+                notification_type=Notification.NotificationType.SYSTEM,
+                title=f"« {deposit.title} » — {volet} : {label}",
+                message=comment or f"Le statut de votre dépôt a évolué : {volet} — {label}.",
+                action_url="/publisher/catalog",
+                resource_id=str(deposit.id),
+            )
+    except Exception:
+        pass
+
+
+
