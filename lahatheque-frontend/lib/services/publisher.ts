@@ -174,3 +174,74 @@ export async function updatePublisherBookProtection(
   await bffPatch(`/catalog/${bookId}/protection/`, { protection_config: protection });
   return true;
 }
+
+// ─── File d'examen des dépôts éditeurs tiers (Admin / Chef Maquettiste / Juriste) ──
+
+export interface PublisherDepositForReview {
+  id: string;
+  title: string;
+  publisher_name: string;
+  isbn_digital: string;
+  discipline: string;
+  price: number;
+  status: string;
+  editorial_status: string;
+  editorial_comment: string;
+  rights_status: string;
+  rights_comment: string;
+  file_url: string | null;
+  created_at: string;
+}
+
+export async function getPublisherDepositsForReview(
+  statusFilter?: string
+): Promise<PublisherDepositForReview[]> {
+  const params = statusFilter && statusFilter !== "all" ? `?status=${statusFilter}` : "";
+  const res = await fetch(`${BFF}/admin/deposits/${params}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || "Erreur chargement dépôts éditeurs");
+  return (json.data as PublisherDepositForReview[]) ?? [];
+}
+
+export async function submitEditorialDecision(
+  depositId: string,
+  decision: "approved" | "revision_requested",
+  comment: string
+): Promise<{ success: boolean; error?: string }> {
+  const res = await fetch(`${BFF}/admin/deposits/${depositId}/editorial-decision/`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision, comment }),
+  });
+  return await res.json();
+}
+
+export async function submitRightsDecision(
+  depositId: string,
+  decision: "approved" | "revision_requested",
+  comment: string
+): Promise<{ success: boolean; error?: string }> {
+  const res = await fetch(`${BFF}/admin/deposits/${depositId}/rights-decision/`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision, comment }),
+  });
+  return await res.json();
+}
+
+export async function publishPublisherDeposit(
+  depositId: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const res = await fetch(`${BFF}/admin/deposits/${depositId}/publish/`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  return await res.json();
+}
+
