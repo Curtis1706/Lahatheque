@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { 
   Gavel, 
   TrendingUp, 
@@ -12,247 +13,338 @@ import {
   Landmark,
   Sparkles,
   Book,
-  Sun
+  Sun,
+  ArrowRight,
+  ShieldCheck,
+  Globe,
+  Award,
+  Users,
+  Mail
 } from "lucide-react";
 
 const domains = [
   {
     id: "01",
-    name: "Droit",
-    description: "Ouvrages juridiques, législation, droit public, privé et international.",
+    name: "Droit & Sciences Politiques",
+    description: "Ouvrages juridiques, législation OHADA, droit public, privé, pénal et international.",
     icon: Gavel,
   },
   {
     id: "02",
-    name: "Économie",
-    description: "Analyses économiques, finance, développement et politiques publiques.",
+    name: "Économie & Gestion",
+    description: "Analyses économiques, comptabilité SYSCOHADA, finance, développement et politiques publiques.",
     icon: TrendingUp,
   },
   {
     id: "03",
-    name: "Sciences humaines",
-    description: "Ressources en sociologie, philosophie, histoire et culture africaine.",
+    name: "Sciences Humaines & Sociales",
+    description: "Ressources en sociologie, philosophie, histoire, anthropologie et patrimoine africain.",
     icon: Compass,
   },
   {
     id: "04",
-    name: "Médecine",
-    description: "Références médicales, santé publique et sciences biomédicales.",
+    name: "Médecine & Santé Publique",
+    description: "Références médicales, pharmacopée, épidémiologie et sciences biomédicales tropicales.",
     icon: Stethoscope,
   },
   {
     id: "05",
-    name: "Gestion",
-    description: "Management, comptabilité, entrepreneuriat et administration.",
+    name: "Sciences de l'Ingénieur & BTP",
+    description: "Génie civil, électrotechnique, mécanique, agronomie et énergies renouvelables.",
     icon: BarChart3,
   },
   {
     id: "06",
-    name: "Informatique",
-    description: "Programmation, intelligence artificielle, réseaux et technologies numériques.",
+    name: "Informatique & Télécoms",
+    description: "Algorithmique, génie logiciel, intelligence artificielle, cybersécurité et réseaux.",
     icon: Code,
   },
   {
     id: "07",
-    name: "Littérature",
-    description: "Œuvres littéraires, analyses de textes et expressions culturelles.",
+    name: "Lettres & Langues",
+    description: "Lettres modernes, linguistique, langues africaines et communication des organisations.",
     icon: BookOpen,
   },
   {
     id: "08",
-    name: "Éducation",
-    description: "Pédagogie, sciences de l'éducation et méthodes d'apprentissage.",
+    name: "Sciences de l'Éducation",
+    description: "Pédagogie universitaire, didactique des disciplines et technologies éducatives.",
     icon: GraduationCap,
   },
   {
     id: "09",
-    name: "Sciences politiques",
-    description: "Institutions, gouvernance, relations internationales et citoyenneté.",
+    name: "Gouvernance & Relations Internationales",
+    description: "Institutions, politiques publiques, diplomatie et intégration régionale africaine.",
     icon: Landmark,
   },
 ];
 
 export default function AboutPage() {
   return (
-    <div className="w-full">
-      
-      {/* Header Section */}
-      <section className="max-w-7xl mx-auto px-6 md:px-12 py-16 md:py-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-        <div className="flex flex-col gap-4 text-center lg:text-left">
-          <span className="text-sm font-bold text-gold uppercase tracking-widest">
-            Qui sommes-nous ?
-          </span>
-          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl text-navy font-bold leading-tight">
-            Lahathèque : la connaissance sans frontières
-          </h1>
-          <p className="text-base md:text-lg text-foreground-muted max-w-xl mt-4 mx-auto lg:mx-0 leading-relaxed">
-            Une bibliothèque moderne pour l'Afrique, ouverte sur le monde, où chaque livre transforme des vies.
-          </p>
-        </div>
+    <div className="min-h-screen bg-background text-foreground py-6 sm:py-8 lg:py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 lg:space-y-16">
         
-        <div className="h-80 md:h-96 w-full rounded-xl overflow-hidden relative shadow-md bg-background-secondary border border-border">
-          {/* Simulated preview showing warm editorial branding illustration */}
-          <div className="absolute inset-0 bg-gradient-to-br from-navy/5 to-gold/5 flex flex-col items-center justify-center p-8 text-center">
-            <BookOpen className="w-16 h-16 text-gold mb-4 opacity-80" />
-            <span className="font-serif text-xl font-bold text-navy">L'excellence académique africaine</span>
-            <p className="text-sm text-foreground-muted mt-2 max-w-sm">
-              Un espace d'étude moderne et inspirant favorisant l'égalité des chances d'apprentissage.
-            </p>
+        {/* 1. HERO BANNER PRINCIPALE (Image + Navy Fade - Même design que la page Auteur) */}
+        <section className="relative rounded-3xl overflow-hidden shadow-xl bg-navy border border-navy-hover">
+          
+          {/* Photo de fond sur la droite */}
+          <div className="absolute inset-0 z-0 flex justify-end">
+            <div className="w-full lg:w-3/5 h-full relative">
+              <img
+                src="/about-hero-section.jpg"
+                alt="À propos de LAHAThèque - La connaissance sans frontières"
+                className="w-full h-full object-cover object-center"
+              />
+              {/* Dégradé de fondu de gauche (Navy vers transparent) */}
+              <div className="absolute inset-0 bg-gradient-to-r from-navy via-navy/90 to-transparent hidden lg:block" />
+              {/* Overlay mobile */}
+              <div className="absolute inset-0 bg-navy/85 lg:hidden" />
+            </div>
           </div>
-        </div>
-      </section>
 
-      {/* Storytelling Section (PAS) */}
-      <section className="bg-background-secondary border-y border-border py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="max-w-3xl mx-auto space-y-12">
+          {/* Badges de confiance flottants en haut à droite */}
+          <div className="absolute top-6 right-6 z-20 hidden md:flex flex-col gap-2.5">
+            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
+              <GraduationCap className="w-4 h-4 text-gold" />
+              <span>Excellence académique</span>
+            </div>
+            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
+              <Globe className="w-4 h-4 text-gold" />
+              <span>Rayonnement panafricain</span>
+            </div>
+          </div>
+
+          {/* Contenu Textuel du Hero (Gauche) */}
+          <div className="relative z-10 max-w-2xl p-8 sm:p-12 lg:p-14 space-y-6 text-white">
             
-            {/* Problem & Agitation */}
-            <div className="space-y-6 text-foreground/90">
-              <h2 className="text-xs font-bold text-gold uppercase tracking-widest">Le défi de l'accès au savoir</h2>
-              <p className="text-base md:text-lg leading-relaxed">
+            <div className="text-xs font-bold uppercase tracking-widest text-gold">
+              Qui sommes-nous ?
+            </div>
+
+            <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-white">
+              La connaissance sans <span className="text-gold">frontières.</span>
+            </h1>
+
+            <p className="font-sans text-xs sm:text-sm md:text-base text-white/85 leading-relaxed max-w-xl">
+              Une bibliothèque universitaire et académique moderne pensée pour l'Afrique et ouverte sur le monde, où chaque ouvrage transforme des vies et élève les esprits.
+            </p>
+
+            {/* Checklist 4 points avec icônes */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div className="flex items-center gap-2.5 text-xs text-white/90">
+                <BookOpen className="w-4 h-4 text-gold shrink-0" />
+                <span>Fonds universitaire certifié</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-white/90">
+                <Award className="w-4 h-4 text-gold shrink-0" />
+                <span>Comités scientifiques reconnus</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-white/90">
+                <ShieldCheck className="w-4 h-4 text-gold shrink-0" />
+                <span>Protection et valorisation DRM</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-white/90">
+                <Users className="w-4 h-4 text-gold shrink-0" />
+                <span>Égalité d'accès aux ressources</span>
+              </div>
+            </div>
+
+            {/* CTA Boutons */}
+            <div className="pt-3 flex flex-wrap gap-4">
+              <Link
+                href="/catalog"
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-gold hover:bg-gold-light text-navy font-sans font-bold text-xs sm:text-sm shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer group"
+              >
+                <span>Explorer le catalogue</span>
+                <ArrowRight className="w-4 h-4 text-navy group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link
+                href="/authors"
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-navy-hover hover:bg-navy-dark text-white font-sans font-bold text-xs sm:text-sm border border-white/20 transition-all duration-200 cursor-pointer"
+              >
+                <span>Espace Auteurs</span>
+              </Link>
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* 2. STORYTELLING SECTION (Notre Défi & Vision) */}
+        <section className="bg-background-secondary rounded-3xl border border-border p-8 sm:p-12 lg:p-16">
+          <div className="max-w-4xl mx-auto space-y-10">
+            
+            {/* En-tête */}
+            <div className="space-y-3">
+              <span className="text-xs font-bold uppercase tracking-widest text-gold">
+                Le défi de l'accès au savoir
+              </span>
+              <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-navy">
+                Pourquoi nous avons créé LAHAThèque
+              </h2>
+            </div>
+
+            {/* Contenu narratif */}
+            <div className="space-y-6 text-foreground/90 font-sans text-sm sm:text-base leading-relaxed">
+              <p>
                 Dans de nombreuses régions d'Afrique, des millions d'étudiants, de chercheurs, d'enseignants et de passionnés de savoir partagent le même combat silencieux : accéder aux ouvrages dont ils ont besoin pour apprendre, réussir et transmettre.
               </p>
-              <p className="text-base md:text-lg leading-relaxed">
-                Pendant longtemps, trouver un manuel universitaire, une revue scientifique ou un ouvrage spécialisé relevait du parcours du combattant. Les bibliothèques étaient insuffisamment fournies, les livres importés coûtaient trop cher, et certains étudiants devaient parcourir plusieurs villes simplement pour consulter un document essentiel à leurs études.
-              </p>
-              <p className="text-base md:text-lg font-semibold text-navy leading-relaxed">
-                C'est de cette réalité qu'est née Lahathèque.
-              </p>
-            </div>
-
-            {/* Solution & Vision */}
-            <div className="py-2 space-y-4 my-8 bg-background p-6 rounded-r-md border border-border border-l-4 border-l-gold shadow-sm">
-              <p className="text-base md:text-lg text-navy font-bold leading-relaxed">
-                Lahathèque est bien plus qu'un diffuseur d'ouvrages numériques. C'est une réponse à une injustice intellectuelle. Une passerelle entre le savoir et celles et ceux qui en sont privés. Une bibliothèque moderne pensée pour l'Afrique, ouverte sur le monde.
-              </p>
-            </div>
-
-            <div className="space-y-6 text-foreground/95">
-              <p className="text-base md:text-lg leading-relaxed">
-                Notre histoire commence avec une conviction simple mais puissante : <br />
-                <strong className="text-navy font-bold">le savoir ne doit pas dépendre du lieu où l'on naît.</strong>
+              <p>
+                Pendant longtemps, trouver un manuel universitaire, une revue scientifique ou un ouvrage spécialisé relevait du parcours du combattant. Les bibliothèques physiques étaient sous-dotées, les importations trop onéreuses, et les délais souvent incompatibles avec l'urgence académique.
               </p>
               
-              <h2 className="text-xs font-bold text-gold uppercase tracking-widest pt-4">Notre Vision</h2>
-              <p className="text-base md:text-lg leading-relaxed">
-                Animés par cette vision, nous avons décidé de bâtir une plateforme capable de rendre accessibles des milliers d'ouvrages universitaires, scientifiques, professionnels et éducatifs aux étudiants africains comme internationaux. Nous avons voulu créer un espace où un étudiant à Cotonou, Dakar, Lomé, Abidjan, Paris ou Montréal peut accéder aux mêmes ressources, aux mêmes opportunités d'apprentissage et à la même richesse intellectuelle.
-              </p>
-              
-              <h2 className="text-xs font-bold text-gold uppercase tracking-widest pt-4">Notre Mission</h2>
-              <p className="text-base md:text-lg leading-relaxed">
-                Chaque livre diffusé par Lahathèque porte une mission : former, élever, inspirer et transformer des vies.
-              </p>
-              <p className="text-base md:text-lg leading-relaxed">
-                Nous croyons profondément que derrière chaque ouvrage téléchargé se cache peut-être :
-              </p>
+              <div className="my-8 bg-background p-6 rounded-2xl border border-border border-l-4 border-l-gold shadow-sm">
+                <p className="font-serif text-base sm:text-lg text-navy font-bold leading-relaxed">
+                  LAHAThèque est bien plus qu'un diffuseur d'ouvrages numériques. C'est une passerelle entre le savoir et celles et ceux qui en ont besoin : une bibliothèque moderne pensée pour l'Afrique et connectée au monde.
+                </p>
+              </div>
 
-              <div className="flex flex-wrap gap-2.5 mt-6">
-                {["un futur avocat", "une future médecin", "un ingénieur", "un enseignant", "un chercheur", "ou encore un jeune entrepreneur africain qui changera demain son pays"].map((val, idx) => (
-                  <span 
-                    key={idx} 
-                    className="px-4 py-2 bg-navy border border-navy text-white rounded-full text-xs font-bold tracking-wide"
-                  >
-                    {val}
-                  </span>
-                ))}
+              <div className="space-y-4">
+                <h3 className="font-serif text-xl font-bold text-navy">
+                  Notre Vision
+                </h3>
+                <p>
+                  Bâtir la première plateforme universitaire panafricaine capable de rendre accessibles des dizaines de milliers d'ouvrages scientifiques, juridiques, économiques et techniques, tout en protégeant les droits patrimoniaux et moraux des auteurs et éditeurs.
+                </p>
+              </div>
+
+              <div className="space-y-4 pt-4">
+                <h3 className="font-serif text-xl font-bold text-navy">
+                  Notre Mission
+                </h3>
+                <p>
+                  Chaque livre diffusé sur LAHAThèque porte une mission : former, inspirer et préparer les bâtisseurs de demain :
+                </p>
+
+                <div className="flex flex-wrap gap-2.5 pt-2">
+                  {[
+                    "Futurs juristes et magistrats",
+                    "Médecins et professionnels de santé",
+                    "Ingénieurs et bâtisseurs",
+                    "Enseignants et chercheurs",
+                    "Économistes et décideurs",
+                    "Entrepreneurs innovants"
+                  ].map((val, idx) => (
+                    <span 
+                      key={idx} 
+                      className="px-4 py-2 bg-navy border border-navy text-white rounded-xl text-xs font-bold tracking-wide shadow-xs"
+                    >
+                      {val}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </section>
+
+        {/* 3. DOMAINES D'EXPERTISE */}
+        <section className="space-y-10">
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <span className="text-xs font-bold text-gold uppercase tracking-widest block">
+              Fonds académique et universitaire
+            </span>
+            <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-navy">
+              Les disciplines couvertes par LAHAThèque
+            </h2>
+            <p className="text-xs sm:text-sm text-foreground-muted">
+              Une sélection rigoureuse d'ouvrages conformes aux programmes LMD et aux réalités du continent.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {domains.map((dom) => {
+              const IconComponent = dom.icon;
+              return (
+                <div 
+                  key={dom.id} 
+                  className="border border-border rounded-2xl p-6 bg-background hover:shadow-md hover:border-gold/50 transition-all duration-300 flex flex-col gap-4 group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gold/10 text-gold flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <IconComponent className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-gold uppercase tracking-widest">{dom.id}</span>
+                    <h3 className="font-serif text-lg font-bold text-navy mb-2 mt-1">{dom.name}</h3>
+                    <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed">{dom.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* 4. NOTRE ENGAGEMENT POUR L'AVENIR */}
+        <section className="bg-navy text-white rounded-3xl p-8 sm:p-12 lg:p-16 border border-navy-hover shadow-xl">
+          <div className="max-w-4xl mx-auto text-center space-y-10">
+            
+            <div className="space-y-4">
+              <span className="text-xs font-bold text-gold uppercase tracking-widest">
+                Notre engagement
+              </span>
+              <p className="font-serif text-xl sm:text-2xl md:text-3xl font-bold leading-relaxed max-w-2xl mx-auto text-white">
+                "Faire de la lecture numérique un levier d'égalité, d'excellence et de développement pour toute l'Afrique."
+              </p>
+            </div>
+            
+            <p className="text-xs sm:text-sm text-white/80 leading-relaxed max-w-2xl mx-auto">
+              Grâce à nos technologies de protection et notre modèle équitable, nous unissons auteurs, universités, éditeurs et lecteurs pour diffuser le savoir au-delà des contraintes géographiques.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+              <div className="flex flex-col items-center gap-3 bg-navy-dark border border-navy-hover p-6 rounded-2xl shadow-sm">
+                <Sparkles className="w-8 h-8 text-gold" />
+                <h4 className="font-serif font-bold text-sm text-white">Diffuser les vocations</h4>
+                <p className="text-[11px] text-white/70">Inspirer la prochaine génération de leaders africains.</p>
+              </div>
+              <div className="flex flex-col items-center gap-3 bg-navy-dark border border-navy-hover p-6 rounded-2xl shadow-sm">
+                <Book className="w-8 h-8 text-gold" />
+                <h4 className="font-serif font-bold text-sm text-white">Diffuser les savoirs</h4>
+                <p className="text-[11px] text-white/70">Valoriser la recherche et l'édition universitaire.</p>
+              </div>
+              <div className="flex flex-col items-center gap-3 bg-navy-dark border border-navy-hover p-6 rounded-2xl shadow-sm">
+                <Sun className="w-8 h-8 text-gold" />
+                <h4 className="font-serif font-bold text-sm text-white">Diffuser l'avenir</h4>
+                <p className="text-[11px] text-white/70">Connecter les universités aux standards mondiaux.</p>
               </div>
             </div>
 
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Content Domains Section */}
-      <section className="max-w-7xl mx-auto px-6 md:px-12 py-16 md:py-24">
-        <div className="text-center mb-16 max-w-3xl mx-auto">
-          <span className="text-xs font-bold text-gold uppercase tracking-widest block mb-4">
-            Spécialisée dans les ouvrages universitaires et académiques,
-          </span>
-          <h2 className="font-serif text-3xl font-bold text-navy">
-            Lahathèque propose des contenus dans plusieurs domaines
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {domains.map((dom) => {
-            const IconComponent = dom.icon;
-            return (
-              <div 
-                key={dom.id} 
-                className="border border-border rounded p-6 bg-background hover:shadow-[0_8px_30px_rgba(27,42,78,0.04)] hover:border-neutral-warm-500/30 transition-all duration-300 flex flex-col gap-4"
+        {/* 5. BANDEAU NEWSLETTER */}
+        <section className="bg-background-secondary rounded-2xl border border-border py-8 px-6 sm:px-10">
+          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3 text-center sm:text-left">
+              <Mail className="w-6 h-6 text-gold shrink-0 hidden sm:block" />
+              <div>
+                <h3 className="font-serif text-lg font-bold text-navy">
+                  Restez informé·e
+                </h3>
+                <p className="text-xs text-foreground-muted">
+                  Recevez les actualités académiques et les nouvelles parutions.
+                </p>
+              </div>
+            </div>
+            <form onSubmit={(e) => e.preventDefault()} className="flex w-full sm:w-auto gap-2">
+              <input 
+                type="email" 
+                placeholder="Votre adresse e-mail" 
+                className="px-4 py-2.5 rounded-xl border border-border bg-background text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none w-full sm:w-64" 
+              />
+              <button 
+                type="submit" 
+                className="px-6 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-navy font-sans font-bold text-xs sm:text-sm transition-colors whitespace-nowrap cursor-pointer shadow-sm"
               >
-                <div className="w-12 h-12 rounded bg-gold/10 text-gold flex items-center justify-center shrink-0">
-                  <IconComponent className="w-6 h-6" />
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-gold opacity-80 uppercase tracking-widest">{dom.id}</span>
-                  <h3 className="font-serif text-xl font-bold text-navy mb-2 mt-1">{dom.name}</h3>
-                  <p className="text-sm text-foreground-muted leading-relaxed">{dom.description}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Closing Statement */}
-      <section className="bg-navy text-white py-16 md:py-24">
-        <div className="max-w-4xl mx-auto px-6 md:px-12 text-center space-y-10">
-          <p className="font-serif text-xl md:text-2xl font-bold leading-relaxed max-w-2xl mx-auto">
-            "Notre ambition est claire : faire de la lecture numérique un levier d'égalité, de réussite et de développement intellectuel."
-          </p>
-          
-          <div className="pt-8 border-t border-navy-hover max-w-2xl mx-auto">
-            <p className="text-sm text-white/80 leading-relaxed mb-8">
-              À travers la technologie, nous rapprochons les auteurs, les éditeurs et les lecteurs. Nous contribuons à faire voyager les idées au-delà des frontières, des océans et des barrières économiques.
-            </p>
-            <p className="text-base font-bold text-gold uppercase tracking-wider mb-6">
-              Chez Lahathèque, nous ne diffusons pas simplement des livres.
-            </p>
+                S'abonner
+              </button>
+            </form>
           </div>
+        </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-            <div className="flex flex-col items-center gap-2 bg-navy-dark border border-navy-hover p-6 rounded-lg">
-              <Sparkles className="w-8 h-8 text-gold" />
-              <p className="text-xs font-bold text-gold uppercase tracking-widest mt-1">Nous diffusons des rêves</p>
-            </div>
-            <div className="flex flex-col items-center gap-2 bg-navy-dark border border-navy-hover p-6 rounded-lg">
-              <Book className="w-8 h-8 text-gold" />
-              <p className="text-xs font-bold text-gold uppercase tracking-widest mt-1">Nous diffusons des savoirs</p>
-            </div>
-            <div className="flex flex-col items-center gap-2 bg-navy-dark border border-navy-hover p-6 rounded-lg">
-              <Sun className="w-8 h-8 text-gold" />
-              <p className="text-xs font-bold text-gold uppercase tracking-widest mt-1">Nous diffusons l'avenir</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Newsletter Section */}
-      <section className="py-16 bg-navy text-white border-t border-navy-hover">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 px-6 md:px-12">
-          <div>
-            <h3 className="font-serif text-xl font-bold mb-2">Abonnez-vous à notre newsletter</h3>
-            <p className="text-sm text-white/70">Inscrivez-vous à notre newsletter pour recevoir les dernières parutions et actualités académiques.</p>
-          </div>
-          <form className="flex w-full md:w-auto gap-2" onSubmit={(e) => e.preventDefault()}>
-            <input 
-              className="w-full md:w-80 h-12 px-4 rounded bg-navy-hover border border-border text-white placeholder:text-white/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold text-sm" 
-              placeholder="Adresse email" 
-              type="email"
-              required
-            />
-            <button 
-              className="h-12 px-6 rounded bg-gold text-white font-bold text-sm hover:bg-gold-dark transition-colors whitespace-nowrap" 
-              type="submit"
-            >
-              Abonnez-vous maintenant &rarr;
-            </button>
-          </form>
-        </div>
-      </section>
-
+      </div>
     </div>
   );
 }

@@ -14,14 +14,14 @@ import {
   Palette, 
   ArrowRight, 
   CheckCircle2, 
-  Clock, 
   Sparkles, 
   Building2, 
   Send,
   HelpCircle,
   Award,
   PhoneCall,
-  FileText
+  FileText,
+  Archive
 } from "lucide-react";
 
 interface Prestation {
@@ -33,10 +33,26 @@ interface Prestation {
   icon: React.ComponentType<{ className?: string }>;
   features: string[];
   target: string;
-  delai: string;
+  popular?: boolean;
 }
 
 const PRESTATIONS: Prestation[] = [
+  {
+    id: "numerisation-archivage",
+    title: "Numérisation & Archivage documentaire",
+    category: "Technologie & Sécurité",
+    tagline: "Équipements haute précision et conservation numérique pérenne",
+    description: "Prise en charge complète des fonds documentaires, thèses, archives et mémoires pour universités, instituts et structures publiques : numérisation non destructive par scanners professionnels adaptés aux reliures fragiles, reconnaissance optique de caractères (OCR), indexation sémantique et archivage numérique sécurisé.",
+    icon: Archive,
+    popular: true,
+    features: [
+      "Scanners de livres et documents professionnels haute résolution",
+      "Numérisation non destructive préservant les ouvrages et reliures fragiles",
+      "Traitement OCR avancé permettant la recherche plein texte",
+      "Indexation et archivage numérique sécurisé conforme aux normes académiques"
+    ],
+    target: "Universités, Centres de recherche, Ministères, Institutions, Entreprises"
+  },
   {
     id: "impression",
     title: "Impression des ouvrages",
@@ -50,8 +66,7 @@ const PRESTATIONS: Prestation[] = [
       "Contrôle qualité colorimétrique prépresse et BAT rigoureux",
       "Conditionnement sous film sécurisé et étiquetage palettes"
     ],
-    target: "Auteurs indépendants, Éditeurs partenaires, Universités",
-    delai: "5 à 10 jours ouvrés"
+    target: "Auteurs indépendants, Éditeurs partenaires, Universités"
   },
   {
     id: "securisation",
@@ -66,8 +81,7 @@ const PRESTATIONS: Prestation[] = [
       "Protection contre la capture d'écran et l'extraction par injection",
       "Journalisation forensique et audit de consultation en temps réel"
     ],
-    target: "Éditeurs, Chercheurs, Institutions & Ministères",
-    delai: "Instantané / Intégration continue"
+    target: "Auteurs indépendants, Éditeurs, Chercheurs, Institutions"
   },
   {
     id: "comite-lecture",
@@ -82,8 +96,7 @@ const PRESTATIONS: Prestation[] = [
       "Rapport argumenté d'acceptation, révision ou orientation",
       "Attestation officielle de validation pour les comités académiques"
     ],
-    target: "Enseignants-chercheurs, Doctorants, Auteurs d'essais",
-    delai: "15 à 21 jours ouvrés"
+    target: "Auteurs indépendants, Enseignants-chercheurs, Doctorants"
   },
   {
     id: "montage-editorial",
@@ -98,8 +111,7 @@ const PRESTATIONS: Prestation[] = [
       "Production des fichiers ePub 3 interactifs et PDF certifiés PDF/X-1a",
       "Génération et attribution des ISBN officiels et code-barres EAN"
     ],
-    target: "Maisons d'édition, Facultés, Auteurs de manuels",
-    delai: "7 à 14 jours ouvrés"
+    target: "Auteurs indépendants, Maisons d'édition, Facultés"
   },
   {
     id: "diffusion",
@@ -114,8 +126,7 @@ const PRESTATIONS: Prestation[] = [
       "Campagnes de visibilité sur les portails documentaires et salons du livre",
       "Reporting mensuel des consultations, lectures et flux de revenus"
     ],
-    target: "Éditeurs, Auteurs confirmés, Organismes de recherche",
-    delai: "Déploiement permanent"
+    target: "Auteurs indépendants, Éditeurs confirmés, Organismes de recherche"
   },
   {
     id: "distribution",
@@ -130,8 +141,7 @@ const PRESTATIONS: Prestation[] = [
       "Acheminement routier et fret aérien optimisé en zone CEDEAO et CEMAC",
       "Facturation unifiée, suivi des bordereaux de livraison et encaissement"
     ],
-    target: "Grossistes, Libraires, Institutions publiques et privées",
-    delai: "48h à 72h selon la zone géographique"
+    target: "Auteurs indépendants, Grossistes, Libraires, Institutions"
   },
   {
     id: "livre-audio",
@@ -146,8 +156,7 @@ const PRESTATIONS: Prestation[] = [
       "Découpage par chapitres avec métadonnées audio synchronisées",
       "Streaming protégé contre l'aspiration et téléchargement hors-ligne sécurisé"
     ],
-    target: "Auteurs jeunesse, Éditeurs de littérature, Vulgarisateurs",
-    delai: "10 à 20 jours ouvrés"
+    target: "Tout public, Auteurs indépendants, Éditeurs"
   },
   {
     id: "anti-plagiat",
@@ -162,8 +171,7 @@ const PRESTATIONS: Prestation[] = [
       "Détection des fragments rédigés par modèles d'IA générative",
       "Certificat d'intégrité académique téléchargeable et infalsifiable"
     ],
-    target: "Rectorats, Commissions de thèse, Comités éditoriaux",
-    delai: "Analyse en moins de 3 minutes"
+    target: "Auteurs indépendants, Rectorats, Commissions de thèse, Comités éditoriaux"
   },
   {
     id: "illustrations",
@@ -178,8 +186,7 @@ const PRESTATIONS: Prestation[] = [
       "Design de couverture avant, dos et 4ème de couverture avec code-barres",
       "Cession totale des droits d'exploitation patrimoniaux"
     ],
-    target: "Auteurs de romans, Éditeurs jeunesse, Pédagogues",
-    delai: "5 à 12 jours ouvrés"
+    target: "Tout public, Auteurs indépendants, Éditeurs"
   }
 ];
 
@@ -198,7 +205,7 @@ export default function PrestationsPage() {
     : PRESTATIONS.filter(p => p.category === selectedCategory);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground font-sans">
       
       {/* 1. Hero Section */}
       <section className="relative bg-background-secondary border-b border-border py-16 md:py-24 overflow-hidden">
@@ -209,34 +216,17 @@ export default function PrestationsPage() {
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 text-center space-y-5">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gold/10 text-navy border border-gold/20 text-xs font-bold uppercase tracking-wider">
-            <Sparkles className="w-4 h-4 text-gold" />
-            Solutions Clé en Main &amp; Ingénierie Éditoriale
+            <Sparkles className="w-3.5 h-3.5 text-gold" />
+            Expertise &amp; Ingénierie Éditoriale
           </div>
 
-          <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-navy max-w-4xl mx-auto leading-tight tracking-tight">
-            Nos Prestations Éditoriales &amp; Technologiques
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-navy tracking-tight max-w-4xl mx-auto">
+            Nos Prestations &amp; Solutions Éditoriales
           </h1>
 
-          <p className="font-sans text-sm sm:text-base md:text-lg text-foreground-muted max-w-2xl mx-auto leading-relaxed">
-            De la relecture scientifique à la distribution transfrontalière, LAHAThèque met son expertise au service des auteurs, éditeurs et universités pour sublimer, protéger et diffuser le savoir africain.
+          <p className="text-sm sm:text-base text-foreground-muted max-w-3xl mx-auto leading-relaxed">
+            De la numérisation patrimoniale haute fidélité à l'impression industrielle et la distribution internationale, découvrez l'ensemble de notre chaîne de valeur dédiée aux auteurs, universités et institutions.
           </p>
-
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-navy hover:bg-navy-hover text-white font-sans font-bold text-sm shadow-md transition-all duration-200"
-            >
-              <PhoneCall className="w-4 h-4 text-gold" />
-              Demander un accompagnement sur-mesure
-            </Link>
-            <Link
-              href="/catalog"
-              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy font-sans font-semibold text-sm transition-all duration-200"
-            >
-              <FileText className="w-4 h-4 text-gold" />
-              Explorer nos publications de référence
-            </Link>
-          </div>
         </div>
       </section>
 
@@ -249,7 +239,7 @@ export default function PrestationsPage() {
               onClick={() => setSelectedCategory(cat.key)}
               className={`px-4 py-2 rounded-full text-xs sm:text-sm font-sans font-medium transition-all cursor-pointer ${
                 selectedCategory === cat.key
-                  ? "bg-navy text-white font-bold shadow-sm"
+                  ? "bg-navy text-white font-bold shadow-xs"
                   : "bg-background-secondary text-foreground-muted hover:text-navy border border-border"
               }`}
             >
@@ -259,21 +249,41 @@ export default function PrestationsPage() {
         </div>
       </section>
 
-      {/* 3. Grille des 9 Prestations */}
+      {/* 3. Grille des Prestations */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 items-stretch">
           {filteredPrestations.map((item) => {
             const Icon = item.icon;
+            const isPopular = item.popular;
+
             return (
               <div
                 key={item.id}
-                className="flex flex-col justify-between bg-background border border-border hover:border-gold/40 rounded-2xl p-6 sm:p-7 shadow-sm hover:shadow-md transition-all duration-200 group"
+                className={`flex flex-col justify-between rounded-2xl p-6 sm:p-7 transition-all duration-200 group relative ${
+                  isPopular 
+                    ? "bg-background border-2 border-gold shadow-md ring-1 ring-gold/20" 
+                    : "bg-background border border-border hover:border-gold/40 shadow-xs hover:shadow-md"
+                }`}
               >
+                {/* Popular Ribbon / Badge en haut à droite */}
+                {isPopular && (
+                  <div className="absolute -top-3 right-6">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider bg-gold text-white px-3 py-1 rounded-full shadow-sm">
+                      <Sparkles className="w-3 h-3 text-white" />
+                      Le plus populaire
+                    </span>
+                  </div>
+                )}
+
                 <div className="space-y-4">
                   
                   {/* Badge & Icon Header */}
                   <div className="flex items-center justify-between">
-                    <div className="w-12 h-12 rounded-xl bg-navy/5 text-navy flex items-center justify-center group-hover:bg-gold/10 group-hover:text-navy transition-colors">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
+                      isPopular 
+                        ? "bg-gold/15 text-navy" 
+                        : "bg-navy/5 text-navy group-hover:bg-gold/10"
+                    }`}>
                       <Icon className="w-6 h-6 text-gold" />
                     </div>
                     <span className="text-[11px] font-bold uppercase tracking-wider text-gold px-2.5 py-1 rounded-full bg-gold/10 border border-gold/20">
@@ -314,20 +324,21 @@ export default function PrestationsPage() {
 
                 {/* Footer Info & Action */}
                 <div className="pt-6 mt-6 border-t border-border space-y-4">
-                  <div className="flex items-center justify-between text-[11px] text-foreground-muted">
-                    <span className="flex items-center gap-1">
-                      <Building2 className="w-3.5 h-3.5 text-gold" />
-                      <strong className="text-navy">Cible :</strong> {item.target.split(",")[0]}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-gold" />
-                      {item.delai}
-                    </span>
+                  <div className="flex items-start gap-1.5 text-xs text-foreground-muted">
+                    <Building2 className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+                    <p className="text-xs leading-relaxed">
+                      <strong className="text-navy font-semibold">Cible :</strong>{" "}
+                      <span className="text-foreground">{item.target}</span>
+                    </p>
                   </div>
 
                   <Link
                     href={`/contact?need=${encodeURIComponent(item.title)}`}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-background-secondary hover:bg-navy hover:text-white text-navy font-sans font-bold text-xs sm:text-sm border border-border hover:border-navy transition-all duration-200 group/btn"
+                    className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl font-sans font-bold text-xs sm:text-sm transition-all duration-200 group/btn ${
+                      isPopular
+                        ? "bg-navy hover:bg-navy-hover text-white shadow-xs"
+                        : "bg-background-secondary hover:bg-navy hover:text-white text-navy border border-border hover:border-navy"
+                    }`}
                   >
                     <span>Demander un devis pour ce service</span>
                     <ArrowRight className="w-4 h-4 text-gold group-hover/btn:translate-x-0.5 transition-transform" />
@@ -349,7 +360,7 @@ export default function PrestationsPage() {
               Notre Démarche d'Excellence
             </h2>
             <p className="text-sm text-foreground-muted">
-              Un accompagnement structuré, rigoureux et transparent pour chaque projet éditorial.
+              Un accompagnement structuré, rigoureux et transparent pour chaque projet éditorial et patrimonial.
             </p>
           </div>
 
@@ -361,7 +372,7 @@ export default function PrestationsPage() {
               </div>
               <h3 className="font-serif font-bold text-navy text-base">Diagnostic &amp; Cadrage</h3>
               <p className="text-xs text-foreground-muted leading-relaxed">
-                Étude de vos besoins, évaluation du manuscrit et proposition technique et financière personnalisée.
+                Étude de vos besoins, évaluation des documents et proposition technique et financière personnalisée.
               </p>
             </div>
 
@@ -369,9 +380,9 @@ export default function PrestationsPage() {
               <div className="w-10 h-10 rounded-full bg-gold/10 text-navy font-serif font-bold text-base flex items-center justify-center mx-auto border border-gold/30">
                 2
               </div>
-              <h3 className="font-serif font-bold text-navy text-base">Production &amp; Révision</h3>
+              <h3 className="font-serif font-bold text-navy text-base">Numérisation &amp; Production</h3>
               <p className="text-xs text-foreground-muted leading-relaxed">
-                Mise en page PAO, enrichissement graphique, relecture éditoriale et validation des épreuves (BAT).
+                Prise en charge par scanners dédiés, composition PAO, traitement OCR et contrôle qualité minutieux.
               </p>
             </div>
 
@@ -379,9 +390,9 @@ export default function PrestationsPage() {
               <div className="w-10 h-10 rounded-full bg-gold/10 text-navy font-serif font-bold text-base flex items-center justify-center mx-auto border border-gold/30">
                 3
               </div>
-              <h3 className="font-serif font-bold text-navy text-base">Sécurisation &amp; Tirage</h3>
+              <h3 className="font-serif font-bold text-navy text-base">Sécurisation &amp; Archivage</h3>
               <p className="text-xs text-foreground-muted leading-relaxed">
-                Intégration du DRM Readium LCP, filigranage dynamique et impression offset/numérique certifiée.
+                Indexation des métadonnées, archivage pérenne et intégration de la protection DRM Readium LCP.
               </p>
             </div>
 
@@ -389,9 +400,9 @@ export default function PrestationsPage() {
               <div className="w-10 h-10 rounded-full bg-gold/10 text-navy font-serif font-bold text-base flex items-center justify-center mx-auto border border-gold/30">
                 4
               </div>
-              <h3 className="font-serif font-bold text-navy text-base">Diffusion &amp; Reporting</h3>
+              <h3 className="font-serif font-bold text-navy text-base">Mise à disposition &amp; Diffusion</h3>
               <p className="text-xs text-foreground-muted leading-relaxed">
-                Mise en ligne sur les réseaux universitaires, distribution physique et suivi transparent des redevances.
+                Restitution des fonds numérisés, intégration aux portails institutionnels et accès sécurisé.
               </p>
             </div>
 
@@ -401,7 +412,7 @@ export default function PrestationsPage() {
           <div className="bg-navy text-white rounded-3xl p-8 sm:p-12 text-center space-y-6 max-w-4xl mx-auto shadow-xl">
             <div className="space-y-2">
               <h3 className="font-serif text-2xl sm:text-3xl font-bold text-white">
-                Un projet éditorial ou académique à concrétiser ?
+                Un projet éditorial, patrimonial ou universitaire à concrétiser ?
               </h3>
               <p className="text-white/80 text-sm max-w-xl mx-auto">
                 Nos conseillers éditoriaux et ingénieurs documentaires vous répondent sous 24h ouvrées avec une solution adaptée.

@@ -37,9 +37,9 @@ const features = [
   },
   {
     icon: IconWallet,
-    title: "Moyens de paiement",
+    title: "Paiements adaptés aux réalités locales",
     description:
-      "Intégration des solutions de paiement local : Mobile Money (MTN, Moov, Orange, Wave), carte bancaire et plus.",
+      "Des solutions de règlement fluides et sécurisées ancrées dans nos réalités : Mobile Money (MTN, Moov, Orange, Wave, Celtiis), cartes bancaires et transactions instantanées.",
   },
 ];
 
