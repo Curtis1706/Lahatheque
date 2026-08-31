@@ -15,6 +15,7 @@ import {
   HelpCircle,
   Mail
 } from "lucide-react";
+import { HeaderSearchBar } from "@/components/features/search/header-search-bar";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -116,16 +117,9 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
           {/* 3. Actions & Search (Right) */}
           <div className="flex items-center gap-3 xl:gap-4 shrink-0">
-            {/* Search Bar */}
-            <div className="hidden md:flex items-center relative">
-              <input 
-                className="w-48 xl:w-64 h-10 pl-4 pr-10 rounded-full border border-border bg-background-secondary focus:outline-none focus:border-navy focus:ring-2 focus:ring-gold/30 text-sm transition-all duration-200" 
-                placeholder="Rechercher..." 
-                type="text"
-              />
-              <button className="absolute right-1 top-1 w-8 h-8 rounded-full bg-navy hover:bg-navy-hover transition-colors flex items-center justify-center text-white" aria-label="Rechercher">
-                <Search className="w-4 h-4" />
-              </button>
+            {/* Search Bar avec autocomplétion et aperçu direct */}
+            <div className="hidden md:block w-48 xl:w-72">
+              <HeaderSearchBar placeholder="Rechercher..." />
             </div>
 
             {/* Connexion Link */}
@@ -154,91 +148,101 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden bg-background border-t border-border px-6 py-4 space-y-3 absolute top-full left-0 right-0 shadow-xl z-50">
-            <Link 
-              href="/" 
-              onClick={() => setMobileMenuOpen(false)}
-              className={pathname === "/" 
-                ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-              }
-            >
-              Accueil
-            </Link>
-            
-            <Link 
-              href="/about" 
-              onClick={() => setMobileMenuOpen(false)}
-              className={pathname === "/about" 
-                ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-              }
-            >
-              À propos
-            </Link>
+          <div className="lg:hidden bg-background border-t border-border px-6 py-4 space-y-4 absolute top-full left-0 right-0 shadow-xl z-50">
+            {/* Mobile Search Bar */}
+            <div className="pt-1">
+              <HeaderSearchBar 
+                placeholder="Rechercher un ouvrage, auteur..." 
+                onSelectResult={() => setMobileMenuOpen(false)}
+              />
+            </div>
 
-            <Link 
-              href="/authors" 
-              onClick={() => setMobileMenuOpen(false)}
-              className={pathname.startsWith("/authors") 
-                ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-              }
-            >
-              Auteur
-            </Link>
+            <div className="space-y-2 pt-2">
+              <Link 
+                href="/" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={pathname === "/" 
+                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
+                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
+                }
+              >
+                Accueil
+              </Link>
+              
+              <Link 
+                href="/about" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={pathname === "/about" 
+                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
+                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
+                }
+              >
+                À propos
+              </Link>
 
-            <Link 
-              href="/partners" 
-              onClick={() => setMobileMenuOpen(false)}
-              className={pathname.startsWith("/partners") 
-                ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-              }
-            >
-              Partenariat
-            </Link>
+              <Link 
+                href="/authors" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={pathname.startsWith("/authors") 
+                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
+                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
+                }
+              >
+                Auteur
+              </Link>
 
-            <Link 
-              href="/prestations" 
-              onClick={() => setMobileMenuOpen(false)}
-              className={pathname.startsWith("/prestations") 
-                ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-              }
-            >
-              Nos prestations
-            </Link>
+              <Link 
+                href="/partners" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={pathname.startsWith("/partners") 
+                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
+                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
+                }
+              >
+                Partenariat
+              </Link>
 
-            <Link 
-              href="/subscriptions" 
-              onClick={() => setMobileMenuOpen(false)}
-              className={pathname.startsWith("/subscriptions") 
-                ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-              }
-            >
-              Nos offres
-            </Link>
+              <Link 
+                href="/prestations" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={pathname.startsWith("/prestations") 
+                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
+                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
+                }
+              >
+                Nos prestations
+              </Link>
 
-            <Link 
-              href="/catalog" 
-              onClick={() => setMobileMenuOpen(false)}
-              className={pathname.startsWith("/catalog") 
-                ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-              }
-            >
-              Catalogue
-            </Link>
+              <Link 
+                href="/subscriptions" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={pathname.startsWith("/subscriptions") 
+                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
+                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
+                }
+              >
+                Nos offres
+              </Link>
 
-            <Link 
-              href="/login" 
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 font-medium py-2.5 text-sm text-navy pt-3 border-t border-border"
-            >
-              <User className="w-4 h-4 text-gold" /> Se connecter
-            </Link>
+              <Link 
+                href="/catalog" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={pathname.startsWith("/catalog") 
+                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
+                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
+                }
+              >
+                Catalogue
+              </Link>
+
+              <Link 
+                href="/login" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 font-medium py-2.5 text-sm text-navy pt-3 border-t border-border"
+              >
+                <User className="w-4 h-4 text-gold" /> Se connecter
+              </Link>
+            </div>
           </div>
         )}
       </header>

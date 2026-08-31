@@ -67,13 +67,10 @@ class BookStreamView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
 
-        # 2. Récupération ou création de la configuration de protection
+        # 2. Récupération de la configuration DRM globale de l'administrateur
         from apps.protection.models import GlobalDrmConfig
         global_drm = GlobalDrmConfig.get_singleton()
-        protection_config = getattr(ouvrage, "protection_config", None)
-        if not protection_config:
-            protection_config = ProtectionConfig.objects.filter(ouvrage=ouvrage).first()
-        effective_config = protection_config or global_drm
+        effective_config = global_drm
 
         # 3. Préparation des métadonnées utilisateur
         ip = request.META.get("HTTP_X_FORWARDED_FOR")

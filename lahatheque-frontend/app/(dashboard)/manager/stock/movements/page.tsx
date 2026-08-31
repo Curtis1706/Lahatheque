@@ -154,7 +154,7 @@ function RestockModal({
                     onClick={() => setSelectedBook(book)}
                     className={`w-full flex items-center gap-3 p-3 text-left transition-colors ${
                       selectedBook?.ouvrage_id === book.ouvrage_id
-                        ? "bg-navy/10 border-l-2 border-l-gold"
+                        ? "bg-gold/10 font-medium"
                         : "hover:bg-background"
                     }`}
                   >

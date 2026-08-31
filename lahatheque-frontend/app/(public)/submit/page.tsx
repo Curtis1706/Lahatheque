@@ -115,7 +115,7 @@ export default function SubmitManuscriptPage() {
               Soumettre un manuscrit
             </h1>
           </div>
-          <div className="md:col-span-5 border-l-4 border-gold pl-6">
+          <div className="md:col-span-5 pl-0 md:pl-4">
             <p className="text-base md:text-lg text-foreground-muted leading-relaxed">
               Notre équipe éditoriale et notre comité de lecture examinent rigoureusement chaque proposition afin de garantir la qualité, la pertinence et l'originalité des travaux publiés.
             </p>

@@ -43,7 +43,9 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
         if obj.created_by:
             full_name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
             return full_name or obj.created_by.email or "Maquettiste"
-        return ""
+        if obj.publisher:
+            return obj.publisher.company_name or "Éditeur"
+        return "Équipe Éditoriale LAHA"
 
     def get_created_by_id(self, obj):
         return str(obj.created_by.id) if obj.created_by else ""

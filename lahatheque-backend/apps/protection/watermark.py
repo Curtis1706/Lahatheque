@@ -40,44 +40,56 @@ class WatermarkEngine:
             return pdf_bytes
 
         # Si aucune config explicite fournie, charger la configuration globale singleton
-        if config is None:
-            try:
-                from apps.protection.models import GlobalDrmConfig
-                config = GlobalDrmConfig.get_singleton()
-            except Exception as err:
-                logger.warning(f"Impossible de charger GlobalDrmConfig: {err}")
-                config = None
+        from apps.protection.models import GlobalDrmConfig
+        global_config = GlobalDrmConfig.get_singleton()
 
-        # Paramètres par défaut
-        template = "Document confié à {nom} ({email}) • IP: {ip}"
-        opacity = 0.50
-        position = "header"
-        invisible_enabled = True
+        is_partner_session = bool(user_info.get("is_partner", False))
 
-        is_partner_session = user_info.get("is_partner", True)
+        # Récupération stricte depuis GlobalDrmConfig (ou config passée en paramètre)
+        if is_partner_session:
+            template = (
+                getattr(config, "watermark_template", None)
+                if config and hasattr(config, "watermark_template")
+                else getattr(global_config, "watermark_template", "")
+            ) or ""
+            subtext_template = ""
+        else:
+            template = (
+                getattr(config, "watermark_laha_template", None)
+                if config and hasattr(config, "watermark_laha_template")
+                else getattr(global_config, "watermark_laha_template", "")
+            ) or ""
+            
+            # Le sous-texte est 100% optionnel : s'il est vide, aucun texte secondaire n'est injecté
+            raw_subtext = (
+                getattr(config, "watermark_laha_subtext", None)
+                if config and hasattr(config, "watermark_laha_subtext")
+                else getattr(global_config, "watermark_laha_subtext", "")
+            )
+            subtext_template = str(raw_subtext or "").strip()
 
-        if config:
-            if hasattr(config, "watermark_template") or hasattr(config, "watermark_text_template"):
-                # GlobalDrmConfig ou ProtectionConfig
-                if is_partner_session:
-                    template = getattr(config, "watermark_template", None) or getattr(config, "watermark_text_template", None) or template
-                else:
-                    template = getattr(config, "watermark_laha_template", None) or getattr(config, "watermark_template", None) or template
+        # Opacité et Position configurées par l'administrateur
+        opacity_val = getattr(global_config, "watermark_opacity", None)
+        if opacity_val is None and config:
+            opacity_val = getattr(config, "watermark_opacity", None)
+        try:
+            opacity = float(opacity_val) if opacity_val is not None else 0.50
+        except (ValueError, TypeError):
+            opacity = 0.50
 
-                opacity_val = getattr(config, "watermark_opacity", None)
-                if opacity_val is not None:
-                    opacity = float(opacity_val)
-                position = getattr(config, "watermark_position", None) or position
-                invisible_enabled = getattr(config, "invisible_watermark_enabled", True)
-            elif isinstance(config, dict):
-                template = config.get("watermark_template") or config.get("watermark_text_template") or template
-                opacity = float(config.get("watermark_opacity", opacity))
-                position = config.get("watermark_position", position)
-                invisible_enabled = config.get("invisible_watermark_enabled", invisible_enabled)
+        position = (
+            getattr(global_config, "watermark_position", None)
+            or getattr(config, "watermark_position", None)
+            or "footer"
+        )
+        invisible_enabled = getattr(
+            global_config, "invisible_watermark_enabled",
+            getattr(config, "invisible_watermark_enabled", True)
+        )
 
         # Construction du texte du filigrane
-        nom = user_info.get("nom") or user_info.get("user_name") or "Lecteur Partenaire"
-        email = user_info.get("email") or user_info.get("user_email") or "partenaire@univ.bj"
+        nom = user_info.get("nom") or user_info.get("user_name") or "Lecteur Authentifié"
+        email = user_info.get("email") or user_info.get("user_email") or ""
         ip = user_info.get("ip") or user_info.get("ip_address") or "127.0.0.1"
         user_id = str(user_info.get("user_id") or "0000-0000")
         titre = user_info.get("title") or user_info.get("titre") or "Document"
@@ -86,7 +98,14 @@ class WatermarkEngine:
         try:
             watermark_text = template.format(nom=nom, email=email, ip=ip, titre=titre, title=titre, id=doc_id)
         except Exception:
-            watermark_text = f"Document confié à {nom} ({email}) • IP: {ip}"
+            watermark_text = template
+
+        subtext = ""
+        if subtext_template:
+            try:
+                subtext = subtext_template.format(nom=nom, email=email, ip=ip, titre=titre, title=titre, id=doc_id)
+            except Exception:
+                subtext = subtext_template
 
         try:
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -95,7 +114,7 @@ class WatermarkEngine:
             return pdf_bytes
 
         # Mode Haute Sécurité (Anti-Extraction) : Conversion en images HD sans couche texte brute
-        profil = getattr(config, "profil_default", getattr(config, "profil", "standard")) if config else "standard"
+        profil = getattr(global_config, "profil_default", getattr(config, "profil", "standard")) if global_config else "standard"
         if profil == "renforce":
             try:
                 raster_doc = fitz.open()
@@ -122,30 +141,54 @@ class WatermarkEngine:
             page_width = rect.width
             page_height = rect.height
 
-            # 1. Filigrane Visible (Position & Opacité conformes aux réglages)
+            # 1. Filigrane Visible (Position & Opacité conformes aux réglages admin)
             if position == "header":
                 font_size = 9.0
                 text_len = fitz.get_text_length(watermark_text, fontname="helv", fontsize=font_size)
                 start_x = max(24.0, (page_width - text_len) / 2)
+                y_main = 22 if not subtext else 18
                 page.insert_text(
-                    fitz.Point(start_x, 24),
+                    fitz.Point(start_x, y_main),
                     watermark_text,
                     fontsize=font_size,
                     color=(0.25, 0.25, 0.30),
                     fill_opacity=opacity
                 )
+                if subtext:
+                    sub_size = 7.5
+                    sub_len = fitz.get_text_length(subtext, fontname="helv", fontsize=sub_size)
+                    sub_x = max(24.0, (page_width - sub_len) / 2)
+                    page.insert_text(
+                        fitz.Point(sub_x, 28),
+                        subtext,
+                        fontsize=sub_size,
+                        color=(0.35, 0.35, 0.40),
+                        fill_opacity=opacity * 0.85
+                    )
 
             elif position == "footer":
                 font_size = 9.0
                 text_len = fitz.get_text_length(watermark_text, fontname="helv", fontsize=font_size)
                 start_x = max(24.0, (page_width - text_len) / 2)
+                y_main = page_height - 24 if subtext else page_height - 18
                 page.insert_text(
-                    fitz.Point(start_x, page_height - 18),
+                    fitz.Point(start_x, y_main),
                     watermark_text,
                     fontsize=font_size,
                     color=(0.25, 0.25, 0.30),
                     fill_opacity=opacity
                 )
+                if subtext:
+                    sub_size = 7.5
+                    sub_len = fitz.get_text_length(subtext, fontname="helv", fontsize=sub_size)
+                    sub_x = max(24.0, (page_width - sub_len) / 2)
+                    page.insert_text(
+                        fitz.Point(sub_x, page_height - 14),
+                        subtext,
+                        fontsize=sub_size,
+                        color=(0.35, 0.35, 0.40),
+                        fill_opacity=opacity * 0.85
+                    )
 
             else:  # "diagonal"
                 theta = math.degrees(math.atan2(page_height, page_width))
@@ -171,6 +214,18 @@ class WatermarkEngine:
                     fill_opacity=opacity,
                     morph=(center_point, fitz.Matrix(theta))
                 )
+                if subtext:
+                    sub_size = max(7.0, font_size * 0.75)
+                    sub_len = fitz.get_text_length(subtext, fontname="helv", fontsize=sub_size)
+                    sub_start = fitz.Point(page_width / 2 - sub_len / 2, page_height / 2 + font_size * 0.35 + sub_size * 1.5)
+                    page.insert_text(
+                        sub_start,
+                        subtext,
+                        fontsize=sub_size,
+                        color=(0.40, 0.40, 0.45),
+                        fill_opacity=opacity * 0.85,
+                        morph=(center_point, fitz.Matrix(theta))
+                    )
 
             # 2. Tatouage Invisible (stéganographie dans une zone neutre)
             if invisible_enabled:

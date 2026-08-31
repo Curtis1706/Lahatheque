@@ -69,7 +69,16 @@ export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
       if (book.country.toLowerCase() !== filters.country.toLowerCase()) return false;
     }
     if (filters.format) {
-      if (book.format_type.toLowerCase() !== filters.format.toLowerCase()) return false;
+      const f = filters.format.toLowerCase();
+      const formatType = (book.format_type as string).toLowerCase();
+      if (f === "digital" || f === "numerique") {
+        if (formatType !== "pdf" && formatType !== "epub" && formatType !== "digital") return false;
+      } else if (f === "paper" || f === "papier") {
+        const isPaper = Boolean((book as unknown as Record<string, unknown>).is_paper_available || formatType === "papier" || formatType === "paper");
+        if (!isPaper) return false;
+      } else {
+        if (formatType !== f) return false;
+      }
     }
     if (filters.year) {
       if (book.publication_year?.toString() !== filters.year.toString()) return false;

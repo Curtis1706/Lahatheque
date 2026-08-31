@@ -215,11 +215,11 @@ export default function StudentBouquetsPage() {
       {/* Modale de confirmation de souscription */}
       {selectedBouquet && (
         <Modal
-          isOpen={Boolean(selectedBouquet)}
+          open={Boolean(selectedBouquet)}
           onClose={() => !subscribing && setSelectedBouquet(null)}
           title="Souscrire au Bouquet Documentaire"
           description="Confirmation de votre abonnement annuel"
-          size="md"
+          maxWidth={520}
         >
           <div className="space-y-5 p-1">
             <div className="bg-background-secondary/50 rounded-xl p-4 border border-border space-y-2">

@@ -314,26 +314,28 @@ export default function ChefValidationHistoryPage() {
       {/* Modale de Détail d'une Décision Archivée */}
       {selectedDeposit && (
         <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-border pb-4">
+          <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-border pb-4 shrink-0">
               <div className="flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-gold" />
                 <h3 className="font-serif font-bold text-navy text-base">Fiche Historique de la Décision</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedDeposit(null)}
                 className="p-1.5 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-navy cursor-pointer"
+                title="Fermer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
+            <div className="space-y-4 text-xs overflow-y-auto flex-1 pr-1">
               <div className="p-4 rounded-2xl bg-background-secondary border border-border flex flex-col sm:flex-row gap-4 items-start">
                 <BookCover3D
                   title={selectedDeposit.metadata.title}
                   authors={selectedDeposit.metadata.authors}
-                  discipline={selectedDeposit.classification.discipline}
+                  discipline={selectedDeposit.classification?.discipline}
                   coverUrl={selectedDeposit.files?.cover_url}
                   size="sm"
                   className="mx-auto sm:mx-0 shrink-0"
@@ -343,19 +345,19 @@ export default function ChefValidationHistoryPage() {
                     <h4 className="font-serif font-bold text-navy text-base">{selectedDeposit.metadata.title}</h4>
                     <StatusBadge status={selectedDeposit.status} />
                   </div>
-                  <p className="text-foreground font-semibold">Auteur(s) : {selectedDeposit.metadata.authors.join(", ")}</p>
+                  <p className="text-foreground font-semibold">Auteur(s) : {selectedDeposit.metadata.authors?.join(", ") || "Auteur Anonyme"}</p>
                   <p className="text-foreground-muted flex items-center gap-1">
                     Maquettiste :{" "}
                     {isCurrentUser(selectedDeposit) ? (
                       <span className="text-gold font-bold">
-                        Vous {selectedDeposit.maquettiste_name && selectedDeposit.maquettiste_name !== "Maquettiste" ? `(${selectedDeposit.maquettiste_name})` : ""}
+                        Vous {selectedDeposit.maquettiste_name && !["Vous", "Maquettiste", "Équipe Éditoriale LAHA"].includes(selectedDeposit.maquettiste_name) ? `(${selectedDeposit.maquettiste_name})` : ""}
                       </span>
                     ) : (
-                      <span className="text-foreground font-medium">{selectedDeposit.maquettiste_name || "Maquettiste"}</span>
+                      <span className="text-foreground font-medium">{selectedDeposit.maquettiste_name || "Équipe Éditoriale LAHA"}</span>
                     )}
                   </p>
-                  <p className="text-foreground-muted">Discipline : {selectedDeposit.classification.discipline}</p>
-                  <p className="text-foreground-muted">Établissement : {selectedDeposit.classification.university}</p>
+                  <p className="text-foreground-muted">Discipline : {selectedDeposit.classification?.discipline || "Non spécifiée"}</p>
+                  <p className="text-foreground-muted">Établissement : {selectedDeposit.classification?.university || "Non affilié"}</p>
                 </div>
               </div>
 
@@ -370,13 +372,19 @@ export default function ChefValidationHistoryPage() {
                 </div>
               )}
 
-              <p className="text-foreground-muted leading-relaxed line-clamp-4 bg-background p-3 rounded-xl border border-border">
-                {selectedDeposit.metadata.summary || "Aucun résumé fourni."}
-              </p>
+              <div className="space-y-1.5">
+                <span className="font-bold text-navy uppercase text-[10px] tracking-wider block">
+                  Résumé complet de l&apos;ouvrage :
+                </span>
+                <div className="text-foreground-muted leading-relaxed bg-background p-4 rounded-2xl border border-border max-h-56 overflow-y-auto whitespace-pre-line text-xs">
+                  {selectedDeposit.metadata.summary || "Aucun résumé fourni."}
+                </div>
+              </div>
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-border">
+            <div className="flex justify-end pt-3 border-t border-border shrink-0">
               <button
+                type="button"
                 onClick={() => setSelectedDeposit(null)}
                 className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors cursor-pointer"
               >

@@ -1,22 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { 
   Search, 
   BookOpen, 
   Building2, 
   GraduationCap, 
-  FileText, 
-  Headphones, 
   Filter, 
   X,
   Sparkles,
   UserCheck,
-  Tag,
   ArrowRight,
-  Calendar,
-  School
+  Calendar
 } from "lucide-react";
 import { Book } from "@/lib/types/catalog";
 import { searchBooks } from "@/lib/services/catalog";
@@ -30,10 +27,13 @@ const PUBLICATION_YEARS = Array.from(
   (_, i) => CURRENT_YEAR - i
 );
 
-export default function CatalogSearchPage() {
+function CatalogSearchInner() {
+  const searchParams = useSearchParams();
+  const urlQuery = searchParams.get("q") || "";
+
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlQuery);
   const [authorQuery, setAuthorQuery] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
   const [selectedInstitution, setSelectedInstitution] = useState("");
@@ -41,6 +41,13 @@ export default function CatalogSearchPage() {
   const [selectedFormat, setSelectedFormat] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  // Sync searchQuery when URL query parameter changes
+  useEffect(() => {
+    if (urlQuery) {
+      setSearchQuery(urlQuery);
+    }
+  }, [urlQuery]);
 
   useEffect(() => {
     const fetchBooks = async () => {
@@ -88,7 +95,7 @@ export default function CatalogSearchPage() {
         <div className="space-y-3 text-center md:text-left">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/10 text-navy border border-gold/20 text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5 text-gold" />
-            Bibliothèque Numérique & Partenaires
+            Bibliothèque Universitaire &amp; Partenaires
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-navy tracking-tight">
             Catalogue des Ouvrages
@@ -98,10 +105,11 @@ export default function CatalogSearchPage() {
           </p>
         </div>
 
-        {/* Barre de Recherche Principale Raycast */}
+        {/* Barre de Recherche Principale Dynamique */}
         <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="w-full sm:max-w-xl">
+          <div className="w-full sm:max-w-2xl">
             <ActionSearchBar 
+              initialValue={searchQuery}
               onSearch={(val) => setSearchQuery(val)}
               onSelectAction={(category, value) => {
                 if (category === "discipline") {
@@ -117,7 +125,7 @@ export default function CatalogSearchPage() {
           <div className="md:hidden w-full">
             <button
               onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-background-secondary text-navy font-bold text-sm w-full justify-center shadow-sm"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-background-secondary text-navy font-bold text-sm w-full justify-center shadow-xs"
             >
               <Filter className="w-4 h-4 text-gold" />
               {showMobileFilters ? "Masquer les filtres" : "Afficher les filtres & Auteurs"}
@@ -186,6 +194,9 @@ export default function CatalogSearchPage() {
                 <option value="UP">Université de Parakou (UP)</option>
                 <option value="UNSTIM">Université Nationale des Sciences, Technologies, Ingénierie et Mathématiques (UNSTIM)</option>
                 <option value="UNA">Université Nationale d'Agriculture (UNA)</option>
+                <option value="UFHB">Université Félix Houphouët-Boigny (UFHB)</option>
+                <option value="UCAD">Université Cheikh Anta Diop (UCAD)</option>
+                <option value="UL">Université de Lomé (UL)</option>
               </select>
             </div>
 
@@ -213,7 +224,7 @@ export default function CatalogSearchPage() {
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
                 <GraduationCap className="w-3.5 h-3.5 text-gold" />
-                Discipline &amp; Matière
+                Discipline Universitaire
               </label>
               <select
                 value={selectedDiscipline}
@@ -222,48 +233,68 @@ export default function CatalogSearchPage() {
               >
                 <option value="">Toutes les disciplines</option>
 
-                <optgroup label="Enseignement Supérieur &amp; Recherche">
-                  <option value="Agriculture">Agriculture, Agronomie &amp; Élevage</option>
-                  <option value="Droit">Droit &amp; Sciences Politiques</option>
-                  <option value="Économie">Sciences Économiques &amp; Gestion</option>
+                <optgroup label="Droit, Sciences Politiques &amp; Criminologie (FADESP)">
+                  <option value="Droit des Affaires">Droit Privé &amp; Droit des Affaires (OHADA)</option>
+                  <option value="Droit Public">Droit Public, Administratif &amp; Constitutionnel</option>
+                  <option value="Droit International">Droit International &amp; Droits de l'Homme</option>
+                  <option value="Droit Pénal">Droit Pénal, Criminologie &amp; Procédure</option>
+                  <option value="Sciences Politiques">Sciences Politiques &amp; Relations Internationales</option>
+                </optgroup>
+
+                <optgroup label="Économie, Gestion &amp; Finance (FASEG)">
+                  <option value="Économie">Sciences Économiques &amp; Économétrie</option>
                   <option value="Comptabilité">Comptabilité, Audit &amp; Finance (SYSCOHADA)</option>
-                  <option value="Médecine">Médecine, Pharmacie &amp; Santé Publique</option>
-                  <option value="Informatique">Informatique, Télécoms &amp; IA</option>
-                  <option value="Ingénierie">Sciences de l'Ingénieur &amp; BTP</option>
-                  <option value="Sciences Exactes">Mathématiques &amp; Physique-Chimie (Univ)</option>
-                  <option value="Sciences Humaines">Philosophie, Sociologie &amp; Psychologie</option>
-                  <option value="Lettres">Lettres Modernes, Langues &amp; Communication</option>
-                  <option value="Histoire">Histoire, Civilisations &amp; Anthropologie</option>
-                  <option value="Pédagogie">Sciences de l'Éducation &amp; Didactique</option>
+                  <option value="Banque">Banque, Assurance &amp; Marchés Financiers</option>
+                  <option value="Management">Management, Stratégie &amp; Ressources Humaines</option>
+                  <option value="Marketing">Marketing, Commerce International &amp; Logistique</option>
+                  <option value="Économie du Développement">Économie du Développement &amp; Politiques Publiques</option>
                 </optgroup>
 
-                <optgroup label="Secondaire (Collège &amp; Lycée)">
-                  <option value="Mathématiques">Mathématiques</option>
-                  <option value="PCT">Physique, Chimie &amp; Technologie (PCT)</option>
-                  <option value="SVT">Sciences de la Vie et de la Terre (SVT)</option>
-                  <option value="Français">Français &amp; Littérature</option>
-                  <option value="Histoire-Géo">Histoire &amp; Géographie</option>
-                  <option value="Philosophie">Philosophie (Terminale)</option>
-                  <option value="Anglais">Anglais &amp; Langues Vivantes</option>
-                  <option value="Langues Nationales">Langues Nationales Africaines</option>
-                  <option value="Éducation Civique">Éducation Civique &amp; Citoyenneté</option>
-                  <option value="Éducation Artistique">Arts Plastiques &amp; Musique</option>
-                  <option value="EPS">Éducation Physique &amp; Sportive (EPS)</option>
+                <optgroup label="Médecine, Pharmacie &amp; Santé (FSS)">
+                  <option value="Médecine">Médecine Générale &amp; Spécialités Cliniques</option>
+                  <option value="Chirurgie">Chirurgie, Anesthésie &amp; Urgences</option>
+                  <option value="Pharmacie">Pharmacie, Pharmacologie &amp; Pharmacopée</option>
+                  <option value="Santé Publique">Santé Publique, Épidémiologie &amp; Médecine Tropicale</option>
+                  <option value="Odonto-Stomatologie">Odonto-Stomatologie &amp; Soins Dentaires</option>
+                  <option value="Sciences Infirmières">Sciences Infirmières &amp; Obstétricales</option>
                 </optgroup>
 
-                <optgroup label="Primaire &amp; Préscolaire">
-                  <option value="Lecture">Lecture, Écriture &amp; Vocabulaire</option>
-                  <option value="Calcul">Calcul &amp; Mathématiques Élémentaires</option>
-                  <option value="Éveil">Éveil Scientifique &amp; Environnement</option>
-                  <option value="Contes">Contes, Récits &amp; Éveil Culturel</option>
+                <optgroup label="Sciences Exactes, Informatique &amp; Ingénierie (FAST / EPAC)">
+                  <option value="Mathématiques">Mathématiques Pures &amp; Appliquées</option>
+                  <option value="Physique">Physique Fondamentale, Quantique &amp; Énergétique</option>
+                  <option value="Chimie">Chimie Organique, Minérale &amp; Analytique</option>
+                  <option value="Informatique">Informatique, Génie Logiciel, Télécoms &amp; IA</option>
+                  <option value="Génie Civil">Génie Civil, BTP &amp; Architecture</option>
+                  <option value="Génie Électrique">Génie Électrique, Électronique &amp; Automatique</option>
+                  <option value="Génie Mécanique">Génie Mécanique &amp; Énergétique Industrielle</option>
+                  <option value="Géologie">Sciences de la Terre, Géologie &amp; Mines</option>
+                  <option value="Biologie">Biologie, Biochimie &amp; Génétique</option>
                 </optgroup>
 
-                <optgroup label="Culture &amp; Grand Public">
-                  <option value="Romans">Romans, Récits &amp; Nouvelles</option>
-                  <option value="Littérature Africaine">Littérature Africaine &amp; Poésie</option>
-                  <option value="BD">Bandes Dessinées, Mangas &amp; Jeunesse</option>
-                  <option value="Développement Personnel">Développement Personnel &amp; Société</option>
-                  <option value="Arts">Arts, Culture &amp; Cuisine</option>
+                <optgroup label="Sciences Agronomiques &amp; Environnement (FSA / UNA)">
+                  <option value="Agriculture">Production Végétale, Phytotechnie &amp; Agronomie</option>
+                  <option value="Élevage">Production Animale &amp; Médecine Vétérinaire</option>
+                  <option value="Agroéconomie">Agroéconomie, Sociologie Rurale &amp; Vulgarisation</option>
+                  <option value="Foresterie">Foresterie, Biodiversité &amp; Ressources Naturelles</option>
+                  <option value="Hydrologie">Génie Rural, Eau, Climat &amp; Assainissement</option>
+                  <option value="Nutrition">Nutrition &amp; Technologies Agroalimentaires</option>
+                </optgroup>
+
+                <optgroup label="Lettres, Langues &amp; Communication (FLLAC)">
+                  <option value="Lettres">Lettres Modernes &amp; Littérature Comparée</option>
+                  <option value="Linguistique">Linguistique Générale &amp; Langues Africaines</option>
+                  <option value="Langues Étrangères">Études Anglophones &amp; Langues Vivantes</option>
+                  <option value="Communication">Sciences de l'Information &amp; de la Communication (SIC)</option>
+                  <option value="Journalisme">Journalisme &amp; Médias Numériques</option>
+                </optgroup>
+
+                <optgroup label="Sciences Humaines &amp; Sociales (FASHS)">
+                  <option value="Philosophie">Philosophie, Éthique &amp; Épistémologie</option>
+                  <option value="Sociologie">Sociologie, Anthropologie &amp; Démographie</option>
+                  <option value="Histoire">Histoire, Archéologie &amp; Patrimoine Africain</option>
+                  <option value="Géographie">Géographie, Aménagement du Territoire &amp; SIG</option>
+                  <option value="Psychologie">Psychologie Clinique &amp; Sciences Cognitives</option>
+                  <option value="Sciences de l'Éducation">Sciences de l'Éducation &amp; Didactique Universitaire</option>
                 </optgroup>
               </select>
             </div>
@@ -280,9 +311,8 @@ export default function CatalogSearchPage() {
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
                 <option value="">Tous les formats</option>
-                <option value="pdf">Livre Numérique (PDF DRM)</option>
-                <option value="epub">Livre Numérique (EPUB)</option>
-                <option value="audio">Livre Audio (Streaming)</option>
+                <option value="digital">Livre numérique</option>
+                <option value="paper">Livre papier</option>
               </select>
             </div>
           </aside>
@@ -322,7 +352,7 @@ export default function CatalogSearchPage() {
                 </p>
                 <button
                   onClick={clearFilters}
-                  className="px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-dark text-white text-xs font-bold transition-colors shadow-sm"
+                  className="px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs font-bold transition-colors shadow-sm"
                 >
                   Réinitialiser la recherche
                 </button>
@@ -409,7 +439,7 @@ export default function CatalogSearchPage() {
                           </div>
                           <Link
                             href={`/catalog/${book.id}`}
-                            className="px-4 py-2 rounded-lg bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                            className="px-4 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
                           >
                             Consulter
                             <ArrowRight className="w-3.5 h-3.5 text-gold" />
@@ -426,5 +456,20 @@ export default function CatalogSearchPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function CatalogSearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center p-8">
+        <div className="text-center space-y-3">
+          <Sparkles className="w-8 h-8 text-gold animate-spin mx-auto" />
+          <p className="text-xs text-foreground-muted font-sans">Chargement du catalogue...</p>
+        </div>
+      </div>
+    }>
+      <CatalogSearchInner />
+    </Suspense>
   );
 }

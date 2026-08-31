@@ -348,80 +348,7 @@ export default function DocumentReaderPage() {
 
   const { jumpToHighlightArea } = highlightPluginInstance
 
-  // Plugin de gravure dynamique du filigrane sur chaque page en mode normal
-  const pageWatermarkPlugin = useMemo<Plugin>(() => {
-    const watermarkPosition = drmSettings?.watermark_position || "diagonal";
-    const parsedOp = drmSettings?.watermark_opacity != null ? parseFloat(String(drmSettings.watermark_opacity)) : 0.20;
-    const watermarkOpacity = !isNaN(parsedOp) ? parsedOp : 0.20;
-    const watermarkLahaText = drmSettings?.watermark_laha_template || "LAHAThèque • Document Certifié & Protégé";
-    const watermarkLahaSubtext = drmSettings?.watermark_laha_subtext || "Licence accordée au Lecteur Authentifié • Reproduction interdite";
 
-
-    return {
-      renderPageLayer: (renderProps: PluginRenderPageLayer) => {
-        const positionStyles: React.CSSProperties = {
-          pointerEvents: "none",
-          position: "absolute",
-          left: 0,
-          right: 0,
-          zIndex: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          userSelect: "none",
-          opacity: watermarkOpacity,
-          padding: "0 24px",
-        };
-
-        if (watermarkPosition === "header") {
-          positionStyles.top = "24px";
-        } else if (watermarkPosition === "footer") {
-          positionStyles.bottom = "24px";
-        } else {
-          // diagonal par défaut
-          positionStyles.top = "50%";
-          positionStyles.transform = "translateY(-50%) rotate(-45deg)";
-        }
-
-        const baseFontSize = Math.max(12, Math.floor(renderProps.scale * 16));
-
-        return (
-          <div style={positionStyles} aria-hidden="true">
-            <div
-              style={{
-                fontSize: `${baseFontSize}px`,
-                fontWeight: 700,
-                color: "#B08D42",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                textAlign: "center",
-                lineHeight: 1.3,
-                textShadow: "0 0 1px rgba(0,0,0,0.1)",
-              }}
-            >
-              {watermarkLahaText}
-            </div>
-            {watermarkLahaSubtext && (
-              <div
-                style={{
-                  fontSize: `${Math.max(9, Math.floor(baseFontSize * 0.65))}px`,
-                  fontWeight: 600,
-                  color: "rgba(176, 141, 66, 0.85)",
-                  fontFamily: "monospace",
-                  letterSpacing: "0.04em",
-                  marginTop: "4px",
-                  textAlign: "center",
-                }}
-              >
-                {watermarkLahaSubtext}
-              </div>
-            )}
-          </div>
-        );
-      },
-    };
-  }, [drmSettings]);
 
 
 
@@ -1058,7 +985,6 @@ export default function DocumentReaderPage() {
                       plugins={[
                         defaultLayoutPluginInstance,
                         highlightPluginInstance,
-                        pageWatermarkPlugin,
                       ]}
                       theme={isNightMode ? 'dark' : 'light'}
                       localization={(fr_FR_Locale as any)}

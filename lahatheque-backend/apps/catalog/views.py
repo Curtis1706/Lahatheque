@@ -31,8 +31,18 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
             query = SearchQuery(q)
             qs = qs.annotate(rank=SearchRank(vector, query)).filter(rank__gte=0.01).order_by('-rank')
 
+        format_val = self.request.query_params.get('format')
+        if format_val and format_val.lower() != 'all':
+            f = format_val.lower()
+            if f in ('digital', 'numerique'):
+                qs = qs.filter(format_type__in=['pdf', 'epub'])
+            elif f in ('paper', 'papier'):
+                qs = qs.filter(is_paper_available=True)
+            else:
+                qs = qs.filter(format_type=f)
+
         for param, field in [('discipline', 'discipline_id'), ('institution', 'institution_id'),
-                             ('language', 'language'), ('country', 'country'), ('format', 'format_type')]:
+                             ('language', 'language'), ('country', 'country')]:
             val = self.request.query_params.get(param)
             if val and val.lower() != 'all':
                 qs = qs.filter(**{field: val})
