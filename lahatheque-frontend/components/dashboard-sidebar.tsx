@@ -225,7 +225,7 @@ export function DashboardSidebar() {
               { label: "Mes Dépôts Manuscrits", href: "/author/submissions", icon: <PenTool className="size-4" /> },
               { label: "Droits & Paiements", href: "/author/royalties", icon: <DollarSign className="size-4" /> },
               { label: "Catalogue Général", href: "/author/catalog", icon: <Search className="size-4" /> },
-              { label: "Mes Achats (-40%)", href: "/author/purchases", icon: <ShoppingBag className="size-4" /> },
+              { label: "Mes Achats", href: "/author/purchases", icon: <ShoppingBag className="size-4" /> },
               { label: "Profil & Délégation", href: "/author/profile", icon: <UserIcon className="size-4" /> },
             ],
           },
