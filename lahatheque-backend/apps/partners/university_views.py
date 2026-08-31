@@ -263,6 +263,13 @@ class UniversityAffiliationsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
+        from django.conf import settings as django_settings
+        if not getattr(django_settings, "ENABLE_UNIVERSITY_AFFILIATION_GATING", False):
+            return Response({
+                "success": False,
+                "error": "Cette fonctionnalité n'est pas activée sur la plateforme actuellement."
+            }, status=403)
+
         inst = get_user_institution(request.user)
         if not inst:
             return Response({"success": True, "data": [], "error": None})
@@ -291,6 +298,13 @@ class UniversityAffiliationActionView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def patch(self, request, pk):
+        from django.conf import settings as django_settings
+        if not getattr(django_settings, "ENABLE_UNIVERSITY_AFFILIATION_GATING", False):
+            return Response({
+                "success": False,
+                "error": "Cette fonctionnalité n'est pas activée sur la plateforme actuellement."
+            }, status=403)
+
         inst = get_user_institution(request.user)
         if not inst:
             return Response({"success": False, "error": "Université introuvable."}, status=400)

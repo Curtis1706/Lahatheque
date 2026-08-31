@@ -1,5 +1,14 @@
 from django.urls import path
-from .views import CreateOrderView, OrderListView, OrderDetailView, SubscriptionPlanListView, SubscribeView, SubscriptionCancelView
+from .views import (
+    CreateOrderView,
+    OrderListView,
+    OrderDetailView,
+    SubscriptionPlanListView,
+    SubscribeView,
+    SubscriptionCancelView,
+    ClientBouquetListView,
+    ClientBouquetSubscribeView,
+)
 from .webhooks import MonerooWebhookView
 from .manager_views import (
     ManagerKpisView,
@@ -41,6 +50,8 @@ urlpatterns = [
     path('subscriptions/plans/', SubscriptionPlanListView.as_view(), name='commerce-subscriptions-plans'),
     path('subscriptions/subscribe/', SubscribeView.as_view(), name='commerce-subscriptions-subscribe'),
     path('subscriptions/<uuid:sub_id>/cancel/', SubscriptionCancelView.as_view(), name='commerce-subscriptions-cancel'),
+    path('bouquets/', ClientBouquetListView.as_view(), name='client-bouquets-list'),
+    path('bouquets/<str:offering_id>/subscribe/', ClientBouquetSubscribeView.as_view(), name='client-bouquet-subscribe'),
     path('webhooks/moneroo/', MonerooWebhookView.as_view(), name='webhook-moneroo'),
 
     # ─── Manager : Stock & Livraison ───────────────────────────────────────────

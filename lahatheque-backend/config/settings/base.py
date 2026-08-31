@@ -336,6 +336,7 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-
-
+# Fonctionnalité désactivée conformément au CDC v3.2 (le Client souscrit directement aux
+# bouquets, section 8 — aucune validation d'affiliation universitaire n'est prévue). Le code
+# est conservé intact pour réactivation future si le besoin métier évolue.
+ENABLE_UNIVERSITY_AFFILIATION_GATING = False

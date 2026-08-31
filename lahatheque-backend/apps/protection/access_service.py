@@ -94,6 +94,27 @@ class AccessService:
                 "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
             }
 
+        # Bouquet souscrit directement par le Client (conforme CDC section 8)
+        from apps.commerce.models import ClientBouquetSubscription
+        from apps.partners.models import BouquetOffering
+        from django.utils import timezone as tz
+
+        today = tz.now().date()
+        client_bouquets = ClientBouquetSubscription.objects.filter(
+            user=user, status="active", start_date__lte=today, end_date__gte=today
+        )
+        for sub in client_bouquets:
+            try:
+                offering = BouquetOffering.objects.get(id=sub.offering_id, is_active=True)
+            except BouquetOffering.DoesNotExist:
+                continue
+            if offering.get_books_queryset().filter(id=book_id).exists():
+                return {
+                    "access_granted": True,
+                    "reason": "client_bouquet_subscription",
+                    "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
+                }
+
         # Abonnement institutionnel (UAC, UNA, etc.)
         student_aff = StudentAffiliation.objects.filter(student=user, is_validated=True).first()
         if student_aff and student_aff.institution:
@@ -109,15 +130,22 @@ class AccessService:
                     "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
                 }
 
-            bouquet_access = AccessService.check_bouquet_access(student_aff.institution, book_id)
-            if bouquet_access:
-                return {
-                    "access_granted": True,
-                    "reason": "bouquet_access",
-                    "institution_name": student_aff.institution.name,
-                    "bouquet_subscription_id": str(bouquet_access.id),
-                    "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
-                }
+            # Accès via bouquet souscrit par l'université — DÉSACTIVÉ pour rester strictement
+            # conforme au CDC v3.2 (le Client souscrit directement aux bouquets, section 8,
+            # sans validation d'affiliation intermédiaire). Réactivable en repassant
+            # ENABLE_UNIVERSITY_AFFILIATION_GATING à True dans les settings — le code métier
+            # ci-dessous n'a pas besoin d'être réécrit.
+            from django.conf import settings as django_settings
+            if getattr(django_settings, "ENABLE_UNIVERSITY_AFFILIATION_GATING", False):
+                bouquet_access = AccessService.check_bouquet_access(student_aff.institution, book_id)
+                if bouquet_access:
+                    return {
+                        "access_granted": True,
+                        "reason": "bouquet_access",
+                        "institution_name": student_aff.institution.name,
+                        "bouquet_subscription_id": str(bouquet_access.id),
+                        "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
+                    }
 
         return {
             "access_granted": False,

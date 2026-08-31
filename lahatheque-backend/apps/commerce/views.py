@@ -362,3 +362,72 @@ class SubscriptionCancelView(APIView):
         sub.save(update_fields=["is_active"])
 
         return Response({"success": True, "message": "Abonnement annulé avec succès."})
+
+
+class ClientBouquetListView(APIView):
+    """GET /api/v1/commerce/bouquets/ - Bouquets disponibles à la souscription directe."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from apps.partners.models import BouquetOffering
+        from .models import ClientBouquetSubscription
+
+        subscribed_ids = set(
+            ClientBouquetSubscription.objects.filter(
+                user=request.user, status="active"
+            ).values_list("offering_id", flat=True)
+        )
+
+        data = []
+        for o in BouquetOffering.objects.filter(is_active=True):
+            data.append({
+                "id": str(o.id),
+                "title": o.title,
+                "bouquet_type": o.bouquet_type,
+                "discipline": o.discipline,
+                "books_count": o.get_books_queryset().count(),
+                "annual_price": float(o.annual_price),
+                "currency": o.currency,
+                "description": o.description,
+                "is_subscribed": str(o.id) in {str(x) for x in subscribed_ids},
+            })
+        return Response({"success": True, "data": data})
+
+
+class ClientBouquetSubscribeView(APIView):
+    """POST /api/v1/commerce/bouquets/<offering_id>/subscribe/ - Souscription directe."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, offering_id):
+        from apps.partners.models import BouquetOffering
+        from .models import ClientBouquetSubscription
+        from datetime import timedelta
+        from django.utils import timezone
+
+        try:
+            offering = BouquetOffering.objects.get(id=offering_id, is_active=True)
+        except BouquetOffering.DoesNotExist:
+            return Response({"success": False, "error": "Bouquet introuvable ou indisponible."}, status=404)
+
+        if ClientBouquetSubscription.objects.filter(
+            user=request.user, offering_id=offering.id, status="active"
+        ).exists():
+            return Response({"success": False, "error": "Vous êtes déjà abonné à ce bouquet."}, status=400)
+
+        start = timezone.now().date()
+        sub = ClientBouquetSubscription.objects.create(
+            user=request.user,
+            offering_id=offering.id,
+            title=offering.title,
+            price_paid=offering.annual_price,
+            currency=offering.currency,
+            start_date=start,
+            end_date=start + timedelta(days=365),
+        )
+
+        return Response({
+            "success": True,
+            "message": f"Souscription au bouquet « {offering.title} » confirmée.",
+            "data": {"id": str(sub.id), "end_date": str(sub.end_date)}
+        }, status=201)
+
