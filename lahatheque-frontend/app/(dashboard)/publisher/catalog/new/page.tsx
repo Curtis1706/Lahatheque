@@ -165,9 +165,9 @@ export default function NewPublisherBookPage() {
   const stepLabels = [
     "1. Identification",
     "2. Contributeurs",
-    "3. Classification (IA)",
+    "3. Fichiers & Résumé",
     "4. Commercial",
-    "5. Fichiers & Résumé",
+    "5. Classification (IA)",
     "6. Droits & Protection",
   ];
 
@@ -362,8 +362,116 @@ export default function NewPublisherBookPage() {
           </div>
         )}
 
-        {/* Étape 3: Classification (IA) */}
+        {/* Étape 3: Fichiers & Résumé */}
         {currentStep === 3 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <Upload className="w-5 h-5 text-gold" />
+              <h2 className="font-serif font-bold text-navy text-base">Fichiers Numériques &amp; Quatrième de Couverture</h2>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  Fichier d&apos;Épreuve Numérique (PDF uniquement)
+                </label>
+                <FileDropzone
+                  label="Téléverser le Manuscrit Numérique (PDF uniquement)"
+                  acceptTypes={[".pdf"]}
+                  selectedFileName={manuscriptFile?.name}
+                  selectedFileSize={manuscriptFile?.size}
+                  onFileSelect={(f) => {
+                    setManuscriptFile(f);
+                    toast.success(`Fichier ${f.name} prêt pour l'envoi.`);
+                  }}
+                  onFileRemove={() => setManuscriptFile(null)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  Résumé / Quatrième de Couverture
+                </label>
+                <textarea
+                  rows={4}
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  placeholder="Présentation synthétique du contenu de l'ouvrage..."
+                  className="w-full p-3.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium leading-relaxed"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Biographie de l&apos;Auteur</label>
+                <textarea
+                  rows={2}
+                  value={authorsBio}
+                  onChange={(e) => setAuthorsBio(e.target.value)}
+                  placeholder="Notice biographique et affiliations universitaires..."
+                  className="w-full p-3.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium leading-relaxed"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Étape 4: Commercial */}
+        {currentStep === 4 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <DollarSign className="w-5 h-5 text-gold" />
+              <h2 className="font-serif font-bold text-navy text-base">Modèle Commercial &amp; Territoires</h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Prix Public Unitaire</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={price}
+                    onChange={(e) => setPrice(Number(e.target.value))}
+                    min={0}
+                    className="w-full pl-3.5 pr-16 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-bold min-h-[44px]"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-foreground-muted">
+                    {currency}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">Modèle de Distribution</label>
+                <select
+                  value={salesModel}
+                  onChange={(e) => setSalesModel(e.target.value as SalesModel)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
+                >
+                  <option value="purchase">Vente à l&apos;unité uniquement</option>
+                  <option value="subscription">Inclus dans les abonnements</option>
+                  <option value="bundle">Intégrable aux bouquets institutionnels</option>
+                  <option value="free">Accès Libre (Open Access)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  Territoires d&apos;Exploitation Autorisés
+                </label>
+                <input
+                  type="text"
+                  value={territories}
+                  onChange={(e) => setTerritories(e.target.value)}
+                  placeholder="ex. Bénin, Togo, Côte d'Ivoire, Sénégal, France, Monde"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Étape 5: Classification (IA) */}
+        {currentStep === 5 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
@@ -428,113 +536,6 @@ export default function NewPublisherBookPage() {
           </div>
         )}
 
-        {/* Étape 4: Commercial */}
-        {currentStep === 4 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 border-b border-border pb-3">
-              <DollarSign className="w-5 h-5 text-gold" />
-              <h2 className="font-serif font-bold text-navy text-base">Modèle Commercial &amp; Territoires</h2>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">Prix Public Unitaire</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(Number(e.target.value))}
-                    min={0}
-                    className="w-full pl-3.5 pr-16 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-bold min-h-[44px]"
-                  />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-foreground-muted">
-                    {currency}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">Modèle de Distribution</label>
-                <select
-                  value={salesModel}
-                  onChange={(e) => setSalesModel(e.target.value as SalesModel)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
-                >
-                  <option value="purchase">Vente à l&apos;unité uniquement</option>
-                  <option value="subscription">Inclus dans les abonnements</option>
-                  <option value="bundle">Intégrable aux bouquets institutionnels</option>
-                  <option value="free">Accès Libre (Open Access)</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                  Territoires d&apos;Exploitation Autorisés
-                </label>
-                <input
-                  type="text"
-                  value={territories}
-                  onChange={(e) => setTerritories(e.target.value)}
-                  placeholder="ex. Bénin, Togo, Côte d'Ivoire, Sénégal, France, Monde"
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Étape 5: Fichiers & Résumé */}
-        {currentStep === 5 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 border-b border-border pb-3">
-              <Upload className="w-5 h-5 text-gold" />
-              <h2 className="font-serif font-bold text-navy text-base">Fichiers Numériques &amp; Quatrième de Couverture</h2>
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                  Fichier d&apos;Épreuve Numérique (PDF uniquement)
-                </label>
-                <FileDropzone
-                  label="Téléverser le Manuscrit Numérique (PDF uniquement)"
-                  acceptTypes={[".pdf"]}
-                  selectedFileName={manuscriptFile?.name}
-                  selectedFileSize={manuscriptFile?.size}
-                  onFileSelect={(f) => {
-                    setManuscriptFile(f);
-                    toast.success(`Fichier ${f.name} prêt pour l'envoi.`);
-                  }}
-                  onFileRemove={() => setManuscriptFile(null)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                  Résumé / Quatrième de Couverture
-                </label>
-                <textarea
-                  rows={4}
-                  value={summary}
-                  onChange={(e) => setSummary(e.target.value)}
-                  placeholder="Présentation synthétique du contenu de l'ouvrage..."
-                  className="w-full p-3.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium leading-relaxed"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">Biographie de l&apos;Auteur</label>
-                <textarea
-                  rows={2}
-                  value={authorsBio}
-                  onChange={(e) => setAuthorsBio(e.target.value)}
-                  placeholder="Notice biographique et affiliations universitaires..."
-                  className="w-full p-3.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium leading-relaxed"
-                />
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Étape 6: Droits & Protection */}
         {currentStep === 6 && (

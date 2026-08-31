@@ -116,3 +116,34 @@ class AuthorRoyaltiesTestCase(TestCase):
         self.assertEqual(b["total_revenue_generated"], 50000)
         self.assertEqual(b["author_royalty_share_amount"], 35000)
         self.assertEqual(b["author_percentage_rate"], 70.0)
+
+    def test_author_payout_request_rejects_amount_exceeding_pending_balance(self):
+        """Fiche AA3 : Vérifie qu'une demande de retrait supérieure au solde disponible est rejetée (400)."""
+        self.client.force_authenticate(user=self.user)
+        # Actuellement, toutes les payout_lines créées dans setUp ont is_settled=True -> pending_amount = 0
+        response = self.client.post("/api/v1/rights/author/payout-request/", {
+            "amount": 50000,
+            "payment_method": "momo",
+            "account_details": "+229 97 00 00 00"
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("supérieur au solde disponible", response.json()["error"])
+
+    def test_author_payout_request_succeeds_when_amount_within_pending_balance(self):
+        """Fiche AA3 : Vérifie qu'une demande de retrait valide dans la limite du solde est acceptée (201)."""
+        # Création d'une ligne non réglée (is_settled=False)
+        RoyaltyPayoutLine.objects.create(
+            calculation=self.calculation,
+            author_right=self.author_right,
+            payout_amount=100000.00,
+            is_settled=False
+        )
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post("/api/v1/rights/author/payout-request/", {
+            "amount": 60000,
+            "payment_method": "momo",
+            "account_details": "+229 97 00 00 00"
+        }, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.json()["success"])
+

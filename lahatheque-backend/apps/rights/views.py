@@ -347,6 +347,21 @@ class AuthorPayoutRequestView(APIView):
         if not amount or float(amount) <= 0:
             return Response({"success": False, "error": "Montant de versement invalide."}, status=400)
 
+        from django.db.models import Sum
+        from .models import RoyaltyPayoutLine
+
+        pending_amount = float(
+            RoyaltyPayoutLine.objects.filter(
+                author_right__user=user, is_settled=False
+            ).aggregate(s=Sum('payout_amount'))['s'] or 0.0
+        )
+
+        if float(amount) > pending_amount:
+            return Response({
+                "success": False,
+                "error": f"Montant demandé ({amount} XOF) supérieur au solde disponible ({pending_amount:.2f} XOF)."
+            }, status=400)
+
         # Enregistrement en base de données
         payout = PayoutRequest.objects.create(
             author=user,

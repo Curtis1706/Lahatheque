@@ -214,7 +214,7 @@ class WholesalerOrdersListView(APIView):
                 "status": ord_obj.status,
                 "carrier_name": ord_obj.carrier_name,
                 "tracking_number": ord_obj.tracking_number,
-                "invoice_url": ord_obj.invoice_url or f"/invoices/{ord_obj.reference}.pdf",
+                "invoice_url": ord_obj.invoice_url or None,
                 "cancel_requested": ord_obj.cancel_requested,
                 "cancel_reason": ord_obj.cancel_reason,
                 # ─── Champs Commande à Crédit Grossiste ─────────────────────────
@@ -444,7 +444,7 @@ class WholesalerOrderDetailView(APIView):
                     "status": ord_obj.status,
                     "carrier_name": ord_obj.carrier_name,
                     "tracking_number": ord_obj.tracking_number,
-                    "invoice_url": ord_obj.invoice_url or f"/invoices/{ord_obj.reference}.pdf",
+                    "invoice_url": ord_obj.invoice_url or None,
                     "cancel_requested": ord_obj.cancel_requested,
                     "cancel_reason": ord_obj.cancel_reason,
                     # ─── Champs Commande à Crédit Grossiste ─────────────────────

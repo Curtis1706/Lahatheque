@@ -363,7 +363,7 @@ class UniversityPaperOrdersView(APIView):
                 "currency": o.currency,
                 "status": o.status,
                 "tracking_number": o.tracking_number,
-                "pdf_order_url": f"/documents/bon-{o.order_number}.pdf",
+                "pdf_order_url": None,
                 "created_at": o.created_at.isoformat() if o.created_at else str(timezone.now())
             })
         return Response({"success": True, "data": orders, "error": None})
