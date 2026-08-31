@@ -115,35 +115,27 @@ export default function ChiefLayoutManuscriptsPage() {
     }
   }
 
-  // Définition des colonnes de la DataTable
+  // Définition des colonnes de la DataTable découpées et aérées
   const columns: DataTableColumn<ManuscriptForReview>[] = [
     {
       key: "title",
-      header: "Manuscrit & Version",
-      className: "min-w-[220px]",
+      header: "Manuscrit",
+      className: "min-w-[200px]",
       cell: (row) => (
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-md bg-gold/15 text-navy font-mono text-[10px] font-bold uppercase tracking-wider">
-              {row.version_type === "brouillon" ? "Brouillon" : "Version finale"}
-            </span>
-            <span className="text-[11px] text-foreground-muted">
-              {new Date(row.submitted_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-            </span>
-          </div>
           <p className="font-serif font-bold text-navy text-sm leading-snug line-clamp-2">
             {row.title}
           </p>
-          <span className="text-[11px] text-foreground-muted font-medium block">
-            Langue : <strong className="text-navy uppercase">{row.suggested_language || "FR"}</strong>
+          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-gold/15 text-navy font-mono uppercase tracking-wider">
+            {row.version_type === "brouillon" ? "Brouillon" : "Version finale"}
           </span>
         </div>
       ),
     },
     {
       key: "author_name",
-      header: "Auteur & Contact",
-      className: "min-w-[180px]",
+      header: "Auteur",
+      className: "min-w-[160px]",
       cell: (row) => (
         <div className="space-y-0.5">
           <p className="font-sans font-semibold text-navy text-xs">
@@ -156,18 +148,45 @@ export default function ChiefLayoutManuscriptsPage() {
       ),
     },
     {
+      key: "submitted_at",
+      header: "Date de dépôt",
+      className: "min-w-[120px]",
+      cell: (row) => (
+        <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
+          <Clock className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+          <span>
+            {new Date(row.submitted_at).toLocaleDateString("fr-FR", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "suggested_language",
+      header: "Langue",
+      className: "min-w-[100px]",
+      cell: (row) => (
+        <span className="px-2.5 py-1 rounded-lg bg-background-secondary border border-border text-navy font-semibold text-[11px] uppercase tracking-wide">
+          {row.suggested_language || "Français"}
+        </span>
+      ),
+    },
+    {
       key: "suggested_summary",
-      header: "Présentation / Résumé",
-      className: "min-w-[240px] max-w-[320px]",
+      header: "Résumé",
+      className: "min-w-[220px] max-w-[280px]",
       cell: (row) => (
         <div className="space-y-1">
           <p className="text-xs text-foreground-muted line-clamp-2 leading-relaxed">
-            {row.suggested_summary || "Aucun résumé fourni par l'auteur."}
+            {row.suggested_summary || "—"}
           </p>
           {row.editorial_note && (
             <div className="flex items-center gap-1 text-[10px] text-gold font-semibold">
-              <MessageSquare className="w-3 h-3 text-gold" />
-              <span>Note éditoriale enregistrée</span>
+              <MessageSquare className="w-3 h-3 text-gold shrink-0" />
+              <span>Note éditoriale présente</span>
             </div>
           )}
         </div>
@@ -176,35 +195,30 @@ export default function ChiefLayoutManuscriptsPage() {
     {
       key: "manuscript_file_url",
       header: "Fichier",
-      className: "min-w-[140px]",
-      cell: (row) => (
+      className: "min-w-[130px]",
+      cell: (row) =>
         row.manuscript_file_url ? (
           <a
             href={row.manuscript_file_url}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-navy/5 hover:bg-navy/10 text-navy text-xs font-semibold transition-colors border border-navy/10"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-navy/5 hover:bg-navy/10 text-navy text-xs font-semibold transition-colors border border-navy/10"
             title="Consulter le fichier manuscrit"
           >
             <Download className="w-3.5 h-3.5 text-gold shrink-0" />
-            <span>Fichier joint</span>
+            <span>Fichier</span>
             <ExternalLink className="w-3 h-3 opacity-60" />
           </a>
         ) : (
-          <span className="text-[11px] text-foreground-muted italic">
-            Aucun fichier
-          </span>
-        )
-      ),
+          <span className="text-[11px] text-foreground-muted italic">Non joint</span>
+        ),
     },
     {
       key: "status",
       header: "Statut",
-      className: "min-w-[150px]",
-      cell: (row) => (
-        <StatusBadge status={row.status} />
-      ),
+      className: "min-w-[140px]",
+      cell: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: "actions",
