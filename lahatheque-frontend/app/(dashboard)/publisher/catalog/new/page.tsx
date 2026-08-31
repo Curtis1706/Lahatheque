@@ -17,6 +17,8 @@ import {
   Info,
   Building2,
   Bot,
+  Image as ImageIcon,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
@@ -67,6 +69,21 @@ export default function NewPublisherBookPage() {
   const [summary, setSummary] = useState("");
   const [authorsBio, setAuthorsBio] = useState("");
   const [manuscriptFile, setManuscriptFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  const handleCoverSelect = (f: File) => {
+    setCoverFile(f);
+    const url = URL.createObjectURL(f);
+    setCoverPreview(url);
+    toast.success(`Couverture « ${f.name} » prête pour l'envoi.`);
+  };
+
+  const handleCoverRemove = () => {
+    if (coverPreview) URL.revokeObjectURL(coverPreview);
+    setCoverFile(null);
+    setCoverPreview(null);
+  };
 
   // Bloc 6: Droits & Licences
   const [licenceType, setLicenceType] = useState<"tous_droits_reserves" | "creative_commons">("tous_droits_reserves");
@@ -149,11 +166,12 @@ export default function NewPublisherBookPage() {
             access_tracing_auto: true,
           },
         },
-        manuscriptFile
+        manuscriptFile,
+        coverFile
       );
 
 
-      toast.success("L'ouvrage a été transmis avec succès au comité de validation.");
+      toast.success("L'ouvrage et sa couverture ont été transmis avec succès au comité.");
       router.push("/publisher/catalog");
     } catch {
       toast.error("Erreur lors du dépôt de l'ouvrage. Veuillez réessayer.");
@@ -364,30 +382,89 @@ export default function NewPublisherBookPage() {
 
         {/* Étape 3: Fichiers & Résumé */}
         {currentStep === 3 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-center gap-2 border-b border-border pb-3">
               <Upload className="w-5 h-5 text-gold" />
-              <h2 className="font-serif font-bold text-navy text-base">Fichiers Numériques &amp; Quatrième de Couverture</h2>
+              <h2 className="font-serif font-bold text-navy text-base">Fichiers &amp; Éléments Visuels</h2>
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                  Fichier d&apos;Épreuve Numérique (PDF uniquement)
+            {/* Grille Couverture + Manuscrit */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* 1. Première de Couverture */}
+              <div className="space-y-2 p-4 rounded-2xl bg-background-secondary border border-border">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-gold" />
+                    Première de Couverture (Image)
+                  </label>
+                  {coverFile && (
+                    <button
+                      type="button"
+                      onClick={handleCoverRemove}
+                      className="text-[11px] font-semibold text-rose-500 hover:underline inline-flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" /> Supprimer
+                    </button>
+                  )}
+                </div>
+
+                {coverPreview ? (
+                  <div className="flex items-center gap-4 p-3 rounded-xl bg-background border border-border">
+                    <img
+                      src={coverPreview}
+                      alt="Aperçu couverture"
+                      className="w-16 h-22 object-cover rounded-lg border border-border shadow-xs shrink-0"
+                    />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="text-xs font-bold text-navy truncate">{coverFile?.name}</p>
+                      <p className="text-[10px] text-foreground-muted font-mono">
+                        {coverFile ? `${(coverFile.size / 1024).toFixed(1)} Ko` : ""}
+                      </p>
+                      <span className="inline-block text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 font-semibold">
+                        Couverture prête
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <FileDropzone
+                    label="Téléverser l'Image de Couverture (PNG, JPG, WEBP)"
+                    acceptTypes={[".png", ".jpg", ".jpeg", ".webp"]}
+                    selectedFileName={coverFile?.name}
+                    selectedFileSize={coverFile?.size}
+                    onFileSelect={handleCoverSelect}
+                    onFileRemove={handleCoverRemove}
+                  />
+                )}
+                <p className="text-[10px] text-foreground-muted">
+                  Format recommandé : 1600x2400 px (ratio 3:4), max 10 Mo.
+                </p>
+              </div>
+
+              {/* 2. Manuscrit PDF */}
+              <div className="space-y-2 p-4 rounded-2xl bg-background-secondary border border-border">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                  <Upload className="w-3.5 h-3.5 text-gold" />
+                  Manuscrit / Épreuve Numérique (PDF)
                 </label>
                 <FileDropzone
-                  label="Téléverser le Manuscrit Numérique (PDF uniquement)"
+                  label="Téléverser le Manuscrit (PDF uniquement)"
                   acceptTypes={[".pdf"]}
                   selectedFileName={manuscriptFile?.name}
                   selectedFileSize={manuscriptFile?.size}
                   onFileSelect={(f) => {
                     setManuscriptFile(f);
-                    toast.success(`Fichier ${f.name} prêt pour l'envoi.`);
+                    toast.success(`Manuscrit « ${f.name} » prêt pour l'envoi.`);
                   }}
                   onFileRemove={() => setManuscriptFile(null)}
                 />
+                <p className="text-[10px] text-foreground-muted">
+                  Document complet avec mentions légales et table des matières.
+                </p>
               </div>
+            </div>
 
+            {/* Résumé et Biographie */}
+            <div className="space-y-4 pt-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-navy uppercase tracking-wider">
                   Résumé / Quatrième de Couverture
