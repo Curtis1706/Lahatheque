@@ -19,6 +19,8 @@ const statusConfig: Record<string, { style: string; defaultLabel: string; defaul
 
   warning: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Attention", defaultIcon: Clock },
   pending: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En attente", defaultIcon: Clock },
+  study_pending: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "À l'étude", defaultIcon: Clock },
+  catalog_preparation: { style: "bg-info/10 text-info border-info/20", defaultLabel: "En préparation maquette", defaultIcon: FileText },
   pending_admin_approval: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En attente", defaultIcon: Clock },
   pending_validation: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En attente", defaultIcon: Clock },
   pending_signature: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "En attente signature", defaultIcon: Clock },
