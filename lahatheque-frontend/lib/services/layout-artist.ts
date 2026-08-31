@@ -17,13 +17,21 @@ function mapBackendToDeposit(b: any, fallbackUserId?: string): LayoutDeposit {
     fallbackUserId ||
     "";
 
-  const maquettisteName =
+  let maquettisteName =
     b.created_by_name ||
     (b.created_by && typeof b.created_by === "object"
       ? `${b.created_by.first_name || ""} ${b.created_by.last_name || ""}`.trim() || b.created_by.email
       : "") ||
     b.maquettiste_name ||
     "";
+
+  if (!maquettisteName || maquettisteName === "Maquettiste") {
+    if (b.publisher_name && b.publisher_name !== "LAHA Éditions") {
+      maquettisteName = b.publisher_name;
+    } else {
+      maquettisteName = "Équipe Éditoriale LAHA";
+    }
+  }
 
   return {
     id: String(b.id),

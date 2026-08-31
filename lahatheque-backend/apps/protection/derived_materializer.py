@@ -38,11 +38,13 @@ class DerivedMaterializer:
         config_version: int = 1,
         profil: str = "standard",
         watermark_template: str = "",
-        watermark_position: str = "header",
-        watermark_opacity: float = 0.50
+        watermark_subtext: str = "",
+        watermark_position: str = "footer",
+        watermark_opacity: float = 0.50,
+        is_partner: bool = False
     ) -> str:
         """Génère la clé SHA-256 unique pour le tuple complet de configuration."""
-        raw = f"{source_id}:{user_id}:{config_version}:{profil}:{watermark_template}:{watermark_position}:{watermark_opacity}"
+        raw = f"{source_id}:{user_id}:{config_version}:{profil}:{watermark_template}:{watermark_subtext}:{watermark_position}:{watermark_opacity}:{is_partner}"
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     @classmethod
@@ -69,22 +71,38 @@ class DerivedMaterializer:
         """
         from .models import DerivedCacheRegistry, GlobalDrmConfig
 
-        if config is None:
-            try:
-                config = GlobalDrmConfig.get_singleton()
-            except Exception:
-                config = None
+        global_config = GlobalDrmConfig.get_singleton()
+        effective_cfg = config or global_config
 
+        is_partner_session = bool(user_info.get("is_partner", False))
         user_id = str(user_info.get("user_id") or "anonymous")
-        config_version = getattr(config, "config_version", 1) if config else 1
-        profil = getattr(config, "profil_default", getattr(config, "profil", "standard")) if config else "standard"
-        template = (
-            getattr(config, "watermark_template", None)
-            or getattr(config, "watermark_text_template", None)
-            or ""
-        ) if config else ""
-        position = getattr(config, "watermark_position", "header") if config else "header"
-        opacity = float(getattr(config, "watermark_opacity", 0.50)) if config else 0.50
+        config_version = getattr(global_config, "config_version", 1)
+        profil = getattr(global_config, "profil_default", "standard")
+
+        if is_partner_session:
+            template = (
+                getattr(effective_cfg, "watermark_template", None)
+                or getattr(global_config, "watermark_template", "")
+            )
+            subtext = ""
+        else:
+            template = (
+                getattr(effective_cfg, "watermark_laha_template", None)
+                or getattr(global_config, "watermark_laha_template", "")
+            )
+            subtext = (
+                getattr(effective_cfg, "watermark_laha_subtext", None)
+                or getattr(global_config, "watermark_laha_subtext", "")
+            )
+
+        position = (
+            getattr(global_config, "watermark_position", None)
+            or getattr(effective_cfg, "watermark_position", "footer")
+        )
+        try:
+            opacity = float(getattr(global_config, "watermark_opacity", 0.50))
+        except (ValueError, TypeError):
+            opacity = 0.50
 
         cache_key = cls.compute_cache_key(
             source_id=source_reference,
@@ -92,8 +110,10 @@ class DerivedMaterializer:
             config_version=config_version,
             profil=profil,
             watermark_template=template,
+            watermark_subtext=subtext,
             watermark_position=position,
-            watermark_opacity=opacity
+            watermark_opacity=opacity,
+            is_partner=is_partner_session
         )
 
         cache_dir = cls._get_cache_dir()
