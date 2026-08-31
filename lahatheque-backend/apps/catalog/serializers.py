@@ -19,7 +19,7 @@ class DomainSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Domain
-        fields = ['id', 'discipline', 'discipline_name', 'name']
+        fields = ['id', 'discipline', 'discipline_name', 'name', 'is_active']
 
 
 class OuvrageReadSerializer(serializers.ModelSerializer):
