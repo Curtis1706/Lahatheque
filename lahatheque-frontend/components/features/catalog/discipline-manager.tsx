@@ -32,6 +32,7 @@ import {
 } from "@/lib/services/classification";
 
 interface DisciplineTableRow extends DisciplineItem {
+  status: string;
   domains_count: number;
   domains_list: DomainItem[];
 }
@@ -84,9 +85,11 @@ export function DisciplineManager() {
   const tableData: DisciplineTableRow[] = useMemo(() => {
     return disciplines.map((d) => {
       const relatedDomains = domains.filter((dom) => dom.discipline === d.id);
+      const isActive = d.is_active !== false;
       return {
         ...d,
-        is_active: d.is_active !== false,
+        is_active: isActive,
+        status: isActive ? "active" : "inactive",
         domains_count: relatedDomains.length,
         domains_list: relatedDomains,
       };
@@ -477,6 +480,15 @@ export function DisciplineManager() {
         rowKey="id"
         loading={loading}
         searchPlaceholder="Rechercher une discipline, un code Dewey..."
+        filterKey="status"
+        filterOptions={[
+          { value: "active", label: "Disciplines Actives" },
+          { value: "inactive", label: "Disciplines Inactives" },
+        ]}
+        filterPlaceholder="Tous les statuts"
+        pageSize={10}
+        pageSizeOptions={[10, 25, 50, 100]}
+        showPagination={true}
         mobileCard={renderMobileCard}
         emptyMessage="Aucune discipline configurée dans le référentiel."
       />
