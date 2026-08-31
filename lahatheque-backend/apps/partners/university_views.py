@@ -20,10 +20,12 @@ from apps.protection.models import TraceAcces
 
 
 def get_user_institution(user):
-    """Récupère l'établissement rattaché à l'utilisateur connecté."""
+    """Récupère l'établissement rattaché à l'utilisateur connecté. Renvoie None si aucun
+    établissement n'est réellement rattaché — ne jamais deviner ni renvoyer un établissement
+    au hasard, pour éviter toute fuite de données entre institutions."""
     if hasattr(user, 'university_profile') and user.university_profile:
         return user.university_profile
-    return Institution.objects.filter(user=user).first() or Institution.objects.first()
+    return Institution.objects.filter(user=user).first()
 
 
 class UniversityKpisView(APIView):

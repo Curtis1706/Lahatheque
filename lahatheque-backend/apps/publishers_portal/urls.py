@@ -15,6 +15,12 @@ from .publisher_views import (
     PublisherAuditLogsView,
     PublisherProfileView,
     PublisherBookProtectionView,
+    PublisherExternalDepositView,
+    PublisherExternalDepositStatusView,
+    PublisherDepositReviewListView,
+    PublisherDepositEditorialDecisionView,
+    PublisherDepositRightsDecisionView,
+    PublisherDepositPublishView,
 )
 
 app_name = 'publishers_portal'
@@ -31,6 +37,12 @@ urlpatterns = [
     path('ai/extract-metadata/', PublisherAiMetadataExtractView.as_view(), name='publisher-ai-metadata'),
     path('deposits/', PublisherDepositsView.as_view(), name='publisher-deposits'),
     path('deposits/batch/', PublisherBatchImportView.as_view(), name='publisher-deposits-batch'),
+    path('admin/deposits/', PublisherDepositReviewListView.as_view(), name='publisher-deposit-review-list'),
+    path('admin/deposits/<str:id>/editorial-decision/', PublisherDepositEditorialDecisionView.as_view(), name='publisher-deposit-editorial-decision'),
+    path('admin/deposits/<str:id>/rights-decision/', PublisherDepositRightsDecisionView.as_view(), name='publisher-deposit-rights-decision'),
+    path('admin/deposits/<str:id>/publish/', PublisherDepositPublishView.as_view(), name='publisher-deposit-publish'),
+    path('external/deposits/', PublisherExternalDepositView.as_view(), name='publisher-external-deposit'),
+    path('external/deposits/<str:pk>/', PublisherExternalDepositStatusView.as_view(), name='publisher-external-deposit-status'),
     path('royalties/', PublisherRoyaltiesListView.as_view(), name='publisher-royalties-list'),
     path('royalties/withdraw/', PublisherRoyaltiesWithdrawView.as_view(), name='publisher-royalties-withdraw'),
     path('api-keys/', PublisherApiKeysView.as_view(), name='publisher-api-keys'),

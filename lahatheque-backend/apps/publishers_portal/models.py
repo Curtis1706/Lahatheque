@@ -144,6 +144,19 @@ class PublisherBookDeposit(models.Model):
         default=PublisherValidationStep.STEP_1
     )
     editorial_comment = models.TextField(blank=True, default="", verbose_name="Commentaires du Comité LAHA")
+    editorial_status = models.CharField(
+        max_length=20,
+        choices=[("pending", "En attente"), ("approved", "Validé"), ("revision_requested", "Corrections demandées")],
+        default="pending",
+        verbose_name="Conformité éditoriale (Chef Maquettiste)"
+    )
+    rights_status = models.CharField(
+        max_length=20,
+        choices=[("pending", "En attente"), ("approved", "Validé"), ("revision_requested", "Corrections demandées")],
+        default="pending",
+        verbose_name="Vérification des droits (Juriste)"
+    )
+    rights_comment = models.TextField(blank=True, default="", verbose_name="Commentaires du Juriste")
     
     # Indicateurs d'usage
     consultations_count = models.PositiveIntegerField(default=0)
@@ -226,7 +239,7 @@ class PublisherRoyaltyPayment(models.Model):
     net_royalty_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0.00)
     currency = models.CharField(max_length=10, default="XOF")
     status = models.CharField(max_length=20, choices=[("paid", "Réglé"), ("pending", "En traitement"), ("failed", "Échoué")], default="paid")
-    pdf_statement_url = models.CharField(max_length=500, blank=True, default="")
+    pdf_statement_url = models.CharField(max_length=500, blank=True, null=True, default="")
     paid_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
 
