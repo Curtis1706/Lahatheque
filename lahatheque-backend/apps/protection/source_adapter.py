@@ -65,7 +65,7 @@ class DocumentSourceAdapter:
 
     @classmethod
     def _fetch_catalog_book(cls, book_id: str) -> bytes:
-        """Récupère le fichier d'un ouvrage du catalogue interne LAHAThèque."""
+        """Récupère le fichier d'un ouvrage du catalogue interne LAHAThèque ou d'un dépôt éditeur/manuscrit."""
         from apps.catalog.models import Ouvrage
 
         ouvrage = None
@@ -75,24 +75,73 @@ class DocumentSourceAdapter:
             # Fallback sur slug si book_id n'est pas un UUID valide
             ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
 
-        if not ouvrage:
-            raise DocumentSourceError(f"Ouvrage introuvable dans le catalogue: {book_id}")
+        if ouvrage:
+            # Le champ fichier est 'file' sur le modèle Ouvrage
+            if ouvrage.file:
+                try:
+                    with ouvrage.file.open("rb") as f:
+                        return f.read()
+                except Exception as e:
+                    logger.error(f"Erreur lecture fichier ouvrage {book_id}: {e}")
 
-        # Le champ fichier est 'file' sur le modèle Ouvrage
-        if ouvrage.file:
+            # Fallback fichier physique de test
+            fallback_path = os.path.join(settings.BASE_DIR, "media", f"{book_id}.pdf")
+            if os.path.exists(fallback_path):
+                with open(fallback_path, "rb") as f:
+                    return f.read()
+
+        # Vérification si c'est un dépôt éditeur (PublisherBookDeposit)
+        from apps.publishers_portal.models import PublisherBookDeposit
+        deposit = None
+        try:
+            deposit = PublisherBookDeposit.objects.filter(id=book_id).first()
+        except Exception:
+            deposit = PublisherBookDeposit.objects.filter(isbn_digital=book_id).first()
+
+        if deposit:
+            if deposit.file_url:
+                try:
+                    if deposit.file_url.startswith("http://") or deposit.file_url.startswith("https://"):
+                        return cls._fetch_external_url(deposit.file_url, options={})
+                    from django.core.files.storage import default_storage
+                    clean_path = deposit.file_url.lstrip("/")
+                    if default_storage.exists(clean_path):
+                        with default_storage.open(clean_path, "rb") as f:
+                            return f.read()
+                    local_fpath = os.path.join(settings.BASE_DIR, "media", clean_path)
+                    if os.path.exists(local_fpath):
+                        with open(local_fpath, "rb") as f:
+                            return f.read()
+                except Exception as e:
+                    logger.error(f"Erreur récupération file_url du dépôt {book_id}: {e}")
+
+        # Vérification si c'est une soumission de manuscrit auteur (AuthorManuscriptSubmission)
+        from apps.rights.models import AuthorManuscriptSubmission
+        sub = None
+        try:
+            sub = AuthorManuscriptSubmission.objects.filter(id=book_id).first()
+        except Exception:
+            sub = None
+
+        if sub and sub.manuscript_file:
             try:
-                with ouvrage.file.open("rb") as f:
+                with sub.manuscript_file.open("rb") as f:
                     return f.read()
             except Exception as e:
-                logger.error(f"Erreur lecture fichier ouvrage {book_id}: {e}")
+                logger.error(f"Erreur lecture manuscrit auteur {book_id}: {e}")
 
-        # Fallback fichier physique de test
-        fallback_path = os.path.join(settings.BASE_DIR, "media", f"{book_id}.pdf")
-        if os.path.exists(fallback_path):
-            with open(fallback_path, "rb") as f:
-                return f.read()
+        # Fallback pour prévisualisation locale / démo
+        demo_paths = [
+            os.path.join(settings.BASE_DIR, "public", "PromptBreeder_Original_Paper-2309.16797v1.pdf"),
+            os.path.join(settings.BASE_DIR, "..", "lahatheque-frontend", "public", "PromptBreeder_Original_Paper-2309.16797v1.pdf"),
+            os.path.join(settings.BASE_DIR, "media", "PromptBreeder_Original_Paper-2309.16797v1.pdf"),
+        ]
+        for dp in demo_paths:
+            if os.path.exists(dp):
+                with open(dp, "rb") as f:
+                    return f.read()
 
-        raise DocumentSourceError(f"Aucun fichier disponible pour l'ouvrage {book_id}")
+        raise DocumentSourceError(f"Aucun fichier disponible pour l'ouvrage ou le dépôt {book_id}")
 
 
     @classmethod

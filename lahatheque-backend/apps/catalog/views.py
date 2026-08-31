@@ -48,6 +48,91 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
                 qs = qs.filter(**{field: val})
         return qs
 
+    def retrieve(self, request, *args, **kwargs):
+        pk = kwargs.get('pk')
+        # 1. Recherche par ID ou ISBN dans Ouvrage (y compris non-publiés pour rôles autorisés)
+        ouvrage = Ouvrage.objects.filter(Q(id=pk) | Q(isbn=pk)).select_related(
+            'publisher', 'discipline', 'institution'
+        ).prefetch_related('authors').first()
+
+        if ouvrage:
+            if ouvrage.status != 'published':
+                user = request.user
+                is_privileged = (
+                    user.is_authenticated and (
+                        user.is_staff or user.is_superuser or
+                        getattr(user, 'role', '') in ['admin', 'chief_layout', 'layout_artist', 'legal_reviewer', 'publisher', 'author']
+                    )
+                )
+                if not is_privileged:
+                    return Response({"success": False, "data": None, "error": "Ouvrage non publié."}, status=status.HTTP_403_FORBIDDEN)
+
+            serializer = self.get_serializer(ouvrage)
+            return Response({"success": True, "data": serializer.data, "error": None})
+
+        # 2. Recherche dans les dépôts éditeur (PublisherBookDeposit)
+        from apps.publishers_portal.models import PublisherBookDeposit
+        deposit = None
+        try:
+            deposit = PublisherBookDeposit.objects.filter(id=pk).first()
+        except Exception:
+            deposit = PublisherBookDeposit.objects.filter(isbn_digital=pk).first()
+
+        if deposit:
+            authors_data = []
+            raw_authors = deposit.authors if isinstance(deposit.authors, list) else [str(deposit.authors)]
+            for a in raw_authors:
+                authors_data.append({"id": str(deposit.id), "full_name": a, "first_name": a, "last_name": ""})
+
+            return Response({
+                "success": True,
+                "data": {
+                    "id": str(deposit.id),
+                    "title": deposit.title,
+                    "subtitle": deposit.subtitle,
+                    "authors": authors_data,
+                    "discipline_name": deposit.discipline,
+                    "collection_name": deposit.discipline,
+                    "summary": deposit.summary,
+                    "page_count": 100,
+                    "cover_image": deposit.cover_url or "",
+                    "format_type": deposit.file_format or "pdf",
+                    "status": deposit.status,
+                    "isbn": deposit.isbn_digital,
+                },
+                "error": None
+            })
+
+        # 3. Recherche dans les manuscrits auteur (AuthorManuscriptSubmission)
+        from apps.rights.models import AuthorManuscriptSubmission
+        try:
+            sub = AuthorManuscriptSubmission.objects.select_related('author').filter(id=pk).first()
+        except Exception:
+            sub = None
+
+        if sub:
+            author_name = sub.author.get_full_name() if sub.author else "Auteur"
+            return Response({
+                "success": True,
+                "data": {
+                    "id": str(sub.id),
+                    "title": sub.title,
+                    "subtitle": "",
+                    "authors": [{"id": str(sub.author_id), "full_name": author_name, "first_name": author_name, "last_name": ""}],
+                    "discipline_name": "Manuscrit Auteur",
+                    "collection_name": "Manuscrit Auteur",
+                    "summary": sub.suggested_summary or "Manuscrit déposé par l'auteur",
+                    "page_count": 100,
+                    "cover_image": "",
+                    "format_type": "pdf",
+                    "status": sub.status,
+                    "isbn": "",
+                },
+                "error": None
+            })
+
+        return Response({"success": False, "data": None, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
 
 class DisciplineViewSet(viewsets.ModelViewSet):
     """CRUD des disciplines — lecture publique, écriture réservée Gestionnaire/Admin."""

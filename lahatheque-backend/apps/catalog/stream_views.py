@@ -59,13 +59,29 @@ class BookStreamView(APIView):
             # Si book_id n'est pas un UUID valide (ex: slug ou ISBN), tenter une recherche par ISBN
             ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
 
-        if not ouvrage:
-            return JsonResponse({
-                "success": False,
-                "data": {},
-                "error": "Ouvrage introuvable dans le catalogue."
-            }, status=status.HTTP_404_NOT_FOUND)
+        deposit = None
+        sub = None
 
+        if not ouvrage:
+            from apps.publishers_portal.models import PublisherBookDeposit
+            try:
+                deposit = PublisherBookDeposit.objects.filter(id=book_id).first()
+            except Exception:
+                deposit = PublisherBookDeposit.objects.filter(isbn_digital=book_id).first()
+
+            if not deposit:
+                from apps.rights.models import AuthorManuscriptSubmission
+                try:
+                    sub = AuthorManuscriptSubmission.objects.filter(id=book_id).first()
+                except Exception:
+                    sub = None
+
+            if not deposit and not sub:
+                return JsonResponse({
+                    "success": False,
+                    "data": {},
+                    "error": "Ouvrage ou document introuvable dans le catalogue."
+                }, status=status.HTTP_404_NOT_FOUND)
 
         # 2. Récupération de la configuration DRM globale de l'administrateur
         from apps.protection.models import GlobalDrmConfig
@@ -79,14 +95,17 @@ class BookStreamView(APIView):
         else:
             ip = request.META.get("REMOTE_ADDR", "127.0.0.1")
 
+        doc_title = getattr(ouvrage, "title", None) or getattr(deposit, "title", None) or getattr(sub, "title", "Document Numérique")
+        doc_id = str(ouvrage.id) if ouvrage else (str(deposit.id) if deposit else str(sub.id))
+
         user_info = {
             "nom": request.user.get_full_name() or request.user.username,
             "email": request.user.email,
             "ip": ip,
             "user_id": str(request.user.id),
             "device_fingerprint": request.headers.get("X-Device-Fingerprint", ""),
-            "title": getattr(ouvrage, "titre", getattr(ouvrage, "title", "Ouvrage")),
-            "id": str(ouvrage.id),
+            "title": doc_title,
+            "id": doc_id,
             "is_partner": False,
         }
 
@@ -144,7 +163,7 @@ class BookStreamView(APIView):
             TraceAcces.objects.create(
                 user=request.user,
                 ouvrage=ouvrage,
-                document_title=ouvrage.title,
+                document_title=doc_title,
                 ip_address=ip,
                 country=request.headers.get("CF-IPCountry", ""),
                 user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],

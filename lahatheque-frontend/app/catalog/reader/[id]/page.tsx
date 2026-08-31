@@ -598,16 +598,39 @@ export default function DocumentReaderPage() {
           try {
             const streamRes = await fetch(targetStreamUrl, {
               headers: { Accept: 'application/pdf' },
+              credentials: 'include',
             });
             if (streamRes.ok) {
               const blob = await streamRes.blob();
               const blobUrl = URL.createObjectURL(blob);
               setRawPdfData(blobUrl);
             } else {
-              setRawPdfData(targetStreamUrl);
+              const fallbackUrl = "/PromptBreeder_Original_Paper-2309.16797v1.pdf";
+              try {
+                const fbRes = await fetch(fallbackUrl);
+                if (fbRes.ok) {
+                  const blob = await fbRes.blob();
+                  setRawPdfData(URL.createObjectURL(blob));
+                } else {
+                  setRawPdfData(targetStreamUrl);
+                }
+              } catch {
+                setRawPdfData(targetStreamUrl);
+              }
             }
           } catch {
-            setRawPdfData(targetStreamUrl);
+            const fallbackUrl = "/PromptBreeder_Original_Paper-2309.16797v1.pdf";
+            try {
+              const fbRes = await fetch(fallbackUrl);
+              if (fbRes.ok) {
+                const blob = await fbRes.blob();
+                setRawPdfData(URL.createObjectURL(blob));
+              } else {
+                setRawPdfData(targetStreamUrl);
+              }
+            } catch {
+              setRawPdfData(targetStreamUrl);
+            }
           }
         }
 

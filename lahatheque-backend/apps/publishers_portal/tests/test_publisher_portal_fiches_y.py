@@ -382,3 +382,29 @@ class PublisherPortalFichesYTestCase(TestCase):
             self.assertEqual(b["consultations_count"], 0)
             self.assertEqual(b["revenue_generated"], 0.0)
 
+    def test_publisher_deposit_reader_metadata_and_stream(self):
+        """Vérifie que la liseuse peut récupérer les métadonnées et streamer le flux d'un dépôt éditeur."""
+        deposit = PublisherBookDeposit.objects.create(
+            publisher=self.publisher_profile,
+            title="Duis dolore asperior",
+            isbn_digital="978-2-DEPOSIT-STREAM-01",
+            authors=["Qui duis inventore a"],
+            discipline="Sciences & Technologies",
+            price=Decimal("12000.00"),
+            status=PublisherDepositStatus.PENDING,
+            summary="Résumé du dépôt éditeur",
+        )
+
+        self.client.force_authenticate(user=self.publisher_user)
+
+        # 1. Récupération des métadonnées pour le lecteur
+        res_meta = self.client.get(f"/api/v1/catalog/books/{deposit.id}/")
+        self.assertEqual(res_meta.status_code, 200)
+        self.assertEqual(res_meta.data["data"]["title"], "Duis dolore asperior")
+        self.assertEqual(res_meta.data["data"]["authors"][0]["full_name"], "Qui duis inventore a")
+
+        # 2. Streaming sécurisé du flux PDF pour le lecteur
+        res_stream = self.client.get(f"/api/v1/catalog/books/{deposit.id}/stream/")
+        self.assertIn(res_stream.status_code, [200, 206])
+        self.assertTrue(len(res_stream.content) > 0)
+

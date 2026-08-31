@@ -82,12 +82,11 @@ class PublisherKpisView(APIView):
                     real_r = float(
                         lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0
                     )
-            if b.status == PublisherDepositStatus.PUBLISHED:
+                else:
+                    real_c = b.consultations_count or 0
+                    real_r = float(b.revenue_generated or 0.0)
                 total_consultations_acc += real_c
                 total_revenue_acc += real_r
-            else:
-                total_consultations_acc += 0
-                total_revenue_acc += 0.0
 
         rate = float(prof.contractual_royalty_rate)
         pending_royalties = (total_revenue_acc * rate) / 100
@@ -103,6 +102,7 @@ class PublisherKpisView(APIView):
                 "totalRevenue": total_revenue_acc,
                 "pendingRoyalties": pending_royalties,
                 "contractualRoyaltyRate": rate,
+                "contractReference": prof.contract_reference or "CTR-PUB-2025-08",
             },
             "error": None,
         })
@@ -685,15 +685,34 @@ class PublisherRoyaltiesWithdrawView(APIView):
         if amount <= 0:
             return Response({"success": False, "error": "Le montant doit être positif."}, status=400)
 
+        from apps.catalog.models import Ouvrage
+        from apps.commerce.models import LigneCommande
+        from django.db.models import F
+
         deposits_qs = PublisherBookDeposit.objects.filter(publisher=prof)
-        rev = float(deposits_qs.aggregate(t=Sum("revenue_generated"))["t"] or 0)
+        total_revenue_acc = 0.0
+        for b in deposits_qs:
+            real_r = 0.0
+            if b.status == PublisherDepositStatus.PUBLISHED:
+                linked_ouvrage = Ouvrage.objects.filter(isbn=b.isbn_digital).first()
+                if linked_ouvrage:
+                    lignes = LigneCommande.objects.filter(
+                        ouvrage=linked_ouvrage, commande__statut_paiement='paid'
+                    )
+                    real_r = float(
+                        lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0
+                    )
+                else:
+                    real_r = float(b.revenue_generated or 0.0)
+                total_revenue_acc += real_r
+
         rate = float(prof.contractual_royalty_rate)
         already_withdrawn = float(
             PublisherRoyaltyPayment.objects.filter(
                 publisher=prof, status__in=["pending", "paid"]
             ).aggregate(t=Sum("net_royalty_amount"))["t"] or 0
         )
-        available_balance = (rev * rate / 100) - already_withdrawn
+        available_balance = max(0.0, (total_revenue_acc * rate / 100) - already_withdrawn)
 
         if float(amount) > available_balance:
             return Response({

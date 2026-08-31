@@ -81,51 +81,50 @@ export default function PublisherOverviewPage() {
         <Link href="/publisher/catalog" className="block">
           <KpiCard
             label="Catalogue Déposé"
-            value={kpis?.totalBooks || 3}
+            value={kpis?.totalBooks ?? 0}
             icon={BookOpen}
-            trend={10}
-            trendPeriod="ce mois"
+            trend={0}
             theme="gold"
-            subtext={`${kpis?.publishedBooks || 1} publié(s) • ${kpis?.pendingValidations || 2} en cours`}
-            sparkline={[2, 2, 3, 3]}
+            subtext={`${kpis?.publishedBooks ?? 0} publié(s) • ${kpis?.pendingValidations ?? 0} en cours`}
+            sparkline={kpis?.totalBooks ? [0, kpis.totalBooks] : [0, 0]}
           />
         </Link>
 
         <Link href="/publisher/stats" className="block">
           <KpiCard
             label="Consultations &amp; Lecteurs"
-            value={kpis?.totalConsultations || 1420}
+            value={kpis?.totalConsultations ?? 0}
             icon={Eye}
-            trend={18}
+            trend={0}
             theme="blue"
-            subtext={`${kpis?.totalDownloads || 380} téléchargements`}
-            sparkline={[900, 1100, 1300, 1420]}
+            subtext={`${kpis?.totalDownloads ?? 0} téléchargements`}
+            sparkline={kpis?.totalConsultations ? [0, kpis.totalConsultations] : [0, 0]}
           />
         </Link>
 
         <Link href="/publisher/royalties" className="block">
           <KpiCard
             label="Chiffre d'Affaires Généré"
-            value={kpis?.totalRevenue || 5700000}
+            value={kpis?.totalRevenue ?? 0}
             formatValue={(v) => `${v.toLocaleString("fr-FR")} XOF`}
             icon={DollarSign}
-            trend={14}
+            trend={0}
             theme="emerald"
             subtext="Ventes cumulées"
-            sparkline={[3000000, 4500000, 5200000, 5700000]}
+            sparkline={kpis?.totalRevenue ? [0, kpis.totalRevenue] : [0, 0]}
           />
         </Link>
 
         <Link href="/publisher/royalties" className="block">
           <KpiCard
             label="Redevances Dues"
-            value={kpis?.pendingRoyalties || 1254000}
+            value={kpis?.pendingRoyalties ?? 0}
             formatValue={(v) => `${v.toLocaleString("fr-FR")} XOF`}
             icon={Building2}
             trend={0}
             theme="amber"
-            subtext={`Taux contractuel : ${kpis?.contractualRoyaltyRate || 22}%`}
-            sparkline={[800000, 1000000, 1254000, 1254000]}
+            subtext={`Taux contractuel : ${kpis?.contractualRoyaltyRate ?? 22}%`}
+            sparkline={kpis?.pendingRoyalties ? [0, kpis.pendingRoyalties] : [0, 0]}
           />
         </Link>
       </div>

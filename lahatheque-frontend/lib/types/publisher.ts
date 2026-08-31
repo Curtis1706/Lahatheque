@@ -173,4 +173,5 @@ export interface PublisherKpis {
   totalRevenue: number;
   pendingRoyalties: number;
   contractualRoyaltyRate: number;
+  contractReference?: string;
 }

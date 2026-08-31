@@ -186,7 +186,7 @@ export default function PublisherRoyaltiesPage() {
         <button
           type="button"
           onClick={handleRequestPayout}
-          disabled={requestingPayout || (kpis?.pendingRoyalties || 0) < 50000}
+          disabled={requestingPayout || (kpis?.pendingRoyalties ?? 0) < 50000}
           className="px-5 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 shadow-xs min-h-[44px] shrink-0 disabled:opacity-50"
         >
           {requestingPayout ? (
@@ -211,7 +211,7 @@ export default function PublisherRoyaltiesPage() {
             Convention de Mandat Partenaire Officiel
           </div>
           <h3 className="font-serif font-bold text-lg text-white">
-            Éditeur Partenaire Certifié • Réf: CTR-PUB-2025-08
+            Éditeur Partenaire Certifié • Réf: {kpis?.contractReference || "CTR-PUB-2025-08"}
           </h3>
           <p className="text-xs text-white/80 max-w-xl leading-relaxed">
             Le calcul des redevances s&apos;effectue en temps réel sur les ventes unitaires et les quotes-parts d&apos;abonnements.
@@ -221,7 +221,7 @@ export default function PublisherRoyaltiesPage() {
         <div className="bg-navy-dark p-4 rounded-2xl border border-gold/30 flex items-center gap-4 shrink-0">
           <div>
             <span className="text-[10px] text-white/60 font-bold uppercase block">Taux Contractuel Convenu</span>
-            <span className="font-bold text-gold text-2xl font-mono">{kpis?.contractualRoyaltyRate || 22}%</span>
+            <span className="font-bold text-gold text-2xl font-mono">{kpis?.contractualRoyaltyRate ?? 22}%</span>
             <span className="text-[9px] text-white/50 flex items-center gap-1 mt-0.5">
               <Lock className="w-3 h-3 text-gold" /> (Lecture seule — Stipulé au contrat)
             </span>
@@ -234,7 +234,7 @@ export default function PublisherRoyaltiesPage() {
         <div className="p-5 rounded-3xl bg-background border border-border space-y-2 shadow-xs">
           <span className="text-xs font-bold text-navy uppercase tracking-wider block">Chiffre d&apos;Affaires Net Généré</span>
           <p className="font-bold text-2xl text-navy font-mono">
-            {(kpis?.totalRevenue || 5700000).toLocaleString("fr-FR")} XOF
+            {(kpis?.totalRevenue ?? 0).toLocaleString("fr-FR")} XOF
           </p>
           <p className="text-[11px] text-foreground-muted">Cumul des ventes de votre catalogue sur la plateforme</p>
         </div>
@@ -242,7 +242,7 @@ export default function PublisherRoyaltiesPage() {
         <div className="p-5 rounded-3xl bg-background border border-border space-y-2 shadow-xs">
           <span className="text-xs font-bold text-navy uppercase tracking-wider block">Solde de Redevances à Percevoir</span>
           <p className="font-bold text-2xl text-gold font-mono">
-            {(kpis?.pendingRoyalties || 1254000).toLocaleString("fr-FR")} XOF
+            {(kpis?.pendingRoyalties ?? 0).toLocaleString("fr-FR")} XOF
           </p>
           <p className="text-[11px] text-foreground-muted">Montant éligible au virement (Seuil minimum : 50 000 XOF)</p>
         </div>
