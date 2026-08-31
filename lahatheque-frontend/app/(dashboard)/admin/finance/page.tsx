@@ -102,7 +102,7 @@ export default function AdminFinancePage() {
         <div className="p-5 rounded-3xl bg-background border border-border space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Crédits Auteurs en Cours</span>
-            <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-600 border border-amber-500/20">
+            <div className="p-2.5 rounded-2xl bg-gold/10 text-gold border border-gold/20">
               <Clock className="w-5 h-5" />
             </div>
           </div>
@@ -117,7 +117,7 @@ export default function AdminFinancePage() {
         <div className="p-5 rounded-3xl bg-background border border-border space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Redevances Versées</span>
-            <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+            <div className="p-2.5 rounded-2xl bg-success/10 text-success border border-success/20">
               <CheckCircle2 className="w-5 h-5" />
             </div>
           </div>
@@ -132,8 +132,8 @@ export default function AdminFinancePage() {
         <div className="p-5 rounded-3xl bg-background border border-border space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Redevances en Attente</span>
-            <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-600 border border-blue-500/20">
-              <DollarSign className="w-5 h-5" />
+            <div className="p-2.5 rounded-2xl bg-navy/5 text-navy border border-border">
+              <DollarSign className="w-5 h-5 text-gold" />
             </div>
           </div>
           <div>
@@ -242,7 +242,7 @@ export default function AdminFinancePage() {
                 </div>
                 <div>
                   <span>Déjà Versé : </span>
-                  <span className="font-mono font-bold text-emerald-600">{a.total_royalties_paid.toLocaleString("fr-FR")} F</span>
+                  <span className="font-mono font-bold text-success">{a.total_royalties_paid.toLocaleString("fr-FR")} F</span>
                 </div>
               </div>
 
@@ -287,7 +287,7 @@ export default function AdminFinancePage() {
                   <td className="py-3.5 text-center font-bold text-navy">{a.books_sold_total} ex.</td>
                   <td className="py-3.5 text-center font-mono font-bold text-gold">{a.royalty_rate_percent}%</td>
                   <td className="py-3.5 font-mono font-bold text-navy text-right">{a.total_royalties_due.toLocaleString("fr-FR")} FCFA</td>
-                  <td className="py-3.5 font-mono font-bold text-emerald-600 text-right">{a.total_royalties_paid.toLocaleString("fr-FR")} FCFA</td>
+                  <td className="py-3.5 font-mono font-bold text-success text-right">{a.total_royalties_paid.toLocaleString("fr-FR")} FCFA</td>
                   <td className="py-3.5 font-mono font-bold text-navy text-right">{a.total_royalties_outstanding.toLocaleString("fr-FR")} FCFA</td>
                 </tr>
               ))}

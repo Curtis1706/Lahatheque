@@ -16,17 +16,10 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Download,
   Eye,
   AlertTriangle,
   UserCheck,
-  Layers,
-  Search,
-  Filter,
   ShieldCheck,
-  FileText,
-  Calendar,
-  Loader2,
   BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,7 +28,6 @@ export default function AdminValidationPage() {
   const [proofs, setProofs] = useState<AdminValidationProof[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Modales
   const [selectedProofForApprove, setSelectedProofForApprove] = useState<AdminValidationProof | null>(null);
@@ -61,18 +53,10 @@ export default function AdminValidationPage() {
   }, []);
 
   const filteredProofs = proofs.filter((p) => {
-    const matchesSearch =
-      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.author_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.publisher_name.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus =
-      filterStatus === "all" ||
-      (filterStatus === "pending" && p.status === "pending_admin_approval") ||
-      (filterStatus === "published" && (p.status === "published" || p.status === "approved")) ||
-      (filterStatus === "rejected" && p.status === "rejected");
-
-    return matchesSearch && matchesStatus;
+    if (filterStatus === "pending") return p.status === "pending_admin_approval";
+    if (filterStatus === "published") return p.status === "published" || p.status === "approved";
+    if (filterStatus === "rejected") return p.status === "rejected";
+    return true;
   });
 
   const pendingCount = proofs.filter((p) => p.status === "pending_admin_approval").length;
@@ -126,43 +110,170 @@ export default function AdminValidationPage() {
     }
   };
 
+  const renderMobileCard = (row: AdminValidationProof) => (
+    <div className="space-y-3 bg-background p-4 rounded-2xl border border-border">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h4 className="font-serif font-bold text-navy text-sm sm:text-base leading-snug">
+            {row.title}
+          </h4>
+          <p className="text-xs text-foreground-muted mt-0.5">
+            {row.author_name} • <span className="text-gold font-medium">{row.publisher_name}</span>
+          </p>
+        </div>
+        <StatusBadge
+          status={
+            row.status === "pending_admin_approval"
+              ? "in_review"
+              : row.status === "published"
+              ? "published"
+              : row.status === "rejected"
+              ? "rejected"
+              : "approved"
+          }
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-xs">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-navy/10 text-navy font-mono font-bold text-xs">
+          {row.version || "v1.0"}
+        </span>
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-background-secondary border border-border text-foreground font-semibold text-[11px] uppercase">
+          {row.format || "PDF"}
+        </span>
+        {row.lcp_compliant ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px] font-semibold">
+            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+            LCP DRM
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-600 border border-slate-500/20 text-[10px]">
+            Standard
+          </span>
+        )}
+        <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-navy/5 text-navy font-medium ml-auto">
+          {row.discipline}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs">
+        <div className="flex items-center gap-1.5 text-foreground-muted font-mono text-[11px]">
+          <Clock className="w-3.5 h-3.5 text-gold shrink-0" />
+          <span>
+            {row.submitted_at
+              ? new Date(row.submitted_at).toLocaleDateString("fr-FR", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "Aujourd'hui"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/admin/validation/${row.id}`}
+            className="p-2 rounded-xl bg-background-secondary border border-border text-foreground hover:text-navy hover:border-gold transition-colors"
+            title="Examiner"
+          >
+            <Eye className="w-4 h-4" />
+          </Link>
+
+          {row.status === "pending_admin_approval" && (
+            <>
+              <button
+                type="button"
+                onClick={() => setSelectedProofForApprove(row)}
+                className="px-3 py-1.5 rounded-xl bg-success text-white hover:bg-success/90 transition-colors text-xs font-semibold flex items-center gap-1 shadow-xs cursor-pointer"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Valider</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedProofForReject(row)}
+                className="px-2.5 py-1.5 rounded-xl bg-error/10 border border-error/20 text-error hover:bg-error/20 transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Rejeter</span>
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const columns: DataTableColumn<AdminValidationProof>[] = [
     {
       key: "title",
       header: "Ouvrage & Discipline",
+      className: "min-w-[280px]",
       cell: (row) => (
-        <div className="space-y-0.5">
-          <p className="font-semibold text-xs text-foreground line-clamp-1">{row.title}</p>
+        <div className="space-y-1 py-0.5">
+          <p className="font-serif font-bold text-xs sm:text-sm text-navy line-clamp-1">
+            {row.title}
+          </p>
           <div className="flex items-center gap-2 text-[11px] text-foreground-muted">
-            <span>{row.author_name}</span>
+            <span className="font-medium text-foreground">{row.author_name || "Auteur non renseigné"}</span>
             <span>•</span>
-            <span className="text-gold font-medium">{row.publisher_name}</span>
+            <span className="text-gold font-medium">{row.publisher_name || "Éditions LAHA"}</span>
           </div>
-          <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-navy/10 text-navy font-semibold">
-            {row.discipline}
-          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-navy/10 text-navy font-semibold">
+              {row.discipline || "Général"}
+            </span>
+            {row.dewey_code && (
+              <span className="text-[10px] font-mono text-foreground-muted">
+                CDD: {row.dewey_code}
+              </span>
+            )}
+          </div>
         </div>
       ),
     },
     {
       key: "version",
       header: "Version & Format",
+      className: "min-w-[200px]",
       cell: (row) => (
-        <div className="space-y-1">
-          <span className="font-mono text-xs font-bold text-navy">{row.version || "v1.0"}</span>
-          <p className="text-[11px] text-foreground-muted">{row.format}</p>
-          {row.lcp_compliant && (
-            <div className="flex items-center gap-1 text-[10px] text-success font-medium">
-              <ShieldCheck className="w-3 h-3 text-success" />
-              <span>Conforme LCP DRM</span>
-            </div>
-          )}
+        <div className="space-y-1.5 py-0.5">
+          {/* Ligne 1 : Badges Version & Format */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-navy/10 text-navy font-mono text-xs font-bold border border-navy/15">
+              {row.version || "v1.0"}
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-background-secondary border border-border text-foreground font-semibold text-[11px] uppercase tracking-wider">
+              {row.format || "PDF"}
+            </span>
+            {row.page_count ? (
+              <span className="text-[11px] text-foreground-muted font-mono">
+                {row.page_count} p.
+              </span>
+            ) : null}
+          </div>
+
+          {/* Ligne 2 : Statut Protection DRM */}
+          <div>
+            {row.lcp_compliant ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px] font-semibold whitespace-nowrap">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Conforme LCP DRM</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-500/10 text-slate-600 border border-slate-500/20 text-[10px] font-medium whitespace-nowrap">
+                <ShieldCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Protection Standard</span>
+              </span>
+            )}
+          </div>
         </div>
       ),
     },
     {
       key: "submitted_at",
       header: "Date de Publication / Soumission",
+      className: "min-w-[180px] whitespace-nowrap",
       cell: (row) => {
         let displayDate = "Aujourd'hui";
         if (row.submitted_at) {
@@ -183,6 +294,12 @@ export default function AdminValidationPage() {
                 {displayDate}
               </span>
             </div>
+            {row.reviewed_by && (
+              <p className="text-[10px] text-foreground-muted flex items-center gap-1 truncate max-w-[160px]">
+                <UserCheck className="w-3 h-3 text-navy shrink-0" />
+                <span className="truncate">Par {row.reviewed_by}</span>
+              </p>
+            )}
           </div>
         );
       },
@@ -190,6 +307,7 @@ export default function AdminValidationPage() {
     {
       key: "status",
       header: "Statut",
+      className: "min-w-[140px]",
       cell: (row) => (
         <div className="space-y-1">
           <StatusBadge
@@ -214,14 +332,16 @@ export default function AdminValidationPage() {
     {
       key: "actions",
       header: "Actions",
+      className: "text-right min-w-[160px]",
       cell: (row) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-end gap-1.5">
           <Link
             href={`/admin/validation/${row.id}`}
             className="p-2 rounded-xl bg-background-secondary border border-border text-foreground hover:border-gold hover:text-navy transition-colors text-xs font-semibold"
             title="Examiner la maquette en détail"
+            aria-label="Examiner la maquette"
           >
-            <Eye className="w-3.5 h-3.5" />
+            <Eye className="w-4 h-4" />
           </Link>
 
           {row.status === "pending_admin_approval" && (
@@ -229,17 +349,17 @@ export default function AdminValidationPage() {
               <button
                 type="button"
                 onClick={() => setSelectedProofForApprove(row)}
-                className="px-2.5 py-1.5 rounded-xl bg-success text-white hover:bg-success/90 transition-colors text-xs font-semibold flex items-center gap-1 shadow-xs"
+                className="px-3 py-1.5 rounded-xl bg-success text-white hover:bg-success/90 transition-colors text-xs font-semibold flex items-center gap-1 shadow-xs cursor-pointer"
                 title="Valider le BAT et publier"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Valider BAT</span>
+                <span>Valider</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setSelectedProofForReject(row)}
-                className="px-2.5 py-1.5 rounded-xl bg-error/10 border border-error/20 text-error hover:bg-error/20 transition-colors text-xs font-semibold flex items-center gap-1"
+                className="px-2.5 py-1.5 rounded-xl bg-error/10 border border-error/20 text-error hover:bg-error/20 transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer"
                 title="Rejeter l'épreuve avec motif"
               >
                 <XCircle className="w-3.5 h-3.5" />
@@ -286,10 +406,10 @@ export default function AdminValidationPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <button
           type="button"
-          onClick={() => setFilterStatus("pending")}
-          className={`p-4 rounded-2xl border text-left transition-all ${
+          onClick={() => setFilterStatus(filterStatus === "pending" ? "all" : "pending")}
+          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             filterStatus === "pending"
-              ? "bg-gold/10 border-gold shadow-xs"
+              ? "bg-gold/10 border-gold shadow-xs ring-2 ring-gold/20"
               : "bg-background-secondary border-border hover:border-navy/30"
           }`}
         >
@@ -303,10 +423,10 @@ export default function AdminValidationPage() {
 
         <button
           type="button"
-          onClick={() => setFilterStatus("published")}
-          className={`p-4 rounded-2xl border text-left transition-all ${
+          onClick={() => setFilterStatus(filterStatus === "published" ? "all" : "published")}
+          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             filterStatus === "published"
-              ? "bg-success/10 border-success shadow-xs"
+              ? "bg-success/10 border-success shadow-xs ring-2 ring-success/20"
               : "bg-background-secondary border-border hover:border-navy/30"
           }`}
         >
@@ -320,10 +440,10 @@ export default function AdminValidationPage() {
 
         <button
           type="button"
-          onClick={() => setFilterStatus("rejected")}
-          className={`p-4 rounded-2xl border text-left transition-all ${
+          onClick={() => setFilterStatus(filterStatus === "rejected" ? "all" : "rejected")}
+          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             filterStatus === "rejected"
-              ? "bg-error/10 border-error shadow-xs"
+              ? "bg-error/10 border-error shadow-xs ring-2 ring-error/20"
               : "bg-background-secondary border-border hover:border-navy/30"
           }`}
         >
@@ -336,44 +456,18 @@ export default function AdminValidationPage() {
         </button>
       </div>
 
-      {/* Barre de Recherche et Filtres */}
-      <div className="p-4 rounded-2xl bg-background-secondary border border-border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-3" />
-          <input
-            type="text"
-            placeholder="Rechercher par titre, auteur, éditeur ou chef maquettiste..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setFilterStatus("all")}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-              filterStatus === "all"
-                ? "bg-navy text-white"
-                : "bg-background border border-border text-foreground hover:bg-background-secondary"
-            }`}
-          >
-            Tous ({proofs.length})
-          </button>
-        </div>
-      </div>
-
-      {/* Tableau des Épreuves */}
-      <div className="rounded-2xl bg-background-secondary border border-border overflow-hidden p-4 sm:p-6">
-        <DataTable
-          data={filteredProofs}
-          columns={columns}
-          rowKey="id"
-          loading={loading}
-          emptyMessage="Aucune épreuve de maquette ne correspond aux critères sélectionnés."
-        />
-      </div>
+      {/* Tableau des Épreuves (DataTable intégrée) */}
+      <DataTable
+        data={filteredProofs}
+        columns={columns}
+        rowKey="id"
+        loading={loading}
+        searchable={true}
+        searchPlaceholder="Rechercher par titre, auteur, éditeur ou chef maquettiste..."
+        mobileCard={renderMobileCard}
+        pageSize={10}
+        emptyMessage="Aucune épreuve de maquette ne correspond aux critères sélectionnés."
+      />
 
       {/* Modale d'Approbation Finale du BAT */}
       <Modal
