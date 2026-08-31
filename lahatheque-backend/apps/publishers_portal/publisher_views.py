@@ -418,9 +418,31 @@ class PublisherDepositsView(APIView):
 
 
 class PublisherBatchImportView(APIView):
-    """POST /api/v1/publishers/catalog/batch-import/ - Import réel CSV/JSON/ONIX 3.0."""
+    """POST /api/v1/publishers/deposits/batch/ - Import réel CSV/JSON/ONIX 3.0.
+    GET  /api/v1/publishers/deposits/batch/ - Historique des imports de l'éditeur connecté.
+    """
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get(self, request):
+        """Renvoie l'historique des imports batch de l'éditeur connecté."""
+        prof = get_or_create_publisher_profile(request.user)
+        logs = PublisherBatchImportLog.objects.filter(publisher=prof).order_by('-created_at')[:50]
+        data = [
+            {
+                "batch_id": str(log.id),
+                "file_name": log.file_name,
+                "format": log.format,
+                "total_records": log.total_records,
+                "success_count": log.success_count,
+                "error_count": log.error_count,
+                "errors": log.errors,
+                "status": log.status,
+                "created_at": log.created_at.isoformat(),
+            }
+            for log in logs
+        ]
+        return Response({"success": True, "data": data})
 
     def post(self, request):
         import csv

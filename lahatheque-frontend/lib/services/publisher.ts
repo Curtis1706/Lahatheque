@@ -112,10 +112,19 @@ export async function uploadBatchCatalogue(
   file: File,
   format: "onix_3" | "csv" | "json" | "zip"
 ): Promise<BatchImportReport> {
-  return bffPost<BatchImportReport>("/deposits/batch/", {
-    filename: file.name,
-    format,
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  formData.append("format", format);
+
+  const res = await fetch(`${BFF}/deposits/batch/`, {
+    method: "POST",
+    credentials: "include",
+    // Ne pas mettre Content-Type manuellement : le navigateur gère la boundary multipart
+    body: formData,
   });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || "Erreur lors de l'import du lot");
+  return json.data as BatchImportReport;
 }
 
 export async function getBatchImportReports(): Promise<BatchImportReport[]> {
