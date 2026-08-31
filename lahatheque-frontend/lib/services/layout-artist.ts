@@ -11,12 +11,24 @@ import type {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function mapBackendToDeposit(b: any, fallbackUserId?: string): LayoutDeposit {
+  const maquettisteId =
+    b.created_by_id ||
+    (typeof b.created_by === "object" ? String(b.created_by?.id || "") : (typeof b.created_by === "string" ? b.created_by : "")) ||
+    fallbackUserId ||
+    "";
+
+  const maquettisteName =
+    b.created_by_name ||
+    (b.created_by && typeof b.created_by === "object"
+      ? `${b.created_by.first_name || ""} ${b.created_by.last_name || ""}`.trim() || b.created_by.email
+      : "") ||
+    b.maquettiste_name ||
+    "";
+
   return {
     id: String(b.id),
-    maquettiste_id: b.created_by?.id || fallbackUserId || "",
-    maquettiste_name: b.created_by
-      ? `${b.created_by.first_name || ""} ${b.created_by.last_name || ""}`.trim()
-      : b.authors_names || "Maquettiste",
+    maquettiste_id: maquettisteId,
+    maquettiste_name: maquettisteName,
     metadata: {
       title: b.title || "Sans titre",
       subtitle: b.subtitle || "",

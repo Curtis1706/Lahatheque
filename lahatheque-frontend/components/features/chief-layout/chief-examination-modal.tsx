@@ -26,6 +26,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { useAuth } from "@/hooks/use-auth";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 
 interface ChiefExaminationModalProps {
@@ -43,10 +44,21 @@ export function ChiefExaminationModal({
   onValidate,
   onReject,
 }: ChiefExaminationModalProps) {
+  const { user } = useAuth();
   const [mode, setMode] = useState<"view" | "reject">("view");
   const [rejectReason, setRejectReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isCurrentUser = Boolean(
+    user &&
+    deposit &&
+    (
+      (deposit.maquettiste_id && (deposit.maquettiste_id === user.id || deposit.maquettiste_id === String(user.id))) ||
+      (`${user.first_name || ""} ${user.last_name || ""}`.trim().toLowerCase() === (deposit.maquettiste_name || "").toLowerCase()) ||
+      (user.email && (deposit.maquettiste_name || "").toLowerCase().includes(user.email.toLowerCase()))
+    )
+  );
 
   if (!isOpen || !deposit) return null;
 
@@ -116,7 +128,14 @@ export function ChiefExaminationModal({
               )}
               <p className="text-xs text-foreground-muted flex items-center gap-1.5 pt-0.5">
                 <User className="w-3.5 h-3.5 text-gold" />
-                Soumis par <span className="font-semibold text-foreground">{deposit.maquettiste_name}</span>
+                Soumis par{" "}
+                {isCurrentUser ? (
+                  <span className="font-bold text-gold">
+                    Vous {deposit.maquettiste_name && deposit.maquettiste_name !== "Maquettiste" ? `(${deposit.maquettiste_name})` : ""}
+                  </span>
+                ) : (
+                  <span className="font-semibold text-foreground">{deposit.maquettiste_name || "Maquettiste"}</span>
+                )}
                 {deposit.submitted_at && (
                   <span>
                     • {new Date(deposit.submitted_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}

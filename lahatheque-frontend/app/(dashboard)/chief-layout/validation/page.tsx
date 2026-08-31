@@ -6,6 +6,7 @@ import { CheckSquare, Search, Filter, ArrowLeft, User, Eye, CheckCircle2, AlertC
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { useAuth } from "@/hooks/use-auth";
 import { ChiefExaminationModal } from "@/components/features/chief-layout/chief-examination-modal";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 import { getPendingDeposits, validateDeposit, requestRevision } from "@/lib/services/layout-artist";
@@ -13,12 +14,28 @@ import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
 export default function ChefValidationPage() {
+  const { user } = useAuth();
   const [deposits, setDeposits] = useState<LayoutDeposit[]>([]);
   const [disciplines, setDisciplines] = useState<DisciplineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [selectedDeposit, setSelectedDeposit] = useState<LayoutDeposit | null>(null);
+
+  const isCurrentUser = (deposit: LayoutDeposit) => {
+    if (!user) return false;
+    if (deposit.maquettiste_id && (deposit.maquettiste_id === user.id || deposit.maquettiste_id === String(user.id))) {
+      return true;
+    }
+    const currentUserName = `${user.first_name || ""} ${user.last_name || ""}`.trim().toLowerCase();
+    if (currentUserName && deposit.maquettiste_name && deposit.maquettiste_name.toLowerCase() === currentUserName) {
+      return true;
+    }
+    if (user.email && deposit.maquettiste_name && deposit.maquettiste_name.toLowerCase() === user.email.toLowerCase()) {
+      return true;
+    }
+    return false;
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -73,13 +90,13 @@ export default function ChefValidationPage() {
         <button
           type="button"
           onClick={() => setSelectedDeposit(row)}
-          className="flex items-center gap-3 text-left hover:text-navy transition-colors group py-1"
+          className="flex items-center gap-3 text-left hover:text-navy transition-colors group py-1 cursor-pointer"
         >
           <BookCover3D
             title={row.metadata.title}
             authors={row.metadata.authors}
             discipline={row.classification.discipline}
-            coverUrl={row.files.cover_url}
+            coverUrl={row.files?.cover_url}
             size="xs"
           />
           <div className="min-w-0">
@@ -94,12 +111,24 @@ export default function ChefValidationPage() {
     {
       key: "maquettiste_name",
       header: "Maquettiste",
-      cell: (row) => (
-        <span className="text-xs text-foreground font-semibold flex items-center gap-1.5">
-          <User className="w-3.5 h-3.5 text-gold" />
-          {row.maquettiste_name}
-        </span>
-      ),
+      cell: (row) => {
+        const isMine = isCurrentUser(row);
+        return (
+          <span className="text-xs font-semibold flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5 text-gold shrink-0" />
+            {isMine ? (
+              <span className="inline-flex items-center gap-1 text-gold font-bold">
+                Vous
+                {row.maquettiste_name && row.maquettiste_name !== "Maquettiste" && (
+                  <span className="text-[10px] text-foreground-muted font-normal">({row.maquettiste_name})</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-foreground">{row.maquettiste_name || "Maquettiste"}</span>
+            )}
+          </span>
+        );
+      },
     },
     {
       key: "classification.discipline",

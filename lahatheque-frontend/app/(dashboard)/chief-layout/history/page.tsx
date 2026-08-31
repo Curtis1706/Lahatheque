@@ -19,16 +19,34 @@ import {
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { useAuth } from "@/hooks/use-auth";
 import { getValidationHistory } from "@/lib/services/layout-artist";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
 export default function ChefValidationHistoryPage() {
+  const { user } = useAuth();
   const [deposits, setDeposits] = useState<LayoutDeposit[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "revision_requested">("all");
   const [selectedDeposit, setSelectedDeposit] = useState<LayoutDeposit | null>(null);
+
+  const isCurrentUser = (deposit: LayoutDeposit) => {
+    if (!user) return false;
+    if (deposit.maquettiste_id && (deposit.maquettiste_id === user.id || deposit.maquettiste_id === String(user.id))) {
+      return true;
+    }
+    const currentUserName = `${user.first_name || ""} ${user.last_name || ""}`.trim().toLowerCase();
+    if (currentUserName && deposit.maquettiste_name && deposit.maquettiste_name.toLowerCase() === currentUserName) {
+      return true;
+    }
+    if (user.email && deposit.maquettiste_name && deposit.maquettiste_name.toLowerCase() === user.email.toLowerCase()) {
+      return true;
+    }
+    return false;
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -91,25 +109,47 @@ export default function ChefValidationHistoryPage() {
       header: "Ouvrage",
       cell: (row) => (
         <button
+          type="button"
           onClick={() => setSelectedDeposit(row)}
-          className="text-left hover:text-navy group transition-colors"
+          className="flex items-center gap-3 text-left hover:text-navy group transition-colors py-1 cursor-pointer"
         >
-          <p className="font-bold text-xs text-navy group-hover:underline truncate max-w-[220px]">
-            {row.metadata.title}
-          </p>
-          <p className="text-[10px] text-foreground-muted">{row.metadata.authors.join(", ")}</p>
+          <BookCover3D
+            title={row.metadata.title}
+            authors={row.metadata.authors}
+            discipline={row.classification.discipline}
+            coverUrl={row.files?.cover_url}
+            size="xs"
+          />
+          <div className="min-w-0">
+            <p className="font-bold text-xs text-navy group-hover:underline truncate max-w-[200px]">
+              {row.metadata.title}
+            </p>
+            <p className="text-[10px] text-foreground-muted font-mono mt-0.5">{row.metadata.authors.join(", ")}</p>
+          </div>
         </button>
       ),
     },
     {
       key: "maquettiste_name",
       header: "Maquettiste",
-      cell: (row) => (
-        <span className="text-xs text-foreground font-semibold flex items-center gap-1.5">
-          <User className="w-3.5 h-3.5 text-gold shrink-0" />
-          {row.maquettiste_name}
-        </span>
-      ),
+      cell: (row) => {
+        const isMine = isCurrentUser(row);
+        return (
+          <span className="text-xs font-semibold flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5 text-gold shrink-0" />
+            {isMine ? (
+              <span className="inline-flex items-center gap-1 text-gold font-bold">
+                Vous
+                {row.maquettiste_name && row.maquettiste_name !== "Maquettiste" && (
+                  <span className="text-[10px] text-foreground-muted font-normal">({row.maquettiste_name})</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-foreground">{row.maquettiste_name || "Maquettiste"}</span>
+            )}
+          </span>
+        );
+      },
     },
     {
       key: "classification.discipline",
@@ -289,15 +329,34 @@ export default function ChefValidationHistoryPage() {
             </div>
 
             <div className="space-y-4 text-xs">
-              <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-2">
-                <div className="flex justify-between items-start">
-                  <h4 className="font-serif font-bold text-navy text-base">{selectedDeposit.metadata.title}</h4>
-                  <StatusBadge status={selectedDeposit.status} />
+              <div className="p-4 rounded-2xl bg-background-secondary border border-border flex flex-col sm:flex-row gap-4 items-start">
+                <BookCover3D
+                  title={selectedDeposit.metadata.title}
+                  authors={selectedDeposit.metadata.authors}
+                  discipline={selectedDeposit.classification.discipline}
+                  coverUrl={selectedDeposit.files?.cover_url}
+                  size="sm"
+                  className="mx-auto sm:mx-0 shrink-0"
+                />
+                <div className="space-y-2 flex-1 min-w-0">
+                  <div className="flex justify-between items-start gap-2">
+                    <h4 className="font-serif font-bold text-navy text-base">{selectedDeposit.metadata.title}</h4>
+                    <StatusBadge status={selectedDeposit.status} />
+                  </div>
+                  <p className="text-foreground font-semibold">Auteur(s) : {selectedDeposit.metadata.authors.join(", ")}</p>
+                  <p className="text-foreground-muted flex items-center gap-1">
+                    Maquettiste :{" "}
+                    {isCurrentUser(selectedDeposit) ? (
+                      <span className="text-gold font-bold">
+                        Vous {selectedDeposit.maquettiste_name && selectedDeposit.maquettiste_name !== "Maquettiste" ? `(${selectedDeposit.maquettiste_name})` : ""}
+                      </span>
+                    ) : (
+                      <span className="text-foreground font-medium">{selectedDeposit.maquettiste_name || "Maquettiste"}</span>
+                    )}
+                  </p>
+                  <p className="text-foreground-muted">Discipline : {selectedDeposit.classification.discipline}</p>
+                  <p className="text-foreground-muted">Établissement : {selectedDeposit.classification.university}</p>
                 </div>
-                <p className="text-foreground font-semibold">Auteur(s) : {selectedDeposit.metadata.authors.join(", ")}</p>
-                <p className="text-foreground-muted">Maquettiste : {selectedDeposit.maquettiste_name}</p>
-                <p className="text-foreground-muted">Discipline : {selectedDeposit.classification.discipline}</p>
-                <p className="text-foreground-muted">Établissement : {selectedDeposit.classification.university}</p>
               </div>
 
               {selectedDeposit.chef_comment && (
