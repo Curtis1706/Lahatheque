@@ -108,10 +108,23 @@ export default function LegalReviewerPublisherDepositsPage() {
       key: "title",
       header: "Ouvrage & Éditeur",
       cell: (row) => (
-        <div className="space-y-0.5">
-          <p className="font-semibold text-xs text-foreground line-clamp-1">{row.title}</p>
-          <p className="text-[10px] text-gold font-medium">{row.publisher_name}</p>
-          <span className="text-[10px] text-foreground-muted font-mono">{row.isbn_digital}</span>
+        <div className="flex items-center gap-3">
+          {row.cover_url && row.cover_url !== "/placeholder-cover.jpg" ? (
+            <img
+              src={row.cover_url}
+              alt=""
+              className="w-8 h-11 rounded-md object-cover border border-border shrink-0 shadow-2xs"
+            />
+          ) : (
+            <div className="w-8 h-11 rounded-md bg-navy/5 border border-border flex items-center justify-center shrink-0">
+              <BookOpen className="w-3.5 h-3.5 text-gold/70" />
+            </div>
+          )}
+          <div className="space-y-0.5 min-w-0">
+            <p className="font-semibold text-xs text-foreground line-clamp-1">{row.title}</p>
+            <p className="text-[10px] text-gold font-medium">{row.publisher_name}</p>
+            <span className="text-[10px] text-foreground-muted font-mono">{row.isbn_digital}</span>
+          </div>
         </div>
       ),
     },

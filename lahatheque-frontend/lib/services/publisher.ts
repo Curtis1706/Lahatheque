@@ -118,11 +118,13 @@ export async function extractBookMetadataWithAi(payload: {
 
 export async function createPublisherBook(
   data: Partial<PublisherBook>,
-  file?: File | null
+  file?: File | null,
+  coverFile?: File | null
 ): Promise<PublisherBook> {
-  if (file) {
+  if (file || coverFile) {
     const formData = new FormData();
-    formData.append("file", file, file.name);
+    if (file) formData.append("file", file, file.name);
+    if (coverFile) formData.append("cover", coverFile, coverFile.name);
     Object.entries(data).forEach(([key, val]) => {
       if (val !== undefined && val !== null) {
         if (typeof val === "object") {
@@ -237,6 +239,7 @@ export interface PublisherDepositForReview {
   editorial_comment: string;
   rights_status: string;
   rights_comment: string;
+  cover_url?: string | null;
   file_url: string | null;
   created_at: string;
 }

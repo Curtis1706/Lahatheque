@@ -150,19 +150,32 @@ export default function PublisherSubmissionsPage() {
               key={b.id}
               className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs hover:border-gold transition-colors"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono font-bold text-xs text-gold">ISBN : {b.isbn_digital}</span>
-                    <span className="text-[11px] font-semibold text-navy bg-navy-light px-2 py-0.5 rounded-md">
-                      {b.discipline}
-                    </span>
-                    <StatusBadge status={b.status} />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+                <div className="flex items-start gap-3.5">
+                  {b.cover_url && b.cover_url !== "/placeholder-cover.jpg" ? (
+                    <img
+                      src={b.cover_url}
+                      alt=""
+                      className="w-12 h-16 rounded-xl object-cover border border-border shrink-0 shadow-xs"
+                    />
+                  ) : (
+                    <div className="w-12 h-16 rounded-xl bg-navy/5 border border-border flex items-center justify-center shrink-0">
+                      <FileText className="w-5 h-5 text-gold/70" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono font-bold text-xs text-gold">ISBN : {b.isbn_digital}</span>
+                      <span className="text-[11px] font-semibold text-navy bg-navy-light px-2 py-0.5 rounded-md">
+                        {b.discipline}
+                      </span>
+                      <StatusBadge status={b.status} />
+                    </div>
+                    <h3 className="font-serif font-bold text-navy text-base leading-snug">{b.title}</h3>
+                    <p className="text-xs text-foreground-muted mt-0.5">
+                      Auteur(s) : <span className="font-semibold text-foreground">{b.authors.join(", ")}</span> • Déposé le {new Date(b.created_at).toLocaleDateString("fr-FR")}
+                    </p>
                   </div>
-                  <h3 className="font-serif font-bold text-navy text-base leading-snug">{b.title}</h3>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    Auteur(s) : <span className="font-semibold text-foreground">{b.authors.join(", ")}</span> • Déposé le {new Date(b.created_at).toLocaleDateString("fr-FR")}
-                  </p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">

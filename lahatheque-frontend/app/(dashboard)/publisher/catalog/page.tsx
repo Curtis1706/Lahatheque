@@ -43,9 +43,22 @@ export default function PublisherCatalogPage() {
       key: "title",
       header: "Ouvrage & ISBN",
       cell: (row) => (
-        <Link href={`/publisher/catalog/${row.id}`} className="hover:text-navy transition-colors">
-          <p className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[260px]">{row.title}</p>
-          <p className="text-[10px] text-foreground-muted font-mono">ISBN : {row.isbn_digital}</p>
+        <Link href={`/publisher/catalog/${row.id}`} className="hover:text-navy transition-colors flex items-center gap-3">
+          {row.cover_url && row.cover_url !== "/placeholder-cover.jpg" ? (
+            <img
+              src={row.cover_url}
+              alt=""
+              className="w-8 h-11 rounded-md object-cover border border-border shrink-0 shadow-2xs"
+            />
+          ) : (
+            <div className="w-8 h-11 rounded-md bg-navy/5 border border-border flex items-center justify-center shrink-0">
+              <BookOpen className="w-3.5 h-3.5 text-gold/70" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[260px]">{row.title}</p>
+            <p className="text-[10px] text-foreground-muted font-mono">ISBN : {row.isbn_digital}</p>
+          </div>
         </Link>
       ),
     },

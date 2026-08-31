@@ -370,6 +370,17 @@ class PublisherDepositsView(APIView):
         except Exception:
             return ""
 
+    def _save_uploaded_cover(self, request):
+        from django.core.files.storage import default_storage
+        uploaded = request.FILES.get("cover") or request.FILES.get("cover_image")
+        if not uploaded:
+            return ""
+        try:
+            saved_path = default_storage.save(f"covers/{uploaded.name}", uploaded)
+            return default_storage.url(saved_path)
+        except Exception:
+            return ""
+
     def post(self, request):
         import json as json_lib
         user = request.user
@@ -422,6 +433,9 @@ class PublisherDepositsView(APIView):
             except Exception:
                 protection_config = {}
 
+        cover_uploaded_url = self._save_uploaded_cover(request)
+        final_cover_url = cover_uploaded_url or data.get("cover_url", "/placeholder-cover.jpg")
+
         deposit = PublisherBookDeposit.objects.create(
             publisher=prof,
             title=title,
@@ -441,7 +455,7 @@ class PublisherDepositsView(APIView):
             allowed_territories=allowed_territories,
             summary=data.get("summary", "Ouvrage déposé pour examen par le comité éditorial."),
             authors_bio=data.get("authors_bio", ""),
-            cover_url=data.get("cover_url", "/placeholder-cover.jpg"),
+            cover_url=final_cover_url,
             file_url=self._save_uploaded_file(request) if request.FILES.get("file") else data.get("file_url", ""),
             file_format=data.get("file_format", "pdf"),
             licence_type=data.get("licence_type", "tous_droits_reserves"),
@@ -1039,6 +1053,7 @@ class PublisherDepositReviewListView(APIView):
             "editorial_comment": d.editorial_comment,
             "rights_status": d.rights_status,
             "rights_comment": d.rights_comment,
+            "cover_url": d.cover_url if (d.cover_url and d.cover_url != "/placeholder-cover.jpg") else None,
             "file_url": d.file_url,
             "created_at": d.created_at.isoformat(),
         } for d in qs]
@@ -1134,45 +1149,53 @@ class PublisherDepositPublishView(APIView):
                 )
             }, status=400)
 
-        discipline_obj, _ = Discipline.objects.get_or_create(name=deposit.discipline)
+        try:
+            discipline_obj, _ = Discipline.objects.get_or_create(name=deposit.discipline)
 
-        ouvrage = Ouvrage.objects.create(
-            title=deposit.title,
-            subtitle=deposit.subtitle,
-            isbn=deposit.isbn_digital,
-            publisher=deposit.publisher,
-            discipline=discipline_obj,
-            language=deposit.language,
-            summary=deposit.summary,
-            format_type=deposit.file_format,
-            file=deposit.file_url,
-            price_digital=deposit.price,
-            status="published",
-        )
+            ouvrage = Ouvrage.objects.create(
+                title=deposit.title,
+                subtitle=deposit.subtitle,
+                isbn=deposit.isbn_digital[:64] if deposit.isbn_digital else "",
+                publisher=deposit.publisher,
+                discipline=discipline_obj,
+                language=deposit.language,
+                summary=deposit.summary,
+                format_type=deposit.file_format,
+                file=deposit.file_url,
+                cover_image=deposit.cover_url if (deposit.cover_url and deposit.cover_url != "/placeholder-cover.jpg") else None,
+                price_digital=deposit.price,
+                status="published",
+            )
 
-        if isinstance(deposit.authors, list):
-            for author_name in deposit.authors:
-                if author_name and isinstance(author_name, str):
-                    parts = author_name.strip().split(maxsplit=1)
-                    first_name = parts[0] if parts else "Auteur"
-                    last_name = parts[1] if len(parts) > 1 else ""
-                    author_obj, _ = BookAuthor.objects.get_or_create(
-                        first_name=first_name,
-                        last_name=last_name,
-                        defaults={"biography": ""}
-                    )
-                    ouvrage.authors.add(author_obj)
+            if isinstance(deposit.authors, list):
+                for author_name in deposit.authors:
+                    if author_name and isinstance(author_name, str):
+                        parts = author_name.strip().split(maxsplit=1)
+                        first_name = parts[0] if parts else "Auteur"
+                        last_name = parts[1] if len(parts) > 1 else ""
+                        author_obj, _ = BookAuthor.objects.get_or_create(
+                            first_name=first_name,
+                            last_name=last_name,
+                            defaults={"biography": ""}
+                        )
+                        ouvrage.authors.add(author_obj)
 
-        deposit.status = PublisherDepositStatus.PUBLISHED
-        deposit.save(update_fields=["status"])
+            deposit.status = PublisherDepositStatus.PUBLISHED
+            deposit.validation_step = PublisherValidationStep.STEP_5
+            deposit.save(update_fields=["status", "validation_step"])
 
-        _notify_publisher_of_review(deposit, "publication", "approved", "Votre ouvrage est désormais publié sur la vitrine LAHAThèque.")
+            _notify_publisher_of_review(deposit, "publication", "approved", "Votre ouvrage est désormais publié sur la vitrine LAHAThèque.")
 
-        return Response({
-            "success": True,
-            "message": f"« {deposit.title} » publié avec succès.",
-            "data": {"id": str(deposit.id), "status": deposit.status}
-        })
+            return Response({
+                "success": True,
+                "message": f"« {deposit.title} » publié avec succès.",
+                "data": {"id": str(deposit.id), "status": deposit.status}
+            })
+        except Exception as e:
+            return Response({
+                "success": False,
+                "error": f"Erreur lors de la création de l'ouvrage sur la vitrine : {str(e)}"
+            }, status=500)
 
 
 def _notify_publisher_of_review(deposit, volet, decision, comment):

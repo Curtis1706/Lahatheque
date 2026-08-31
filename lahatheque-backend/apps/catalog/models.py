@@ -35,7 +35,7 @@ class Ouvrage(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    isbn = models.CharField(max_length=17, blank=True, default='')
+    isbn = models.CharField(max_length=64, blank=True, default='')
     title = models.CharField(max_length=255)
     subtitle = models.CharField(max_length=255, blank=True)
     publisher = models.ForeignKey('publishers_portal.Publisher', on_delete=models.PROTECT, related_name='ouvrages', null=True, blank=True)
