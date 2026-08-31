@@ -7,7 +7,7 @@ import {
   IconRosetteDiscountCheck,
   IconDevices,
   IconCoin,
-  IconWallet,
+  IconCertificate,
 } from "@tabler/icons-react";
 
 const features = [
@@ -36,10 +36,10 @@ const features = [
       "Des offres pensées pour le pouvoir d'achat des étudiants africains et des formules d'abonnement flexibles.",
   },
   {
-    icon: IconWallet,
-    title: "Paiements adaptés aux réalités locales",
+    icon: IconCertificate,
+    title: "Ouvrages adaptés aux réalités locales",
     description:
-      "Des solutions de règlement fluides et sécurisées ancrées dans nos réalités : Mobile Money (MTN, Moov, Orange, Wave, Celtiis), cartes bancaires et transactions instantanées.",
+      "Des contenus académiques, juridiques (OHADA), économiques et scientifiques en prise directe avec les contextes, programmes universitaires et réalités du continent africain.",
   },
 ];
 
