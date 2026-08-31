@@ -125,7 +125,7 @@ export default function HomePage() {
           <div className="relative z-0 flex items-end justify-center lg:justify-end w-full lg:col-span-7 pr-0 mr-0">
             <div className="relative w-full flex items-end justify-center lg:justify-end">
               <Image
-                src="/hero-section-img.jpg"
+                src="/hero-section.jpg"
                 alt="Bibliothèque numérique LAHAThèque — Livres et savoir académique"
                 width={1600}
                 height={1000}

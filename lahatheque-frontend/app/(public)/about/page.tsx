@@ -84,7 +84,7 @@ export default function AboutPage() {
     <div className="min-h-screen bg-background text-foreground py-6 sm:py-8 lg:py-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 lg:space-y-16">
         
-        {/* 1. HERO BANNER PRINCIPALE (Image + Navy Fade - Même design que la page Auteur) */}
+        {/* 1. HERO BANNER PRINCIPALE (Image + Navy Fade) */}
         <section className="relative rounded-3xl overflow-hidden shadow-xl bg-navy border border-navy-hover">
           
           {/* Photo de fond sur la droite */}
@@ -104,11 +104,11 @@ export default function AboutPage() {
 
           {/* Badges de confiance flottants en haut à droite */}
           <div className="absolute top-6 right-6 z-20 hidden md:flex flex-col gap-2.5">
-            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
+            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-navy-hover px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
               <GraduationCap className="w-4 h-4 text-gold" />
               <span>Excellence académique</span>
             </div>
-            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
+            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-navy-hover px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
               <Globe className="w-4 h-4 text-gold" />
               <span>Rayonnement panafricain</span>
             </div>
@@ -160,7 +160,7 @@ export default function AboutPage() {
               </Link>
               <Link
                 href="/authors"
-                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-navy-hover hover:bg-navy-dark text-white font-sans font-bold text-xs sm:text-sm border border-white/20 transition-all duration-200 cursor-pointer"
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-navy-hover hover:bg-navy-dark text-white font-sans font-bold text-xs sm:text-sm border border-navy-hover transition-all duration-200 cursor-pointer"
               >
                 <span>Espace Auteurs</span>
               </Link>
@@ -170,8 +170,8 @@ export default function AboutPage() {
 
         </section>
 
-        {/* 2. STORYTELLING SECTION (Notre Défi & Vision) */}
-        <section className="bg-background-secondary rounded-3xl border border-border p-8 sm:p-12 lg:p-16">
+        {/* 2. STORYTELLING SECTION (Notre Défi & Vision - Épuré et fluide) */}
+        <section className="py-6 sm:py-10">
           <div className="max-w-4xl mx-auto space-y-10">
             
             {/* En-tête */}
@@ -193,7 +193,7 @@ export default function AboutPage() {
                 Pendant longtemps, trouver un manuel universitaire, une revue scientifique ou un ouvrage spécialisé relevait du parcours du combattant. Les bibliothèques physiques étaient sous-dotées, les importations trop onéreuses, et les délais souvent incompatibles avec l'urgence académique.
               </p>
               
-              <div className="my-8 bg-background p-6 rounded-2xl border border-border border-l-4 border-l-gold shadow-sm">
+              <div className="my-8 bg-background-secondary p-6 sm:p-8 rounded-2xl border border-border">
                 <p className="font-serif text-base sm:text-lg text-navy font-bold leading-relaxed">
                   LAHAThèque est bien plus qu'un diffuseur d'ouvrages numériques. C'est une passerelle entre le savoir et celles et ceux qui en ont besoin : une bibliothèque moderne pensée pour l'Afrique et connectée au monde.
                 </p>
@@ -227,7 +227,7 @@ export default function AboutPage() {
                   ].map((val, idx) => (
                     <span 
                       key={idx} 
-                      className="px-4 py-2 bg-navy border border-navy text-white rounded-xl text-xs font-bold tracking-wide shadow-xs"
+                      className="px-4 py-2 bg-navy text-white rounded-xl text-xs font-bold tracking-wide shadow-xs"
                     >
                       {val}
                     </span>
