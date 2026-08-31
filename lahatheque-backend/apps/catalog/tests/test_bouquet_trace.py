@@ -3,7 +3,7 @@ Tests unitaires — Fiches W2/W3 : traçabilité des lectures via bouquet sur Tr
 """
 from datetime import date, timedelta
 from unittest.mock import patch
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from apps.accounts.models import User
 from apps.catalog.models import Ouvrage, Discipline
@@ -13,6 +13,7 @@ from apps.protection.models import TraceAcces
 from apps.protection.derived_materializer import DerivedMaterializer
 
 
+@override_settings(ENABLE_UNIVERSITY_AFFILIATION_GATING=True)
 class BouquetTraceTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()

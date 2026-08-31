@@ -479,6 +479,13 @@ class StudentUniversityView(APIView):
 
     def post(self, request):
         """Demande d'affiliation universitaire."""
+        from django.conf import settings as django_settings
+        if not getattr(django_settings, "ENABLE_UNIVERSITY_AFFILIATION_GATING", False):
+            return Response({
+                "success": False,
+                "error": "Cette fonctionnalité n'est pas activée sur la plateforme actuellement."
+            }, status=403)
+
         user = request.user
 
         # Une seule affiliation active à la fois

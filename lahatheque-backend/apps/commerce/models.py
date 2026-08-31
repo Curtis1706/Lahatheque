@@ -2,6 +2,7 @@
 import uuid
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 class Currency(models.Model):
     code = models.CharField(max_length=3, unique=True) # ISO 4217: XOF, XAF, CDF, EUR, USD
@@ -431,4 +432,24 @@ class WholesaleNotification(models.Model):
         ordering = ["-created_at"]
 
 
+class ClientBouquetSubscription(models.Model):
+    """Souscription directe d'un Client à un bouquet documentaire (CDC section 8)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bouquet_subscriptions'
+    )
+    offering_id = models.UUIDField()
+    title = models.CharField(max_length=255)
+    price_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    currency = models.CharField(max_length=10, default="XOF")
+    status = models.CharField(
+        max_length=20,
+        choices=[("active", "Actif"), ("expired", "Expiré"), ("cancelled", "Annulé")],
+        default="active"
+    )
+    start_date = models.DateField(default=timezone.now)
+    end_date = models.DateField()
+    created_at = models.DateTimeField(default=timezone.now)
 
+    class Meta:
+        ordering = ["-created_at"]

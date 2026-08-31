@@ -100,9 +100,13 @@ export function DashboardSidebar() {
               { label: "Espace Lecteur", href: "/student", icon: <LayoutDashboard className="size-4" /> },
               { label: "Catalogue & Recherche", href: "/student/catalog", icon: <Search className="size-4" /> },
               { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="size-4" /> },
+              { label: "Bouquets Documentaires", href: "/student/bouquets", icon: <Layers className="size-4" /> },
               { label: "Achats & Commandes", href: "/student/orders", icon: <PackageCheck className="size-4" /> },
               { label: "Historique & Stats", href: "/student/history", icon: <History className="size-4" /> },
-              { label: "Mon Université", href: "/student/university", icon: <GraduationCap className="size-4" /> },
+              // Désactivé conformément au CDC v3.2 (le Client souscrit directement aux
+              // bouquets, sans affiliation universitaire — voir Fiches X1-X4). Réactiver
+              // cette ligne si le besoin métier évolue.
+              // { label: "Mon Université", href: "/student/university", icon: <GraduationCap className="size-4" /> },
               { label: "Profil & Paramètres", href: "/student/profile", icon: <UserIcon className="size-4" /> },
             ],
           },
@@ -140,7 +144,8 @@ export function DashboardSidebar() {
               { label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="size-4" /> },
               { label: "Catalogue Universitaire", href: "/university/catalog", icon: <BookOpen className="size-4" /> },
               { label: "Statistiques & Usage", href: "/university/stats", icon: <FileBarChart className="size-4" /> },
-              { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="size-4" /> },
+              // Désactivé conformément au CDC v3.2 — voir Fiches X1-X4.
+              // { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="size-4" /> },
               { label: "Commandes Papier", href: "/university/purchases", icon: <PackageCheck className="size-4" /> },
               { label: "Redevances (15%)", href: "/university/royalties", icon: <DollarSign className="size-4" /> },
               { label: "Profil & Paramètres", href: "/university/profile", icon: <Building2 className="size-4" /> },

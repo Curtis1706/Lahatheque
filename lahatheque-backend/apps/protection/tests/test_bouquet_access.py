@@ -4,13 +4,15 @@ Vérifie que l'accès est réellement limité aux livres inclus dans le bouquet 
 jamais étendu au catalogue entier, et respecte les dates de validité.
 """
 from datetime import date, timedelta
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from apps.accounts.models import User
 from apps.catalog.models import Ouvrage, Discipline
 from apps.partners.models import Institution, StudentAffiliation, BouquetOffering, UniversityBouquetSubscription
+from apps.commerce.models import ClientBouquetSubscription
 from apps.protection.access_service import AccessService
 
 
+@override_settings(ENABLE_UNIVERSITY_AFFILIATION_GATING=True)
 class BouquetAccessTestCase(TestCase):
     def setUp(self):
         self.institution = Institution.objects.create(
@@ -108,3 +110,36 @@ class BouquetAccessTestCase(TestCase):
         result = AccessService.check_user_book_access(self.student, custom_book.id)
         self.assertTrue(result["access_granted"])
         self.assertEqual(result["reason"], "bouquet_access")
+
+
+class ClientDirectBouquetAccessTestCase(TestCase):
+    """
+    Tests unitaires — Fiche X4 : Accès direct du Client aux livres d'un bouquet souscrit
+    (conforme CDC section 8), indépendant de toute affiliation universitaire.
+    """
+    def setUp(self):
+        self.discipline = Discipline.objects.create(name="Gestion", code_dewey="650")
+        self.book_in_bouquet = Ouvrage.objects.create(
+            title="Manuel de Gestion", isbn="978-0-00000-099-9",
+            discipline=self.discipline, format_type="pdf",
+            price_digital=6000, status="published"
+        )
+        self.client_user = User.objects.create_user(
+            username="client_direct", email="client@direct.bj",
+            password="TestPass123!", role="student"
+        )
+        self.offering = BouquetOffering.objects.create(
+            title="Bouquet Gestion Direct", bouquet_type="discipline",
+            discipline="Gestion", annual_price=50000, is_active=True
+        )
+        self.sub = ClientBouquetSubscription.objects.create(
+            user=self.client_user, offering_id=self.offering.id,
+            title=self.offering.title, price_paid=50000,
+            status="active", start_date=date.today(), end_date=date.today() + timedelta(days=365)
+        )
+
+    def test_direct_client_subscription_grants_access(self):
+        result = AccessService.check_user_book_access(self.client_user, self.book_in_bouquet.id)
+        self.assertTrue(result["access_granted"])
+        self.assertEqual(result["reason"], "client_bouquet_subscription")
+
