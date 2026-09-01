@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ShoppingCart, Building2, Send, Plus, Trash2, BookOpen, AlertCircle } from "lucide-react";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getWholesalerBooks, createWholesalerOrder } from "@/lib/services/wholesaler";
 import type { WholesalerBookItem, WholesalerCartItem } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
@@ -192,17 +193,14 @@ export default function NewWholesalerOrderPage() {
                 {cartItems.map((ci) => (
                   <div key={ci.book_id} className="p-4 rounded-2xl bg-background-secondary border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-3">
-                      {ci.book.cover_url ? (
-                        <img
-                          src={ci.book.cover_url}
-                          alt={ci.book.title}
-                          className="w-10 h-14 object-cover rounded-lg border border-border shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-14 bg-navy/10 rounded-lg border border-border shrink-0 flex items-center justify-center">
-                          <BookOpen className="w-5 h-5 text-gold" />
-                        </div>
-                      )}
+                      <BookCover3D
+                        title={ci.book.title}
+                        authors={ci.book.authors}
+                        discipline={ci.book.discipline}
+                        coverUrl={ci.book.cover_url}
+                        size="xs"
+                        interactive={false}
+                      />
                       <div>
                         <p className="font-serif font-bold text-navy line-clamp-1">{ci.book.title}</p>
                         <p className="text-[10px] text-foreground-muted font-mono">{ci.book.isbn_digital}</p>
@@ -217,7 +215,7 @@ export default function NewWholesalerOrderPage() {
                           onClick={() => handleUpdateQty(ci.book_id, "digital_licenses_qty", ci.digital_licenses_qty > 0 ? 0 : 1)}
                           className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
                             ci.digital_licenses_qty > 0
-                              ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                              ? "bg-success/10 text-success border-success/30"
                               : "bg-background text-foreground-muted border-border hover:text-navy"
                           }`}
                         >
@@ -237,7 +235,7 @@ export default function NewWholesalerOrderPage() {
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(ci.book_id)}
-                        className="p-2 text-foreground-muted hover:text-red-600 transition-colors"
+                        className="p-2 text-foreground-muted hover:text-error transition-colors"
                         title="Retirer"
                       >
                         <Trash2 className="w-4 h-4" />

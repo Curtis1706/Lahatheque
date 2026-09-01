@@ -14,6 +14,7 @@ import {
   Download,
   FileText,
 } from "lucide-react";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
@@ -108,22 +109,20 @@ export default function ChiefLayoutPublisherDepositsPage() {
     {
       key: "title",
       header: "Ouvrage & Éditeur",
+      className: "min-w-[280px]",
       cell: (row) => (
-        <div className="flex items-center gap-3">
-          {row.cover_url && row.cover_url !== "/placeholder-cover.jpg" ? (
-            <img
-              src={row.cover_url}
-              alt=""
-              className="w-8 h-11 rounded-md object-cover border border-border shrink-0 shadow-2xs"
-            />
-          ) : (
-            <div className="w-8 h-11 rounded-md bg-navy/5 border border-border flex items-center justify-center shrink-0">
-              <BookOpen className="w-3.5 h-3.5 text-gold/70" />
-            </div>
-          )}
+        <div className="flex items-center gap-3 py-1">
+          <BookCover3D
+            title={row.title}
+            authors={row.publisher_name}
+            discipline={row.discipline}
+            coverUrl={row.cover_url}
+            size="xs"
+            interactive={false}
+          />
           <div className="space-y-0.5 min-w-0">
-            <p className="font-semibold text-xs text-foreground line-clamp-1">{row.title}</p>
-            <p className="text-[10px] text-gold font-medium">{row.publisher_name}</p>
+            <p className="font-serif font-bold text-xs text-navy leading-snug line-clamp-1">{row.title}</p>
+            <p className="text-[11px] text-gold font-medium">{row.publisher_name}</p>
             <span className="text-[10px] text-foreground-muted font-mono">{row.isbn_digital}</span>
           </div>
         </div>

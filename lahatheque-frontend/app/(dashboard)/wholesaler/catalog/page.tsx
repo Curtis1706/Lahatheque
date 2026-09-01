@@ -17,6 +17,7 @@ import {
   FileText,
   Book,
 } from "lucide-react";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { WholesaleCartDrawer } from "@/components/features/wholesaler/wholesale-cart-drawer";
 import { BookPreviewModal } from "@/components/features/wholesaler/book-preview-modal";
@@ -131,21 +132,17 @@ export default function WholesalerCatalogPage() {
     {
       key: "title",
       header: "Ouvrage & Référence",
-      className: "min-w-[320px]",
+      className: "min-w-[340px]",
       cell: (row) => (
         <div className="flex items-center gap-3.5 py-1">
-          <div className="w-12 h-16 rounded-xl overflow-hidden bg-background-secondary border border-border shrink-0 shadow-xs flex items-center justify-center">
-            {row.cover_url && row.cover_url !== "/placeholder-cover.jpg" ? (
-              <img
-                src={row.cover_url}
-                alt={row.title}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <BookOpen className="w-5 h-5 text-navy/40" />
-            )}
-          </div>
+          <BookCover3D
+            title={row.title}
+            authors={row.authors}
+            discipline={row.discipline}
+            coverUrl={row.cover_url}
+            size="xs"
+            interactive={false}
+          />
           <div className="min-w-0 space-y-0.5">
             <h4 className="font-serif font-bold text-xs text-navy leading-snug line-clamp-2" title={row.title}>
               {row.title}
@@ -409,27 +406,20 @@ export default function WholesalerCatalogPage() {
               className="p-5 rounded-3xl bg-background border border-border space-y-4 shadow-xs hover:border-gold/60 hover:shadow-md transition-all flex flex-col justify-between"
             >
               <div className="space-y-3">
-                {/* Visuel Couverture Réelle ou Placeholder élégant */}
-                <div className="relative rounded-2xl overflow-hidden bg-background-secondary border border-border aspect-[3/4] flex items-center justify-center group shadow-xs">
-                  {book.cover_url && book.cover_url !== "/placeholder-cover.jpg" ? (
-                    <img
-                      src={book.cover_url}
-                      alt={book.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="p-4 text-center space-y-2">
-                      <BookOpen className="w-10 h-10 text-navy/40 mx-auto" />
-                      <span className="text-[10px] font-bold text-navy uppercase block line-clamp-2">
-                        {book.title}
-                      </span>
-                    </div>
-                  )}
+                {/* Visuel Couverture Réelle ou 3D Standardisée LAHAThèque */}
+                <div className="relative rounded-2xl overflow-hidden bg-background-secondary/60 border border-border p-3 flex items-center justify-center group shadow-xs">
+                  <BookCover3D
+                    title={book.title}
+                    authors={book.authors}
+                    discipline={book.discipline}
+                    coverUrl={book.cover_url}
+                    size="md"
+                    className="w-28 h-40 sm:w-32 sm:h-44"
+                  />
                   <button
                     type="button"
                     onClick={() => setPreviewBook(book)}
-                    className="absolute inset-0 bg-navy/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1.5 backdrop-blur-xs cursor-pointer"
+                    className="absolute inset-0 bg-navy/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1.5 backdrop-blur-xs cursor-pointer rounded-2xl"
                   >
                     <Eye className="w-4 h-4 text-gold" />
                     Consulter Extrait

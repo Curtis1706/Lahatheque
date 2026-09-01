@@ -16,6 +16,7 @@ import {
   Percent,
   Package,
 } from "lucide-react";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getWholesalerTrendingData } from "@/lib/services/wholesaler";
 import type { WholesaleTrendBook, WholesalerBookItem } from "@/lib/types/wholesaler";
 import { WholesaleOrderModal } from "@/components/features/wholesaler/wholesale-order-modal";
@@ -259,19 +260,16 @@ export default function WholesalerNotificationsPage() {
                         className="group p-4 sm:p-5 rounded-3xl bg-background border border-border hover:border-gold/50 transition-all duration-200 flex flex-col justify-between gap-4 shadow-xs"
                       >
                         <div className="space-y-3">
-                          {/* En-tête de carte avec Couverture & Infos */}
+                          {/* En-tête de carte avec Couverture 3D & Infos */}
                           <div className="flex gap-3.5">
-                            {b.cover_url ? (
-                              <img
-                                src={b.cover_url}
-                                alt={b.title}
-                                className="w-16 h-22 object-cover rounded-xl border border-border shrink-0 shadow-xs group-hover:scale-102 transition-transform"
-                              />
-                            ) : (
-                              <div className="w-16 h-22 rounded-xl bg-navy/10 border border-border flex items-center justify-center shrink-0">
-                                <BookOpen className="w-6 h-6 text-navy/40" />
-                              </div>
-                            )}
+                            <BookCover3D
+                              title={b.title}
+                              authors={b.authors}
+                              discipline={b.discipline}
+                              coverUrl={b.cover_url}
+                              size="xs"
+                              interactive={false}
+                            />
 
                             <div className="min-w-0 flex-1 space-y-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -409,17 +407,14 @@ export default function WholesalerNotificationsPage() {
                           {/* En-tête avec badge classement */}
                           <div className="flex gap-3.5">
                             <div className="relative shrink-0">
-                              {b.cover_url ? (
-                                <img
-                                  src={b.cover_url}
-                                  alt={b.title}
-                                  className="w-16 h-22 object-cover rounded-xl border border-border shadow-xs group-hover:scale-102 transition-transform"
-                                />
-                              ) : (
-                                <div className="w-16 h-22 rounded-xl bg-navy/10 border border-border flex items-center justify-center">
-                                  <BookOpen className="w-6 h-6 text-navy/40" />
-                                </div>
-                              )}
+                              <BookCover3D
+                                title={b.title}
+                                authors={b.authors}
+                                discipline={b.discipline}
+                                coverUrl={b.cover_url}
+                                size="xs"
+                                interactive={false}
+                              />
                               <span
                                 className={`absolute -top-2 -left-2 size-6 rounded-full flex items-center justify-center font-mono font-bold text-xs shadow-xs border ${
                                   isTop1

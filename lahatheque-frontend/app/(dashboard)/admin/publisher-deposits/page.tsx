@@ -12,6 +12,7 @@ import {
   Download,
   FileText,
 } from "lucide-react";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
@@ -152,17 +153,14 @@ export default function AdminPublisherDepositsPage() {
     <div className="space-y-3 bg-background p-4 rounded-2xl border border-border">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3">
-          {row.cover_url && row.cover_url !== "/placeholder-cover.jpg" ? (
-            <img
-              src={row.cover_url}
-              alt=""
-              className="w-9 h-12 rounded-md object-cover border border-border shrink-0 shadow-2xs"
-            />
-          ) : (
-            <div className="w-9 h-12 rounded-md bg-navy/5 border border-border flex items-center justify-center shrink-0">
-              <BookOpen className="w-4 h-4 text-gold/70" />
-            </div>
-          )}
+          <BookCover3D
+            title={row.title}
+            authors={row.publisher_name}
+            discipline={row.discipline}
+            coverUrl={row.cover_url}
+            size="xs"
+            interactive={false}
+          />
           <div className="min-w-0">
             <h4 className="font-serif font-bold text-navy text-sm leading-snug">
               {row.title}
@@ -236,20 +234,17 @@ export default function AdminPublisherDepositsPage() {
     {
       key: "title",
       header: "Ouvrage & Éditeur",
-      className: "min-w-[260px]",
+      className: "min-w-[280px]",
       cell: (row) => (
         <div className="flex items-center gap-3 py-0.5">
-          {row.cover_url && row.cover_url !== "/placeholder-cover.jpg" ? (
-            <img
-              src={row.cover_url}
-              alt=""
-              className="w-9 h-12 rounded-md object-cover border border-border shrink-0 shadow-2xs"
-            />
-          ) : (
-            <div className="w-9 h-12 rounded-md bg-navy/5 border border-border flex items-center justify-center shrink-0">
-              <BookOpen className="w-4 h-4 text-gold/70" />
-            </div>
-          )}
+          <BookCover3D
+            title={row.title}
+            authors={row.publisher_name}
+            discipline={row.discipline}
+            coverUrl={row.cover_url}
+            size="xs"
+            interactive={false}
+          />
           <div className="space-y-0.5 min-w-0">
             <p className="font-serif font-bold text-xs sm:text-sm text-navy line-clamp-1">{row.title}</p>
             <p className="text-[11px] text-gold font-medium">{row.publisher_name}</p>

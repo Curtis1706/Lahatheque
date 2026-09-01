@@ -16,6 +16,7 @@ import {
   Search,
   Filter,
 } from "lucide-react";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getPublisherBooks } from "@/lib/services/publisher";
 import type { PublisherBook, ValidationStep } from "@/lib/types/publisher";
@@ -152,17 +153,14 @@ export default function PublisherSubmissionsPage() {
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
                 <div className="flex items-start gap-3.5">
-                  {b.cover_url && b.cover_url !== "/placeholder-cover.jpg" ? (
-                    <img
-                      src={b.cover_url}
-                      alt=""
-                      className="w-12 h-16 rounded-xl object-cover border border-border shrink-0 shadow-xs"
-                    />
-                  ) : (
-                    <div className="w-12 h-16 rounded-xl bg-navy/5 border border-border flex items-center justify-center shrink-0">
-                      <FileText className="w-5 h-5 text-gold/70" />
-                    </div>
-                  )}
+                  <BookCover3D
+                    title={b.title}
+                    authors={b.authors}
+                    discipline={b.discipline}
+                    coverUrl={b.cover_url}
+                    size="xs"
+                    interactive={false}
+                  />
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-mono font-bold text-xs text-gold">ISBN : {b.isbn_digital}</span>
