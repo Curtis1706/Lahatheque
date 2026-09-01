@@ -414,8 +414,10 @@ class StudentHistoryStatsView(APIView):
         timeline = [
             {
                 'id': str(s.id),
-                'ouvrage_title': s.ouvrage.title,
-                'ouvrage_discipline': s.ouvrage.discipline.name if s.ouvrage.discipline else '',
+                'ouvrage_id': str(s.ouvrage.id) if s.ouvrage else '',
+                'ouvrage_title': s.ouvrage.title if s.ouvrage else 'Ouvrage',
+                'ouvrage_discipline': s.ouvrage.discipline.name if (s.ouvrage and s.ouvrage.discipline) else '',
+                'ouvrage_cover_url': s.ouvrage.cover_url if s.ouvrage else '',
                 'duration_minutes': round(s.duration_seconds / 60),
                 'pages_read': s.pages_read,
                 'session_date': str(s.session_date),

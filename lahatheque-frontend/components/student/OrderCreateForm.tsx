@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { getStudentCatalog } from "@/lib/services/student";
 import { createOrder, type OrderItemPayload } from "@/lib/services/commerce-orders";
 import type { BookAPI } from "@/lib/services/student";
-import { InlineLoader } from "@/components/ui/page-loader";
+import { Loader } from "@/components/ui/loader";
 import { BookCover } from "@/components/features/student/book-cover";
 
 interface CartItem {
@@ -83,12 +83,21 @@ function BookCombobox({
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => !loading && setIsOpen(!isOpen)}
         disabled={loading}
-        className="w-full px-3.5 py-2 text-xs border border-border rounded-xl bg-background-secondary text-navy hover:border-gold/50 flex items-center justify-between gap-2.5 transition-all text-left min-h-[44px] cursor-pointer"
+        className={`w-full px-3.5 py-2 text-xs border rounded-xl flex items-center justify-between gap-2.5 transition-all text-left min-h-[44px] ${
+          loading
+            ? "bg-background-secondary/80 border-border text-foreground-muted cursor-not-allowed animate-pulse"
+            : "bg-background-secondary border-border text-navy hover:border-gold/50 cursor-pointer"
+        }`}
         aria-expanded={isOpen}
       >
-        {selectedBook ? (
+        {loading ? (
+          <div className="flex items-center gap-2.5 text-xs text-foreground-muted">
+            <Loader variant="spinner" size={14} className="text-gold" />
+            <span className="font-medium">Chargement des ouvrages du catalogue...</span>
+          </div>
+        ) : selectedBook ? (
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="shrink-0">
               <BookCover book={selectedBook} size="xs" />
@@ -113,18 +122,23 @@ function BookCombobox({
           </div>
         ) : (
           <span className="text-foreground-muted text-xs">
-            {loading ? "Chargement des ouvrages…" : "Rechercher et sélectionner un ouvrage…"}
+            Rechercher et sélectionner un ouvrage…
           </span>
         )}
-        <ChevronDown
-          className={`w-4 h-4 text-foreground-muted shrink-0 transition-transform ${
-            isOpen ? "rotate-180 text-gold" : ""
-          }`}
-        />
+
+        {loading ? (
+          <Loader variant="dots" size={16} className="text-gold shrink-0" />
+        ) : (
+          <ChevronDown
+            className={`w-4 h-4 text-foreground-muted shrink-0 transition-transform ${
+              isOpen ? "rotate-180 text-gold" : ""
+            }`}
+          />
+        )}
       </button>
 
       {/* Dropdown Menu */}
-      {isOpen && (
+      {isOpen && !loading && (
         <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-background border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in duration-150">
           {/* Search Box */}
           <div className="p-2.5 border-b border-border bg-background-secondary flex items-center gap-2">
@@ -141,7 +155,7 @@ function BookCombobox({
               <button
                 type="button"
                 onClick={() => setSearchTerm("")}
-                className="text-foreground-muted hover:text-navy p-1"
+                className="text-foreground-muted hover:text-navy p-1 cursor-pointer"
                 title="Effacer la recherche"
               >
                 <X className="w-3 h-3" />
@@ -388,23 +402,33 @@ export default function OrderCreateForm({
 
       {/* ── Section 1 — Sélection des articles ─────────────────────────── */}
       <section aria-labelledby="section-articles" className="space-y-4">
-        <h3
-          id="section-articles"
-          className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-2"
-        >
-          <span>1. Sélection des articles</span>
-        </h3>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3
+            id="section-articles"
+            className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-2"
+          >
+            <span>1. Sélection des articles</span>
+          </h3>
+
+          {loading && (
+            <div className="flex items-center gap-2 text-[11px] font-bold text-gold bg-gold/10 border border-gold/30 px-3 py-1 rounded-full animate-pulse">
+              <Loader variant="spinner" size={12} />
+              <span>Chargement du catalogue en cours...</span>
+            </div>
+          )}
+        </div>
 
         {/* Filtres + sélecteur avec aperçu couverture */}
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center flex-wrap">
           {/* Filtre discipline */}
           <select
             value={disciplineFilter}
+            disabled={loading}
             onChange={(e) => {
               setDisciplineFilter(e.target.value);
               setSelectedBookId("");
             }}
-            className="px-3.5 py-2.5 text-xs border border-border rounded-xl bg-background-secondary text-navy focus:border-gold outline-none flex-1 min-w-[150px] min-h-[44px]"
+            className="px-3.5 py-2.5 text-xs border border-border rounded-xl bg-background-secondary text-navy focus:border-gold outline-none flex-1 min-w-[150px] min-h-[44px] disabled:opacity-70 disabled:cursor-not-allowed"
             aria-label="Filtrer par matière"
           >
             <option value="all">Toutes disciplines</option>
@@ -415,7 +439,7 @@ export default function OrderCreateForm({
             ))}
           </select>
 
-          {/* Sélecteur d'ouvrage avec recherche et couverture miniature */}
+          {/* Sélecteur d'ouvrage avec recherche, loader explicite et couverture miniature */}
           <BookCombobox
             books={books}
             selectedBookId={selectedBookId}
@@ -451,8 +475,9 @@ export default function OrderCreateForm({
           {/* Bouton Ajouter */}
           <button
             type="button"
+            disabled={loading || !selectedBookId}
             onClick={handleAddToCart}
-            className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors flex items-center gap-2 justify-center min-h-[44px] cursor-pointer shadow-xs"
+            className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors flex items-center gap-2 justify-center min-h-[44px] cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4 text-gold" aria-hidden="true" />
             <span>Ajouter au panier</span>
@@ -677,7 +702,7 @@ export default function OrderCreateForm({
           disabled={submitting || cart.length === 0}
           className="flex-1 px-5 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors min-h-[48px] cursor-pointer shadow-md"
         >
-          {submitting ? <InlineLoader size={16} /> : <ShoppingCart className="w-4 h-4 text-gold" />}
+          {submitting ? <Loader variant="spinner" size={16} /> : <ShoppingCart className="w-4 h-4 text-gold" />}
           <span>{submitting ? "Création de la commande…" : "Valider et créer la commande"}</span>
         </button>
       </div>

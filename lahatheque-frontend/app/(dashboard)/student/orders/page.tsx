@@ -10,9 +10,8 @@ import {
   Copy,
   Download,
   Plus,
-  Search,
-  ChevronRight,
-  RotateCcw,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -22,8 +21,7 @@ import {
 } from "@/lib/services/student";
 import OrderCreateForm from "@/components/student/OrderCreateForm";
 import { BookCover } from "@/components/features/student/book-cover";
-import { ViewToggle, type ViewMode } from "@/components/features/student/view-toggle";
-import { Pagination } from "@/components/ui/pagination";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -71,304 +69,11 @@ function StatusBadge({
   );
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+// ─── Ligne Étendue de Commande ────────────────────────────────────────────────
 
-function SkeletonOrder() {
-  return (
-    <div className="p-5 rounded-3xl border border-border bg-background animate-pulse space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-16 rounded-xl bg-navy/10 shrink-0" />
-        <div className="space-y-2 flex-1">
-          <div className="h-3 rounded bg-navy/10 w-1/3" />
-          <div className="h-2 rounded bg-navy/10 w-2/3" />
-          <div className="h-2 rounded bg-navy/10 w-1/2" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Carte Commande (Vue Grille) ──────────────────────────────────────────────
-
-function OrderCard({ order }: { order: OrderAPI }) {
-  const [expanded, setExpanded] = useState(false);
-
-  const handleCopyTracking = (tracking: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(tracking);
-    toast.success(`Numéro de suivi copié : ${tracking}`);
-  };
-
-  const handleDownloadInvoice = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toast.success(`Facture #${String(order.id).slice(0, 8).toUpperCase()} générée`);
-  };
-
-  const primaryItem = order.lignes?.[0];
-
-  return (
-    <div className="rounded-3xl border border-border bg-background shadow-xs overflow-hidden transition-all hover:border-gold/50">
-      {/* En-tête cliquable */}
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="w-full p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-background-secondary/50 transition-colors text-left cursor-pointer"
-      >
-        <div className="flex items-center gap-4 min-w-0 flex-1">
-          {/* Miniatures des couvertures (jusqu'à 2 livres) */}
-          <div className="flex items-center -space-x-4 shrink-0">
-            {order.lignes.slice(0, 2).map((ligne, idx) => (
-              <div
-                key={ligne.id || idx}
-                className="relative z-10 transition-transform hover:z-20 hover:scale-105"
-              >
-                <BookCover
-                  book={{
-                    id: String(ligne.ouvrage || ligne.id),
-                    title: ligne.ouvrage_title,
-                  }}
-                  size="xs"
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-[10px] font-bold text-navy bg-navy/5 px-2 py-0.5 rounded-md border border-navy/10">
-                #{String(order.id).slice(0, 8).toUpperCase()}
-              </span>
-              <StatusBadge
-                status={order.statut_paiement}
-                label={order.statut_paiement_display}
-              />
-              <StatusBadge
-                status={order.statut_commande}
-                label={order.statut_commande_display}
-              />
-            </div>
-
-            <p className="font-serif font-bold text-navy text-sm truncate">
-              {primaryItem?.ouvrage_title || "Commande d'ouvrages"}
-              {order.lignes.length > 1 && (
-                <span className="text-xs font-normal text-foreground-muted">
-                  {" "}et {order.lignes.length - 1} autre{order.lignes.length > 2 ? "s" : ""}
-                </span>
-              )}
-            </p>
-
-            <p className="text-[11px] text-foreground-muted">
-              {formatDate(order.created_at)} &bull; {order.lignes.length} article{order.lignes.length > 1 ? "s" : ""}
-            </p>
-          </div>
-        </div>
-
-        <div className="shrink-0 flex items-center gap-3 self-end sm:self-center">
-          <div className="text-right">
-            <p className="font-mono font-bold text-navy text-sm sm:text-base">
-              {formatPrice(order.total_amount)}
-            </p>
-            <p className="text-[10px] text-gold font-bold flex items-center gap-1 justify-end">
-              <span>{expanded ? "Masquer le détail" : "Afficher le détail"}</span>
-              <ChevronRight className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`} />
-            </p>
-          </div>
-        </div>
-      </button>
-
-      {/* Détail étendu */}
-      {expanded && (
-        <div className="border-t border-border p-5 space-y-4 bg-background-secondary/60 animate-in fade-in duration-200">
-          {/* Lignes de commande */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-navy">
-              Articles commandés
-            </p>
-            {order.lignes.map((ligne: OrderLineAPI) => (
-              <div
-                key={ligne.id}
-                className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-background border border-border"
-              >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="shrink-0">
-                    <BookCover
-                      book={{
-                        id: String(ligne.ouvrage || ligne.id),
-                        title: ligne.ouvrage_title,
-                      }}
-                      size="xs"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-serif font-bold text-navy text-xs truncate">
-                      {ligne.ouvrage_title}
-                    </p>
-                    <p className="text-[10px] text-foreground-muted">
-                      Format : <strong className="text-navy">{ligne.format_display}</strong> &bull; Quantité : <strong className="font-mono text-navy">{ligne.quantity}</strong>
-                    </p>
-                  </div>
-                </div>
-                <p className="shrink-0 font-mono font-bold text-navy text-xs sm:text-sm">
-                  {formatPrice(ligne.unit_price * ligne.quantity)}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Suivi expédition & logistique physique */}
-          {order.livraison && (
-            <div className="pt-3 border-t border-border space-y-2">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-gold" />
-                  <h4 className="font-bold text-navy text-xs uppercase tracking-wider">
-                    Suivi Colis Physique
-                  </h4>
-                  <StatusBadge
-                    status={order.livraison.statut}
-                    label={order.livraison.statut_display}
-                  />
-                </div>
-
-                {order.livraison.tracking_number && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleCopyTracking(order.livraison!.tracking_number, e)}
-                    className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-navy bg-background hover:border-gold px-2.5 py-1 rounded-lg border border-border transition-colors cursor-pointer"
-                  >
-                    <Copy className="w-3 h-3 text-gold" />
-                    Tracking : {order.livraison.tracking_number}
-                  </button>
-                )}
-              </div>
-
-              <div className="text-xs space-y-0.5 text-foreground-muted bg-background p-3.5 rounded-2xl border border-border">
-                <p>
-                  <strong className="text-navy">Adresse :</strong> {order.livraison.shipping_address}, {order.livraison.city}, {order.livraison.country}
-                </p>
-                {order.livraison.carrier_name && (
-                  <p>
-                    <strong className="text-navy">Transporteur :</strong> {order.livraison.carrier_name}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Facture PDF */}
-          <div className="pt-2 flex justify-end">
-            <button
-              type="button"
-              onClick={handleDownloadInvoice}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[40px] cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5 text-gold" />
-              Télécharger le reçu PDF
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Tableau Data Table des Commandes ─────────────────────────────────────────
-
-function OrdersDataTable({ orders }: { orders: OrderAPI[] }) {
-  return (
-    <div className="rounded-3xl border border-border bg-background overflow-hidden shadow-xs">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-border bg-background-secondary text-foreground-muted text-[11px] font-bold uppercase tracking-wider">
-              <th className="py-3.5 px-4">Commande</th>
-              <th className="py-3.5 px-4">Ouvrage(s)</th>
-              <th className="py-3.5 px-4">Format &amp; Qté</th>
-              <th className="py-3.5 px-4">Paiement</th>
-              <th className="py-3.5 px-4">Livraison</th>
-              <th className="py-3.5 px-4 text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border text-navy font-medium">
-            {orders.map((order) => {
-              const primaryItem = order.lignes?.[0];
-              return (
-                <tr key={order.id} className="hover:bg-background-secondary/50 transition-colors">
-                  {/* Commande */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    <p className="font-mono font-bold text-navy">
-                      #{String(order.id).slice(0, 8).toUpperCase()}
-                    </p>
-                    <p className="text-[10px] text-foreground-muted">
-                      {formatDate(order.created_at)}
-                    </p>
-                  </td>
-
-                  {/* Ouvrage(s) avec Cover */}
-                  <td className="py-4 px-4 min-w-[220px]">
-                    <div className="flex items-center gap-3">
-                      <div className="shrink-0">
-                        <BookCover
-                          book={{
-                            id: String(primaryItem?.ouvrage || primaryItem?.id || order.id),
-                            title: primaryItem?.ouvrage_title || "Ouvrage",
-                          }}
-                          size="xs"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-serif font-bold text-navy text-xs truncate max-w-[200px]">
-                          {primaryItem?.ouvrage_title || "Ouvrage commandé"}
-                        </p>
-                        {order.lignes.length > 1 && (
-                          <p className="text-[10px] text-gold font-medium">
-                            + {order.lignes.length - 1} autre{order.lignes.length > 2 ? "s" : ""} livre{order.lignes.length > 2 ? "s" : ""}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Format & Qté */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    <span className="text-[11px] font-semibold text-navy">
-                      {primaryItem?.format_display || "Numérique"}
-                    </span>
-                    <p className="text-[10px] text-foreground-muted font-mono">
-                      {order.lignes.reduce((sum, l) => sum + l.quantity, 0)} exemplaire(s)
-                    </p>
-                  </td>
-
-                  {/* Statut Paiement */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    <StatusBadge
-                      status={order.statut_paiement}
-                      label={order.statut_paiement_display}
-                    />
-                  </td>
-
-                  {/* Statut Livraison */}
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    <StatusBadge
-                      status={order.statut_commande}
-                      label={order.statut_commande_display}
-                    />
-                  </td>
-
-                  {/* Total */}
-                  <td className="py-4 px-4 text-right whitespace-nowrap">
-                    <span className="font-mono font-bold text-navy text-sm">
-                      {formatPrice(order.total_amount)}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+interface OrderTableRow extends OrderAPI {
+  order_reference: string;
+  book_title_summary: string;
 }
 
 // ─── Page Principale ──────────────────────────────────────────────────────────
@@ -378,15 +83,7 @@ export default function StudentOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-
-  // Filtres & affichage
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "pending">("all");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(9);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -407,7 +104,7 @@ export default function StudentOrdersPage() {
     loadData();
   }, [loadData]);
 
-  // Calculs financiers stricts sans concaténation de chaînes
+  // Calculs financiers stricts sans concaténation
   const paidCount = useMemo(
     () => orders.filter((o) => o.statut_paiement === "paid").length,
     [orders]
@@ -424,39 +121,239 @@ export default function StudentOrdersPage() {
     [orders]
   );
 
-  // Filtrage combiné : recherche & onglet statut
-  const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
-      if (statusFilter === "paid" && o.statut_paiement !== "paid") return false;
-      if (statusFilter === "pending" && o.statut_paiement !== "pending") return false;
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase();
-      return (
-        String(o.id).toLowerCase().includes(q) ||
-        o.lignes.some((l) => l.ouvrage_title.toLowerCase().includes(q))
-      );
-    });
-  }, [orders, statusFilter, searchQuery]);
-
-  // Pagination
-  const totalOrders = filteredOrders.length;
-  const totalPages = Math.ceil(totalOrders / pageSize) || 1;
-
-  const paginatedOrders = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredOrders.slice(start, start + pageSize);
-  }, [filteredOrders, currentPage, pageSize]);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const handleCopyTracking = (tracking: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(tracking);
+    toast.success(`Numéro de suivi copié : ${tracking}`);
   };
 
-  const handleResetFilters = () => {
-    setSearchQuery("");
-    setStatusFilter("all");
-    setCurrentPage(1);
-    toast.info("Filtres réinitialisés");
+  const handleDownloadInvoice = (order: OrderAPI, e: React.MouseEvent) => {
+    e.stopPropagation();
+    toast.success(`Facture #${String(order.id).slice(0, 8).toUpperCase()} générée avec succès.`);
+  };
+
+  // Transformation des données pour la DataTable
+  const tableData: OrderTableRow[] = useMemo(() => {
+    return orders.map((o) => ({
+      ...o,
+      order_reference: `#${String(o.id).slice(0, 8).toUpperCase()}`,
+      book_title_summary: o.lignes.map((l) => l.ouvrage_title).join(", "),
+    }));
+  }, [orders]);
+
+  // Définition des colonnes DataTable
+  const columns: DataTableColumn<OrderTableRow>[] = [
+    {
+      key: "order_reference",
+      header: "N° Commande & Date",
+      cell: (row) => (
+        <div className="space-y-0.5">
+          <p className="font-mono font-bold text-navy text-xs">
+            {row.order_reference}
+          </p>
+          <p className="text-[10px] text-foreground-muted">
+            {formatDate(row.created_at)}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "book_title_summary",
+      header: "Ouvrage(s) commandé(s)",
+      cell: (row) => {
+        const primaryLigne = row.lignes?.[0];
+        return (
+          <div className="flex items-center gap-3 min-w-[200px]">
+            <div className="flex items-center -space-x-4 shrink-0">
+              {row.lignes.slice(0, 2).map((ligne, idx) => (
+                <div key={ligne.id || idx} className="relative z-10 transition-transform hover:z-20 hover:scale-105">
+                  <BookCover
+                    book={{
+                      id: String(ligne.ouvrage || ligne.id),
+                      title: ligne.ouvrage_title,
+                    }}
+                    size="xs"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="font-serif font-bold text-navy text-xs truncate max-w-[220px]">
+                {primaryLigne?.ouvrage_title || "Commande d'ouvrages"}
+              </p>
+              <p className="text-[10px] text-foreground-muted">
+                {row.lignes.length} article{row.lignes.length > 1 ? "s" : ""}
+                {row.lignes.length > 1 && (
+                  <span className="text-gold font-semibold"> (+{row.lignes.length - 1} autre{row.lignes.length > 2 ? "s" : ""})</span>
+                )}
+              </p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "statut_paiement",
+      header: "Paiement",
+      cell: (row) => (
+        <StatusBadge
+          status={row.statut_paiement}
+          label={row.statut_paiement_display}
+        />
+      ),
+    },
+    {
+      key: "statut_commande",
+      header: "Statut Livraison",
+      cell: (row) => (
+        <StatusBadge
+          status={row.statut_commande}
+          label={row.statut_commande_display}
+        />
+      ),
+    },
+    {
+      key: "total_amount",
+      header: "Montant Total",
+      className: "text-right",
+      cell: (row) => (
+        <div className="text-right">
+          <p className="font-mono font-bold text-navy text-xs sm:text-sm">
+            {formatPrice(row.total_amount)}
+          </p>
+          <p className="text-[10px] text-foreground-muted">
+            {row.mode_paiement_display || "Règlement"}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      className: "text-right",
+      cell: (row) => {
+        const isExpanded = expandedOrderId === String(row.id);
+        return (
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpandedOrderId(isExpanded ? null : String(row.id));
+              }}
+              className="px-2.5 py-1.5 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <span>{isExpanded ? "Fermer" : "Détails"}</span>
+              {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-gold" /> : <ChevronDown className="w-3.5 h-3.5 text-gold" />}
+            </button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  // Rendu mobile de chaque commande en carte empilée
+  const renderMobileCard = (row: OrderTableRow) => {
+    const isExpanded = expandedOrderId === String(row.id);
+    const primaryLigne = row.lignes?.[0];
+
+    return (
+      <div className="p-4 rounded-3xl border border-border bg-background space-y-3 shadow-xs">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="font-mono text-[10px] font-bold text-navy bg-navy/5 px-2 py-0.5 rounded-md border border-navy/10">
+            {row.order_reference}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <StatusBadge status={row.statut_paiement} label={row.statut_paiement_display} />
+            <StatusBadge status={row.statut_commande} label={row.statut_commande_display} />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3.5 pt-1">
+          <div className="shrink-0">
+            <BookCover
+              book={{
+                id: String(primaryLigne?.ouvrage || primaryLigne?.id || row.id),
+                title: primaryLigne?.ouvrage_title || "Ouvrage",
+              }}
+              size="xs"
+            />
+          </div>
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="font-serif font-bold text-navy text-xs truncate">
+              {primaryLigne?.ouvrage_title || "Commande d'ouvrages"}
+            </p>
+            <p className="text-[11px] text-foreground-muted">
+              {formatDate(row.created_at)} &bull; {row.lignes.length} article{row.lignes.length > 1 ? "s" : ""}
+            </p>
+            <p className="font-mono font-bold text-navy text-xs pt-1">
+              {formatPrice(row.total_amount)}
+            </p>
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setExpandedOrderId(isExpanded ? null : String(row.id))}
+            className="text-xs font-bold text-navy hover:text-gold flex items-center gap-1 transition-colors"
+          >
+            <span>{isExpanded ? "Masquer détails" : "Afficher détails"}</span>
+            {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-gold" /> : <ChevronDown className="w-3.5 h-3.5 text-gold" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => handleDownloadInvoice(row, e)}
+            className="p-1.5 rounded-lg text-gold hover:bg-navy/5 transition-colors"
+            title="Télécharger le reçu PDF"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Détails étendus mobile */}
+        {isExpanded && (
+          <div className="p-3.5 rounded-2xl bg-background-secondary border border-border space-y-3 animate-in fade-in duration-150">
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-navy">
+                Articles commandés :
+              </p>
+              {row.lignes.map((ligne) => (
+                <div key={ligne.id} className="p-2.5 rounded-xl bg-background border border-border flex items-center justify-between gap-2 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-navy truncate">{ligne.ouvrage_title}</p>
+                    <p className="text-[10px] text-foreground-muted">
+                      {ligne.format_display} &bull; Qté: {ligne.quantity}
+                    </p>
+                  </div>
+                  <span className="font-mono font-bold text-navy shrink-0">
+                    {formatPrice(ligne.unit_price * ligne.quantity)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {row.livraison && (
+              <div className="pt-2 border-t border-border space-y-1 text-xs">
+                <p className="text-[10px] font-bold text-navy uppercase tracking-wider">
+                  Livraison ({row.livraison.statut_display}) :
+                </p>
+                <p className="text-foreground-muted text-[11px]">
+                  {row.livraison.shipping_address}, {row.livraison.city}
+                </p>
+                {row.livraison.tracking_number && (
+                  <p className="font-mono text-gold text-[10px] font-bold">
+                    Tracking : {row.livraison.tracking_number}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -492,8 +389,7 @@ export default function StudentOrdersPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setShowCreateForm((v) => !v)}
             className="inline-flex items-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shrink-0 min-h-[44px] cursor-pointer shadow-xs"
@@ -505,7 +401,13 @@ export default function StudentOrdersPage() {
       </div>
 
       {/* ── KPIs Financiers ───────────────────────────────────────────── */}
-      {!loading && orders.length > 0 && (
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="h-28 rounded-3xl bg-background border border-border animate-pulse" />
+          <div className="h-28 rounded-3xl bg-background border border-border animate-pulse" />
+          <div className="h-28 rounded-3xl bg-background border border-border animate-pulse" />
+        </div>
+      ) : orders.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="p-5 rounded-3xl bg-background border border-border shadow-xs text-center">
             <p className="font-serif font-bold text-3xl text-navy">
@@ -530,7 +432,7 @@ export default function StudentOrdersPage() {
             </p>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* ── Formulaire Nouvelle Commande ────────────────────────────────── */}
       {showCreateForm && (
@@ -543,72 +445,6 @@ export default function StudentOrdersPage() {
         />
       )}
 
-      {/* ── Filtres & Recherche ────────────────────────────────────────── */}
-      <div className="p-5 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-        {/* Recherche */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-4 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Rechercher par titre de livre ou référence de commande..."
-            className="w-full pl-11 pr-4 py-3 text-xs sm:text-sm bg-background-secondary border border-border rounded-2xl text-navy placeholder:text-foreground-muted focus:outline-none focus:border-gold min-h-[48px] transition-colors"
-          />
-        </div>
-
-        {/* Onglets Filtres Statut */}
-        <div className="flex items-center gap-2 pt-2 border-t border-border flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter("all");
-              setCurrentPage(1);
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors border min-h-[40px] cursor-pointer ${
-              statusFilter === "all"
-                ? "bg-navy text-white border-navy shadow-xs"
-                : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
-            }`}
-          >
-            Toutes ({orders.length})
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter("paid");
-              setCurrentPage(1);
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors border min-h-[40px] cursor-pointer ${
-              statusFilter === "paid"
-                ? "bg-navy text-white border-navy shadow-xs"
-                : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
-            }`}
-          >
-            Payées ({paidCount})
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter("pending");
-              setCurrentPage(1);
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors border min-h-[40px] cursor-pointer ${
-              statusFilter === "pending"
-                ? "bg-gold text-navy border-gold shadow-xs"
-                : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
-            }`}
-          >
-            En attente ({pendingCount})
-          </button>
-        </div>
-      </div>
-
       {/* ── Erreur ────────────────────────────────────────────────────── */}
       {error && (
         <div className="p-4 rounded-2xl border border-error/30 bg-error/10 text-error text-xs sm:text-sm font-medium">
@@ -616,52 +452,37 @@ export default function StudentOrdersPage() {
         </div>
       )}
 
-      {/* ── Liste / Tableau des Commandes ──────────────────────────────── */}
-      <div className="space-y-6">
-        {!loading && (
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <p className="text-xs text-foreground-muted">
-              <strong className="text-navy font-bold">{totalOrders}</strong> commande{totalOrders > 1 ? "s" : ""}{" "}
-              {statusFilter === "paid" ? "payées" : statusFilter === "pending" ? "en attente" : "enregistrées"}
-              {searchQuery && (
-                <span>
-                  {" "}pour « <strong className="text-navy">{searchQuery}</strong> »
-                </span>
-              )}
-            </p>
-
-            {totalPages > 1 && (
-              <span className="text-xs text-foreground-muted font-medium">
-                Page <strong className="text-navy">{currentPage}</strong> sur <strong className="text-navy">{totalPages}</strong>
-              </span>
-            )}
-          </div>
-        )}
-
-        {loading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <SkeletonOrder key={i} />
-            ))}
-          </div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="py-20 px-6 rounded-3xl bg-background border border-dashed border-border text-center space-y-4 shadow-xs">
-            <div className="w-14 h-14 rounded-2xl bg-navy/5 flex items-center justify-center mx-auto text-foreground-muted">
-              <PackageCheck className="w-7 h-7 opacity-60" />
-            </div>
-            <div className="space-y-1 max-w-sm mx-auto">
-              <h3 className="font-serif font-bold text-navy text-lg">
-                {orders.length === 0
-                  ? "Aucun achat enregistré"
-                  : "Aucune commande correspondante"}
-              </h3>
-              <p className="text-xs text-foreground-muted leading-relaxed">
-                {orders.length === 0
-                  ? "Explorez le catalogue académique pour acquérir vos premiers ouvrages numériques ou commander vos livres papier."
-                  : "Modifiez vos critères de recherche ou réinitialisez les filtres."}
-              </p>
-            </div>
-            {orders.length === 0 ? (
+      {/* ── DataTable Officielle des Commandes ──────────────────────────── */}
+      <div className="space-y-4">
+        <DataTable<OrderTableRow>
+          data={tableData}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+          searchPlaceholder="Rechercher par référence ou titre d'ouvrage..."
+          filterKey="statut_paiement"
+          filterOptions={[
+            { value: "all", label: "Tous les paiements" },
+            { value: "paid", label: "Payées uniquement" },
+            { value: "pending", label: "En attente uniquement" },
+          ]}
+          filterPlaceholder="Filtrer par statut"
+          pageSize={10}
+          pageSizeOptions={[10, 20, 50]}
+          mobileCard={renderMobileCard}
+          emptyState={
+            <div className="py-20 px-6 rounded-3xl bg-background border border-dashed border-border text-center space-y-4 shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-navy/5 flex items-center justify-center mx-auto text-foreground-muted">
+                <PackageCheck className="w-7 h-7 opacity-60" />
+              </div>
+              <div className="space-y-1 max-w-sm mx-auto">
+                <h3 className="font-serif font-bold text-navy text-lg">
+                  Aucun achat enregistré
+                </h3>
+                <p className="text-xs text-foreground-muted leading-relaxed">
+                  Explorez le catalogue académique pour acquérir vos premiers ouvrages numériques ou commander vos livres papier.
+                </p>
+              </div>
               <Link
                 href="/student/catalog"
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px] shadow-xs cursor-pointer"
@@ -669,45 +490,106 @@ export default function StudentOrdersPage() {
                 <ShoppingBag className="w-4 h-4 text-gold" />
                 <span>Explorer le Catalogue</span>
               </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px] shadow-xs cursor-pointer"
-              >
-                <RotateCcw className="w-4 h-4 text-gold" />
-                <span>Réinitialiser les filtres</span>
-              </button>
-            )}
-          </div>
-        ) : (
-          <>
-            {viewMode === "grid" ? (
-              <div className="space-y-3.5">
-                {paginatedOrders.map((order) => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
-              </div>
-            ) : (
-              <OrdersDataTable orders={paginatedOrders} />
-            )}
+            </div>
+          }
+        />
 
-            {/* Pagination */}
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={totalOrders}
-              pageSize={pageSize}
-              onPageChange={handlePageChange}
-              onPageSizeChange={(s) => {
-                setPageSize(s);
-                setCurrentPage(1);
-              }}
-              pageSizeOptions={[6, 9, 12, 24]}
-              itemLabel="commandes"
-            />
-          </>
-        )}
+        {/* Détail de la commande dépliée sous le tableau si sélectionné */}
+        {expandedOrderId && (() => {
+          const selectedOrder = orders.find((o) => String(o.id) === expandedOrderId);
+          if (!selectedOrder) return null;
+
+          return (
+            <div className="p-6 rounded-3xl bg-background border border-gold/40 space-y-4 shadow-lg animate-in fade-in duration-200">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
+                <div className="space-y-0.5">
+                  <h3 className="font-serif font-bold text-navy text-base sm:text-lg">
+                    Détail de la commande #{String(selectedOrder.id).slice(0, 8).toUpperCase()}
+                  </h3>
+                  <p className="text-xs text-foreground-muted">
+                    Passée le {formatDate(selectedOrder.created_at)} &bull; {selectedOrder.mode_paiement_display}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandedOrderId(null)}
+                  className="px-3 py-1.5 rounded-xl border border-border text-xs font-bold text-navy hover:bg-background-secondary transition-colors"
+                >
+                  Fermer
+                </button>
+              </div>
+
+              {/* Articles */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-navy">
+                  Articles commandés :
+                </p>
+                <div className="divide-y divide-border border border-border rounded-2xl overflow-hidden bg-background-secondary/30">
+                  {selectedOrder.lignes.map((ligne) => (
+                    <div key={ligne.id} className="p-3.5 flex items-center justify-between gap-4 bg-background">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <BookCover
+                          book={{
+                            id: String(ligne.ouvrage || ligne.id),
+                            title: ligne.ouvrage_title,
+                          }}
+                          size="xs"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-serif font-bold text-navy text-xs truncate">{ligne.ouvrage_title}</p>
+                          <p className="text-[10px] text-foreground-muted">
+                            Format : <strong className="text-navy">{ligne.format_display}</strong> &bull; Quantité : <strong className="font-mono text-navy">{ligne.quantity}</strong>
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-mono font-bold text-navy text-xs sm:text-sm shrink-0">
+                        {formatPrice(ligne.unit_price * ligne.quantity)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Livraison physique */}
+              {selectedOrder.livraison && (
+                <div className="p-4 rounded-2xl bg-navy text-white space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-gold" />
+                      <span className="text-xs font-bold text-gold uppercase tracking-wider">Suivi Livraison :</span>
+                      <StatusBadge status={selectedOrder.livraison.statut} label={selectedOrder.livraison.statut_display} />
+                    </div>
+                    {selectedOrder.livraison.tracking_number && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopyTracking(selectedOrder.livraison!.tracking_number, e)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-navy-dark border border-navy-hover text-gold font-mono text-[10px] font-bold cursor-pointer"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Tracking : {selectedOrder.livraison.tracking_number}</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-white/80">
+                    <strong>Adresse :</strong> {selectedOrder.livraison.shipping_address}, {selectedOrder.livraison.city}
+                  </p>
+                </div>
+              )}
+
+              {/* Téléchargement Facture */}
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={(e) => handleDownloadInvoice(selectedOrder, e)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-gold" />
+                  <span>Télécharger le reçu PDF</span>
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
