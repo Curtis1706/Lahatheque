@@ -8,7 +8,7 @@ import re
 from typing import Optional, Tuple
 from django.http import HttpResponse, JsonResponse
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
 
 from apps.catalog.models import Ouvrage
@@ -96,7 +96,7 @@ class BookStreamView(APIView):
             ip = request.META.get("REMOTE_ADDR", "127.0.0.1")
 
         doc_title = getattr(ouvrage, "title", None) or getattr(deposit, "title", None) or getattr(sub, "title", "Document Numérique")
-        doc_id = str(ouvrage.id) if ouvrage else (str(deposit.id) if deposit else str(sub.id))
+        doc_id = str(ouvrage.id) if ouvrage else (str(deposit.id) if deposit else (str(sub.id) if sub else "unknown"))
 
         user_info = {
             "nom": request.user.get_full_name() or request.user.username,

@@ -53,10 +53,16 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     try {
       if (contentType && contentType.includes('multipart/form-data')) {
-        const rawBuf = await request.arrayBuffer()
-        body = Buffer.from(rawBuf)
-        headers.set('content-length', String(rawBuf.byteLength))
-        console.log(`[BFF Proxy] Multipart payload reçu : ${(rawBuf.byteLength / (1024 * 1024)).toFixed(2)} Mo pour ${targetUrl}`)
+        const incomingFormData = await request.formData()
+        const outgoingFormData = new FormData()
+        for (const [key, value] of incomingFormData.entries()) {
+          outgoingFormData.append(key, value)
+        }
+        body = outgoingFormData
+        // Supprimer content-type et content-length pour laisser fetch calculer le boundary exact
+        headers.delete('content-type')
+        headers.delete('content-length')
+        console.log(`[BFF Proxy] Multipart FormData reconstitué avec succès pour ${targetUrl}`)
       } else {
         body = await request.text()
         headers.set('content-length', String(Buffer.byteLength(body, 'utf-8')))
@@ -69,16 +75,29 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
 
   try {
     let backendRes: Response | null = null
+    const fetchController = new AbortController()
+    const timeoutHandle = setTimeout(() => fetchController.abort(), 20000)
+
     try {
       backendRes = await fetch(targetUrl, {
         method: request.method,
         headers: headers,
         body: body || undefined,
         cache: 'no-store',
+        signal: fetchController.signal,
         // @ts-ignore
         duplex: 'half',
       })
-    } catch (netErr) {
+      clearTimeout(timeoutHandle)
+    } catch (netErr: any) {
+      clearTimeout(timeoutHandle)
+      if (netErr?.name === 'AbortError') {
+        console.error(`[BFF Proxy TIMEOUT] Le backend Django à ${targetUrl} n'a pas répondu en 20s.`)
+        return NextResponse.json(
+          { error: "Le serveur backend Django n'a pas répondu dans les délais (20s)." },
+          { status: 504 }
+        )
+      }
       if (targetUrl.includes('localhost')) {
         const ipv4Url = targetUrl.replace('localhost', '127.0.0.1')
         backendRes = await fetch(ipv4Url, {

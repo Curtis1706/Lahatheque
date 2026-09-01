@@ -10,10 +10,17 @@ from botocore.client import Config
 class R2MediaStorage(S3Boto3Storage):
     """
     Storage Cloudflare R2 compatible S3.
-    Téléverse directement les fichiers dans le bucket Cloudflare R2.
+    Téléverse directement les fichiers dans le bucket Cloudflare R2 avec timeouts sécurisés.
     """
     bucket_name = getattr(settings, 'CLOUDFLARE_R2_BUCKET_NAME', 'lahatheque')
-    endpoint_url = getattr(settings, 'CLOUDFLARE_R2_ENDPOINT', '')
+    
+    @property
+    def endpoint_url(self):
+        url = getattr(settings, 'CLOUDFLARE_R2_ENDPOINT', '')
+        if url and not url.startswith('http://') and not url.startswith('https://'):
+            return f"https://{url}"
+        return url
+
     access_key = getattr(settings, 'CLOUDFLARE_R2_ACCESS_KEY_ID', '')
     secret_key = getattr(settings, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY', '')
     region_name = 'auto'
@@ -29,7 +36,10 @@ class R2MediaStorage(S3Boto3Storage):
 
     client_config = Config(
         signature_version='s3v4',
-        s3={'addressing_style': 'path'}
+        s3={'addressing_style': 'path'},
+        connect_timeout=5,
+        read_timeout=15,
+        retries={'max_attempts': 2}
     )
 
     # Racine du bucket : permet aux ImageField (ex: avatars/, covers/, books/) d'être à la racine
@@ -47,12 +57,14 @@ class R2MediaStorage(S3Boto3Storage):
             if code in ('404', 'NoSuchKey', 'NotFound', '403', 'Forbidden', 'AccessDenied'):
                 return False
             raise
+        except Exception:
+            return False
 
-    def url(self, name):
+    def url(self, name, parameters=None, expire=None, http_method=None):
         """
         Retourne l'URL publique R2 absolue.
         Format : https://{public_domain}/{name}
         """
         if self.custom_domain:
             return f"https://{self.custom_domain.rstrip('/')}/{str(name).lstrip('/')}"
-        return super().url(name)
+        return super().url(name, parameters=parameters, expire=expire, http_method=http_method)
