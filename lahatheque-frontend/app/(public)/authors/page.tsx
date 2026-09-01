@@ -165,29 +165,29 @@ export default function AuthorsPublicPage() {
               <img
                 src="/authors-hero.jpg"
                 alt="Comité de lecture et auteurs LAHAThèque"
-                className="w-full h-full object-cover object-center"
+                className="w-full h-full object-cover object-center opacity-20 sm:opacity-30 lg:opacity-100 transition-opacity duration-300"
               />
-              {/* Dégradé de fondu de gauche (Navy vers transparent) */}
+              {/* Dégradé de fondu de gauche (Navy vers transparent) pour Desktop */}
               <div className="absolute inset-0 bg-gradient-to-r from-navy via-navy/90 to-transparent hidden lg:block" />
-              {/* Overlay mobile */}
-              <div className="absolute inset-0 bg-navy/85 lg:hidden" />
+              {/* Overlay mobile sombre et protecteur avec dégradé vertical et léger flou */}
+              <div className="absolute inset-0 bg-gradient-to-b from-navy-dark/95 via-navy/90 to-navy-dark/95 backdrop-blur-[2px] lg:hidden" />
             </div>
           </div>
 
           {/* Badges de confiance flottants en haut à droite */}
           <div className="absolute top-6 right-6 z-20 hidden md:flex flex-col gap-2.5">
-            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
+            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-navy-hover px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
               <Lock className="w-4 h-4 text-gold" />
               <span>Confidentiel</span>
             </div>
-            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
+            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-navy-hover px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
               <Users className="w-4 h-4 text-gold" />
               <span>Suivi personnalisé</span>
             </div>
           </div>
 
           {/* Contenu Textuel du Hero (Gauche) */}
-          <div className="relative z-10 max-w-2xl p-8 sm:p-12 lg:p-14 space-y-6 text-white">
+          <div className="relative z-10 max-w-2xl p-6 sm:p-10 lg:p-14 space-y-5 sm:space-y-6 text-white">
             
             <div className="text-xs font-bold uppercase tracking-widest text-gold">
               Espace auteurs

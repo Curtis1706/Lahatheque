@@ -10,15 +10,14 @@ import {
   Plus,
   Minus,
   ArrowLeft,
-  ShieldCheck,
-  Filter,
   Search,
-  CheckCircle2,
   Package,
-  Layers,
-  Sparkles,
+  LayoutGrid,
+  List,
+  FileText,
+  Book,
 } from "lucide-react";
-import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { WholesaleCartDrawer } from "@/components/features/wholesaler/wholesale-cart-drawer";
 import { BookPreviewModal } from "@/components/features/wholesaler/book-preview-modal";
 import { WholesaleOrderModal } from "@/components/features/wholesaler/wholesale-order-modal";
@@ -35,6 +34,7 @@ export default function WholesalerCatalogPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // Panier grossiste state
   const [cart, setCart] = useState<WholesalerCartItem[]>([]);
@@ -126,13 +126,115 @@ export default function WholesalerCatalogPage() {
 
   const totalCartCount = cart.length;
 
+  // Colonnes DataTable (Aérées, visuelles et élégantes)
+  const columns: DataTableColumn<WholesalerBookItem>[] = [
+    {
+      key: "title",
+      header: "Ouvrage & Référence",
+      className: "min-w-[320px]",
+      cell: (row) => (
+        <div className="flex items-center gap-3.5 py-1">
+          <div className="w-12 h-16 rounded-xl overflow-hidden bg-background-secondary border border-border shrink-0 shadow-xs flex items-center justify-center">
+            {row.cover_url && row.cover_url !== "/placeholder-cover.jpg" ? (
+              <img
+                src={row.cover_url}
+                alt={row.title}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <BookOpen className="w-5 h-5 text-navy/40" />
+            )}
+          </div>
+          <div className="min-w-0 space-y-0.5">
+            <h4 className="font-serif font-bold text-xs text-navy leading-snug line-clamp-2" title={row.title}>
+              {row.title}
+            </h4>
+            <p className="text-[11px] text-foreground-muted truncate">
+              {row.authors.join(", ")}
+            </p>
+            <p className="text-[10px] text-foreground-muted font-mono">
+              ISBN : {row.isbn_digital}
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "discipline",
+      header: "Discipline",
+      className: "min-w-[170px]",
+      cell: (row) => (
+        <span className="text-[10px] font-bold text-gold bg-gold/10 border border-gold/20 px-2.5 py-1 rounded-lg inline-block">
+          {row.discipline}
+        </span>
+      ),
+    },
+    {
+      key: "digital_wholesale_price",
+      header: "Licence Numérique (-25%)",
+      className: "min-w-[160px]",
+      cell: (row) => (
+        <div className="space-y-0.5">
+          <div className="font-mono font-bold text-xs text-navy">
+            {row.digital_wholesale_price.toLocaleString("fr-FR")} XOF
+          </div>
+          <div className="text-[10px] text-foreground-muted line-through font-mono">
+            Public : {(row.public_price || Math.round(row.digital_wholesale_price / 0.75)).toLocaleString("fr-FR")} XOF
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "print_wholesale_price",
+      header: "Exemplaire Papier (-32%)",
+      className: "min-w-[160px]",
+      cell: (row) => (
+        <div className="space-y-0.5">
+          <div className="font-mono font-bold text-xs text-navy">
+            {row.print_wholesale_price.toLocaleString("fr-FR")} XOF
+          </div>
+          <div className="text-[10px] text-foreground-muted line-through font-mono">
+            Public : {(row.public_price || Math.round(row.print_wholesale_price / 0.68)).toLocaleString("fr-FR")} XOF
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "id",
+      header: "Actions",
+      className: "min-w-[240px] text-right",
+      cell: (row) => (
+        <div className="flex items-center justify-end gap-2 flex-nowrap">
+          <button
+            type="button"
+            onClick={() => setPreviewBook(row)}
+            className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border text-navy hover:border-gold text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0 min-h-[38px]"
+            title="Consulter l'extrait"
+          >
+            <Eye className="w-3.5 h-3.5 text-gold" />
+            <span>Extrait</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setOrderBook(row)}
+            className="px-3.5 py-1.5 rounded-xl bg-gold text-navy hover:bg-gold-light text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs shrink-0 min-h-[38px]"
+          >
+            <Package className="w-3.5 h-3.5" />
+            <span>Commander</span>
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto animate-in fade-in duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
-        <Link href="/wholesaler" className="hover:text-navy">Vue d&apos;ensemble</Link>
+        <Link href="/wholesaler" className="hover:text-navy transition-colors">Vue d&apos;ensemble</Link>
         <span>/</span>
-        <span className="text-navy font-semibold">Catalogue &amp; Achat Gros</span>
+        <span className="text-navy font-semibold">Catalogue & Achat Gros</span>
       </div>
 
       {/* Header */}
@@ -144,10 +246,10 @@ export default function WholesalerCatalogPage() {
           </Link>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
             <BookOpen className="w-4 h-4 text-gold" />
-            Catalogue B2B &amp; Tarifs Librairies Partenaires
+            Catalogue B2B & Tarifs Librairies Partenaires
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Catalogue Achat en Gros &amp; Réassort
+            Catalogue Achat en Gros & Réassort
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
             Commandez vos lots mixtes (licences numériques pour étudiants + cartons de livres papier) avec remises volume automatiques.
@@ -157,7 +259,7 @@ export default function WholesalerCatalogPage() {
         <button
           type="button"
           onClick={() => setCartOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-xs relative self-start sm:self-center min-h-[44px] cursor-pointer"
+          className="px-4 py-2.5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-xs relative self-start sm:self-center min-h-[44px] cursor-pointer"
         >
           <ShoppingCart className="w-4 h-4 text-gold" />
           <span>Panier Commande Groupée</span>
@@ -169,49 +271,81 @@ export default function WholesalerCatalogPage() {
         </button>
       </div>
 
-      {/* Filtres & Recherche */}
-      <div className="p-4 rounded-2xl bg-background border border-border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher par titre, ISBN ou auteur..."
-            className="w-full pl-9 pr-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
-          />
-        </div>
+      {/* Filtres, Recherche & Sélecteur de Mode de Vue (Grille / Tableau) */}
+      <div className="p-4 rounded-3xl bg-background border border-border flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-center gap-3 flex-1 w-full">
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher par titre, ISBN ou auteur..."
+              className="w-full pl-9 pr-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
+            />
+          </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
-          <button
-            type="button"
-            onClick={() => setDisciplineFilter("all")}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-colors border cursor-pointer ${
-              disciplineFilter === "all"
-                ? "bg-navy text-white border-navy"
-                : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
-            }`}
-          >
-            Toutes disciplines ({books.length})
-          </button>
-          {disciplines.map((d) => (
+          <div className="flex items-center gap-2 overflow-x-auto w-full pb-1 sm:pb-0 scrollbar-none">
             <button
-              key={d.id}
               type="button"
-              onClick={() => setDisciplineFilter(d.name)}
-              className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-colors border cursor-pointer ${
-                disciplineFilter === d.name
+              onClick={() => setDisciplineFilter("all")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors border cursor-pointer min-h-[38px] ${
+                disciplineFilter === "all"
                   ? "bg-navy text-white border-navy"
                   : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
               }`}
             >
-              {d.name}
+              Toutes disciplines ({books.length})
             </button>
-          ))}
+            {disciplines.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => setDisciplineFilter(d.name)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors border cursor-pointer min-h-[38px] ${
+                  disciplineFilter === d.name
+                    ? "bg-navy text-white border-navy"
+                    : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
+                }`}
+              >
+                {d.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sélecteur de Mode Grille / Tableau */}
+        <div className="inline-flex rounded-2xl bg-background-secondary border border-border p-1 self-end lg:self-center shrink-0">
+          <button
+            type="button"
+            onClick={() => setViewMode("grid")}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              viewMode === "grid"
+                ? "bg-navy text-white shadow-sm"
+                : "text-foreground-muted hover:text-navy"
+            }`}
+            title="Affichage en Grille"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Grille</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("table")}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              viewMode === "table"
+                ? "bg-navy text-white shadow-sm"
+                : "text-foreground-muted hover:text-navy"
+            }`}
+            title="Affichage en Tableau"
+          >
+            <List className="w-3.5 h-3.5" />
+            <span>Tableau</span>
+          </button>
         </div>
       </div>
 
-      {/* Erreur, Skeleton Loading ou Grille */}
+      {/* Rendu dynamique : Erreur, Chargement, Grille ou DataTable */}
       {loadError ? (
         <div className="p-8 text-center rounded-3xl bg-error/5 border border-error/20 space-y-4">
           <div className="w-12 h-12 rounded-full bg-error/10 text-error flex items-center justify-center mx-auto">
@@ -266,106 +400,115 @@ export default function WholesalerCatalogPage() {
             Réinitialiser les filtres
           </button>
         </div>
-      ) : (
+      ) : viewMode === "grid" ? (
+        /* VUE EN GRILLE */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredBooks.map((book) => {
-            const isInCart = cart.some((item) => item.book_id === book.id);
-
-            return (
-              <div
-                key={book.id}
-                className="p-5 rounded-3xl bg-background border border-border space-y-4 shadow-xs hover:border-gold/60 hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  {/* Visuel Couverture Réelle ou 3D */}
-                  <div className="relative rounded-2xl overflow-hidden bg-background-secondary border border-border aspect-[3/4] flex items-center justify-center group shadow-xs">
-                    {book.cover_url && book.cover_url !== "/placeholder-cover.jpg" ? (
-                      <img
-                        src={book.cover_url}
-                        alt={book.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="p-4 text-center space-y-2">
-                        <BookOpen className="w-10 h-10 text-navy/40 mx-auto" />
-                        <span className="text-[10px] font-bold text-navy uppercase block line-clamp-2">
-                          {book.title}
-                        </span>
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setPreviewBook(book)}
-                      className="absolute inset-0 bg-navy/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1.5 backdrop-blur-xs cursor-pointer"
-                    >
-                      <Eye className="w-4 h-4 text-gold" />
-                      Consulter Extrait
-                    </button>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] font-bold text-gold bg-gold/10 border border-gold/20 px-2 py-0.5 rounded-md inline-block mb-1">
-                      {book.discipline}
-                    </span>
-                    <h3 className="font-serif font-bold text-xs text-navy leading-snug line-clamp-2">
-                      {book.title}
-                    </h3>
-                    <p className="text-[11px] text-foreground-muted truncate mt-0.5">
-                      {book.authors.join(", ")}
-                    </p>
-                    <p className="text-[10px] text-foreground-muted font-mono">
-                      ISBN: {book.isbn_digital}
-                    </p>
-                  </div>
-
-                  {/* Tarifs de gros & Remises */}
-                  <div className="p-3 rounded-2xl bg-background-secondary border border-border space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-foreground-muted font-bold">
-                        Licence Numérique (-{book.digital_discount_pct ?? 25}%) :
-                      </span>
-                      <span className="font-mono font-bold text-navy">
-                        {book.digital_wholesale_price.toLocaleString("fr-FR")} XOF
+          {filteredBooks.map((book) => (
+            <div
+              key={book.id}
+              className="p-5 rounded-3xl bg-background border border-border space-y-4 shadow-xs hover:border-gold/60 hover:shadow-md transition-all flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                {/* Visuel Couverture Réelle ou Placeholder élégant */}
+                <div className="relative rounded-2xl overflow-hidden bg-background-secondary border border-border aspect-[3/4] flex items-center justify-center group shadow-xs">
+                  {book.cover_url && book.cover_url !== "/placeholder-cover.jpg" ? (
+                    <img
+                      src={book.cover_url}
+                      alt={book.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="p-4 text-center space-y-2">
+                      <BookOpen className="w-10 h-10 text-navy/40 mx-auto" />
+                      <span className="text-[10px] font-bold text-navy uppercase block line-clamp-2">
+                        {book.title}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-foreground-muted font-bold">
-                        Exemplaire Papier (-{book.paper_discount_pct ?? 32}%) :
-                      </span>
-                      <span className="font-mono font-bold text-navy">
-                        {book.print_wholesale_price.toLocaleString("fr-FR")} XOF
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2 pt-2">
+                  )}
                   <button
                     type="button"
                     onClick={() => setPreviewBook(book)}
-                    className="w-full py-2 rounded-xl bg-background-secondary border border-border text-navy text-xs font-bold hover:border-gold transition-colors flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px]"
+                    className="absolute inset-0 bg-navy/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1.5 backdrop-blur-xs cursor-pointer"
                   >
-                    <Eye className="w-3.5 h-3.5 text-gold" />
-                    Voir Extrait &amp; Fiche
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setOrderBook(book)}
-                    className="w-full py-2.5 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer min-h-[44px] bg-gold text-navy hover:bg-gold-light"
-                  >
-                    <Package className="w-3.5 h-3.5" />
-                    Commander cet Ouvrage
+                    <Eye className="w-4 h-4 text-gold" />
+                    Consulter Extrait
                   </button>
                 </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-gold bg-gold/10 border border-gold/20 px-2 py-0.5 rounded-md inline-block mb-1">
+                    {book.discipline}
+                  </span>
+                  <h3 className="font-serif font-bold text-xs text-navy leading-snug line-clamp-2">
+                    {book.title}
+                  </h3>
+                  <p className="text-[11px] text-foreground-muted truncate mt-0.5">
+                    {book.authors.join(", ")}
+                  </p>
+                  <p className="text-[10px] text-foreground-muted font-mono">
+                    ISBN : {book.isbn_digital}
+                  </p>
+                </div>
+
+                {/* Tarifs de gros & Remises */}
+                <div className="p-3 rounded-2xl bg-background-secondary border border-border space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-foreground-muted font-bold">
+                      Licence Numérique (-{book.digital_discount_pct ?? 25}%) :
+                    </span>
+                    <span className="font-mono font-bold text-navy">
+                      {book.digital_wholesale_price.toLocaleString("fr-FR")} XOF
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-foreground-muted font-bold">
+                      Exemplaire Papier (-{book.paper_discount_pct ?? 32}%) :
+                    </span>
+                    <span className="font-mono font-bold text-navy">
+                      {book.print_wholesale_price.toLocaleString("fr-FR")} XOF
+                    </span>
+                  </div>
+                </div>
               </div>
-            );
-          })}
+
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewBook(book)}
+                  className="w-full py-2 rounded-xl bg-background-secondary border border-border text-navy text-xs font-bold hover:border-gold transition-colors flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px]"
+                >
+                  <Eye className="w-3.5 h-3.5 text-gold" />
+                  Voir Extrait & Fiche
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setOrderBook(book)}
+                  className="w-full py-2.5 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer min-h-[44px] bg-gold text-navy hover:bg-gold-light"
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  Commander cet Ouvrage
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* VUE EN TABLEAU (DATATABLE AÉRÉE & VISUELLE) */
+        <div className="space-y-4">
+          <DataTable
+            data={filteredBooks}
+            columns={columns}
+            rowKey="id"
+            loading={loading}
+            searchable={false}
+            emptyMessage="Aucun ouvrage ne correspond à vos filtres."
+          />
         </div>
       )}
 
-      {/* Modale de Commande Grossiste Directe (UX claire et fluide) */}
+      {/* Modale de Commande Grossiste Directe */}
       <WholesaleOrderModal
         book={orderBook}
         isOpen={orderBook !== null}
@@ -384,7 +527,7 @@ export default function WholesalerCatalogPage() {
         }}
       />
 
-      {/* Drawer du Panier 21st.dev Shopping Cart (id: 5797) */}
+      {/* Drawer du Panier */}
       <WholesaleCartDrawer
         items={cart}
         onUpdateQty={handleUpdateQty}
