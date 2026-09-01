@@ -237,3 +237,70 @@ export async function saveDrmGlobalSettings(settings: DrmGlobalSettings): Promis
   return false;
 }
 
+/**
+ * Configuration de protection par défaut pour un ouvrage
+ */
+export const DEFAULT_BOOK_PROTECTION: ProtectionConfig = {
+  watermark_enabled: true,
+  watermark_position: "bottom-right",
+  watermark_opacity: 30,
+  user_watermarking: true,
+  lcp_drm_enabled: true,
+  max_allowed_devices: 3,
+  max_loan_days: 30,
+  disable_copy_paste: true,
+  disable_print: true,
+  audio_encryption_auto: true,
+  access_tracing_auto: true,
+};
+
+/**
+ * Récupère la configuration DRM/protection spécifique à un ouvrage du catalogue.
+ * Endpoint : GET /api/v1/protection/configs/by-book/{bookId}/
+ */
+export async function getBookProtectionConfig(bookId: string): Promise<ProtectionConfig> {
+  try {
+    const res = await fetch(`/api/bff/protection/configs/by-book/${bookId}/`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const d = json.data || json;
+      return {
+        watermark_enabled: d.watermark_enabled ?? d.watermark_visible ?? true,
+        watermark_position: d.watermark_position || "bottom-right",
+        watermark_opacity: d.watermark_opacity ?? 30,
+        user_watermarking: d.user_watermarking ?? d.invisible_watermark_enabled ?? true,
+        lcp_drm_enabled: d.lcp_drm_enabled ?? true,
+        max_allowed_devices: d.max_allowed_devices ?? d.max_devices_per_user ?? 3,
+        max_loan_days: d.max_loan_days ?? d.loan_duration_days ?? 30,
+        disable_copy_paste: d.disable_copy_paste != null ? Boolean(d.disable_copy_paste) : (d.allow_copy != null ? !d.allow_copy : true),
+        disable_print: d.disable_print != null ? Boolean(d.disable_print) : (d.allow_print != null ? !d.allow_print : true),
+        audio_encryption_auto: true,
+        access_tracing_auto: true,
+      };
+    }
+  } catch (err) {
+    console.error("[Protection] Erreur chargement config ouvrage:", err);
+  }
+  return DEFAULT_BOOK_PROTECTION;
+}
+
+/**
+ * Enregistre la configuration DRM/protection spécifique à un ouvrage du catalogue.
+ * Endpoint : PATCH /api/v1/protection/configs/by-book/{bookId}/
+ */
+export async function saveBookProtectionConfig(bookId: string, config: ProtectionConfig): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/bff/protection/configs/by-book/${bookId}/`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config),
+    });
+    if (res.ok) return true;
+  } catch (err) {
+    console.error("[Protection] Erreur sauvegarde config ouvrage:", err);
+  }
+  return false;
+}

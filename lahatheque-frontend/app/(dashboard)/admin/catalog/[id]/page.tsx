@@ -100,14 +100,22 @@ export default function AdminBookDetailPage() {
 
         {/* Protection & DRM */}
         <div className="p-5 rounded-2xl bg-background-secondary border border-border space-y-3">
-          <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
-            <Shield className="w-4 h-4 text-error" />
-            Protection Numérique
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+              <Shield className="w-4 h-4 text-gold" />
+              Protection Numérique
+            </h3>
+            <Link
+              href={`/admin/catalog/${book.id}/protection`}
+              className="text-[11px] font-bold text-navy hover:text-gold transition-colors"
+            >
+              Modifier &rarr;
+            </Link>
+          </div>
           <div className="space-y-2 text-xs">
             <div className="flex justify-between py-1 border-b border-border">
               <span className="text-foreground-muted">Technologie DRM :</span>
-              <span className="font-mono font-bold uppercase text-navy">{book.protection_type}</span>
+              <span className="font-mono font-bold uppercase text-navy">{book.protection_type || "LCP"}</span>
             </div>
             <div className="flex justify-between py-1 border-b border-border">
               <span className="text-foreground-muted">Filigrane e-mail :</span>
@@ -140,6 +148,14 @@ export default function AdminBookDetailPage() {
           >
             <BookOpen className="w-4 h-4 text-gold" />
             <span>Lire l'Ouvrage (Lecteur LAHA)</span>
+          </Link>
+
+          <Link
+            href={`/admin/catalog/${book.id}/protection`}
+            className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-xs font-semibold hover:border-gold transition-colors flex items-center justify-center gap-1.5"
+          >
+            <Shield className="w-3.5 h-3.5 text-gold" />
+            <span>Gérer DRM</span>
           </Link>
 
           <Link

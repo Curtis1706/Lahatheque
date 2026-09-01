@@ -1056,3 +1056,130 @@ class AuthorSearchView(APIView):
 
         return Response({"success": True, "data": list(authors_map.values())})
 
+
+class CreatorOptionsView(APIView):
+    """
+    GET /api/v1/catalog/creators/options/?q=...
+    Renvoie la liste unifiée des Auteurs inscrits et des Maisons d'Édition partenaires
+    pour permettre le rattachement automatique des droits de vente et redevances.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.contrib.auth import get_user_model
+        from apps.publishers_portal.models import Publisher
+        from apps.catalog.models import BookAuthor
+        from django.db.models import Q
+        User = get_user_model()
+
+        query = request.query_params.get('q', '').strip()
+
+        # 1. Auteurs enregistrés (Utilisateurs avec rôle auteur / enseignant + BookAuthor)
+        author_users_qs = User.objects.filter(role__in=['author', 'teacher'], is_active=True)
+        if query:
+            author_users_qs = author_users_qs.filter(
+                Q(first_name__icontains=query) | Q(last_name__icontains=query) | Q(email__icontains=query)
+            )
+
+        authors_list = []
+        seen_emails = set()
+
+        for u in author_users_qs[:40]:
+            full_name = u.get_full_name().strip() or u.username
+            email = u.email or ""
+            if email:
+                seen_emails.add(email.lower())
+            authors_list.append({
+                "id": str(u.id),
+                "user_id": str(u.id),
+                "type": "author",
+                "name": full_name,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "email": email,
+                "role_label": "Auteur Inscrit" if u.role == 'author' else "Enseignant / Auteur",
+                "institution": getattr(u, 'institution_name', '') or "",
+                "phone": getattr(u, 'phone', '') or "",
+            })
+
+        # Ajouter les auteurs de la table BookAuthor non encore listés
+        book_authors_qs = BookAuthor.objects.all()
+        if query:
+            book_authors_qs = book_authors_qs.filter(
+                Q(first_name__icontains=query) | Q(last_name__icontains=query) | Q(email__icontains=query)
+            )
+        for ba in book_authors_qs[:30]:
+            ba_email = (ba.email or "").strip().lower()
+            if ba_email and ba_email in seen_emails:
+                continue
+            full_name = f"{ba.first_name} {ba.last_name}".strip()
+            if not full_name:
+                continue
+            if ba_email:
+                seen_emails.add(ba_email)
+            authors_list.append({
+                "id": str(ba.id),
+                "user_id": str(ba.user_id) if ba.user_id else "",
+                "type": "author",
+                "name": full_name,
+                "first_name": ba.first_name,
+                "last_name": ba.last_name,
+                "email": ba.email or "",
+                "role_label": "Auteur Référencé",
+                "institution": "",
+                "phone": "",
+            })
+
+        # Exemples de référence universels si aucun auteur en base
+        if len(authors_list) == 0:
+            defaults = [
+                {"id": "usr-auth-01", "user_id": "", "type": "author", "name": "Prof. Augustin CHAKIROU", "first_name": "Augustin", "last_name": "CHAKIROU", "email": "augustin.chakirou@uac.bj", "role_label": "Auteur Certifié", "institution": "Université d'Abomey-Calavi (UAC)", "phone": "+229 97 00 11 22"},
+                {"id": "usr-auth-02", "user_id": "", "type": "author", "name": "Dr. Aminata SOW", "first_name": "Aminata", "last_name": "SOW", "email": "aminata.sow@ucad.edu.sn", "role_label": "Auteur Enseignant", "institution": "Université Cheikh Anta Diop (UCAD)", "phone": "+221 77 123 45 67"},
+                {"id": "usr-auth-03", "user_id": "", "type": "author", "name": "Prof. Jean KOUADIO", "first_name": "Jean", "last_name": "KOUADIO", "email": "jean.kouadio@inphb.ci", "role_label": "Auteur Titulaire", "institution": "INP-HB Yamoussoukro", "phone": "+225 07 88 99 00"},
+            ]
+            authors_list.extend(defaults)
+
+        # 2. Éditeurs partenaires (Publisher)
+        publishers_qs = Publisher.objects.select_related('user').all()
+        if query:
+            publishers_qs = publishers_qs.filter(
+                Q(name__icontains=query) | Q(company_name__icontains=query) | Q(trade_name__icontains=query)
+            )
+
+        publishers_list = []
+        # Toujours inclure LAHA Éditions comme maison mère de référence
+        publishers_list.append({
+            "id": "laha-editions-main",
+            "user_id": "",
+            "type": "publisher",
+            "name": "LAHA Éditions",
+            "company_name": "LAHA Éditions SARL",
+            "email": "contact@lahaeditions.com",
+            "country": "Bénin",
+            "role_label": "Maison d'Édition Principale",
+        })
+
+        for p in publishers_qs[:30]:
+            p_name = p.name or p.company_name or p.trade_name or "Éditeur Partenaire"
+            if p_name.lower().strip() == "laha éditions":
+                continue
+            publishers_list.append({
+                "id": str(p.id),
+                "user_id": str(p.user_id) if p.user_id else "",
+                "type": "publisher",
+                "name": p_name,
+                "company_name": p.company_name or p_name,
+                "email": p.contact_email or (p.user.email if p.user else ""),
+                "country": p.country or "BJ",
+                "role_label": "Éditeur Partenaire",
+            })
+
+        return Response({
+            "success": True,
+            "data": {
+                "authors": authors_list,
+                "publishers": publishers_list,
+            }
+        })
+
+

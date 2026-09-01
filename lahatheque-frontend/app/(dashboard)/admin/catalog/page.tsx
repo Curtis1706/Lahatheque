@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getAdminCatalog, updateBookPricing, deleteAdminCatalogBook } from "@/lib/services/admin";
 import { AdminCatalogBook } from "@/lib/types/admin";
-import { BookOpen, Search, Tag, History, Shield, Eye, Pencil, X, Save, CheckCircle2, Trash2 } from "lucide-react";
+import { BookOpen, Search, Tag, History, Shield, Eye, Pencil, X, Save, CheckCircle2, Trash2, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { InlineLoader } from "@/components/ui/page-loader";
@@ -173,7 +173,7 @@ export default function AdminCatalogPage() {
       header: "DRM / Protection",
       cell: (row) => (
         <Link
-          href={`/publisher/catalog/${row.id}/protection`}
+          href={`/admin/catalog/${row.id}/protection`}
           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-navy/10 hover:bg-navy hover:text-white text-navy font-semibold text-[11px] font-mono uppercase transition-all group"
           title="Configurer les règles de protection pour cet ouvrage"
         >
@@ -196,7 +196,7 @@ export default function AdminCatalogPage() {
             <Pencil className="w-3.5 h-3.5" />
           </button>
           <Link
-            href={`/publisher/catalog/${row.id}/protection`}
+            href={`/admin/catalog/${row.id}/protection`}
             className="p-1.5 rounded-lg border border-border bg-background hover:bg-navy hover:text-white text-foreground-muted transition-colors"
             title="Gérer les droits DRM"
           >
@@ -237,6 +237,14 @@ export default function AdminCatalogPage() {
         {/* Boutons d'action et bascule de vue */}
         <div className="flex flex-wrap items-center gap-2.5">
           <ViewToggle mode={viewMode} onChange={setViewMode} />
+
+          <Link
+            href="/admin/catalog/new"
+            className="px-4 py-2 rounded-xl bg-navy text-white font-bold text-xs hover:bg-navy-hover transition-colors flex items-center gap-2 min-h-[38px] shadow-xs"
+          >
+            <PlusCircle className="w-4 h-4 text-gold" />
+            <span>Ajouter un Ouvrage</span>
+          </Link>
 
           <Link
             href="/admin/settings/drm"
@@ -308,7 +316,7 @@ export default function AdminCatalogPage() {
                     <Pencil className="w-3.5 h-3.5 text-gold" />
                   </button>
                   <Link
-                    href={`/publisher/catalog/${book.id}/protection`}
+                    href={`/admin/catalog/${book.id}/protection`}
                     className="flex-1 py-2 px-2 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy text-[11px] font-bold text-center transition-colors flex items-center justify-center gap-1 min-h-[36px]"
                   >
                     <Shield className="w-3 h-3 text-gold" />

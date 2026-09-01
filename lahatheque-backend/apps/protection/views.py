@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.decorators import action
 from rest_framework import status
 
 from .models import Annotation, ProtectionConfig, TraceAcces, GlobalDrmConfig
@@ -114,13 +115,102 @@ class ProtectionConfigViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return ProtectionConfig.objects.select_related("ouvrage").all()
+        qs = ProtectionConfig.objects.select_related("ouvrage").all()
+        ouvrage_id = self.request.query_params.get("ouvrage") or self.request.query_params.get("book_id")
+        if ouvrage_id:
+            qs = qs.filter(ouvrage_id=ouvrage_id)
+        return qs
 
     def perform_update(self, serializer):
         # Incrémenter la version de configuration pour invalider automatiquement les caches dérivés
         instance = serializer.save()
         instance.config_version += 1
         instance.save(update_fields=["config_version"])
+
+    @action(detail=False, methods=['get', 'patch'], url_path='by-book/(?P<book_id>[^/.]+)')
+    def by_book(self, request, book_id=None):
+        from apps.catalog.models import Ouvrage
+        ouvrage = Ouvrage.objects.filter(id=book_id).first()
+        if not ouvrage:
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        config, _ = ProtectionConfig.objects.get_or_create(ouvrage=ouvrage)
+
+        if request.method.lower() == 'patch':
+            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+            # Accepter à la fois la nomenclature frontend (ProtectionConfigCard) et modèle Django
+            if "watermark_enabled" in data:
+                config.watermark_visible = bool(data["watermark_enabled"])
+            if "watermark_visible" in data:
+                config.watermark_visible = bool(data["watermark_visible"])
+            if "watermark_position" in data:
+                config.watermark_position = str(data["watermark_position"])
+            if "watermark_opacity" in data:
+                try:
+                    val = float(data["watermark_opacity"])
+                    config.watermark_opacity = (val / 100.0) if val > 1.0 else val
+                except (ValueError, TypeError):
+                    pass
+            if "lcp_drm_enabled" in data:
+                config.lcp_drm_enabled = bool(data["lcp_drm_enabled"])
+            if "disable_copy_paste" in data:
+                config.allow_copy = not bool(data["disable_copy_paste"])
+            if "allow_copy" in data:
+                config.allow_copy = bool(data["allow_copy"])
+            if "disable_print" in data:
+                config.allow_print = not bool(data["disable_print"])
+            if "allow_print" in data:
+                config.allow_print = bool(data["allow_print"])
+            if "max_allowed_devices" in data:
+                try:
+                    config.max_devices_per_user = int(data["max_allowed_devices"])
+                except (ValueError, TypeError):
+                    pass
+            if "max_loan_days" in data:
+                try:
+                    config.loan_duration_days = int(data["max_loan_days"])
+                except (ValueError, TypeError):
+                    pass
+
+            config.config_version += 1
+            config.save()
+
+        # Retourner avec format unifié + champs pratiques frontend
+        raw_opacity = float(config.watermark_opacity or 0.20)
+        opacity_pct = int(raw_opacity * 100) if raw_opacity <= 1.0 else int(raw_opacity)
+
+        resp_data = {
+            "id": config.id,
+            "ouvrage": str(ouvrage.id),
+            "book_title": ouvrage.title,
+            "profil": config.profil,
+            "allow_print": config.allow_print,
+            "allow_copy": config.allow_copy,
+            "allow_download": config.allow_download,
+            "watermark_visible": config.watermark_visible,
+            "watermark_position": config.watermark_position,
+            "watermark_opacity": opacity_pct,
+            "invisible_watermark_enabled": config.invisible_watermark_enabled,
+            "max_devices_per_user": config.max_devices_per_user,
+            "loan_duration_days": config.loan_duration_days,
+            "lcp_drm_enabled": config.lcp_drm_enabled,
+            "config_version": config.config_version,
+            # Format standard pour ProtectionConfigCard :
+            "watermark_enabled": config.watermark_visible,
+            "disable_copy_paste": not config.allow_copy,
+            "disable_print": not config.allow_print,
+            "max_allowed_devices": config.max_devices_per_user,
+            "max_loan_days": config.loan_duration_days,
+            "user_watermarking": config.invisible_watermark_enabled,
+            "audio_encryption_auto": True,
+            "access_tracing_auto": True,
+        }
+
+        return Response({
+            "success": True,
+            "data": resp_data,
+            "message": "Configuration DRM de l'ouvrage enregistrée avec succès."
+        })
 
 
 class AnnotationViewSet(ModelViewSet):

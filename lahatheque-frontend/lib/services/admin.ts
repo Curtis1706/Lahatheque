@@ -251,6 +251,20 @@ export async function deleteAdminCatalogBook(bookId: string): Promise<{ success:
   return { success: false, error: data.error || 'Erreur lors de la suppression de l\'ouvrage.' };
 }
 
+export async function createAdminCatalogBook(formData: FormData): Promise<{ success: boolean; data?: any; error?: string }> {
+  const res = await fetch('/api/bff/catalog/my-deposits/', {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (res.ok && (json.success !== false)) {
+    return { success: true, data: json.data || json };
+  }
+  const errorMsg = json.error || (typeof json.details === 'object' ? JSON.stringify(json.details) : json.detail) || 'Erreur lors de la création de l\'ouvrage.';
+  return { success: false, error: errorMsg };
+}
+
 export interface RoleDiscounts {
   author: { paper_pct: number; digital_pct: number };
   wholesaler: { paper_pct: number; digital_pct: number };

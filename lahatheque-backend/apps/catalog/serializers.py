@@ -90,8 +90,12 @@ class OuvrageCreateSerializer(serializers.Serializer):
     """
     title = serializers.CharField(max_length=255)
     subtitle = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
-    isbn = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+    isbn = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
+    publisher_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+    publisher_id = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
     authors_names = serializers.CharField(required=False, allow_blank=True, default='')
+    author_id = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
+    author_user_id = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
     summary = serializers.CharField(required=False, allow_blank=True, default='')
     language = serializers.CharField(max_length=50, required=False, allow_blank=True, default='fr')
     format_type = serializers.CharField(max_length=20, required=False, allow_blank=True, default='pdf')
@@ -158,7 +162,23 @@ class OuvrageCreateSerializer(serializers.Serializer):
                 name__icontains=institution_name.split('(')[0].strip()
             ).first()
 
-        # Extraction des noms et emails d'auteurs
+        # Résolution du diffuseur / éditeur
+        publisher_obj = None
+        publisher_id = validated_data.pop('publisher_id', '')
+        publisher_name = validated_data.pop('publisher_name', '')
+        from apps.publishers_portal.models import Publisher
+        if publisher_id:
+            try:
+                publisher_obj = Publisher.objects.filter(id=publisher_id).first()
+            except Exception:
+                publisher_obj = None
+        if not publisher_obj and publisher_name and 'laha' not in publisher_name.lower():
+            publisher_obj = Publisher.objects.filter(company_name__icontains=publisher_name.strip()).first() or \
+                            Publisher.objects.filter(name__icontains=publisher_name.strip()).first()
+
+        # Extraction des identifiants et données d'auteurs
+        author_id = validated_data.pop('author_id', '')
+        author_user_id = validated_data.pop('author_user_id', '')
         authors_names = validated_data.pop('authors_names', '')
         authors_emails = validated_data.pop('authors_emails', '')
         file_key = validated_data.pop('file_key', '')
@@ -208,7 +228,7 @@ class OuvrageCreateSerializer(serializers.Serializer):
             ouvrage = existing_ouvrage
             ouvrage.title = validated_data['title']
             ouvrage.subtitle = validated_data.get('subtitle', '')
-            ouvrage.isbn = validated_data.get('isbn', '')[:17]
+            ouvrage.isbn = validated_data.get('isbn', '')[:64]
             ouvrage.summary = validated_data.get('summary', '')
             ouvrage.language = validated_data.get('language', 'fr')[:10]
             ouvrage.format_type = validated_data.get('format_type', 'pdf').lower()[:20]
@@ -227,13 +247,14 @@ class OuvrageCreateSerializer(serializers.Serializer):
             ouvrage.summary_source = validated_data.get('summary_source', 'ai_suggested')
             ouvrage.discipline = discipline_obj
             ouvrage.institution = institution_obj
+            ouvrage.publisher = publisher_obj or ouvrage.publisher
             ouvrage.pre_edition_dossier = dossier
             ouvrage.rejection_reason = ''  # Réinitialiser le motif de rejet lors d'une nouvelle soumission
         else:
             ouvrage = Ouvrage.objects.create(
                 title=validated_data['title'],
                 subtitle=validated_data.get('subtitle', ''),
-                isbn=validated_data.get('isbn', '')[:17],
+                isbn=validated_data.get('isbn', '')[:64],
                 summary=validated_data.get('summary', ''),
                 language=validated_data.get('language', 'fr')[:10],
                 format_type=validated_data.get('format_type', 'pdf').lower()[:20],
@@ -252,6 +273,7 @@ class OuvrageCreateSerializer(serializers.Serializer):
                 summary_source=validated_data.get('summary_source', 'ai_suggested'),
                 discipline=discipline_obj,
                 institution=institution_obj,
+                publisher=publisher_obj,
                 pre_edition_dossier=dossier,
                 created_by=user,
                 status='draft',
@@ -284,10 +306,34 @@ class OuvrageCreateSerializer(serializers.Serializer):
         ouvrage.save()
 
         # Réinitialiser les auteurs si mise à jour
-        if existing_ouvrage and authors_names:
+        if existing_ouvrage and (authors_names or author_user_id or author_id):
             ouvrage.authors.clear()
 
-        # Créer les BookAuthor à partir des noms et lier les comptes auteurs si fournis
+        # Résolution de l'auteur sélectionné (User ou BookAuthor)
+        from apps.accounts.models import User
+        from apps.rights.models import AuthorRight, RepartitionDroits, RoyaltyRate
+
+        selected_author_user = None
+        target_uid = author_user_id or author_id
+        if target_uid:
+            try:
+                selected_author_user = User.objects.filter(id=target_uid).first()
+            except Exception:
+                selected_author_user = None
+
+        # Créer les BookAuthor à partir des noms ou de l'auteur sélectionné
+        primary_author_obj = None
+        if selected_author_user:
+            primary_author_obj, _ = BookAuthor.objects.get_or_create(
+                user=selected_author_user,
+                defaults={
+                    'first_name': selected_author_user.first_name or (authors_names.split(' ')[0] if authors_names else "Auteur"),
+                    'last_name': selected_author_user.last_name or (authors_names.split(' ', 1)[1] if ' ' in authors_names else ""),
+                    'email': selected_author_user.email
+                }
+            )
+            ouvrage.authors.add(primary_author_obj)
+
         if authors_names:
             names = [n.strip() for n in authors_names.split(',') if n.strip()]
             emails = [e.strip() for e in authors_emails.split(',') if e.strip()] if authors_emails else []
@@ -297,10 +343,9 @@ class OuvrageCreateSerializer(serializers.Serializer):
                 last = parts[1] if len(parts) > 1 else ''
                 author_email = emails[idx] if idx < len(emails) else ''
 
-                author_user = None
-                if author_email:
-                    from apps.accounts.models import User
-                    author_user = User.objects.filter(email__iexact=author_email, role='author').first()
+                author_user = selected_author_user
+                if not author_user and author_email:
+                    author_user = User.objects.filter(email__iexact=author_email).first()
 
                 author_obj, created = BookAuthor.objects.get_or_create(
                     first_name=first,
@@ -314,12 +359,69 @@ class OuvrageCreateSerializer(serializers.Serializer):
                     author_obj.save(update_fields=['user', 'email'])
 
                 ouvrage.authors.add(author_obj)
+                if not primary_author_obj:
+                    primary_author_obj = author_obj
+                if not selected_author_user and author_user:
+                    selected_author_user = author_user
 
                 # Si un dossier de pré-édition est lié et possède un auteur_user
                 if dossier and dossier.auteur_user and not author_obj.user:
                     author_obj.user = dossier.auteur_user
                     author_obj.email = dossier.auteur_email or author_obj.email
                     author_obj.save(update_fields=['user', 'email'])
+                    if not selected_author_user:
+                        selected_author_user = dossier.auteur_user
+
+        # ─── Configuration Automatique des Droits & Redevances de Vente ────────────
+        try:
+            # 1. Barème standard de redevances
+            RoyaltyRate.objects.get_or_create(
+                ouvrage=ouvrage,
+                defaults={
+                    "author_share_percent": 70.00 if selected_author_user else 0.00,
+                    "publisher_share_percent": 30.00 if publisher_obj else 0.00,
+                    "platform_share_percent": 0.00
+                }
+            )
+
+            # 2. Rattachement du droit d'auteur pour l'auteur sélectionné
+            if selected_author_user:
+                AuthorRight.objects.get_or_create(
+                    ouvrage=ouvrage,
+                    user=selected_author_user,
+                    defaults={
+                        "author": primary_author_obj,
+                        "role": "auteur_principal",
+                        "pool_share_percent": 100.00
+                    }
+                )
+
+                RepartitionDroits.objects.get_or_create(
+                    ouvrage=ouvrage,
+                    beneficiaire=selected_author_user,
+                    defaults={
+                        "role_libelle": "Auteur Principal",
+                        "pourcentage": 100.00,
+                        "taux_papier": 10.00,
+                        "taux_numerique": 15.00,
+                        "taux_audio_tts": 8.00,
+                    }
+                )
+
+            # 3. Rattachement pour l'Éditeur Tiers partenaire
+            if publisher_obj and publisher_obj.user:
+                if not RepartitionDroits.objects.filter(ouvrage=ouvrage, beneficiaire=publisher_obj.user).exists():
+                    RepartitionDroits.objects.create(
+                        ouvrage=ouvrage,
+                        beneficiaire=publisher_obj.user,
+                        role_libelle="Éditeur Tiers",
+                        pourcentage=100.00 if not selected_author_user else 30.00,
+                        taux_papier=70.00,
+                        taux_numerique=70.00,
+                        taux_audio_tts=50.00,
+                    )
+        except Exception as rights_err:
+            logger.warning(f"Impossible d'initialiser les droits d'auteur pour {ouvrage.id}: {rights_err}")
 
         # Mise à jour du statut du dossier de pré-édition si applicable
         if dossier and dossier.status == 'en_attente_depot':
