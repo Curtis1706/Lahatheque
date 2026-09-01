@@ -101,9 +101,20 @@ export async function getProfile(): Promise<{ success: boolean; data?: UserProfi
 }
 
 export async function updateProfile(formData: FormData): Promise<{ success: boolean; data?: any; error?: string; message?: string }> {
+  const startTime = Date.now();
+  const avatarFile = formData.get("avatar");
+  const avatarInfo = avatarFile instanceof File 
+    ? `Fichier: "${avatarFile.name}", ${(avatarFile.size / 1024).toFixed(1)} Ko, type: ${avatarFile.type}`
+    : "Aucun fichier binaire";
+  
+  console.log(`[AUTH SERVICE] [PHOTO UPLOAD START] Envoi PATCH /api/bff/auth/profile/ -> ${avatarInfo}`);
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => {
+      console.warn(`[AUTH SERVICE] [PHOTO UPLOAD TIMEOUT] La requête a dépassé 60 secondes d'attente.`);
+      controller.abort();
+    }, 60000);
 
     const res = await fetch('/api/bff/auth/profile/', {
       method: 'PATCH',
@@ -113,16 +124,29 @@ export async function updateProfile(formData: FormData): Promise<{ success: bool
     });
     clearTimeout(timeoutId);
 
+    const elapsed = Date.now() - startTime;
+    console.log(`[AUTH SERVICE] [PHOTO UPLOAD RESPONSE] Statut HTTP ${res.status} reçu en ${elapsed}ms.`);
+
     const data = await res.json();
     if (!res.ok) {
-      return { success: false, error: data.error || 'Erreur lors de la mise à jour.' };
+      console.error(`[AUTH SERVICE] [PHOTO UPLOAD ERROR] Échec HTTP ${res.status}:`, data);
+      return { success: false, error: data.error || 'Erreur lors de la mise à jour du profil.' };
     }
+
+    console.log(`[AUTH SERVICE] [PHOTO UPLOAD SUCCESS] Profil mis à jour:`, {
+      avatar_url: data.data?.avatar_url,
+      email: data.data?.email,
+      elapsed_ms: elapsed,
+    });
 
     return { success: true, data: data.data, message: data.message };
   } catch (err: any) {
+    const elapsed = Date.now() - startTime;
     if (err?.name === 'AbortError') {
-      return { success: false, error: 'Délai d’attente dépassé lors de l’envoi de la photo.' };
+      console.error(`[AUTH SERVICE] [PHOTO UPLOAD TIMEOUT] Délai d'attente de 60s dépassé.`);
+      return { success: false, error: 'Délai d’attente dépassé (60s) lors de l’envoi de la photo vers Cloudflare R2.' };
     }
+    console.error(`[AUTH SERVICE] [PHOTO UPLOAD NETWORK ERROR] Exception après ${elapsed}ms:`, err);
     return { success: false, error: 'Impossible de mettre à jour le profil.' };
   }
 }

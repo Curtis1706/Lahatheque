@@ -42,20 +42,25 @@ export function ProfileAvatarCard({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log(`[PROFILE AVATAR UI] Fichier sélectionné par l'utilisateur: "${file.name}" (${(file.size / 1024).toFixed(1)} Ko, type: ${file.type})`);
+
     // Validation du format
     const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     if (!allowedTypes.includes(file.type)) {
+      console.warn(`[PROFILE AVATAR UI] Format invalide rejeté: ${file.type}`);
       toast.error("Format de fichier non supporté. Veuillez choisir une image JPG, PNG ou WEBP.");
       return;
     }
 
     // Validation de la taille (5MB max)
     if (file.size > 5 * 1024 * 1024) {
+      console.warn(`[PROFILE AVATAR UI] Taille excessive: ${(file.size / (1024 * 1024)).toFixed(2)} Mo`);
       toast.error("L'image est trop volumineuse. La taille maximale autorisée est de 5 Mo.");
       return;
     }
 
     const localPreviewUrl = URL.createObjectURL(file);
+    console.log(`[PROFILE AVATAR UI] Aperçu local créé: ${localPreviewUrl}`);
     setAvatarPreview(localPreviewUrl);
     setIsUploading(true);
 
@@ -63,10 +68,13 @@ export function ProfileAvatarCard({
       const formData = new FormData();
       formData.append("avatar", file);
 
+      console.log(`[PROFILE AVATAR UI] Lancement de l'upload vers le serveur...`);
       const res = await updateProfile(formData);
+
       if (res.success) {
         toast.success("Photo de profil mise à jour avec succès.");
         const serverUrl = res.data?.avatar_url || res.data?.avatar || localPreviewUrl;
+        console.log(`[PROFILE AVATAR UI] Upload terminé avec succès. URL distante Cloudflare R2:`, serverUrl);
         setAvatarPreview(serverUrl);
         if (updateUser) {
           updateUser({ avatar: serverUrl, avatar_url: serverUrl, profile_photo: serverUrl });
@@ -76,10 +84,12 @@ export function ProfileAvatarCard({
           onAvatarUpdated(serverUrl);
         }
       } else {
+        console.error(`[PROFILE AVATAR UI] Erreur renvoyée par le serveur:`, res.error);
         toast.error(res.error || "Échec de la mise à jour de la photo de profil.");
         setAvatarPreview(initialAvatar);
       }
-    } catch {
+    } catch (err) {
+      console.error(`[PROFILE AVATAR UI] Exception attrapée lors de l'upload:`, err);
       toast.error("Impossible de joindre le serveur pour mettre à jour la photo.");
       setAvatarPreview(initialAvatar);
     } finally {
@@ -89,6 +99,7 @@ export function ProfileAvatarCard({
   };
 
   const handleRemoveAvatar = async () => {
+    console.log(`[PROFILE AVATAR UI] Demande de suppression de l'avatar`);
     setIsUploading(true);
     try {
       const formData = new FormData();
@@ -98,15 +109,18 @@ export function ProfileAvatarCard({
       if (res.success) {
         setAvatarPreview(null);
         toast.success("Photo de profil supprimée.");
+        console.log(`[PROFILE AVATAR UI] Avatar supprimé avec succès.`);
         if (updateUser) {
           updateUser({ avatar: undefined, avatar_url: undefined, profile_photo: null });
         }
         if (refreshUser) await refreshUser();
         if (onAvatarUpdated) onAvatarUpdated(null);
       } else {
+        console.error(`[PROFILE AVATAR UI] Erreur suppression:`, res.error);
         toast.error(res.error || "Impossible de supprimer la photo.");
       }
-    } catch {
+    } catch (err) {
+      console.error(`[PROFILE AVATAR UI] Exception suppression:`, err);
       toast.error("Erreur de connexion au serveur.");
     } finally {
       setIsUploading(false);
