@@ -46,7 +46,6 @@ import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 import "@react-pdf-viewer/highlight/lib/styles/index.css";
 
 import { FlipBookReader } from "@/components/library/FlipBook";
-import { FlipBookQuiz } from "@/components/library/FlipBookQuiz";
 import { ReaderSecurity } from "@/components/features/reader/ReaderSecurity";
 import {
   hostedReaderApi,
@@ -100,7 +99,6 @@ export default function HostedReaderPage() {
   const [isNightMode, setIsNightMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(28);
-  const [showQuiz, setShowQuiz] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -243,25 +241,9 @@ export default function HostedReaderPage() {
           total_pages: totalPages,
           reading_time_seconds: 5,
         });
-
-        // Déclenchement automatique du quiz sur la dernière page
-        if (
-          session.quiz?.enabled &&
-          session.quiz?.show_on_last_page &&
-          newPage >= (totalPages || session.book.total_pages) &&
-          !session.quiz_completed &&
-          !showQuiz
-        ) {
-          setTimeout(() => {
-            setShowQuiz(true);
-            toast.info("Quiz disponible", {
-              description: "Vous avez atteint la fin du document. Validez vos connaissances.",
-            });
-          }, 800);
-        }
       }
     },
-    [session, token, totalPages, showQuiz]
+    [session, token, totalPages]
   );
 
   // Bascule Plein écran
@@ -704,29 +686,7 @@ export default function HostedReaderPage() {
             {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
           </button>
 
-          {/* Bouton Quiz */}
-          {session.quiz?.enabled && (
-            <button
-              onClick={() => setShowQuiz(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                session.quiz_completed
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "bg-[var(--partner-accent,#B4AB6B)] text-black hover:brightness-110 shadow-sm"
-              }`}
-            >
-              {session.quiz_completed ? (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>{session.quiz_score}%</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Quiz</span>
-                </>
-              )}
-            </button>
-          )}
+
 
           {/* Commutateur Bimodal (3D Immersion vs Normal) */}
           <div className="flex items-center bg-black/30 p-0.5 rounded-lg border border-white/10">
@@ -814,32 +774,7 @@ export default function HostedReaderPage() {
         )}
       </main>
 
-      {/* Modale Interactive de Quiz */}
-      <AnimatePresence>
-        {showQuiz && (
-          <FlipBookQuiz
-            bookId={session.book.id}
-            onClose={() => setShowQuiz(false)}
-            onComplete={(result: { score: number; is_validated: boolean; passing_score: number }) => {
-              setSession((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      quiz_completed: true,
-                      quiz_score: result.score,
-                    }
-                  : null
-              );
 
-              toast.success("Quiz complété !", {
-                description: `Score obtenu : ${result.score}% — ${
-                  result.is_validated ? "Félicitations, validé !" : "Seuil non atteint."
-                }`,
-              });
-            }}
-          />
-        )}
-      </AnimatePresence>
 
       {/* Styles Globaux pour le Thème Partenaire et Mode Nuit */}
       <style jsx global>{`

@@ -28,7 +28,6 @@ import '@react-pdf-viewer/default-layout/lib/styles/index.css'
 import '@react-pdf-viewer/highlight/lib/styles/index.css'
 
 import { FlipBookReader, Annotation as FlipBookAnnotation } from "@/components/library/FlipBook"
-import { FlipBookQuiz } from "@/components/library/FlipBookQuiz"
 import { ReaderSecurity } from "@/components/features/reader/ReaderSecurity"
 
 
@@ -301,9 +300,6 @@ export default function DocumentReaderPage() {
   const isOfficeDoc = book?.file?.match(/\.(docx|doc|pptx|ppt|xlsx|xls)$/i)
   const effectiveImmersionMode = (isMobile || isAudioOnly || isOfficeDoc) ? false : isImmersionMode
 
-  const [hasQuiz, setHasQuiz] = useState(false)
-  const [isQuizValidated, setIsQuizValidated] = useState(false)
-  const [isQuizOverlayOpen, setIsQuizOverlayOpen] = useState(false)
   const [showSampleEndOverlay, setShowSampleEndOverlay] = useState(false)
 
   const {
@@ -638,13 +634,7 @@ export default function DocumentReaderPage() {
           }
         }
 
-        // Check for Quiz (uniquement en lecture intégrale, jamais pour un extrait)
-        if (!isSampleMode) {
-          const quizRes = await libraryApi.getQuizzes(id as string)
-          if (quizRes && quizRes.questions.length > 0) {
-            setHasQuiz(true)
-          }
-        }
+
 
       } catch (err) {
         console.warn("API indisponible, chargement du document de démonstration R2:", err)
@@ -1045,21 +1035,7 @@ export default function DocumentReaderPage() {
             </Button>
           )}
 
-          {hasQuiz && isStudent && (
-            <Button
-              onClick={() => setIsQuizOverlayOpen(true)}
-              variant="outline"
-              className={cn(
-                "inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border h-9 px-3.5 text-xs font-bold transition-colors cursor-pointer min-h-[36px]",
-                isQuizValidated
-                  ? "border-success text-success bg-success/10"
-                  : "border-gold text-navy bg-gold hover:bg-gold-hover"
-              )}
-            >
-              <CheckCircle2 size={15} />
-              <span className="hidden lg:inline">{isQuizValidated ? "Validée" : "Quiz"}</span>
-            </Button>
-          )}
+
         </div>
       </header>
 
@@ -1344,31 +1320,6 @@ export default function DocumentReaderPage() {
 
 
 
-      <AnimatePresence>
-        {isQuizOverlayOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[10001] bg-navy-dark"
-          >
-            <FlipBookQuiz
-              bookId={id as string}
-              onClose={() => setIsQuizOverlayOpen(false)}
-              onComplete={(res: any) => {
-                if (res.is_validated) {
-                  setIsQuizValidated(true)
-                  // Si le quiz est validé, on force la progression à 100%
-                  if (totalPages > 0) {
-                    setCurrentPage(totalPages - 1)
-                    syncProgress(totalPages - 1)
-                  }
-                }
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
 
 

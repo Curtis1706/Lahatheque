@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   BookOpen,
   ArrowLeft,
   Search,
-  Heart,
-  Filter,
+  Bookmark,
   Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -19,21 +19,38 @@ import {
 import { BookCard } from "@/components/features/student/book-card";
 import { BookListItem } from "@/components/features/student/book-list-item";
 import { ViewToggle, type ViewMode } from "@/components/features/student/view-toggle";
+import { Pagination } from "@/components/ui/pagination";
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+// ─── Skeletons ────────────────────────────────────────────────────────────────
 
-function SkeletonBook() {
+function SkeletonBookCard() {
   return (
-    <div className="p-4 rounded-3xl border border-border bg-background animate-pulse space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="w-16 h-22 rounded-xl bg-navy/10 shrink-0" />
+    <div className="p-5 rounded-3xl border border-border bg-background animate-pulse space-y-4">
+      <div className="flex items-center gap-4">
+        <div className="w-16 h-24 rounded-xl bg-navy/10 shrink-0" />
         <div className="flex-1 space-y-2">
-          <div className="h-3 rounded bg-navy/10 w-3/4" />
-          <div className="h-2 rounded bg-navy/10 w-1/2" />
-          <div className="h-2 rounded bg-navy/10 w-1/3" />
+          <div className="h-3 rounded bg-navy/10 w-1/4" />
+          <div className="h-4 rounded bg-navy/10 w-3/4" />
+          <div className="h-3 rounded bg-navy/10 w-1/2" />
         </div>
       </div>
-      <div className="h-2 rounded-full bg-navy/10" />
+      <div className="h-2 rounded-full bg-navy/10 w-full" />
+    </div>
+  );
+}
+
+function SkeletonBookList() {
+  return (
+    <div className="p-4 sm:p-5 rounded-3xl border border-border bg-background animate-pulse flex items-center justify-between gap-4">
+      <div className="flex items-center gap-4 flex-1 min-w-0">
+        <div className="w-14 h-20 rounded-xl bg-navy/10 shrink-0" />
+        <div className="space-y-2 flex-1 min-w-0">
+          <div className="h-3 rounded bg-navy/10 w-1/4" />
+          <div className="h-4 rounded bg-navy/10 w-3/5" />
+          <div className="h-3 rounded bg-navy/10 w-1/3" />
+        </div>
+      </div>
+      <div className="h-10 rounded-xl bg-navy/10 w-32 shrink-0 hidden sm:block" />
     </div>
   );
 }
@@ -45,25 +62,25 @@ export default function StudentBooksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [formatFilter, setFormatFilter] = useState("all");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(9);
 
   const loadBooks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getStudentBooks(
-        formatFilter !== "all" ? formatFilter : undefined,
-        onlyFavorites
-      );
+      const data = await getStudentBooks();
       setBooks(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erreur de chargement");
+      setError(err instanceof Error ? err.message : "Erreur de chargement de la bibliothèque");
     } finally {
       setLoading(false);
     }
-  }, [formatFilter, onlyFavorites]);
+  }, []);
 
   useEffect(() => {
     loadBooks();
@@ -80,26 +97,58 @@ export default function StudentBooksPage() {
     }
   };
 
-  const filteredBooks = books.filter((b) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      b.title.toLowerCase().includes(q) ||
-      b.authors?.some(
-        (a) =>
-          a.first_name.toLowerCase().includes(q) ||
-          a.last_name.toLowerCase().includes(q) ||
-          a.full_name.toLowerCase().includes(q)
-      ) ||
-      b.discipline_name?.toLowerCase().includes(q)
-    );
-  });
+  // Filtrage combiné : recherche textuelle et filtre favoris
+  const filteredBooks = useMemo(() => {
+    return books.filter((b) => {
+      if (onlyFavorites && !b.is_favorite) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        b.title.toLowerCase().includes(q) ||
+        b.authors?.some(
+          (a) =>
+            a.first_name.toLowerCase().includes(q) ||
+            a.last_name.toLowerCase().includes(q) ||
+            a.full_name.toLowerCase().includes(q)
+        ) ||
+        b.discipline_name?.toLowerCase().includes(q)
+      );
+    });
+  }, [books, onlyFavorites, searchQuery]);
+
+  const favoriteCount = useMemo(() => books.filter((b) => b.is_favorite).length, [books]);
+
+  // Pagination calculée sur les livres filtrés
+  const totalBooks = filteredBooks.length;
+  const totalPages = Math.ceil(totalBooks / pageSize) || 1;
+
+  const paginatedBooks = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredBooks.slice(start, start + pageSize);
+  }, [filteredBooks, currentPage, pageSize]);
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    toast.info(mode === "grid" ? "Mode Grille activé" : "Mode Liste / Tableau activé");
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setOnlyFavorites(false);
+    setCurrentPage(1);
+    toast.info("Filtres réinitialisés");
+  };
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto min-w-0 pr-14 sm:pr-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
-        <Link href="/student" className="hover:text-navy">
+        <Link href="/student" className="hover:text-navy transition-colors">
           Mon Espace
         </Link>
         <span>/</span>
@@ -111,186 +160,225 @@ export default function StudentBooksPage() {
         <div>
           <Link
             href="/student"
-            className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1"
+            className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline mb-2"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            Retour
+            <span>Retour à l&apos;espace étudiant</span>
           </Link>
-          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1.5">
             <BookOpen className="w-4 h-4 text-gold" />
-            Fonds Personnel de Lecture
+            <span>Fonds Personnel de Lecture</span>
           </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+          <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-navy">
             Ma Bibliothèque
           </h1>
-          <p className="text-xs text-foreground-muted mt-1">
-            Tous les livres débloqués par vos bouquets universitaires, achats et
-            accès libres.
+          <p className="text-xs sm:text-sm text-foreground-muted mt-1.5 max-w-2xl leading-relaxed">
+            Consultez tous vos ouvrages débloqués, reprenez vos lectures en cours et gérez votre sélection de favoris.
           </p>
         </div>
 
         {/* Contrôles Header : Sélecteur Grille/Liste */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
+        <div className="shrink-0 flex items-center gap-3">
+          <ViewToggle mode={viewMode} onChange={handleViewModeChange} />
         </div>
       </div>
 
       {/* ── Filtres & Recherche ────────────────────────────────────────── */}
-      <div className="p-4 rounded-3xl bg-background border border-border space-y-3 shadow-xs">
+      <div className="p-5 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
         {/* Recherche */}
         <div className="relative">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-foreground-muted absolute left-4 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher par titre, auteur ou matière..."
-            className="w-full pl-10 pr-4 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy placeholder:text-foreground-muted focus:outline-none focus:border-gold min-h-[44px]"
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Rechercher par titre, auteur, matière..."
+            className="w-full pl-11 pr-4 py-3 text-xs sm:text-sm bg-background-secondary border border-border rounded-2xl text-navy placeholder:text-foreground-muted focus:outline-none focus:border-gold min-h-[48px] transition-colors"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-foreground-muted" />
-            <span className="text-[10px] font-bold uppercase text-foreground-muted">
-              Format :
-            </span>
-          </div>
-          {[
-            { id: "all", label: "Tous" },
-            { id: "epub", label: "EPUB" },
-            { id: "pdf", label: "PDF" },
-          ].map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => {
-                setFormatFilter(f.id);
-                toast.info(`Filtre format : ${f.label}`);
-              }}
-              className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-colors border min-h-[36px] ${
-                formatFilter === f.id
-                  ? "bg-navy text-white border-navy shadow-xs"
-                  : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+        {/* Onglets Filtres : Tous les ouvrages / Mes Favoris */}
+        <div className="flex items-center gap-2 pt-2 border-t border-border flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              setOnlyFavorites(false);
+              setCurrentPage(1);
+              toast.info("Tous les ouvrages");
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors border min-h-[40px] cursor-pointer ${
+              !onlyFavorites
+                ? "bg-navy text-white border-navy shadow-xs"
+                : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
+            }`}
+          >
+            Tous les ouvrages ({books.length})
+          </button>
 
-          <div className="ml-auto">
-            <button
-              type="button"
-              onClick={() => {
-                const nextFav = !onlyFavorites;
-                setOnlyFavorites(nextFav);
-                toast.info(nextFav ? "Affichage des favoris uniquement" : "Affichage de tous les ouvrages");
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-colors border flex items-center gap-1.5 min-h-[36px] ${
-                onlyFavorites
-                  ? "bg-gold text-navy border-gold shadow-xs"
-                  : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
-              }`}
-            >
-              <Heart
-                className={`w-3.5 h-3.5 ${onlyFavorites ? "fill-current" : ""}`}
-              />
-              Favoris
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOnlyFavorites(true);
+              setCurrentPage(1);
+              toast.info("Mes Favoris");
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-2 min-h-[40px] cursor-pointer ${
+              onlyFavorites
+                ? "bg-gold text-navy border-gold shadow-xs"
+                : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
+            }`}
+          >
+            <Bookmark className={`w-3.5 h-3.5 ${onlyFavorites ? "fill-current text-navy" : "text-gold"}`} />
+            <span>Mes Favoris ({favoriteCount})</span>
+          </button>
         </div>
       </div>
 
       {/* ── Erreur ─────────────────────────────────────────────────── */}
       {error && (
-        <div className="p-4 rounded-2xl border border-error/30 bg-error/10 text-error text-sm">
+        <div className="p-4 rounded-2xl border border-error/30 bg-error/10 text-error text-xs sm:text-sm font-medium">
           {error}
         </div>
       )}
 
-      {/* ── Contenu ────────────────────────────────────────────────── */}
-      {loading ? (
-        <div
-          className={
-            viewMode === "grid"
-              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
-              : "space-y-3"
-          }
-        >
-          {Array.from({ length: 6 }).map((_, i) => (
-            <SkeletonBook key={i} />
-          ))}
-        </div>
-      ) : filteredBooks.length === 0 ? (
-        <div className="py-16 rounded-3xl bg-background border border-dashed border-border text-center space-y-3">
-          <BookOpen className="w-10 h-10 text-foreground-muted mx-auto opacity-40" />
-          <h3 className="font-serif font-bold text-navy text-lg">
-            {books.length === 0
-              ? "Votre bibliothèque est vide"
-              : "Aucun résultat pour cette recherche"}
-          </h3>
-          <p className="text-xs text-foreground-muted max-w-sm mx-auto">
-            {books.length === 0
-              ? "Explorez le catalogue académique pour acquérir vos premiers ouvrages ou connectez votre université."
-              : "Modifiez vos critères de recherche ou réinitialisez les filtres."}
-          </p>
-          {books.length === 0 ? (
-            <Link
-              href="/student/catalog"
-              className="inline-flex mt-2 items-center gap-2 px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px]"
-            >
-              <Sparkles className="w-4 h-4 text-gold" />
-              Explorer le Catalogue
-            </Link>
+      {/* ── Résultats ──────────────────────────────────────────────── */}
+      <div className="space-y-6">
+        {!loading && (
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <p className="text-xs text-foreground-muted">
+              <strong className="text-navy font-bold">{totalBooks}</strong> ouvrage{totalBooks > 1 ? "s" : ""}{" "}
+              {onlyFavorites ? "dans vos favoris" : "dans votre bibliothèque"}
+              {searchQuery && (
+                <span>
+                  {" "}pour « <strong className="text-navy">{searchQuery}</strong> »
+                </span>
+              )}
+            </p>
+
+            {totalPages > 1 && (
+              <span className="text-xs text-foreground-muted font-medium">
+                Page <strong className="text-navy">{currentPage}</strong> sur <strong className="text-navy">{totalPages}</strong>
+              </span>
+            )}
+          </div>
+        )}
+
+        {loading ? (
+          viewMode === "grid" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonBookCard key={i} />
+              ))}
+            </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery("");
-                setFormatFilter("all");
-                setOnlyFavorites(false);
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonBookList key={i} />
+              ))}
+            </div>
+          )
+        ) : filteredBooks.length === 0 ? (
+          <div className="py-20 px-6 rounded-3xl bg-background border border-dashed border-border text-center space-y-4 shadow-xs">
+            <div className="w-14 h-14 rounded-2xl bg-navy/5 flex items-center justify-center mx-auto text-foreground-muted">
+              {onlyFavorites ? (
+                <Bookmark className="w-7 h-7 text-gold opacity-80" />
+              ) : (
+                <BookOpen className="w-7 h-7 opacity-60" />
+              )}
+            </div>
+            <div className="space-y-1 max-w-sm mx-auto">
+              <h3 className="font-serif font-bold text-navy text-lg">
+                {onlyFavorites
+                  ? "Aucun favori enregistré"
+                  : books.length === 0
+                  ? "Votre bibliothèque est vide"
+                  : "Aucun résultat trouvé"}
+              </h3>
+              <p className="text-xs text-foreground-muted leading-relaxed">
+                {onlyFavorites
+                  ? "Cliquez sur l'icône de marque-page d'un ouvrage pour l'ajouter à vos favoris."
+                  : books.length === 0
+                  ? "Explorez le catalogue académique pour acquérir vos premiers ouvrages ou débloquer vos bouquets campus."
+                  : "Modifiez vos critères de recherche ou réinitialisez les filtres."}
+              </p>
+            </div>
+            {books.length === 0 ? (
+              <Link
+                href="/student/catalog"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px] shadow-xs cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-gold" />
+                <span>Explorer le Catalogue</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px] shadow-xs cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4 text-gold" />
+                <span>Réinitialiser les filtres</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {viewMode === "grid" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {paginatedBooks.map((book) => (
+                  <BookCard
+                    key={book.id}
+                    book={{
+                      ...book,
+                      author: book.authors?.map((a) => a.full_name).join(", ") || "Auteur académique",
+                      discipline: book.discipline_name || "Général",
+                      format: "PDF",
+                      progress_percent: book.progress_percent || 0,
+                      is_favorite: Boolean(book.is_favorite),
+                    }}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {paginatedBooks.map((book) => (
+                  <BookListItem
+                    key={book.id}
+                    book={{
+                      ...book,
+                      author: book.authors?.map((a) => a.full_name).join(", ") || "Auteur académique",
+                      discipline: book.discipline_name || "Général",
+                      format: "PDF",
+                      progress_percent: book.progress_percent || 0,
+                      is_favorite: Boolean(book.is_favorite),
+                    }}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalBooks}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setCurrentPage(1);
               }}
-              className="inline-flex mt-2 items-center gap-2 px-4 py-2 rounded-xl border border-border text-navy text-xs font-semibold hover:border-gold"
-            >
-              Réinitialiser les filtres
-            </button>
-          )}
-        </div>
-      ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredBooks.map((book) => (
-            <BookCard
-              key={book.id}
-              book={{
-                ...book,
-                author: book.authors?.map((a) => a.full_name).join(", ") || "Auteur académique",
-                discipline: book.discipline_name || "Général",
-                format: book.format_type?.toUpperCase() === "PDF" ? "PDF" : "EPUB",
-                progress_percent: book.progress_percent || 0,
-                is_favorite: Boolean(book.is_favorite),
-              }}
-              onToggleFavorite={handleToggleFavorite}
+              pageSizeOptions={[6, 9, 12, 24]}
+              itemLabel="ouvrages"
             />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredBooks.map((book) => (
-            <BookListItem
-              key={book.id}
-              book={{
-                ...book,
-                author: book.authors?.map((a) => a.full_name).join(", ") || "Auteur académique",
-                discipline: book.discipline_name || "Général",
-                format: book.format_type?.toUpperCase() === "PDF" ? "PDF" : "EPUB",
-                progress_percent: book.progress_percent || 0,
-                is_favorite: Boolean(book.is_favorite),
-              }}
-              onToggleFavorite={handleToggleFavorite}
-            />
-          ))}
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
