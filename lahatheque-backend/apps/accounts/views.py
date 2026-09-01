@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
 from .services import login as service_login, _register_user, _build_user_payload
 
@@ -50,6 +51,7 @@ class MeView(APIView):
 
 class ProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         payload = _build_user_payload(request.user)

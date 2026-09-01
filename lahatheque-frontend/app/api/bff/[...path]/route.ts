@@ -75,6 +75,8 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
         headers: headers,
         body: body || undefined,
         cache: 'no-store',
+        // @ts-ignore
+        duplex: 'half',
       })
     } catch (netErr) {
       if (targetUrl.includes('localhost')) {
@@ -84,6 +86,8 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
           headers: headers,
           body: body || undefined,
           cache: 'no-store',
+          // @ts-ignore
+          duplex: 'half',
         })
       } else {
         throw netErr

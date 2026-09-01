@@ -23,6 +23,7 @@ import {
   Feather
 } from "lucide-react";
 import { toast } from "sonner";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -178,12 +179,10 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-navy">Téléphone (Mobile Money & Alertes)</label>
-                  <input 
-                    type="text"
-                    placeholder="+229 97 00 00 00"
-                    className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-navy min-h-[44px]"
+                  <PhoneInput
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={setPhone}
+                    className="bg-background min-h-[44px]"
                   />
                 </div>
               </div>

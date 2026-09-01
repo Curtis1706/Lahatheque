@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
 import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 export default function ManagerProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -201,17 +202,11 @@ export default function ManagerProfilePage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-navy">Téléphone d&apos;astreinte *</label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="tel"
-                      required
-                      placeholder="+229 97 00 00 00"
-                      className="w-full bg-background-secondary border border-border rounded-xl pl-9 pr-3 py-3 text-xs sm:text-sm text-foreground focus:outline-none focus:border-gold min-h-[44px]"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                    />
-                  </div>
+                  <PhoneInput
+                    value={phone}
+                    onChange={setPhone}
+                    className="bg-background-secondary min-h-[44px]"
+                  />
                   <p className="text-[10px] text-foreground-muted">Utilisé pour la coordination transporteurs.</p>
                 </div>
               </div>

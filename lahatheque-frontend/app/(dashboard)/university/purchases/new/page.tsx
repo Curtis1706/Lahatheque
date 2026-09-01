@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { PhoneInput } from "@/components/ui/phone-input";
 import {
   getUniversityCatalog,
   createUniversityPaperOrder,
@@ -172,14 +173,12 @@ export default function NewUniversityPaperOrderPage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                Téléphone Contact <span className="text-rose-500">*</span>
+                Téléphone Contact <span className="text-gold">*</span>
               </label>
-              <input
-                type="text"
-                required
+              <PhoneInput
                 value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
+                onChange={setContactPhone}
+                className="bg-background-secondary min-h-[44px]"
               />
             </div>
 

@@ -102,10 +102,16 @@ export async function getProfile(): Promise<{ success: boolean; data?: UserProfi
 
 export async function updateProfile(formData: FormData): Promise<{ success: boolean; data?: any; error?: string; message?: string }> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
     const res = await fetch('/api/bff/auth/profile/', {
       method: 'PATCH',
       body: formData,
+      credentials: 'include',
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     const data = await res.json();
     if (!res.ok) {
@@ -113,7 +119,10 @@ export async function updateProfile(formData: FormData): Promise<{ success: bool
     }
 
     return { success: true, data: data.data, message: data.message };
-  } catch {
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      return { success: false, error: 'Délai d’attente dépassé lors de l’envoi de la photo.' };
+    }
     return { success: false, error: 'Impossible de mettre à jour le profil.' };
   }
 }
@@ -128,6 +137,7 @@ export async function changePassword(payload: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      credentials: 'include',
     });
 
     const data = await res.json();

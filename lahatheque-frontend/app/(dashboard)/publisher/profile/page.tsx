@@ -24,6 +24,7 @@ import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-
 import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
 import type { PublisherProfileData, PublisherEntityType } from "@/lib/types/publisher";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 export default function PublisherProfilePage() {
   const [profile, setProfile] = useState<PublisherProfileData | null>(null);
@@ -429,12 +430,10 @@ export default function PublisherProfilePage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-navy uppercase tracking-wider">Téléphone d&apos;Astreinte</label>
-              <input
-                type="tel"
+              <PhoneInput
                 value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="+229 97 00 11 22"
-                className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
+                onChange={setContactPhone}
+                className="bg-background-secondary min-h-[44px]"
               />
             </div>
           </div>
@@ -449,31 +448,29 @@ export default function PublisherProfilePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-navy uppercase tracking-wider">Nom de la Banque</label>
+              <label className="text-xs font-bold text-navy uppercase tracking-wider">Nom de la Banque / Établissement</label>
               <input
                 type="text"
                 value={bankName}
                 onChange={(e) => setBankName(e.target.value)}
-                placeholder="Ecobank Bénin"
+                placeholder="Ex: Ecobank Bénin, BOA, Société Générale"
                 className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-navy uppercase tracking-wider">Code BIC / SWIFT</label>
+              <label className="text-xs font-bold text-navy uppercase tracking-wider">Code SWIFT / BIC</label>
               <input
                 type="text"
                 value={bankSwift}
                 onChange={(e) => setBankSwift(e.target.value)}
                 placeholder="ECOBBJBJ"
-                className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-mono min-h-[44px]"
+                className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-mono uppercase min-h-[44px]"
               />
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                Numéro IBAN / Compte Bancaire
-              </label>
+              <label className="text-xs font-bold text-navy uppercase tracking-wider">Numéro de Compte IBAN / RIB Complet</label>
               <input
                 type="text"
                 value={bankIban}
@@ -488,12 +485,10 @@ export default function PublisherProfilePage() {
                 <Smartphone className="w-3.5 h-3.5 text-gold" />
                 Compte Mobile Money (MTN / Moov / Wave / Orange)
               </label>
-              <input
-                type="tel"
+              <PhoneInput
                 value={momoNumber}
-                onChange={(e) => setMomoNumber(e.target.value)}
-                placeholder="+229 97 00 11 22"
-                className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
+                onChange={setMomoNumber}
+                className="bg-background-secondary min-h-[44px]"
               />
             </div>
           </div>

@@ -25,6 +25,7 @@ import {
   Mail
 } from "lucide-react";
 import { PartnerLogoMarquee } from "@/components/ui/partner-logo-marquee";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 type PartnerType = "university" | "publisher" | "distributor";
 
@@ -412,13 +413,10 @@ export default function PartnersPublicPage() {
                       <label className="text-xs font-bold uppercase tracking-wider text-navy block mb-1.5">
                         Téléphone / WhatsApp *
                       </label>
-                      <input
-                        type="tel"
-                        required
+                      <PhoneInput
                         value={contactPhone}
-                        onChange={(e) => setContactPhone(e.target.value)}
-                        placeholder="+229 ... / +225 ..."
-                        className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-xs sm:text-sm focus:outline-none focus:border-navy focus:ring-2 focus:ring-gold/30"
+                        onChange={setContactPhone}
+                        className="bg-background min-h-[44px]"
                       />
                     </div>
 

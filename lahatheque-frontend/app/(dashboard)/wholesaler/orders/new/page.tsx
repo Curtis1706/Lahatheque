@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ShoppingCart, Building2, Send, Plus, Trash2, BookOpen, AlertCircle } from "lucide-react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { getWholesalerBooks, createWholesalerOrder } from "@/lib/services/wholesaler";
 import type { WholesalerBookItem, WholesalerCartItem } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
@@ -287,16 +288,13 @@ export default function NewWholesalerOrderPage() {
               </div>
 
               <div>
-                <label htmlFor="contact-tel" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
                   Téléphone Direct Responsable Achats *
                 </label>
-                <input
-                  id="contact-tel"
-                  type="text"
+                <PhoneInput
                   value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl font-mono text-navy font-bold focus:outline-none focus:border-gold min-h-[44px]"
-                  required
+                  onChange={setContactPhone}
+                  className="bg-background-secondary min-h-[44px]"
                 />
               </div>
             </div>

@@ -3,10 +3,12 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Mail, ArrowRight } from "lucide-react";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 function ContactFormContent() {
   const searchParams = useSearchParams();
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
+  const [phone, setPhone] = useState("");
 
   useEffect(() => {
     const needParam = searchParams.get("need");
@@ -164,37 +166,15 @@ function ContactFormContent() {
               </div>
 
               {/* Téléphone */}
-              <div className="flex gap-4">
-                <div className="w-1/3 flex flex-col gap-2">
-                  <label className="text-sm font-bold text-navy">Indicatif</label>
-                  <div className="relative">
-                    <select className="w-full bg-background border border-border rounded text-sm p-3 focus:border-navy focus:ring-2 focus:ring-gold/30 outline-none appearance-none pr-8 cursor-pointer">
-                      <option>+229</option>
-                      <option>+225</option>
-                      <option>+221</option>
-                      <option>+228</option>
-                      <option>+223</option>
-                      <option>+33</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-foreground-muted">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-                <div className="w-2/3 flex flex-col gap-2">
-                  <label className="text-sm font-bold text-navy" htmlFor="phone">
-                    Numéro de téléphone *
-                  </label>
-                  <input 
-                    className="w-full bg-background border border-border rounded text-sm p-3 focus:border-navy focus:ring-2 focus:ring-gold/30 outline-none transition-all" 
-                    id="phone" 
-                    placeholder="01 23 45 67 89" 
-                    required 
-                    type="tel"
-                  />
-                </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-bold text-navy">
+                  Numéro de téléphone *
+                </label>
+                <PhoneInput
+                  value={phone}
+                  onChange={setPhone}
+                  className="bg-background min-h-[46px]"
+                />
               </div>
 
               {/* Email */}
