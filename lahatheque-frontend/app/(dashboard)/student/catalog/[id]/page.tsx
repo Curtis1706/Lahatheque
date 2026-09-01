@@ -111,10 +111,9 @@ function AccessBlock({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Extrait gratuit */}
-        <button
-          type="button"
-          onClick={onOpenSample}
-          className="p-4 rounded-2xl border border-border bg-background-secondary hover:border-gold text-left space-y-1 transition-all cursor-pointer"
+        <Link
+          href={`/catalog/reader/${book.id}?mode=sample`}
+          className="p-4 rounded-2xl border border-border bg-background-secondary hover:border-gold text-left space-y-1 transition-all cursor-pointer block"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-navy flex items-center gap-1.5">
@@ -122,13 +121,13 @@ function AccessBlock({
               Extrait Gratuit
             </span>
             <span className="text-[10px] uppercase font-bold text-gold bg-gold/15 px-2 py-0.5 rounded-md">
-              15 Pages
+              {book.sample_pages_count || 10} Pages
             </span>
           </div>
           <p className="text-[11px] text-foreground-muted">
-            Lecture instantanée sans inscription préalable.
+            Lecture instantanée dans la liseuse sans inscription préalable.
           </p>
-        </button>
+        </Link>
 
         {/* Commander cet ouvrage — Unifié */}
         <button
@@ -366,14 +365,13 @@ export default function StudentBookDetailPage() {
           </div>
 
           <div className="flex items-center gap-2 pt-2 border-t border-border flex-wrap">
-            <button
-              type="button"
-              onClick={() => setShowSample(true)}
+            <Link
+              href={`/catalog/reader/${book.id}?mode=sample`}
               className="px-4 py-2 rounded-xl border border-border bg-background-secondary hover:border-gold text-navy text-xs font-semibold transition-all flex items-center gap-1.5 min-h-[40px] cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5 text-gold" />
               Consulter l&apos;extrait ({book.sample_pages_count || 10} pages)
-            </button>
+            </Link>
           </div>
         </div>
       </div>

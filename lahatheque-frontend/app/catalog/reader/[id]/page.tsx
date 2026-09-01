@@ -297,6 +297,7 @@ export default function DocumentReaderPage() {
   const [hasQuiz, setHasQuiz] = useState(false)
   const [isQuizValidated, setIsQuizValidated] = useState(false)
   const [isQuizOverlayOpen, setIsQuizOverlayOpen] = useState(false)
+  const [showSampleEndOverlay, setShowSampleEndOverlay] = useState(false)
 
   const {
     isTtsActive,
@@ -585,16 +586,27 @@ export default function DocumentReaderPage() {
           return;
         }
 
-        const data = await libraryApi.getBook(id as string)
-        setBook(data)
-        if (data.progress) {
+        const isSampleMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'sample';
+
+        const data = await libraryApi.getBook(id as string).catch(() => ({
+          id: id as string,
+          title: "Extrait Gratuit",
+          format_type: "pdf" as const,
+          file: "",
+          progress: { last_page: 0 },
+        }));
+        setBook(data as any)
+        if (data && 'progress' in data && data.progress && !isSampleMode) {
           setCurrentPage(data.progress.last_page || 0)
         }
 
         // --- CHARGEMENT SÉCURISÉ EN MÉMOIRE (BLOB URL) ---
         // Empêche les extensions comme Internet Download Manager (IDM) d'intercepter la requête
         // et garantit un affichage instantané dans le lecteur normal sans erreur 204
-        const targetStreamUrl = (data && data.file) ? data.file : (id === 'lesson_pdf' ? '' : `/api/bff/catalog/books/${id}/stream/`);
+        const targetStreamUrl = isSampleMode
+          ? `/api/bff/catalog/books/${id}/sample/`
+          : ((data && data.file) ? data.file : (id === 'lesson_pdf' ? '' : `/api/bff/catalog/books/${id}/stream/`));
+
         if (targetStreamUrl) {
           try {
             const streamRes = await fetch(targetStreamUrl, {
@@ -609,7 +621,9 @@ export default function DocumentReaderPage() {
               setPdfLoadError(
                 streamRes.status === 403
                   ? "Vous n'avez pas accès à cet ouvrage. Achetez-le ou vérifiez votre abonnement."
-                  : "Ce document est introuvable ou n'a pas encore été mis en ligne."
+                  : (isSampleMode
+                      ? "Impossible de charger l'extrait gratuit pour cet ouvrage."
+                      : "Ce document est introuvable ou n'a pas encore été mis en ligne.")
               );
             }
           } catch {
@@ -617,10 +631,12 @@ export default function DocumentReaderPage() {
           }
         }
 
-        // Check for Quiz
-        const quizRes = await libraryApi.getQuizzes(id as string)
-        if (quizRes && quizRes.questions.length > 0) {
-          setHasQuiz(true)
+        // Check for Quiz (uniquement en lecture intégrale, jamais pour un extrait)
+        if (!isSampleMode) {
+          const quizRes = await libraryApi.getQuizzes(id as string)
+          if (quizRes && quizRes.questions.length > 0) {
+            setHasQuiz(true)
+          }
         }
 
       } catch (err) {
@@ -805,11 +821,13 @@ export default function DocumentReaderPage() {
 
   const hasAudio = !!book.audio_file;
 
-  if (effectiveImmersionMode && book.file) {
+  const isSampleMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'sample';
+
+  if (effectiveImmersionMode && (book.file || rawPdfData)) {
     const parsedDrmOpacity = drmSettings?.watermark_opacity != null ? parseFloat(String(drmSettings.watermark_opacity)) : 0.20;
     const safeDrmOpacity = !isNaN(parsedDrmOpacity) ? parsedDrmOpacity : 0.20;
     const currentPosition = drmSettings?.watermark_position || "diagonal";
-    const streamPdfUrl = rawPdfData || (id === 'lesson_pdf' ? book.file : `/api/bff/catalog/books/${id}/stream/`);
+    const streamPdfUrl = rawPdfData || (id === 'lesson_pdf' ? book.file : isSampleMode ? `/api/bff/catalog/books/${id}/sample/` : `/api/bff/catalog/books/${id}/stream/`);
 
     return (
       <>
@@ -828,6 +846,11 @@ export default function DocumentReaderPage() {
           bookId={id as string}
           initialPage={currentPage}
           isMobile={isMobile}
+          isSample={isSampleMode}
+          hideQuiz={isSampleMode}
+          onLastPageReached={() => {
+            if (isSampleMode) setShowSampleEndOverlay(true);
+          }}
           onPageChange={setCurrentPage}
           onClose={() => setIsImmersionMode(false)}
           authorName={book?.author_name || "Auteur LAHA"}
@@ -855,6 +878,32 @@ export default function DocumentReaderPage() {
           ttsRate={ttsRate}
           onToggleTtsRate={() => setTtsRate(ttsRate === 2 ? 0.75 : ttsRate + 0.25)}
         />
+
+        {showSampleEndOverlay && (
+          <div className="fixed inset-0 z-[10000] bg-navy-dark/90 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-navy border border-gold/40 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center text-white space-y-4 shadow-2xl">
+              <h3 className="font-serif font-bold text-xl text-white">Fin de l&apos;extrait gratuit</h3>
+              <p className="text-xs text-white/80 leading-relaxed">
+                Pour continuer la lecture de « <strong className="text-gold">{book.title}</strong> », achetez l&apos;ouvrage ou activez votre bouquet universitaire.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button
+                  onClick={() => router.push(`/student/catalog/${id}`)}
+                  className="flex-1 py-3 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-hover cursor-pointer"
+                >
+                  Acheter cet ouvrage
+                </Button>
+                <Button
+                  onClick={() => setShowSampleEndOverlay(false)}
+                  variant="ghost"
+                  className="text-white/70 hover:text-white text-xs cursor-pointer"
+                >
+                  Revoir l&apos;extrait
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     );
   }

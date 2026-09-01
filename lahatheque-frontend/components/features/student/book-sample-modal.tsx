@@ -76,6 +76,8 @@ export function BookSampleModal({ book, isOpen, onClose }: BookSampleModalProps)
               bookId={`sample-${book.id}`}
               onLastPageReached={() => setReachedEnd(true)}
               hideInternalHeader={true}
+              hideQuiz={true}
+              isSample={true}
             />
           </div>
         )}
@@ -98,7 +100,15 @@ export function BookSampleModal({ book, isOpen, onClose }: BookSampleModalProps)
           </div>
         )}
 
-        <div className="flex justify-end pt-2 border-t border-border">
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <Link
+            href={`/catalog/reader/${book.id}?mode=sample`}
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-gold" />
+            Ouvrir dans la liseuse complète
+          </Link>
           <button
             type="button"
             onClick={onClose}

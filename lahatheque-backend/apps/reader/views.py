@@ -533,13 +533,21 @@ class QuizRetrieveOrGenerateView(APIView):
         if not book_id:
             return Response({"success": False, "error": "book_id requis."}, status=400)
 
+        # Les extraits gratuits et aperçus temporaires n'ont pas de quiz
+        clean_id = str(book_id).strip()
+        if clean_id.startswith('sample-') or clean_id in ['preview', 'demo', 'lesson_pdf']:
+            return Response({"success": True, "data": None, "message": "Aucun quiz disponible pour ce mode d'aperçu."})
+
         ouvrage = None
         try:
             import uuid as _uuid
-            valid_uuid = _uuid.UUID(str(book_id).strip())
-            ouvrage = Ouvrage.objects.filter(id=valid_uuid).first()
-        except (ValueError, TypeError, AttributeError, Exception):
-            ouvrage = Ouvrage.objects.filter(slug=book_id).first()
+            try:
+                valid_uuid = _uuid.UUID(clean_id)
+                ouvrage = Ouvrage.objects.filter(id=valid_uuid).first()
+            except (ValueError, TypeError):
+                ouvrage = Ouvrage.objects.filter(isbn=clean_id).first()
+        except Exception:
+            ouvrage = None
 
         if not ouvrage:
             return Response({"success": True, "data": None, "message": "Aucun quiz disponible pour ce document."})
