@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { z } from 'zod'
 
-const DJANGO_API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api').replace(/\/$/, '')
+const rawApiUrl = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api').replace(/\/+$/, '')
+const DJANGO_API_URL = rawApiUrl.replace('localhost:8000', '127.0.0.1:8000').replace(/\/v1$/, '').replace(/\/api$/, '') + '/api'
 const IS_PROD = process.env.NODE_ENV === 'production'
 
 // Constantes centralisées
@@ -149,12 +150,26 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
+      cache: 'no-store',
     })
 
-    const data = await response.json()
+    let data: any = {}
+    try {
+      const text = await response.text()
+      try {
+        data = JSON.parse(text)
+      } catch {
+        data = { error: text || 'Erreur du serveur d\'authentification' }
+      }
+    } catch {
+      data = { error: 'Réponse vide du backend' }
+    }
 
     if (!response.ok) {
-      return NextResponse.json(data, { status: response.status })
+      return NextResponse.json(
+        { error: data.error || data.detail || 'Identifiants invalides' },
+        { status: response.status }
+      )
     }
 
     const accessToken = data.tokens?.access || data.access || data.token
@@ -177,7 +192,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('[BFF Session] Login error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ error: 'Erreur interne lors de la connexion' }, { status: 500 })
   }
 }
 
@@ -217,26 +232,31 @@ export async function GET(request: NextRequest) {
 
   try {
     const response = await fetch(`${DJANGO_API_URL}/v1/auth/me/`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
     })
 
     if (!response.ok) {
-      return NextResponse.json({ authenticated: false }, { status: response.status })
+      return NextResponse.json({ authenticated: false }, { status: 401 })
     }
 
-    const userData = await response.json()
+    let userData: any = null
+    try {
+      userData = await response.json()
+    } catch {
+      return NextResponse.json({ authenticated: false }, { status: 401 })
+    }
 
     // Réponse : uniquement l'état d'auth + données profil UI. Pas de token.
     const sessionRes = NextResponse.json({ authenticated: true, user: userData })
 
     // Rafraîchit le cookie UI (sans token) pour garder les données profil à jour
-    // Passe l'accessToken pour que access_expires_at soit synchronisé avec le vrai exp.
     setUiCookie(sessionRes, userData, accessToken)
 
     return sessionRes
 
   } catch (error) {
-    return NextResponse.json({ authenticated: false, error: 'Failed to fetch user' }, { status: 500 })
+    return NextResponse.json({ authenticated: false, error: 'Session non authentifiée' }, { status: 401 })
   }
 }
 

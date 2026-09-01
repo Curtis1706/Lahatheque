@@ -34,23 +34,31 @@ class StudentOverviewView(APIView):
 
     def get(self, request):
         user = request.user
+        from apps.protection.access_service import AccessService
 
-        # Bibliothèque : livres avec progression
-        total_books = ReadingProgress.objects.filter(user=user).count()
-
-        # Livre en cours de lecture (progression max non terminé)
-        current_reading = (
+        # Récupérer les progressions de lecture de l'utilisateur
+        all_progress = list(
             ReadingProgress.objects
-            .filter(user=user, is_completed=False)
+            .filter(user=user)
             .select_related('ouvrage', 'ouvrage__discipline', 'ouvrage__publisher')
             .prefetch_related('ouvrage__authors')
             .order_by('-last_read_at')
-            .first()
         )
+
+        valid_progress = [
+            p for p in all_progress
+            if AccessService.check_user_book_access(user, str(p.ouvrage.id)).get("access_granted")
+        ]
+
+        # Bibliothèque : livres avec accès légitime
+        total_books = len(valid_progress)
+
+        # Livre en cours de lecture (progression max non terminé)
         current_reading_data = None
+        current_reading = next((p for p in valid_progress if not p.is_completed), None)
         if current_reading:
             current_reading_data = {
-                'ouvrage': OuvrageBasicSerializer(current_reading.ouvrage).data,
+                'ouvrage': OuvrageBasicSerializer(current_reading.ouvrage, context={'request': request}).data,
                 'progress_percent': current_reading.progress_percent,
                 'last_read_chapter': current_reading.last_read_chapter,
                 'last_read_at': current_reading.last_read_at,
@@ -124,6 +132,7 @@ class StudentBooksView(APIView):
         user = request.user
         format_filter = request.query_params.get('format')
         favorites_only = request.query_params.get('favorites') == 'true'
+        from apps.protection.access_service import AccessService
 
         qs = (
             ReadingProgress.objects
@@ -143,7 +152,11 @@ class StudentBooksView(APIView):
 
         data = []
         for progress in qs:
-            ouvrage_data = OuvrageBasicSerializer(progress.ouvrage).data
+            access_info = AccessService.check_user_book_access(user, str(progress.ouvrage.id))
+            if not access_info.get("access_granted"):
+                continue
+
+            ouvrage_data = OuvrageBasicSerializer(progress.ouvrage, context={'request': request}).data
             data.append({
                 **ouvrage_data,
                 'progress_percent': progress.progress_percent,
@@ -152,7 +165,7 @@ class StudentBooksView(APIView):
                 'last_read_at': progress.last_read_at,
                 'is_completed': progress.is_completed,
                 'is_favorite': progress.is_favorite,
-                'access_type': 'purchased',
+                'access_type': access_info.get("reason", "purchased"),
             })
 
         return Response({'success': True, 'data': data, 'error': None})

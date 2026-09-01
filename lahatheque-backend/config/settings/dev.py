@@ -7,7 +7,7 @@ DEBUG = True
 # déverrouillage de test des livres, et n'existe QUE dans ce fichier dev.py — il est donc
 # structurellement impossible qu'il fuite en production par simple héritage de settings.
 # Mettre à False ci-dessous pour tester le contrôle d'accès réel même en développement.
-DEV_UNLOCK_ALL_BOOKS = True
+DEV_UNLOCK_ALL_BOOKS = False
 
 # Utiliser le serveur SMTP réel si le mot de passe est renseigné dans .env
 if EMAIL_HOST_PASSWORD:

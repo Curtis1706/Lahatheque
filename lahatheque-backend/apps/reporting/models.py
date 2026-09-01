@@ -12,6 +12,7 @@ class InstitutionAnalytics(models.Model):
     most_read_disciplines = models.JSONField(default=list)
 
 class Notification(models.Model):
+    objects = models.Manager()
     class NotificationType(models.TextChoices):
         SYSTEM = 'system', 'Système'
         MESSAGE = 'message', 'Message'

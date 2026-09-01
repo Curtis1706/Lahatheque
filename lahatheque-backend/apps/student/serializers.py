@@ -46,7 +46,9 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     def get_is_owned(self, obj) -> bool:
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
-            return ReadingProgress.objects.filter(user=request.user, ouvrage=obj).exists()
+            from apps.protection.access_service import AccessService
+            access_info = AccessService.check_user_book_access(request.user, str(obj.id))
+            return bool(access_info.get("access_granted"))
         return False
 
     def get_has_digital_access(self, obj) -> bool:

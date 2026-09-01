@@ -22,6 +22,7 @@ ROLE_CHOICES = (
 )
 
 class User(AbstractUser):
+    objects = models.Manager()
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=30, blank=True, null=True)
@@ -54,14 +55,20 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ['username']
 
 class MFAConfig(models.Model):
+    objects = models.Manager()
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='mfa_config')
     backup_codes = models.JSONField(default=list)
     last_used_at = models.DateTimeField(blank=True, null=True)
 
 class OTP(models.Model):
+    objects = models.Manager()
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otps')
     code = models.CharField(max_length=6)
     channel = models.CharField(max_length=10, choices=[('sms', 'SMS'), ('email', 'Email')])
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
     expires_at = models.DateTimeField()
+
+    def is_expired(self) -> bool:
+        return timezone.now() > self.expires_at
+

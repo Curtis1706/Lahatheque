@@ -82,10 +82,11 @@ class CreateOrderView(APIView):
 
             # Vérification anti-doublon pour l'achat numérique
             if format_type == 'digital':
-                from apps.student.models import ReadingProgress
-                if ReadingProgress.objects.filter(user=request.user, ouvrage=ouvrage).exists():
+                from apps.protection.access_service import AccessService
+                access_info = AccessService.check_user_book_access(request.user, str(ouvrage.id))
+                if access_info.get("access_granted"):
                     return Response({
-                        'error': f"Vous possédez déjà la version numérique de « {ouvrage.title} » dans votre bibliothèque."
+                        'error': f"Vous possédez déjà l'accès numérique à « {ouvrage.title} »."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             # Vérification du stock disponible pour le format papier, agrégé sur tous les entrepôts

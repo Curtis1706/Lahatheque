@@ -143,14 +143,25 @@ function CatalogBookCard({
               )}
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => onOpenOrderModal(book)}
-              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 min-h-[40px] shadow-xs cursor-pointer"
-            >
-              <ShoppingBag className="w-3.5 h-3.5 text-gold" />
-              Commander
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onOpenSample(book)}
+                className="px-3.5 py-2.5 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-gold text-xs font-bold transition-colors flex items-center gap-1.5 min-h-[40px] shadow-2xs cursor-pointer"
+                title="Lire un extrait gratuit"
+              >
+                <Eye className="w-3.5 h-3.5 text-gold" />
+                Extrait
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenOrderModal(book)}
+                className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 min-h-[40px] shadow-xs cursor-pointer"
+              >
+                <ShoppingBag className="w-3.5 h-3.5 text-gold" />
+                Commander
+              </button>
+            </div>
           )}
 
           <Link
