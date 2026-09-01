@@ -681,11 +681,19 @@ export default function DocumentReaderPage() {
 
 
 
+  // Session tracking (temps réel et pages réelles consultées)
+  const sessionStartTimeRef = useRef<number>(Date.now());
+  const pagesReadSetRef = useRef<Set<number>>(new Set([0]));
+
   // Sync progress with backend
   const syncProgress = useCallback(async (page: number, customTotal?: number) => {
     try {
       const effectiveTotal = customTotal && customTotal > 0 ? customTotal : (totalPages > 0 ? totalPages : (book?.page_count || 1));
       const targetPage = Math.max(1, page + 1);
+      pagesReadSetRef.current.add(page);
+
+      const elapsedSeconds = Math.max(15, Math.round((Date.now() - sessionStartTimeRef.current) / 1000));
+      const effectivePagesRead = Math.max(1, pagesReadSetRef.current.size, targetPage);
 
       if (id === 'lesson_pdf') {
         const sParams = new URLSearchParams(window.location.search);
@@ -693,7 +701,7 @@ export default function DocumentReaderPage() {
         const lessonId = sParams.get('lesson_id');
 
         if (bookId && effectiveTotal > 0) {
-          await libraryApi.syncProgress(bookId, targetPage, effectiveTotal, 15);
+          await libraryApi.syncProgress(bookId, targetPage, effectiveTotal, elapsedSeconds, effectivePagesRead);
         }
         if (lessonId && effectiveTotal > 0) {
           const pos = targetPage;
@@ -713,7 +721,7 @@ export default function DocumentReaderPage() {
       }
 
       if (id && !String(id).startsWith('sample-') && !isSampleMode) {
-        await libraryApi.syncProgress(id as string, targetPage, effectiveTotal, 15);
+        await libraryApi.syncProgress(id as string, targetPage, effectiveTotal, elapsedSeconds, effectivePagesRead);
       }
     } catch (err) {
       console.error("Erreur sync progression", err);
@@ -722,6 +730,7 @@ export default function DocumentReaderPage() {
 
   // Handle page change from viewer
   const handlePageChange = (e: { currentPage: number }) => {
+    pagesReadSetRef.current.add(e.currentPage);
     setCurrentPage(e.currentPage);
     syncProgress(e.currentPage, totalPages);
   };
@@ -733,13 +742,13 @@ export default function DocumentReaderPage() {
     syncProgress(currentPage, num);
   };
 
-  // Periodic sync (every 15 seconds)
+  // Periodic sync (every 30 seconds)
   useEffect(() => {
     const interval = setInterval(() => {
       if (currentPage >= 0 && id && !isSampleMode) {
         syncProgress(currentPage, totalPages);
       }
-    }, 15000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [currentPage, totalPages, id, isSampleMode, syncProgress]);
 

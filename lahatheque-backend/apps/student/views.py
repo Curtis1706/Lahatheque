@@ -282,21 +282,30 @@ class StudentUpdateReadingProgressView(APIView):
             }
         )
 
-        # Enregistre la session de lecture
-        duration = data.get('duration_seconds', 0)
-        if duration <= 0:
-            duration = 15
-        pages_read = data.get('pages_read', 0)
-        if pages_read <= 0:
-            pages_read = 1
+        # Enregistre ou met à jour la session active de lecture
+        duration = int(data.get('duration_seconds') or 15)
+        pages_read = int(data.get('pages_read') or 1)
 
-        ReadingSession.objects.create(
-            user=user,
-            ouvrage=ouvrage,
-            duration_seconds=duration,
-            pages_read=pages_read,
-            session_date=timezone.now().date(),
+        # Regroupe avec la session récente si elle a eu lieu aujourd'hui il y a moins de 30 min
+        recent_session = (
+            ReadingSession.objects
+            .filter(user=user, ouvrage=ouvrage, session_date=timezone.now().date())
+            .order_by('-created_at')
+            .first()
         )
+
+        if recent_session and (timezone.now() - recent_session.created_at).total_seconds() < 1800:
+            recent_session.duration_seconds += duration
+            recent_session.pages_read = max(recent_session.pages_read, pages_read)
+            recent_session.save(update_fields=['duration_seconds', 'pages_read'])
+        else:
+            ReadingSession.objects.create(
+                user=user,
+                ouvrage=ouvrage,
+                duration_seconds=max(30, duration),
+                pages_read=max(1, pages_read),
+                session_date=timezone.now().date(),
+            )
 
         return Response({
             'success': True,
@@ -418,8 +427,9 @@ class StudentHistoryStatsView(APIView):
                 'ouvrage_title': s.ouvrage.title if s.ouvrage else 'Ouvrage',
                 'ouvrage_discipline': s.ouvrage.discipline.name if (s.ouvrage and s.ouvrage.discipline) else '',
                 'ouvrage_cover_url': s.ouvrage.cover_url if s.ouvrage else '',
-                'duration_minutes': round(s.duration_seconds / 60),
-                'pages_read': s.pages_read,
+                'duration_seconds': s.duration_seconds,
+                'duration_minutes': max(1, round(s.duration_seconds / 60)) if s.duration_seconds >= 20 else (1 if s.duration_seconds > 0 else 0),
+                'pages_read': max(1, s.pages_read),
                 'session_date': str(s.session_date),
             }
             for s in recent_sessions
