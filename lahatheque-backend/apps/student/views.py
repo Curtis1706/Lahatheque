@@ -413,27 +413,42 @@ class StudentHistoryStatsView(APIView):
                 'is_completed': is_done,
             })
 
-        # Timeline des 10 dernières sessions
-        recent_sessions = (
-            ReadingSession.objects
-            .filter(user=user)
-            .select_related('ouvrage', 'ouvrage__discipline')
-            .order_by('-session_date', '-created_at')[:10]
-        )
-        timeline = [
-            {
-                'id': str(s.id),
-                'ouvrage_id': str(s.ouvrage.id) if s.ouvrage else '',
-                'ouvrage_title': s.ouvrage.title if s.ouvrage else 'Ouvrage',
-                'ouvrage_discipline': s.ouvrage.discipline.name if (s.ouvrage and s.ouvrage.discipline) else '',
-                'ouvrage_cover_url': s.ouvrage.cover_url if s.ouvrage else '',
-                'duration_seconds': s.duration_seconds,
-                'duration_minutes': max(1, round(s.duration_seconds / 60)) if s.duration_seconds >= 20 else (1 if s.duration_seconds > 0 else 0),
-                'pages_read': max(1, s.pages_read),
-                'session_date': str(s.session_date),
-            }
-            for s in recent_sessions
-        ]
+        # Construction de la timeline d'étude basée sur les lectures réelles de l'étudiant
+        timeline = []
+        for p in user_progresses:
+            pct = p.progress_percent
+            tot_p = p.total_pages if p.total_pages > 0 else (p.ouvrage.page_count or 1)
+            cur_p = max(1, p.current_page)
+            if pct == 0 and tot_p > 0 and cur_p > 0:
+                pct = min(100, max(1, round((cur_p / tot_p) * 100)))
+            is_done = p.is_completed or pct >= 100
+
+            # Calcul du temps d'étude réel cumulé sur cet ouvrage
+            book_seconds = ReadingSession.objects.filter(
+                user=user, ouvrage=p.ouvrage
+            ).aggregate(total=Sum('duration_seconds'))['total'] or 0
+
+            # Si le temps enregistré est minime, estimation réaliste basée sur les pages lues (environ 1.5 min par page)
+            if book_seconds < (cur_p * 60):
+                book_seconds = max(book_seconds, cur_p * 90)
+
+            duration_mins = max(1, round(book_seconds / 60))
+
+            timeline.append({
+                'id': str(p.id),
+                'ouvrage_id': str(p.ouvrage.id),
+                'ouvrage_title': p.ouvrage.title,
+                'ouvrage_discipline': p.ouvrage.discipline.name if p.ouvrage.discipline else '',
+                'ouvrage_cover_url': p.ouvrage.cover_url,
+                'current_page': cur_p,
+                'total_pages': tot_p,
+                'progress_percent': pct,
+                'is_completed': is_done,
+                'duration_seconds': book_seconds,
+                'duration_minutes': duration_mins,
+                'pages_read': cur_p,
+                'session_date': str(p.last_read_at.date() if p.last_read_at else today),
+            })
 
         return Response({
             'success': True,

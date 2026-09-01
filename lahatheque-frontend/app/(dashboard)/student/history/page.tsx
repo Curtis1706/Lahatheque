@@ -8,6 +8,7 @@ import {
   BookOpen,
   ArrowUpRight,
   Clock,
+  CheckCircle2,
 } from "lucide-react";
 import {
   getStudentHistoryStats,
@@ -25,6 +26,14 @@ function formatDate(dateStr: string): string {
     month: "long",
     year: "numeric",
   });
+}
+
+function formatStudyDuration(minutes: number): string {
+  if (!minutes || minutes <= 0) return "< 1 min";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMins = minutes % 60;
+  return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -73,7 +82,7 @@ export default function StudentHistoryPage() {
   const columns: DataTableColumn<SessionRow>[] = [
     {
       key: "session_date",
-      header: "Date de session",
+      header: "Dernière lecture",
       cell: (row) => (
         <span className="text-foreground-muted font-medium text-xs">
           {formatDate(row.session_date)}
@@ -108,20 +117,47 @@ export default function StudentHistoryPage() {
               {row.ouvrage_title}
             </Link>
             <p className="text-[10px] text-foreground-muted">
-              Session #{String(row.id).slice(0, 8)}
+              {row.ouvrage_discipline || "Académique"}
             </p>
           </div>
         </div>
       ),
     },
     {
-      key: "ouvrage_discipline",
-      header: "Matière / Discipline",
-      cell: (row) => (
-        <span className="text-[10px] font-bold uppercase tracking-wider text-gold px-2.5 py-0.5 rounded-md bg-navy/5 border border-gold/30">
-          {row.ouvrage_discipline || "Général"}
-        </span>
-      ),
+      key: "progress_percent",
+      header: "Progression d'Étude",
+      cell: (row) => {
+        const pct = row.progress_percent ?? 0;
+        const cur = row.current_page ?? row.pages_read ?? 1;
+        const tot = row.total_pages ?? cur;
+        const isDone = row.is_completed || pct >= 100;
+
+        return (
+          <div className="space-y-1 min-w-[140px]">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-mono font-bold text-navy">
+                {isDone ? (
+                  <span className="inline-flex items-center gap-1 text-success">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Terminé
+                  </span>
+                ) : (
+                  `Page ${cur} / ${tot}`
+                )}
+              </span>
+              <span className="font-mono text-gold font-bold">{pct}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-navy/10 rounded-full overflow-hidden border border-navy/10">
+              <div
+                className={`h-full transition-all duration-300 ${
+                  isDone ? "bg-success" : "bg-gold"
+                }`}
+                style={{ width: `${Math.max(3, Math.min(100, pct))}%` }}
+              />
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: "duration_minutes",
@@ -129,18 +165,22 @@ export default function StudentHistoryPage() {
       cell: (row) => (
         <div className="flex items-center gap-1.5 font-mono font-bold text-navy text-xs">
           <Clock className="w-3.5 h-3.5 text-gold shrink-0" />
-          <span>{row.duration_minutes} min</span>
+          <span>{formatStudyDuration(row.duration_minutes)}</span>
         </div>
       ),
     },
     {
       key: "pages_read",
-      header: "Pages lues",
-      cell: (row) => (
-        <span className="font-mono text-navy font-semibold text-xs">
-          {row.pages_read} page{row.pages_read > 1 ? "s" : ""}
-        </span>
-      ),
+      header: "Pages consultées",
+      cell: (row) => {
+        const cur = row.current_page ?? row.pages_read ?? 1;
+        const tot = row.total_pages ?? cur;
+        return (
+          <span className="font-mono text-navy font-semibold text-xs">
+            {cur} / {tot} pages
+          </span>
+        );
+      },
     },
     {
       key: "actions",
@@ -159,52 +199,75 @@ export default function StudentHistoryPage() {
   ];
 
   // Carte responsive mobile pour chaque session
-  const renderMobileCard = (row: SessionRow) => (
-    <div className="p-4 rounded-3xl border border-border bg-background space-y-3 shadow-xs">
-      <div className="flex items-center gap-3.5">
-        <Link
-          href={row.ouvrage_id ? `/catalog/reader/${row.ouvrage_id}` : "/student/books"}
-          className="shrink-0"
-        >
-          <BookCover
-            book={{
-              id: row.ouvrage_id || row.id,
-              title: row.ouvrage_title,
-              discipline: row.ouvrage_discipline,
-              cover_url: row.ouvrage_cover_url,
-            }}
-            size="xs"
-          />
-        </Link>
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <span className="text-[10px] font-bold text-gold uppercase tracking-wider block">
-            {row.ouvrage_discipline || "Académique"}
-          </span>
-          <p className="font-serif font-bold text-navy text-xs sm:text-sm truncate">
-            {row.ouvrage_title}
-          </p>
-          <p className="text-[10px] text-foreground-muted">
-            {formatDate(row.session_date)}
-          </p>
+  const renderMobileCard = (row: SessionRow) => {
+    const pct = row.progress_percent ?? 0;
+    const cur = row.current_page ?? row.pages_read ?? 1;
+    const tot = row.total_pages ?? cur;
+    const isDone = row.is_completed || pct >= 100;
+
+    return (
+      <div className="p-4 rounded-3xl border border-border bg-background space-y-3 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <Link
+            href={row.ouvrage_id ? `/catalog/reader/${row.ouvrage_id}` : "/student/books"}
+            className="shrink-0"
+          >
+            <BookCover
+              book={{
+                id: row.ouvrage_id || row.id,
+                title: row.ouvrage_title,
+                discipline: row.ouvrage_discipline,
+                cover_url: row.ouvrage_cover_url,
+              }}
+              size="xs"
+            />
+          </Link>
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <span className="text-[10px] font-bold text-gold uppercase tracking-wider block">
+              {row.ouvrage_discipline || "Académique"}
+            </span>
+            <p className="font-serif font-bold text-navy text-xs sm:text-sm truncate">
+              {row.ouvrage_title}
+            </p>
+            <p className="text-[10px] text-foreground-muted">
+              Dernière session : {formatDate(row.session_date)}
+            </p>
+          </div>
+        </div>
+
+        {/* Progression mobile */}
+        <div className="space-y-1 pt-1">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-mono font-bold text-navy">
+              {isDone ? "Terminé (100%)" : `Page ${cur} / ${tot}`}
+            </span>
+            <span className="font-mono text-gold font-bold">{pct}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-navy/10 rounded-full overflow-hidden border border-navy/10">
+            <div
+              className={`h-full ${isDone ? "bg-success" : "bg-gold"}`}
+              style={{ width: `${Math.max(3, Math.min(100, pct))}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-border flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 font-mono font-bold text-navy text-xs">
+            <Clock className="w-3.5 h-3.5 text-gold" />
+            <span>{formatStudyDuration(row.duration_minutes)} d&apos;étude</span>
+          </div>
+
+          <Link
+            href={row.ouvrage_id ? `/catalog/reader/${row.ouvrage_id}` : "/student/books"}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover"
+          >
+            <span>Reprendre</span>
+            <ArrowUpRight className="w-3 h-3 text-gold" />
+          </Link>
         </div>
       </div>
-
-      <div className="pt-2 border-t border-border flex items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2 font-mono font-bold text-navy">
-          <Clock className="w-3.5 h-3.5 text-gold" />
-          <span>{row.duration_minutes} min &bull; {row.pages_read} pages</span>
-        </div>
-
-        <Link
-          href={row.ouvrage_id ? `/catalog/reader/${row.ouvrage_id}` : "/student/books"}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover"
-        >
-          <span>Lire</span>
-          <ArrowUpRight className="w-3 h-3 text-gold" />
-        </Link>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto min-w-0 pr-14 sm:pr-8">
@@ -235,7 +298,7 @@ export default function StudentHistoryPage() {
             Historique &amp; Statistiques d&apos;Étude
           </h1>
           <p className="text-xs sm:text-sm text-foreground-muted mt-1.5 max-w-2xl leading-relaxed">
-            Consultez votre assiduité, vos heures d&apos;étude active et vos sessions de lecture récentes.
+            Consultez votre assiduité, vos heures d&apos;étude active et la progression détaillée de chaque ouvrage.
           </p>
         </div>
 
@@ -266,14 +329,14 @@ export default function StudentHistoryPage() {
         <StudentKpiCharts stats={stats} />
       ) : null}
 
-      {/* ── DataTable Officielle des Sessions Récentes ────────────────── */}
+      {/* ── DataTable Officielle des Ouvrages en Cours d'Étude ─────────── */}
       <div className="space-y-4 pt-2">
         <DataTable<SessionRow>
           data={allSessions}
           columns={columns}
           rowKey="id"
           loading={loading}
-          searchPlaceholder="Rechercher une session par titre d'ouvrage ou matière..."
+          searchPlaceholder="Rechercher par titre d'ouvrage ou matière..."
           filterKey="ouvrage_discipline"
           filterPlaceholder="Toutes disciplines"
           pageSize={10}

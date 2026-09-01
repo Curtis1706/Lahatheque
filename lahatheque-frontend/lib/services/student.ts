@@ -221,6 +221,10 @@ export interface HistoryStatsAPI {
     ouvrage_title: string;
     ouvrage_discipline: string;
     ouvrage_cover_url?: string;
+    current_page?: number;
+    total_pages?: number;
+    progress_percent?: number;
+    is_completed?: boolean;
     duration_minutes: number;
     pages_read: number;
     session_date: string;
