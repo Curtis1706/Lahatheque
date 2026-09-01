@@ -56,10 +56,17 @@ class StudentOverviewView(APIView):
         # Livre en cours de lecture (progression max non terminé)
         current_reading_data = None
         current_reading = next((p for p in valid_progress if not p.is_completed), None)
+        if not current_reading and valid_progress:
+            current_reading = valid_progress[0]
+
         if current_reading:
+            progress_pct = current_reading.progress_percent
+            if progress_pct == 0 and current_reading.total_pages > 0 and current_reading.current_page > 0:
+                progress_pct = min(100, max(1, round((current_reading.current_page / current_reading.total_pages) * 100)))
+
             current_reading_data = {
                 'ouvrage': OuvrageBasicSerializer(current_reading.ouvrage, context={'request': request}).data,
-                'progress_percent': current_reading.progress_percent,
+                'progress_percent': progress_pct,
                 'last_read_chapter': current_reading.last_read_chapter,
                 'last_read_at': current_reading.last_read_at,
             }
@@ -156,14 +163,18 @@ class StudentBooksView(APIView):
             if not access_info.get("access_granted"):
                 continue
 
+            progress_pct = progress.progress_percent
+            if progress_pct == 0 and progress.total_pages > 0 and progress.current_page > 0:
+                progress_pct = min(100, max(1, round((progress.current_page / progress.total_pages) * 100)))
+
             ouvrage_data = OuvrageBasicSerializer(progress.ouvrage, context={'request': request}).data
             data.append({
                 **ouvrage_data,
-                'progress_percent': progress.progress_percent,
+                'progress_percent': progress_pct,
                 'current_page': progress.current_page,
                 'last_read_chapter': progress.last_read_chapter,
                 'last_read_at': progress.last_read_at,
-                'is_completed': progress.is_completed,
+                'is_completed': progress.is_completed or progress_pct >= 100,
                 'is_favorite': progress.is_favorite,
                 'access_type': access_info.get("reason", "purchased"),
             })
@@ -325,13 +336,21 @@ class StudentHistoryStatsView(APIView):
         weekly_hours = round(weekly_sec / 3600, 1)
 
         # Répartition par discipline
-        discipline_data = (
+        discipline_data = list(
             ReadingSession.objects
             .filter(user=user)
             .values('ouvrage__discipline__name')
             .annotate(total_sec=Sum('duration_seconds'))
             .order_by('-total_sec')
         )
+        if not discipline_data:
+            discipline_data = list(
+                ReadingProgress.objects
+                .filter(user=user, ouvrage__discipline__isnull=False)
+                .values('ouvrage__discipline__name')
+                .annotate(total_sec=Count('id'))
+                .order_by('-total_sec')
+            )
         total_all = sum(d['total_sec'] for d in discipline_data) or 1
         DISCIPLINE_COLORS = [
             'var(--color-gold)', 'var(--color-navy)', '#4A7FA5',
@@ -346,21 +365,27 @@ class StudentHistoryStatsView(APIView):
             for i, d in enumerate(discipline_data[:6])
         ]
 
-        # Progression globale
-        total_books = ReadingProgress.objects.filter(user=user).count()
-        avg_progress = (
-            ReadingProgress.objects
-            .filter(user=user)
-            .aggregate(avg=Sum('progress_percent'))['avg'] or 0
-        ) / total_books if total_books > 0 else 0
+        # Progression globale & livres terminés
+        user_progresses = list(ReadingProgress.objects.filter(user=user))
+        total_books = len(user_progresses)
+        sum_progress = 0
+        books_completed = 0
+        for p in user_progresses:
+            pct = p.progress_percent
+            if pct == 0 and p.total_pages > 0 and p.current_page > 0:
+                pct = min(100, max(1, round((p.current_page / p.total_pages) * 100)))
+            if p.is_completed or pct >= 100:
+                books_completed += 1
+            sum_progress += pct
 
-        # Livres terminés
-        books_completed = ReadingProgress.objects.filter(user=user, is_completed=True).count()
+        avg_progress = round(sum_progress / total_books) if total_books > 0 else 0
 
         # Total pages lues
-        total_pages = ReadingSession.objects.filter(user=user).aggregate(
+        session_pages = ReadingSession.objects.filter(user=user).aggregate(
             total=Sum('pages_read')
         )['total'] or 0
+        progress_pages = sum(p.current_page for p in user_progresses)
+        total_pages = max(session_pages, progress_pages)
 
         # Streak
         streak_days = _compute_reading_streak(user)

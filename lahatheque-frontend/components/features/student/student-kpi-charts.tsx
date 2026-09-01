@@ -73,15 +73,12 @@ function WeeklyHoursCard({ stats }: { stats: StudentKpiChartsProps["stats"] }) {
   );
 }
 
-// ─── Carte 2 : Objectifs de la semaine — remplace les 3 anneaux vides ──────
+// ─── Carte 2 : Objectifs de la semaine — dynamique ─────────────────────────
 
 function WeeklyGoalsCard({ stats }: { stats: StudentKpiChartsProps["stats"] }) {
-  const goals = [
-    { id: "1", title: "Chapitre 4 — Droit Constitutionnel", isCompleted: true },
-    { id: "2", title: "Synthèse Économie & Gestion", isCompleted: false },
-  ];
-  const progress = stats.overall_progress;
-  const hasProgress = progress > 0 || stats.books_completed_count > 0;
+  const progress = stats.overall_progress || 0;
+  const completedCount = stats.books_completed_count || 0;
+  const hasProgress = progress > 0 || completedCount > 0;
 
   return (
     <div className="bg-background border border-border rounded-3xl p-5 space-y-4 shadow-xs flex flex-col justify-between h-full">
@@ -91,46 +88,54 @@ function WeeklyGoalsCard({ stats }: { stats: StudentKpiChartsProps["stats"] }) {
             Objectifs de la Semaine
           </span>
           <div className="font-mono text-2xl font-semibold text-navy">
-            {stats.books_completed_count}
-            <span className="text-sm text-foreground-muted"> ouvrage{stats.books_completed_count > 1 ? "s" : ""} terminé{stats.books_completed_count > 1 ? "s" : ""}</span>
+            {completedCount}
+            <span className="text-sm text-foreground-muted"> ouvrage{completedCount > 1 ? "s" : ""} terminé{completedCount > 1 ? "s" : ""}</span>
           </div>
+        </div>
+        <div className="p-2.5 rounded-xl bg-gold/10 text-gold border border-gold/30 shrink-0">
+          <Award className="w-5 h-5" />
         </div>
       </div>
 
       {hasProgress ? (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <div className="flex items-center justify-between text-[11px]">
-            <span className="text-foreground-muted">Progression globale</span>
-            <span className="font-mono font-semibold text-navy">{progress}%</span>
+            <span className="text-foreground-muted font-medium">Progression globale</span>
+            <span className="font-mono font-bold text-navy">{progress}%</span>
           </div>
-          <div className="h-1.5 rounded-full bg-background-secondary overflow-hidden">
+          <div className="h-2 rounded-full bg-background-secondary overflow-hidden border border-border">
             <div
-              className="h-full rounded-full bg-gold transition-all"
-              style={{ width: `${progress}%` }}
+              className="h-full rounded-full bg-gold transition-all duration-500"
+              style={{ width: `${Math.min(100, Math.max(progress > 0 ? 5 : 0, progress))}%` }}
             />
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="p-3 rounded-2xl bg-background-secondary border border-border text-center">
+          <p className="text-[11px] text-foreground-muted font-medium">
+            Lisez vos ouvrages pour compléter vos objectifs hebdomadaires
+          </p>
+        </div>
+      )}
 
-      <div className="space-y-2 pt-1">
-        {goals.map((goal) => (
-          <div key={goal.id} className="flex items-center gap-2 text-[11px]">
-            {goal.isCompleted ? (
+      <div className="space-y-1.5 pt-1">
+        {"recent_sessions_timeline" in stats && Array.isArray((stats as HistoryStatsAPI).recent_sessions_timeline) && (stats as HistoryStatsAPI).recent_sessions_timeline.length > 0 ? (
+          (stats as HistoryStatsAPI).recent_sessions_timeline.slice(0, 2).map((item, idx) => (
+            <div key={idx} className="flex items-center gap-2 text-[11px] min-w-0">
               <CheckCircle2 className="w-3.5 h-3.5 text-gold shrink-0" />
-            ) : (
-              <Circle className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
-            )}
-            <span
-              className={
-                goal.isCompleted
-                  ? "text-foreground-muted line-through"
-                  : "text-navy font-medium"
-              }
-            >
-              {goal.title}
+              <span className="text-navy font-medium truncate">
+                {item.ouvrage_title}
+              </span>
+            </div>
+          ))
+        ) : (
+          <div className="flex items-center gap-2 text-[11px]">
+            <Circle className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+            <span className="text-foreground-muted italic">
+              Aucun ouvrage complété cette semaine
             </span>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
