@@ -56,6 +56,12 @@ export default function AdminApiKeysPage() {
   const [keyToRevoke, setKeyToRevoke] = useState<PartnerApiKey | null>(null);
   const [keyToRotate, setKeyToRotate] = useState<PartnerApiKey | null>(null);
   const [rotatedSecretResult, setRotatedSecretResult] = useState<{ clientSecret: string; partnerName: string } | null>(null);
+  const [newKeyCredentialsResult, setNewKeyCredentialsResult] = useState<{
+    name: string;
+    partner: string;
+    clientId: string;
+    clientSecret: string;
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
 
@@ -173,6 +179,16 @@ export default function AdminApiKeysPage() {
 
       setKeys((prev) => [created, ...prev]);
       setIsCreateModalOpen(false);
+
+      if (created && created.clientSecret) {
+        setNewKeyCredentialsResult({
+          name: created.name,
+          partner: created.partner,
+          clientId: created.clientId,
+          clientSecret: created.clientSecret,
+        });
+      }
+
       setFormData({
         name: "",
         partner: "",
@@ -184,11 +200,7 @@ export default function AdminApiKeysPage() {
         webhookUrl: "",
       });
 
-      toast.success("Application partenaire configurée avec succès !", {
-        description: isVip
-          ? "Accès VIP Illimité activé (aucun quota d'appels ni de sessions)."
-          : "Identifiants OAuth2 générés et enregistrés en base.",
-      });
+      toast.success("Application partenaire configurée avec succès !");
     } catch (err) {
       toast.error("Erreur lors de la création de la clé API.");
     } finally {
@@ -1663,6 +1675,78 @@ export default function AdminApiKeysPage() {
                 className="px-5 py-2 rounded-xl bg-navy text-white hover:bg-navy-dark transition-all cursor-pointer shadow-sm"
               >
                 J&apos;ai bien copié mon secret
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale d'Affichage des Nouveaux Identifiants lors de la Création */}
+      {newKeyCredentialsResult && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-background border border-border rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center text-gold mx-auto">
+              <Key className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-navy">Identifiants OAuth2 Générés avec Succès</h3>
+              <p className="text-xs text-foreground-secondary">
+                Voici les identifiants pour l&apos;application <strong className="text-foreground">{newKeyCredentialsResult.name}</strong> ({newKeyCredentialsResult.partner}).
+              </p>
+            </div>
+
+            {/* Client ID */}
+            <div className="p-3.5 rounded-xl bg-background-secondary border border-border space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-foreground-muted">
+                <span>CLIENT ID (PUBLIC)</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-background border border-border">
+                <span className="font-mono text-xs font-bold text-navy select-all break-all">
+                  {newKeyCredentialsResult.clientId}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(newKeyCredentialsResult.clientId, "Client ID")}
+                  className="px-3 py-1.5 rounded-lg bg-navy text-white hover:bg-navy-dark text-xs font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                >
+                  <Copy className="w-3.5 h-3.5 text-gold" />
+                  <span>Copier</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Client Secret */}
+            <div className="p-3.5 rounded-xl bg-background-secondary border border-border space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-foreground-muted">
+                <span>CLIENT SECRET</span>
+                <span className="text-amber-600 font-bold">À COPIER MAINTENANT</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-background border border-border">
+                <span className="font-mono text-xs font-bold text-navy select-all break-all">
+                  {newKeyCredentialsResult.clientSecret}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(newKeyCredentialsResult.clientSecret, "Client Secret")}
+                  className="px-3 py-1.5 rounded-lg bg-navy text-white hover:bg-navy-dark text-xs font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                >
+                  <Copy className="w-3.5 h-3.5 text-gold" />
+                  <span>Copier</span>
+                </button>
+              </div>
+              <p className="text-[10px] text-foreground-muted">
+                Attention : pour des raisons de sécurité, ce secret est haché en base de données et ne sera plus jamais affiché en clair.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end pt-2 border-t border-border text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setNewKeyCredentialsResult(null)}
+                className="px-5 py-2 rounded-xl bg-navy text-white hover:bg-navy-dark transition-all cursor-pointer shadow-sm"
+              >
+                J&apos;ai bien enregistré mes identifiants
               </button>
             </div>
           </div>
