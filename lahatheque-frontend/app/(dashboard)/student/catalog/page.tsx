@@ -241,7 +241,7 @@ export default function StudentCatalogPage() {
           Explorer le Catalogue
         </h1>
         <p className="text-xs text-foreground-muted mt-1">
-          Consultez les 15 premières pages gratuitement sans inscription préalable. Achetez à l&apos;unité ou débloquez via vos bouquets campus.
+          Consultez un extrait gratuit sans inscription préalable. Achetez à l&apos;unité ou débloquez via vos bouquets campus.
         </p>
       </div>
 

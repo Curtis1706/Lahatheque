@@ -34,7 +34,7 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'isbn', 'title', 'subtitle', 'authors',
             'discipline_name', 'publisher_name', 'institution_name',
-            'country', 'format_type', 'page_count', 'publication_date',
+            'country', 'format_type', 'page_count', 'sample_pages_count', 'publication_date',
             'language', 'summary', 'status', 'price_digital', 'price_paper',
             'is_paper_available', 'cover_url', 'is_owned', 'has_digital_access',
             'author_discounted_digital_price', 'author_discounted_paper_price',

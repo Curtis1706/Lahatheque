@@ -369,10 +369,10 @@ export default function StudentBookDetailPage() {
             <button
               type="button"
               onClick={() => setShowSample(true)}
-              className="px-4 py-2 rounded-xl border border-border bg-background-secondary hover:border-gold text-navy text-xs font-semibold transition-all flex items-center gap-1.5 min-h-[40px]"
+              className="px-4 py-2 rounded-xl border border-border bg-background-secondary hover:border-gold text-navy text-xs font-semibold transition-all flex items-center gap-1.5 min-h-[40px] cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5 text-gold" />
-              Consulter l&apos;extrait (15 pages)
+              Consulter l&apos;extrait ({book.sample_pages_count || 10} pages)
             </button>
           </div>
         </div>

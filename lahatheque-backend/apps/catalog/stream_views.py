@@ -207,3 +207,66 @@ class BookStreamView(APIView):
             return None, None
 
         return start, end
+
+
+class BookSampleStreamView(APIView):
+    """
+    GET /api/v1/catalog/books/<book_id>/sample/ - Extrait gratuit RÉEL : les N premières
+    pages du vrai fichier, filigranées "EXTRAIT GRATUIT". Accessible à tout utilisateur
+    authentifié, sans exiger d'achat ni d'abonnement.
+    """
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
+
+    def get(self, request, book_id):
+        import fitz
+        from apps.protection.source_adapter import DocumentSourceAdapter, DocumentSourceError
+        from apps.catalog.models import Ouvrage
+
+        try:
+            ouvrage = Ouvrage.objects.filter(id=book_id, status='published').first()
+            if not ouvrage:
+                ouvrage = Ouvrage.objects.filter(isbn=book_id, status='published').first()
+            if not ouvrage:
+                return JsonResponse({"success": False, "error": "Ouvrage introuvable."}, status=404)
+        except Exception:
+            return JsonResponse({"success": False, "error": "Ouvrage introuvable."}, status=404)
+
+        try:
+            full_pdf_bytes = DocumentSourceAdapter.get_document_bytes("catalog_book", str(ouvrage.id))
+        except DocumentSourceError as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=404)
+
+        sample_pages = ouvrage.sample_pages_count
+
+        try:
+            src_doc = fitz.open(stream=full_pdf_bytes, filetype="pdf")
+            extract_doc = fitz.open()
+            page_limit = min(sample_pages, src_doc.page_count)
+            extract_doc.insert_pdf(src_doc, from_page=0, to_page=page_limit - 1)
+
+            for page in extract_doc:
+                page.insert_textbox(
+                    fitz.Rect(0, page.rect.height / 2 - 40, page.rect.width, page.rect.height / 2 + 40),
+                    "EXTRAIT GRATUIT — LAHAThèque",
+                    fontsize=28,
+                    color=(0.7, 0.7, 0.7),
+                    rotate=45,
+                    align=1,
+                )
+
+            sample_bytes = extract_doc.tobytes()
+            total_pages = src_doc.page_count
+            src_doc.close()
+            extract_doc.close()
+        except Exception as e:
+            return JsonResponse({"success": False, "error": f"Impossible de générer l'extrait : {e}"}, status=500)
+
+        response = HttpResponse(sample_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="extrait-{ouvrage.id}.pdf"'
+        response["X-Sample-Pages"] = str(page_limit)
+        response["X-Sample-Total-Pages"] = str(total_pages)
+        response["Access-Control-Expose-Headers"] = "X-Sample-Pages, X-Sample-Total-Pages"
+        response["Cache-Control"] = "private, no-store, must-revalidate"
+        return response
+

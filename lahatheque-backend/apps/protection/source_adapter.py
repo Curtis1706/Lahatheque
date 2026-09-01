@@ -64,6 +64,16 @@ class DocumentSourceAdapter:
             raise DocumentSourceError(f"Type de source de document inconnu: '{source_type}'")
 
     @classmethod
+    def get_source_bytes(
+        cls,
+        source_type: str,
+        source_reference: str,
+        options: Optional[Dict[str, Any]] = None
+    ) -> bytes:
+        """Alias pour get_document_bytes."""
+        return cls.get_document_bytes(source_type, source_reference, options)
+
+    @classmethod
     def _fetch_catalog_book(cls, book_id: str) -> bytes:
         """Récupère le fichier d'un ouvrage du catalogue interne LAHAThèque ou d'un dépôt éditeur/manuscrit."""
         from apps.catalog.models import Ouvrage

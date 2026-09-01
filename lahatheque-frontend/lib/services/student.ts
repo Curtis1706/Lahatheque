@@ -68,6 +68,7 @@ export interface BookAPI {
   country: string;
   format_type: "pdf" | "epub" | "audio";
   page_count: number;
+  sample_pages_count?: number;
   publication_date: string;
   language: string;
   summary: string;

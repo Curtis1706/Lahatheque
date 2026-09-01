@@ -103,6 +103,26 @@ class Ouvrage(models.Model):
     )
 
     @property
+    def sample_pages_count(self) -> int:
+        """
+        Nombre de pages de l'extrait gratuit. Il y a TOUJOURS un extrait, quelle que soit la
+        taille du fichier (y compris les PDF de test à 4-5 pages), mais il ne donne jamais le
+        livre entier — au moins une page reste toujours réservée à l'achat, sauf le cas
+        limite d'un livre d'une seule page. Pour les livres suffisamment longs : 12% du
+        contenu, plancher 8, plafond 30.
+        """
+        if not self.page_count or self.page_count <= 0:
+            return 10
+
+        if self.page_count == 1:
+            return 1
+
+        max_allowed = self.page_count - 1  # au moins 1 page reste derrière le mur de paiement
+        proportional = round(self.page_count * 0.12)
+        desired = min(30, max(8, proportional))
+        return max(1, min(desired, max_allowed))
+
+    @property
     def price(self):
         return self.price_digital
 

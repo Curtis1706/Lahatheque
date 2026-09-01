@@ -1,12 +1,11 @@
 "use client";
 
-import React from "react";
-import { Sparkles, FileText, ArrowUpRight, BookOpen } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Sparkles, ShoppingBag } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
+import { FlipBook } from "@/components/library/FlipBook";
 import type { ClientBookAccess } from "@/lib/types/student";
-import { BookCover } from "./book-cover";
 
 interface BookSampleModalProps {
   book: (Partial<ClientBookAccess> & { id: string; title: string; author?: string }) | null;
@@ -14,15 +13,36 @@ interface BookSampleModalProps {
   onClose: () => void;
 }
 
-export function BookSampleModal({
-  book,
-  isOpen,
-  onClose,
-}: BookSampleModalProps) {
-  if (!book) return null;
+export function BookSampleModal({ book, isOpen, onClose }: BookSampleModalProps) {
+  const [samplePdfBytes, setSamplePdfBytes] = useState<Uint8Array | null>(null);
+  const [samplePagesCount, setSamplePagesCount] = useState<number>(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reachedEnd, setReachedEnd] = useState(false);
 
-  const authorName = book.author || "Auteur académique";
-  const disciplineName = book.discipline || book.discipline_name || "Matière générale";
+  useEffect(() => {
+    if (!isOpen || !book?.id) return;
+
+    setLoading(true);
+    setError(null);
+    setReachedEnd(false);
+
+    fetch(`/api/bff/catalog/books/${book.id}/sample/`, { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          throw new Error(json.error || "Extrait indisponible pour cet ouvrage.");
+        }
+        const pages = res.headers.get("X-Sample-Pages") || res.headers.get("x-sample-pages");
+        setSamplePagesCount(pages ? parseInt(pages, 10) : 0);
+        const buf = await res.arrayBuffer();
+        setSamplePdfBytes(new Uint8Array(buf));
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [isOpen, book?.id]);
+
+  if (!book) return null;
 
   return (
     <Modal
@@ -34,58 +54,55 @@ export function BookSampleModal({
           Extrait Gratuit : {book.title}
         </div>
       }
-      maxWidth={680}
+      maxWidth={800}
     >
-      <div className="space-y-4 pt-2 text-xs">
-        <div className="p-3.5 rounded-2xl bg-gold/10 border border-gold/30 text-navy flex items-center justify-between">
-          <span className="font-semibold flex items-center gap-1.5">
-            <FileText className="w-4 h-4 text-gold" />
-            Lecture d&apos;extrait gratuit ({book.sample_pages_count || 15} premières pages)
-          </span>
-          <span className="text-[10px] font-mono uppercase bg-gold/20 text-gold px-2 py-0.5 rounded font-bold">
-            Sans inscription
-          </span>
-        </div>
-
-        {/* Header avec Couverture et résumé */}
-        <div className="flex items-center gap-4 p-4 rounded-2xl bg-background-secondary border border-border">
-          <BookCover book={book} size="sm" />
-          <div className="min-w-0 space-y-1">
-            <h3 className="font-serif font-bold text-navy text-sm line-clamp-2">{book.title}</h3>
-            <p className="text-xs text-foreground-muted truncate">Par {authorName}</p>
-            <p className="text-[11px] text-navy font-medium font-mono">{disciplineName}</p>
+      <div className="space-y-4 pt-2">
+        {loading && (
+          <div className="text-center py-12 space-y-2">
+            <p className="text-xs text-foreground-muted">Chargement de l&apos;extrait...</p>
           </div>
-        </div>
+        )}
 
-        {/* Aperçu des pages d'extrait */}
-        <div className="p-6 rounded-3xl bg-background-secondary border border-border min-h-[200px] max-h-[300px] overflow-y-auto space-y-4 font-serif text-sm leading-relaxed text-foreground select-none">
-          <p className="first-letter:text-3xl first-letter:font-bold first-letter:text-navy">
-            &ldquo;L&apos;organisation des institutions et la diffusion des connaissances juridiques et scientifiques constituent les piliers de l&apos;excellence universitaire en Afrique. Cet extrait présente la table des matières, l&apos;introduction générale et les fondements méthodologiques de l&apos;ouvrage.&rdquo;
-          </p>
+        {error && (
+          <div className="text-center py-12 space-y-3">
+            <p className="text-sm text-foreground-muted">{error}</p>
+          </div>
+        )}
 
-          <p className="text-xs text-foreground-muted font-sans italic border-l-2 border-gold pl-3 py-1">
-            Note de consultation : Vous pouvez lire cet extrait en toute liberté. Pour débloquer l&apos;intégralité de l&apos;ouvrage, vous pouvez l&apos;acquérir à l&apos;unité ou activer vos bouquets universitaires partenaires.
-          </p>
-        </div>
+        {!loading && !error && samplePdfBytes && (
+          <div className="rounded-2xl overflow-hidden border border-border bg-background-secondary" style={{ height: 480 }}>
+            <FlipBook
+              fileUrl={samplePdfBytes}
+              bookId={`sample-${book.id}`}
+              onLastPageReached={() => setReachedEnd(true)}
+              hideInternalHeader={true}
+            />
+          </div>
+        )}
 
-        <div className="flex items-center justify-between pt-3 border-t border-border flex-wrap gap-2">
-          <Link
-            href={`/catalog/reader/${book.id}`}
-            onClick={() => {
-              toast.info(`Ouverture de la liseuse pour « ${book.title} »`);
-              onClose();
-            }}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors min-h-[40px]"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            Ouvrir la Liseuse Complète
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </Link>
+        {reachedEnd && (
+          <div className="p-5 rounded-2xl bg-navy text-white text-center space-y-3">
+            <p className="font-serif font-bold text-base">Fin de l&apos;extrait gratuit ({samplePagesCount} pages)</p>
+            <p className="text-xs text-white/80">
+              Pour continuer la lecture de « {book.title} », achetez l&apos;ouvrage ou activez votre
+              bouquet universitaire.
+            </p>
+            <Link
+              href={`/student/catalog/${book.id}`}
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-hover transition-colors cursor-pointer"
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              Voir les options d&apos;achat
+            </Link>
+          </div>
+        )}
 
+        <div className="flex justify-end pt-2 border-t border-border">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[40px]"
+            className="px-5 py-2 rounded-xl bg-background-secondary border border-border text-navy text-xs font-bold hover:bg-border/40 transition-colors cursor-pointer"
           >
             Fermer
           </button>

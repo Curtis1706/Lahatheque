@@ -40,6 +40,7 @@ interface FlipBookProps {
   initialPage?: number;
   isMobile?: boolean;
   onPageChange?: (page: number) => void;
+  onLastPageReached?: () => void;
   onClose?: () => void;
   initialAnnotations?: Annotation[];
   onAskQuestion?: () => void;
@@ -315,6 +316,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   ttsPitch = 1,
   onDocumentLoad,
   hideInternalHeader = false,
+  onLastPageReached,
 }) => {
   const [numPages, setNumPages]     = useState<number>(0);
 
@@ -561,9 +563,17 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   }, [currentPage, numPages, pages, bookId]);
 
 
+  const hasTriggeredLastPage = useRef(false);
+
   const onFlip = (e: any) => {
-    setCurrentPage(e.data);
-    onPageChange?.(e.data);
+    const pageIndex = e.data;
+    setCurrentPage(pageIndex);
+    onPageChange?.(pageIndex);
+
+    if (numPages > 0 && pageIndex >= numPages - 1 && !hasTriggeredLastPage.current) {
+      hasTriggeredLastPage.current = true;
+      onLastPageReached?.();
+    }
   };
 
   const notePopoverCssCoords = useMemo(() => {
@@ -968,4 +978,5 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   );
 }
 
+export const FlipBook = FlipBookReader;
 export type { Annotation } from './flipbook/types';

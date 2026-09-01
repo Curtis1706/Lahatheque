@@ -12,7 +12,7 @@ from .views import (
     AuthorSearchView,
     CreatorOptionsView,
 )
-from .stream_views import BookStreamView
+from .stream_views import BookStreamView, BookSampleStreamView
 
 app_name = 'catalog'
 
@@ -34,5 +34,6 @@ urlpatterns = [
     path('authors/search/', AuthorSearchView.as_view(), name='author-search'),
     path('onix/import/', ONIXImportView.as_view(), name='onix-import'),
     path('books/<str:book_id>/stream/', BookStreamView.as_view(), name='book-stream'),
+    path('books/<str:book_id>/sample/', BookSampleStreamView.as_view(), name='book-sample-stream'),
 ] + router.urls
 
