@@ -112,7 +112,7 @@ Même en consultant un livre officiel du catalogue LAHAThèque, vous pouvez habi
 * `q` (optionnel) : Recherche textuelle dans les titres (ex: `?q=constitutionnel`).
 * `discipline` (optionnel) : Filtrage par matière (ex: `?discipline=Droit`).
 
-**Exemple de Réponse (200 OK) :**
+**Exemple de Réponse Complète (200 OK) :**
 ```json
 {
   "success": true,
@@ -120,25 +120,42 @@ Même en consultant un livre officiel du catalogue LAHAThèque, vous pouvez habi
   "data": [
     {
       "id": "e4a2c5b0-7d12-4e9a-9e11-8a9d12345678",
+      "isbn": "978-2-919999-01-2",
       "title": "Droit Constitutionnel des États d'Afrique Francophone",
-      "summary": "Ouvrage de référence sur les institutions républicaines...",
-      "discipline_name": "Droit & Sciences Politiques",
+      "subtitle": "Théorie générale et régimes politiques comparés",
+      "author_name": "Prof. Jean-Marc Agossou",
+      "author": "Prof. Jean-Marc Agossou",
       "authors": [
-        { "full_name": "Prof. Jean-Marc Agossou" }
+        {
+          "id": "uuid-auteur-1",
+          "first_name": "Jean-Marc",
+          "last_name": "Agossou",
+          "full_name": "Jean-Marc Agossou"
+        }
       ],
+      "discipline_name": "Droit & Sciences Politiques",
+      "publisher_name": "Éditions LAHA",
+      "institution_name": "Université d'Abomey-Calavi",
+      "country": "BJ",
+      "format_type": "pdf",
       "page_count": 348,
+      "sample_pages_count": 15,
       "publication_date": "2026-01-15",
-      "price_digital": 5000,
-      "price_paper": 8500,
+      "language": "fr",
+      "summary": "Ouvrage de référence sur les institutions républicaines et l'évolution constitutionnelle en Afrique francophone.",
+      "status": "published",
+      "price_digital": 5000.0,
+      "price_paper": 8500.0,
+      "is_paper_available": true,
       "cover_url": "https://lahatheque.com/api/bff/catalog/books/e4a2c5b0-7d12-4e9a-9e11-8a9d12345678/cover/"
     }
   ]
 }
 ```
 
-> **À propos des couvertures d'ouvrages (`cover_url`) :**
-> - L'URL renvoyée est une URL absolue complète directement exploitable dans vos balises `<img src={book.cover_url} />`.
-> - Si un visuel dédié a été importé par l'éditeur, il est délivré. Sinon, le moteur extrait automatiquement la première page du PDF pour générer la couverture.
+> **À propos des métadonnées & couvertures (`cover_url`) :**
+> - **Auteurs :** Les champs `author_name` et `author` fournissent directement la chaîne textuelle prête à l'affichage (ex: `"Prof. Jean-Marc Agossou"`). Le tableau `authors` fournit la liste détaillée des co-auteurs.
+> - **Couverture :** `cover_url` est une URL absolue complète utilisable directement dans `<img src={book.cover_url} />`. Si un visuel dédié a été importé par l'éditeur, il est délivré. Sinon, le moteur extrait automatiquement la première page du PDF pour générer la couverture.
 
 #### Détail d'un livre spécifique :
 * **Route :** `GET /api/v1/partner/catalog/{book_id}/`

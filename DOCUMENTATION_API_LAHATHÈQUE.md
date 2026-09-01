@@ -248,14 +248,34 @@ Recherche et consultation des ouvrages publiés du catalogue académique.
   "data": [
     {
       "id": "e4a2c5b0-7d12-4e9a-9e11-8a9d12345678",
+      "isbn": "978-2-919999-01-2",
       "title": "Droit Constitutionnel des États d'Afrique Francophone",
+      "subtitle": "Théorie générale et régimes politiques comparés",
+      "author_name": "Prof. Jean-Marc Agossou",
+      "author": "Prof. Jean-Marc Agossou",
+      "authors": [
+        {
+          "id": "uuid-auteur-1",
+          "first_name": "Jean-Marc",
+          "last_name": "Agossou",
+          "full_name": "Jean-Marc Agossou"
+        }
+      ],
       "discipline_name": "Droit & Sciences Politiques",
-      "authors": [{ "full_name": "Prof. Jean-Marc Agossou" }],
+      "publisher_name": "Éditions LAHA",
+      "institution_name": "Université d'Abomey-Calavi",
+      "country": "BJ",
+      "format_type": "pdf",
       "page_count": 348,
+      "sample_pages_count": 15,
       "publication_date": "2026-01-15",
-      "price_digital": 5000,
-      "price_paper": 8500,
-      "cover_url": "https://lahatheque.com/api/bff/catalog/books/e4a2c5b0.../cover/"
+      "language": "fr",
+      "summary": "Analyse comparative des régimes constitutionnels africains...",
+      "status": "published",
+      "price_digital": 5000.0,
+      "price_paper": 8500.0,
+      "is_paper_available": true,
+      "cover_url": "https://lahatheque.com/api/bff/catalog/books/e4a2c5b0-7d12-4e9a-9e11-8a9d12345678/cover/"
     }
   ]
 }
@@ -270,16 +290,34 @@ Consultation de la fiche détaillée d'un ouvrage du catalogue.
   "success": true,
   "data": {
     "id": "e4a2c5b0-7d12-4e9a-9e11-8a9d12345678",
+    "isbn": "978-2-919999-01-2",
     "title": "Droit Constitutionnel des États d'Afrique Francophone",
-    "summary": "Analyse comparative des régimes constitutionnels...",
+    "subtitle": "Théorie générale et régimes politiques comparés",
+    "author_name": "Prof. Jean-Marc Agossou",
+    "author": "Prof. Jean-Marc Agossou",
+    "authors": [
+      {
+        "id": "uuid-auteur-1",
+        "first_name": "Jean-Marc",
+        "last_name": "Agossou",
+        "full_name": "Jean-Marc Agossou"
+      }
+    ],
     "discipline_name": "Droit & Sciences Politiques",
-    "authors": [{ "full_name": "Prof. Jean-Marc Agossou" }],
+    "publisher_name": "Éditions LAHA",
+    "institution_name": "Université d'Abomey-Calavi",
+    "country": "BJ",
+    "format_type": "pdf",
     "page_count": 348,
     "sample_pages_count": 15,
-    "language": "Français",
-    "price_digital": 5000,
-    "price_paper": 8500,
-    "cover_url": "https://lahatheque.com/api/bff/catalog/books/e4a2c5b0.../cover/"
+    "publication_date": "2026-01-15",
+    "language": "fr",
+    "summary": "Analyse comparative des régimes constitutionnels africains...",
+    "status": "published",
+    "price_digital": 5000.0,
+    "price_paper": 8500.0,
+    "is_paper_available": true,
+    "cover_url": "https://lahatheque.com/api/bff/catalog/books/e4a2c5b0-7d12-4e9a-9e11-8a9d12345678/cover/"
   }
 }
 ```

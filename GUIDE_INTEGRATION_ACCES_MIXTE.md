@@ -97,8 +97,50 @@ Pour créer une session de lecture (`POST /api/v1/reader/sessions/`), vous trans
 * `POST /api/v1/oauth2/token/revoke/` : Révocation immédiate d'un jeton compromis.
 
 ### 5.2 Catalogue & Abonnements
-* `GET /api/v1/partner/catalog/` : Recherche documentaire (filtres `q` et `discipline`). Chaque livre inclut une `cover_url` absolue directement affichable dans vos balises `<img src={book.cover_url} />`.
+* `GET /api/v1/partner/catalog/` : Recherche documentaire (filtres `q` et `discipline`).
 * `GET /api/v1/partner/catalog/{id}/` : Fiche détaillée d'un livre.
+
+**Structure Exhaustive de la Réponse Catalogue (200 OK) :**
+```json
+{
+  "success": true,
+  "count": 1,
+  "data": [
+    {
+      "id": "e4a2c5b0-7d12-4e9a-9e11-8a9d12345678",
+      "isbn": "978-2-919999-01-2",
+      "title": "Droit Constitutionnel des États d'Afrique Francophone",
+      "subtitle": "Théorie générale et régimes politiques comparés",
+      "author_name": "Prof. Jean-Marc Agossou",
+      "author": "Prof. Jean-Marc Agossou",
+      "authors": [
+        {
+          "id": "uuid-auteur-1",
+          "first_name": "Jean-Marc",
+          "last_name": "Agossou",
+          "full_name": "Jean-Marc Agossou"
+        }
+      ],
+      "discipline_name": "Droit & Sciences Politiques",
+      "publisher_name": "Éditions LAHA",
+      "institution_name": "Université d'Abomey-Calavi",
+      "country": "BJ",
+      "format_type": "pdf",
+      "page_count": 348,
+      "sample_pages_count": 15,
+      "publication_date": "2026-01-15",
+      "language": "fr",
+      "summary": "Ouvrage de référence sur les institutions républicaines...",
+      "status": "published",
+      "price_digital": 5000.0,
+      "price_paper": 8500.0,
+      "is_paper_available": true,
+      "cover_url": "https://lahatheque.com/api/bff/catalog/books/e4a2c5b0-7d12-4e9a-9e11-8a9d12345678/cover/"
+    }
+  ]
+}
+```
+
 * `GET /api/v1/partner/bouquets/` : Liste des bouquets d'institution disponibles.
 * `GET /api/v1/partner/bouquets/{offering_id}/check-access/?book_id={id}` : Contrôle des droits bouquet.
 * `GET /api/v1/partner/stats/usage/` : Statistiques de consultation campus.

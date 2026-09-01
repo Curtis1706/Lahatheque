@@ -20,6 +20,8 @@ class AuthorNameSerializer(serializers.ModelSerializer):
 class OuvrageBasicSerializer(serializers.ModelSerializer):
     """Sérialiseur compact d'un ouvrage pour la bibliothèque / catalogue student."""
     authors = AuthorNameSerializer(many=True, read_only=True)
+    author_name = serializers.SerializerMethodField()
+    author = serializers.SerializerMethodField()
     discipline_name = serializers.CharField(source='discipline.name', read_only=True, default='')
     publisher_name = serializers.CharField(source='publisher.name', read_only=True, default='')
     institution_name = serializers.CharField(source='institution.name', read_only=True, default='')
@@ -32,13 +34,25 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ouvrage
         fields = [
-            'id', 'isbn', 'title', 'subtitle', 'authors',
+            'id', 'isbn', 'title', 'subtitle', 'authors', 'author_name', 'author',
             'discipline_name', 'publisher_name', 'institution_name',
             'country', 'format_type', 'page_count', 'sample_pages_count', 'publication_date',
             'language', 'summary', 'status', 'price_digital', 'price_paper',
             'is_paper_available', 'cover_url', 'is_owned', 'has_digital_access',
             'author_discounted_digital_price', 'author_discounted_paper_price',
         ]
+
+    def get_author_name(self, obj) -> str:
+        if obj.pk and hasattr(obj, 'authors'):
+            authors_qs = getattr(obj, 'authors')
+            if hasattr(authors_qs, 'all'):
+                names = [f"{a.first_name} {a.last_name}".strip() for a in authors_qs.all() if f"{a.first_name} {a.last_name}".strip()]
+                if names:
+                    return ", ".join(names)
+        return ""
+
+    def get_author(self, obj) -> str:
+        return self.get_author_name(obj)
 
     def get_cover_url(self, obj) -> str:
         url = obj.cover_url or ''
