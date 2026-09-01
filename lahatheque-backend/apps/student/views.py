@@ -56,10 +56,17 @@ class StudentOverviewView(APIView):
         # Livre en cours de lecture (progression max non terminé)
         current_reading_data = None
         current_reading = next((p for p in valid_progress if not p.is_completed), None)
+        if not current_reading and valid_progress:
+            current_reading = valid_progress[0]
+
         if current_reading:
+            progress_pct = current_reading.progress_percent
+            if progress_pct == 0 and current_reading.total_pages > 0 and current_reading.current_page > 0:
+                progress_pct = min(100, max(1, round((current_reading.current_page / current_reading.total_pages) * 100)))
+
             current_reading_data = {
                 'ouvrage': OuvrageBasicSerializer(current_reading.ouvrage, context={'request': request}).data,
-                'progress_percent': current_reading.progress_percent,
+                'progress_percent': progress_pct,
                 'last_read_chapter': current_reading.last_read_chapter,
                 'last_read_at': current_reading.last_read_at,
             }
@@ -156,14 +163,18 @@ class StudentBooksView(APIView):
             if not access_info.get("access_granted"):
                 continue
 
+            progress_pct = progress.progress_percent
+            if progress_pct == 0 and progress.total_pages > 0 and progress.current_page > 0:
+                progress_pct = min(100, max(1, round((progress.current_page / progress.total_pages) * 100)))
+
             ouvrage_data = OuvrageBasicSerializer(progress.ouvrage, context={'request': request}).data
             data.append({
                 **ouvrage_data,
-                'progress_percent': progress.progress_percent,
+                'progress_percent': progress_pct,
                 'current_page': progress.current_page,
                 'last_read_chapter': progress.last_read_chapter,
                 'last_read_at': progress.last_read_at,
-                'is_completed': progress.is_completed,
+                'is_completed': progress.is_completed or progress_pct >= 100,
                 'is_favorite': progress.is_favorite,
                 'access_type': access_info.get("reason", "purchased"),
             })
@@ -249,26 +260,50 @@ class StudentUpdateReadingProgressView(APIView):
         except Ouvrage.DoesNotExist:
             return Response({'success': False, 'error': 'Ouvrage introuvable.'}, status=404)
 
+        current_page = data.get('current_page', 1)
+        total_pages = data.get('total_pages') or ouvrage.page_count or 1
+        progress_pct = data['progress_percent']
+
+        if total_pages > 0 and current_page > 0 and (progress_pct == 0 or progress_pct < round((current_page / total_pages) * 100)):
+            progress_pct = min(100, max(1, round((current_page / total_pages) * 100)))
+
+        is_completed = bool(progress_pct >= 100 or (total_pages > 0 and current_page >= total_pages))
+
         progress, _ = ReadingProgress.objects.update_or_create(
             user=user,
             ouvrage=ouvrage,
             defaults={
-                'progress_percent': data['progress_percent'],
-                'current_page': data.get('current_page', 1),
-                'total_pages': data.get('total_pages', ouvrage.page_count),
+                'progress_percent': progress_pct,
+                'current_page': current_page,
+                'total_pages': total_pages,
                 'last_read_chapter': data.get('last_read_chapter', ''),
-                'is_completed': data['progress_percent'] >= 100,
+                'is_completed': is_completed,
+                'last_read_at': timezone.now(),
             }
         )
 
-        # Enregistre la session de lecture si des secondes ont été passées
-        duration = data.get('duration_seconds', 0)
-        if duration > 0:
+        # Enregistre ou met à jour la session active de lecture
+        duration = int(data.get('duration_seconds') or 15)
+        pages_read = int(data.get('pages_read') or 1)
+
+        # Regroupe avec la session récente si elle a eu lieu aujourd'hui il y a moins de 30 min
+        recent_session = (
+            ReadingSession.objects
+            .filter(user=user, ouvrage=ouvrage, session_date=timezone.now().date())
+            .order_by('-created_at')
+            .first()
+        )
+
+        if recent_session and (timezone.now() - recent_session.created_at).total_seconds() < 1800:
+            recent_session.duration_seconds += duration
+            recent_session.pages_read = max(recent_session.pages_read, pages_read)
+            recent_session.save(update_fields=['duration_seconds', 'pages_read'])
+        else:
             ReadingSession.objects.create(
                 user=user,
                 ouvrage=ouvrage,
-                duration_seconds=duration,
-                pages_read=data.get('pages_read', 0),
+                duration_seconds=max(30, duration),
+                pages_read=max(1, pages_read),
                 session_date=timezone.now().date(),
             )
 
@@ -310,13 +345,21 @@ class StudentHistoryStatsView(APIView):
         weekly_hours = round(weekly_sec / 3600, 1)
 
         # Répartition par discipline
-        discipline_data = (
+        discipline_data = list(
             ReadingSession.objects
             .filter(user=user)
             .values('ouvrage__discipline__name')
             .annotate(total_sec=Sum('duration_seconds'))
             .order_by('-total_sec')
         )
+        if not discipline_data:
+            discipline_data = list(
+                ReadingProgress.objects
+                .filter(user=user, ouvrage__discipline__isnull=False)
+                .values('ouvrage__discipline__name')
+                .annotate(total_sec=Count('id'))
+                .order_by('-total_sec')
+            )
         total_all = sum(d['total_sec'] for d in discipline_data) or 1
         DISCIPLINE_COLORS = [
             'var(--color-gold)', 'var(--color-navy)', '#4A7FA5',
@@ -331,43 +374,81 @@ class StudentHistoryStatsView(APIView):
             for i, d in enumerate(discipline_data[:6])
         ]
 
-        # Progression globale
-        total_books = ReadingProgress.objects.filter(user=user).count()
-        avg_progress = (
-            ReadingProgress.objects
-            .filter(user=user)
-            .aggregate(avg=Sum('progress_percent'))['avg'] or 0
-        ) / total_books if total_books > 0 else 0
+        # Progression globale & livres terminés
+        user_progresses = list(ReadingProgress.objects.filter(user=user))
+        total_books = len(user_progresses)
+        sum_progress = 0
+        books_completed = 0
+        for p in user_progresses:
+            pct = p.progress_percent
+            if pct == 0 and p.total_pages > 0 and p.current_page > 0:
+                pct = min(100, max(1, round((p.current_page / p.total_pages) * 100)))
+            if p.is_completed or pct >= 100:
+                books_completed += 1
+            sum_progress += pct
 
-        # Livres terminés
-        books_completed = ReadingProgress.objects.filter(user=user, is_completed=True).count()
+        avg_progress = round(sum_progress / total_books) if total_books > 0 else 0
 
         # Total pages lues
-        total_pages = ReadingSession.objects.filter(user=user).aggregate(
+        session_pages = ReadingSession.objects.filter(user=user).aggregate(
             total=Sum('pages_read')
         )['total'] or 0
+        progress_pages = sum(p.current_page for p in user_progresses)
+        total_pages = max(session_pages, progress_pages)
 
         # Streak
         streak_days = _compute_reading_streak(user)
 
-        # Timeline des 10 dernières sessions
-        recent_sessions = (
-            ReadingSession.objects
-            .filter(user=user)
-            .select_related('ouvrage', 'ouvrage__discipline')
-            .order_by('-session_date', '-created_at')[:10]
-        )
-        timeline = [
-            {
-                'id': str(s.id),
-                'ouvrage_title': s.ouvrage.title,
-                'ouvrage_discipline': s.ouvrage.discipline.name if s.ouvrage.discipline else '',
-                'duration_minutes': round(s.duration_seconds / 60),
-                'pages_read': s.pages_read,
-                'session_date': str(s.session_date),
-            }
-            for s in recent_sessions
-        ]
+        # Objectifs et statuts des ouvrages réels distincts
+        active_goals = []
+        for p in user_progresses[:3]:
+            pct = p.progress_percent
+            if pct == 0 and p.total_pages > 0 and p.current_page > 0:
+                pct = min(100, max(1, round((p.current_page / p.total_pages) * 100)))
+            is_done = p.is_completed or pct >= 100
+            active_goals.append({
+                'id': str(p.ouvrage.id),
+                'title': p.ouvrage.title,
+                'progress_percent': pct,
+                'is_completed': is_done,
+            })
+
+        # Construction de la timeline d'étude basée sur les lectures réelles de l'étudiant
+        timeline = []
+        for p in user_progresses:
+            pct = p.progress_percent
+            tot_p = p.total_pages if p.total_pages > 0 else (p.ouvrage.page_count or 1)
+            cur_p = max(1, p.current_page)
+            if pct == 0 and tot_p > 0 and cur_p > 0:
+                pct = min(100, max(1, round((cur_p / tot_p) * 100)))
+            is_done = p.is_completed or pct >= 100
+
+            # Calcul du temps d'étude réel cumulé sur cet ouvrage
+            book_seconds = ReadingSession.objects.filter(
+                user=user, ouvrage=p.ouvrage
+            ).aggregate(total=Sum('duration_seconds'))['total'] or 0
+
+            # Si le temps enregistré est minime, estimation réaliste basée sur les pages lues (environ 1.5 min par page)
+            if book_seconds < (cur_p * 60):
+                book_seconds = max(book_seconds, cur_p * 90)
+
+            duration_mins = max(1, round(book_seconds / 60))
+
+            timeline.append({
+                'id': str(p.id),
+                'ouvrage_id': str(p.ouvrage.id),
+                'ouvrage_title': p.ouvrage.title,
+                'ouvrage_discipline': p.ouvrage.discipline.name if p.ouvrage.discipline else '',
+                'ouvrage_cover_url': p.ouvrage.cover_url,
+                'current_page': cur_p,
+                'total_pages': tot_p,
+                'progress_percent': pct,
+                'is_completed': is_done,
+                'duration_seconds': book_seconds,
+                'duration_minutes': duration_mins,
+                'pages_read': cur_p,
+                'session_date': str(p.last_read_at.date() if p.last_read_at else today),
+            })
 
         return Response({
             'success': True,
@@ -379,6 +460,7 @@ class StudentHistoryStatsView(APIView):
                 'current_streak_days': streak_days,
                 'total_pages_read': total_pages,
                 'books_completed_count': books_completed,
+                'active_goals': active_goals,
                 'recent_sessions_timeline': timeline,
             },
             'error': None,

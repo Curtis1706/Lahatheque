@@ -5,7 +5,8 @@ import HTMLFlipBook from 'react-pageflip';
 import { 
   ChevronLeft, ChevronRight, X, Check,
   Play, Pause, Volume2, VolumeX, Headphones,
-  ZoomIn, ZoomOut, Maximize, Minimize
+  ZoomIn, ZoomOut, Maximize, Minimize,
+  ArrowLeft, LayoutGrid
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { libraryApi } from '@/lib/services/library';
@@ -19,7 +20,6 @@ import { FloatingDock } from './flipbook/FloatingDock';
 import { SelectionLayer } from './flipbook/SelectionLayer';
 import { AnnotationLayer } from './flipbook/AnnotationLayer';
 import { AnnotationSidebar } from './flipbook/AnnotationSidebar';
-import { FlipBookQuiz } from './FlipBookQuiz';
 
 const PAGE_RENDER_WINDOW = 4;
 
@@ -42,6 +42,7 @@ interface FlipBookProps {
   onPageChange?: (page: number) => void;
   onLastPageReached?: () => void;
   onClose?: () => void;
+  onExit?: () => void;
   initialAnnotations?: Annotation[];
   onAskQuestion?: () => void;
   authorName?: string;
@@ -288,6 +289,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   isMobile = false,
   onPageChange,
   onClose,
+  onExit,
   initialAnnotations = [],
   onAskQuestion,
   authorName,
@@ -323,10 +325,11 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   onLastPageReached,
 }) => {
   const [numPages, setNumPages]     = useState<number>(0);
-
   const [pages, setPages]           = useState<string[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
-  const [currentPage, setCurrentPage] = useState(initialPage);
+
+  const effectiveInitialPage = isSample ? 0 : (initialPage || 0);
+  const [currentPage, setCurrentPage] = useState(effectiveInitialPage);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -340,11 +343,6 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
       document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
     }
   };
-
-  // Quiz States
-  const [showQuiz, setShowQuiz] = useState(false);
-  const [hasQuiz, setHasQuiz] = useState(false);
-  const [isQuizValidated, setIsQuizValidated] = useState(false);
 
   const pdfInstance       = useRef<any>(null);
   const renderingIndices  = useRef<Set<number>>(new Set());
@@ -426,7 +424,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
     };
   }, [onClose, showNoteModal, setActiveTool]);
 
-  const initialPageRef = useRef(initialPage ?? 0);
+  const initialPageRef = useRef(effectiveInitialPage);
   const onDocumentLoadRef = useRef(onDocumentLoad);
   onDocumentLoadRef.current = onDocumentLoad;
 
@@ -512,20 +510,6 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
           setPages(prev => { const next = [...prev]; next[i] = url; return next; });
         }
         if (!isCancelled) setIsLoading(false);
-
-        if (!hideQuiz && !isSample && !bookId.startsWith('sample-') && bookId !== 'preview' && bookId !== 'demo' && bookId !== 'lesson_pdf') {
-          try {
-            const quizData = await libraryApi.getQuizzes(bookId);
-            if (quizData && quizData.questions.length > 0) {
-              setHasQuiz(true);
-              if (initialPageRef.current >= total - 1) {
-                setShowQuiz(true);
-              }
-            }
-          } catch (err) {
-            console.error("[FlipBook] Quiz check error:", err);
-          }
-        }
       } catch (err) {
         console.error('[FlipBook] PDF load error:', err);
         if (!isCancelled) setIsLoading(false);
@@ -608,8 +592,19 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
       {!hideInternalHeader && (
         <header className="w-full bg-navy border-b border-navy-hover px-4 md:px-8 py-2.5 flex items-center justify-between text-white shrink-0 z-50">
           <div className="flex items-center gap-3 min-w-0">
+            {(onExit || onClose) && (
+              <button
+                type="button"
+                onClick={onExit || onClose}
+                title="Quitter la liseuse"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-navy-dark hover:bg-navy border border-navy-hover text-gold font-bold text-xs transition-colors cursor-pointer shrink-0 min-h-[36px]"
+              >
+                <ArrowLeft size={15} />
+                <span className="hidden sm:inline">Quitter</span>
+              </button>
+            )}
             <span className="font-bold text-gold text-sm md:text-base tracking-tight font-serif truncate">
-              LAHAThèque • Immersion 3D
+              {isSample ? "Extrait Gratuit • Immersion 3D" : "LAHAThèque • Immersion 3D"}
             </span>
 
           {/* Direct Page Jump Input */}
@@ -709,17 +704,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             </button>
           )}
 
-          {/* Quiz Button */}
-          {hasQuiz && currentPage >= numPages - 1 && !isQuizValidated && !showQuiz && (
-            <button 
-              type="button"
-              onClick={() => setShowQuiz(true)}
-              className="inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap h-9 px-3.5 rounded-lg bg-gold hover:bg-gold-hover text-navy text-xs font-bold transition-all cursor-pointer min-h-[36px]"
-            >
-              <Check size={14} strokeWidth={3} />
-              <span>Quiz</span>
-            </button>
-          )}
+
 
           {/* Audio Narrator */}
           {hasAudio && (
@@ -741,14 +726,15 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             </div>
           )}
 
-          {/* Quit Immersion */}
+          {/* Basculer Lecteur Classique */}
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap h-9 px-3.5 rounded-lg bg-navy-dark hover:bg-navy border border-navy-hover text-gold text-xs font-bold transition-colors cursor-pointer min-h-[36px]"
+            title="Passer en lecteur classique"
+            className="inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap h-9 px-3.5 rounded-xl bg-navy-dark hover:bg-navy border border-navy-hover text-white/90 hover:text-gold text-xs font-bold transition-colors cursor-pointer min-h-[36px]"
           >
-            <X size={14} />
-            <span className="hidden md:inline">Mode Normal</span>
+            <LayoutGrid size={14} />
+            <span className="hidden md:inline">Lecteur Classique</span>
           </button>
         </div>
       </header>
@@ -803,7 +789,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             className="laha-flipbook"
             ref={bookRef}
             style={{ backgroundColor: 'transparent' }}
-            startPage={initialPage}
+            startPage={effectiveInitialPage}
             drawShadow={!isMobile}
             flippingTime={isMobile ? 400 : 700}
             usePortrait={isMobile}
@@ -960,25 +946,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
         onDelete={handleAnnotationDelete}
       />
 
-      {/* ── Quiz Overlay ─────────────────────────── */}
-      <AnimatePresence>
-        {showQuiz && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[1000] bg-navy-dark p-4 sm:p-8"
-          >
-            <FlipBookQuiz 
-              bookId={bookId} 
-              onClose={() => setShowQuiz(false)}
-              onComplete={(res) => {
-                if (res.is_validated) setIsQuizValidated(true);
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+
       
     </div>
   );

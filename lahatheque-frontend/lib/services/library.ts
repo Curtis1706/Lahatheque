@@ -111,11 +111,20 @@ export const libraryApi = {
     };
   },
 
-  async syncProgress(bookId: string, currentPage?: number, totalPages?: number): Promise<boolean> {
+  async syncProgress(
+    bookId: string,
+    currentPage?: number,
+    totalPages?: number,
+    durationSeconds?: number,
+    pagesRead?: number
+  ): Promise<boolean> {
     try {
-      const progressPercent = (totalPages && currentPage)
-        ? Math.min(100, Math.round((currentPage / totalPages) * 100))
-        : 0;
+      const page = Math.max(1, currentPage != null ? Number(currentPage) : 1);
+      const total = totalPages && Number(totalPages) > 0 ? Number(totalPages) : Math.max(1, page);
+      const progressPercent = Math.min(100, Math.max(1, Math.round((page / total) * 100)));
+
+      console.log(`[LIBRARY API] [SYNC PROGRESS] Livre ID=${bookId}, Page=${page}/${total}, Progression=${progressPercent}%, Durée=${durationSeconds || 15}s, Pages=${pagesRead || page}`);
+
       const res = await fetch("/api/bff/student/reading/progress/", {
         method: "POST",
         credentials: "include",
@@ -123,12 +132,15 @@ export const libraryApi = {
         body: JSON.stringify({
           ouvrage_id: bookId,
           progress_percent: progressPercent,
-          current_page: currentPage || 0,
-          total_pages: totalPages || 0,
+          current_page: page,
+          total_pages: total,
+          duration_seconds: Math.max(15, durationSeconds || 15),
+          pages_read: Math.max(1, pagesRead || page),
         }),
       });
       return res.ok;
-    } catch {
+    } catch (err) {
+      console.error("[LIBRARY API] [SYNC PROGRESS ERROR]:", err);
       return false;
     }
   },

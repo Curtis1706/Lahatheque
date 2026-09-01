@@ -28,7 +28,6 @@ import '@react-pdf-viewer/default-layout/lib/styles/index.css'
 import '@react-pdf-viewer/highlight/lib/styles/index.css'
 
 import { FlipBookReader, Annotation as FlipBookAnnotation } from "@/components/library/FlipBook"
-import { FlipBookQuiz } from "@/components/library/FlipBookQuiz"
 import { ReaderSecurity } from "@/components/features/reader/ReaderSecurity"
 
 
@@ -283,6 +282,13 @@ export default function DocumentReaderPage() {
   const [isNightMode, setIsNightMode] = useState(false)
   const [currentPage, setCurrentPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
+  const [isSampleMode, setIsSampleMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsSampleMode(new URLSearchParams(window.location.search).get('mode') === 'sample')
+    }
+  }, [])
 
   const [isSaving, setIsSaving] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
@@ -294,9 +300,6 @@ export default function DocumentReaderPage() {
   const isOfficeDoc = book?.file?.match(/\.(docx|doc|pptx|ppt|xlsx|xls)$/i)
   const effectiveImmersionMode = (isMobile || isAudioOnly || isOfficeDoc) ? false : isImmersionMode
 
-  const [hasQuiz, setHasQuiz] = useState(false)
-  const [isQuizValidated, setIsQuizValidated] = useState(false)
-  const [isQuizOverlayOpen, setIsQuizOverlayOpen] = useState(false)
   const [showSampleEndOverlay, setShowSampleEndOverlay] = useState(false)
 
   const {
@@ -631,13 +634,7 @@ export default function DocumentReaderPage() {
           }
         }
 
-        // Check for Quiz (uniquement en lecture intégrale, jamais pour un extrait)
-        if (!isSampleMode) {
-          const quizRes = await libraryApi.getQuizzes(id as string)
-          if (quizRes && quizRes.questions.length > 0) {
-            setHasQuiz(true)
-          }
-        }
+
 
       } catch (err) {
         console.warn("API indisponible, chargement du document de démonstration R2:", err)
@@ -684,23 +681,32 @@ export default function DocumentReaderPage() {
 
 
 
-  // Sync progress with backend
-  const syncProgress = useCallback(async (page: number) => {
-    try {
-      if (id === 'lesson_pdf') {
-        const sParams = new URLSearchParams(window.location.search)
-        const bookId = sParams.get('book_id')
-        const lessonId = sParams.get('lesson_id')
+  // Session tracking (temps réel et pages réelles consultées)
+  const sessionStartTimeRef = useRef<number>(Date.now());
+  const pagesReadSetRef = useRef<Set<number>>(new Set([0]));
 
-        // Sync ReadingProgress if we have a book_id (for PDF supports and fiches de synthèse)
-        if (bookId && totalPages > 0) {
-          await libraryApi.syncProgress(bookId, page + 1, totalPages)
+  // Sync progress with backend
+  const syncProgress = useCallback(async (page: number, customTotal?: number) => {
+    try {
+      const effectiveTotal = customTotal && customTotal > 0 ? customTotal : (totalPages > 0 ? totalPages : (book?.page_count || 1));
+      const targetPage = Math.max(1, page + 1);
+      pagesReadSetRef.current.add(page);
+
+      const elapsedSeconds = Math.max(15, Math.round((Date.now() - sessionStartTimeRef.current) / 1000));
+      const effectivePagesRead = Math.max(1, pagesReadSetRef.current.size, targetPage);
+
+      if (id === 'lesson_pdf') {
+        const sParams = new URLSearchParams(window.location.search);
+        const bookId = sParams.get('book_id');
+        const lessonId = sParams.get('lesson_id');
+
+        if (bookId && effectiveTotal > 0) {
+          await libraryApi.syncProgress(bookId, targetPage, effectiveTotal, elapsedSeconds, effectivePagesRead);
         }
-        // Also sync lesson progress if we have a lesson_id (for lesson PDFs)
-        if (lessonId && totalPages > 0) {
-          const pos = page + 1
-          const pct = (pos / totalPages) * 100
-          const completed = pct >= 90
+        if (lessonId && effectiveTotal > 0) {
+          const pos = targetPage;
+          const pct = Math.min(100, Math.round((pos / effectiveTotal) * 100));
+          const completed = pct >= 90;
           await fetch(`/api/bff/content/lessons/${lessonId}/progress/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -709,39 +715,58 @@ export default function DocumentReaderPage() {
               progress: pct,
               completed,
             }),
-          })
+          });
         }
-        return
+        return;
       }
-      await libraryApi.syncProgress(id as string, page + 1, totalPages)
+
+      if (id && !String(id).startsWith('sample-') && !isSampleMode) {
+        await libraryApi.syncProgress(id as string, targetPage, effectiveTotal, elapsedSeconds, effectivePagesRead);
+      }
     } catch (err) {
-      console.error("Erreur sync progression", err)
+      console.error("Erreur sync progression", err);
     }
-  }, [id, totalPages])
-
-
-
-
-
-
+  }, [id, totalPages, book, isSampleMode]);
 
   // Handle page change from viewer
   const handlePageChange = (e: { currentPage: number }) => {
-    setCurrentPage(e.currentPage)
-  }
+    pagesReadSetRef.current.add(e.currentPage);
+    setCurrentPage(e.currentPage);
+    syncProgress(e.currentPage, totalPages);
+  };
 
   // Handle document load to get total pages
   const handleDocumentLoad = (e: { doc: any }) => {
-    setTotalPages(e.doc.numPages)
-  }
+    const num = e.doc?.numPages || 1;
+    setTotalPages(num);
+    syncProgress(currentPage, num);
+  };
 
   // Periodic sync (every 30 seconds)
   useEffect(() => {
     const interval = setInterval(() => {
-      if (currentPage >= 0) syncProgress(currentPage)
-    }, 30000)
-    return () => clearInterval(interval)
-  }, [currentPage, syncProgress])
+      if (currentPage >= 0 && id && !isSampleMode) {
+        syncProgress(currentPage, totalPages);
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [currentPage, totalPages, id, isSampleMode, syncProgress]);
+
+  // Sync on unmount or before leaving page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (currentPage >= 0 && id && !isSampleMode) {
+        syncProgress(currentPage, totalPages);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (currentPage >= 0 && id && !isSampleMode) {
+        syncProgress(currentPage, totalPages);
+      }
+    };
+  }, [currentPage, totalPages, id, isSampleMode, syncProgress]);
 
   // Mouse wheel navigation for Page mode
   const [isWheelLocked, setIsWheelLocked] = useState(false)
@@ -821,8 +846,6 @@ export default function DocumentReaderPage() {
 
   const hasAudio = !!book.audio_file;
 
-  const isSampleMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'sample';
-
   if (effectiveImmersionMode && (book.file || rawPdfData)) {
     const parsedDrmOpacity = drmSettings?.watermark_opacity != null ? parseFloat(String(drmSettings.watermark_opacity)) : 0.20;
     const safeDrmOpacity = !isNaN(parsedDrmOpacity) ? parsedDrmOpacity : 0.20;
@@ -844,15 +867,33 @@ export default function DocumentReaderPage() {
           key={`${id}_${currentPosition}_${safeDrmOpacity}_${drmSettings?.watermark_laha_template || ""}`}
           fileUrl={streamPdfUrl}
           bookId={id as string}
-          initialPage={currentPage}
+          initialPage={isSampleMode ? 0 : currentPage}
           isMobile={isMobile}
           isSample={isSampleMode}
           hideQuiz={isSampleMode}
-          onLastPageReached={() => {
-            if (isSampleMode) setShowSampleEndOverlay(true);
+          onDocumentLoad={(num) => {
+            setTotalPages(num);
+            syncProgress(currentPage, num);
           }}
-          onPageChange={setCurrentPage}
-          onClose={() => setIsImmersionMode(false)}
+          onLastPageReached={() => {
+            if (isSampleMode) {
+              setShowSampleEndOverlay(true);
+            } else {
+              syncProgress(totalPages - 1, totalPages);
+            }
+          }}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            syncProgress(page, totalPages);
+          }}
+          onExit={() => {
+            syncProgress(currentPage, totalPages);
+            router.back();
+          }}
+          onClose={() => {
+            syncProgress(currentPage, totalPages);
+            setIsImmersionMode(false);
+          }}
           authorName={book?.author_name || "Auteur LAHA"}
           watermarkMode="laha"
           watermarkPosition={currentPosition}
@@ -1007,21 +1048,7 @@ export default function DocumentReaderPage() {
             </Button>
           )}
 
-          {hasQuiz && isStudent && (
-            <Button
-              onClick={() => setIsQuizOverlayOpen(true)}
-              variant="outline"
-              className={cn(
-                "inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border h-9 px-3.5 text-xs font-bold transition-colors cursor-pointer min-h-[36px]",
-                isQuizValidated
-                  ? "border-success text-success bg-success/10"
-                  : "border-gold text-navy bg-gold hover:bg-gold-hover"
-              )}
-            >
-              <CheckCircle2 size={15} />
-              <span className="hidden lg:inline">{isQuizValidated ? "Validée" : "Quiz"}</span>
-            </Button>
-          )}
+
         </div>
       </header>
 
@@ -1306,31 +1333,6 @@ export default function DocumentReaderPage() {
 
 
 
-      <AnimatePresence>
-        {isQuizOverlayOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[10001] bg-navy-dark"
-          >
-            <FlipBookQuiz
-              bookId={id as string}
-              onClose={() => setIsQuizOverlayOpen(false)}
-              onComplete={(res: any) => {
-                if (res.is_validated) {
-                  setIsQuizValidated(true)
-                  // Si le quiz est validé, on force la progression à 100%
-                  if (totalPages > 0) {
-                    setCurrentPage(totalPages - 1)
-                    syncProgress(totalPages - 1)
-                  }
-                }
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
 
 
