@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { ProfileAvatarCard } from "@/components/features/profile/profile-avatar-card";
 import { ChangePasswordCard } from "@/components/features/profile/change-password-card";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 export default function LegalReviewerProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -164,11 +165,10 @@ export default function LegalReviewerProfilePage() {
 
               <div>
                 <label className="block font-bold text-navy mb-1.5">Téléphone d&apos;Astreinte / WhatsApp</label>
-                <input
-                  type="text"
+                <PhoneInput
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                  onChange={setPhone}
+                  className="bg-background min-h-[44px]"
                 />
               </div>
             </div>

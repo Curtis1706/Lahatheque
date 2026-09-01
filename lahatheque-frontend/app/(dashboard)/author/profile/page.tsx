@@ -25,6 +25,7 @@ import { ChangePasswordCard } from "@/components/features/profile/change-passwor
 import type { AuthorDelegateAccess } from "@/lib/types/author";
 import { toast } from "sonner";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 export default function AuthorProfilePage() {
   const { user } = useAuth();
@@ -234,11 +235,10 @@ export default function AuthorProfilePage() {
             </div>
             <div>
               <label className="block font-bold text-navy mb-1.5">Téléphone / WhatsApp</label>
-              <input
-                type="tel"
+              <PhoneInput
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                onChange={setPhone}
+                className="bg-background min-h-[44px]"
               />
             </div>
           </div>
@@ -287,12 +287,10 @@ export default function AuthorProfilePage() {
             </div>
             <div className="sm:col-span-2">
               <label className="block font-bold text-navy mb-1.5">Numéro Mobile Money (MTN MoMo / Moov Money)</label>
-              <input
-                type="tel"
+              <PhoneInput
                 value={momoNumber}
-                onChange={(e) => setMomoNumber(e.target.value)}
-                placeholder="+229 97 00 11 22"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                onChange={setMomoNumber}
+                className="bg-background min-h-[44px]"
               />
             </div>
           </div>

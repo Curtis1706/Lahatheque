@@ -28,14 +28,15 @@ export function ProfileAvatarCard({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(initialAvatar);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Synchroniser avec currentAvatarUrl ou le user auth
+  // Synchroniser avec currentAvatarUrl ou le user auth (uniquement hors upload)
   useEffect(() => {
+    if (isUploading) return;
     if (currentAvatarUrl !== undefined) {
       setAvatarPreview(currentAvatarUrl);
     } else {
       setAvatarPreview(user?.avatar_url || user?.avatar || user?.profile_photo || null);
     }
-  }, [currentAvatarUrl, user?.avatar_url, user?.avatar, user?.profile_photo]);
+  }, [currentAvatarUrl, user?.avatar_url, user?.avatar, user?.profile_photo, isUploading]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

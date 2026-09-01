@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getStudentProfile,
@@ -296,22 +297,15 @@ export default function StudentProfilePage() {
 
               <div className="space-y-1">
                 <label
-                  htmlFor="phone"
                   className="block text-[10px] font-bold text-navy uppercase tracking-wider"
                 >
                   Numéro de Téléphone (Mobile Money / WhatsApp)
                 </label>
-                <div className="relative">
-                  <Phone className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    id="phone"
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+229 97 12 34 56"
-                    className="w-full pl-9 pr-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl font-mono text-navy focus:outline-none focus:border-gold min-h-[44px]"
-                  />
-                </div>
+                <PhoneInput
+                  value={phone}
+                  onChange={setPhone}
+                  className="bg-background-secondary min-h-[44px]"
+                />
               </div>
 
               <div className="space-y-1">

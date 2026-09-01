@@ -34,6 +34,7 @@ import {
 import type { WholesaleCompanyProfile } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 export default function WholesalerProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -281,16 +282,11 @@ export default function WholesalerProfilePage() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-navy">Téléphone d&apos;Astreinte / Coordination *</label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="tel"
-                    required
-                    className="w-full bg-background-secondary border border-border rounded-xl pl-9 pr-3 py-3 text-xs sm:text-sm font-mono text-foreground focus:outline-none focus:border-gold min-h-[44px]"
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                  />
-                </div>
+                <PhoneInput
+                  value={contactPhone}
+                  onChange={setContactPhone}
+                  className="bg-background-secondary min-h-[44px]"
+                />
               </div>
             </div>
 
