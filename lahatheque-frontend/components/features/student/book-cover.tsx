@@ -25,11 +25,11 @@ export function BookCover({ book, className, size = "md" }: BookCoverProps) {
   const [imageError, setImageError] = useState(false);
 
   const sizeClasses = {
-    xs: "w-12 h-16 text-[7px]",
-    sm: "w-16 h-22 text-[8px]",
-    md: "w-20 h-28 sm:w-24 sm:h-32 text-[9px] sm:text-[10px]",
-    lg: "w-32 h-44 sm:w-40 sm:h-56 text-xs",
-    xl: "w-44 h-60 sm:w-52 sm:h-72 text-sm",
+    xs: "w-12 h-16 min-w-[3rem] min-h-[4rem] text-[7px]",
+    sm: "w-16 h-24 min-w-[4rem] min-h-[6rem] text-[8px]",
+    md: "w-20 h-28 sm:w-24 sm:h-32 min-w-[5rem] min-h-[7rem] text-[9px] sm:text-[10px]",
+    lg: "w-32 h-44 sm:w-40 sm:h-56 min-w-[8rem] min-h-[11rem] text-xs",
+    xl: "w-44 h-60 sm:w-52 sm:h-72 min-w-[11rem] min-h-[15rem] text-sm",
   };
 
   const coverUrl = book.cover_url || (book.id ? `/api/bff/catalog/books/${book.id}/cover/` : "");

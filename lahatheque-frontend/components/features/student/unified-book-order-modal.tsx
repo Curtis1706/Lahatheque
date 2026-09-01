@@ -132,7 +132,7 @@ export function UnifiedBookOrderModal({
   // Écran d'animation du décompte de paiement (de 4500 à 0 XOF)
   if (paymentPhase === "countdown") {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/85 p-4 animate-in fade-in duration-200">
         <div className="bg-background border border-border rounded-3xl shadow-2xl w-full max-w-sm p-7 text-center space-y-5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold/10 text-gold text-[10px] font-bold uppercase tracking-wider border border-gold/20">
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -175,7 +175,7 @@ export function UnifiedBookOrderModal({
 
   if (success) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/80 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-300">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/85 p-4 animate-in fade-in zoom-in-95 duration-300">
         <div className="bg-background border border-border rounded-3xl shadow-2xl w-full max-w-sm p-7 text-center space-y-5">
           <div className="w-16 h-16 rounded-full bg-success/10 text-success flex items-center justify-center mx-auto border border-success/30 animate-in zoom-in duration-300">
             <CheckCircle2 className="w-9 h-9" />
@@ -227,7 +227,7 @@ export function UnifiedBookOrderModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-navy-dark/70 backdrop-blur-xs p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-navy-dark/80 p-4">
       <div className="bg-background border border-border rounded-3xl shadow-xl w-full max-w-lg p-6 space-y-5 max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
