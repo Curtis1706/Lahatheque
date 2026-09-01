@@ -19,16 +19,16 @@ export interface DataStreamProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const typeColor: Record<string, string> = {
   info: "text-gold",
-  warning: "text-amber-400",
-  error: "text-red-400",
-  success: "text-emerald-400",
+  warning: "text-warning",
+  error: "text-error",
+  success: "text-success",
 };
 
 const typeDot: Record<string, string> = {
   info: "bg-gold",
-  warning: "bg-amber-400",
-  error: "bg-red-400",
-  success: "bg-emerald-400",
+  warning: "bg-warning",
+  error: "bg-error",
+  success: "bg-success",
 };
 
 export function DataStream({

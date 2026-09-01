@@ -9,15 +9,15 @@ function StatusPill({ status }: { status: number }) {
   const isSuccess = status >= 200 && status < 300;
   const isClientError = status >= 400 && status < 500;
   const color = isSuccess
-    ? "bg-emerald-500/10 text-emerald-600"
+    ? "bg-success/10 text-success border border-success/20"
     : isClientError
-    ? "bg-amber-500/10 text-amber-600"
+    ? "bg-warning/10 text-warning border border-warning/20"
     : status >= 500
-    ? "bg-error/10 text-error"
-    : "bg-navy-light text-navy";
+    ? "bg-error/10 text-error border border-error/20"
+    : "bg-background-secondary border border-border text-navy";
 
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-mono font-semibold ${color}`}>
+    <span className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-semibold ${color}`}>
       {status}
     </span>
   );
@@ -37,6 +37,7 @@ export default function AdminApiLogsPage() {
     {
       key: "timestamp",
       header: "Date",
+      className: "min-w-[160px]",
       cell: (row) => (
         <span className="text-xs text-foreground-muted font-mono">
           {row.timestamp ? new Date(row.timestamp).toLocaleString("fr-FR") : "—"}
@@ -45,8 +46,18 @@ export default function AdminApiLogsPage() {
     },
     {
       key: "partner",
-      header: "Partenaire",
-      cell: (row) => <span className="text-xs font-semibold text-navy">{row.partner}</span>,
+      header: "Partenaire / Origine",
+      className: "min-w-[180px]",
+      cell: (row) => {
+        const isPublic = !row.partner || row.partner.toLowerCase().includes("non authentifi") || row.partner.toLowerCase().includes("public");
+        return isPublic ? (
+          <span className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-md bg-navy/5 text-foreground-muted border border-border">
+            Accès Public (Sans clé)
+          </span>
+        ) : (
+          <span className="text-xs font-semibold text-navy">{row.partner}</span>
+        );
+      },
     },
     {
       key: "endpoint",
