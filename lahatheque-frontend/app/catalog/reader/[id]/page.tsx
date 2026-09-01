@@ -858,7 +858,7 @@ export default function DocumentReaderPage() {
           key={`${id}_${currentPosition}_${safeDrmOpacity}_${drmSettings?.watermark_laha_template || ""}`}
           fileUrl={streamPdfUrl}
           bookId={id as string}
-          initialPage={currentPage}
+          initialPage={isSampleMode ? 0 : currentPage}
           isMobile={isMobile}
           isSample={isSampleMode}
           hideQuiz={isSampleMode}
@@ -876,6 +876,10 @@ export default function DocumentReaderPage() {
           onPageChange={(page) => {
             setCurrentPage(page);
             syncProgress(page, totalPages);
+          }}
+          onExit={() => {
+            syncProgress(currentPage, totalPages);
+            router.back();
           }}
           onClose={() => {
             syncProgress(currentPage, totalPages);

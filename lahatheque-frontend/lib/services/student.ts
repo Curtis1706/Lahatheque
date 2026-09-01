@@ -209,6 +209,12 @@ export interface HistoryStatsAPI {
   current_streak_days: number;
   total_pages_read: number;
   books_completed_count: number;
+  active_goals?: {
+    id: string;
+    title: string;
+    progress_percent: number;
+    is_completed: boolean;
+  }[];
   recent_sessions_timeline: {
     id: string;
     ouvrage_id?: string;

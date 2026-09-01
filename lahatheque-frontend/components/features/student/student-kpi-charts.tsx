@@ -119,23 +119,57 @@ function WeeklyGoalsCard({ stats }: { stats: StudentKpiChartsProps["stats"] }) {
       )}
 
       <div className="space-y-1.5 pt-1">
-        {"recent_sessions_timeline" in stats && Array.isArray((stats as HistoryStatsAPI).recent_sessions_timeline) && (stats as HistoryStatsAPI).recent_sessions_timeline.length > 0 ? (
-          (stats as HistoryStatsAPI).recent_sessions_timeline.slice(0, 2).map((item, idx) => (
-            <div key={idx} className="flex items-center gap-2 text-[11px] min-w-0">
-              <CheckCircle2 className="w-3.5 h-3.5 text-gold shrink-0" />
-              <span className="text-navy font-medium truncate">
-                {item.ouvrage_title}
+        {(() => {
+          const activeGoals = (stats as HistoryStatsAPI).active_goals;
+          if (Array.isArray(activeGoals) && activeGoals.length > 0) {
+            return activeGoals.slice(0, 2).map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-2 text-[11px] min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  {item.is_completed ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-gold shrink-0" />
+                  ) : (
+                    <Circle className="w-3.5 h-3.5 text-navy/40 shrink-0" />
+                  )}
+                  <span className="text-navy font-medium truncate">
+                    {item.title}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono font-semibold text-navy shrink-0">
+                  {item.progress_percent}%
+                </span>
+              </div>
+            ));
+          }
+
+          // Fallback avec dédoublonnage strict des titres
+          const timeline = (stats as HistoryStatsAPI).recent_sessions_timeline;
+          if (Array.isArray(timeline) && timeline.length > 0) {
+            const seen = new Set<string>();
+            const unique = timeline.filter((t) => {
+              if (seen.has(t.ouvrage_title)) return false;
+              seen.add(t.ouvrage_title);
+              return true;
+            }).slice(0, 2);
+
+            return unique.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-[11px] min-w-0">
+                <Circle className="w-3.5 h-3.5 text-navy/40 shrink-0" />
+                <span className="text-navy font-medium truncate">
+                  {item.ouvrage_title}
+                </span>
+              </div>
+            ));
+          }
+
+          return (
+            <div className="flex items-center gap-2 text-[11px]">
+              <Circle className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+              <span className="text-foreground-muted italic">
+                Aucune lecture enregistrée
               </span>
             </div>
-          ))
-        ) : (
-          <div className="flex items-center gap-2 text-[11px]">
-            <Circle className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
-            <span className="text-foreground-muted italic">
-              Aucun ouvrage complété cette semaine
-            </span>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

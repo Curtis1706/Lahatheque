@@ -390,6 +390,20 @@ class StudentHistoryStatsView(APIView):
         # Streak
         streak_days = _compute_reading_streak(user)
 
+        # Objectifs et statuts des ouvrages réels distincts
+        active_goals = []
+        for p in user_progresses[:3]:
+            pct = p.progress_percent
+            if pct == 0 and p.total_pages > 0 and p.current_page > 0:
+                pct = min(100, max(1, round((p.current_page / p.total_pages) * 100)))
+            is_done = p.is_completed or pct >= 100
+            active_goals.append({
+                'id': str(p.ouvrage.id),
+                'title': p.ouvrage.title,
+                'progress_percent': pct,
+                'is_completed': is_done,
+            })
+
         # Timeline des 10 dernières sessions
         recent_sessions = (
             ReadingSession.objects
@@ -419,6 +433,7 @@ class StudentHistoryStatsView(APIView):
                 'current_streak_days': streak_days,
                 'total_pages_read': total_pages,
                 'books_completed_count': books_completed,
+                'active_goals': active_goals,
                 'recent_sessions_timeline': timeline,
             },
             'error': None,
