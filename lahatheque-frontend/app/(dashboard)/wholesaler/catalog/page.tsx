@@ -16,6 +16,9 @@ import {
   List,
   FileText,
   Book,
+  Filter,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -268,77 +271,100 @@ export default function WholesalerCatalogPage() {
         </button>
       </div>
 
-      {/* Filtres, Recherche & Sélecteur de Mode de Vue (Grille / Tableau) */}
-      <div className="p-4 rounded-3xl bg-background border border-border flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xs">
+      {/* Barre de Recherche, Filtre Discipline & Sélecteur Grille / Tableau */}
+      <div className="p-4 rounded-3xl bg-background border border-border flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+        {/* Recherche et Filtre par Discipline */}
         <div className="flex flex-col sm:flex-row items-center gap-3 flex-1 w-full">
-          <div className="relative w-full sm:w-72">
+          {/* Recherche */}
+          <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher par titre, ISBN ou auteur..."
-              className="w-full pl-9 pr-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
+              className="w-full pl-9 pr-8 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-navy cursor-pointer"
+                title="Effacer la recherche"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto w-full pb-1 sm:pb-0 scrollbar-none">
+          {/* Sélecteur de Discipline Dropdown */}
+          <div className="relative w-full sm:w-64">
+            <Filter className="w-3.5 h-3.5 text-gold absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              value={disciplineFilter}
+              onChange={(e) => setDisciplineFilter(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[40px] appearance-none cursor-pointer"
+            >
+              <option value="all">Toutes disciplines ({books.length})</option>
+              {disciplines.map((d) => (
+                <option key={d.id} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-foreground-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {(disciplineFilter !== "all" || searchQuery) && (
             <button
               type="button"
-              onClick={() => setDisciplineFilter("all")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors border cursor-pointer min-h-[38px] ${
-                disciplineFilter === "all"
-                  ? "bg-navy text-white border-navy"
-                  : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
-              }`}
+              onClick={() => {
+                setSearchQuery("");
+                setDisciplineFilter("all");
+              }}
+              className="px-3 py-2 text-xs text-foreground-muted hover:text-error transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+              title="Réinitialiser les filtres"
             >
-              Toutes disciplines ({books.length})
+              <X className="w-3.5 h-3.5" />
+              <span>Effacer filtres</span>
             </button>
-            {disciplines.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => setDisciplineFilter(d.name)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors border cursor-pointer min-h-[38px] ${
-                  disciplineFilter === d.name
-                    ? "bg-navy text-white border-navy"
-                    : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
-                }`}
-              >
-                {d.name}
-              </button>
-            ))}
-          </div>
+          )}
         </div>
 
-        {/* Sélecteur de Mode Grille / Tableau */}
-        <div className="inline-flex rounded-2xl bg-background-secondary border border-border p-1 self-end lg:self-center shrink-0">
-          <button
-            type="button"
-            onClick={() => setViewMode("grid")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              viewMode === "grid"
-                ? "bg-navy text-white shadow-sm"
-                : "text-foreground-muted hover:text-navy"
-            }`}
-            title="Affichage en Grille"
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Grille</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("table")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              viewMode === "table"
-                ? "bg-navy text-white shadow-sm"
-                : "text-foreground-muted hover:text-navy"
-            }`}
-            title="Affichage en Tableau"
-          >
-            <List className="w-3.5 h-3.5" />
-            <span>Tableau</span>
-          </button>
+        {/* Compteur & Sélecteur de Vue Grille / Tableau */}
+        <div className="flex items-center justify-between sm:justify-end gap-3 w-full md:w-auto shrink-0 border-t md:border-t-0 pt-2 md:pt-0 border-border">
+          <span className="text-xs text-foreground-muted font-medium whitespace-nowrap">
+            {filteredBooks.length} ouvrage{filteredBooks.length > 1 ? "s" : ""}
+          </span>
+
+          <div className="inline-flex rounded-xl bg-background-secondary border border-border p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === "grid"
+                  ? "bg-navy text-white shadow-xs font-bold"
+                  : "text-foreground-muted hover:text-navy"
+              }`}
+              title="Affichage en Grille"
+            >
+              <LayoutGrid className="w-3.5 h-3.5 text-gold" />
+              <span>Grille</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === "table"
+                  ? "bg-navy text-white shadow-xs font-bold"
+                  : "text-foreground-muted hover:text-navy"
+              }`}
+              title="Affichage en Tableau"
+            >
+              <List className="w-3.5 h-3.5 text-gold" />
+              <span>Tableau</span>
+            </button>
+          </div>
         </div>
       </div>
 
