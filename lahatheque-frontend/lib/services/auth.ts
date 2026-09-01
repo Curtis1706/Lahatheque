@@ -103,51 +103,87 @@ export async function getProfile(): Promise<{ success: boolean; data?: UserProfi
 export async function updateProfile(formData: FormData): Promise<{ success: boolean; data?: any; error?: string; message?: string }> {
   const startTime = Date.now();
   const avatarFile = formData.get("avatar");
-  const avatarInfo = avatarFile instanceof File 
-    ? `Fichier: "${avatarFile.name}", ${(avatarFile.size / 1024).toFixed(1)} Ko, type: ${avatarFile.type}`
-    : "Aucun fichier binaire";
+  const isFile = avatarFile instanceof File;
   
-  console.log(`[AUTH SERVICE] [PHOTO UPLOAD START] Envoi PATCH /api/bff/auth/profile/ -> ${avatarInfo}`);
+  console.groupCollapsed(
+    `%c[LAHAThèque Telemetry] Envoi Profil & Avatar (%c${isFile ? (avatarFile as File).name : "Texte seul"}%c)`,
+    "background: #1B2A4E; color: #B08D42; font-weight: bold; padding: 2px 6px; border-radius: 4px;",
+    "color: #3b82f6; font-weight: bold;",
+    "color: #B08D42;"
+  );
+
+  console.log(`[AUTH SERVICE] [STEP 1] Détails payload:`, {
+    has_file: isFile,
+    file_name: isFile ? (avatarFile as File).name : null,
+    file_size_bytes: isFile ? (avatarFile as File).size : 0,
+    file_size_kb: isFile ? ((avatarFile as File).size / 1024).toFixed(1) + " Ko" : null,
+    file_type: isFile ? (avatarFile as File).type : null,
+    timestamp: new Date().toISOString(),
+  });
 
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.warn(`[AUTH SERVICE] [PHOTO UPLOAD TIMEOUT] La requête a dépassé 60 secondes d'attente.`);
+      console.warn(`[AUTH SERVICE] [TIMEOUT 30s] La requête n'a pas répondu après 30s.`);
       controller.abort();
-    }, 60000);
+    }, 30000);
 
-    const res = await fetch('/api/bff/auth/profile/', {
-      method: 'PATCH',
-      body: formData,
-      credentials: 'include',
-      signal: controller.signal,
-    });
+    let res: Response;
+    let usedEndpoint = '/api/auth/profile';
+
+    try {
+      console.log(`[AUTH SERVICE] [STEP 2] Tentative de connexion via ${usedEndpoint}...`);
+      res = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        body: formData,
+        credentials: 'include',
+        signal: controller.signal,
+      });
+    } catch (e: any) {
+      if (e?.name === 'AbortError') throw e;
+      usedEndpoint = '/api/bff/auth/profile/';
+      console.warn(`[AUTH SERVICE] [FALLBACK] Redirection vers ${usedEndpoint} suite à:`, e);
+      res = await fetch('/api/bff/auth/profile/', {
+        method: 'PATCH',
+        body: formData,
+        credentials: 'include',
+        signal: controller.signal,
+      });
+    }
     clearTimeout(timeoutId);
 
     const elapsed = Date.now() - startTime;
-    console.log(`[AUTH SERVICE] [PHOTO UPLOAD RESPONSE] Statut HTTP ${res.status} reçu en ${elapsed}ms.`);
+    console.log(`[AUTH SERVICE] [STEP 3] Réponse HTTP ${res.status} (${res.statusText}) via ${usedEndpoint} reçue en ${elapsed}ms.`);
 
     const data = await res.json();
+    console.log(`[AUTH SERVICE] [STEP 4] Corps de la réponse décodé:`, data);
+
     if (!res.ok) {
-      console.error(`[AUTH SERVICE] [PHOTO UPLOAD ERROR] Échec HTTP ${res.status}:`, data);
+      console.error(`[AUTH SERVICE] [ERROR] Échec (HTTP ${res.status}):`, data.error || data);
+      console.groupEnd();
       return { success: false, error: data.error || 'Erreur lors de la mise à jour du profil.' };
     }
 
-    console.log(`[AUTH SERVICE] [PHOTO UPLOAD SUCCESS] Profil mis à jour:`, {
-      avatar_url: data.data?.avatar_url,
-      email: data.data?.email,
+    console.log(`[AUTH SERVICE] [STEP 5 - SUCCESS] Profil synchronisé avec succès:`, {
+      avatar_url: data.data?.avatar_url || data.avatar_url,
+      user_id: data.data?.id || data.id,
+      email: data.data?.email || data.email,
       elapsed_ms: elapsed,
+      debug_info: data._debug || null,
     });
+    console.groupEnd();
 
-    return { success: true, data: data.data, message: data.message };
+    return { success: true, data: data.data || data, message: data.message };
   } catch (err: any) {
     const elapsed = Date.now() - startTime;
     if (err?.name === 'AbortError') {
-      console.error(`[AUTH SERVICE] [PHOTO UPLOAD TIMEOUT] Délai d'attente de 60s dépassé.`);
-      return { success: false, error: 'Délai d’attente dépassé (60s) lors de l’envoi de la photo vers Cloudflare R2.' };
+      console.error(`[AUTH SERVICE] [TIMEOUT ERROR] Délai d'attente de 30s dépassé. Le serveur n'a pas répondu.`);
+      console.groupEnd();
+      return { success: false, error: 'Délai d’attente dépassé (30s) lors de l’envoi de la photo.' };
     }
-    console.error(`[AUTH SERVICE] [PHOTO UPLOAD NETWORK ERROR] Exception après ${elapsed}ms:`, err);
-    return { success: false, error: 'Impossible de mettre à jour le profil.' };
+    console.error(`[AUTH SERVICE] [NETWORK ERROR] Exception attrapée après ${elapsed}ms:`, err);
+    console.groupEnd();
+    return { success: false, error: 'Impossible de joindre le serveur pour mettre à jour le profil.' };
   }
 }
 
