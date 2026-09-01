@@ -130,18 +130,9 @@ class DocumentSourceAdapter:
             except Exception as e:
                 logger.error(f"Erreur lecture manuscrit auteur {book_id}: {e}")
 
-        # Fallback pour prévisualisation locale / démo
-        demo_paths = [
-            os.path.join(settings.BASE_DIR, "public", "PromptBreeder_Original_Paper-2309.16797v1.pdf"),
-            os.path.join(settings.BASE_DIR, "..", "lahatheque-frontend", "public", "PromptBreeder_Original_Paper-2309.16797v1.pdf"),
-            os.path.join(settings.BASE_DIR, "media", "PromptBreeder_Original_Paper-2309.16797v1.pdf"),
-        ]
-        for dp in demo_paths:
-            if os.path.exists(dp):
-                with open(dp, "rb") as f:
-                    return f.read()
-
-        raise DocumentSourceError(f"Aucun fichier disponible pour l'ouvrage ou le dépôt {book_id}")
+        raise DocumentSourceError(
+            f"Aucun fichier source disponible pour l'ouvrage {book_id}."
+        )
 
 
     @classmethod

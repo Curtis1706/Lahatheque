@@ -244,6 +244,7 @@ export default function DocumentReaderPage() {
   const [book, setBook] = useState<any>(null)
   const [rawPdfData, setRawPdfData] = useState<string | null>(null)
   const [isPdfLoading, setIsPdfLoading] = useState(false)
+  const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
   const [drmSettings, setDrmSettings] = useState<any>(null)
 
   const {
@@ -605,32 +606,14 @@ export default function DocumentReaderPage() {
               const blobUrl = URL.createObjectURL(blob);
               setRawPdfData(blobUrl);
             } else {
-              const fallbackUrl = "/PromptBreeder_Original_Paper-2309.16797v1.pdf";
-              try {
-                const fbRes = await fetch(fallbackUrl);
-                if (fbRes.ok) {
-                  const blob = await fbRes.blob();
-                  setRawPdfData(URL.createObjectURL(blob));
-                } else {
-                  setRawPdfData(targetStreamUrl);
-                }
-              } catch {
-                setRawPdfData(targetStreamUrl);
-              }
+              setPdfLoadError(
+                streamRes.status === 403
+                  ? "Vous n'avez pas accès à cet ouvrage. Achetez-le ou vérifiez votre abonnement."
+                  : "Ce document est introuvable ou n'a pas encore été mis en ligne."
+              );
             }
           } catch {
-            const fallbackUrl = "/PromptBreeder_Original_Paper-2309.16797v1.pdf";
-            try {
-              const fbRes = await fetch(fallbackUrl);
-              if (fbRes.ok) {
-                const blob = await fbRes.blob();
-                setRawPdfData(URL.createObjectURL(blob));
-              } else {
-                setRawPdfData(targetStreamUrl);
-              }
-            } catch {
-              setRawPdfData(targetStreamUrl);
-            }
+            setPdfLoadError("Impossible de contacter le serveur de documents. Vérifiez votre connexion et réessayez.");
           }
         }
 
@@ -774,6 +757,48 @@ export default function DocumentReaderPage() {
     return (
       <div className="h-screen bg-background flex flex-col items-center justify-center">
         <PageLoader label={isPdfLoading ? 'Chargement sécurisé du document' : 'Préparation de votre salle de lecture'} />
+      </div>
+    )
+  }
+
+  if (pdfLoadError) {
+    return (
+      <div className="h-screen flex flex-col select-none bg-navy-dark text-white">
+        <header className="px-4 md:px-8 flex items-center justify-between border-b border-navy-hover relative z-[100] bg-navy h-auto py-3 md:h-20 md:py-0 text-white">
+          <div className="flex items-center gap-3 md:gap-6 flex-1 min-w-0">
+            <Button
+              onClick={() => router.back()}
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-lg inline-flex items-center justify-center p-0 text-gold bg-navy-dark hover:bg-navy border border-navy-hover cursor-pointer shrink-0 transition-colors"
+            >
+              <ArrowLeft size={18} />
+            </Button>
+            <div className="space-y-0.5 min-w-0">
+              <h1 className="font-bold uppercase tracking-tight truncate font-serif text-gold text-base">
+                {book?.title || "Ouvrage"}
+              </h1>
+            </div>
+          </div>
+        </header>
+        <main className="flex-1 flex flex-col items-center justify-center gap-4 text-center p-8">
+          <p className="text-white text-sm font-semibold max-w-md">{pdfLoadError}</p>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => router.back()}
+              variant="outline"
+              className="border-navy-hover bg-navy text-white text-xs font-semibold"
+            >
+              Retour au catalogue
+            </Button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-hover transition-colors"
+            >
+              Réessayer
+            </button>
+          </div>
+        </main>
       </div>
     )
   }

@@ -539,7 +539,7 @@ class LegalKpisView(APIView):
 
 def get_contract_file_url(fichier_path):
     if not fichier_path:
-        return "/PromptBreeder_Original_Paper-2309.16797v1.pdf"
+        return None
     if str(fichier_path).startswith("http://") or str(fichier_path).startswith("https://"):
         return str(fichier_path)
     
@@ -1168,13 +1168,10 @@ class LegalContractStreamView(APIView):
                         logger.warning(f"Erreur téléchargement HTTP contrat {c.id}: {e}")
 
         if not pdf_bytes:
-            # Fallback document modèle
-            fallback_path = os.path.join(settings.BASE_DIR, "media", "PromptBreeder_Original_Paper-2309.16797v1.pdf")
-            if os.path.exists(fallback_path):
-                with open(fallback_path, "rb") as f:
-                    pdf_bytes = f.read()
-            else:
-                return Response({"success": False, "error": "Document du contrat introuvable."}, status=404)
+            return Response({
+                "success": False,
+                "error": "Le fichier de ce contrat est introuvable ou n'a pas encore été téléversé."
+            }, status=404)
 
         # Application du filigrane PyMuPDF (DRM avec position, opacité, texte officiel)
         try:

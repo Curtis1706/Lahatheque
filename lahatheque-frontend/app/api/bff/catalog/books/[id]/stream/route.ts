@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 
 const DJANGO_API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api').replace(/\/$/, '');
 
@@ -86,55 +84,10 @@ export async function GET(
       { status: backendRes.status }
     );
   } catch (error) {
-    // Backend Django entièrement inaccessible (réseau coupé) :
-    // Fallback de démonstration uniquement dans ce cas extrême
-    const samplePath = path.join(process.cwd(), 'public', 'PromptBreeder_Original_Paper-2309.16797v1.pdf');
-    if (!fs.existsSync(samplePath)) {
-      return NextResponse.json(
-        { success: false, error: 'Serveur de documents indisponible.' },
-        { status: 503 }
-      );
-    }
-
-    const stat = fs.statSync(samplePath);
-    const totalSize = stat.size;
-
-    if (rangeHeader) {
-      const match = rangeHeader.match(/bytes=(\d+)-(\d+)?/);
-      if (match) {
-        const start = parseInt(match[1], 10);
-        const end = match[2] ? parseInt(match[2], 10) : Math.min(start + 256 * 1024 - 1, totalSize - 1);
-        const chunkSize = end - start + 1;
-
-        const fd = fs.openSync(samplePath, 'r');
-        const buffer = Buffer.alloc(chunkSize);
-        fs.readSync(fd, buffer, 0, chunkSize, start);
-        fs.closeSync(fd);
-
-        return new NextResponse(buffer, {
-          status: 206,
-          headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Range': `bytes ${start}-${end}/${totalSize}`,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': chunkSize.toString(),
-            'Cache-Control': 'private, no-store, must-revalidate',
-          },
-        });
-      }
-    }
-
-    // Envoi standard 200 OK
-    const fileBuffer = fs.readFileSync(samplePath);
-    return new NextResponse(fileBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Accept-Ranges': 'bytes',
-        'Content-Length': totalSize.toString(),
-        'Cache-Control': 'private, no-store, must-revalidate',
-      },
-    });
+    return NextResponse.json(
+      { success: false, error: 'Serveur de documents indisponible. Veuillez réessayer dans quelques instants.' },
+      { status: 503 }
+    );
   }
 }
 
