@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/v1/reporting/', include('apps.reporting.urls')),
     path('api/v1/admin/', include('apps.reporting.admin_urls')),
     path('api/v1/reader/', include('apps.reader.urls')),
+    path('api/v1/partner/', include('apps.reader.partner_urls')),
     path('api/v1/student/', include('apps.student.urls')),
 ]
 

@@ -65,12 +65,19 @@ class PartnerAuthentication(BaseAuthentication):
     Le secret est TOUJOURS requis — plus aucune authentification par client_id seul.
     """
     def authenticate(self, request):
-        # 1. Bearer JWT (émis côté serveur, ex: pour des intégrations OAuth2 futures)
+        # 1. Bearer JWT (émis côté serveur pour les intégrations OAuth2)
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token_str = auth_header.split(" ", 1)[1].strip()
+            signing_key: str = str(getattr(settings, "OAUTH2_PARTNER_JWT_SIGNING_KEY", settings.SECRET_KEY))
             try:
-                payload = jwt.decode(token_str, settings.SECRET_KEY, algorithms=["HS256"])
+                payload = jwt.decode(token_str, signing_key, algorithms=["HS256"])
+                jti = payload.get("jti")
+                if jti:
+                    from apps.accounts.oauth2.models import RevokedPartnerToken
+                    if RevokedPartnerToken.objects.filter(jti=jti).exists():
+                        return None
+
                 partner_id = payload.get("partner_id")
                 if partner_id:
                     partner = PartnerApp.objects.filter(id=partner_id, is_active=True).first()
@@ -105,8 +112,15 @@ class IsAuthenticatedPartner(BasePermission):
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token_str = auth_header.split(" ", 1)[1].strip()
+            signing_key: str = str(getattr(settings, "OAUTH2_PARTNER_JWT_SIGNING_KEY", settings.SECRET_KEY))
             try:
-                payload = jwt.decode(token_str, settings.SECRET_KEY, algorithms=["HS256"])
+                payload = jwt.decode(token_str, signing_key, algorithms=["HS256"])
+                jti = payload.get("jti")
+                if jti:
+                    from apps.accounts.oauth2.models import RevokedPartnerToken
+                    if RevokedPartnerToken.objects.filter(jti=jti).exists():
+                        return False
+
                 partner_id = payload.get("partner_id")
                 if partner_id:
                     partner = PartnerApp.objects.filter(id=partner_id, is_active=True).first()

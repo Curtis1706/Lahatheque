@@ -5,10 +5,10 @@ from .models import PartnerApp, PartnerEndUser, ReaderSession, ResultatQuizSessi
 
 @admin.register(PartnerApp)
 class PartnerAppAdmin(admin.ModelAdmin):
-    list_display = ('name', 'id', 'is_active', 'created_at')
-    list_filter = ('is_active',)
-    search_fields = ('name', 'id')
-    readonly_fields = ('id', 'created_at', 'updated_at')
+    list_display = ('name', 'client_id', 'linked_institution', 'is_active', 'created_at')
+    list_filter = ('is_active', 'linked_institution')
+    search_fields = ('name', 'client_id', 'id')
+    readonly_fields = ('id', 'client_secret_hash', 'created_at', 'updated_at')
 
 
 @admin.register(PartnerEndUser)

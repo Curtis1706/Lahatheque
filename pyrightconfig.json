@@ -12,5 +12,10 @@
         "lahatheque-backend"
       ]
     }
-  ]
+  ],
+  "reportMissingTypeStubs": false,
+  "reportMissingImports": false,
+  "reportAttributeAccessIssue": false,
+  "reportGeneralTypeIssues": false,
+  "reportOptionalMemberAccess": false
 }

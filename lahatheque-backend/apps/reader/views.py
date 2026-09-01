@@ -883,3 +883,135 @@ class ReaderProtectedStreamView(APIView):
             return None, None
 
         return start, end
+
+
+# ─── Vues API Partenaire Externe (CDC Section 9.1) ────────────────────────────
+
+class PartnerCatalogListView(APIView):
+    """GET /api/v1/partner/catalog/ - Consultation du catalogue pour partenaires externes (CDC 9.1)."""
+    authentication_classes = [PartnerAuthentication]
+    permission_classes = [IsAuthenticatedPartner]
+
+    def get(self, request):
+        from apps.catalog.models import Ouvrage
+        from apps.student.serializers import OuvrageBasicSerializer
+
+        qs = Ouvrage.objects.filter(status='published').select_related('discipline', 'institution').prefetch_related('authors')
+
+        q = request.query_params.get('q', '').strip()
+        if q:
+            qs = qs.filter(title__icontains=q)
+
+        discipline = request.query_params.get('discipline', '').strip()
+        if discipline:
+            qs = qs.filter(discipline__name__icontains=discipline)
+
+        total_count = qs.count()
+        qs = qs[:100]
+
+        serializer = OuvrageBasicSerializer(qs, many=True, context={'request': request})
+        return Response({"success": True, "data": serializer.data, "count": total_count})
+
+
+class PartnerCatalogDetailView(APIView):
+    """GET /api/v1/partner/catalog/<id>/ - Détail d'un ouvrage pour partenaires externes."""
+    authentication_classes = [PartnerAuthentication]
+    permission_classes = [IsAuthenticatedPartner]
+
+    def get(self, request, id):
+        from apps.catalog.models import Ouvrage
+        from apps.student.serializers import OuvrageBasicSerializer
+
+        try:
+            ouvrage = Ouvrage.objects.get(id=id, status='published')
+        except (Ouvrage.DoesNotExist, Exception):
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = OuvrageBasicSerializer(ouvrage, context={'request': request})
+        return Response({"success": True, "data": serializer.data})
+
+
+class PartnerBouquetsListView(APIView):
+    """GET /api/v1/partner/bouquets/ - Bouquets disponibles, consultables par un partenaire externe."""
+    authentication_classes = [PartnerAuthentication]
+    permission_classes = [IsAuthenticatedPartner]
+
+    def get(self, request):
+        from apps.partners.models import BouquetOffering
+
+        data = [{
+            "id": str(o.id),
+            "title": o.title,
+            "bouquet_type": o.bouquet_type,
+            "discipline": o.discipline,
+            "books_count": o.books_count,
+            "annual_price": float(o.annual_price),
+            "currency": o.currency,
+        } for o in BouquetOffering.objects.filter(is_active=True)]
+
+        return Response({"success": True, "data": data})
+
+
+class PartnerBouquetLicenseCheckView(APIView):
+    """GET /api/v1/partner/bouquets/<offering_id>/check-access/?book_id=<id>"""
+    authentication_classes = [PartnerAuthentication]
+    permission_classes = [IsAuthenticatedPartner]
+
+    def get(self, request, offering_id):
+        from apps.partners.models import BouquetOffering, UniversityBouquetSubscription
+
+        book_id = request.query_params.get('book_id')
+        if not book_id:
+            return Response({"success": False, "error": "Le paramètre book_id est requis."}, status=status.HTTP_400_BAD_REQUEST)
+
+        partner = getattr(request, 'partner', None)
+        institution = getattr(partner, 'linked_institution', None) if partner else None
+
+        if not institution:
+            return Response({"success": True, "data": {"has_access": False, "reason": "Aucune institution rattachée à ce partenaire."}})
+
+        has_sub = UniversityBouquetSubscription.objects.filter(
+            institution=institution, offering_id=offering_id, status='active'
+        ).exists()
+
+        if not has_sub:
+            return Response({"success": True, "data": {"has_access": False, "reason": "Aucune souscription active."}})
+
+        try:
+            offering = BouquetOffering.objects.get(id=offering_id)
+            has_book = offering.get_books_queryset(requesting_institution=institution).filter(id=book_id).exists()
+        except BouquetOffering.DoesNotExist:
+            has_book = False
+
+        return Response({"success": True, "data": {"has_access": has_book}})
+
+
+class PartnerUsageStatsView(APIView):
+    """GET /api/v1/partner/stats/usage/ - Statistiques d'usage pour l'institution du partenaire."""
+    authentication_classes = [PartnerAuthentication]
+    permission_classes = [IsAuthenticatedPartner]
+
+    def get(self, request):
+        from apps.protection.models import TraceAcces
+        from django.db.models import Count
+
+        partner = getattr(request, 'partner', None)
+        institution = getattr(partner, 'linked_institution', None) if partner else None
+        if not institution:
+            qs = TraceAcces.objects.filter(partner_id=str(partner.id)) if partner else TraceAcces.objects.none()
+        else:
+            qs = TraceAcces.objects.filter(institution=institution)
+
+        top_books = list(
+            qs.values('ouvrage__title')
+            .annotate(consultations=Count('id'))
+            .order_by('-consultations')[:10]
+        )
+
+        return Response({
+            "success": True,
+            "data": {
+                "total_consultations": qs.count(),
+                "top_books": top_books,
+            }
+        })

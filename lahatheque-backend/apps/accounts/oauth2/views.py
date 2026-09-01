@@ -5,7 +5,7 @@ Conforme au protocole OAuth2 Client Credentials Grant et au plan technique LAHAT
 
 import jwt
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from django.conf import settings
 from django.utils import timezone
 from rest_framework.views import APIView
@@ -72,6 +72,9 @@ class OAuthTokenView(APIView):
             )
 
         # Génération du jeton JWT signé
+        import uuid as uuid_lib
+        jti = str(uuid_lib.uuid4())
+
         now = timezone.now()
         expires_in = 36000  # 10 heures
         exp_ts = int((now + timedelta(seconds=expires_in)).timestamp())
@@ -84,26 +87,62 @@ class OAuthTokenView(APIView):
             "client_id": partner.client_id or str(partner.id),
             "scope": "reader:sessions reader:byod catalog:read",
             "type": "partner_access_token",
+            "jti": jti,
             "iat": now_ts,
             "exp": exp_ts,
         }
 
-        token_jwt = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+        signing_key: str = str(getattr(settings, "OAUTH2_PARTNER_JWT_SIGNING_KEY", settings.SECRET_KEY))
+        token_jwt = jwt.encode(payload, signing_key, algorithm="HS256")
 
         return Response({
             "access_token": token_jwt,
             "token_type": "Bearer",
             "expires_in": expires_in,
-            "scope": "reader:sessions reader:byod"
+            "scope": "reader:sessions reader:byod catalog:read"
         }, status=status.HTTP_200_OK)
 
 
 class OAuthRevokeView(APIView):
     """
     POST /api/v1/oauth2/token/revoke/
-    Révocation d'un jeton OAuth2.
+    Révocation réelle via liste de révocation (jti).
     """
     permission_classes = []
+    authentication_classes = []
 
     def post(self, request):
+        token_str = request.data.get("token", "")
+        if not token_str:
+            return Response(
+                {"error": "invalid_request", "error_description": "Le paramètre token est requis."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        signing_key: str = str(getattr(settings, "OAUTH2_PARTNER_JWT_SIGNING_KEY", settings.SECRET_KEY))
+        try:
+            payload = jwt.decode(token_str, signing_key, algorithms=["HS256"], options={"verify_exp": False})
+        except Exception:
+            return Response({"status": "revoked"}, status=status.HTTP_200_OK)
+
+        jti = payload.get("jti")
+        if not jti:
+            return Response({"status": "revoked"}, status=status.HTTP_200_OK)
+
+        from .models import RevokedPartnerToken
+        exp_ts = payload.get("exp", 0)
+        expires_at = (
+            datetime.fromtimestamp(exp_ts, tz=dt_timezone.utc)
+            if exp_ts
+            else timezone.now() + timedelta(hours=10)
+        )
+
+        RevokedPartnerToken.objects.get_or_create(
+            jti=jti,
+            defaults={
+                "partner_id": payload.get("partner_id"),
+                "expires_at": expires_at,
+            }
+        )
+
         return Response({"status": "revoked"}, status=status.HTTP_200_OK)

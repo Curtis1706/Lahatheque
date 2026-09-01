@@ -15,6 +15,7 @@ class PartnerApp(models.Model):
     Application cliente partenaire enregistrée (LMS universitaire, école, SaaS tiers).
     Liée à une application OAuth2 pour l'authentification machine-to-machine.
     """
+    objects = models.Manager()
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, help_text="Nom de l'application cliente ou de l'institution")
     oauth_application = models.OneToOneField(
@@ -24,6 +25,14 @@ class PartnerApp(models.Model):
         blank=True,
         related_name='partner_profile',
         help_text="Application OAuth2 pour l'authentification Client Credentials"
+    )
+    linked_institution = models.ForeignKey(
+        'partners.Institution',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='partner_apps',
+        help_text="Établissement/Institution académique rattaché à cette application partenaire"
     )
     allowed_return_origins = models.JSONField(
         default=list,
@@ -78,6 +87,7 @@ class PartnerEndUser(models.Model):
     Utilisateur fantôme représentant l'apprenant/lecteur distant.
     Assure l'isolation des données (annotations, progression) par partenaire.
     """
+    objects = models.Manager()
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     partner = models.ForeignKey(
         PartnerApp,
@@ -124,6 +134,7 @@ class ReaderSession(models.Model):
     Session éphémère de lecture hébergée.
     Supporte les ouvrages internes LAHAThèque et les documents externes distants (BYOD).
     """
+    objects = models.Manager()
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     partner = models.ForeignKey(
         PartnerApp,
@@ -266,6 +277,7 @@ class ResultatQuizSession(models.Model):
     """
     Résultat de l'évaluation interactive passée au cours d'une session.
     """
+    objects = models.Manager()
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     session = models.OneToOneField(
         ReaderSession,
@@ -298,6 +310,7 @@ class WebhookLog(models.Model):
     Journal d'audit et de traçabilité des livraisons de webhooks aux partenaires.
     Garantit l'idempotence et le suivi des retries.
     """
+    objects = models.Manager()
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     partner = models.ForeignKey(
         PartnerApp,
@@ -345,6 +358,7 @@ class ApiRequestLog(models.Model):
     Journal RÉEL de chaque requête HTTP reçue sur l'API Lecteur Hébergé,
     capturée par un middleware Django (pas reconstruite a posteriori).
     """
+    objects = models.Manager()
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     partner = models.ForeignKey(
         PartnerApp, null=True, blank=True, on_delete=models.SET_NULL, related_name='request_logs'

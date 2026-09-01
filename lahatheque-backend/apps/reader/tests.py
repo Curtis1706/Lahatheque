@@ -262,3 +262,155 @@ class ReaderAPITestCase(TestCase):
         )
         self.assertEqual(resp_bad_client.status_code, 401)
         self.assertEqual(resp_bad_client.json()["error"], "invalid_client")
+
+    def test_fiche_ad1_and_ad2_revocation_and_signing_key(self) -> None:
+        """AD1 & AD2: Émission avec jti, clé dédiée et révocation effective."""
+        import jwt
+        from django.conf import settings
+        from apps.accounts.oauth2.models import RevokedPartnerToken
+
+        # 1. Émission du jeton
+        resp = self.client.post(
+            "/api/v1/oauth2/token/",
+            data=json.dumps({
+                "grant_type": "client_credentials",
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        token = resp.json()["access_token"]
+
+        # 2. Décodage avec la clé dédiée OAUTH2_PARTNER_JWT_SIGNING_KEY
+        signing_key = getattr(settings, "OAUTH2_PARTNER_JWT_SIGNING_KEY", settings.SECRET_KEY)
+        payload = jwt.decode(token, signing_key, algorithms=["HS256"])
+        self.assertIn("jti", payload)
+        self.assertEqual(payload["partner_id"], str(self.partner.id))
+
+        # 3. Requête valide avant révocation
+        cat_resp = self.client.get(
+            "/api/v1/partner/catalog/",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+        self.assertEqual(cat_resp.status_code, 200)
+
+        # 4. Révocation du token
+        rev_resp = self.client.post(
+            "/api/v1/oauth2/token/revoke/",
+            data=json.dumps({"token": token}),
+            content_type="application/json",
+        )
+        self.assertEqual(rev_resp.status_code, 200)
+        self.assertEqual(rev_resp.json(), {"status": "revoked"})
+        self.assertTrue(RevokedPartnerToken.objects.filter(jti=payload["jti"]).exists())
+
+        # 5. Échec d'authentification après révocation
+        cat_resp_after = self.client.get(
+            "/api/v1/partner/catalog/",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+        self.assertIn(cat_resp_after.status_code, (401, 403))
+
+    def test_fiche_ad3_partner_catalog_endpoints(self) -> None:
+        """AD3: Consultation et recherche catalogue via /api/v1/partner/catalog/."""
+        resp = self.client.get(
+            "/api/v1/partner/catalog/",
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret,
+        )
+        self.assertEqual(resp.status_code, 200)
+        res_data = resp.json()
+        self.assertTrue(res_data["success"])
+        self.assertGreaterEqual(len(res_data["data"]), 1)
+
+        # Détail
+        detail_resp = self.client.get(
+            f"/api/v1/partner/catalog/{self.ouvrage.id}/",
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret,
+        )
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertEqual(detail_resp.json()["data"]["title"], "Manuel d'Intelligence Artificielle")
+
+    def test_fiche_ad4_partner_bouquets_endpoints(self) -> None:
+        """AD4: Consultation des bouquets et vérification de licence."""
+        from apps.partners.models import Institution, BouquetOffering, UniversityBouquetSubscription
+
+        institution = Institution.objects.create(
+            name="Université d'Abomey-Calavi",
+            code="UAC-TEST",
+            country="BJ",
+            city="Abomey-Calavi",
+        )
+        self.partner.linked_institution = institution
+        self.partner.save()
+
+        offering = BouquetOffering.objects.create(
+            title="Bouquet Juridique & Sciences",
+            bouquet_type="custom",
+            books_count=1,
+            annual_price=250000,
+            currency="XOF",
+            is_active=True,
+        )
+        offering.custom_books.add(self.ouvrage)
+
+        # Liste des bouquets
+        resp = self.client.get(
+            "/api/v1/partner/bouquets/",
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["success"])
+
+        # Check access avant souscription
+        check_resp = self.client.get(
+            f"/api/v1/partner/bouquets/{offering.id}/check-access/?book_id={self.ouvrage.id}",
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret,
+        )
+        self.assertEqual(check_resp.status_code, 200)
+        self.assertFalse(check_resp.json()["data"]["has_access"])
+
+        # Souscription active
+        today = timezone.now().date()
+        UniversityBouquetSubscription.objects.create(
+            institution=institution,
+            offering_id=offering.id,
+            status="active",
+            start_date=today,
+            end_date=today + timedelta(days=365),
+        )
+
+        # Check access avec souscription
+        check_resp_sub = self.client.get(
+            f"/api/v1/partner/bouquets/{offering.id}/check-access/?book_id={self.ouvrage.id}",
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret,
+        )
+        self.assertEqual(check_resp_sub.status_code, 200)
+        self.assertTrue(check_resp_sub.json()["data"]["has_access"])
+
+    def test_fiche_ad5_partner_usage_stats(self) -> None:
+        """AD5: Consultation des statistiques d'usage."""
+        from apps.protection.models import TraceAcces
+
+        TraceAcces.objects.create(
+            ouvrage=self.ouvrage,
+            partner_id=str(self.partner.id),
+            document_title=self.ouvrage.title,
+            ip_address="127.0.0.1",
+            access_type="read_full",
+        )
+
+        resp = self.client.get(
+            "/api/v1/partner/stats/usage/",
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret,
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["data"]
+        self.assertGreaterEqual(data["total_consultations"], 1)
+        self.assertGreaterEqual(len(data["top_books"]), 1)

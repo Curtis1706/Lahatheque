@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-lahatheque-dev-key-change-in-prod')
 READER_JWT_SIGNING_KEY = config('READER_JWT_SIGNING_KEY', default=SECRET_KEY)
+OAUTH2_PARTNER_JWT_SIGNING_KEY = config('OAUTH2_PARTNER_JWT_SIGNING_KEY', default=config('READER_JWT_SIGNING_KEY', default=SECRET_KEY))
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config(

@@ -4,6 +4,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 
 from django.utils import timezone
+from .oauth2.models import RevokedPartnerToken
 
 ROLE_CHOICES = (
     ('student', 'Étudiant / Client Lecteur'),
