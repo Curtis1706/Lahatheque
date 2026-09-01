@@ -249,28 +249,43 @@ class StudentUpdateReadingProgressView(APIView):
         except Ouvrage.DoesNotExist:
             return Response({'success': False, 'error': 'Ouvrage introuvable.'}, status=404)
 
+        current_page = data.get('current_page', 1)
+        total_pages = data.get('total_pages') or ouvrage.page_count or 1
+        progress_pct = data['progress_percent']
+
+        if total_pages > 0 and current_page > 0 and (progress_pct == 0 or progress_pct < round((current_page / total_pages) * 100)):
+            progress_pct = min(100, max(1, round((current_page / total_pages) * 100)))
+
+        is_completed = bool(progress_pct >= 100 or (total_pages > 0 and current_page >= total_pages))
+
         progress, _ = ReadingProgress.objects.update_or_create(
             user=user,
             ouvrage=ouvrage,
             defaults={
-                'progress_percent': data['progress_percent'],
-                'current_page': data.get('current_page', 1),
-                'total_pages': data.get('total_pages', ouvrage.page_count),
+                'progress_percent': progress_pct,
+                'current_page': current_page,
+                'total_pages': total_pages,
                 'last_read_chapter': data.get('last_read_chapter', ''),
-                'is_completed': data['progress_percent'] >= 100,
+                'is_completed': is_completed,
+                'last_read_at': timezone.now(),
             }
         )
 
-        # Enregistre la session de lecture si des secondes ont été passées
+        # Enregistre la session de lecture
         duration = data.get('duration_seconds', 0)
-        if duration > 0:
-            ReadingSession.objects.create(
-                user=user,
-                ouvrage=ouvrage,
-                duration_seconds=duration,
-                pages_read=data.get('pages_read', 0),
-                session_date=timezone.now().date(),
-            )
+        if duration <= 0:
+            duration = 15
+        pages_read = data.get('pages_read', 0)
+        if pages_read <= 0:
+            pages_read = 1
+
+        ReadingSession.objects.create(
+            user=user,
+            ouvrage=ouvrage,
+            duration_seconds=duration,
+            pages_read=pages_read,
+            session_date=timezone.now().date(),
+        )
 
         return Response({
             'success': True,

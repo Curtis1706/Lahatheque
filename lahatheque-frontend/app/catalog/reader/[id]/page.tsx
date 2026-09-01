@@ -283,6 +283,13 @@ export default function DocumentReaderPage() {
   const [isNightMode, setIsNightMode] = useState(false)
   const [currentPage, setCurrentPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
+  const [isSampleMode, setIsSampleMode] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsSampleMode(new URLSearchParams(window.location.search).get('mode') === 'sample')
+    }
+  }, [])
 
   const [isSaving, setIsSaving] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
@@ -685,22 +692,23 @@ export default function DocumentReaderPage() {
 
 
   // Sync progress with backend
-  const syncProgress = useCallback(async (page: number) => {
+  const syncProgress = useCallback(async (page: number, customTotal?: number) => {
     try {
-      if (id === 'lesson_pdf') {
-        const sParams = new URLSearchParams(window.location.search)
-        const bookId = sParams.get('book_id')
-        const lessonId = sParams.get('lesson_id')
+      const effectiveTotal = customTotal && customTotal > 0 ? customTotal : (totalPages > 0 ? totalPages : (book?.page_count || 1));
+      const targetPage = Math.max(1, page + 1);
 
-        // Sync ReadingProgress if we have a book_id (for PDF supports and fiches de synthèse)
-        if (bookId && totalPages > 0) {
-          await libraryApi.syncProgress(bookId, page + 1, totalPages)
+      if (id === 'lesson_pdf') {
+        const sParams = new URLSearchParams(window.location.search);
+        const bookId = sParams.get('book_id');
+        const lessonId = sParams.get('lesson_id');
+
+        if (bookId && effectiveTotal > 0) {
+          await libraryApi.syncProgress(bookId, targetPage, effectiveTotal, 15);
         }
-        // Also sync lesson progress if we have a lesson_id (for lesson PDFs)
-        if (lessonId && totalPages > 0) {
-          const pos = page + 1
-          const pct = (pos / totalPages) * 100
-          const completed = pct >= 90
+        if (lessonId && effectiveTotal > 0) {
+          const pos = targetPage;
+          const pct = Math.min(100, Math.round((pos / effectiveTotal) * 100));
+          const completed = pct >= 90;
           await fetch(`/api/bff/content/lessons/${lessonId}/progress/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -709,39 +717,57 @@ export default function DocumentReaderPage() {
               progress: pct,
               completed,
             }),
-          })
+          });
         }
-        return
+        return;
       }
-      await libraryApi.syncProgress(id as string, page + 1, totalPages)
+
+      if (id && !String(id).startsWith('sample-') && !isSampleMode) {
+        await libraryApi.syncProgress(id as string, targetPage, effectiveTotal, 15);
+      }
     } catch (err) {
-      console.error("Erreur sync progression", err)
+      console.error("Erreur sync progression", err);
     }
-  }, [id, totalPages])
-
-
-
-
-
-
+  }, [id, totalPages, book, isSampleMode]);
 
   // Handle page change from viewer
   const handlePageChange = (e: { currentPage: number }) => {
-    setCurrentPage(e.currentPage)
-  }
+    setCurrentPage(e.currentPage);
+    syncProgress(e.currentPage, totalPages);
+  };
 
   // Handle document load to get total pages
   const handleDocumentLoad = (e: { doc: any }) => {
-    setTotalPages(e.doc.numPages)
-  }
+    const num = e.doc?.numPages || 1;
+    setTotalPages(num);
+    syncProgress(currentPage, num);
+  };
 
-  // Periodic sync (every 30 seconds)
+  // Periodic sync (every 15 seconds)
   useEffect(() => {
     const interval = setInterval(() => {
-      if (currentPage >= 0) syncProgress(currentPage)
-    }, 30000)
-    return () => clearInterval(interval)
-  }, [currentPage, syncProgress])
+      if (currentPage >= 0 && id && !isSampleMode) {
+        syncProgress(currentPage, totalPages);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [currentPage, totalPages, id, isSampleMode, syncProgress]);
+
+  // Sync on unmount or before leaving page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (currentPage >= 0 && id && !isSampleMode) {
+        syncProgress(currentPage, totalPages);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (currentPage >= 0 && id && !isSampleMode) {
+        syncProgress(currentPage, totalPages);
+      }
+    };
+  }, [currentPage, totalPages, id, isSampleMode, syncProgress]);
 
   // Mouse wheel navigation for Page mode
   const [isWheelLocked, setIsWheelLocked] = useState(false)
@@ -821,8 +847,6 @@ export default function DocumentReaderPage() {
 
   const hasAudio = !!book.audio_file;
 
-  const isSampleMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'sample';
-
   if (effectiveImmersionMode && (book.file || rawPdfData)) {
     const parsedDrmOpacity = drmSettings?.watermark_opacity != null ? parseFloat(String(drmSettings.watermark_opacity)) : 0.20;
     const safeDrmOpacity = !isNaN(parsedDrmOpacity) ? parsedDrmOpacity : 0.20;
@@ -848,11 +872,25 @@ export default function DocumentReaderPage() {
           isMobile={isMobile}
           isSample={isSampleMode}
           hideQuiz={isSampleMode}
-          onLastPageReached={() => {
-            if (isSampleMode) setShowSampleEndOverlay(true);
+          onDocumentLoad={(num) => {
+            setTotalPages(num);
+            syncProgress(currentPage, num);
           }}
-          onPageChange={setCurrentPage}
-          onClose={() => setIsImmersionMode(false)}
+          onLastPageReached={() => {
+            if (isSampleMode) {
+              setShowSampleEndOverlay(true);
+            } else {
+              syncProgress(totalPages - 1, totalPages);
+            }
+          }}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            syncProgress(page, totalPages);
+          }}
+          onClose={() => {
+            syncProgress(currentPage, totalPages);
+            setIsImmersionMode(false);
+          }}
           authorName={book?.author_name || "Auteur LAHA"}
           watermarkMode="laha"
           watermarkPosition={currentPosition}
