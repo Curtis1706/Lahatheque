@@ -75,16 +75,29 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
 
   try {
     let backendRes: Response | null = null
+    const fetchController = new AbortController()
+    const timeoutHandle = setTimeout(() => fetchController.abort(), 20000)
+
     try {
       backendRes = await fetch(targetUrl, {
         method: request.method,
         headers: headers,
         body: body || undefined,
         cache: 'no-store',
+        signal: fetchController.signal,
         // @ts-ignore
         duplex: 'half',
       })
-    } catch (netErr) {
+      clearTimeout(timeoutHandle)
+    } catch (netErr: any) {
+      clearTimeout(timeoutHandle)
+      if (netErr?.name === 'AbortError') {
+        console.error(`[BFF Proxy TIMEOUT] Le backend Django à ${targetUrl} n'a pas répondu en 20s.`)
+        return NextResponse.json(
+          { error: "Le serveur backend Django n'a pas répondu dans les délais (20s)." },
+          { status: 504 }
+        )
+      }
       if (targetUrl.includes('localhost')) {
         const ipv4Url = targetUrl.replace('localhost', '127.0.0.1')
         backendRes = await fetch(ipv4Url, {

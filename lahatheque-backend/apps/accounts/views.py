@@ -108,12 +108,23 @@ class ProfileView(APIView):
                     f"({avatar_file.size / 1024:.1f} Ko), content_type='{avatar_file.content_type}'. "
                     f"Storage actif='{storage_name}', R2 Bucket='{bucket_name}', R2 Domain='{public_domain}'"
                 )
-                user.avatar = avatar_file
+                try:
+                    user.avatar = avatar_file
+                    user.save()
+                except Exception as upload_err:
+                    logger.exception(f"[DJANGO AVATAR STORAGE ERROR] Échec écriture stockage distant: {upload_err}")
+                    from django.core.files.storage import FileSystemStorage
+                    local_fs = FileSystemStorage()
+                    saved_rel = local_fs.save(f"avatars/{avatar_file.name}", avatar_file)
+                    user.avatar.name = saved_rel
+                    user.save()
+                    logger.warning(f"[DJANGO AVATAR FALLBACK] Avatar sauvegardé localement en secours: {saved_rel}")
             elif 'avatar' in data and not data.get('avatar'):
                 logger.info(f"[DJANGO PROFILE AVATAR] Suppression de l'avatar pour l'utilisateur ID={user.id}")
                 user.avatar = None
-
-            user.save()
+                user.save()
+            else:
+                user.save()
 
             elapsed = (time.time() - start_time) * 1000
             payload = _build_user_payload(user)
