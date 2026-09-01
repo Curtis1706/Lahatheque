@@ -264,7 +264,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                 <img src="/logo.jpg" alt="LAHATHÈQUE" className="h-9 w-auto object-contain" />
               </Link>
               <p className="text-white/80 text-xs sm:text-sm leading-relaxed max-w-sm">
-                Pas de nation prospère sans une éducation équitable. La première bibliothèque numérique panafricaine pour les étudiants, enseignants et chercheurs.
+                La première bibliothèque numérique panafricaine pour les étudiants, enseignants et chercheurs.
               </p>
             </div>
 
