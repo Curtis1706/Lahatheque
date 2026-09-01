@@ -14,6 +14,7 @@ import {
   GraduationCap,
   Sparkles,
 } from "lucide-react";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { getUniversityCatalog } from "@/lib/services/university";
 import type { UniversityBookCatalogItem } from "@/lib/types/university";
@@ -59,23 +60,18 @@ export default function UniversityCatalogPage() {
     {
       key: "title",
       header: "Ouvrage & Couverture",
+      className: "min-w-[320px]",
       cell: (row) => (
         <div className="flex items-center gap-3 py-1">
-          <div className="relative w-10 h-14 rounded-lg bg-navy/10 overflow-hidden shrink-0 border border-border shadow-xs">
-            {row.cover_url ? (
-              <Image
-                src={row.cover_url}
-                alt={row.title}
-                fill
-                className="object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-navy text-white text-[9px] font-bold">
-                LAHA
-              </div>
-            )}
-          </div>
-          <div className="space-y-0.5">
+          <BookCover3D
+            title={row.title}
+            authors={row.authors}
+            discipline={row.discipline}
+            coverUrl={row.cover_url}
+            size="xs"
+            interactive={false}
+          />
+          <div className="space-y-0.5 min-w-0">
             <p className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[240px]">
               {row.title}
             </p>
