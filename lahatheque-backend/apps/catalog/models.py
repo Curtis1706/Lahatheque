@@ -129,7 +129,12 @@ class Ouvrage(models.Model):
     @property
     def cover_url(self) -> str:
         if self.cover_image and hasattr(self.cover_image, 'url'):
-            return self.cover_image.url
+            url = str(self.cover_image.url)
+            if url.startswith('/media/'):
+                return f"/api/bff{url}"
+            return url
+        if self.file and hasattr(self.file, 'name') and self.file.name:
+            return f"/api/bff/catalog/books/{self.id}/cover/"
         return ""
 
     @property

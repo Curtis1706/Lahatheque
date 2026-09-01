@@ -211,8 +211,10 @@ export interface HistoryStatsAPI {
   books_completed_count: number;
   recent_sessions_timeline: {
     id: string;
+    ouvrage_id?: string;
     ouvrage_title: string;
     ouvrage_discipline: string;
+    ouvrage_cover_url?: string;
     duration_minutes: number;
     pages_read: number;
     session_date: string;

@@ -14,6 +14,7 @@ import {
   type HistoryStatsAPI,
 } from "@/lib/services/student";
 import { StudentKpiCharts } from "@/components/features/student/student-kpi-charts";
+import { BookCover } from "@/components/features/student/book-cover";
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -122,16 +123,26 @@ export default function StudentHistoryPage() {
                 className="p-4 rounded-2xl border border-border bg-background hover:border-gold/60 transition-all flex items-center justify-between gap-4 shadow-xs"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="shrink-0 p-2.5 rounded-xl bg-navy/10 text-navy">
-                    <BookOpen className="w-4 h-4" />
-                  </div>
+                  <Link href={session.ouvrage_id ? `/catalog/reader/${session.ouvrage_id}` : '/student/books'} className="shrink-0" title={session.ouvrage_title}>
+                    <BookCover
+                      book={{
+                        id: session.ouvrage_id || session.id,
+                        title: session.ouvrage_title,
+                        discipline: session.ouvrage_discipline,
+                        cover_url: session.ouvrage_cover_url,
+                      }}
+                      size="xs"
+                    />
+                  </Link>
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold text-gold uppercase tracking-wider">
                       {session.ouvrage_discipline || "Académique"}
                     </p>
-                    <p className="font-serif font-bold text-navy text-sm truncate">
-                      {session.ouvrage_title}
-                    </p>
+                    <Link href={session.ouvrage_id ? `/catalog/reader/${session.ouvrage_id}` : '/student/books'}>
+                      <p className="font-serif font-bold text-navy text-sm truncate hover:text-gold transition-colors">
+                        {session.ouvrage_title}
+                      </p>
+                    </Link>
                     <p className="text-[11px] text-foreground-muted">
                       {new Date(session.session_date).toLocaleDateString(
                         "fr-FR",

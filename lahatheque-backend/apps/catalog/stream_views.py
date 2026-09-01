@@ -281,3 +281,61 @@ class BookSampleStreamView(APIView):
         response["Cache-Control"] = "private, no-store, must-revalidate"
         return response
 
+
+class BookCoverStreamView(APIView):
+    """
+    GET /api/v1/catalog/books/<book_id>/cover/
+    Retourne la couverture du livre sous forme d'image JPEG :
+    1. Si cover_image existe sur l'ouvrage, la renvoie.
+    2. Sinon, extrait et rastérise la 1ère page du PDF sous forme d'image JPEG.
+    Accessible publiquement pour afficher les couvertures sur tout le catalogue.
+    """
+    permission_classes = [AllowAny]
+    renderer_classes = [PassthroughStreamRenderer]
+
+    def get(self, request, book_id):
+        import fitz
+        from apps.catalog.models import Ouvrage
+        from apps.protection.source_adapter import DocumentSourceAdapter, DocumentSourceError
+
+        ouvrage = None
+        try:
+            import uuid as _uuid
+            valid_uuid = _uuid.UUID(str(book_id).strip())
+            ouvrage = Ouvrage.objects.filter(id=valid_uuid).first()
+        except (ValueError, TypeError):
+            ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
+
+        if not ouvrage:
+            return HttpResponse(status=404)
+
+        # 1. Si cover_image est renseignée
+        if ouvrage.cover_image and hasattr(ouvrage.cover_image, 'read'):
+            try:
+                ouvrage.cover_image.seek(0)
+                img_data = ouvrage.cover_image.read()
+                response = HttpResponse(img_data, content_type="image/jpeg")
+                response["Cache-Control"] = "public, max-age=86400"
+                return response
+            except Exception:
+                pass
+
+        # 2. Sinon, extraction de la 1ère page du PDF
+        try:
+            pdf_bytes = DocumentSourceAdapter.get_document_bytes("catalog_book", str(ouvrage.id))
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            if doc.page_count > 0:
+                page = doc.load_page(0)
+                pix = page.get_pixmap(dpi=150)
+                img_bytes = pix.tobytes("jpeg")
+                doc.close()
+                response = HttpResponse(img_bytes, content_type="image/jpeg")
+                response["Cache-Control"] = "public, max-age=86400"
+                return response
+            doc.close()
+        except Exception:
+            pass
+
+        return HttpResponse(status=404)
+
+

@@ -12,6 +12,7 @@ import {
   type HistoryStatsAPI,
 } from "@/lib/services/student";
 import { StudentKpiCharts } from "@/components/features/student/student-kpi-charts";
+import { BookCover } from "@/components/features/student/book-cover";
 import {
   BookOpen,
   Search,
@@ -41,17 +42,19 @@ function RecentBookCard({ book }: { book: BookAPI }) {
 
   return (
     <div className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center gap-4">
-      <div className="shrink-0 w-12 h-16 rounded-lg bg-navy/10 border border-navy/20 flex items-center justify-center">
-        <BookOpen className="w-5 h-5 text-navy/40" />
-      </div>
+      <Link href={`/catalog/reader/${book.id}`} className="shrink-0" title={`Lire ${book.title}`}>
+        <BookCover book={book} size="xs" />
+      </Link>
 
       <div className="min-w-0 flex-1 space-y-1">
         <p className="text-[11px] font-bold text-gold uppercase tracking-wider">
           {book.discipline_name || "Académique"}
         </p>
-        <h3 className="font-serif font-bold text-navy text-sm leading-tight truncate">
-          {book.title}
-        </h3>
+        <Link href={`/catalog/reader/${book.id}`}>
+          <h3 className="font-serif font-bold text-navy text-sm leading-tight truncate group-hover:text-gold transition-colors">
+            {book.title}
+          </h3>
+        </Link>
         <p className="text-[11px] text-foreground-muted truncate">
           Par {authorName}
         </p>
@@ -77,8 +80,8 @@ function RecentBookCard({ book }: { book: BookAPI }) {
 
       <Link
         href={`/catalog/reader/${book.id}`}
-        className="shrink-0 p-2 rounded-xl bg-navy/10 hover:bg-gold/20 transition-colors"
-        title="Lire"
+        className="shrink-0 p-2.5 rounded-xl bg-navy/10 hover:bg-gold/20 transition-colors"
+        title="Continuer la lecture"
       >
         <Play className="w-4 h-4 text-navy" />
       </Link>
@@ -97,19 +100,19 @@ function ReadingHeroCard({
     return (
       <div className="book-ribbon p-7 sm:p-8 rounded-3xl bg-background border-2 border-gold/70 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="flex items-center gap-5 min-w-0">
-          <div className="shrink-0 w-20 h-28 rounded-2xl bg-gradient-to-br from-navy-dark via-navy to-navy-hover border border-gold/40 flex flex-col items-center justify-center p-3 shadow-md relative overflow-hidden">
-            <div className="absolute inset-0 bg-gold/10 opacity-30" />
-            <BookOpen className="w-9 h-9 text-gold relative z-10" />
-            <span className="text-[9px] font-mono text-gold-light mt-1.5 uppercase font-bold relative z-10 tracking-widest">LAHA</span>
-          </div>
+          <Link href={`/catalog/reader/${currentReading.ouvrage.id}`} className="shrink-0" title={`Continuer ${currentReading.ouvrage.title}`}>
+            <BookCover book={currentReading.ouvrage} size="md" />
+          </Link>
           <div className="min-w-0 space-y-2">
             <div className="section-ribbon-badge">
               <Play className="w-3 h-3 fill-current" />
               <span>Reprendre la lecture · {currentReading.progress_percent}%</span>
             </div>
-            <h3 className="font-serif font-bold text-navy text-xl sm:text-2xl truncate">
-              {currentReading.ouvrage.title}
-            </h3>
+            <Link href={`/catalog/reader/${currentReading.ouvrage.id}`}>
+              <h3 className="font-serif font-bold text-navy text-xl sm:text-2xl truncate hover:text-gold transition-colors">
+                {currentReading.ouvrage.title}
+              </h3>
+            </Link>
             <p className="text-xs sm:text-sm text-foreground-muted truncate">
               Par {currentReading.ouvrage.authors?.map((a) => a.full_name).join(", ")}
             </p>
@@ -150,7 +153,7 @@ function ReadingHeroCard({
             Prêt pour votre première lecture ?
           </h3>
           <p className="text-xs sm:text-sm text-foreground-muted max-w-lg">
-            Explorez le catalogue académique et commencez avec la liseuse protégée — 15 premières pages gratuites sur chaque ouvrage.
+            Explorez le catalogue académique et commencez avec la liseuse protégée — extrait gratuit disponible sur chaque ouvrage.
           </p>
         </div>
       </div>

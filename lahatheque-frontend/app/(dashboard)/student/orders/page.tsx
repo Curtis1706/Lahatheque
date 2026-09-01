@@ -22,6 +22,7 @@ import {
   type OrderLineAPI,
 } from "@/lib/services/student";
 import OrderCreateForm from "@/components/student/OrderCreateForm";
+import { BookCover } from "@/components/features/student/book-cover";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -151,8 +152,14 @@ function OrderCard({ order }: { order: OrderAPI }) {
                 className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-background border border-border"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="shrink-0 w-9 h-12 rounded-lg bg-navy/10 border border-navy/20 flex items-center justify-center">
-                    <BookOpen className="w-4 h-4 text-navy/40" />
+                  <div className="shrink-0">
+                    <BookCover
+                      book={{
+                        id: String(ligne.ouvrage || ligne.id),
+                        title: ligne.ouvrage_title,
+                      }}
+                      size="xs"
+                    />
                   </div>
                   <div className="min-w-0">
                     <p className="font-serif font-bold text-navy text-xs truncate">

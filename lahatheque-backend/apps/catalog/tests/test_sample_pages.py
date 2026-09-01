@@ -109,3 +109,11 @@ class BookSampleStreamViewTestCase:
     def test_sample_unauthenticated_rejected(self):
         response = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/sample/")
         assert response.status_code == 401
+
+    def test_cover_stream_generation(self):
+        pdf_bytes = self._generate_dummy_pdf(3)
+        with patch("apps.protection.source_adapter.DocumentSourceAdapter.get_document_bytes", return_value=pdf_bytes):
+            response = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/cover/")
+            assert response.status_code == 200
+            assert response["Content-Type"] == "image/jpeg"
+            assert len(response.content) > 0

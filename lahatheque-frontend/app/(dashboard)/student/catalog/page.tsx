@@ -24,21 +24,22 @@ import {
 } from "@/lib/services/student";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
 import { UnifiedBookOrderModal } from "@/components/features/student/unified-book-order-modal";
+import { BookCover } from "@/components/features/student/book-cover";
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function SkeletonBook() {
   return (
-    <div className="p-4 rounded-3xl border border-border bg-background animate-pulse space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-16 rounded-xl bg-navy/10 shrink-0" />
+    <div className="p-5 rounded-3xl border border-border bg-background animate-pulse space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="w-16 h-22 rounded-xl bg-navy/10 shrink-0" />
         <div className="flex-1 space-y-2">
-          <div className="h-3 rounded bg-navy/10 w-2/3" />
+          <div className="h-3 rounded bg-navy/10 w-1/4" />
+          <div className="h-4 rounded bg-navy/10 w-3/4" />
           <div className="h-2 rounded bg-navy/10 w-1/2" />
-          <div className="h-2 rounded bg-navy/10 w-1/3" />
         </div>
       </div>
-      <div className="h-8 rounded-xl bg-navy/10" />
+      <div className="h-10 rounded-xl bg-navy/10" />
     </div>
   );
 }
@@ -60,17 +61,19 @@ function CatalogBookCard({
   return (
     <div className="group p-5 rounded-3xl border border-border bg-background hover:border-gold/60 transition-all shadow-xs flex flex-col justify-between gap-4">
       <div className="space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="shrink-0 w-12 h-16 rounded-xl bg-navy/10 border border-navy/20 flex items-center justify-center">
-            <BookOpen className="w-5 h-5 text-navy/40" />
-          </div>
+        <div className="flex items-start gap-4">
+          <Link href={`/student/catalog/${book.id}`} className="shrink-0" title={`Consulter « ${book.title} »`}>
+            <BookCover book={book} size="sm" />
+          </Link>
           <div className="min-w-0 flex-1 space-y-1">
             <p className="text-[10px] font-bold text-gold uppercase tracking-wider truncate">
               {book.discipline_name || "Académique"}
             </p>
-            <h3 className="font-serif font-bold text-navy text-sm sm:text-base leading-snug line-clamp-2">
-              {book.title}
-            </h3>
+            <Link href={`/student/catalog/${book.id}`}>
+              <h3 className="font-serif font-bold text-navy text-sm sm:text-base leading-snug line-clamp-2 hover:text-gold transition-colors">
+                {book.title}
+              </h3>
+            </Link>
             <p className="text-[11px] text-foreground-muted truncate">
               Par {authorName}
             </p>

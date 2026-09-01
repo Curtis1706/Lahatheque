@@ -24,6 +24,7 @@ import {
 } from "@/lib/services/student";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
 import { UnifiedBookOrderModal } from "@/components/features/student/unified-book-order-modal";
+import { BookCover } from "@/components/features/student/book-cover";
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -274,25 +275,8 @@ export default function StudentBookDetailPage() {
       {/* ── Fiche Livre ─────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-6 p-6 rounded-3xl bg-background border border-border shadow-xs">
         {/* Couverture */}
-        <div className="shrink-0 w-36 h-48 sm:w-44 sm:h-60 rounded-2xl bg-navy-dark border border-navy flex flex-col justify-between p-4 text-white shadow-md mx-auto sm:mx-0">
-          <div className="space-y-1">
-            <span className="text-[9px] font-mono text-gold font-bold uppercase tracking-wider block">
-              {book.discipline_name || "ACADÉMIQUE"}
-            </span>
-            <div className="h-0.5 w-6 bg-gold rounded" />
-          </div>
-          <div className="space-y-1">
-            <h4 className="font-serif font-bold text-white text-xs sm:text-sm line-clamp-3 leading-tight">
-              {book.title}
-            </h4>
-            <p className="text-[10px] text-foreground-muted truncate">
-              {authorName}
-            </p>
-          </div>
-          <div className="pt-2 border-t border-navy/40 flex justify-between text-[9px] text-foreground-muted">
-            <span>Éd. {new Date(book.publication_date || "2026").getFullYear()}</span>
-            <BookOpen className="w-3 h-3 text-gold" />
-          </div>
+        <div className="shrink-0 flex justify-center sm:justify-start">
+          <BookCover book={book} size="lg" />
         </div>
 
         {/* Infos */}
