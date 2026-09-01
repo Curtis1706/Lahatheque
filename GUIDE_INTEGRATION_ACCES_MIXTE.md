@@ -97,7 +97,7 @@ Pour créer une session de lecture (`POST /api/v1/reader/sessions/`), vous trans
 * `POST /api/v1/oauth2/token/revoke/` : Révocation immédiate d'un jeton compromis.
 
 ### 5.2 Catalogue & Abonnements
-* `GET /api/v1/partner/catalog/` : Recherche documentaire (filtres `q` et `discipline`).
+* `GET /api/v1/partner/catalog/` : Recherche documentaire (filtres `q` et `discipline`). Chaque livre inclut une `cover_url` absolue directement affichable dans vos balises `<img src={book.cover_url} />`.
 * `GET /api/v1/partner/catalog/{id}/` : Fiche détaillée d'un livre.
 * `GET /api/v1/partner/bouquets/` : Liste des bouquets d'institution disponibles.
 * `GET /api/v1/partner/bouquets/{offering_id}/check-access/?book_id={id}` : Contrôle des droits bouquet.

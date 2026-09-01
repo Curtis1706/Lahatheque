@@ -130,11 +130,15 @@ Même en consultant un livre officiel du catalogue LAHAThèque, vous pouvez habi
       "publication_date": "2026-01-15",
       "price_digital": 5000,
       "price_paper": 8500,
-      "cover_url": "https://lahatheque.com/api/bff/catalog/books/e4a2c5b0.../cover/"
+      "cover_url": "https://lahatheque.com/api/bff/catalog/books/e4a2c5b0-7d12-4e9a-9e11-8a9d12345678/cover/"
     }
   ]
 }
 ```
+
+> **À propos des couvertures d'ouvrages (`cover_url`) :**
+> - L'URL renvoyée est une URL absolue complète directement exploitable dans vos balises `<img src={book.cover_url} />`.
+> - Si un visuel dédié a été importé par l'éditeur, il est délivré. Sinon, le moteur extrait automatiquement la première page du PDF pour générer la couverture.
 
 #### Détail d'un livre spécifique :
 * **Route :** `GET /api/v1/partner/catalog/{book_id}/`

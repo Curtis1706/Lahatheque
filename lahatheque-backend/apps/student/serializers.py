@@ -41,7 +41,15 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
         ]
 
     def get_cover_url(self, obj) -> str:
-        return obj.cover_url or ''
+        url = obj.cover_url or ''
+        if url:
+            request = self.context.get('request')
+            if request:
+                try:
+                    return request.build_absolute_uri(url)
+                except Exception:
+                    pass
+        return url
 
     def get_is_owned(self, obj) -> bool:
         request = self.context.get('request')
