@@ -245,17 +245,28 @@ class BookSampleStreamView(APIView):
             page_limit = min(sample_pages, src_doc.page_count)
             extract_doc.insert_pdf(src_doc, from_page=0, to_page=page_limit - 1)
 
+            import math
             for page in extract_doc:
-                page.insert_textbox(
-                    fitz.Rect(0, page.rect.height / 2 - 40, page.rect.width, page.rect.height / 2 + 40),
-                    "EXTRAIT GRATUIT — LAHAThèque",
-                    fontsize=28,
-                    color=(0.7, 0.7, 0.7),
-                    rotate=45,
-                    align=1,
+                rect = page.rect
+                page_width = rect.width
+                page_height = rect.height
+                theta = math.degrees(math.atan2(page_height, page_width))
+                watermark_text = "EXTRAIT GRATUIT — LAHAThèque"
+                font_size = max(14.0, min(24.0, float(page_width / 25)))
+                text_len = fitz.get_text_length(watermark_text, fontname="helv", fontsize=font_size)
+                center_point = fitz.Point(page_width / 2, page_height / 2)
+                start_point = fitz.Point(page_width / 2 - text_len / 2, page_height / 2 + font_size * 0.35)
+
+                page.insert_text(
+                    start_point,
+                    watermark_text,
+                    fontsize=font_size,
+                    color=(0.6, 0.6, 0.6),
+                    fill_opacity=0.45,
+                    morph=(center_point, fitz.Matrix(theta))
                 )
 
-            sample_bytes = extract_doc.tobytes()
+            sample_bytes = extract_doc.tobytes(garbage=3, deflate=True)
             total_pages = src_doc.page_count
             src_doc.close()
             extract_doc.close()
