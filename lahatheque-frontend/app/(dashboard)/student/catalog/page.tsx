@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Search,
   BookOpen,
@@ -205,9 +206,11 @@ export default function StudentCatalogPage() {
     loadCatalog();
   }, [loadCatalog]);
 
+  const router = useRouter();
+
   const handleOpenSample = (book: BookAPI) => {
-    setSampleModalBook(book);
-    toast.info(`Ouverture de l'extrait pour « ${book.title} »`);
+    toast.info(`Ouverture de l'extrait dans la liseuse pour « ${book.title} »`);
+    router.push(`/catalog/reader/${book.id}?mode=sample`);
   };
 
   const books = catalogData?.books || [];

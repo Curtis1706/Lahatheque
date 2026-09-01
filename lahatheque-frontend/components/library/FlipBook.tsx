@@ -86,6 +86,8 @@ interface FlipBookProps {
   onToggleTtsRate?: () => void;
   onDocumentLoad?: (numPages: number) => void;
   hideInternalHeader?: boolean;
+  hideQuiz?: boolean;
+  isSample?: boolean;
 }
 
 
@@ -316,6 +318,8 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   ttsPitch = 1,
   onDocumentLoad,
   hideInternalHeader = false,
+  hideQuiz = false,
+  isSample = false,
   onLastPageReached,
 }) => {
   const [numPages, setNumPages]     = useState<number>(0);
@@ -509,16 +513,18 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
         }
         if (!isCancelled) setIsLoading(false);
 
-        try {
-          const quizData = await libraryApi.getQuizzes(bookId);
-          if (quizData && quizData.questions.length > 0) {
-            setHasQuiz(true);
-            if (initialPageRef.current >= total - 1) {
-              setShowQuiz(true);
+        if (!hideQuiz && !isSample && !bookId.startsWith('sample-') && bookId !== 'preview' && bookId !== 'demo' && bookId !== 'lesson_pdf') {
+          try {
+            const quizData = await libraryApi.getQuizzes(bookId);
+            if (quizData && quizData.questions.length > 0) {
+              setHasQuiz(true);
+              if (initialPageRef.current >= total - 1) {
+                setShowQuiz(true);
+              }
             }
+          } catch (err) {
+            console.error("[FlipBook] Quiz check error:", err);
           }
-        } catch (err) {
-          console.error("[FlipBook] Quiz check error:", err);
         }
       } catch (err) {
         console.error('[FlipBook] PDF load error:', err);
@@ -530,7 +536,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [fileUrl, bookId]);
+  }, [fileUrl, bookId, hideQuiz, isSample]);
 
   // ── Lazy load nearby pages ──
   useEffect(() => {

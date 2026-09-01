@@ -193,6 +193,9 @@ export const libraryApi = {
   },
 
   async getQuizzes(bookId: string): Promise<QuizData | null> {
+    if (!bookId || bookId.startsWith("sample-") || bookId === "preview" || bookId === "demo" || bookId === "lesson_pdf") {
+      return null;
+    }
     try {
       const res = await fetch(`/api/bff/reader/quizzes/?book_id=${bookId}`, {
         credentials: "include",
