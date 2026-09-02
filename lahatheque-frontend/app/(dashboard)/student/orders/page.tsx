@@ -216,12 +216,15 @@ export default function StudentOrdersPage() {
     {
       key: "delivery_status",
       header: "Statut Livraison",
-      cell: (row) =>
-        row.delivery_status ? (
-          <StatusBadge status={row.delivery_status} label={row.delivery_status_display || row.delivery_status} />
+      cell: (row) => {
+        const status = row.delivery_status || row.livraison?.statut;
+        const display = row.delivery_status_display || (row.livraison as any)?.statut_display || status;
+        return status ? (
+          <StatusBadge status={status} label={display || status} />
         ) : (
           <span className="text-[10px] text-foreground-muted">—</span>
-        ),
+        );
+      },
     },
     {
       key: "total_amount",
@@ -274,9 +277,15 @@ export default function StudentOrdersPage() {
           <span className="font-mono text-[10px] font-bold text-navy bg-navy/5 px-2 py-0.5 rounded-md border border-navy/10">
             {row.order_reference}
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <StatusBadge status={row.statut_paiement} label={row.statut_paiement_display} />
             <StatusBadge status={row.statut_commande} label={row.statut_commande_display} />
+            {(row.delivery_status || row.livraison?.statut) && (
+              <StatusBadge
+                status={row.delivery_status || row.livraison!.statut}
+                label={row.delivery_status_display || (row.livraison as any)?.statut_display || row.delivery_status || row.livraison!.statut}
+              />
+            )}
           </div>
         </div>
 

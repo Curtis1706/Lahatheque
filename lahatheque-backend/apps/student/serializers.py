@@ -129,7 +129,8 @@ class PhysicalDeliverySerializer(serializers.ModelSerializer):
         model = PhysicalDelivery
         fields = [
             'id', 'shipping_address', 'city', 'country',
-            'tracking_number', 'carrier_name', 'statut', 'statut_display', 'updated_at'
+            'tracking_number', 'carrier_name', 'delivery_service', 'delivery_fee',
+            'statut', 'statut_display', 'updated_at'
         ]
 
     def get_statut_display(self, obj) -> str:
@@ -184,6 +185,8 @@ class OrderStudentSerializer(serializers.ModelSerializer):
     statut_commande_display = serializers.SerializerMethodField()
     mode_paiement_display = serializers.SerializerMethodField()
     type_commande_display = serializers.SerializerMethodField()
+    delivery_status = serializers.SerializerMethodField()
+    delivery_status_display = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -191,6 +194,7 @@ class OrderStudentSerializer(serializers.ModelSerializer):
             'id', 'total_amount', 'currency',
             'statut_paiement', 'statut_paiement_display',
             'statut_commande', 'statut_commande_display',
+            'delivery_status', 'delivery_status_display',
             'mode_paiement', 'mode_paiement_display',
             'type_commande', 'type_commande_display',
             'is_credit_purchase', 'credit_due_date',
@@ -216,6 +220,25 @@ class OrderStudentSerializer(serializers.ModelSerializer):
             'returned': 'Retournée',
         }
         return mapping.get(obj.statut_commande, obj.statut_commande)
+
+    def get_delivery_status(self, obj):
+        livraison = getattr(obj, 'livraison', None)
+        if livraison:
+            return livraison.statut
+        has_paper_line = obj.lignes.filter(format_type='paper').exists() if hasattr(obj, 'lignes') else False
+        return 'sans_livraison' if has_paper_line else None
+
+    def get_delivery_status_display(self, obj):
+        livraison = getattr(obj, 'livraison', None)
+        if livraison:
+            mapping = {
+                'en_preparation': 'En préparation',
+                'expedie': 'Expédié',
+                'livre': 'Livré',
+            }
+            return mapping.get(livraison.statut, livraison.get_statut_display() if hasattr(livraison, 'get_statut_display') else livraison.statut)
+        has_paper_line = obj.lignes.filter(format_type='paper').exists() if hasattr(obj, 'lignes') else False
+        return "Livraison non enregistrée — contactez le support" if has_paper_line else "Numérique (pas de livraison)"
 
     def get_mode_paiement_display(self, obj) -> str:
         mapping = {
