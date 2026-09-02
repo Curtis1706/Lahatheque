@@ -33,6 +33,20 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
     headers.set('referer', referer)
   }
 
+  // 🌐 Transmission de la véritable IP publique cliente à Django
+  const cfConnectingIp = request.headers.get('cf-connecting-ip')
+  if (cfConnectingIp) headers.set('cf-connecting-ip', cfConnectingIp)
+
+  const xRealIp = request.headers.get('x-real-ip')
+  if (xRealIp) headers.set('x-real-ip', xRealIp)
+
+  const xForwardedFor = request.headers.get('x-forwarded-for')
+  if (xForwardedFor) {
+    headers.set('x-forwarded-for', xForwardedFor)
+  } else if (cfConnectingIp || xRealIp) {
+    headers.set('x-forwarded-for', (cfConnectingIp || xRealIp)!)
+  }
+
   const accessToken = request.cookies.get('laha_access')?.value || request.cookies.get('access_token')?.value
   const authHeader = request.headers.get('authorization')
   const readerToken = request.headers.get('x-reader-token')
