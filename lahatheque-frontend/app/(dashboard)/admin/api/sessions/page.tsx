@@ -223,7 +223,7 @@ export default function AdminHostedSessionsPage() {
         <KpiMetricCard
           label="Lectures Actives"
           value={activeCount}
-          caption="Apprenants connectés"
+          caption="Utilisateurs connectés"
           tone="emerald"
           icon={<Radio className="w-4 h-4 animate-pulse text-emerald-600" />}
         />
@@ -257,7 +257,7 @@ export default function AdminHostedSessionsPage() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
             <input
               type="text"
-              placeholder="Rechercher étudiant, livre, IP, partenaire..."
+              placeholder="Rechercher utilisateur, livre, IP, partenaire..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-border bg-background focus:outline-none focus:ring-1 focus:ring-gold text-foreground placeholder:text-foreground-muted"
@@ -373,7 +373,7 @@ export default function AdminHostedSessionsPage() {
                 {/* Utilisateur */}
                 <div className="space-y-0.5">
                   <span className="text-[10px] uppercase font-bold text-foreground-muted tracking-wider">
-                    Apprenant
+                    Utilisateur
                   </span>
                   <div className="font-semibold text-foreground flex items-center gap-1">
                     <User className="w-3 h-3 text-gold" />
@@ -449,7 +449,7 @@ export default function AdminHostedSessionsPage() {
                 <tr className="border-b border-border bg-background text-foreground-secondary">
                   <th className="py-3 px-4 font-semibold">ID & Statut</th>
                   <th className="py-3 px-4 font-semibold">Document & Partenaire</th>
-                  <th className="py-3 px-4 font-semibold">Apprenant</th>
+                  <th className="py-3 px-4 font-semibold">Utilisateur</th>
                   <th className="py-3 px-4 font-semibold">Progression</th>
                   <th className="py-3 px-4 font-semibold">Temps</th>
                   <th className="py-3 px-4 font-semibold">Quiz</th>
@@ -592,7 +592,7 @@ export default function AdminHostedSessionsPage() {
             <div className="text-center space-y-1">
               <h3 className="text-base font-bold text-navy">Interrompre cette session ?</h3>
               <p className="text-xs text-foreground-secondary">
-                L'accès de l'étudiant <strong className="text-foreground">{sessionToRevoke.userName}</strong> ({sessionToRevoke.userEmail}) sera instantanément fermé et le token révoqué.
+                L'accès de l'utilisateur <strong className="text-foreground">{sessionToRevoke.userName}</strong> ({sessionToRevoke.userEmail}) sera instantanément fermé et le token révoqué.
               </p>
             </div>
 
