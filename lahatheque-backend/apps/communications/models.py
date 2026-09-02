@@ -26,53 +26,56 @@ class ContactMessage(models.Model):
         return f"{self.subject} - {self.name} ({self.created_at.strftime('%d/%m/%Y %H:%M')})"
 
 
-class GuideItem(models.Model):
+class GuideCategory(models.Model):
     """
-    Guide d'utilisation créé et administré par l'Admin, ciblé par rôle utilisateur.
+    Catégorie de guide d'utilisation (ex: 'Mon Compte', 'Paiements', 'Lecteur & Annotations')
+    Filtrée automatiquement selon les rôles cibles.
     """
-    ROLE_CHOICES = [
-        ("public", "Grand Public / Visiteurs"),
-        ("student", "Lecteurs & Étudiants"),
-        ("wholesaler", "Libraires & Grossistes"),
-        ("university", "Universités & Partenaires"),
-        ("publisher", "Éditeurs Tiers"),
-        ("author", "Auteurs"),
-        ("manager", "Gestionnaires Logistiques"),
-        ("layout_artist", "Maquettistes"),
-        ("chief_layout", "Chefs Maquettistes"),
-        ("legal_reviewer", "Relecteurs Juridiques"),
-        ("admin", "Administrateurs Plateforme"),
-    ]
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    target_role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="student", verbose_name="Rôle ciblé")
-    category_label = models.CharField(max_length=150, verbose_name="Libellé catégorie")
-    title = models.CharField(max_length=255, verbose_name="Titre du guide")
-    summary = models.TextField(verbose_name="Résumé / Objectif")
-    icon_name = models.CharField(max_length=50, default="BookOpen", verbose_name="Nom de l'icône Lucide")
-    image_url = models.URLField(blank=True, default="", verbose_name="URL de l'image d'illustration (Cloudflare R2 / CDN)")
-    video_url = models.URLField(blank=True, default="", verbose_name="URL de la vidéo explicative (Cloudflare R2 MP4 / WebM ou externe)")
-    content = models.TextField(blank=True, default="", verbose_name="Corps riche (HTML / Markdown)")
-    steps = models.JSONField(default=list, verbose_name="Étapes pas-à-pas (JSON)")
-    faq = models.JSONField(default=list, blank=True, verbose_name="Questions fréquentes associées (JSON)")
-    order = models.IntegerField(default=0, verbose_name="Ordre d'affichage")
-    is_published = models.BooleanField(default=True, verbose_name="Publié")
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="created_guides",
-        verbose_name="Créé par (Admin)"
+    title = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    roles = models.JSONField(
+        default=list, 
+        help_text='Liste des rôles cibles (ex: ["student", "wholesaler", "university", "publisher", "author", "manager", "layout_artist", "chief_layout", "legal_reviewer", "admin"])'
     )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Dernière mise à jour")
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "communications_guide_item"
-        ordering = ["order", "-created_at"]
-        verbose_name = "Guide d'Utilisation"
-        verbose_name_plural = "Guides d'Utilisation"
+        db_table = 'guide_categories'
+        verbose_name = "Catégorie de Guide"
+        verbose_name_plural = "Catégories de Guide"
+        ordering = ['order', 'title']
 
-    def __str__(self) -> str:
-        return f"[{self.get_target_role_display()}] {self.title}"
+    def __str__(self):
+        return self.title
+
+
+class GuideArticle(models.Model):
+    """
+    Article ou Question/Réponse au sein d'une catégorie.
+    Contient du texte HTML riche généré par Tiptap, avec images et vidéos.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    category = models.ForeignKey(GuideCategory, on_delete=models.CASCADE, related_name='articles')
+    title = models.CharField(max_length=200, help_text="Titre ou question de l'article")
+    content = models.TextField(help_text="Contenu HTML Tiptap ou Markdown")
+    video_url = models.URLField(blank=True, null=True, help_text="Lien vidéo externe (YouTube, Vimeo, MP4 direct...)")
+    stream_id = models.CharField(max_length=100, blank=True, verbose_name="ID Cloudflare Stream")
+    image = models.ImageField(upload_to='guides/images/%Y/%m/', blank=True, null=True)
+    image_url = models.URLField(blank=True, null=True, verbose_name="URL Image Cloudflare R2 / Cloudinary")
+    order = models.IntegerField(default=0)
+    is_published = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'guide_articles'
+        verbose_name = "Article de Guide"
+        verbose_name_plural = "Articles de Guide"
+        ordering = ['order', 'title']
+
+    def __str__(self):
+        return self.title

@@ -85,17 +85,38 @@ export function RoleGuideView({ role, roleLabel, initialArticles }: RoleGuideVie
     const fetchRoleGuides = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/v1/communications/guides/?role=${role}`);
+        console.log(`[ROLE GUIDE UI] Chargement des guides pour rôle "${role}" depuis /api/v1/guides/?role=${role}...`);
+        const res = await fetch(`/api/v1/guides/?role=${role}`);
         if (res.ok) {
           const data = await res.json();
-          const list: GuideArticle[] = Array.isArray(data) ? data : (data?.results || []);
-          const roleList = list.filter((g) => g.target_role === role || g.target_role === "all");
-          setArticles(roleList);
-          if (roleList.length > 0) {
-            setActiveArticleId(roleList[0].id);
+          const rawList = Array.isArray(data) ? data : (data?.results || []);
+          console.log(`[ROLE GUIDE UI] Données reçues depuis PostgreSQL:`, rawList);
+
+          const flattenedArticles: GuideArticle[] = [];
+          rawList.forEach((catItem: any) => {
+            if (Array.isArray(catItem.articles)) {
+              catItem.articles.forEach((art: any) => {
+                flattenedArticles.push({
+                  ...art,
+                  category_label: catItem.title || "Général",
+                  target_role: role,
+                  steps: art.steps || [],
+                  faq: art.faq || [],
+                });
+              });
+            } else if (catItem.title && catItem.content !== undefined) {
+              flattenedArticles.push(catItem);
+            }
+          });
+
+          console.log(`[ROLE GUIDE UI] ${flattenedArticles.length} articles disponibles pour "${role}":`, flattenedArticles);
+          setArticles(flattenedArticles);
+          if (flattenedArticles.length > 0) {
+            setActiveArticleId(flattenedArticles[0].id);
           }
         }
-      } catch {
+      } catch (err) {
+        console.error("[ROLE GUIDE UI] Erreur:", err);
         setArticles([]);
       } finally {
         setLoading(false);

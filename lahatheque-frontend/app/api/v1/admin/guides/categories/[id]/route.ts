@@ -1,0 +1,111 @@
+import { NextRequest, NextResponse } from "next/server";
+
+function getForwardHeaders(request: NextRequest): Headers {
+  const headers = new Headers();
+  headers.set("content-type", "application/json");
+
+  const cookieHeader = request.headers.get("cookie") || "";
+  if (cookieHeader) headers.set("cookie", cookieHeader);
+
+  const accessToken =
+    request.cookies.get("laha_access")?.value ||
+    request.cookies.get("access_token")?.value;
+  const authHeader = request.headers.get("authorization");
+
+  if (accessToken) {
+    headers.set("authorization", `Bearer ${accessToken}`);
+  } else if (authHeader) {
+    headers.set("authorization", authHeader);
+  }
+
+  return headers;
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const rawApiUrl = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
+  const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
+
+  try {
+    const body = await request.json();
+    const headers = getForwardHeaders(request);
+    console.log(`[API /admin/guides/categories/${id}/] PUT vers Django:`, body);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/admin/guides/categories/${id}/`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    const data = await djangoRes.json();
+    console.log(`[API /admin/guides/categories/${id}/] PUT réponse (${djangoRes.status}):`, data);
+    return NextResponse.json(data, { status: djangoRes.status });
+  } catch (err: any) {
+    console.error(`[API /admin/guides/categories/${id}/] Erreur PUT:`, err);
+    return NextResponse.json(
+      { error: "Impossible de modifier la catégorie en base de données." },
+      { status: 502 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const rawApiUrl = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
+  const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
+
+  try {
+    const body = await request.json();
+    const headers = getForwardHeaders(request);
+    console.log(`[API /admin/guides/categories/${id}/] PATCH vers Django:`, body);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/admin/guides/categories/${id}/`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    const data = await djangoRes.json();
+    return NextResponse.json(data, { status: djangoRes.status });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: "Impossible de modifier la catégorie en base de données." },
+      { status: 502 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const rawApiUrl = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
+  const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
+
+  try {
+    const headers = getForwardHeaders(request);
+    console.log(`[API /admin/guides/categories/${id}/] DELETE vers Django`);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/admin/guides/categories/${id}/`, {
+      method: "DELETE",
+      headers,
+    });
+
+    if (djangoRes.status === 204 || djangoRes.ok) {
+      console.log(`[API /admin/guides/categories/${id}/] DELETE réussi`);
+      return NextResponse.json({ success: true });
+    }
+    const data = await djangoRes.json().catch(() => ({}));
+    return NextResponse.json(data, { status: djangoRes.status });
+  } catch (err: any) {
+    console.error(`[API /admin/guides/categories/${id}/] Erreur DELETE:`, err);
+    return NextResponse.json(
+      { error: "Impossible de supprimer la catégorie de la base de données." },
+      { status: 502 }
+    );
+  }
+}
