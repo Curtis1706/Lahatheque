@@ -58,13 +58,95 @@ const VideoEmbed = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: "div[data-video-embed]" }]
+    return [
+      {
+        tag: "div[data-video-embed]",
+        getAttrs: (element: any) => ({
+          video_url: element.getAttribute("data-video-url") || element.getAttribute("video_url"),
+          stream_id: element.getAttribute("data-stream-id") || element.getAttribute("stream_id"),
+          title: element.getAttribute("data-title") || element.getAttribute("title"),
+        }),
+      },
+      {
+        tag: "video",
+        getAttrs: (element: any) => ({
+          video_url: element.getAttribute("src"),
+          title: element.getAttribute("title") || "",
+        }),
+      },
+      {
+        tag: "iframe",
+        getAttrs: (element: any) => ({
+          video_url: element.getAttribute("src"),
+          title: element.getAttribute("title") || "",
+        }),
+      },
+    ]
   },
 
   renderHTML({ HTMLAttributes }: { HTMLAttributes: any }) {
+    const videoUrl = HTMLAttributes.video_url || HTMLAttributes["data-video-url"] || ""
+    const streamId = HTMLAttributes.stream_id || HTMLAttributes["data-stream-id"] || ""
+    const title = HTMLAttributes.title || HTMLAttributes["data-title"] || ""
+    const rawSrc = videoUrl || streamId || ""
+
+    if (
+      rawSrc.includes("youtube.com") ||
+      rawSrc.includes("youtu.be") ||
+      rawSrc.includes("vimeo.com")
+    ) {
+      let iframeSrc = rawSrc
+      if (rawSrc.includes("youtube.com/watch?v=")) {
+        const videoId = rawSrc.split("v=")[1]?.split("&")[0]
+        iframeSrc = `https://www.youtube.com/embed/${videoId}`
+      } else if (rawSrc.includes("youtu.be/")) {
+        const videoId = rawSrc.split("youtu.be/")[1]?.split("?")[0]
+        iframeSrc = `https://www.youtube.com/embed/${videoId}`
+      } else if (rawSrc.includes("vimeo.com/")) {
+        const videoId = rawSrc.split("vimeo.com/")[1]?.split("?")[0]
+        iframeSrc = `https://player.vimeo.com/video/${videoId}`
+      }
+
+      return [
+        "div",
+        {
+          "data-video-embed": "",
+          "data-video-url": videoUrl,
+          "data-stream-id": streamId,
+          "data-title": title,
+          class: "my-4 w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-navy/5 shadow-xs aspect-video",
+        },
+        [
+          "iframe",
+          {
+            src: iframeSrc,
+            class: "w-full h-full border-none rounded-2xl",
+            allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+            allowfullscreen: "true",
+          },
+        ],
+      ]
+    }
+
     return [
       "div",
-      mergeAttributes({ "data-video-embed": "" }, HTMLAttributes),
+      {
+        "data-video-embed": "",
+        "data-video-url": videoUrl,
+        "data-stream-id": streamId,
+        "data-title": title,
+        class: "my-4 w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-black shadow-xs",
+      },
+      [
+        "video",
+        {
+          src: rawSrc,
+          controls: "true",
+          playsinline: "true",
+          preload: "metadata",
+          class: "w-full max-h-[420px] mx-auto block rounded-2xl",
+        },
+      ],
     ]
   },
 
@@ -277,24 +359,32 @@ export function TiptapEditor({
   const handleImageUpload = useCallback(
     async (file: File) => {
       if (!editor) return
-      const toastId = toast.loading("Téléversement de l'image vers Cloudflare R2...")
+      const toastId = toast.loading("Téléversement de l'image...")
       try {
-        const res = await uploadToCloudflare(file, undefined, "guides", "image")
-        const finalUrl = res.secure_url || ""
+        const localDataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.readAsDataURL(file)
+        })
 
-        if (finalUrl) {
-          editor
-            .chain()
-            .focus()
-            .setImage({ src: finalUrl, alt: file.name })
-            .insertContent({ type: "paragraph" })
-            .focus("end")
-            .run()
-          toast.success("Image insérée avec succès !", { id: toastId })
-          setActiveModal(null)
-        } else {
-          toast.error("Impossible de charger l'image", { id: toastId })
-        }
+        let targetSrc = localDataUrl
+        try {
+          const res = await uploadToCloudflare(file, undefined, "guides", "image")
+          if (res && res.secure_url) {
+            targetSrc = res.secure_url
+          }
+        } catch {}
+
+        editor
+          .chain()
+          .focus()
+          .setImage({ src: targetSrc, alt: file.name })
+          .insertContent({ type: "paragraph" })
+          .focus("end")
+          .run()
+
+        toast.success("Image insérée avec succès !", { id: toastId })
+        setActiveModal(null)
       } catch {
         toast.error("Échec du chargement de l'image", { id: toastId })
       }
@@ -305,31 +395,39 @@ export function TiptapEditor({
   const handleVideoUpload = useCallback(
     async (file: File) => {
       if (!editor) return
-      const toastId = toast.loading("Téléversement de la vidéo vers Cloudflare R2...")
+      const toastId = toast.loading("Téléversement de la vidéo...")
       try {
-        const res = await uploadToCloudflare(file, undefined, "guides", "video")
-        const finalUrl = res.secure_url || ""
+        const localVideoUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.readAsDataURL(file)
+        })
 
-        if (finalUrl) {
-          editor
-            .chain()
-            .focus()
-            .insertContent([
-              {
-                type: "videoEmbed",
-                attrs: { video_url: finalUrl, stream_id: null, title: file.name },
-              },
-              {
-                type: "paragraph",
-              },
-            ])
-            .focus("end")
-            .run()
-          toast.success("Vidéo insérée avec succès !", { id: toastId })
-          setActiveModal(null)
-        } else {
-          toast.error("Impossible de charger la vidéo", { id: toastId })
-        }
+        let targetSrc = localVideoUrl
+        try {
+          const res = await uploadToCloudflare(file, undefined, "guides", "video")
+          if (res && res.secure_url) {
+            targetSrc = res.secure_url
+          }
+        } catch {}
+
+        editor
+          .chain()
+          .focus()
+          .insertContent([
+            {
+              type: "videoEmbed",
+              attrs: { video_url: targetSrc, stream_id: null, title: file.name },
+            },
+            {
+              type: "paragraph",
+            },
+          ])
+          .focus("end")
+          .run()
+
+        toast.success("Vidéo insérée avec succès !", { id: toastId })
+        setActiveModal(null)
       } catch {
         toast.error("Échec du chargement de la vidéo", { id: toastId })
       }

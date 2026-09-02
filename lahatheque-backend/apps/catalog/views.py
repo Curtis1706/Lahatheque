@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
+from django.conf import settings
 from .models import Ouvrage, Discipline, Domain, Country
 from .serializers import OuvrageReadSerializer, OuvrageCreateSerializer, DisciplineSerializer, DomainSerializer, CountrySerializer
 from .permissions import IsLayoutArtistOrAbove, IsChiefLayoutOnly, IsManagerOrAdmin
@@ -595,12 +596,22 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                     ExpiresIn=3600
                 )
 
+                download_url = s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={
+                        'Bucket': bucket_name,
+                        'Key': key,
+                    },
+                    ExpiresIn=604800
+                )
+
                 print(f"[R2 STORAGE] Presigned URL générée avec succès pour '{key}' ({content_type})", flush=True)
                 return Response({
                     "success": True,
                     "data": {
                         "direct_to_r2": True,
                         "upload_url": upload_url,
+                        "download_url": download_url,
                         "file_key": key,
                         "bucket": bucket_name
                     }
@@ -616,6 +627,56 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                 "message": "Stockage local ou R2 non configuré, repli vers multipart standard."
             }
         })
+
+    @action(detail=False, methods=['get'], url_path='r2-media', permission_classes=[permissions.AllowAny])
+    def get_r2_media(self, request):
+        """
+        GET /api/v1/catalog/my-deposits/r2-media/?key=covers/...
+        Proxy sécurisé de streaming direct depuis Cloudflare R2 vers le Frontend.
+        """
+        key = request.query_params.get('key', '').strip().lstrip('/')
+        if not key:
+            return Response({"error": "Clé de fichier requise"}, status=400)
+
+        # Protection des documents sensibles
+        if any(key.startswith(p) for p in ['contrats/', 'manuscripts/', 'publisher_deposits/']):
+            if not request.user or not request.user.is_authenticated:
+                return Response({"error": "Authentification requise"}, status=401)
+
+        bucket_name = getattr(settings, 'CLOUDFLARE_R2_BUCKET_NAME', 'lahatheque')
+        endpoint_url = getattr(settings, 'CLOUDFLARE_R2_ENDPOINT', '')
+        access_key = getattr(settings, 'CLOUDFLARE_R2_ACCESS_KEY_ID', '')
+        secret_key = getattr(settings, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY', '')
+
+        if endpoint_url and access_key and secret_key:
+            try:
+                import boto3
+                from botocore.client import Config
+                from django.http import StreamingHttpResponse
+
+                s3_client = boto3.client(
+                    's3',
+                    endpoint_url=endpoint_url,
+                    aws_access_key_id=access_key,
+                    aws_secret_access_key=secret_key,
+                    region_name='auto',
+                    config=Config(signature_version='s3v4', s3={'addressing_style': 'path'})
+                )
+
+                s3_response = s3_client.get_object(Bucket=bucket_name, Key=key)
+                content_type = s3_response.get('ContentType', 'application/octet-stream')
+                body_stream = s3_response['Body']
+
+                response = StreamingHttpResponse(
+                    body_stream.iter_chunks(chunk_size=65536),
+                    content_type=content_type
+                )
+                response['Cache-Control'] = 'public, max-age=86400'
+                return response
+            except Exception as err:
+                return Response({"error": f"Fichier introuvable sur R2: {err}"}, status=404)
+
+        return Response({"error": "Stockage R2 non configuré"}, status=404)
 
     @action(detail=False, methods=['get'], url_path='kpis')
     def get_maquettiste_kpis(self, request):
