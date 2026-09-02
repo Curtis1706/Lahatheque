@@ -83,6 +83,24 @@ def task_scan_and_send_deposit_reminders():
                 f"Cordialement,\nL'équipe LAHAThèque"
             )
 
+            from django.core.mail import send_mail
+            from django.conf import settings as django_settings
+
+            email_sent = False
+            error_detail = ""
+            try:
+                send_mail(
+                    subject=subject,
+                    message=body_text,
+                    from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'contact@lahatheque.com'),
+                    recipient_list=[recipient_email],
+                    fail_silently=False,
+                )
+                email_sent = True
+            except Exception as mail_err:
+                error_detail = str(mail_err)
+                logger.error(f"Échec envoi relance dépôt {deposit.id} à {recipient_email}: {mail_err}")
+
             try:
                 RelanceAutomatiqueLog.objects.create(
                     type_relance=RelanceAutomatiqueLog.TypeRelance.DEPOT_EN_ATTENTE,
@@ -90,11 +108,14 @@ def task_scan_and_send_deposit_reminders():
                     destinataire_email=recipient_email,
                     destinataire_nom=recipient_name,
                     objet=subject,
-                    message=body_text,
+                    message=body_text if email_sent else f"{body_text}\n\n[ÉCHEC: {error_detail}]",
                     reference_id=str(deposit.id),
-                    statut=RelanceAutomatiqueLog.StatutRelance.ENVOYE
+                    statut=RelanceAutomatiqueLog.StatutRelance.ENVOYE if email_sent else RelanceAutomatiqueLog.StatutRelance.ECHEC
                 )
-                results["sent"] += 1
+                if email_sent:
+                    results["sent"] += 1
+                else:
+                    results["errors"] += 1
             except Exception as e:
                 logger.error(f"Erreur enregistrement relance dépôt {deposit.id}: {e}")
                 results["errors"] += 1
@@ -117,8 +138,9 @@ def task_scan_and_send_unpaid_reminders():
 
     try:
         from apps.commerce.models import Order
+        filter_field = 'statut_paiement' if hasattr(Order, 'statut_paiement') else 'payment_status'
         unpaid_orders = Order.objects.filter(
-            payment_status='pending',
+            **{filter_field: 'pending'},
             created_at__lte=cutoff_date
         ).select_related('user')
 
@@ -140,6 +162,24 @@ def task_scan_and_send_unpaid_reminders():
                 f"L'équipe LAHAThèque"
             )
 
+            from django.core.mail import send_mail
+            from django.conf import settings as django_settings
+
+            email_sent = False
+            error_detail = ""
+            try:
+                send_mail(
+                    subject=subject,
+                    message=body_text,
+                    from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'contact@lahatheque.com'),
+                    recipient_list=[recipient_email],
+                    fail_silently=False,
+                )
+                email_sent = True
+            except Exception as mail_err:
+                error_detail = str(mail_err)
+                logger.error(f"Échec envoi relance impayé {order.id} à {recipient_email}: {mail_err}")
+
             try:
                 RelanceAutomatiqueLog.objects.create(
                     type_relance=RelanceAutomatiqueLog.TypeRelance.FACTURE_IMPAYEE,
@@ -147,11 +187,14 @@ def task_scan_and_send_unpaid_reminders():
                     destinataire_email=recipient_email,
                     destinataire_nom=recipient_name,
                     objet=subject,
-                    message=body_text,
+                    message=body_text if email_sent else f"{body_text}\n\n[ÉCHEC: {error_detail}]",
                     reference_id=str(order.id),
-                    statut=RelanceAutomatiqueLog.StatutRelance.ENVOYE
+                    statut=RelanceAutomatiqueLog.StatutRelance.ENVOYE if email_sent else RelanceAutomatiqueLog.StatutRelance.ECHEC
                 )
-                results["sent"] += 1
+                if email_sent:
+                    results["sent"] += 1
+                else:
+                    results["errors"] += 1
             except Exception as e:
                 logger.error(f"Erreur enregistrement relance impayé {order.id}: {e}")
                 results["errors"] += 1
@@ -198,6 +241,24 @@ def task_scan_and_send_subscription_expiry_reminders():
                 f"L'équipe LAHAThèque"
             )
 
+            from django.core.mail import send_mail
+            from django.conf import settings as django_settings
+
+            email_sent = False
+            error_detail = ""
+            try:
+                send_mail(
+                    subject=subject,
+                    message=body_text,
+                    from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'contact@lahatheque.com'),
+                    recipient_list=[recipient_email],
+                    fail_silently=False,
+                )
+                email_sent = True
+            except Exception as mail_err:
+                error_detail = str(mail_err)
+                logger.error(f"Échec envoi relance abonnement {sub.id} à {recipient_email}: {mail_err}")
+
             try:
                 RelanceAutomatiqueLog.objects.create(
                     type_relance=RelanceAutomatiqueLog.TypeRelance.ABONNEMENT_EXPIRATION,
@@ -205,11 +266,14 @@ def task_scan_and_send_subscription_expiry_reminders():
                     destinataire_email=recipient_email,
                     destinataire_nom=recipient_name,
                     objet=subject,
-                    message=body_text,
+                    message=body_text if email_sent else f"{body_text}\n\n[ÉCHEC: {error_detail}]",
                     reference_id=str(sub.id),
-                    statut=RelanceAutomatiqueLog.StatutRelance.ENVOYE
+                    statut=RelanceAutomatiqueLog.StatutRelance.ENVOYE if email_sent else RelanceAutomatiqueLog.StatutRelance.ECHEC
                 )
-                results["sent"] += 1
+                if email_sent:
+                    results["sent"] += 1
+                else:
+                    results["errors"] += 1
             except Exception as e:
                 logger.error(f"Erreur enregistrement relance abonnement {sub.id}: {e}")
                 results["errors"] += 1

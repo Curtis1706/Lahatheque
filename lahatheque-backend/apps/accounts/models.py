@@ -1,7 +1,7 @@
 """Modèles identités, rôles et authentification (User, MFAConfig, OTP)."""
 import uuid
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 
 from django.utils import timezone
 from .oauth2.models import RevokedPartnerToken
@@ -23,7 +23,7 @@ ROLE_CHOICES = (
 )
 
 class User(AbstractUser):
-    objects = models.Manager()
+    objects = UserManager()
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=30, blank=True, null=True)

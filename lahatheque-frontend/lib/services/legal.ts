@@ -249,14 +249,12 @@ export async function getAIRoyaltySuggestions(): Promise<AIRoyaltySuggestion[]> 
     title: s.book_title || s.contract_title,
     authors: [s.beneficiary_name],
     proposed_splits: [
-      { author_name: s.beneficiary_name, percentage: s.suggested_digital_rate || 70 }
+      { author_name: s.beneficiary_name, percentage: s.suggested_rate || 50 }
     ],
     is_validated: s.is_validated,
     ai_confidence: Math.round((s.confidence_score || 0.95) * 100),
     extracted_clause: s.extracted_clause,
-    suggested_paper_rate: s.suggested_paper_rate,
-    suggested_digital_rate: s.suggested_digital_rate,
-    suggested_audio_tts_rate: s.suggested_audio_tts_rate,
+    suggested_rate: s.suggested_rate,
   }));
 }
 
