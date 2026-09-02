@@ -454,6 +454,8 @@ class DeliveriesListView(APIView):
                 "country": d.country,
                 "carrier_name": d.carrier_name,
                 "tracking_number": d.tracking_number,
+                "delivery_service": d.delivery_service,
+                "delivery_fee": float(d.delivery_fee) if d.delivery_fee is not None else None,
                 "statut": d.statut,
                 "total_amount": float(d.commande.total_amount) if d.commande and d.commande.total_amount else 0.0,
                 "mode_paiement": d.commande.mode_paiement if d.commande else "mobile_money",
@@ -582,6 +584,8 @@ class DeliveryDetailView(APIView):
                 "country": d.country,
                 "carrier_name": d.carrier_name,
                 "tracking_number": d.tracking_number,
+                "delivery_service": d.delivery_service,
+                "delivery_fee": float(d.delivery_fee) if d.delivery_fee is not None else None,
                 "statut": d.statut,
                 "total_amount": float(d.commande.total_amount) if d.commande and d.commande.total_amount else 0.0,
                 "mode_paiement": d.commande.mode_paiement if d.commande else "mobile_money",
@@ -684,6 +688,17 @@ class DeliveryDetailView(APIView):
                 val = request.data.get(field)
                 if val is not None:
                     setattr(d, field, val)
+
+            if 'delivery_service' in request.data:
+                d.delivery_service = str(request.data['delivery_service'])
+            if 'delivery_fee' in request.data:
+                fee_val = request.data['delivery_fee']
+                if fee_val is not None and fee_val != "":
+                    from decimal import Decimal
+                    d.delivery_fee = Decimal(str(fee_val))
+                else:
+                    d.delivery_fee = None
+
             # Normaliser le statut si besoin
             if d.statut in ('in_transit', 'shipped'):
                 d.statut = 'expedie'
@@ -735,6 +750,8 @@ class DeliveryDetailView(APIView):
                 "data": {
                     "id": str(d.id),
                     "statut": d.statut,
+                    "delivery_service": d.delivery_service,
+                    "delivery_fee": float(d.delivery_fee) if d.delivery_fee is not None else None,
                     "commande_statut": d.commande.statut_commande,
                 },
                 "error": None

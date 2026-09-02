@@ -28,8 +28,11 @@ export function PaperOrderModal({
   if (!book) return null;
 
   const unitPrice = book.price_paper || book.paper_price || 15000;
-  const shippingFee = 2500;
-  const totalPrice = unitPrice * quantity + shippingFee;
+  // Les frais de livraison sont définis par le Gestionnaire selon le service choisi,
+  // communiqués après traitement — jamais un montant inventé côté client.
+  const shippingFee = 0;
+  const shippingFeeUnknown = true;
+  const totalPrice = unitPrice * quantity;
   const authorName = book.author || "Auteur académique";
 
   const handleConfirm = async (e: React.FormEvent) => {
@@ -108,12 +111,13 @@ export function PaperOrderModal({
             <span>Sous-total ({quantity} ex.) :</span>
             <span className="font-mono">{(unitPrice * quantity).toLocaleString("fr-FR")} XOF</span>
           </div>
-          <div className="flex justify-between text-foreground-muted">
-            <span>Frais d&apos;expédition &amp; Logistique :</span>
-            <span className="font-mono">{shippingFee.toLocaleString("fr-FR")} XOF</span>
-          </div>
+          {shippingFeeUnknown && (
+            <p className="text-[11px] text-foreground-muted italic pt-1">
+              Frais de livraison à confirmer — communiqués après traitement de votre commande par notre équipe logistique.
+            </p>
+          )}
           <div className="flex justify-between text-sm font-bold text-navy pt-2 border-t border-border">
-            <span>Total TTC à régler :</span>
+            <span>Total des ouvrages :</span>
             <span className="font-mono text-gold">{totalPrice.toLocaleString("fr-FR")} XOF</span>
           </div>
         </div>

@@ -152,6 +152,8 @@ export interface OrderAPI {
   statut_paiement_display: string;
   statut_commande: string;
   statut_commande_display: string;
+  delivery_status?: string;
+  delivery_status_display?: string;
   mode_paiement?: string;
   mode_paiement_display?: string;
   type_commande?: string;

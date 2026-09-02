@@ -134,6 +134,14 @@ class PhysicalDelivery(models.Model):
     plage_horaire_fin = models.TimeField(null=True, blank=True)
     tracking_number = models.CharField(max_length=100, blank=True, default='')
     carrier_name = models.CharField(max_length=100, blank=True, default='')
+    delivery_service = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text="Service de livraison choisi par le Gestionnaire (ex: DHL, coursier local, retrait en agence)"
+    )
+    delivery_fee = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Frais de livraison définis par le Gestionnaire selon le service choisi"
+    )
     statut = models.CharField(max_length=30, choices=STATUS_CHOICES, default='en_preparation')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

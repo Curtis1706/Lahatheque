@@ -205,13 +205,23 @@ export default function StudentOrdersPage() {
     },
     {
       key: "statut_commande",
-      header: "Statut Livraison",
+      header: "Statut Commande",
       cell: (row) => (
         <StatusBadge
           status={row.statut_commande}
           label={row.statut_commande_display}
         />
       ),
+    },
+    {
+      key: "delivery_status",
+      header: "Statut Livraison",
+      cell: (row) =>
+        row.delivery_status ? (
+          <StatusBadge status={row.delivery_status} label={row.delivery_status_display || row.delivery_status} />
+        ) : (
+          <span className="text-[10px] text-foreground-muted">—</span>
+        ),
     },
     {
       key: "total_amount",
