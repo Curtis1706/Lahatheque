@@ -116,39 +116,6 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             >
               Catalogue
             </Link>
-
-            {/* Onglet Aide & Contact (Dropdown Desktop) */}
-            <div className="relative group">
-              <button
-                type="button"
-                className={`flex items-center gap-1.5 text-sm py-2 font-medium transition-colors duration-200 whitespace-nowrap cursor-pointer ${
-                  pathname === "/guide" || pathname === "/contact"
-                    ? "text-navy font-bold border-b-2 border-gold font-sans"
-                    : "text-foreground hover:text-gold"
-                }`}
-              >
-                <span>Aide &amp; Contact</span>
-                <ChevronDown className="w-3.5 h-3.5 opacity-70 group-hover:rotate-180 transition-transform duration-200" />
-              </button>
-
-              <div className="absolute top-full right-0 w-52 bg-background rounded-2xl border border-border p-2 shadow-xl opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-50">
-                <Link
-                  href="/guide"
-                  className="flex items-center gap-2.5 p-2.5 rounded-xl text-xs font-semibold text-foreground hover:text-navy hover:bg-background-secondary transition-colors"
-                >
-                  <HelpCircle className="w-4 h-4 text-gold shrink-0" />
-                  <span>Guide d&apos;utilisation</span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new CustomEvent("app-open-contact"))}
-                  className="w-full flex items-center gap-2.5 p-2.5 rounded-xl text-xs font-semibold text-foreground hover:text-navy hover:bg-background-secondary transition-colors text-left cursor-pointer"
-                >
-                  <Mail className="w-4 h-4 text-gold shrink-0" />
-                  <span>Nous contacter</span>
-                </button>
-              </div>
-            </div>
           </nav>
 
           {/* 3. Actions & Search (Right) */}
@@ -274,28 +241,6 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               >
                 Catalogue
               </Link>
-
-              <Link 
-                href="/guide" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={pathname.startsWith("/guide") 
-                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-                }
-              >
-                Guide d&apos;utilisation
-              </Link>
-
-              <button 
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  window.dispatchEvent(new CustomEvent("app-open-contact"));
-                }}
-                className="w-full text-left font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm cursor-pointer"
-              >
-                Nous contacter
-              </button>
 
               <Link 
                 href="/login" 

@@ -43,6 +43,7 @@ import {
   Search,
   Sparkles,
   BellRing,
+  Edit2,
   FileSpreadsheet,
   Key,
   Activity,
@@ -360,7 +361,15 @@ export function DashboardSidebar() {
                   { label: "Sécurité DRM & Filigrane", href: "/admin/settings/drm", icon: <ShieldCheck className="size-3.5" /> },
                 ],
               },
-              { label: "Gestion des Guides", href: "/admin/guides", icon: <HelpCircle className="size-4" /> },
+              {
+                label: "Guides & Assistance",
+                href: "/admin/guides",
+                icon: <HelpCircle className="size-4" />,
+                sublinks: [
+                  { label: "Guides d'utilisation", href: "/admin/guide", icon: <BookOpen className="size-3.5" /> },
+                  { label: "Gestion des guides", href: "/admin/guides", icon: <Edit2 className="size-3.5" /> },
+                ],
+              },
             ],
           },
         ];
@@ -379,15 +388,25 @@ export function DashboardSidebar() {
     }
   };
 
+  const getRoleGuideHref = () => {
+    if (!user) return "/student/guide";
+    if (user.role === "admin" || user.role === "super_admin") return "/admin/guide";
+    if (user.role === "super_client" || user.role === "wholesaler") return "/wholesaler/guide";
+    if (user.role === "legal_reviewer") return "/legal-reviewer/guide";
+    if (user.role === "layout_artist") return "/layout-artist/guide";
+    if (user.role === "chief_layout") return "/chief-layout/guide";
+    return `/${user.role}/guide`;
+  };
+
   const supportGroup: { groupLabel?: string; items: NavLinkItem[] } = {
     groupLabel: "Support & Assistance",
     items: [
       {
         label: "Aide & Contact",
-        href: "/guide",
+        href: getRoleGuideHref(),
         icon: <HelpCircle className="size-4" />,
         sublinks: [
-          { label: "Guide d'utilisation", href: "/guide", icon: <BookOpen className="size-3.5" /> },
+          { label: "Guide d'utilisation", href: getRoleGuideHref(), icon: <BookOpen className="size-3.5" /> },
           { label: "Nous contacter", href: "#contact", icon: <Mail className="size-3.5" /> },
         ],
       },
