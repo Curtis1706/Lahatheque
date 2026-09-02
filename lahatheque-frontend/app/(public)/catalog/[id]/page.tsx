@@ -1,32 +1,73 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { 
-  BookOpen, 
   ArrowLeft, 
-  Building2, 
-  Globe, 
-  FileText, 
   ShieldCheck, 
   Award, 
-  Clock,
-  Sparkles,
   AlertTriangle,
   Star,
-  Layers,
   ChevronRight,
-  Mail
+  Loader2
 } from "lucide-react";
+import { Book } from "@/lib/types/catalog";
 import { getBookById, searchBooks } from "@/lib/services/catalog";
 import { BookActionButtons } from "@/components/catalog/book-action-buttons";
 import { Book as Book3D } from "@/components/ui/book";
 import { formatEur } from "@/components/cart/cart-drawer";
 
-export default async function BookDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const book = await getBookById(id);
+export default function BookDetailPage() {
+  const params = useParams();
+  const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
+
+  const [book, setBook] = useState<Book | null>(null);
+  const [relatedBooks, setRelatedBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+    let isMounted = true;
+
+    async function loadData() {
+      setLoading(true);
+      try {
+        const fetchedBook = await getBookById(id);
+        if (!isMounted) return;
+        setBook(fetchedBook);
+
+        if (fetchedBook) {
+          const disciplineId = fetchedBook.discipline_detail?.id?.toString();
+          const allBooks = await searchBooks({ discipline: disciplineId });
+          if (isMounted) {
+            setRelatedBooks(allBooks.filter((b) => b.id !== fetchedBook.id).slice(0, 4));
+          }
+        }
+      } catch (err) {
+        console.error("Erreur chargement livre :", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] bg-background text-foreground flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-10 h-10 text-gold animate-spin" />
+        <p className="text-xs sm:text-sm text-foreground-muted font-sans">
+          Chargement de l'ouvrage en cours...
+        </p>
+      </div>
+    );
+  }
 
   if (!book) {
     return (
@@ -40,7 +81,7 @@ export default async function BookDetailPage({
         </p>
         <Link
           href="/catalog"
-          className="inline-flex items-center gap-2 bg-navy hover:bg-navy-dark text-white text-xs font-bold px-6 py-3 rounded-xl shadow"
+          className="inline-flex items-center gap-2 bg-navy hover:bg-navy-dark text-white text-xs font-bold px-6 py-3 rounded-xl shadow cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           Retour au catalogue
@@ -48,10 +89,6 @@ export default async function BookDetailPage({
       </div>
     );
   }
-
-  // Récupérer les livres similaires de la même discipline
-  const allBooks = await searchBooks({ discipline: book.discipline_detail?.id?.toString() });
-  const relatedBooks = allBooks.filter((b) => b.id !== book.id).slice(0, 4);
 
   const authorsString = book.authors_details && book.authors_details.length > 0
     ? book.authors_details.map((a) => `${a.first_name} ${a.last_name}`).join(", ")
@@ -163,7 +200,7 @@ export default async function BookDetailPage({
               {/* Badges de Caractéristiques */}
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-background text-navy border border-border text-[11px] font-semibold">
-                  Catégorie : <strong className="ml-1 text-navy">{book.discipline_detail?.name}</strong>
+                  Catégorie : <strong className="ml-1 text-navy">{book.discipline_detail?.name || "Général"}</strong>
                 </span>
 
                 <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-background text-navy border border-border text-[11px] font-semibold">
@@ -207,29 +244,29 @@ export default async function BookDetailPage({
           </div>
 
           <div className="prose max-w-none text-xs sm:text-sm text-foreground/90 leading-relaxed space-y-4">
-            <p>{book.summary}</p>
+            <p>{book.summary || "Aucune description détaillée n'a été fournie pour cet ouvrage."}</p>
           </div>
 
           {/* Table des Spécifications Techniques */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border text-xs">
             <div>
               <span className="text-foreground-muted block text-[11px] font-semibold uppercase tracking-wider font-mono">ISBN</span>
-              <span className="font-mono text-navy font-bold">{book.isbn}</span>
+              <span className="font-mono text-navy font-bold">{book.isbn || "Non renseigné"}</span>
             </div>
 
             <div>
               <span className="text-foreground-muted block text-[11px] font-semibold uppercase tracking-wider font-mono">Éditeur</span>
-              <span className="font-semibold text-navy">{book.publisher_name}</span>
+              <span className="font-semibold text-navy">{book.publisher_name || "LAHA Éditions"}</span>
             </div>
 
             <div>
               <span className="text-foreground-muted block text-[11px] font-semibold uppercase tracking-wider font-mono">Année d'édition</span>
-              <span className="font-semibold text-navy font-mono">{book.publication_year || 2025}</span>
+              <span className="font-semibold text-navy font-mono">{book.publication_year || 2026}</span>
             </div>
 
             <div>
               <span className="text-foreground-muted block text-[11px] font-semibold uppercase tracking-wider font-mono">Pagination</span>
-              <span className="font-semibold text-navy font-mono">{book.total_pages || 320} pages</span>
+              <span className="font-semibold text-navy font-mono">{book.total_pages || (book as any).page_count || 120} pages</span>
             </div>
           </div>
         </div>
