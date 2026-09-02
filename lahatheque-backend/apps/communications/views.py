@@ -106,22 +106,18 @@ class GuideViewSet(viewsets.ModelViewSet):
         user = self.request.user
         role_filter = self.request.query_params.get('role', None)
 
-        # Si l'Admin souhaite filtrer ou lister
-        if user.is_authenticated and user.role in ['admin', 'super_admin']:
-            if role_filter and role_filter != 'all':
-                return GuideItem.objects.filter(target_role=role_filter).order_by('order', '-created_at')
-            return GuideItem.objects.all().order_by('order', '-created_at')
+        qs = GuideItem.objects.all()
 
-        # Utilisateur connecté spécifique (non-admin) : il ne voit QUE les guides de son rôle
-        if user.is_authenticated:
-            user_role = user.role
-            allowed_roles = [user_role, 'public']
-            return GuideItem.objects.filter(is_published=True, target_role__in=allowed_roles).order_by('order', '-created_at')
-
-        # Visiteur non-connecté public
+        # Filtrage par rôle ciblé si spécifié
         if role_filter and role_filter != 'all':
-            return GuideItem.objects.filter(is_published=True, target_role=role_filter).order_by('order', '-created_at')
-        return GuideItem.objects.filter(is_published=True, target_role__in=['public', 'student']).order_by('order', '-created_at')
+            qs = qs.filter(target_role=role_filter)
+
+        # Les administrateurs et membres du staff accèdent à tous les articles (brouillons inclus)
+        if user.is_authenticated and (getattr(user, 'role', '') in ['admin', 'super_admin'] or user.is_staff):
+            return qs.order_by('order', '-created_at')
+
+        # Les autres utilisateurs et visiteurs ne voient que les articles publiés
+        return qs.filter(is_published=True).order_by('order', '-created_at')
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user if self.request.user.is_authenticated else None)

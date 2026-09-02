@@ -129,28 +129,38 @@ function GuideArticleEditorContent() {
     };
 
     try {
+      let res: Response;
       if (articleId) {
         // Mise à jour
-        await fetch(`/api/v1/communications/guides/${articleId}/`, {
+        res = await fetch(`/api/v1/communications/guides/${articleId}/`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        toast.success("Article de guide mis à jour avec succès !", { id: toastId });
       } else {
         // Création
-        await fetch("/api/v1/communications/guides/", {
+        res = await fetch("/api/v1/communications/guides/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        toast.success("Nouvel article créé et enregistré !", { id: toastId });
       }
 
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const errorMsg =
+          resData.detail ||
+          resData.error ||
+          resData.message ||
+          (typeof resData === "object" ? JSON.stringify(resData) : "Erreur lors de l'enregistrement en base de données.");
+        toast.error(`Échec : ${errorMsg}`, { id: toastId });
+        return;
+      }
+
+      toast.success(articleId ? "Article de guide mis à jour avec succès !" : "Nouvel article créé et enregistré !", { id: toastId });
       router.push("/admin/guides?mode=manage");
-    } catch {
-      toast.success("Article enregistré !", { id: toastId });
-      router.push("/admin/guides?mode=manage");
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur de communication avec le serveur", { id: toastId });
     } finally {
       setIsSaving(false);
     }
