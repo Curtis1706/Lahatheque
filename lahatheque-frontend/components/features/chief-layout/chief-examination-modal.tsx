@@ -96,7 +96,7 @@ export function ChiefExaminationModal({
   return (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/70 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 overflow-y-auto"
         onClick={handleResetAndClose}
         role="dialog"
         aria-modal="true"

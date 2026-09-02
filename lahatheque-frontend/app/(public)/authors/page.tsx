@@ -169,18 +169,18 @@ export default function AuthorsPublicPage() {
               />
               {/* Dégradé de fondu de gauche (Navy vers transparent) pour Desktop */}
               <div className="absolute inset-0 bg-gradient-to-r from-navy via-navy/90 to-transparent hidden lg:block" />
-              {/* Overlay mobile sombre et protecteur avec dégradé vertical et léger flou */}
-              <div className="absolute inset-0 bg-gradient-to-b from-navy-dark/95 via-navy/90 to-navy-dark/95 backdrop-blur-[2px] lg:hidden" />
+              {/* Overlay mobile sombre et protecteur avec dégradé vertical */}
+              <div className="absolute inset-0 bg-gradient-to-b from-navy-dark/95 via-navy/90 to-navy-dark/95 lg:hidden" />
             </div>
           </div>
 
           {/* Badges de confiance flottants en haut à droite */}
           <div className="absolute top-6 right-6 z-20 hidden md:flex flex-col gap-2.5">
-            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-navy-hover px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
+            <div className="flex items-center gap-2 bg-navy-dark border border-navy-hover px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
               <Lock className="w-4 h-4 text-gold" />
               <span>Confidentiel</span>
             </div>
-            <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md border border-navy-hover px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
+            <div className="flex items-center gap-2 bg-navy-dark border border-navy-hover px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-lg">
               <Users className="w-4 h-4 text-gold" />
               <span>Suivi personnalisé</span>
             </div>

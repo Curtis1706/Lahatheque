@@ -145,7 +145,7 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-200"
     >
       <div
         className="w-full max-w-3xl bg-background rounded-3xl border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"

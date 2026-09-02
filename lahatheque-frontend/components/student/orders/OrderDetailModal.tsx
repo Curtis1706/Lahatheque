@@ -28,7 +28,7 @@ export function OrderDetailModal({ order, isOpen, onClose }: OrderDetailModalPro
   const vat = totalNumber - subtotal;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-dark/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-dark/70 animate-in fade-in duration-200">
       <div className="bg-background border border-border w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Modal Header */}

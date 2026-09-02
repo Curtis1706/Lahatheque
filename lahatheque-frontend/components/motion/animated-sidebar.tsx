@@ -374,7 +374,7 @@ function MobileSidebar({
         transition={context.reduce ? REDUCED_TRANSITION : PANEL_TRANSITION}
         onClick={() => context.setOpenMobile(false)}
         className={cn(
-          "fixed inset-0 bg-black/60 backdrop-blur-xs",
+          "fixed inset-0 bg-black/60",
           context.openMobile ? "pointer-events-auto" : "pointer-events-none"
         )}
       />

@@ -313,7 +313,7 @@ export default function ChefValidationHistoryPage() {
 
       {/* Modale de Détail d'une Décision Archivée */}
       {selectedDeposit && (
-        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-border pb-4 shrink-0">
               <div className="flex items-center gap-2">

@@ -37,7 +37,9 @@ import {
   UploadCloud,
   FileCheck2,
   Scale,
-  Boxes
+  Boxes,
+  Mail,
+  HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -296,7 +298,12 @@ export function MobileBottomNav() {
   };
 
   const nav = getBottomNavConfig();
-  const drawerLinks = getDrawerMenuLinks();
+  const rawDrawerLinks = getDrawerMenuLinks();
+  const drawerLinks = [
+    ...rawDrawerLinks,
+    { label: "Guide d'utilisation", href: "/guide", icon: <BookOpen className="w-4 h-4" /> },
+    { label: "Nous contacter", href: "#contact", icon: <Mail className="w-4 h-4" /> },
+  ];
 
   const getRoleBadgeLabel = () => {
     switch (user?.role) {
@@ -409,13 +416,13 @@ export function MobileBottomNav() {
       <AnimatePresence>
         {menuOpen && (
           <>
-            {/* Backdrop Overlay */}
+            {/* Backdrop Overlay (sans glassmorphisme) */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMenuOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[90] md:hidden"
+              className="fixed inset-0 bg-black/60 z-[90] md:hidden"
             />
 
             {/* Bottom Sheet Drawer Panel */}
@@ -460,6 +467,22 @@ export function MobileBottomNav() {
                 <div className="grid grid-cols-2 gap-2.5">
                   {drawerLinks.map((link) => {
                     const isActive = checkIsActive(link.href);
+                    if (link.href === "#contact") {
+                      return (
+                        <button
+                          key={link.href + link.label}
+                          type="button"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            window.dispatchEvent(new CustomEvent("app-open-contact"));
+                          }}
+                          className="p-3 rounded-xl border bg-background-secondary border-border text-navy font-semibold hover:border-gold flex items-center gap-2.5 text-xs transition-colors truncate text-left cursor-pointer"
+                        >
+                          <div className="text-gold">{link.icon}</div>
+                          <span className="truncate">{link.label}</span>
+                        </button>
+                      );
+                    }
                     return (
                       <Link
                         key={link.href + link.label}

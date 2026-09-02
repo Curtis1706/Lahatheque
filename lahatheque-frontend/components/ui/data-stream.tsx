@@ -70,7 +70,7 @@ export function DataStream({
     <div
       data-slot="laha-data-stream"
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-navy-hover bg-navy-dark text-slate-100 shadow-2xl backdrop-blur-md",
+        "relative overflow-hidden rounded-2xl border border-navy-hover bg-navy-dark text-slate-100 shadow-2xl",
         className
       )}
       {...props}

@@ -6,6 +6,7 @@ import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { AnimatedSidebarProvider, AnimatedSidebarInset } from "@/components/motion/animated-sidebar";
 import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
 import { NotificationBell } from "@/components/ui/notification-bell";
+import { ContactSupportDialog } from "@/components/ui/contact-support-dialog";
 
 interface Props {
   children: ReactNode;
@@ -65,6 +66,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </AnimatedSidebarInset>
             {/* Floating Dock Bottom Navigation for Mobile (21st.dev Floating Nav) */}
             <MobileBottomNav />
+            {/* Modale de Contact Support globale */}
+            <ContactSupportDialog />
           </div>
         </AnimatedSidebarProvider>
       </AuthGuard>

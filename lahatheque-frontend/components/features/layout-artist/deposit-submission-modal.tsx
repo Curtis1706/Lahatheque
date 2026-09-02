@@ -104,7 +104,7 @@ export function DepositSubmissionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-200">
       {/* Top Global Animated Progress Bar */}
       <div className="fixed top-0 left-0 right-0 h-1.5 bg-background-secondary z-50 overflow-hidden">
         <div

@@ -363,7 +363,7 @@ export default function AdminCatalogPage() {
 
       {/* Modale d'Édition Rapide */}
       {editingBook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-in fade-in">
           <div className="bg-background rounded-3xl border border-border p-6 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
@@ -466,7 +466,7 @@ export default function AdminCatalogPage() {
 
       {/* Modal Confirmation de Suppression d'un Ouvrage */}
       {deleteConfirmBook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-xs animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-in fade-in">
           <div className="bg-background rounded-3xl border border-border p-6 max-w-sm w-full shadow-2xl space-y-4 text-center animate-in zoom-in-95">
             <div className="w-12 h-12 rounded-full bg-error/15 text-error mx-auto flex items-center justify-center">
               <Trash2 className="w-6 h-6" />

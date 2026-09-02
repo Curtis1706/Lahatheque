@@ -79,18 +79,30 @@ function VideoEmbedView({ node, deleteNode }: NodeViewProps) {
     ? `https://${CLOUDFLARE_STREAM_SUBDOMAIN}/${stream_id}/iframe`
     : video_url
 
+  const isDirectVideo =
+    src &&
+    (src.includes(".mp4") ||
+      src.includes(".webm") ||
+      src.includes(".r2.cloudflarestorage.com") ||
+      src.includes(".r2.dev") ||
+      (!src.includes("youtube.com") && !src.includes("youtu.be") && !src.includes("vimeo.com") && !src.includes("iframe")));
+
   return (
     <NodeViewWrapper className="my-4 relative group">
-      <div className="relative rounded-xl overflow-hidden border border-border bg-black aspect-video max-w-2xl mx-auto">
+      <div className="relative rounded-2xl overflow-hidden border border-border bg-black aspect-video max-w-2xl mx-auto shadow-md">
         {src ? (
-          <iframe
-            src={src}
-            className="w-full h-full border-none"
-            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
+          isDirectVideo ? (
+            <video src={src} controls playsInline className="w-full h-full object-cover" />
+          ) : (
+            <iframe
+              src={src}
+              className="w-full h-full border-none"
+              allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          )
         ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+          <div className="flex items-center justify-center h-full text-foreground-muted text-xs">
             Vidéo non disponible
           </div>
         )}
@@ -98,7 +110,7 @@ function VideoEmbedView({ node, deleteNode }: NodeViewProps) {
       <button
         onClick={deleteNode}
         type="button"
-        className="absolute top-2 right-2 bg-rose-600 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold shadow-md"
+        className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold shadow-md cursor-pointer"
         title="Supprimer la vidéo"
       >
         <X className="w-4 h-4" />
@@ -119,7 +131,7 @@ function EditorModal({
   children: React.ReactNode
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 animate-in fade-in duration-150">
       <div className="bg-card border border-border sm:max-w-md w-full rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         <div className="flex justify-between items-center px-5 py-3.5 border-b border-border bg-muted/20">
           <h4 className="text-sm font-bold text-foreground">{title}</h4>
@@ -349,7 +361,7 @@ export function TiptapEditor({
       />
 
       {/* Toolbar fixe en haut de l'éditeur */}
-      <div className="flex flex-wrap items-center gap-1 px-3 py-2.5 border-b border-border bg-card/95 backdrop-blur shadow-sm overflow-x-auto shrink-0">
+      <div className="flex flex-wrap items-center gap-1 px-3 py-2.5 border-b border-border bg-card shadow-sm overflow-x-auto shrink-0">
         {/* Annuler / Rétablir */}
         <div className="flex items-center gap-0.5">
           <ToolbarButton

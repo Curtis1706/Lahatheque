@@ -70,6 +70,8 @@ import {
   Tag,
   PanelLeft,
   Globe,
+  HelpCircle,
+  Mail,
 } from "lucide-react";
 
 interface SubLinkItem {
@@ -358,6 +360,7 @@ export function DashboardSidebar() {
                   { label: "Sécurité DRM & Filigrane", href: "/admin/settings/drm", icon: <ShieldCheck className="size-3.5" /> },
                 ],
               },
+              { label: "Gestion des Guides", href: "/admin/guides", icon: <HelpCircle className="size-4" /> },
             ],
           },
         ];
@@ -376,7 +379,23 @@ export function DashboardSidebar() {
     }
   };
 
-  const groups = getLinks();
+  const supportGroup: { groupLabel?: string; items: NavLinkItem[] } = {
+    groupLabel: "Support & Assistance",
+    items: [
+      {
+        label: "Aide & Contact",
+        href: "/guide",
+        icon: <HelpCircle className="size-4" />,
+        sublinks: [
+          { label: "Guide d'utilisation", href: "/guide", icon: <BookOpen className="size-3.5" /> },
+          { label: "Nous contacter", href: "#contact", icon: <Mail className="size-3.5" /> },
+        ],
+      },
+    ],
+  };
+
+  const roleGroups = getLinks();
+  const groups = [...roleGroups, supportGroup];
   const userDisplayName = user
     ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email || "Profil"
     : "Profil";
@@ -507,11 +526,16 @@ export function DashboardSidebar() {
                       {hasSublinks && item.sublinks ? (
                         <AnimatedSidebarMenuSub open={isOpen}>
                           {item.sublinks.map((sub) => (
-                            <AnimatedSidebarMenuSubItem key={sub.href}>
+                            <AnimatedSidebarMenuSubItem key={sub.href + sub.label}>
                               <AnimatedSidebarMenuSubButton
-                                href={sub.href}
+                                href={sub.href === "#contact" ? undefined : sub.href}
                                 isActive={pathname === sub.href}
                                 icon={sub.icon}
+                                onSelect={() => {
+                                  if (sub.href === "#contact") {
+                                    window.dispatchEvent(new CustomEvent("app-open-contact"));
+                                  }
+                                }}
                               >
                                 {sub.label}
                               </AnimatedSidebarMenuSubButton>

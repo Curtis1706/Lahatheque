@@ -36,7 +36,7 @@ export function WholesaleCartDrawer({
   const totalPrintCount = items.reduce((acc, item) => acc + item.print_copies_qty, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60">
       <div className="w-full max-w-lg bg-background h-full shadow-2xl flex flex-col justify-between border-l border-border animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="p-5 border-b border-border flex items-center justify-between bg-navy text-white">

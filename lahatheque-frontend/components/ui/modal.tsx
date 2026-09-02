@@ -426,7 +426,7 @@ export function Modal({
             aria-hidden="true"
             variants={variants.backdrop}
             style={{ touchAction: "none" }}
-            className="absolute inset-0 bg-navy-dark/60 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-navy-dark/70"
           />
           <motion.div
             {...panelProps}

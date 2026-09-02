@@ -94,7 +94,7 @@ function TableOfContents({
                     }}
                     className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors leading-snug ${
                       activeArticleId === art.id
-                        ? "bg-laha-gold/10 text-laha-gold font-semibold"
+                        ? "bg-gold/10 text-gold font-semibold"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     }`}
                   >
@@ -115,19 +115,19 @@ function TableOfContents({
 const PROSE_CLASSES = `
   tiptap-content
   text-sm text-foreground leading-relaxed
-  [&_h1]:text-xl [&_h1]:font-bold [&_h1]:text-foreground [&_h1]:mt-5 [&_h1]:mb-3
-  [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-foreground [&_h2]:mt-4 [&_h2]:mb-2
-  [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mt-3 [&_h3]:mb-1.5
-  [&_p]:text-muted-foreground [&_p]:mb-3 [&_p:last-child]:mb-0
-  [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_ul]:text-muted-foreground
-  [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3 [&_ol]:text-muted-foreground
+  [&_h1]:text-xl [&_h1]:font-bold [&_h1]:text-navy [&_h1]:mt-5 [&_h1]:mb-3
+  [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-navy [&_h2]:mt-4 [&_h2]:mb-2
+  [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-navy [&_h3]:mt-3 [&_h3]:mb-1.5
+  [&_p]:text-foreground-muted [&_p]:mb-3 [&_p:last-child]:mb-0
+  [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_ul]:text-foreground-muted
+  [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3 [&_ol]:text-foreground-muted
   [&_li]:mb-1
-  [&_a]:text-laha-gold [&_a]:underline [&_a]:underline-offset-2
+  [&_a]:text-gold [&_a]:underline [&_a]:underline-offset-2
   [&_strong]:font-semibold [&_strong]:text-foreground
   [&_em]:italic
-  [&_code]:font-mono [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded
-  [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-4 [&_pre]:overflow-x-auto [&_pre]:mb-3
-  [&_blockquote]:border-l-2 [&_blockquote]:border-laha-gold/40 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:mb-3
+  [&_code]:font-mono [&_code]:text-xs [&_code]:bg-background-secondary [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded
+  [&_pre]:bg-background-secondary [&_pre]:rounded-lg [&_pre]:p-4 [&_pre]:overflow-x-auto [&_pre]:mb-3
+  [&_blockquote]:border-l-2 [&_blockquote]:border-gold/40 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-foreground-muted [&_blockquote]:mb-3
   [&_hr]:border-border [&_hr]:my-4
   [&_img]:rounded-xl [&_img]:max-w-full [&_img]:h-auto [&_img]:my-4 [&_img]:border [&_img]:border-border
   [&_.tiptap-video]:my-4
@@ -385,7 +385,7 @@ export function GuideViewer({ role, roleTitle }: GuideViewerProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-40 bg-black/60 lg:hidden"
               onClick={() => setTocOpen(false)}
             />
             <motion.aside

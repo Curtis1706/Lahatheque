@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'apps.reporting',
     'apps.reader',
     'apps.student',
+    'apps.communications',
 ]
 
 MIDDLEWARE = [

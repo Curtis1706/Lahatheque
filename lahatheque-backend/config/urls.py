@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/v1/reader/', include('apps.reader.urls')),
     path('api/v1/partner/', include('apps.reader.partner_urls')),
     path('api/v1/student/', include('apps.student.urls')),
+    path('api/v1/communications/', include('apps.communications.urls')),
 ]
 
 if settings.DEBUG:
