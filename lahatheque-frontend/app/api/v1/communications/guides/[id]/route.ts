@@ -1,40 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateGuideInStore, deleteGuideFromStore } from "@/lib/mock/guides";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
+  const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
+
   try {
     const body = await request.json();
-    const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
-    const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
+    const cookieHeader = request.headers.get("cookie") || "";
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify(body),
+    });
 
-    try {
-      const cookieHeader = request.headers.get("cookie") || "";
-      const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: cookieHeader,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (djangoRes.ok) {
-        const data = await djangoRes.json();
-        return NextResponse.json(data);
-      }
-    } catch {}
-
-    const updated = updateGuideInStore(id, body);
-    if (!updated) {
-      return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
-    }
-    return NextResponse.json(updated);
+    const data = await djangoRes.json();
+    return NextResponse.json(data, { status: djangoRes.status });
   } catch {
-    return NextResponse.json({ error: "Erreur de mise à jour" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Impossible de modifier l'article dans la base de données." },
+      { status: 502 }
+    );
   }
 }
 
@@ -43,35 +35,28 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
+  const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
+
   try {
     const body = await request.json();
-    const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
-    const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
+    const cookieHeader = request.headers.get("cookie") || "";
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify(body),
+    });
 
-    try {
-      const cookieHeader = request.headers.get("cookie") || "";
-      const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: cookieHeader,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (djangoRes.ok) {
-        const data = await djangoRes.json();
-        return NextResponse.json(data);
-      }
-    } catch {}
-
-    const updated = updateGuideInStore(id, body);
-    if (!updated) {
-      return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
-    }
-    return NextResponse.json(updated);
+    const data = await djangoRes.json();
+    return NextResponse.json(data, { status: djangoRes.status });
   } catch {
-    return NextResponse.json({ error: "Erreur de mise à jour" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Impossible de modifier l'article dans la base de données." },
+      { status: 502 }
+    );
   }
 }
 
@@ -85,14 +70,22 @@ export async function DELETE(
 
   try {
     const cookieHeader = request.headers.get("cookie") || "";
-    await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
       method: "DELETE",
       headers: {
         Cookie: cookieHeader,
       },
     });
-  } catch {}
 
-  deleteGuideFromStore(id);
-  return NextResponse.json({ success: true });
+    if (djangoRes.status === 204 || djangoRes.ok) {
+      return NextResponse.json({ success: true });
+    }
+    const data = await djangoRes.json().catch(() => ({}));
+    return NextResponse.json(data, { status: djangoRes.status });
+  } catch {
+    return NextResponse.json(
+      { error: "Impossible de supprimer l'article de la base de données." },
+      { status: 502 }
+    );
+  }
 }

@@ -94,9 +94,9 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 class GuideViewSet(viewsets.ModelViewSet):
     """
-    CRUD complet pour les Guides d'utilisation.
-    - Filtrage automatique selon le rôle de l'utilisateur connecté
-    - L'Admin accède à l'intégralité des guides pour création / édition / suppression.
+    CRUD complet pour les Guides d'utilisation connecté à PostgreSQL.
+    - Filtrage dynamique selon le rôle utilisateur
+    - L'Admin accède à l'intégralité des guides en base pour création / édition / suppression.
     """
     queryset = GuideItem.objects.all()
     serializer_class = GuideItemSerializer
@@ -109,20 +109,19 @@ class GuideViewSet(viewsets.ModelViewSet):
         # Si l'Admin souhaite filtrer ou lister
         if user.is_authenticated and user.role in ['admin', 'super_admin']:
             if role_filter and role_filter != 'all':
-                return GuideItem.objects.filter(target_role=role_filter)
-            return GuideItem.objects.all()
+                return GuideItem.objects.filter(target_role=role_filter).order_by('order', '-created_at')
+            return GuideItem.objects.all().order_by('order', '-created_at')
 
         # Utilisateur connecté spécifique (non-admin) : il ne voit QUE les guides de son rôle
         if user.is_authenticated:
             user_role = user.role
-            # Mappe le rôle réel vers les guides
             allowed_roles = [user_role, 'public']
-            return GuideItem.objects.filter(is_published=True, target_role__in=allowed_roles)
+            return GuideItem.objects.filter(is_published=True, target_role__in=allowed_roles).order_by('order', '-created_at')
 
         # Visiteur non-connecté public
-        if role_filter:
-            return GuideItem.objects.filter(is_published=True, target_role=role_filter)
-        return GuideItem.objects.filter(is_published=True, target_role__in=['public', 'student'])
+        if role_filter and role_filter != 'all':
+            return GuideItem.objects.filter(is_published=True, target_role=role_filter).order_by('order', '-created_at')
+        return GuideItem.objects.filter(is_published=True, target_role__in=['public', 'student']).order_by('order', '-created_at')
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user if self.request.user.is_authenticated else None)

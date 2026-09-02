@@ -78,35 +78,7 @@ function AdminGuidesMainContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
 
-  // Catégories personnalisées persistantes
-  const [customCategories, setCustomCategories] = useState<{ name: string; role: string; description?: string; order: number; is_active: boolean }[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("lahatheque_admin_guide_categories");
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return [
-      { name: "Compte et connexion", role: "student", order: 0, is_active: true },
-      { name: "Lecture & Annotations", role: "student", order: 1, is_active: true },
-      { name: "Gestion du catalogue", role: "admin", order: 0, is_active: true },
-      { name: "Commandes & Remises", role: "wholesaler", order: 0, is_active: true },
-      { name: "Dépôts & Éditions", role: "publisher", order: 0, is_active: true },
-      { name: "Contrats & Redevances", role: "author", order: 0, is_active: true },
-      { name: "Validation Maquettes", role: "chief_layout", order: 0, is_active: true },
-    ];
-  });
-
-  // Sauvegarde dans localStorage à chaque modification
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("lahatheque_admin_guide_categories", JSON.stringify(customCategories));
-      } catch {}
-    }
-  }, [customCategories]);
-
-  // Modale Catégorie (Screenshot 2)
+  // Modale Catégorie
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [categoryTitle, setCategoryTitle] = useState("");
@@ -117,7 +89,7 @@ function AdminGuidesMainContent() {
 
   const articleRefs = useRef<{ [key: string]: HTMLElement | null }>({});
 
-  // Charger les guides depuis l'API Django
+  // Charger les guides directement depuis la base de données PostgreSQL
   const fetchGuides = async () => {
     try {
       setLoading(true);
@@ -140,24 +112,15 @@ function AdminGuidesMainContent() {
     fetchGuides();
   }, []);
 
-  // Articles pour le rôle actuellement sélectionné
+  // Articles pour le rôle actuellement sélectionné issus de PostgreSQL
   const currentRoleArticles = useMemo(() => {
     return guides.filter((g) => g.target_role === selectedRoleTab);
   }, [guides, selectedRoleTab]);
 
-  // Regroupement par catégorie pour le rôle actif (incluant les catégories vides)
+  // Regroupement par catégorie 100% basé sur les données PostgreSQL
   const currentCategoriesMap = useMemo(() => {
     const map = new Map<string, GuideData[]>();
 
-    // 1. Initialiser avec les catégories enregistrées pour ce rôle
-    customCategories
-      .filter((c) => c.role === selectedRoleTab)
-      .sort((a, b) => a.order - b.order)
-      .forEach((c) => {
-        map.set(c.name, []);
-      });
-
-    // 2. Remplir avec les articles réels
     currentRoleArticles.forEach((art) => {
       const cat = art.category_label || "Général";
       if (!map.has(cat)) {
@@ -167,7 +130,7 @@ function AdminGuidesMainContent() {
     });
 
     return map;
-  }, [currentRoleArticles, customCategories, selectedRoleTab]);
+  }, [currentRoleArticles]);
 
   const currentCategoryNames = useMemo(() => {
     return Array.from(currentCategoriesMap.keys());
@@ -203,20 +166,19 @@ function AdminGuidesMainContent() {
     router.replace(`?${params.toString()}`);
   };
 
-  // Suppression d'un Article
+  // Suppression d'un Article dans PostgreSQL
   const handleDeleteArticle = async (id: string) => {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet article de guide ?")) return;
     try {
       await fetch(`/api/v1/communications/guides/${id}/`, { method: "DELETE" });
       setGuides((prev) => prev.filter((g) => g.id !== id));
-      toast.success("Article supprimé.");
+      toast.success("Article supprimé de la base de données.");
     } catch {
-      setGuides((prev) => prev.filter((g) => g.id !== id));
-      toast.success("Article supprimé.");
+      toast.error("Échec de la suppression de l'article.");
     }
   };
 
-  // Suppression d'une catégorie entière
+  // Suppression d'une catégorie entière dans PostgreSQL
   const handleDeleteCategory = async (catName: string) => {
     if (
       !window.confirm(
@@ -238,14 +200,10 @@ function AdminGuidesMainContent() {
       )
     );
 
-    setCustomCategories((prev) =>
-      prev.filter((c) => !(c.role === selectedRoleTab && c.name === catName))
-    );
-
-    toast.success(`Catégorie "${catName}" supprimée.`);
+    toast.success(`Catégorie "${catName}" et articles associés supprimés.`);
   };
 
-  // Modale Catégorie (Screenshot 2)
+  // Modale Catégorie
   const handleOpenCreateCategory = () => {
     setEditingCategory(null);
     setCategoryTitle("");
@@ -276,7 +234,7 @@ function AdminGuidesMainContent() {
     const trimmedTitle = categoryTitle.trim();
 
     if (editingCategory) {
-      // Renommer la catégorie sur tous les articles existants
+      // Renommer la catégorie sur tous les articles existants en base PostgreSQL
       const affected = currentRoleArticles.filter((g) => g.category_label === editingCategory);
       for (const art of affected) {
         try {
@@ -288,14 +246,6 @@ function AdminGuidesMainContent() {
         } catch {}
       }
 
-      setCustomCategories((prev) =>
-        prev.map((c) =>
-          c.role === selectedRoleTab && c.name === editingCategory
-            ? { ...c, name: trimmedTitle, description: categoryDescription, order: categoryOrder, is_active: categoryActive }
-            : c
-        )
-      );
-
       setGuides((prev) =>
         prev.map((g) =>
           g.target_role === selectedRoleTab && g.category_label === editingCategory
@@ -304,25 +254,16 @@ function AdminGuidesMainContent() {
         )
       );
       toast.success(`Catégorie renommée en "${trimmedTitle}".`);
+      setIsCategoryModalOpen(false);
     } else {
-      // Créer la nouvelle catégorie
-      const newCat = {
-        name: trimmedTitle,
-        role: categoryRole,
-        description: categoryDescription,
-        order: categoryOrder,
-        is_active: categoryActive,
-      };
-
-      setCustomCategories((prev) => {
-        const filtered = prev.filter((c) => !(c.role === categoryRole && c.name === trimmedTitle));
-        return [...filtered, newCat];
-      });
-
-      toast.success(`Catégorie "${trimmedTitle}" créée avec succès !`);
+      setIsCategoryModalOpen(false);
+      // Redirige directement vers l'éditeur pour rédiger le premier article de cette catégorie en base
+      router.push(
+        `/admin/guides/editor?category=${encodeURIComponent(
+          trimmedTitle
+        )}&role=${categoryRole}`
+      );
     }
-
-    setIsCategoryModalOpen(false);
   };
 
   return (
