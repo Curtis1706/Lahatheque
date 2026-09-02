@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { INITIAL_GUIDES, MockGuideArticle } from "@/lib/mock/guides";
-
-// Stockage en mémoire partagé pour la session
-let guidesStore: MockGuideArticle[] = [...INITIAL_GUIDES];
+import { getGuidesStore, addGuideToStore, MockGuideArticle } from "@/lib/mock/guides";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const role = searchParams.get("role");
 
-  let results = guidesStore;
+  const store = getGuidesStore();
+  let results = store;
   if (role && role !== "all") {
-    results = guidesStore.filter((g) => g.target_role === role || g.target_role === "all");
+    results = store.filter((g) => g.target_role === role || g.target_role === "all");
   }
 
   return NextResponse.json({
@@ -35,7 +33,7 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString(),
     };
 
-    guidesStore.unshift(newGuide);
+    addGuideToStore(newGuide);
     return NextResponse.json(newGuide, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Données invalides" }, { status: 400 });
