@@ -67,11 +67,12 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
     (typeof book.authors === "string" ? book.authors : "Auteur LAHA"));
 
   const handleAddToCart = (autoRedirectToCheckout = false) => {
+    const coverUrl = book.cover_url || book.cover_image || (book.id ? `/api/bff/catalog/books/${book.id}/cover/` : "");
     addItem({
       bookId: book.id,
       title: book.title,
       author: authorName,
-      cover: book.cover_url || book.cover_image,
+      cover: coverUrl,
       format: selectedFormat,
       price: activePrice,
       quantity: selectedFormat === "digital" ? 1 : quantity,
@@ -255,8 +256,8 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
 
         {/* Bouton Extrait 3D / Consultation Directe */}
         <Link
-          href={`/catalog/reader/${book.id}`}
-          className="w-full py-2.5 px-4 rounded-xl bg-background-secondary hover:bg-navy/10 text-navy font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-border"
+          href={`/catalog/reader/${book.id}?mode=sample`}
+          className="w-full py-2.5 px-4 rounded-xl bg-background-secondary hover:bg-navy/10 text-navy font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-border cursor-pointer"
         >
           <BookOpen className="w-4 h-4 text-gold" />
           <span>Feuilleter l'extrait gratuit en immersion 3D</span>

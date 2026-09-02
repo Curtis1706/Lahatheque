@@ -84,13 +84,15 @@ export default function CartPage() {
                 className="bg-background-secondary rounded-2xl border border-border p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 transition-all hover:border-border/80 shadow-xs"
               >
                 {/* Couverture */}
-                <div className="w-18 h-24 relative bg-background rounded-xl overflow-hidden shrink-0 border border-border shadow-xs">
+                <div className="w-18 h-24 rounded-xl bg-background border border-border shrink-0 overflow-hidden shadow-xs flex items-center justify-center">
                   {item.cover ? (
-                    <Image
+                    <img
                       src={item.cover}
                       alt={item.title}
-                      fill
-                      className="object-cover"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = "none";
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-navy/10 text-navy font-bold text-[10px] font-mono">

@@ -212,10 +212,10 @@ class BookStreamView(APIView):
 class BookSampleStreamView(APIView):
     """
     GET /api/v1/catalog/books/<book_id>/sample/ - Extrait gratuit RÉEL : les N premières
-    pages du vrai fichier, filigranées "EXTRAIT GRATUIT". Accessible à tout utilisateur
-    authentifié, sans exiger d'achat ni d'abonnement.
+    pages du vrai fichier, filigranées "EXTRAIT GRATUIT". Accessible publiquement à tout visiteur,
+    sans exiger d'achat ni d'abonnement.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
 
     def get(self, request, book_id):

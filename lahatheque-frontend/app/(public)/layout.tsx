@@ -139,7 +139,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             >
               <ShoppingCart className="w-6 h-6" />
               {totalCount > 0 && (
-                <span className="absolute top-0 right-0 bg-gold text-navy text-[10px] font-bold font-mono w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-xs">
+                <span className="absolute -top-1 -right-1 bg-gold text-navy text-[11px] font-bold font-mono min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center shadow-md">
                   {totalCount}
                 </span>
               )}
