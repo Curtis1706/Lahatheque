@@ -106,10 +106,15 @@ class ReaderSessionViewSet(ViewSet):
             if not isinstance(session_metadata, dict):
                 session_metadata = {}
             
-            # Récupération de l'adresse IP partenaire ou cliente
+            # Récupération de l'adresse IP partenaire ou cliente réelle
             user_ip = validated_data.get('user_ip') or request.data.get('user_ip')
             if not user_ip:
-                user_ip = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', '127.0.0.1')).split(',')[0].strip()
+                user_ip = (
+                    request.META.get("HTTP_CF_CONNECTING_IP")
+                    or request.META.get("HTTP_X_REAL_IP")
+                    or request.META.get("HTTP_X_FORWARDED_FOR")
+                    or request.META.get("REMOTE_ADDR", "127.0.0.1")
+                ).split(',')[0].strip()
             if user_ip:
                 session_metadata['user_ip'] = user_ip
 
@@ -299,8 +304,13 @@ class ReaderValidateTokenView(APIView):
         doc_title = getattr(session.ouvrage, 'titre', None) or getattr(session.ouvrage, 'title', None) or session.custom_document_title or "Document"
         doc_author = getattr(session.ouvrage, 'auteur', None) or getattr(session.ouvrage, 'author', None) or session.custom_document_author or "Auteur"
 
-        # Enregistrement de l'accès dans TraceAcces
-        ip_addr = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', '127.0.0.1')).split(',')[0].strip()
+        # Enregistrement de l'accès dans TraceAcces avec la véritable IP cliente
+        ip_addr = (
+            request.META.get("HTTP_CF_CONNECTING_IP")
+            or request.META.get("HTTP_X_REAL_IP")
+            or request.META.get("HTTP_X_FORWARDED_FOR")
+            or request.META.get("REMOTE_ADDR", "127.0.0.1")
+        ).split(',')[0].strip()
         TraceAcces.objects.create(
             ouvrage=session.ouvrage,
             partner_id=str(session.partner_id) if hasattr(session, 'partner_id') and session.partner_id else str(session.partner.id),

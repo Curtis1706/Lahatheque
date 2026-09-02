@@ -556,6 +556,135 @@ public class LahathequeCatalogClient
         return json.GetProperty("data").GetProperty("reader_url").GetString();
     }
 }
+---
+
+### 6.6 Exemples d'Affichage des Couvertures (Front-End & Mobile)
+
+Pour garantir une expérience visuelle irréprochable sur tous vos supports, voici comment afficher les couvertures avec repli automatique (fallback) selon votre technologie :
+
+#### A. React / Next.js / TypeScript
+```tsx
+import React, { useState } from 'react';
+
+export function BookCoverCard({ book }: { book: any }) {
+  const [error, setError] = useState(false);
+  const author = book.author_name || book.author || 'Éditions LAHA';
+
+  return (
+    <div className="w-32 h-48 rounded-r-lg bg-[#0F1A33] border border-slate-700 relative overflow-hidden shadow-md flex flex-col justify-between">
+      <div className="absolute top-0 bottom-0 left-0 w-2 bg-[#0A1122] border-r border-slate-700/60 z-20" />
+      {book.cover_url && !error ? (
+        <img
+          src={book.cover_url}
+          alt={book.title}
+          onError={() => setError(true)}
+          className="w-full h-full object-cover absolute inset-0 z-10"
+          loading="lazy"
+        />
+      ) : (
+        <div className="flex flex-col justify-between h-full p-2.5 z-10 bg-[#1B2A4E] text-white">
+          <span className="text-[7px] text-[#B08D42] font-bold uppercase tracking-wider pl-1.5">{book.discipline_name || 'ACADÉMIQUE'}</span>
+          <h4 className="font-serif font-bold text-xs leading-tight line-clamp-3 pl-1.5">{book.title}</h4>
+          <p className="text-[8px] text-slate-300 truncate pl-1.5">{author}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+#### B. Vue.js 3 / Nuxt
+```vue
+<template>
+  <div class="book-cover-card">
+    <div class="book-spine"></div>
+    <img 
+      v-if="book.cover_url && !hasError" 
+      :src="book.cover_url" 
+      :alt="book.title" 
+      @error="hasError = true" 
+      class="cover-img"
+    />
+    <div v-else class="cover-fallback">
+      <span class="discipline">{{ book.discipline_name || 'ACADÉMIQUE' }}</span>
+      <h4 class="title">{{ book.title }}</h4>
+      <span class="author">{{ book.author_name || book.author || 'Éditions LAHA' }}</span>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+const props = defineProps({ book: Object });
+const hasError = ref(false);
+</script>
+```
+
+#### C. Flutter / Dart (Mobile)
+```dart
+import 'package:flutter/material.dart';
+
+class BookCoverWidget extends StatelessWidget {
+  final Map<String, dynamic> book;
+  const BookCoverWidget({Key? key, required this.book}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final coverUrl = book['cover_url'] as String? ?? '';
+    final title = book['title'] as String? ?? 'Ouvrage';
+    final author = book['author_name'] ?? book['author'] ?? 'Éditions LAHA';
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(topRight: Radius.circular(8), bottomRight: Radius.circular(8)),
+      child: Container(
+        width: 120,
+        height: 180,
+        color: const Color(0xFF1B2A4E),
+        child: coverUrl.isNotEmpty
+            ? Image.network(
+                coverUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => _buildFallback(title, author),
+              )
+            : _buildFallback(title, author),
+      ),
+    );
+  }
+
+  Widget _buildFallback(String title, String author) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text("ACADÉMIQUE", style: TextStyle(color: Color(0xFFB08D42), fontSize: 8, fontWeight: FontWeight.bold)),
+          Text(title, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(author, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 9)),
+        ],
+      ),
+    );
+  }
+}
+```
+
+#### D. PHP / Blade (Laravel)
+```html
+<div class="relative w-32 h-48 rounded-r-lg bg-[#0F1A33] border border-slate-700 overflow-hidden shadow">
+    <div class="absolute top-0 bottom-0 left-0 w-2 bg-[#0A1122] border-r border-slate-700/60 z-20"></div>
+    <img 
+        src="{{ $book['cover_url'] }}" 
+        alt="{{ $book['title'] }}" 
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+        class="w-full h-full object-cover absolute inset-0 z-10"
+        loading="lazy"
+    />
+    <div class="hidden flex-col justify-between h-full p-2.5 bg-[#1B2A4E] text-white z-10">
+        <span class="text-[7px] text-[#B08D42] font-bold uppercase">{{ $book['discipline_name'] ?? 'ACADÉMIQUE' }}</span>
+        <h4 class="font-serif font-bold text-xs leading-tight line-clamp-3">{{ $book['title'] }}</h4>
+        <p class="text-[8px] text-slate-300 truncate">{{ $book['author_name'] ?? $book['author'] ?? 'Éditions LAHA' }}</p>
+    </div>
+</div>
 ```
 
 ---

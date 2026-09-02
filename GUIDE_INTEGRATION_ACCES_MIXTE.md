@@ -406,6 +406,91 @@ class LahathequeUnifiedService
 
 ---
 
+### 6.4 Exemples d'Affichage des Couvertures (Front-End & Mobile)
+
+Pour afficher élégamment vos couvertures d'ouvrages et de cours internes avec fallback automatique :
+
+#### A. React / Next.js / TypeScript
+```tsx
+import React, { useState } from 'react';
+
+export function UnifiedBookCover({ book }: { book: any }) {
+  const [error, setError] = useState(false);
+  const author = book.author_name || book.author || book.document_author || 'Éditions LAHA';
+
+  return (
+    <div className="w-32 h-48 rounded-r-lg bg-[#0F1A33] border border-slate-700 relative overflow-hidden shadow-md flex flex-col justify-between">
+      <div className="absolute top-0 bottom-0 left-0 w-2 bg-[#0A1122] border-r border-slate-700/60 z-20" />
+      {book.cover_url && !error ? (
+        <img
+          src={book.cover_url}
+          alt={book.title}
+          onError={() => setError(true)}
+          className="w-full h-full object-cover absolute inset-0 z-10"
+          loading="lazy"
+        />
+      ) : (
+        <div className="flex flex-col justify-between h-full p-2.5 z-10 bg-[#1B2A4E] text-white">
+          <span className="text-[7px] text-[#B08D42] font-bold uppercase tracking-wider pl-1.5">{book.discipline_name || 'COURS'}</span>
+          <h4 className="font-serif font-bold text-xs leading-tight line-clamp-3 pl-1.5">{book.title}</h4>
+          <p className="text-[8px] text-slate-300 truncate pl-1.5">{author}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+#### B. Flutter / Dart (Mobile)
+```dart
+import 'package:flutter/material.dart';
+
+class BookCoverWidget extends StatelessWidget {
+  final Map<String, dynamic> book;
+  const BookCoverWidget({Key? key, required this.book}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final coverUrl = book['cover_url'] as String? ?? '';
+    final title = book['title'] as String? ?? 'Ouvrage';
+    final author = book['author_name'] ?? book['author'] ?? 'Éditions LAHA';
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(topRight: Radius.circular(8), bottomRight: Radius.circular(8)),
+      child: Container(
+        width: 120,
+        height: 180,
+        color: const Color(0xFF1B2A4E),
+        child: coverUrl.isNotEmpty
+            ? Image.network(
+                coverUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => _buildFallback(title, author),
+              )
+            : _buildFallback(title, author),
+      ),
+    );
+  }
+
+  Widget _buildFallback(String title, String author) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text("ACADÉMIQUE", style: TextStyle(color: Color(0xFFB08D42), fontSize: 8, fontWeight: FontWeight.bold)),
+          Text(title, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(author, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 9)),
+        ],
+      ),
+    );
+  }
+}
+```
+
+---
+
 ## 7. Matrice Complète des Erreurs & Dépannage Pas-à-Pas
 
 | Code HTTP | Message d'erreur | Pourquoi cette erreur survient | Que vérifier exactement ? | Action Corrective Immédiate |

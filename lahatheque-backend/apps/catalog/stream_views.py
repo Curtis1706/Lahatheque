@@ -336,6 +336,59 @@ class BookCoverStreamView(APIView):
         except Exception:
             pass
 
-        return HttpResponse(status=404)
+        # 3. Fallback SVG dynamique aux couleurs officielles LAHAThèque (Navy & Gold)
+        import html
+        title = (ouvrage.title or "Ouvrage Académique")[:70]
+        discipline = (ouvrage.discipline.name if getattr(ouvrage, 'discipline', None) else "LAHAThèque")[:40]
+        author = ouvrage.auteur or "Éditions LAHA"
+        if len(author) > 50:
+            author = author[:47] + "..."
+
+        title_esc = html.escape(title)
+        discipline_esc = html.escape(discipline.upper())
+        author_esc = html.escape(author)
+
+        words = title_esc.split()
+        lines = []
+        cur_line = []
+        for w in words:
+            if len(" ".join(cur_line + [w])) <= 22:
+                cur_line.append(w)
+            else:
+                lines.append(" ".join(cur_line))
+                cur_line = [w]
+        if cur_line:
+            lines.append(" ".join(cur_line))
+        lines = lines[:4]
+
+        title_tspan = "".join([f'<tspan x="200" dy="{30 if i > 0 else 0}">{l}</tspan>' for i, l in enumerate(lines)])
+
+        svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1B2A4E" />
+      <stop offset="100%" stop-color="#0F1A33" />
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4AF37" />
+      <stop offset="100%" stop-color="#B08D42" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#bg)" rx="8" />
+  <rect x="16" y="16" width="368" height="568" fill="none" stroke="#2E3F66" stroke-width="2" rx="4" />
+  <rect x="24" y="24" width="352" height="552" fill="none" stroke="url(#gold)" stroke-width="1" stroke-opacity="0.4" rx="2" />
+  <rect x="40" y="50" width="320" height="28" fill="#2E3F66" rx="14" />
+  <text x="200" y="69" fill="#D4AF37" font-family="system-ui, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="1.5">{discipline_esc}</text>
+  <text x="200" y="220" fill="#FFFFFF" font-family="Georgia, serif" font-size="22" font-weight="bold" text-anchor="middle">
+    {title_tspan}
+  </text>
+  <line x1="140" y1="380" x2="260" y2="380" stroke="url(#gold)" stroke-width="2" stroke-linecap="round" />
+  <text x="200" y="430" fill="#D4AF37" font-family="system-ui, sans-serif" font-size="14" font-weight="600" text-anchor="middle">{author_esc}</text>
+  <text x="200" y="540" fill="#94A3B8" font-family="system-ui, sans-serif" font-size="11" font-weight="500" text-anchor="middle" letter-spacing="2">LAHAThèque • Éditions</text>
+</svg>"""
+
+        response = HttpResponse(svg_content.encode('utf-8'), content_type="image/svg+xml")
+        response["Cache-Control"] = "public, max-age=86400"
+        return response
 
 

@@ -133,7 +133,7 @@ class Ouvrage(models.Model):
             if url.startswith('/media/'):
                 return f"/api/bff{url}"
             return url
-        if self.file and hasattr(self.file, 'name') and self.file.name:
+        if self.id:
             return f"/api/bff/catalog/books/{self.id}/cover/"
         return ""
 

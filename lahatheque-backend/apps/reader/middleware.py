@@ -27,7 +27,13 @@ class ReaderApiLoggingMiddleware:
         try:
             from apps.reader.models import ApiRequestLog, PartnerApp, ReaderSession
 
-            client_ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", ""))
+            # Extraction de la véritable IP publique cliente (Cloudflare, Nginx, Proxies)
+            client_ip = (
+                request.META.get("HTTP_CF_CONNECTING_IP")
+                or request.META.get("HTTP_X_REAL_IP")
+                or request.META.get("HTTP_X_FORWARDED_FOR")
+                or request.META.get("REMOTE_ADDR", "")
+            )
             if client_ip:
                 client_ip = client_ip.split(",")[0].strip()
 
