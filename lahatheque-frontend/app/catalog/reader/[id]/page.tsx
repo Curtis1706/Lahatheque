@@ -603,35 +603,18 @@ export default function DocumentReaderPage() {
           setCurrentPage(data.progress.last_page || 0)
         }
 
-        // --- CHARGEMENT SÉCURISÉ EN MÉMOIRE (BLOB URL) ---
-        // Empêche les extensions comme Internet Download Manager (IDM) d'intercepter la requête
-        // et garantit un affichage instantané dans le lecteur normal sans erreur 204
+        // --- CHARGEMENT PROGRESSIF HAUTE PERFORMANCE (STREAMING HTTP 206) ---
+        // Transmet directement l'URL de streaming au lecteur sans télécharger tout le fichier à l'avance
         const targetStreamUrl = isSampleMode
           ? `/api/bff/catalog/books/${id}/sample/`
           : ((data && data.file) ? data.file : (id === 'lesson_pdf' ? '' : `/api/bff/catalog/books/${id}/stream/`));
 
         if (targetStreamUrl) {
-          try {
-            const streamRes = await fetch(targetStreamUrl, {
-              headers: { Accept: 'application/pdf' },
-              credentials: 'include',
-            });
-            if (streamRes.ok) {
-              const blob = await streamRes.blob();
-              const blobUrl = URL.createObjectURL(blob);
-              setRawPdfData(blobUrl);
-            } else {
-              setPdfLoadError(
-                streamRes.status === 403
-                  ? "Vous n'avez pas accès à cet ouvrage. Achetez-le ou vérifiez votre abonnement."
-                  : (isSampleMode
-                      ? "Impossible de charger l'extrait gratuit pour cet ouvrage."
-                      : "Ce document est introuvable ou n'a pas encore été mis en ligne.")
-              );
-            }
-          } catch {
-            setPdfLoadError("Impossible de contacter le serveur de documents. Vérifiez votre connexion et réessayez.");
-          }
+          setRawPdfData(targetStreamUrl);
+          setIsLoading(false);
+        } else {
+          setPdfLoadError("Ce document est introuvable ou n'a pas encore été mis en ligne.");
+          setIsLoading(false);
         }
 
 
