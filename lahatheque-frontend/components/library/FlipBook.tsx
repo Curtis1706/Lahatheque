@@ -591,7 +591,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
               {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
             </button>
 
-            {/* TTS Read Aloud */}
+            {/* TTS Read Aloud (Masqué)
             {onToggleTts && (
               <button
                 type="button"
@@ -608,6 +608,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
                 <span className="hidden md:inline">{isTtsActive ? 'Arrêter TTS' : 'Lecture Vocale'}</span>
               </button>
             )}
+            */}
 
             {/* Audio Narrator */}
             {hasAudio && (

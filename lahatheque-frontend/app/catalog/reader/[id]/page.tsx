@@ -471,8 +471,9 @@ export default function DocumentReaderPage() {
               <div style={{ padding: '0px 2px' }}><ZoomOut /></div>
               <div style={{ padding: '0px 2px' }}><Zoom /></div>
               <div style={{ padding: '0px 2px' }}><ZoomIn /></div>
+              {/* <div className="rpv-toolbar__divider" style={{ borderRight: '1px solid #2E3F66', height: '20px', margin: '0 4px' }} />
+              <div style={{ padding: '0px 2px' }}><SwitchTheme /></div> */}
               <div className="rpv-toolbar__divider" style={{ borderRight: '1px solid #2E3F66', height: '20px', margin: '0 4px' }} />
-              <div style={{ padding: '0px 2px' }}><SwitchTheme /></div>
               <div style={{ padding: '0px 2px' }}><EnterFullScreen /></div>
             </div>
           );
@@ -975,6 +976,7 @@ export default function DocumentReaderPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* Bouton Mode Nuit / Jour (Masqué)
           <Button
             onClick={() => setIsNightMode(!isNightMode)}
             variant="outline"
@@ -983,6 +985,7 @@ export default function DocumentReaderPage() {
             {isNightMode ? <Sun size={15} /> : <Moon size={15} />}
             <span className="hidden md:inline">{isNightMode ? "Jour" : "Nuit"}</span>
           </Button>
+          */}
 
           <Button
             onClick={() => {
@@ -999,7 +1002,7 @@ export default function DocumentReaderPage() {
             <span className="hidden sm:inline">Sauvegarder</span>
           </Button>
 
-          {/* 🔊 Lire à voix haute (TTS) */}
+          {/* 🔊 Lire à voix haute (TTS) (Masqué)
           {book.file && !book.file.match(/\.(docx|doc|pptx|ppt|xlsx|xls)$/i) && (
             <Button
               onClick={handleTtsToggle}
@@ -1019,6 +1022,7 @@ export default function DocumentReaderPage() {
               </span>
             </Button>
           )}
+          */}
 
           {!isMobile && !book.file?.match(/\.(docx|doc|pptx|ppt|xlsx|xls)$/i) && (
             <Button
