@@ -16,11 +16,14 @@ import {
   Mail
 } from "lucide-react";
 import { HeaderSearchBar } from "@/components/features/search/header-search-bar";
+import { useCart } from "@/context/cart-context";
+import { CartDrawer } from "@/components/cart/cart-drawer";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const { totalCount, toggleDrawer } = useCart();
 
   const toggleDropdown = (name: string) => {
     if (activeDropdown === name) {
@@ -127,18 +130,25 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               <User className="w-5 h-5 text-gold" /> Connexion
             </Link>
 
-            {/* Cart Icon */}
-            <button className="relative p-2 text-foreground hover:text-navy transition-colors shrink-0" aria-label="Panier">
+            {/* Cart Icon & Trigger */}
+            <button 
+              type="button"
+              onClick={toggleDrawer}
+              className="relative p-2 text-foreground hover:text-navy transition-colors shrink-0 cursor-pointer" 
+              aria-label="Panier d'achat"
+            >
               <ShoppingCart className="w-6 h-6" />
-              <span className="absolute top-0 right-0 bg-gold text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                0
-              </span>
+              {totalCount > 0 && (
+                <span className="absolute top-0 right-0 bg-gold text-navy text-[10px] font-bold font-mono w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-xs">
+                  {totalCount}
+                </span>
+              )}
             </button>
 
             {/* Mobile Menu Burger */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
-              className="lg:hidden p-2 text-foreground hover:text-navy transition-colors shrink-0"
+              className="lg:hidden p-2 text-foreground hover:text-navy transition-colors shrink-0 cursor-pointer"
               aria-label={mobileMenuOpen ? "Fermer le menu" : "Ouvrir le menu"}
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -251,6 +261,9 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <main className="flex-grow">
         {children}
       </main>
+
+      {/* Cart Slide-Over Drawer Global */}
+      <CartDrawer />
 
       {/* Footer Component */}
       <footer className="bg-navy text-white border-t border-navy-hover">

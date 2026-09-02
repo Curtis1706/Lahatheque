@@ -12,16 +12,23 @@ export interface CartItem {
   price: number;
   quantity: number;
   maxStockPaper?: number;
+  category?: string;
+  country?: string;
+  level?: string;
 }
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "id">) => void;
+  addItem: (item: Omit<CartItem, "id">, autoOpenDrawer?: boolean) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, delta: number) => void;
   clearCart: () => void;
   totalAmount: number;
   totalCount: number;
+  isDrawerOpen: boolean;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+  toggleDrawer: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -29,6 +36,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -53,7 +61,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, loaded]);
 
-  const addItem = (newItem: Omit<CartItem, "id">) => {
+  const openDrawer = () => setIsDrawerOpen(true);
+  const closeDrawer = () => setIsDrawerOpen(false);
+  const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
+
+  const addItem = (newItem: Omit<CartItem, "id">, autoOpenDrawer: boolean = true) => {
     const itemId = `${newItem.bookId}_${newItem.format}`;
     setItems((prev) => {
       const existing = prev.find((i) => i.id === itemId);
@@ -66,6 +78,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       return [...prev, { ...newItem, id: itemId, quantity: newItem.quantity || 1 }];
     });
+
+    if (autoOpenDrawer) {
+      setIsDrawerOpen(true);
+    }
   };
 
   const removeItem = (id: string) => {
@@ -103,6 +119,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         clearCart,
         totalAmount,
         totalCount,
+        isDrawerOpen,
+        openDrawer,
+        closeDrawer,
+        toggleDrawer,
       }}
     >
       {children}

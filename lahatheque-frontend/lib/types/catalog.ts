@@ -23,6 +23,13 @@ export interface Book {
   summary: string;
   publication_year?: number;
   price?: number;
+  price_paper?: number;
+  stock_disponible?: number;
+  is_paper_available?: boolean;
+  is_digital_available?: boolean;
+  level?: string;
+  total_pages?: number;
+  rating?: number;
   currency?: string;
   cover_color?: string;
   cover_text_color?: string;
