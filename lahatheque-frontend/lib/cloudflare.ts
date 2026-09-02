@@ -5,14 +5,8 @@
 
 import { uploadFileDirectlyToR2 } from "@/lib/services/storage";
 
-const R2_PUBLIC_DOMAIN = (
-  process.env.NEXT_PUBLIC_R2_URL ||
-  process.env.CLOUDFLARE_R2_PUBLIC_URL ||
-  "https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev"
-).replace(/\/+$/, "");
-
 /**
- * Téléverse un fichier média vers Cloudflare R2 avec fallback instantané.
+ * Téléverse un fichier média vers Cloudflare R2 avec URL proxy Next.js garantie.
  */
 export async function uploadToCloudflare(
   file: File,
@@ -30,7 +24,7 @@ export async function uploadToCloudflare(
     );
 
     if (res && res.directToR2 && res.fileKey) {
-      const publicUrl = `${R2_PUBLIC_DOMAIN}/${res.fileKey}`;
+      const publicUrl = `/uploads/${res.fileKey}`;
       return {
         secure_url: publicUrl,
         public_id: res.fileKey,

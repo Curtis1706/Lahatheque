@@ -10,15 +10,17 @@ export async function GET(
   const subPath = (resolvedParams.path || []).join("/");
   const cleanPath = subPath.replace(/^\/+|\/+$/g, "");
 
-  const accessToken =
-    request.cookies.get("laha_access")?.value ||
-    request.cookies.get("access_token")?.value;
+  const isSensitive = SENSITIVE_PREFIXES.some((prefix) => cleanPath.startsWith(prefix));
 
-  if (!accessToken) {
-    return new NextResponse("Authentification requise.", { status: 401 });
-  }
+  if (isSensitive) {
+    const accessToken =
+      request.cookies.get("laha_access")?.value ||
+      request.cookies.get("access_token")?.value;
 
-  if (SENSITIVE_PREFIXES.some((prefix) => cleanPath.startsWith(prefix))) {
+    if (!accessToken) {
+      return new NextResponse("Authentification requise.", { status: 401 });
+    }
+
     return new NextResponse(
       "Ce type de document doit être consulté via son endpoint sécurisé dédié.",
       { status: 403 }
@@ -42,7 +44,7 @@ export async function GET(
         headers: {
           "Content-Type": contentType,
           "Content-Disposition": "inline",
-          "Cache-Control": "private, max-age=3600",
+          "Cache-Control": "public, max-age=86400",
         },
       });
     }
@@ -64,7 +66,7 @@ export async function GET(
         headers: {
           "Content-Type": contentType,
           "Content-Disposition": "inline",
-          "Cache-Control": "private, max-age=3600",
+          "Cache-Control": "public, max-age=86400",
         },
       });
     }

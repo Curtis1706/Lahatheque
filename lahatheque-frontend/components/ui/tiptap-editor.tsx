@@ -277,26 +277,24 @@ export function TiptapEditor({
   const handleImageUpload = useCallback(
     async (file: File) => {
       if (!editor) return
-      const toastId = toast.loading("Insertion de l'image...")
+      const toastId = toast.loading("Téléversement de l'image vers Cloudflare R2...")
       try {
-        const localDataUrl = await new Promise<string>((resolve) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(reader.result as string)
-          reader.readAsDataURL(file)
-        })
+        const res = await uploadToCloudflare(file, undefined, "guides", "image")
+        const finalUrl = res.secure_url || ""
 
-        // Téléversement en tâche de fond vers Cloudflare R2
-        uploadToCloudflare(file, undefined, "guides", "image").catch(() => {})
-
-        editor
-          .chain()
-          .focus()
-          .setImage({ src: localDataUrl, alt: file.name })
-          .insertContent({ type: "paragraph" })
-          .focus("end")
-          .run()
-        toast.success("Image insérée avec succès !", { id: toastId })
-        setActiveModal(null)
+        if (finalUrl) {
+          editor
+            .chain()
+            .focus()
+            .setImage({ src: finalUrl, alt: file.name })
+            .insertContent({ type: "paragraph" })
+            .focus("end")
+            .run()
+          toast.success("Image insérée avec succès !", { id: toastId })
+          setActiveModal(null)
+        } else {
+          toast.error("Impossible de charger l'image", { id: toastId })
+        }
       } catch {
         toast.error("Échec du chargement de l'image", { id: toastId })
       }
@@ -307,33 +305,31 @@ export function TiptapEditor({
   const handleVideoUpload = useCallback(
     async (file: File) => {
       if (!editor) return
-      const toastId = toast.loading("Insertion de la vidéo...")
+      const toastId = toast.loading("Téléversement de la vidéo vers Cloudflare R2...")
       try {
-        const localVideoUrl = await new Promise<string>((resolve) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(reader.result as string)
-          reader.readAsDataURL(file)
-        })
+        const res = await uploadToCloudflare(file, undefined, "guides", "video")
+        const finalUrl = res.secure_url || ""
 
-        // Téléversement en tâche de fond vers Cloudflare R2
-        uploadToCloudflare(file, undefined, "guides", "video").catch(() => {})
-
-        editor
-          .chain()
-          .focus()
-          .insertContent([
-            {
-              type: "videoEmbed",
-              attrs: { video_url: localVideoUrl, stream_id: null, title: file.name },
-            },
-            {
-              type: "paragraph",
-            },
-          ])
-          .focus("end")
-          .run()
-        toast.success("Vidéo insérée avec succès !", { id: toastId })
-        setActiveModal(null)
+        if (finalUrl) {
+          editor
+            .chain()
+            .focus()
+            .insertContent([
+              {
+                type: "videoEmbed",
+                attrs: { video_url: finalUrl, stream_id: null, title: file.name },
+              },
+              {
+                type: "paragraph",
+              },
+            ])
+            .focus("end")
+            .run()
+          toast.success("Vidéo insérée avec succès !", { id: toastId })
+          setActiveModal(null)
+        } else {
+          toast.error("Impossible de charger la vidéo", { id: toastId })
+        }
       } catch {
         toast.error("Échec du chargement de la vidéo", { id: toastId })
       }
