@@ -135,7 +135,7 @@ const VideoEmbed = Node.create({
         "data-video-url": videoUrl,
         "data-stream-id": streamId,
         "data-title": title,
-        class: "my-4 w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-black shadow-xs",
+        class: "my-4 w-full max-w-2xl overflow-hidden rounded-2xl bg-black shadow-xs mx-auto",
       },
       [
         "video",
@@ -144,7 +144,7 @@ const VideoEmbed = Node.create({
           controls: "true",
           playsinline: "true",
           preload: "metadata",
-          class: "w-full max-h-[420px] mx-auto block rounded-2xl",
+          class: "w-full max-h-[520px] h-auto object-contain mx-auto block rounded-2xl bg-black",
         },
       ],
     ]
@@ -169,7 +169,8 @@ function VideoEmbedView({ node, deleteNode }: NodeViewProps) {
     rawSrc.includes(".webm") ||
     rawSrc.includes(".r2.cloudflarestorage.com") ||
     rawSrc.includes(".r2.dev") ||
-    rawSrc.includes("/media/")
+    rawSrc.includes("/media/") ||
+    rawSrc.includes("/uploads/")
   ) {
     isDirectVideo = true
     src = rawSrc
@@ -191,20 +192,22 @@ function VideoEmbedView({ node, deleteNode }: NodeViewProps) {
 
   return (
     <NodeViewWrapper className="my-4 relative group">
-      <div className="relative rounded-2xl overflow-hidden border border-border bg-black aspect-video max-w-2xl mx-auto shadow-md">
+      <div className="relative rounded-2xl overflow-hidden bg-black max-w-2xl mx-auto shadow-md">
         {src ? (
           isDirectVideo ? (
-            <video src={src} controls playsInline className="w-full h-full object-cover rounded-2xl" />
+            <video src={src} controls playsInline className="w-full max-h-[520px] h-auto object-contain rounded-2xl bg-black block mx-auto" />
           ) : (
-            <iframe
-              src={src}
-              className="w-full h-full border-none rounded-2xl"
-              allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+            <div className="aspect-video w-full">
+              <iframe
+                src={src}
+                className="w-full h-full border-none rounded-2xl"
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
           )
         ) : (
-          <div className="flex items-center justify-center h-full text-foreground-muted text-xs">
+          <div className="flex items-center justify-center h-48 text-foreground-muted text-xs">
             Vidéo non disponible
           </div>
         )}
@@ -359,7 +362,7 @@ export function TiptapEditor({
   const handleImageUpload = useCallback(
     async (file: File) => {
       if (!editor) return
-      const toastId = toast.loading("Téléversement de l'image...")
+      const toastId = toast.loading("Insertion de l'image...")
       try {
         const localDataUrl = await new Promise<string>((resolve) => {
           const reader = new FileReader()
@@ -367,26 +370,22 @@ export function TiptapEditor({
           reader.readAsDataURL(file)
         })
 
-        let targetSrc = localDataUrl
-        try {
-          const res = await uploadToCloudflare(file, undefined, "guides", "image")
-          if (res && res.secure_url) {
-            targetSrc = res.secure_url
-          }
-        } catch {}
-
+        // Insertion directe de l'image en base64 pour affichage 100% garanti partout
         editor
           .chain()
           .focus()
-          .setImage({ src: targetSrc, alt: file.name })
+          .setImage({ src: localDataUrl, alt: file.name })
           .insertContent({ type: "paragraph" })
           .focus("end")
           .run()
 
+        // Upload de sauvegarde en arrière-plan
+        uploadToCloudflare(file, undefined, "guides", "image").catch(() => {})
+
         toast.success("Image insérée avec succès !", { id: toastId })
         setActiveModal(null)
       } catch {
-        toast.error("Échec du chargement de l'image", { id: toastId })
+        toast.error("Échec de l'insertion de l'image", { id: toastId })
       }
     },
     [editor]
