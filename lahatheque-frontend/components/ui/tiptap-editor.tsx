@@ -131,18 +131,19 @@ function EditorModal({
   children: React.ReactNode
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 animate-in fade-in duration-150">
-      <div className="bg-card border border-border sm:max-w-md w-full rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-        <div className="flex justify-between items-center px-5 py-3.5 border-b border-border bg-muted/20">
-          <h4 className="text-sm font-bold text-foreground">{title}</h4>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 animate-in fade-in duration-150">
+      <div className="bg-background border border-border sm:max-w-md w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="flex justify-between items-center px-5 py-3.5 border-b border-border bg-background-secondary">
+          <h4 className="text-sm font-bold text-navy">{title}</h4>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+            className="p-1 rounded-md text-foreground-muted hover:text-navy hover:bg-background transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-5 overflow-y-auto">{children}</div>
+        <div className="p-5 overflow-y-auto bg-background">{children}</div>
       </div>
     </div>
   )
@@ -543,35 +544,35 @@ export function TiptapEditor({
         <EditorModal title="Ajouter une image" onClose={() => setActiveModal(null)}>
           <div className="space-y-5">
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-foreground-muted block mb-2 font-mono">
                 Option 1 : Choisir un fichier depuis votre appareil
               </label>
               <button
                 type="button"
                 onClick={() => imageInputRef.current?.click()}
-                className="w-full py-4 border-2 border-dashed border-border hover:border-laha-gold/60 rounded-xl bg-muted/20 flex flex-col items-center justify-center gap-2 transition-colors group"
+                className="w-full py-5 border-2 border-dashed border-border hover:border-gold/60 rounded-xl bg-background-secondary flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer group"
               >
-                <Upload className="w-6 h-6 text-muted-foreground group-hover:text-laha-gold transition-colors" />
-                <span className="text-xs font-bold text-foreground">Parcourir vos fichiers...</span>
+                <Upload className="w-6 h-6 text-foreground-muted group-hover:text-gold transition-colors" />
+                <span className="text-xs font-bold text-navy">Parcourir vos fichiers...</span>
               </button>
             </div>
 
             <div className="border-t border-border pt-4">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
-                Option 2 : Coller l'adresse d'une image web
+              <label className="text-xs font-bold uppercase tracking-wider text-foreground-muted block mb-1.5 font-mono">
+                Option 2 : Coller l&apos;adresse d&apos;une image web (Cloudflare R2)
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://domaine.com/photo.jpg"
-                  className="flex-1 h-10 px-3 bg-background border border-border rounded-xl text-sm text-foreground outline-none focus:border-laha-gold"
+                  placeholder="https://...r2.cloudflarestorage.com/photo.webp"
+                  className="flex-1 h-10 px-3 bg-background border border-border rounded-xl text-xs text-foreground outline-none focus:border-navy"
                 />
                 <button
                   type="button"
                   onClick={applyImageUrl}
-                  className="px-4 py-2 bg-foreground text-background text-xs font-bold rounded-xl hover:opacity-90"
+                  className="px-4 py-2 bg-navy text-white text-xs font-bold rounded-xl hover:bg-navy-dark cursor-pointer shadow-xs"
                 >
                   Valider
                 </button>
@@ -586,38 +587,38 @@ export function TiptapEditor({
         <EditorModal title="Ajouter une vidéo" onClose={() => setActiveModal(null)}>
           <div className="space-y-5">
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-foreground-muted block mb-2 font-mono">
                 Option 1 : Importer une vidéo depuis votre ordinateur
               </label>
               <button
                 type="button"
                 onClick={() => videoInputRef.current?.click()}
-                className="w-full py-4 border-2 border-dashed border-border hover:border-sky-500/60 rounded-xl bg-muted/20 flex flex-col items-center justify-center gap-2 transition-colors group"
+                className="w-full py-5 border-2 border-dashed border-border hover:border-gold/60 rounded-xl bg-background-secondary flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer group"
               >
-                <Upload className="w-6 h-6 text-muted-foreground group-hover:text-sky-500 transition-colors" />
-                <span className="text-xs font-bold text-foreground">Téléverser une vidéo (Cloudflare)...</span>
+                <Upload className="w-6 h-6 text-foreground-muted group-hover:text-gold transition-colors" />
+                <span className="text-xs font-bold text-navy">Téléverser une vidéo...</span>
               </button>
             </div>
 
             <div className="border-t border-border pt-4">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
-                Option 2 : Coller un lien ou un ID vidéo
+              <label className="text-xs font-bold uppercase tracking-wider text-foreground-muted block mb-1.5 font-mono">
+                Option 2 : Coller un lien vidéo (Cloudflare R2 MP4 ou URL)
               </label>
-              <p className="text-[11px] text-muted-foreground mb-2">
-                Entrez un lien web (ex: YouTube, Vimeo) ou un identifiant Cloudflare Stream.
+              <p className="text-[11px] text-foreground-muted mb-2">
+                Entrez une URL directe Cloudflare R2 (ex: .mp4, .webm) ou un lien vidéo web.
               </p>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={videoInput}
                   onChange={(e) => setVideoInput(e.target.value)}
-                  placeholder="Ex: https://youtube.com/... ou ID Cloudflare"
-                  className="flex-1 h-10 px-3 bg-background border border-border rounded-xl text-sm text-foreground outline-none focus:border-laha-gold"
+                  placeholder="https://...r2.cloudflarestorage.com/video.mp4"
+                  className="flex-1 h-10 px-3 bg-background border border-border rounded-xl text-xs text-foreground outline-none focus:border-navy"
                 />
                 <button
                   type="button"
                   onClick={applyVideoInput}
-                  className="px-4 py-2 bg-foreground text-background text-xs font-bold rounded-xl hover:opacity-90"
+                  className="px-4 py-2 bg-navy text-white text-xs font-bold rounded-xl hover:bg-navy-dark cursor-pointer shadow-xs"
                 >
                   Valider
                 </button>

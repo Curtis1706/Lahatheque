@@ -331,153 +331,23 @@ export function RoleGuideView({ role, roleLabel, initialArticles }: RoleGuideVie
                             <h4 className="font-serif text-lg sm:text-xl font-bold text-navy leading-snug">
                               {idx + 1}. {art.title}
                             </h4>
-                            <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed">
-                              {art.summary}
-                            </p>
+                            {art.summary && art.summary !== art.title && (
+                              <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed">
+                                {art.summary}
+                              </p>
+                            )}
                           </div>
 
-                          {/* Illustration Principale / Vidéo Globale R2 si existante */}
-                          {(art.image_url || art.video_url) && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {art.image_url && (
-                                <div className="rounded-2xl overflow-hidden border border-border bg-background shadow-xs max-h-72">
-                                  <img
-                                    src={art.image_url}
-                                    alt={art.title}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                              )}
-                              {art.video_url && (
-                                <div className="rounded-2xl overflow-hidden border border-border bg-black shadow-xs max-h-72 flex items-center justify-center">
-                                  <video
-                                    src={art.video_url}
-                                    controls
-                                    playsInline
-                                    className="w-full h-full object-cover rounded-2xl"
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Contenu Enrichi Tiptap (Images & Vidéos au fil du texte) */}
-                          {art.content && (
+                          {/* Contenu Enrichi Tiptap (contenant tout : texte, listes, images R2 et vidéos) */}
+                          {art.content ? (
                             <div
-                              className="tiptap-content text-xs sm:text-sm text-foreground-muted leading-relaxed space-y-3 [&_img]:rounded-2xl [&_img]:border [&_img]:border-border [&_img]:my-4 [&_video]:rounded-2xl [&_video]:border [&_video]:border-border [&_video]:my-4 [&_video]:w-full [&_video]:max-w-2xl [&_h2]:text-navy [&_h2]:font-bold [&_h2]:text-base [&_h3]:text-navy [&_h3]:font-bold [&_h3]:text-sm [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                              className="tiptap-content text-xs sm:text-sm text-foreground-muted leading-relaxed space-y-4 [&_img]:rounded-2xl [&_img]:border [&_img]:border-border [&_img]:my-4 [&_img]:max-w-full [&_video]:rounded-2xl [&_video]:border [&_video]:border-border [&_video]:my-4 [&_video]:w-full [&_video]:max-w-2xl [&_h2]:text-navy [&_h2]:font-bold [&_h2]:text-base [&_h2]:mt-4 [&_h3]:text-navy [&_h3]:font-bold [&_h3]:text-sm [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_p]:leading-relaxed"
                               dangerouslySetInnerHTML={{ __html: art.content }}
                             />
-                          )}
-
-                          {/* Étapes pas-à-pas illustrées */}
-                          {art.steps && art.steps.length > 0 && (
-                            <div className="space-y-4 pt-2">
-                              <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-gold" />
-                                <h5 className="font-bold text-xs uppercase tracking-wider text-navy font-mono">
-                                  Démarche pas-à-pas ({art.steps.length} étapes) :
-                                </h5>
-                              </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {art.steps.map((step, sIdx) => (
-                                  <div
-                                    key={sIdx}
-                                    className="p-4 sm:p-5 rounded-2xl bg-background border border-border space-y-3 flex flex-col justify-between"
-                                  >
-                                    <div className="space-y-2">
-                                      <div className="flex items-start gap-2.5">
-                                        <span className="w-5 h-5 rounded-full bg-gold/15 text-gold font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 border border-gold/30">
-                                          {sIdx + 1}
-                                        </span>
-                                        <h6 className="font-semibold text-xs sm:text-sm text-navy leading-snug">
-                                          {step.title}
-                                        </h6>
-                                      </div>
-                                      <p className="text-xs text-foreground-muted leading-relaxed pl-7">
-                                        {step.description}
-                                      </p>
-
-                                      {/* Illustrations / Vidéos spécifiques à l'étape */}
-                                      {(step.image_url || step.video_url) && (
-                                        <div className="pl-7 pt-1 space-y-2">
-                                          {step.image_url && (
-                                            <div className="rounded-xl overflow-hidden border border-border">
-                                              <img
-                                                src={step.image_url}
-                                                alt={step.title}
-                                                className="w-full h-32 object-cover"
-                                              />
-                                            </div>
-                                          )}
-                                          {step.video_url && (
-                                            <div className="rounded-xl overflow-hidden border border-border bg-black">
-                                              <video
-                                                src={step.video_url}
-                                                controls
-                                                playsInline
-                                                className="w-full h-32 object-cover"
-                                              />
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {step.tip && (
-                                      <div className="pl-7 pt-1">
-                                        <div className="flex items-start gap-1.5 text-[11px] text-foreground-muted bg-background-secondary p-2.5 rounded-xl border border-border">
-                                          <Info className="w-3.5 h-3.5 text-gold shrink-0 mt-0.5" />
-                                          <span>{step.tip}</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* FAQ Accordéon Interactive */}
-                          {art.faq && art.faq.length > 0 && (
-                            <div className="space-y-3 pt-4 border-t border-border">
-                              <h5 className="font-bold text-xs uppercase tracking-wider text-navy font-mono">
-                                Questions fréquentes :
-                              </h5>
-                              <div className="space-y-2">
-                                {art.faq.map((fItem, fIdx) => {
-                                  const faqKey = `${art.id}-faq-${fIdx}`;
-                                  const isOpen = !!openFaqIndices[faqKey];
-                                  return (
-                                    <div
-                                      key={fIdx}
-                                      className="rounded-2xl bg-background border border-border overflow-hidden transition-colors"
-                                    >
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleFaq(faqKey)}
-                                        className="w-full p-4 flex items-center justify-between gap-3 text-left cursor-pointer hover:bg-background-secondary/50 transition-colors"
-                                      >
-                                        <span className="font-semibold text-xs sm:text-sm text-navy flex items-center gap-2">
-                                          <HelpCircle className="w-4 h-4 text-gold shrink-0" />
-                                          {fItem.question}
-                                        </span>
-                                        <ChevronDown
-                                          className={`w-4 h-4 text-foreground-muted shrink-0 transition-transform duration-200 ${
-                                            isOpen ? "rotate-180" : ""
-                                          }`}
-                                        />
-                                      </button>
-                                      {isOpen && (
-                                        <div className="px-4 pb-4 pt-1 text-xs text-foreground-muted leading-relaxed pl-10 border-t border-border/50 animate-in fade-in duration-150">
-                                          {fItem.answer}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
+                          ) : (
+                            <p className="text-xs text-foreground-muted italic">
+                              Contenu en cours de rédaction.
+                            </p>
                           )}
                         </article>
                       ))}
