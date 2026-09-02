@@ -165,9 +165,7 @@ export interface AIRoyaltySuggestion {
   is_validated: boolean;
   ai_confidence: number; // ex: 92%
   extracted_clause?: string;
-  suggested_paper_rate?: number;
-  suggested_digital_rate?: number;
-  suggested_audio_tts_rate?: number;
+  suggested_rate?: number;
 }
 
 export interface PreEditionContract {

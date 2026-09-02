@@ -292,6 +292,9 @@ class DebtReminderConfig(models.Model):
     first_reminder_days = models.IntegerField(default=7)
     min_amount_threshold = models.DecimalField(max_digits=10, decimal_places=2, default=5000.00)
     max_reminders_count = models.IntegerField(default=3)
+    reminder_frequency_days = models.IntegerField(
+        default=5, help_text="Nombre de jours entre deux relances successives pour un même impayé"
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod

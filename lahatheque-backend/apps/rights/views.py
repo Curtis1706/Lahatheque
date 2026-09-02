@@ -722,7 +722,9 @@ class LegalContractsListView(APIView):
         # Traitement du fichier PDF/DOCX
         uploaded_file = request.FILES.get("file")
         saved_path = ""
-        extracted_text = ""
+        file_name = request.data.get("file_name", "")
+        file_size = int(request.data.get("file_size", 0))
+        extracted_text = str(request.data.get("extracted_text", "")) if hasattr(request.data, "get") else ""
 
         if uploaded_file:
             file_name = uploaded_file.name
@@ -796,6 +798,32 @@ class LegalContractsListView(APIView):
             notes=notes,
             tags=["contrat", db_type]
         )
+
+        # Génération réelle d'une suggestion IA pour le contrat téléversé / indexé
+        try:
+            from apps.ai_engine.services.openai_service import analyze_document_with_openai
+            import re
+
+            analysis = analyze_document_with_openai(
+                text_sample=contrat.texte_integral_index[:8000] if contrat.texte_integral_index else "",
+                filename=contrat.titre,
+                total_pages=0,
+            )
+
+            pct_match = re.search(r'(\d{1,3})\s*%', contrat.texte_integral_index or "")
+            suggested_pct = float(pct_match.group(1)) if pct_match else 50.0
+            suggested_pct = min(100.0, max(0.0, suggested_pct))
+
+            AIRoyaltySuggestion.objects.create(
+                contrat=contrat,
+                ouvrage=contrat.ouvrage,
+                beneficiaire_nom=contrat.contracting_party or "Auteur Principal",
+                pourcentage_suggere=suggested_pct,
+                clause_extraite=(analysis.get("summary", "") or "")[:500],
+                confiance_score=0.75 if pct_match else 0.5,
+            )
+        except Exception as e:
+            logger.warning(f"Suggestion IA non générée pour le contrat {contrat.id}: {e}")
 
         # Si des quotes-parts d'ayants droit sont définies et qu'un ouvrage est lié, on verrouille la répartition en base
         if ouvrage and len(repartitions_data) > 0:
@@ -1350,7 +1378,7 @@ class LegalAiSuggestionsListView(APIView):
             beneficiary = s.beneficiaire_nom or (s.contrat.contracting_party if s.contrat else "Auteur Principal")
             clause = s.clause_extraite or ""
             pct = float(s.pourcentage_suggere) if s.pourcentage_suggere else 100.0
-            
+
             suggestions.append({
                 "id": str(s.id),
                 "contract_id": str(s.contrat_id) if s.contrat_id else "",
@@ -1358,9 +1386,6 @@ class LegalAiSuggestionsListView(APIView):
                 "book_title": book_title,
                 "beneficiary_name": beneficiary,
                 "suggested_rate": pct,
-                "suggested_paper_rate": 10.0,
-                "suggested_digital_rate": 15.0,
-                "suggested_audio_tts_rate": 8.0,
                 "extracted_clause": clause,
                 "confidence_score": float(s.confiance_score) if s.confiance_score else 0.95,
                 "is_validated": s.is_validated,
@@ -1868,7 +1893,7 @@ class DebtReminderConfigView(APIView):
                 "days_before_first_reminder": config.first_reminder_days,
                 "min_amount_threshold": float(config.min_amount_threshold),
                 "max_reminders_count": config.max_reminders_count,
-                "frequency_days": 5,
+                "frequency_days": config.reminder_frequency_days,
             }
         })
 
@@ -1886,6 +1911,8 @@ class DebtReminderConfigView(APIView):
             config.min_amount_threshold = float(request.data["min_amount_threshold"])
         if "max_reminders_count" in request.data:
             config.max_reminders_count = int(request.data["max_reminders_count"])
+        if "frequency_days" in request.data:
+            config.reminder_frequency_days = int(request.data["frequency_days"])
         config.save()
 
         return Response({
@@ -1897,7 +1924,7 @@ class DebtReminderConfigView(APIView):
                 "days_before_first_reminder": config.first_reminder_days,
                 "min_amount_threshold": float(config.min_amount_threshold),
                 "max_reminders_count": config.max_reminders_count,
-                "frequency_days": 5,
+                "frequency_days": config.reminder_frequency_days,
             }
         })
 
