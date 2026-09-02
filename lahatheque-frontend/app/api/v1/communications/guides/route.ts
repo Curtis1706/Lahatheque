@@ -5,6 +5,28 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const role = searchParams.get("role");
 
+  const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
+  const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
+
+  try {
+    const cookieHeader = request.headers.get("cookie") || "";
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${request.nextUrl.search}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      cache: "no-store",
+    });
+
+    if (djangoRes.ok) {
+      const data = await djangoRes.json();
+      return NextResponse.json(data);
+    }
+  } catch {
+    // Mode fallback mémoire local
+  }
+
   const store = getGuidesStore();
   let results = store;
   if (role && role !== "all") {
@@ -20,6 +42,26 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
+    const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
+
+    try {
+      const cookieHeader = request.headers.get("cookie") || "";
+      const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: cookieHeader,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (djangoRes.ok) {
+        const data = await djangoRes.json();
+        return NextResponse.json(data, { status: 201 });
+      }
+    } catch {}
+
     const newGuide: MockGuideArticle = {
       id: `guide-${Date.now()}`,
       target_role: body.target_role || "student",
