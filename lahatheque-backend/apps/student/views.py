@@ -417,9 +417,10 @@ class StudentHistoryStatsView(APIView):
         timeline = []
         for p in user_progresses:
             pct = p.progress_percent
-            tot_p = p.total_pages if p.total_pages > 0 else (p.ouvrage.page_count or 1)
+            real_total = p.total_pages if p.total_pages > 0 else (p.ouvrage.page_count or 0)
+            tot_p = real_total if real_total > 0 else None
             cur_p = max(1, p.current_page)
-            if pct == 0 and tot_p > 0 and cur_p > 0:
+            if pct == 0 and tot_p and tot_p > 0 and cur_p > 0:
                 pct = min(100, max(1, round((cur_p / tot_p) * 100)))
             is_done = p.is_completed or pct >= 100
 
