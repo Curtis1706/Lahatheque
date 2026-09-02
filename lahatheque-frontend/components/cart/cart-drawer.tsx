@@ -108,13 +108,15 @@ export function CartDrawer() {
                 items.map((item) => (
                   <div key={item.id} className="py-4 first:pt-0 last:pb-0 flex items-start gap-4 group">
                     {/* Miniature Couverture */}
-                    <div className="w-16 h-22 relative rounded-lg bg-background-secondary border border-border shrink-0 overflow-hidden shadow-xs">
+                    <div className="w-16 h-22 rounded-lg bg-background-secondary border border-border shrink-0 overflow-hidden shadow-xs flex items-center justify-center">
                       {item.cover ? (
-                        <Image
+                        <img
                           src={item.cover}
                           alt={item.title}
-                          fill
-                          className="object-cover"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = "none";
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-navy/10 text-navy font-bold text-[10px] font-mono">
