@@ -448,7 +448,7 @@ export default function AdminBouquetsPage() {
 
       {/* Modal Création / Édition */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-dark/60 backdrop-blur-xs overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 overflow-y-auto">
           <div className="relative w-full max-w-2xl rounded-3xl bg-background border border-border shadow-2xl p-6 sm:p-8 my-8 max-h-[90vh] overflow-y-auto space-y-6">
             <div className="flex items-center justify-between border-b border-border pb-4">
               <div>

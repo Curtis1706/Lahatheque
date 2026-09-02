@@ -921,7 +921,7 @@ export default function DocumentReaderPage() {
         />
 
         {showSampleEndOverlay && (
-          <div className="fixed inset-0 z-[10000] bg-navy-dark/90 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[10000] bg-navy-dark/95 flex items-center justify-center p-4">
             <div className="bg-navy border border-gold/40 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center text-white space-y-4 shadow-2xl">
               <h3 className="font-serif font-bold text-xl text-white">Fin de l&apos;extrait gratuit</h3>
               <p className="text-xs text-white/80 leading-relaxed">

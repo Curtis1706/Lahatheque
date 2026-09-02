@@ -132,7 +132,7 @@ export function AuthorFileDropzone({
         )}
 
         {isLoading && (
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-xs rounded-2xl flex flex-col items-center justify-center gap-2 text-gold">
+          <div className="absolute inset-0 bg-background/95 rounded-2xl flex flex-col items-center justify-center gap-2 text-gold">
             <Loader variant="dots" size={28} label="Analyse du manuscrit" />
             <p className="text-xs font-bold text-navy">Analyse du manuscrit par l&apos;IA en cours...</p>
           </div>

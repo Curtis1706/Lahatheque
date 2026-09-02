@@ -154,7 +154,7 @@ export function DashboardHeader() {
   const dashboardUrl = getDashboardLink(user?.role);
 
   return (
-    <header className="bg-background/95 backdrop-blur-md border-b border-border py-3.5 px-4 sm:px-6 lg:px-8 flex items-center justify-between shadow-xs sticky top-0 z-40 transition-colors">
+    <header className="bg-background border-b border-border py-3.5 px-4 sm:px-6 lg:px-8 flex items-center justify-between shadow-xs sticky top-0 z-40 transition-colors">
       
       {/* Titre & Fil d'Ariane dynamique de la page active */}
       <div className="flex items-center gap-2 min-w-0">

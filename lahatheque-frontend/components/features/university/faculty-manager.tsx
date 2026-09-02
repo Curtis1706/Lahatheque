@@ -157,7 +157,7 @@ export function FacultyManager({
 
       {/* Modal Ajout Faculté */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <form
             onSubmit={handleCreate}
             className="bg-background border border-border rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl"

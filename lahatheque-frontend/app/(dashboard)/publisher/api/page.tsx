@@ -120,7 +120,7 @@ export default function PublisherApiPage() {
 
       {/* Modale de Confirmation de Révocation */}
       {revokeTargetId && (
-        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="p-6 rounded-3xl bg-background border border-border max-w-md w-full space-y-4 shadow-xl">
             <div className="flex items-center gap-3 text-rose-600">
               <div className="p-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/30">

@@ -272,7 +272,7 @@ export function StudentAffiliationTable({
 
       {/* Modal Aperçu Carte d'Étudiant */}
       {selectedStudentForCard && (
-        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-background border border-border rounded-3xl p-6 max-w-md w-full space-y-4 shadow-xl">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
@@ -316,7 +316,7 @@ export function StudentAffiliationTable({
 
       {/* Modal Confirmation de Suspension */}
       {suspendingStudent && (
-        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-background border border-border rounded-3xl p-6 max-w-md w-full space-y-4 shadow-xl">
             <div className="flex items-center gap-3 text-amber-600">
               <AlertTriangle className="w-6 h-6 shrink-0" />

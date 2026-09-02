@@ -583,7 +583,7 @@ export default function AdminHostedSessionsPage() {
 
       {/* Modale de Confirmation de Révocation de Session */}
       {sessionToRevoke && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-background border border-border rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-600 mx-auto">
               <AlertTriangle className="w-6 h-6" />

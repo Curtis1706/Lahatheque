@@ -43,7 +43,7 @@ export function EditRoyaltyModal({
   return (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
         onClick={onClose}
         role="dialog"
         aria-modal="true"

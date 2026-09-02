@@ -47,7 +47,7 @@ export function ShipOrderModal({ order, isOpen, onClose, onConfirm }: ShipOrderM
   return (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
         onClick={onClose}
         onKeyDown={handleKeyDown}
         role="dialog"

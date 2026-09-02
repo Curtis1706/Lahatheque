@@ -741,7 +741,7 @@ export default function AuthorPurchasesPage() {
 
       {/* MODALE DE RETOUR PRODUIT CRÉDIT */}
       {returnOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
           <div className="w-full max-w-md rounded-3xl bg-background border border-border shadow-2xl p-6 space-y-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

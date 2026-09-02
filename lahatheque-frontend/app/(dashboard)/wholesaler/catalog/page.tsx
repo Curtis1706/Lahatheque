@@ -445,7 +445,7 @@ export default function WholesalerCatalogPage() {
                   <button
                     type="button"
                     onClick={() => setPreviewBook(book)}
-                    className="absolute inset-0 bg-navy/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1.5 backdrop-blur-xs cursor-pointer rounded-2xl"
+                    className="absolute inset-0 bg-navy/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1.5 cursor-pointer rounded-2xl"
                   >
                     <Eye className="w-4 h-4 text-gold" />
                     Consulter Extrait

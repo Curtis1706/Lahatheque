@@ -43,14 +43,14 @@ export function CartDrawer() {
     <AnimatePresence>
       {isDrawerOpen && (
         <div className="fixed inset-0 z-[100] flex justify-end">
-          {/* Overlay avec flou d'arrière-plan */}
+          {/* Overlay sombre solide pur (sans glassmorphisme) */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={closeDrawer}
-            className="fixed inset-0 bg-black/50 backdrop-blur-xs cursor-pointer"
+            className="fixed inset-0 bg-black/60 cursor-pointer"
             aria-hidden="true"
           />
 
@@ -191,7 +191,7 @@ export function CartDrawer() {
 
             {/* Pied du Panneau (Total & CTA) */}
             {items.length > 0 && (
-              <div className="p-6 border-t border-border bg-background-secondary/60 space-y-4">
+              <div className="p-6 border-t border-border bg-background-secondary space-y-4">
                 <div className="flex items-baseline justify-between">
                   <span className="text-xs font-bold text-foreground">
                     {totalCount} {totalCount > 1 ? "articles" : "article"}
