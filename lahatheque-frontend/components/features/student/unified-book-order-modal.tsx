@@ -39,7 +39,10 @@ export function UnifiedBookOrderModal({
   const [success, setSuccess] = useState(false);
 
   const unitPrice = format === "digital" ? (book.price_digital ?? 0) : (book.price_paper ?? 0);
-  const shippingFee = format === "paper" ? 2500 : 0;
+  // Les frais de livraison sont définis par le Gestionnaire selon le service choisi,
+  // communiqués après traitement — jamais un montant inventé côté client.
+  const shippingFee = 0;
+  const shippingFeeUnknown = format === "paper";
   const total = unitPrice * quantity + shippingFee;
 
   const authorsDisplay =
@@ -411,9 +414,11 @@ export function UnifiedBookOrderModal({
             </div>
 
             <div className="p-3.5 rounded-2xl bg-navy/5 border border-navy/20 space-y-1 text-right">
-              <p className="text-[11px] text-foreground-muted">
-                Frais de livraison : {shippingFee.toLocaleString("fr-FR")} XOF
-              </p>
+              {shippingFeeUnknown && (
+                <p className="text-[11px] text-foreground-muted italic text-left">
+                  Frais de livraison à confirmer — communiqués après traitement de votre commande par notre équipe logistique.
+                </p>
+              )}
               <p className="text-sm font-bold text-gold">Total : {total.toLocaleString("fr-FR")} XOF</p>
             </div>
           </>

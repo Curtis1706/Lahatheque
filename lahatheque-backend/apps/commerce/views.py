@@ -99,16 +99,32 @@ class CreateOrderView(APIView):
                     }, status=status.HTTP_400_BAD_REQUEST)
 
                 from django.db.models import Sum, F
+                from apps.commerce.models import StockOuvrage
 
-                total_disponible = ouvrage.stocks_entrepots.aggregate(
-                    total=Sum(F('quantite_reelle') - F('quantite_reservee'))
-                )['total'] or 0
+                with transaction.atomic():
+                    stocks_locked = list(
+                        StockOuvrage.objects.select_for_update()
+                        .filter(ouvrage=ouvrage)
+                    )
+                    total_disponible = sum(
+                        (s.quantite_reelle - s.quantite_reservee) for s in stocks_locked
+                    )
 
-                if total_disponible < quantity:
-                    return Response({
-                        'error': f"Stock insuffisant pour '{ouvrage.title}' en format Papier "
-                                 f"(disponible : {total_disponible}, demandé : {quantity})."
-                    }, status=status.HTTP_400_BAD_REQUEST)
+                    if total_disponible < quantity:
+                        return Response({
+                            'error': f"Stock insuffisant pour '{ouvrage.title}' en format Papier "
+                                     f"(disponible : {total_disponible}, demandé : {quantity})."
+                        }, status=status.HTTP_400_BAD_REQUEST)
+
+                    remaining_to_reserve = quantity
+                    for stock in stocks_locked:
+                        available_here = stock.quantite_reelle - stock.quantite_reservee
+                        if available_here <= 0 or remaining_to_reserve <= 0:
+                            continue
+                        take = min(available_here, remaining_to_reserve)
+                        stock.quantite_reservee = F('quantite_reservee') + take
+                        stock.save(update_fields=['quantite_reservee'])
+                        remaining_to_reserve -= take
 
             unit_price = ouvrage.price if format_type == 'digital' else (ouvrage.price_paper or ouvrage.price)
             line_total = unit_price * quantity
@@ -120,6 +136,11 @@ class CreateOrderView(APIView):
                 'unit_price': unit_price,
                 'quantity': quantity
             })
+
+        if has_paper and not shipping_address.strip():
+            return Response({
+                'error': "Une adresse de livraison est obligatoire pour toute commande incluant un exemplaire papier."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             commande = Order.objects.create(

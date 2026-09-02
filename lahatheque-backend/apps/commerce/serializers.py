@@ -23,18 +23,36 @@ class PhysicalDeliverySerializer(serializers.ModelSerializer):
         model = PhysicalDelivery
         fields = [
             'id', 'shipping_address', 'city', 'country',
-            'tracking_number', 'carrier_name', 'statut', 'updated_at',
+            'tracking_number', 'carrier_name', 'delivery_service', 'delivery_fee',
+            'statut', 'updated_at',
             'date_livraison_souhaitee', 'plage_horaire_debut', 'plage_horaire_fin',
         ]
 
 class OrderSerializer(serializers.ModelSerializer):
     lignes = LigneCommandeSerializer(many=True, read_only=True)
     livraison = PhysicalDeliverySerializer(read_only=True)
+    delivery_status = serializers.SerializerMethodField()
+    delivery_status_display = serializers.SerializerMethodField()
+
+    def get_delivery_status(self, obj):
+        livraison = getattr(obj, 'livraison', None)
+        if livraison:
+            return livraison.statut
+        has_paper_line = obj.lignes.filter(format_type='paper').exists() if hasattr(obj, 'lignes') else False
+        return 'sans_livraison' if has_paper_line else None
+
+    def get_delivery_status_display(self, obj):
+        livraison = getattr(obj, 'livraison', None)
+        if livraison:
+            return livraison.get_statut_display()
+        has_paper_line = obj.lignes.filter(format_type='paper').exists() if hasattr(obj, 'lignes') else False
+        return "Livraison non enregistrée — contactez le support" if has_paper_line else "Numérique (pas de livraison)"
 
     class Meta:
         model = Order
         fields = [
             'id', 'user', 'total_amount', 'currency', 'statut_paiement', 'statut_commande',
+            'delivery_status', 'delivery_status_display',
             'is_credit_purchase', 'credit_due_date', 'returned_at', 'return_reason',
             'lignes', 'livraison', 'created_at'
         ]
