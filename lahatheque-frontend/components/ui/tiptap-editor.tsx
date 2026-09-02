@@ -75,28 +75,48 @@ const VideoEmbed = Node.create({
 
 function VideoEmbedView({ node, deleteNode }: NodeViewProps) {
   const { stream_id, video_url, title } = node.attrs
-  const src = stream_id
-    ? `https://${CLOUDFLARE_STREAM_SUBDOMAIN}/${stream_id}/iframe`
-    : video_url
+  const rawSrc = video_url || stream_id || ""
 
-  const isDirectVideo =
-    src &&
-    (src.includes(".mp4") ||
-      src.includes(".webm") ||
-      src.includes(".r2.cloudflarestorage.com") ||
-      src.includes(".r2.dev") ||
-      (!src.includes("youtube.com") && !src.includes("youtu.be") && !src.includes("vimeo.com") && !src.includes("iframe")));
+  let src = rawSrc
+  let isDirectVideo = false
+
+  if (
+    rawSrc.startsWith("data:video") ||
+    rawSrc.startsWith("blob:") ||
+    rawSrc.includes(".mp4") ||
+    rawSrc.includes(".webm") ||
+    rawSrc.includes(".r2.cloudflarestorage.com") ||
+    rawSrc.includes(".r2.dev") ||
+    rawSrc.includes("/media/")
+  ) {
+    isDirectVideo = true
+    src = rawSrc
+  } else if (rawSrc.includes("youtube.com/watch?v=")) {
+    const videoId = rawSrc.split("v=")[1]?.split("&")[0]
+    src = `https://www.youtube.com/embed/${videoId}`
+  } else if (rawSrc.includes("youtu.be/")) {
+    const videoId = rawSrc.split("youtu.be/")[1]?.split("?")[0]
+    src = `https://www.youtube.com/embed/${videoId}`
+  } else if (rawSrc.includes("vimeo.com/")) {
+    const videoId = rawSrc.split("vimeo.com/")[1]?.split("?")[0]
+    src = `https://player.vimeo.com/video/${videoId}`
+  } else if (stream_id && !stream_id.startsWith("http") && !stream_id.startsWith("data:")) {
+    src = `https://${CLOUDFLARE_STREAM_SUBDOMAIN}/${stream_id}/iframe`
+  } else if (rawSrc) {
+    isDirectVideo = true
+    src = rawSrc
+  }
 
   return (
     <NodeViewWrapper className="my-4 relative group">
       <div className="relative rounded-2xl overflow-hidden border border-border bg-black aspect-video max-w-2xl mx-auto shadow-md">
         {src ? (
           isDirectVideo ? (
-            <video src={src} controls playsInline className="w-full h-full object-cover" />
+            <video src={src} controls playsInline className="w-full h-full object-cover rounded-2xl" />
           ) : (
             <iframe
               src={src}
-              className="w-full h-full border-none"
+              className="w-full h-full border-none rounded-2xl"
               allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
@@ -172,10 +192,10 @@ function ToolbarButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 ${
+      className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 cursor-pointer ${
         active
-          ? "bg-laha-gold/15 text-laha-gold"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+          ? "bg-gold/15 text-gold font-bold"
+          : "text-foreground-muted hover:text-navy hover:bg-background-secondary"
       } ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
     >
       {children}
@@ -217,18 +237,18 @@ export function TiptapEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [2, 3] },
-        dropcursor: { color: "var(--laha-gold, #c9a84c)", width: 2 },
+        dropcursor: { color: "var(--color-navy, #1B2A4E)", width: 2 },
       }),
       Image.configure({
         HTMLAttributes: {
-          class: "rounded-xl max-w-full h-auto border border-border my-4 block",
+          class: "rounded-2xl max-w-full h-auto border border-border my-4 block shadow-xs",
         },
-        allowBase64: false,
+        allowBase64: true,
       }),
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
-          class: "text-laha-gold underline underline-offset-2",
+          class: "text-gold underline underline-offset-2 font-medium",
           rel: "noopener noreferrer",
           target: "_blank",
         },
@@ -250,18 +270,24 @@ export function TiptapEditor({
   const handleImageUpload = useCallback(
     async (file: File) => {
       if (!editor) return
-      const toastId = toast.loading("Upload de l'image en cours...")
+      const toastId = toast.loading("Téléversement vers Cloudflare R2...")
       try {
         const res = await uploadToCloudflare(file, undefined, "guides", "image")
-        editor
-          .chain()
-          .focus()
-          .setImage({ src: res.secure_url, alt: file.name })
-          .run()
-        toast.success("Image insérée avec succès !", { id: toastId })
-        setActiveModal(null)
+        if (res.secure_url) {
+          editor
+            .chain()
+            .focus()
+            .setImage({ src: res.secure_url, alt: file.name })
+            .insertContent({ type: "paragraph" })
+            .focus("end")
+            .run()
+          toast.success("Image insérée avec succès !", { id: toastId })
+          setActiveModal(null)
+        } else {
+          toast.error("Impossible de charger l'image", { id: toastId })
+        }
       } catch {
-        toast.error("Échec du téléchargement de l'image", { id: toastId })
+        toast.error("Échec du téléversement de l'image", { id: toastId })
       }
     },
     [editor]
@@ -270,21 +296,31 @@ export function TiptapEditor({
   const handleVideoUpload = useCallback(
     async (file: File) => {
       if (!editor) return
-      const toastId = toast.loading("Upload de la vidéo vers Cloudflare Stream...")
+      const toastId = toast.loading("Téléversement de la vidéo vers Cloudflare R2...")
       try {
         const res = await uploadToCloudflare(file, undefined, "guides", "video")
-        editor
-          .chain()
-          .focus()
-          .insertContent({
-            type: "videoEmbed",
-            attrs: { stream_id: res.public_id, title: file.name },
-          })
-          .run()
-        toast.success("Vidéo insérée avec succès !", { id: toastId })
-        setActiveModal(null)
+        if (res.secure_url) {
+          editor
+            .chain()
+            .focus()
+            .insertContent([
+              {
+                type: "videoEmbed",
+                attrs: { video_url: res.secure_url, stream_id: null, title: file.name },
+              },
+              {
+                type: "paragraph",
+              },
+            ])
+            .focus("end")
+            .run()
+          toast.success("Vidéo insérée avec succès !", { id: toastId })
+          setActiveModal(null)
+        } else {
+          toast.error("Impossible de charger la vidéo", { id: toastId })
+        }
       } catch {
-        toast.error("Échec du téléchargement de la vidéo", { id: toastId })
+        toast.error("Échec du téléversement de la vidéo", { id: toastId })
       }
     },
     [editor]
@@ -310,7 +346,13 @@ export function TiptapEditor({
     if (!src.startsWith("http://") && !src.startsWith("https://")) {
       src = `https://${src}`
     }
-    editor.chain().focus().setImage({ src, alt: "Image" }).run()
+    editor
+      .chain()
+      .focus()
+      .setImage({ src, alt: "Image" })
+      .insertContent({ type: "paragraph" })
+      .focus("end")
+      .run()
     setImageUrl("")
     setActiveModal(null)
   }
@@ -322,12 +364,18 @@ export function TiptapEditor({
     editor
       .chain()
       .focus()
-      .insertContent({
-        type: "videoEmbed",
-        attrs: isUrl
-          ? { video_url: val, stream_id: null, title: "Vidéo" }
-          : { stream_id: val, video_url: null, title: "Vidéo" },
-      })
+      .insertContent([
+        {
+          type: "videoEmbed",
+          attrs: isUrl
+            ? { video_url: val, stream_id: null, title: "Vidéo" }
+            : { stream_id: val, video_url: null, title: "Vidéo" },
+        },
+        {
+          type: "paragraph",
+        },
+      ])
+      .focus("end")
       .run()
     setVideoInput("")
     setActiveModal(null)
@@ -336,7 +384,7 @@ export function TiptapEditor({
   if (!editor) return null
 
   return (
-    <div className="border border-border rounded-2xl overflow-hidden bg-background focus-within:border-laha-gold transition-colors shadow-sm flex flex-col">
+    <div className="border border-border rounded-2xl overflow-hidden bg-background focus-within:border-navy transition-colors shadow-2xs flex flex-col">
       {/* Inputs fichiers cachés */}
       <input
         ref={imageInputRef}
