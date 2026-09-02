@@ -78,6 +78,34 @@ function AdminGuidesMainContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
 
+  // Catégories personnalisées persistantes
+  const [customCategories, setCustomCategories] = useState<{ name: string; role: string; description?: string; order: number; is_active: boolean }[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("lahatheque_admin_guide_categories");
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return [
+      { name: "Compte et connexion", role: "student", order: 0, is_active: true },
+      { name: "Lecture & Annotations", role: "student", order: 1, is_active: true },
+      { name: "Gestion du catalogue", role: "admin", order: 0, is_active: true },
+      { name: "Commandes & Remises", role: "wholesaler", order: 0, is_active: true },
+      { name: "Dépôts & Éditions", role: "publisher", order: 0, is_active: true },
+      { name: "Contrats & Redevances", role: "author", order: 0, is_active: true },
+      { name: "Validation Maquettes", role: "chief_layout", order: 0, is_active: true },
+    ];
+  });
+
+  // Sauvegarde dans localStorage à chaque modification
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("lahatheque_admin_guide_categories", JSON.stringify(customCategories));
+      } catch {}
+    }
+  }, [customCategories]);
+
   // Modale Catégorie (Screenshot 2)
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -117,9 +145,19 @@ function AdminGuidesMainContent() {
     return guides.filter((g) => g.target_role === selectedRoleTab);
   }, [guides, selectedRoleTab]);
 
-  // Regroupement par catégorie pour le rôle actif
+  // Regroupement par catégorie pour le rôle actif (incluant les catégories vides)
   const currentCategoriesMap = useMemo(() => {
     const map = new Map<string, GuideData[]>();
+
+    // 1. Initialiser avec les catégories enregistrées pour ce rôle
+    customCategories
+      .filter((c) => c.role === selectedRoleTab)
+      .sort((a, b) => a.order - b.order)
+      .forEach((c) => {
+        map.set(c.name, []);
+      });
+
+    // 2. Remplir avec les articles réels
     currentRoleArticles.forEach((art) => {
       const cat = art.category_label || "Général";
       if (!map.has(cat)) {
@@ -127,8 +165,9 @@ function AdminGuidesMainContent() {
       }
       map.get(cat)!.push(art);
     });
+
     return map;
-  }, [currentRoleArticles]);
+  }, [currentRoleArticles, customCategories, selectedRoleTab]);
 
   const currentCategoryNames = useMemo(() => {
     return Array.from(currentCategoriesMap.keys());
@@ -192,11 +231,17 @@ function AdminGuidesMainContent() {
         await fetch(`/api/v1/communications/guides/${art.id}/`, { method: "DELETE" });
       } catch {}
     }
+
     setGuides((prev) =>
       prev.filter(
         (g) => !(g.target_role === selectedRoleTab && g.category_label === catName)
       )
     );
+
+    setCustomCategories((prev) =>
+      prev.filter((c) => !(c.role === selectedRoleTab && c.name === catName))
+    );
+
     toast.success(`Catégorie "${catName}" supprimée.`);
   };
 
@@ -228,6 +273,8 @@ function AdminGuidesMainContent() {
       return;
     }
 
+    const trimmedTitle = categoryTitle.trim();
+
     if (editingCategory) {
       // Renommer la catégorie sur tous les articles existants
       const affected = currentRoleArticles.filter((g) => g.category_label === editingCategory);
@@ -236,28 +283,46 @@ function AdminGuidesMainContent() {
           await fetch(`/api/v1/communications/guides/${art.id}/`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ category_label: categoryTitle.trim() }),
+            body: JSON.stringify({ category_label: trimmedTitle }),
           });
         } catch {}
       }
+
+      setCustomCategories((prev) =>
+        prev.map((c) =>
+          c.role === selectedRoleTab && c.name === editingCategory
+            ? { ...c, name: trimmedTitle, description: categoryDescription, order: categoryOrder, is_active: categoryActive }
+            : c
+        )
+      );
+
       setGuides((prev) =>
         prev.map((g) =>
           g.target_role === selectedRoleTab && g.category_label === editingCategory
-            ? { ...g, category_label: categoryTitle.trim() }
+            ? { ...g, category_label: trimmedTitle }
             : g
         )
       );
-      toast.success(`Catégorie renommée en "${categoryTitle.trim()}".`);
-      setIsCategoryModalOpen(false);
+      toast.success(`Catégorie renommée en "${trimmedTitle}".`);
     } else {
-      setIsCategoryModalOpen(false);
-      // Redirige vers la création du premier article dans cette catégorie
-      router.push(
-        `/admin/guides/editor?category=${encodeURIComponent(
-          categoryTitle.trim()
-        )}&role=${categoryRole}`
-      );
+      // Créer la nouvelle catégorie
+      const newCat = {
+        name: trimmedTitle,
+        role: categoryRole,
+        description: categoryDescription,
+        order: categoryOrder,
+        is_active: categoryActive,
+      };
+
+      setCustomCategories((prev) => {
+        const filtered = prev.filter((c) => !(c.role === categoryRole && c.name === trimmedTitle));
+        return [...filtered, newCat];
+      });
+
+      toast.success(`Catégorie "${trimmedTitle}" créée avec succès !`);
     }
+
+    setIsCategoryModalOpen(false);
   };
 
   return (
@@ -589,48 +654,70 @@ function AdminGuidesMainContent() {
 
                   {/* Liste des articles dans la catégorie */}
                   <div className="space-y-2 pl-2 sm:pl-4">
-                    {catArticles.map((art, aIdx) => (
-                      <div
-                        key={art.id}
-                        className="p-3.5 sm:p-4 rounded-2xl bg-background border border-border flex items-center justify-between gap-3 hover:border-gold/40 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <Book className="w-4 h-4 text-gold shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-xs sm:text-sm font-semibold text-navy truncate">
-                              {aIdx + 1}. {art.title}
-                            </p>
+                    {catArticles.length === 0 ? (
+                      <div className="p-5 rounded-2xl bg-background border border-dashed border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                        <div>
+                          <p className="text-xs font-semibold text-navy">
+                            Aucun article dans cette catégorie pour le moment
+                          </p>
+                          <p className="text-[11px] text-foreground-muted">
+                            Rédigez le premier article pour alimenter cette section du guide.
+                          </p>
+                        </div>
+                        <Link
+                          href={`/admin/guides/editor?role=${selectedRoleTab}&category=${encodeURIComponent(
+                            categoryHeading
+                          )}`}
+                          className="h-8 px-3 rounded-xl bg-navy hover:bg-navy-dark text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs transition-colors shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-gold" />
+                          <span>Rédiger un article</span>
+                        </Link>
+                      </div>
+                    ) : (
+                      catArticles.map((art, aIdx) => (
+                        <div
+                          key={art.id}
+                          className="p-3.5 sm:p-4 rounded-2xl bg-background border border-border flex items-center justify-between gap-3 hover:border-gold/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Book className="w-4 h-4 text-gold shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs sm:text-sm font-semibold text-navy truncate">
+                                {aIdx + 1}. {art.title}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                art.is_published
+                                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                                  : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                              }`}
+                            >
+                              {art.is_published ? "Publié" : "Brouillon"}
+                            </span>
+                            <Link
+                              href={`/admin/guides/editor?id=${art.id}`}
+                              className="p-2 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-navy transition-colors cursor-pointer"
+                              title="Modifier l'article"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteArticle(art.id)}
+                              className="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors cursor-pointer"
+                              title="Supprimer l'article"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                              art.is_published
-                                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                                : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
-                            }`}
-                          >
-                            {art.is_published ? "Publié" : "Brouillon"}
-                          </span>
-                          <Link
-                            href={`/admin/guides/editor?id=${art.id}`}
-                            className="p-2 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-navy transition-colors cursor-pointer"
-                            title="Modifier l'article"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteArticle(art.id)}
-                            className="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors cursor-pointer"
-                            title="Supprimer l'article"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
               ))}

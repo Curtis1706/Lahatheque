@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
 
     if (djangoRes.ok) {
       const data = await djangoRes.json();
-      return NextResponse.json(data);
+      const list = Array.isArray(data) ? data : (data?.results || []);
+      if (list.length > 0) {
+        return NextResponse.json(data);
+      }
     }
   } catch {
     // Mode fallback mémoire local
