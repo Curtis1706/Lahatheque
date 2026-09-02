@@ -12,6 +12,14 @@ export interface SearchFilters {
   year?: string | number;
 }
 
+function getBaseApiUrl(): string {
+  if (typeof window === "undefined") {
+    const internalUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+    return internalUrl.replace(/\/+$/, "");
+  }
+  return "/api/bff";
+}
+
 export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
   try {
     const params = new URLSearchParams();
@@ -25,20 +33,32 @@ export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
     if (filters.year) params.set("year", filters.year.toString());
 
     const queryStr = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`/api/bff/catalog/books/${queryStr}`, {
+    const isServer = typeof window === "undefined";
+    const url = isServer
+      ? `${getBaseApiUrl()}/v1/catalog/books/${queryStr}`
+      : `/api/bff/catalog/books/${queryStr}`;
+
+    const res = await fetch(url, {
       credentials: "include",
       cache: "no-store",
     });
     if (res.ok) {
       const json = await res.json();
-      const results = Array.isArray(json) ? json : (json.results || []);
+      let results: Book[] = [];
+      if (Array.isArray(json)) {
+        results = json;
+      } else if (json && Array.isArray(json.data)) {
+        results = json.data;
+      } else if (json && Array.isArray(json.results)) {
+        results = json.results;
+      }
       if (results.length > 0) return results;
     }
   } catch (err) {
     console.warn("BFF catalog non joignable, utilisation des données mockées :", err);
   }
 
-  // Filtrage local robuste sur mockBooks
+  // Filtrage local robuste sur mockBooks en fallback
   return mockBooks.filter((book) => {
     if (filters.q) {
       const query = filters.q.toLowerCase();
@@ -89,15 +109,27 @@ export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
 
 export async function getBookById(id: string): Promise<Book | null> {
   try {
-    const res = await fetch(`/api/bff/catalog/books/${id}/`, {
+    const isServer = typeof window === "undefined";
+    const url = isServer
+      ? `${getBaseApiUrl()}/v1/catalog/books/${id}/`
+      : `/api/bff/catalog/books/${id}/`;
+
+    const res = await fetch(url, {
       credentials: "include",
       cache: "no-store",
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const json = await res.json();
+      if (json && typeof json === "object") {
+        if ("data" in json && json.data) {
+          return json.data as Book;
+        }
+        return json as Book;
+      }
+    }
   } catch (err) {
     console.warn("BFF book detail fallback:", err);
   }
 
   return mockBooks.find((b) => b.id === id) || null;
 }
-
