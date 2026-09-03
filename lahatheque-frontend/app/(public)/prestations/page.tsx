@@ -77,7 +77,7 @@ const PRESTATIONS: Prestation[] = [
     icon: ShieldCheck,
     features: [
       "Filigrane nominatif et invisible propre à chaque session de lecture",
-      "Compatibilité avec les liseuses sécurisées et le lecteur Web officiel",
+      "Compatibilité avec le lecteur Web sécurisé et navigation fluide",
       "Protection contre la capture d'écran et l'extraction par injection",
       "Journalisation forensique et audit de consultation en temps réel"
     ],
@@ -154,7 +154,7 @@ const PRESTATIONS: Prestation[] = [
       "Voix narratives professionnelles adaptées au ton de l'ouvrage",
       "Mastering sonore respectant les normes audio broadcast (EBU R128)",
       "Découpage par chapitres avec métadonnées audio synchronisées",
-      "Streaming protégé contre l'aspiration et téléchargement hors-ligne sécurisé"
+      "Streaming audio protégé contre l'aspiration et la copie non autorisée"
     ],
     target: "Tout public, Auteurs indépendants, Éditeurs"
   },

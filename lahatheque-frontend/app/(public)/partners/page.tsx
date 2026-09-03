@@ -47,7 +47,7 @@ const PARTNER_PROFILES = [
       {
         icon: Users,
         title: "Accès Simultané Illimité",
-        description: "Finies les ruptures d'ouvrages à la bibliothèque. Des milliers d'étudiants consultent simultanément le même manuel sur web et mobile."
+        description: "Finies les ruptures d'ouvrages à la bibliothèque. Des milliers d'étudiants consultent simultanément le même manuel sur la plateforme web."
       },
       {
         icon: KeyRound,
@@ -91,7 +91,7 @@ const PARTNER_PROFILES = [
       {
         icon: Layers,
         title: "Distribution Hybride Papier / Numérique",
-        description: "Mise en avant de vos tirages papier en librairie partenaire et déclinaisons numériques / audio sur nos applications."
+        description: "Mise en avant de vos tirages papier en librairie partenaire et déclinaisons numériques / audio sur notre plateforme web."
       },
       {
         icon: FileCheck2,
