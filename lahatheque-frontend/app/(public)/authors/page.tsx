@@ -25,6 +25,7 @@ import {
   Send
 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { ACADEMIC_DISCIPLINES } from "@/lib/constants/classification";
 
 export default function AuthorsPublicPage() {
   // Stepper state
@@ -672,11 +673,11 @@ export default function AuthorsPublicPage() {
                       />
                     </div>
 
-                    {/* Genre littéraire & Pays */}
+                    {/* Discipline scientifique & Pays */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block font-medium text-foreground mb-1">
-                          Genre littéraire <span className="text-gold">*</span>
+                          Discipline / Domaine <span className="text-gold">*</span>
                         </label>
                         <select
                           required
@@ -685,18 +686,12 @@ export default function AuthorsPublicPage() {
                           onChange={(e) => setGenre(e.target.value)}
                           className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
                         >
-                          <option value="">Sélectionner</option>
-                          <option value="Scolaires">Scolaires</option>
-                          <option value="Romans">Romans</option>
-                          <option value="Bandes dessinées">Bandes dessinées</option>
-                          <option value="Poésie">Poésie</option>
-                          <option value="Nouvelles">Nouvelles</option>
-                          <option value="Contes">Contes</option>
-                          <option value="Essais">Essais</option>
-                          <option value="Biographie">Biographie</option>
-                          <option value="Théâtre">Théâtre</option>
-                          <option value="Devellopement personnel">Devellopement personnel</option>
-                          <option value="Autre">Autre / Hors catégorie</option>
+                          <option value="">Sélectionner une discipline</option>
+                          {ACADEMIC_DISCIPLINES.map((disc) => (
+                            <option key={disc} value={disc}>
+                              {disc}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div>

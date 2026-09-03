@@ -17,6 +17,7 @@ import {
   Check
 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { ACADEMIC_DISCIPLINES } from "@/lib/constants/classification";
 
 export default function SubmitManuscriptPage() {
   const [dragActive, setDragActive] = useState(false);
@@ -291,13 +292,13 @@ export default function SubmitManuscriptPage() {
                 />
               </div>
 
-              {/* Genre littéraire & Pays */}
+              {/* Discipline scientifique & Pays */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {/* Genre littéraire */}
+                {/* Discipline scientifique */}
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-bold text-navy">
-                    Genre littéraire <span className="text-gold">*</span>
+                    Discipline / Domaine <span className="text-gold">*</span>
                   </label>
                   <select 
                     name="workType"
@@ -306,18 +307,12 @@ export default function SubmitManuscriptPage() {
                     value={genre}
                     onChange={(e) => setGenre(e.target.value)}
                   >
-                    <option value="">Sélectionner</option>
-                    <option value="Scolaires">Scolaires</option>
-                    <option value="Romans">Romans</option>
-                    <option value="Bandes dessinées">Bandes dessinées</option>
-                    <option value="Poésie">Poésie</option>
-                    <option value="Nouvelles">Nouvelles</option>
-                    <option value="Contes">Contes</option>
-                    <option value="Essais">Essais</option>
-                    <option value="Biographie">Biographie</option>
-                    <option value="Théâtre">Théâtre</option>
-                    <option value="Devellopement personnel">Devellopement personnel</option>
-                    <option value="Autre">Autre / Hors catégorie</option>
+                    <option value="">Sélectionner une discipline</option>
+                    {ACADEMIC_DISCIPLINES.map((disc) => (
+                      <option key={disc} value={disc}>
+                        {disc}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
