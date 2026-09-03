@@ -589,6 +589,12 @@ class PartnerSessionSupervisionViewSet(viewsets.ViewSet):
 
                 duration_minutes = int(s.reading_time_seconds / 60) if s.reading_time_seconds else 0
 
+                cover_url = ""
+                if s.ouvrage_id:
+                    cover_url = f"/api/bff/catalog/books/{s.ouvrage_id}/cover/"
+                elif isinstance(s.metadata, dict) and s.metadata.get("cover_url"):
+                    cover_url = str(s.metadata["cover_url"])
+
                 results.append({
                     "id": str(s.id),
                     "partnerName": partner_name,
@@ -596,6 +602,8 @@ class PartnerSessionSupervisionViewSet(viewsets.ViewSet):
                     "studentEmail": user_email,
                     "studentIp": student_ip,
                     "bookTitle": title,
+                    "bookId": str(s.ouvrage_id or ""),
+                    "coverUrl": cover_url,
                     "sourceType": s.source_type,
                     "sourceUrl": s.custom_document_url if s.source_type == "external_url" else None,
                     "startedAt": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else timezone.now().strftime("%Y-%m-%d %H:%M"),

@@ -12,6 +12,7 @@ export interface TraceRecord {
   partner_name?: string;
   book_title: string;
   book_id: string;
+  cover_url?: string;
   access_type: "read_chunk" | "read_online" | "text_request" | "audio_stream";
   ip_address: string;
   country: string;
@@ -101,13 +102,17 @@ export async function getAccessTraces(): Promise<TraceRecord[]> {
           ? `${uName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@univ.bj`
           : "etudiant@univ.bj";
 
+        const bookId = String(s.bookId || s.book_id || s.ouvrage || s.id || "");
+        const coverUrl = s.coverUrl || s.cover_url || (bookId && !bookId.startsWith("byod") ? `/api/bff/catalog/books/${bookId}/cover/` : "");
+
         traces.push({
           id: String(s.id),
           user_name: uName,
           user_email: s.studentEmail || s.userEmail || emailFallback,
           partner_name: pName,
           book_title: s.bookTitle || s.documentTitle || "Ouvrage Académique",
-          book_id: String(s.bookId || s.id),
+          book_id: bookId,
+          cover_url: coverUrl,
           access_type: "read_chunk",
           ip_address: s.studentIp || s.userIp || "127.0.0.1",
           country: "BJ",

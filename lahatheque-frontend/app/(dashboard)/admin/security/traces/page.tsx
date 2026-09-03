@@ -296,19 +296,19 @@ export default function AdminTracesAccesPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-background border-b border-border text-foreground-muted font-semibold">
                   <tr>
-                    <th className="py-3 px-4">ID & Date</th>
-                    <th className="py-3 px-4">Lecteur / Utilisateur</th>
-                    <th className="py-3 px-4">Document & Partenaire</th>
-                    <th className="py-3 px-4">Progression</th>
-                    <th className="py-3 px-4">Origine (IP & Pays)</th>
-                    <th className="py-3 px-4">Temps & Terminal</th>
+                    <th className="py-4 px-5 whitespace-nowrap">ID & Date</th>
+                    <th className="py-4 px-5 whitespace-nowrap">Lecteur / Utilisateur</th>
+                    <th className="py-4 px-5">Document & Partenaire</th>
+                    <th className="py-4 px-5 whitespace-nowrap">Progression</th>
+                    <th className="py-4 px-5 whitespace-nowrap">Origine (IP & Pays)</th>
+                    <th className="py-4 px-5 whitespace-nowrap">Temps & Terminal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {paginatedTraces.map((trace) => (
                     <tr key={trace.id} className="hover:bg-background/60 transition-colors">
                       {/* ID & Date */}
-                      <td className="py-3.5 px-4 font-mono text-[11px] text-foreground-muted whitespace-nowrap">
+                      <td className="py-5 px-5 font-mono text-[11px] text-foreground-muted whitespace-nowrap align-middle">
                         <div className="font-bold text-navy font-sans text-xs">
                           {new Date(trace.timestamp).toLocaleDateString("fr-FR", {
                             day: "2-digit",
@@ -316,7 +316,7 @@ export default function AdminTracesAccesPage() {
                             year: "numeric",
                           })}
                         </div>
-                        <div className="text-[10px] text-foreground-muted">
+                        <div className="text-[11px] text-foreground-muted mt-0.5">
                           {new Date(trace.timestamp).toLocaleTimeString("fr-FR", {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -325,44 +325,67 @@ export default function AdminTracesAccesPage() {
                       </td>
 
                       {/* Lecteur / Utilisateur */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-gold shrink-0" />
-                          <p className="font-bold text-navy text-xs">{trace.user_name}</p>
+                      <td className="py-5 px-5 align-middle">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                            <User className="w-3.5 h-3.5 text-gold" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-navy text-xs md:text-sm">{trace.user_name}</p>
+                            <p className="text-[11px] text-foreground-muted font-mono">{trace.user_email}</p>
+                          </div>
                         </div>
-                        <p className="text-[10px] text-foreground-muted font-mono pl-5">
-                          {trace.user_email}
-                        </p>
                       </td>
 
-                      {/* Document & Partenaire */}
-                      <td className="py-3.5 px-4 max-w-[240px]">
-                        <div className="flex items-center gap-1.5">
-                          <BookOpen className="w-3.5 h-3.5 text-navy shrink-0" />
-                          <p className="font-medium text-foreground truncate text-xs" title={trace.book_title}>
-                            {trace.book_title}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5 pl-5">
-                          <span className="text-[10px] font-bold text-gold uppercase tracking-wider">
-                            {trace.partner_name || "LAHAThèque"}
-                          </span>
-                          <span className="text-border">•</span>
-                          {getAccessTypeBadge(trace.access_type)}
+                      {/* Document & Partenaire avec Couverture */}
+                      <td className="py-5 px-5 align-middle">
+                        <div className="flex items-center gap-3.5">
+                          {/* Miniature de couverture de l'ouvrage */}
+                          <div className="relative w-10 h-14 shrink-0 rounded-lg overflow-hidden bg-navy/10 border border-border/80 shadow-xs flex items-center justify-center">
+                            {trace.cover_url ? (
+                              <img
+                                src={trace.cover_url}
+                                alt={trace.book_title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                  const fallback = e.currentTarget.parentElement?.querySelector(".fallback-cover");
+                                  if (fallback) fallback.classList.remove("hidden");
+                                }}
+                              />
+                            ) : null}
+                            <div className={`fallback-cover ${trace.cover_url ? "hidden" : "flex"} w-full h-full items-center justify-center bg-navy/90 text-gold`}>
+                              <BookOpen className="w-4 h-4" />
+                            </div>
+                          </div>
+
+                          {/* Titre et Badges */}
+                          <div className="min-w-0 max-w-[280px] lg:max-w-[340px] space-y-1">
+                            <p className="font-semibold text-foreground text-xs md:text-sm leading-snug line-clamp-2" title={trace.book_title}>
+                              {trace.book_title}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                              <span className="text-[10px] font-bold text-gold uppercase tracking-wider bg-gold/10 px-1.5 py-0.5 rounded">
+                                {trace.partner_name || "LAHAThèque"}
+                              </span>
+                              <span className="text-border">•</span>
+                              {getAccessTypeBadge(trace.access_type)}
+                            </div>
+                          </div>
                         </div>
                       </td>
 
                       {/* Progression & Page */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex items-center justify-between gap-2 max-w-[120px]">
-                          <span className="font-bold text-navy text-xs">
+                      <td className="py-5 px-5 whitespace-nowrap align-middle">
+                        <div className="flex items-center justify-between gap-3 max-w-[130px]">
+                          <span className="font-bold text-navy text-xs md:text-sm">
                             {trace.progress_percent ?? 0}%
                           </span>
-                          <span className="text-[10px] text-foreground-muted font-mono">
+                          <span className="text-[11px] text-foreground-muted font-mono font-medium">
                             p. {trace.current_page || trace.page_number || 1}/{trace.total_pages || 1}
                           </span>
                         </div>
-                        <div className="w-full max-w-[120px] bg-background border border-border rounded-full h-1.5 mt-1 overflow-hidden">
+                        <div className="w-full max-w-[130px] bg-background border border-border rounded-full h-2 mt-1.5 overflow-hidden">
                           <div
                             className="bg-gold h-full rounded-full transition-all duration-300"
                             style={{ width: `${Math.min(100, trace.progress_percent ?? 0)}%` }}
@@ -371,24 +394,24 @@ export default function AdminTracesAccesPage() {
                       </td>
 
                       {/* Origine (IP & Pays) */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-[10px] px-1.5 py-0.5 rounded bg-background border border-border text-navy font-mono">
+                      <td className="py-5 px-5 whitespace-nowrap align-middle">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-background border border-border text-navy font-mono">
                             {trace.country || "BJ"}
                           </span>
-                          <span className="font-mono text-xs font-semibold text-navy">
+                          <span className="font-mono text-xs md:text-sm font-semibold text-navy">
                             {trace.ip_address}
                           </span>
                         </div>
                       </td>
 
                       {/* Temps & Terminal */}
-                      <td className="py-3.5 px-4 max-w-[200px]">
-                        <div className="flex items-center gap-1 text-[11px] font-medium text-foreground">
-                          <Clock className="w-3 h-3 text-gold shrink-0" />
+                      <td className="py-5 px-5 max-w-[220px] align-middle">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                          <Clock className="w-3.5 h-3.5 text-gold shrink-0" />
                           <span>{trace.reading_time_minutes ? `${trace.reading_time_minutes} min` : "1 min"}</span>
                         </div>
-                        <p className="text-[10px] text-foreground-muted font-mono truncate mt-0.5" title={trace.device_fingerprint}>
+                        <p className="text-[11px] text-foreground-muted font-mono truncate mt-1" title={trace.device_fingerprint}>
                           {formatDeviceFingerprint(trace.device_fingerprint)}
                         </p>
                       </td>
@@ -401,10 +424,10 @@ export default function AdminTracesAccesPage() {
             {/* Version Cartes Empilées (Mobile < 768px) */}
             <div className="md:hidden divide-y divide-border">
               {paginatedTraces.map((trace) => (
-                <div key={trace.id} className="p-4 space-y-3">
+                <div key={trace.id} className="p-4 space-y-3.5">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-[10px] px-1.5 py-0.5 rounded bg-background border border-border text-navy font-mono">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-background border border-border text-navy font-mono">
                         {trace.country || "BJ"}
                       </span>
                       <span className="font-mono text-xs font-bold text-navy">
@@ -414,32 +437,53 @@ export default function AdminTracesAccesPage() {
                     {getAccessTypeBadge(trace.access_type)}
                   </div>
 
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-gold shrink-0" />
-                      <p className="text-xs font-bold text-navy">{trace.user_name}</p>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                      <User className="w-4 h-4 text-gold" />
                     </div>
-                    <p className="text-[10px] text-foreground-muted font-mono pl-5">
-                      {trace.user_email}
-                    </p>
+                    <div>
+                      <p className="text-xs font-bold text-navy">{trace.user_name}</p>
+                      <p className="text-[11px] text-foreground-muted font-mono">{trace.user_email}</p>
+                    </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-background border border-border text-xs space-y-2">
-                    <div className="flex items-center gap-1.5">
-                      <BookOpen className="w-3.5 h-3.5 text-navy shrink-0" />
-                      <p className="font-medium text-foreground truncate">{trace.book_title}</p>
+                  {/* Carte Document avec Couverture sur Mobile */}
+                  <div className="p-3 rounded-xl bg-background border border-border text-xs space-y-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-9 h-12 shrink-0 rounded-lg overflow-hidden bg-navy/10 border border-border shadow-xs flex items-center justify-center">
+                        {trace.cover_url ? (
+                          <img
+                            src={trace.cover_url}
+                            alt={trace.book_title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              const fallback = e.currentTarget.parentElement?.querySelector(".fallback-cover-mobile");
+                              if (fallback) fallback.classList.remove("hidden");
+                            }}
+                          />
+                        ) : null}
+                        <div className={`fallback-cover-mobile ${trace.cover_url ? "hidden" : "flex"} w-full h-full items-center justify-center bg-navy/90 text-gold`}>
+                          <BookOpen className="w-3.5 h-3.5" />
+                        </div>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground truncate text-xs">{trace.book_title}</p>
+                        <p className="text-[10px] font-bold text-gold uppercase tracking-wider mt-0.5">
+                          {trace.partner_name || "LAHAThèque"}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-[10px] pt-1 border-t border-border">
-                      <span className="font-bold text-gold uppercase tracking-wider">
-                        {trace.partner_name || "LAHAThèque"}
-                      </span>
+                    <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-border">
+                      <span className="font-medium text-foreground-muted">Progression</span>
                       <span className="font-mono font-bold text-navy">
                         p. {trace.current_page || trace.page_number || 1}/{trace.total_pages || 1} ({trace.progress_percent ?? 0}%)
                       </span>
                     </div>
 
-                    <div className="w-full bg-background-secondary border border-border rounded-full h-1.5 overflow-hidden">
+                    <div className="w-full bg-background-secondary border border-border rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-gold h-full rounded-full"
                         style={{ width: `${Math.min(100, trace.progress_percent ?? 0)}%` }}
@@ -447,12 +491,12 @@ export default function AdminTracesAccesPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-[10px] text-foreground-muted pt-1">
-                    <div className="flex items-center gap-1 font-mono">
-                      <Clock className="w-3 h-3 text-gold" />
+                  <div className="flex items-center justify-between text-[11px] text-foreground-muted pt-1">
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <Clock className="w-3.5 h-3.5 text-gold" />
                       <span>{trace.reading_time_minutes ? `${trace.reading_time_minutes} min` : "1 min"}</span>
                       <span className="text-border">•</span>
-                      <span className="truncate max-w-[120px]">{formatDeviceFingerprint(trace.device_fingerprint)}</span>
+                      <span className="truncate max-w-[130px]">{formatDeviceFingerprint(trace.device_fingerprint)}</span>
                     </div>
                     <span className="font-mono">
                       {new Date(trace.timestamp).toLocaleDateString("fr-FR", {
