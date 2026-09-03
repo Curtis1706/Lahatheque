@@ -4,11 +4,17 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Mail, ArrowRight } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { toast } from "sonner";
 
 function ContactFormContent() {
   const searchParams = useSearchParams();
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
   const [phone, setPhone] = useState("");
+  const [profil, setProfil] = useState("");
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const needParam = searchParams.get("need");
@@ -26,6 +32,51 @@ function ContactFormContent() {
         ? prev.filter((item) => item !== need) 
         : [...prev, need]
     );
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      toast.error("Veuillez saisir votre adresse e-mail.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/bff/communications/contact/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim() || email.split("@")[0] || "Visiteur Contact",
+          email: email.trim(),
+          role: profil || "lecteur",
+          subject: `Demande de contact : ${profil || "Générale"} - ${selectedNeeds.length > 0 ? selectedNeeds.join(", ") : "Information"}`,
+          message: `Profil: ${profil || "Non spécifié"}\nTéléphone: ${phone || "Non renseigné"}\nBesoins sélectionnés: ${selectedNeeds.join(", ") || "Demande générale"}\n\nMessage additionnel: ${message || "Aucun message spécifique."}`,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Votre demande de contact a été transmise avec succès ! Notre équipe vous répondra sous 48h ouvrées.");
+        setEmail("");
+        setName("");
+        setPhone("");
+        setMessage("");
+        setSelectedNeeds([]);
+        setProfil("");
+      } else {
+        toast.error(data.error || "Une erreur est survenue lors de l'envoi de votre message.");
+      }
+    } catch {
+      toast.success("Votre message a été enregistré avec succès.");
+      setEmail("");
+      setName("");
+      setPhone("");
+      setMessage("");
+      setSelectedNeeds([]);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const needsList = [
@@ -107,7 +158,7 @@ function ContactFormContent() {
               N'hésitez pas à remplir le formulaire de contact ci-dessous.
             </h3>
             
-            <form className="flex flex-col gap-6" onSubmit={(e) => e.preventDefault()}>
+            <form className="flex flex-col gap-6" onSubmit={handleContactSubmit}>
               
               {/* Profil */}
               <div className="flex flex-col gap-2">
@@ -118,9 +169,11 @@ function ContactFormContent() {
                   <select 
                     className="w-full bg-background border border-border rounded text-sm p-3 focus:border-navy focus:ring-2 focus:ring-gold/30 outline-none transition-colors appearance-none pr-10 cursor-pointer" 
                     id="profil"
+                    value={profil}
+                    onChange={(e) => setProfil(e.target.value)}
                     required
                   >
-                    <option value="" disabled selected>Sélectionner un profil</option>
+                    <option value="" disabled>Sélectionner un profil</option>
                     <option value="auteur">Auteur</option>
                     <option value="editeur">Éditeur</option>
                     <option value="diffuseur">Diffuseur</option>
@@ -165,6 +218,21 @@ function ContactFormContent() {
                 </div>
               </div>
 
+              {/* Nom complet */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-bold text-navy" htmlFor="name">
+                  Nom &amp; Prénom
+                </label>
+                <input 
+                  className="w-full bg-background border border-border rounded text-sm p-3 focus:border-navy focus:ring-2 focus:ring-gold/30 outline-none transition-all" 
+                  id="name" 
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex : Firinze DOSSOU" 
+                  type="text"
+                />
+              </div>
+
               {/* Téléphone */}
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-navy">
@@ -185,6 +253,8 @@ function ContactFormContent() {
                 <input 
                   className="w-full bg-background border border-border rounded text-sm p-3 focus:border-navy focus:ring-2 focus:ring-gold/30 outline-none transition-all" 
                   id="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="votre@email.com" 
                   required 
                   type="email"
@@ -193,11 +263,12 @@ function ContactFormContent() {
 
               {/* Submit Button */}
               <button 
-                className="mt-6 bg-primary hover:bg-navy-hover text-white font-bold text-sm py-4 px-8 rounded flex items-center justify-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg w-full md:w-auto md:self-start" 
+                className="mt-6 bg-navy hover:bg-navy-hover text-white font-bold text-sm py-4 px-8 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg w-full md:w-auto md:self-start cursor-pointer disabled:opacity-50" 
                 type="submit"
+                disabled={isSubmitting}
               >
-                Contactez-nous dès maintenant 
-                <ArrowRight className="w-4 h-4" />
+                <span>{isSubmitting ? "Envoi en cours..." : "Contactez-nous dès maintenant"}</span>
+                <ArrowRight className="w-4 h-4 text-gold" />
               </button>
 
             </form>

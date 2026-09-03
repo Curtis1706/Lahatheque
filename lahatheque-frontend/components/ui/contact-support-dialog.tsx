@@ -91,7 +91,7 @@ export function ContactSupportDialog({
 
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/communications/contact/", {
+      const res = await fetch("/api/bff/communications/contact/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

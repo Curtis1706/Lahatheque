@@ -157,9 +157,8 @@ export default function PartnersPublicPage() {
     setSubmitError(null);
     setIsSubmitting(true);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     try {
-      const response = await fetch(`${apiUrl}/api/v1/communications/partnership/`, {
+      const response = await fetch("/api/bff/communications/partnership/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

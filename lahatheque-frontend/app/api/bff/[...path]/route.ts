@@ -93,8 +93,9 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
 
   try {
     let backendRes: Response | null = null
+    const timeoutMs = (contentType && contentType.includes('multipart/form-data')) ? 300000 : 30000
     const fetchController = new AbortController()
-    const timeoutHandle = setTimeout(() => fetchController.abort(), 20000)
+    const timeoutHandle = setTimeout(() => fetchController.abort(), timeoutMs)
 
     try {
       backendRes = await fetch(targetUrl, {
@@ -110,9 +111,9 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
     } catch (netErr: any) {
       clearTimeout(timeoutHandle)
       if (netErr?.name === 'AbortError') {
-        console.error(`[BFF Proxy TIMEOUT] Le backend Django à ${targetUrl} n'a pas répondu en 20s.`)
+        console.error(`[BFF Proxy TIMEOUT] Le backend Django à ${targetUrl} n'a pas répondu en ${timeoutMs / 1000}s.`)
         return NextResponse.json(
-          { error: "Le serveur backend Django n'a pas répondu dans les délais (20s)." },
+          { error: `Le serveur backend n'a pas répondu dans les délais (${timeoutMs / 1000}s).` },
           { status: 504 }
         )
       }
