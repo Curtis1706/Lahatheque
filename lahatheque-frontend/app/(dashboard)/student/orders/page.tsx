@@ -22,6 +22,7 @@ import {
 import OrderCreateForm from "@/components/student/OrderCreateForm";
 import { BookCover } from "@/components/features/student/book-cover";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { generateOfficialPdf } from "@/lib/services/export-service";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -138,9 +139,42 @@ export default function StudentOrdersPage() {
     toast.success(`Numéro de suivi copié : ${tracking}`);
   };
 
-  const handleDownloadInvoice = (order: OrderAPI, e: React.MouseEvent) => {
+  const handleDownloadInvoice = async (order: OrderAPI, e: React.MouseEvent) => {
     e.stopPropagation();
-    toast.success(`Facture #${String(order.id).slice(0, 8).toUpperCase()} téléchargée avec succès.`);
+    try {
+      const orderRef = `#${String(order.id).slice(0, 8).toUpperCase()}`;
+      await generateOfficialPdf({
+        docType: "FACTURE",
+        docNumber: orderRef,
+        date: formatDate(order.created_at),
+        recipient: {
+          name: "Client / Apprenant LAHAThèque",
+          roleOrTitle: "Compte Lecteur Particulier",
+          addressOrCampus: order.livraison ? `${order.livraison.shipping_address}, ${order.livraison.city}` : "Livraison Numérique Instantanée",
+          emailOrPhone: order.livraison ? `Transporteur : ${order.livraison.carrier_name}` : "contact@lahatheque.bj",
+        },
+        summaryCards: [
+          { label: "Articles", value: `${order.lignes.length} ouvrage(s)` },
+          { label: "Mode Livraison", value: order.livraison?.carrier_name || "Numérique Instantané" },
+          { label: "Paiement", value: order.mode_paiement_display || "Mobile Money" },
+        ],
+        tableHeaders: ["Réf. Article", "Titre de l'Ouvrage", "Format", "Qté", "Prix Unitaire", "Total"],
+        tableRows: order.lignes.map((l, idx) => [
+          `ART-${idx + 1}`,
+          l.ouvrage_title,
+          l.format_display || (l.format_type === "paper" ? "Livre Papier" : "Numérique"),
+          `${l.quantity} ex.`,
+          formatPrice(l.unit_price),
+          formatPrice(Number(l.unit_price) * l.quantity),
+        ]),
+        totalAmount: formatPrice(order.total_amount),
+        totalNotes: `Facture acquittée (${order.statut_paiement_display || "Payé"}). Conforme à la législation fiscale UEMOA en vigueur.`,
+        filename: `facture_LAHA_${orderRef.replace("#", "")}.pdf`,
+      });
+      toast.success(`Facture ${orderRef} générée et téléchargée au format PDF officiel !`);
+    } catch {
+      toast.error("Erreur lors de la génération de la facture.");
+    }
   };
 
   // Transformation des données pour la DataTable

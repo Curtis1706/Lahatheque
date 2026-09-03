@@ -5,6 +5,7 @@ import { Shield, Search, Filter, Globe, Download, RefreshCw, Smartphone, Clock, 
 import { toast } from "sonner";
 import { getAccessTraces, type TraceRecord } from "@/lib/services/protection";
 import { PageLoader } from "@/components/ui/page-loader";
+import { generateCsvExport, generateOfficialPdf } from "@/lib/services/export-service";
 
 
 export default function AdminTracesAccesPage() {
@@ -84,8 +85,30 @@ export default function AdminTracesAccesPage() {
           </button>
           <button
             type="button"
-            onClick={() => toast.success("Export du registre d'audit généré au format CSV.")}
-            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-navy text-white hover:bg-navy-hover transition-colors cursor-pointer shadow-sm"
+            onClick={() => {
+              if (filteredTraces.length === 0) {
+                toast.info("Aucune trace d'accès à exporter.");
+                return;
+              }
+              generateCsvExport(
+                filteredTraces.map((t) => ({
+                  ID: t.id,
+                  Utilisateur: t.user_name,
+                  Email: t.user_email,
+                  Ouvrage_Consulte: t.book_title,
+                  ID_Livre: t.book_id,
+                  Type_Acces: t.access_type,
+                  Adresse_IP: t.ip_address,
+                  Pays: t.country,
+                  Empreinte_Appareil: t.device_fingerprint,
+                  Page_Consultee: t.page_number || "—",
+                  Horodatage_UTC: t.timestamp,
+                })),
+                `audit_traces_securite_lahatheque_${new Date().toISOString().slice(0, 10)}`
+              );
+              toast.success("Registre d'audit exporté avec succès (format UTF-8 BOM pour Excel) !");
+            }}
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-navy text-white hover:bg-navy-hover transition-colors cursor-pointer shadow-sm min-h-[38px]"
           >
             <Download className="w-3.5 h-3.5 text-gold" />
             <span>Exporter Audit (CSV)</span>

@@ -10,6 +10,7 @@ import { getWholesalerOrderDetail, requestOrderCancellation, returnWholesaleCred
 import type { WholesalerOrder } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
+import { generateOfficialPdf } from "@/lib/services/export-service";
 
 export default function WholesalerOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -128,17 +129,52 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
         </div>
 
         <div className="flex items-center gap-2">
-          {order.invoice_url && (
-            <a
-              href={order.invoice_url}
-              target="_blank"
-              rel="noreferrer"
-              className="px-3.5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
-            >
-              <Download className="w-4 h-4 text-gold" />
-              Télécharger Facture Proforma PDF
-            </a>
-          )}
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const orderRef = order.reference || `#CMD-GROS-${order.id.slice(0, 8).toUpperCase()}`;
+                const totalVol = (order.total_digital_licenses || 0) + (order.total_print_copies || 0);
+                await generateOfficialPdf({
+                  docType: "BON_COMMANDE",
+                  docNumber: orderRef,
+                  date: new Date(order.created_at).toLocaleDateString("fr-FR"),
+                  recipient: {
+                    name: order.company_name || "Établissement Grossiste Partenaire",
+                    roleOrTitle: "Grossiste Commercial Agréé",
+                    addressOrCampus: order.delivery_address || "Livraison Réseau Grossiste",
+                    emailOrPhone: order.contact_phone || "grossiste@lahatheque.bj",
+                  },
+                  summaryCards: [
+                    { label: "Volume Total", value: `${totalVol} ex. commandés` },
+                    { label: "Numérique / Papier", value: `${order.total_digital_licenses || 0} num. / ${order.total_print_copies || 0} pap.` },
+                    { label: "Statut Commande", value: order.status.toUpperCase() },
+                  ],
+                  tableHeaders: ["Réf.", "Titre de l'Ouvrage", "ISBN", "Qté Num.", "Prix Num.", "Qté Pap.", "Prix Pap.", "Sous-Total"],
+                  tableRows: order.items.map((i, idx) => [
+                    `SKU-${idx + 1}`,
+                    i.title,
+                    i.isbn || "—",
+                    `${i.digital_licenses_qty} lic.`,
+                    `${i.digital_unit_price.toLocaleString("fr-FR")} F`,
+                    `${i.print_copies_qty} ex.`,
+                    `${i.print_unit_price.toLocaleString("fr-FR")} F`,
+                    `${Number(i.subtotal).toLocaleString("fr-FR")} FCFA`,
+                  ]),
+                  totalAmount: `${Number(order.total_amount).toLocaleString("fr-FR")} ${order.currency || "FCFA"}`,
+                  totalNotes: `Bon de Commande & Facture Proforma Grossiste. Conditions de règlement : Net à 30 jours pour commande à crédit validée.`,
+                  filename: `proforma_grossiste_${order.reference || order.id.slice(0, 8)}.pdf`,
+                });
+                toast.success("Facture proforma PDF officielle générée et téléchargée !");
+              } catch {
+                toast.error("Erreur lors de la génération de la facture proforma.");
+              }
+            }}
+            className="px-3.5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-gold" />
+            Télécharger Facture Proforma PDF
+          </button>
 
           {order.status !== "delivered" && order.status !== "cancelled" && (
             <button

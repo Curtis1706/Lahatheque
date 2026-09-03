@@ -19,6 +19,8 @@ import {
   requestUniversityRoyaltyWithdrawal,
 } from "@/lib/services/university";
 import type { UniversityRoyaltyStatementData } from "@/lib/types/university";
+import { toast } from "sonner";
+import { generateOfficialPdf } from "@/lib/services/export-service";
 
 export default function UniversityRoyaltiesPage() {
   const [data, setData] = useState<{
@@ -126,25 +128,55 @@ export default function UniversityRoyaltiesPage() {
       },
     },
     {
-      key: "pdf_statement_url" as keyof UniversityRoyaltyStatementData,
-      header: "",
+      key: "period" as keyof UniversityRoyaltyStatementData,
+      header: "Actions",
       cell: (row) => (
         <div className="flex items-center justify-end">
-          {row.pdf_statement_url ? (
-            <a
-              href={row.pdf_statement_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-2.5 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold text-navy text-[11px] font-bold inline-flex items-center gap-1 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5 text-gold" />
-              <span>Relevé PDF</span>
-            </a>
-          ) : (
-            <span className="text-[11px] text-foreground-muted italic">
-              Relevé PDF non encore disponible
-            </span>
-          )}
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await generateOfficialPdf({
+                  docType: "BORDEREAU_REDEVANCES",
+                  docNumber: row.reference || `REL-UNIV-${row.id.slice(0, 8).toUpperCase()}`,
+                  date: new Date(row.created_at || Date.now()).toLocaleDateString("fr-FR"),
+                  period: row.period,
+                  recipient: {
+                    name: "Université Partenaire LAHAThèque",
+                    roleOrTitle: "Établissement d'Enseignement Supérieur",
+                    addressOrCampus: "Campus Universitaire Principal",
+                    emailOrPhone: "partenaire.univ@lahatheque.bj",
+                  },
+                  summaryCards: [
+                    { label: "Période Décomptée", value: row.period },
+                    { label: "Assiette Ventes", value: `${row.total_sales_catalog.toLocaleString("fr-FR")} ${row.currency}` },
+                    { label: "Taux Contractuel", value: `${row.royalty_rate} %` },
+                    { label: "Statut Règlement", value: row.status === "paid" ? "Versé sur Compte" : "Disponible" },
+                  ],
+                  tableHeaders: ["Période", "Volume Catalogue (HT)", "Taux Partenaire", "Redevance Nette Déléguée", "Statut"],
+                  tableRows: [
+                    [
+                      row.period,
+                      `${row.total_sales_catalog.toLocaleString("fr-FR")} ${row.currency}`,
+                      `${row.royalty_rate}%`,
+                      `${row.net_royalty_amount.toLocaleString("fr-FR")} ${row.currency}`,
+                      row.status === "paid" ? "Versé" : "En attente",
+                    ],
+                  ],
+                  totalAmount: `${row.net_royalty_amount.toLocaleString("fr-FR")} ${row.currency}`,
+                  totalNotes: "Relevé trimestriel officiel certifié par LAHAThèque Éditions & Numérique S.A. Calcul conforme à la convention de partenariat académique.",
+                  filename: `releve_redevances_univ_${row.period.replace(/\s+/g, "_")}.pdf`,
+                });
+                toast.success("Relevé de redevances PDF officiel téléchargé !");
+              } catch {
+                toast.error("Erreur lors de la génération du relevé PDF.");
+              }
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold text-navy text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-gold" />
+            <span>Relevé PDF</span>
+          </button>
         </div>
       ),
     },

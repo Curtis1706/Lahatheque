@@ -17,7 +17,9 @@ import {
   ShieldCheck,
   CreditCard,
   History,
-  X
+  X,
+  Download,
+  FileText,
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -36,6 +38,7 @@ import {
   PartnerRoyaltyConfig,
 } from "@/lib/types/admin";
 import { toast } from "sonner";
+import { generateOfficialPdf, generateCsvExport } from "@/lib/services/export-service";
 
 export default function AdminRoyaltiesManagementPage() {
   const [royalties, setRoyalties] = useState<AdminRoyalty[]>([]);
@@ -241,18 +244,65 @@ export default function AdminRoyaltiesManagementPage() {
       className: "text-right",
       cell: (row) => (
         <div className="flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await generateOfficialPdf({
+                  docType: "BORDEREAU_REDEVANCES",
+                  docNumber: `REL-ADMIN-${row.id.slice(0, 8).toUpperCase()}`,
+                  date: new Date().toLocaleDateString("fr-FR"),
+                  period: row.period_month || "Trimestre en cours",
+                  recipient: {
+                    name: row.beneficiary_name,
+                    roleOrTitle: `Bénéficiaire : ${row.beneficiary_type === "author" ? "Auteur" : row.beneficiary_type === "publisher" ? "Maison d'Édition" : "Université"}`,
+                    emailOrPhone: row.beneficiary_email || "contact@lahatheque.bj",
+                    addressOrCampus: row.account_details || "Compte Partenaire Enregistré",
+                  },
+                  summaryCards: [
+                    { label: "Bénéficiaire", value: row.beneficiary_name },
+                    { label: "Assiette Brute", value: `${row.total_revenue.toLocaleString("fr-FR")} XOF` },
+                    { label: "Montant Net Dû", value: `${row.payout_amount.toLocaleString("fr-FR")} XOF` },
+                    { label: "Statut", value: row.status.toUpperCase() },
+                  ],
+                  tableHeaders: ["Bénéficiaire", "Type", "Ouvrage / Période", "Assiette Brute", "Montant Net Dû", "Statut"],
+                  tableRows: [
+                    [
+                      row.beneficiary_name,
+                      row.beneficiary_type,
+                      row.book_title || row.period_month || "Ventes plateforme",
+                      `${row.total_revenue.toLocaleString("fr-FR")} XOF`,
+                      `${row.payout_amount.toLocaleString("fr-FR")} XOF`,
+                      row.status,
+                    ],
+                  ],
+                  totalAmount: `${row.payout_amount.toLocaleString("fr-FR")} XOF`,
+                  totalNotes: "Bordereau de redevances certifié par la Direction Financière LAHAThèque Éditions & Numérique S.A.",
+                  filename: `bordereau_admin_${row.id.slice(0, 8)}.pdf`,
+                });
+                toast.success("Bordereau PDF officiel généré avec succès !");
+              } catch {
+                toast.error("Erreur lors de la génération du bordereau PDF.");
+              }
+            }}
+            className="p-1.5 rounded-lg bg-background-secondary border border-border hover:border-gold text-navy transition-colors cursor-pointer"
+            title="Télécharger le bordereau certifié PDF"
+          >
+            <Download className="w-3.5 h-3.5 text-gold" />
+          </button>
+
           {row.status !== "settled" ? (
             <>
               <button
                 onClick={() => handleOpenProcessPayout(row, "approve")}
-                className="px-2.5 py-1 rounded-lg bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-1"
+                className="px-2.5 py-1 rounded-lg bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-1 cursor-pointer"
                 title="Valider le versement"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" /> Valider
               </button>
               <button
                 onClick={() => handleOpenProcessPayout(row, "reject")}
-                className="px-2.5 py-1 rounded-lg bg-error/10 text-error text-xs font-semibold hover:bg-error/20 transition-colors"
+                className="px-2.5 py-1 rounded-lg bg-error/10 text-error text-xs font-semibold hover:bg-error/20 transition-colors cursor-pointer"
                 title="Rejeter"
               >
                 Rejeter
@@ -285,8 +335,38 @@ export default function AdminRoyaltiesManagementPage() {
           </p>
         </div>
 
-        {/* Accès direct aux sous-espaces */}
+        {/* Accès direct aux sous-espaces et export */}
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (royalties.length === 0) {
+                toast.info("Aucune redevance à exporter.");
+                return;
+              }
+              generateCsvExport(
+                royalties.map((r) => ({
+                  ID: r.id,
+                  Beneficiaire: r.beneficiary_name,
+                  Type: r.beneficiary_type,
+                  Email: r.beneficiary_email || "",
+                  Ouvrage_Motif: r.book_title || "Ventes globales",
+                  Periode: r.period_month || "Trimestre",
+                  Assiette_Brute_XOF: r.total_revenue,
+                  Montant_Net_Du_XOF: r.payout_amount,
+                  Statut: r.status,
+                  Moyen_Paiement: r.payment_method || "Virement",
+                  Coordonnees_Bancaires: r.account_details || "",
+                })),
+                `journal_redevances_admin_${new Date().toISOString().slice(0, 10)}`
+              );
+              toast.success("Journal des redevances exporté avec succès (format UTF-8 BOM pour Excel) !");
+            }}
+            className="px-3.5 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer min-h-[40px]"
+          >
+            <Download className="w-3.5 h-3.5 text-gold" />
+            Exporter le Journal
+          </button>
           <Link
             href="/admin/royalties/authors"
             className="px-3 py-2 rounded-xl bg-background-secondary border border-border hover:border-gold text-foreground text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs"

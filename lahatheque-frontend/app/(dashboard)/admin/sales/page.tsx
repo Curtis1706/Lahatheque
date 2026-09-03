@@ -16,6 +16,7 @@ import {
 } from "@/lib/types/admin";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
+import { generateCsvExport } from "@/lib/services/export-service";
 
 export default function AdminSalesPage() {
   const [sales, setSales] = useState<AdminSale[]>([]);
@@ -127,10 +128,32 @@ export default function AdminSalesPage() {
         </div>
 
         <button
-          onClick={() => toast.info("Export des ventes en cours de téléchargement (Excel)...")}
-          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-sm shrink-0"
+          onClick={() => {
+            if (!sales || sales.length === 0) {
+              toast.info("Aucune vente à exporter.");
+              return;
+            }
+            generateCsvExport(
+              sales.map((s) => ({
+                Numero_Commande: s.order_number || s.id,
+                Client: s.user_name || s.buyer_name || s.user_email,
+                Email: s.user_email || s.buyer_email || "",
+                Article_Achete: s.book_title || s.item_title || s.subscription_name || "Abonnement / Bouquet",
+                Type_Produit: s.type || s.item_type || "unitaire",
+                Moyen_Paiement: s.payment_method || "Mobile Money",
+                Montant_FCFA: s.amount,
+                Devise: s.currency || "XOF",
+                Statut_Paiement: s.payment_status,
+                Date_Transaction: s.created_at ? new Date(s.created_at).toLocaleDateString("fr-FR") : "",
+                Pays: s.country || "BJ",
+              })),
+              `journal_ventes_lahatheque_${new Date().toISOString().slice(0, 10)}`
+            );
+            toast.success("Journal des ventes exporté avec succès (format UTF-8 BOM pour Excel) !");
+          }}
+          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-sm shrink-0 cursor-pointer min-h-[44px]"
         >
-          <Download className="w-4 h-4" />
+          <Download className="w-4 h-4 text-gold" />
           Exporter le Journal
         </button>
       </div>

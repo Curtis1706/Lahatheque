@@ -217,18 +217,38 @@ export async function updateUniversityProfile(
 }
 
 export async function exportBouquetCatalogWord(bouquet: UniversityBouquet): Promise<void> {
-  const res = await fetch(`${BFF}/bouquets/${bouquet.id}/export-word/`, {
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error("Erreur lors de la génération du document Word.");
+  try {
+    const res = await fetch(`${BFF}/bouquets/${bouquet.id}/export-word/`, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Bouquet_${bouquet.title.replace(/\s+/g, "_").slice(0, 50)}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      return;
+    }
+  } catch {
+    // Fallback direct sur le générateur Word officiel client
+  }
 
-  const blob = await res.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `Bouquet_${bouquet.title.replace(/\s+/g, "_").slice(0, 50)}.docx`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  window.URL.revokeObjectURL(url);
+  // Fallback client haute fidélité
+  const { generateWordDocument } = await import("@/lib/services/export-service");
+  generateWordDocument({
+    title: bouquet.title,
+    subtitle: bouquet.description,
+    institutionName: "Université Partenaire",
+    facultyName: bouquet.faculty_code || bouquet.discipline,
+    items: (bouquet.sample_books || []).map((b) => ({
+      title: b.title,
+      author: b.author || "Auteur Universitaire",
+      discipline: bouquet.discipline,
+    })),
+    filename: `Bouquet_${bouquet.title.replace(/\s+/g, "_").slice(0, 50)}.doc`,
+  });
 }

@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { getValidationHistory } from "@/lib/services/layout-artist";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
+import { generateCsvExport } from "@/lib/services/export-service";
 
 export default function ChefValidationHistoryPage() {
   const { user } = useAuth();
@@ -82,25 +83,19 @@ export default function ChefValidationHistoryPage() {
       toast.info("Aucune donnée à exporter.");
       return;
     }
-    const headers = ["Titre", "Auteurs", "Maquettiste", "Discipline", "Statut", "Date Decision", "Commentaire"];
-    const rows = filteredDeposits.map((d) => [
-      `"${d.metadata.title.replace(/"/g, '""')}"`,
-      `"${d.metadata.authors.join(", ").replace(/"/g, '""')}"`,
-      `"${d.maquettiste_name}"`,
-      `"${d.classification.discipline}"`,
-      d.status === "published" ? "Valide & Publie" : "Revision Demandee",
-      d.validated_at || d.created_at,
-      `"${(d.chef_comment || "").replace(/"/g, '""')}"`,
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `historique_validations_lahatheque_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Historique exporté au format CSV avec succès.");
+    generateCsvExport(
+      filteredDeposits.map((d) => ({
+        Titre: d.metadata.title,
+        Auteurs: d.metadata.authors.join(", "),
+        Maquettiste: d.maquettiste_name,
+        Discipline: d.classification.discipline,
+        Statut: d.status === "published" ? "Validé & Publié" : "Révision Demandée",
+        Date_Decision: d.validated_at || d.created_at,
+        Commentaire_Chef: d.chef_comment || "—",
+      })),
+      `historique_validations_lahatheque_${new Date().toISOString().slice(0, 10)}`
+    );
+    toast.success("Historique des validations exporté au format CSV (UTF-8 BOM) avec succès !");
   };
 
   const columns: DataTableColumn<LayoutDeposit>[] = [

@@ -21,6 +21,8 @@ import {
   type PayoutRequestItem
 } from "@/lib/services/author";
 import type { AuthorRoyaltyPayment } from "@/lib/types/author";
+import { toast } from "sonner";
+import { generateOfficialPdf } from "@/lib/services/export-service";
 
 export default function AuthorRoyaltiesPage() {
   const [activeTab, setActiveTab] = useState<"statements" | "requests">("statements");
@@ -99,15 +101,51 @@ export default function AuthorRoyaltiesPage() {
       key: "receipt_url",
       header: "Relevé",
       cell: (row) => (
-        <a
-          href={row.receipt_url}
-          target="_blank"
-          rel="noreferrer"
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await generateOfficialPdf({
+                docType: "BORDEREAU_REDEVANCES",
+                docNumber: `REL-AUTEUR-${row.id.slice(0, 8).toUpperCase()}`,
+                date: row.payment_date || new Date().toLocaleDateString("fr-FR"),
+                period: row.period,
+                recipient: {
+                  name: "Auteur / Créateur d'Ouvrage",
+                  roleOrTitle: "Titulaire de Droits d'Auteur LAHAThèque",
+                  addressOrCampus: "Compte Auteur Agréé",
+                  emailOrPhone: "auteur@lahatheque.bj",
+                },
+                summaryCards: [
+                  { label: "Période Décomptée", value: row.period },
+                  { label: "Ventes Période", value: `${row.total_sales_count.toLocaleString("fr-FR")} exemplaires` },
+                  { label: "Quote-part Auteur", value: "15 % (Droits)" },
+                  { label: "Statut Règlement", value: row.status.toUpperCase() },
+                ],
+                tableHeaders: ["Période", "Volume Ventes", "Revenus Bruts (HT)", "Quote-part Auteur (15%)", "Statut"],
+                tableRows: [
+                  [
+                    row.period,
+                    `${row.total_sales_count.toLocaleString("fr-FR")} ex.`,
+                    `${row.gross_revenue.toLocaleString("fr-FR")} XOF`,
+                    `${row.author_earned_amount.toLocaleString("fr-FR")} XOF`,
+                    row.status === "paid" ? "Payé" : "En cours",
+                  ],
+                ],
+                totalAmount: `${row.author_earned_amount.toLocaleString("fr-FR")} XOF`,
+                totalNotes: "Bordereau de redevances et droits d'auteur certifié par LAHAThèque Éditions & Numérique S.A. Conforme au barème officiel de rétribution.",
+                filename: `releve_droits_auteur_${row.period.replace(/\s+/g, "_")}.pdf`,
+              });
+              toast.success("Bordereau officiel de redevances PDF téléchargé !");
+            } catch {
+              toast.error("Erreur lors de la génération du relevé PDF.");
+            }
+          }}
           className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1 cursor-pointer"
         >
           <Download className="w-3.5 h-3.5 text-gold" />
           Relevé PDF
-        </a>
+        </button>
       ),
     },
   ];
