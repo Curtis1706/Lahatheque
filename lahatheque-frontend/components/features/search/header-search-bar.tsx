@@ -230,14 +230,24 @@ export function HeaderSearchBar({
                       }`}
                     >
                       {/* Vignette couverture */}
-                      <div 
-                        className="w-9 h-12 rounded-md shrink-0 flex items-center justify-center text-center p-1 text-[8px] font-serif font-bold shadow-xs border border-border"
-                        style={{
-                          backgroundColor: book.cover_color || "var(--navy)",
-                          color: book.cover_text_color || "var(--gold)"
-                        }}
-                      >
-                        <BookOpen className="w-4 h-4 opacity-80" />
+                      <div className="w-9 h-12 rounded-md shrink-0 overflow-hidden shadow-xs border border-border bg-background-secondary flex items-center justify-center">
+                        {book.cover_url || book.cover_image ? (
+                          <img
+                            src={book.cover_url || book.cover_image}
+                            alt={book.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div 
+                            className="w-full h-full flex items-center justify-center text-center p-1 text-[8px] font-serif font-bold"
+                            style={{
+                              backgroundColor: book.cover_color || "var(--navy)",
+                              color: book.cover_text_color || "var(--gold)"
+                            }}
+                          >
+                            <BookOpen className="w-4 h-4 opacity-80" />
+                          </div>
+                        )}
                       </div>
 
                       {/* Infos Ouvrage */}

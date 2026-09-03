@@ -24,14 +24,31 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+
+        # 1. Recherche plein texte et textuelle robuste (q)
         q = self.request.query_params.get('q', '').strip()
         if q:
-            vector = SearchVector('title', weight='A') + \
-                     SearchVector('subtitle', weight='B') + \
-                     SearchVector('summary', weight='C')
-            query = SearchQuery(q)
-            qs = qs.annotate(rank=SearchRank(vector, query)).filter(rank__gte=0.01).order_by('-rank')
+            qs = qs.filter(
+                Q(title__icontains=q) |
+                Q(subtitle__icontains=q) |
+                Q(summary__icontains=q) |
+                Q(isbn__icontains=q) |
+                Q(publisher_name__icontains=q) |
+                Q(authors__first_name__icontains=q) |
+                Q(authors__last_name__icontains=q) |
+                Q(discipline__name__icontains=q) |
+                Q(disciplines__name__icontains=q)
+            ).distinct()
 
+        # 2. Filtre auteur spécifique
+        author = self.request.query_params.get('author', '').strip()
+        if author:
+            qs = qs.filter(
+                Q(authors__first_name__icontains=author) |
+                Q(authors__last_name__icontains=author)
+            ).distinct()
+
+        # 3. Filtre format
         format_val = self.request.query_params.get('format')
         if format_val and format_val.lower() != 'all':
             f = format_val.lower()
@@ -42,12 +59,49 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
             else:
                 qs = qs.filter(format_type=f)
 
-        for param, field in [('discipline', 'discipline_id'), ('institution', 'institution_id'),
-                             ('language', 'language'), ('country', 'country')]:
-            val = self.request.query_params.get(param)
-            if val and val.lower() != 'all':
-                qs = qs.filter(**{field: val})
-        return qs
+        # 4. Filtre discipline (par ID numérique ou par nom textuel)
+        disc_val = self.request.query_params.get('discipline')
+        if disc_val and disc_val.lower() != 'all':
+            if disc_val.isdigit():
+                qs = qs.filter(Q(discipline_id=int(disc_val)) | Q(disciplines__id=int(disc_val))).distinct()
+            else:
+                qs = qs.filter(Q(discipline__name__icontains=disc_val) | Q(disciplines__name__icontains=disc_val)).distinct()
+
+        # 5. Filtre institution / université (par UUID, code ou nom)
+        inst_val = self.request.query_params.get('institution')
+        if inst_val and inst_val.lower() != 'all':
+            import uuid
+            is_uuid = False
+            try:
+                uuid.UUID(inst_val)
+                is_uuid = True
+            except ValueError:
+                pass
+            if is_uuid:
+                qs = qs.filter(institution_id=inst_val)
+            else:
+                qs = qs.filter(
+                    Q(institution__code__iexact=inst_val) |
+                    Q(institution__name__icontains=inst_val) |
+                    Q(institution__short_name__iexact=inst_val)
+                )
+
+        # 6. Filtre langue
+        lang_val = self.request.query_params.get('language')
+        if lang_val and lang_val.lower() != 'all':
+            qs = qs.filter(language__iexact=lang_val)
+
+        # 7. Filtre pays
+        country_val = self.request.query_params.get('country')
+        if country_val and country_val.lower() != 'all':
+            qs = qs.filter(country__iexact=country_val)
+
+        # 8. Filtre année de publication
+        year_val = self.request.query_params.get('year')
+        if year_val and year_val.isdigit():
+            qs = qs.filter(publication_date__year=int(year_val))
+
+        return qs.order_by('-created_at')
 
     def retrieve(self, request, *args, **kwargs):
         pk = kwargs.get('pk')
@@ -1257,5 +1311,27 @@ class CreatorOptionsView(APIView):
                 "publishers": publishers_list,
             }
         })
+
+
+class PublicInstitutionsListView(APIView):
+    """GET /api/v1/catalog/institutions/ - Liste des universités partenaires actives."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from apps.partners.models import Institution
+        institutions = Institution.objects.filter(is_active=True).order_by('name')
+        data = [
+            {
+                "id": str(i.id),
+                "code": i.code,
+                "name": i.name,
+                "short_name": i.short_name or i.code,
+                "city": i.city,
+                "country": i.country,
+            }
+            for i in institutions
+        ]
+        return Response({"success": True, "data": data, "error": None})
+
 
 

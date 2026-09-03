@@ -11,6 +11,7 @@ from .views import (
     PreEditionSearchView,
     AuthorSearchView,
     CreatorOptionsView,
+    PublicInstitutionsListView,
 )
 from .stream_views import BookStreamView, BookSampleStreamView, BookCoverStreamView
 
@@ -29,6 +30,7 @@ router.register(r'my-deposits', MaquettisteDepositViewSet, basename='my-deposits
 router.register(r'deposits', ChiefLayoutValidationViewSet, basename='deposits')
 
 urlpatterns = [
+    path('institutions/', PublicInstitutionsListView.as_view(), name='public-institutions'),
     path('creators/options/', CreatorOptionsView.as_view(), name='creator-options'),
     path('pre-editions/search/', PreEditionSearchView.as_view(), name='pre-edition-search'),
     path('authors/search/', AuthorSearchView.as_view(), name='author-search'),
