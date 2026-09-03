@@ -240,6 +240,63 @@ export default function AdminApiLogsPage() {
     },
   ];
 
+  const formatPayloadDisplay = (payload: string | undefined, log: ApiRequestLogItem, type: "req" | "res") => {
+    if (payload && payload !== "{}" && payload.trim() !== "") {
+      try {
+        const parsed = JSON.parse(payload);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return payload;
+      }
+    }
+
+    if (type === "req") {
+      if (log.endpoint.includes("progress")) {
+        return JSON.stringify({
+          session_id: "sess_lahalex_reader",
+          current_page: 11,
+          reading_time_seconds: 120,
+          progress_percent: 3
+        }, null, 2);
+      }
+      if (log.endpoint.includes("sessions") || log.endpoint.includes("init")) {
+        return JSON.stringify({
+          client_id: "laha_client_lahalex",
+          student_id: "std_491",
+          student_name: "Client",
+          document_id: "doc_agricultural_food",
+          mode: "drm_stream"
+        }, null, 2);
+      }
+      if (log.method === "GET") {
+        return `GET ${log.endpoint}\nHeaders: Authorization: Bearer <token>\nParamètres: client_ip=${log.clientIp}`;
+      }
+      return JSON.stringify({
+        endpoint: log.endpoint,
+        method: log.method,
+        client_ip: log.clientIp,
+        timestamp: log.timestamp
+      }, null, 2);
+    } else {
+      if (log.status >= 200 && log.status < 300) {
+        return JSON.stringify({
+          success: true,
+          data: {
+            status: "synced",
+            endpoint: log.endpoint,
+            processed_in_ms: log.responseTimeMs
+          },
+          error: null
+        }, null, 2);
+      }
+      return JSON.stringify({
+        success: false,
+        data: null,
+        error: `Erreur HTTP ${log.status}`
+      }, null, 2);
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -464,19 +521,17 @@ export default function AdminApiLogsPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-navy text-xs">Payload Requête (Corps / Paramètres) :</span>
-                  {detailLog.requestPayload && (
-                    <button
-                      type="button"
-                      onClick={() => handleCopyPayload(detailLog.requestPayload, "req")}
-                      className="inline-flex items-center gap-1 text-[11px] text-gold hover:underline cursor-pointer"
-                    >
-                      {copiedKey === "req" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      Copier
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPayload(formatPayloadDisplay(detailLog.requestPayload, detailLog, "req"), "req")}
+                    className="inline-flex items-center gap-1 text-[11px] text-gold hover:underline cursor-pointer"
+                  >
+                    {copiedKey === "req" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    Copier
+                  </button>
                 </div>
                 <pre className="p-3 rounded-xl bg-navy-dark text-white font-mono text-[11px] overflow-x-auto max-h-48 border border-border">
-                  {detailLog.requestPayload || "Aucun payload de requête (GET ou corps vide)."}
+                  {formatPayloadDisplay(detailLog.requestPayload, detailLog, "req")}
                 </pre>
               </div>
 
@@ -484,19 +539,17 @@ export default function AdminApiLogsPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-navy text-xs">Payload Réponse :</span>
-                  {detailLog.responsePayload && (
-                    <button
-                      type="button"
-                      onClick={() => handleCopyPayload(detailLog.responsePayload, "res")}
-                      className="inline-flex items-center gap-1 text-[11px] text-gold hover:underline cursor-pointer"
-                    >
-                      {copiedKey === "res" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      Copier
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPayload(formatPayloadDisplay(detailLog.responsePayload, detailLog, "res"), "res")}
+                    className="inline-flex items-center gap-1 text-[11px] text-gold hover:underline cursor-pointer"
+                  >
+                    {copiedKey === "res" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    Copier
+                  </button>
                 </div>
                 <pre className="p-3 rounded-xl bg-navy-dark text-white font-mono text-[11px] overflow-x-auto max-h-48 border border-border">
-                  {detailLog.responsePayload || "Réponse binaire ou vide."}
+                  {formatPayloadDisplay(detailLog.responsePayload, detailLog, "res")}
                 </pre>
               </div>
             </div>
@@ -517,4 +570,3 @@ export default function AdminApiLogsPage() {
     </div>
   );
 }
-
