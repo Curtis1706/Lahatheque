@@ -20,6 +20,7 @@ import { CountingNumber } from "@/components/ui/counting-number";
 import { PanafricanPresenceSection } from "@/components/features/home/panafrican-presence-section";
 import { WhyChooseSection } from "@/components/features/home/why-choose-section";
 import { PartnerLogoMarquee } from "@/components/ui/partner-logo-marquee";
+import { VisionSection } from "@/components/features/home/vision-section";
 
 const bestSellers = [
   {
@@ -309,6 +310,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Notre Vision */}
+      <VisionSection />
 
       {/* Audiences */}
       <section className="py-20 px-6 md:px-10 bg-background">
