@@ -37,6 +37,7 @@ import {
 } from "@/lib/constants/classification";
 import { type DisciplineItem } from "@/lib/services/classification";
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { toast } from "sonner";
 
 export default function ChiefLayoutDepositPage() {
@@ -75,6 +76,32 @@ export default function ChiefLayoutDepositPage() {
   // IA State
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<AiBookAnalysisResult | null>(null);
+
+  const disciplineOptions: SearchableOption[] = React.useMemo(() => {
+    const list: SearchableOption[] = realDisciplines.length > 0
+      ? realDisciplines.map((d) => ({
+          value: d.name,
+          label: d.name,
+          subtitle: d.code_dewey ? `Dewey ${d.code_dewey}` : undefined,
+          badge: d.code_dewey || undefined,
+        }))
+      : getGenreOptions(aiResult?.genre_category, genreCategory).map((g) => ({
+          value: g.label,
+          label: g.label,
+          subtitle: g.dewey ? `Dewey ${g.dewey}` : undefined,
+          badge: g.dewey || undefined,
+        }));
+
+    if (genreCategory && !list.some((o) => o.value === genreCategory)) {
+      list.unshift({
+        value: genreCategory,
+        label: genreCategory,
+        subtitle: deweyCode ? `Dewey ${deweyCode}` : undefined,
+        badge: deweyCode || undefined,
+      });
+    }
+    return list;
+  }, [realDisciplines, aiResult?.genre_category, genreCategory, deweyCode]);
 
   const handleBookFileSelect = async (file: File) => {
     setBookFile(file);
@@ -655,24 +682,15 @@ export default function ChiefLayoutDepositPage() {
                     </button>
                   )}
                 </div>
-                <select
+                <SearchableSelect
+                  options={disciplineOptions}
                   value={genreCategory}
-                  onChange={(e) => handleGenreChange(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                >
-                  {disciplinesLoading && realDisciplines.length === 0 ? (
-                    <option value="">Chargement des disciplines...</option>
-                  ) : (
-                    (realDisciplines.length > 0
-                      ? realDisciplines.map((d) => ({ label: d.name, dewey: d.code_dewey || "000", faculty: null }))
-                      : getGenreOptions(aiResult?.genre_category, genreCategory)
-                    ).map((g, i) => (
-                      <option key={i} value={g.label}>
-                        {g.label} ({g.dewey})
-                      </option>
-                    ))
-                  )}
-                </select>
+                  onChange={(val) => handleGenreChange(val)}
+                  placeholder={disciplinesLoading && realDisciplines.length === 0 ? "Chargement des disciplines..." : "Sélectionner ou rechercher une discipline..."}
+                  searchPlaceholder="Rechercher parmi les 900+ disciplines (nom, Dewey)..."
+                  emptyMessage="Aucune discipline trouvée pour cette recherche."
+                  disabled={disciplinesLoading && realDisciplines.length === 0}
+                />
               </div>
 
               <div className="space-y-1.5">

@@ -28,6 +28,8 @@ import {
   getCountryOptions, 
   getGenreOptions 
 } from "@/lib/constants/classification";
+import { useDisciplines } from "@/lib/hooks/use-disciplines";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 
 interface EditBookModalProps {
   book: LayoutDeposit;
@@ -55,12 +57,39 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
   const [pricePaper, setPricePaper] = useState(book.admin_price || 7500);
 
   // Classification
+  const { disciplines: realDisciplines, loading: disciplinesLoading } = useDisciplines();
   const [discipline, setDiscipline] = useState(book.classification.discipline || "Littérature Africaine & Conte");
   const [deweyCode, setDeweyCode] = useState(book.classification.discipline ? "" : "800");
   const [university, setUniversity] = useState(book.classification.university || "Université d'Abomey-Calavi (UAC - Bénin)");
   const [faculty, setFaculty] = useState(book.classification.faculty || "");
   const [country, setCountry] = useState(matchCountry(book.classification.country || "BJ"));
   const [targetAudience, setTargetAudience] = useState("Grand Public & Universitaire");
+
+  const disciplineOptions: SearchableOption[] = React.useMemo(() => {
+    const list: SearchableOption[] = realDisciplines.length > 0
+      ? realDisciplines.map((d) => ({
+          value: d.name,
+          label: d.name,
+          subtitle: d.code_dewey ? `Dewey ${d.code_dewey}` : undefined,
+          badge: d.code_dewey || undefined,
+        }))
+      : getGenreOptions(null, discipline).map((g) => ({
+          value: g.label,
+          label: g.label,
+          subtitle: g.dewey ? `Dewey ${g.dewey}` : undefined,
+          badge: g.dewey || undefined,
+        }));
+
+    if (discipline && !list.some((o) => o.value === discipline)) {
+      list.unshift({
+        value: discipline,
+        label: discipline,
+        subtitle: deweyCode ? `Dewey ${deweyCode}` : undefined,
+        badge: deweyCode || undefined,
+      });
+    }
+    return list;
+  }, [realDisciplines, discipline, deweyCode]);
 
   // Files
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -85,9 +114,15 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
 
   const handleGenreChange = (newGenre: string) => {
     setDiscipline(newGenre);
+    const realFound = realDisciplines.find((d) => d.name === newGenre);
+    if (realFound && realFound.code_dewey) {
+      setDeweyCode(realFound.code_dewey);
+    }
     const found = matchGenreCategory(newGenre);
     if (found) {
-      setDeweyCode(found.dewey);
+      if (!realFound?.code_dewey) {
+        setDeweyCode(found.dewey);
+      }
       if (found.faculty) setFaculty(found.faculty);
     }
   };
@@ -486,17 +521,15 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">
                     Discipline / Genre *
                   </label>
-                  <select
+                  <SearchableSelect
+                    options={disciplineOptions}
                     value={discipline}
-                    onChange={(e) => handleGenreChange(e.target.value)}
-                    className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                  >
-                    {getGenreOptions(null, discipline).map((g, i) => (
-                      <option key={i} value={g.label}>
-                        {g.label} ({g.dewey})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => handleGenreChange(val)}
+                    placeholder={disciplinesLoading && realDisciplines.length === 0 ? "Chargement des disciplines..." : "Sélectionner ou rechercher une discipline..."}
+                    searchPlaceholder="Rechercher parmi les 900+ disciplines (nom, Dewey)..."
+                    emptyMessage="Aucune discipline trouvée pour cette recherche."
+                    disabled={disciplinesLoading && realDisciplines.length === 0}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
