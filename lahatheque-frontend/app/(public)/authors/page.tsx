@@ -25,10 +25,11 @@ import {
   Send
 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { ACADEMIC_DISCIPLINES } from "@/lib/constants/classification";
+import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import { uploadPublicManuscriptToR2 } from "@/lib/services/storage";
 
 export default function AuthorsPublicPage() {
+  const { disciplineNames } = useDisciplines();
   // Stepper state
   const [step, setStep] = useState<number>(1);
   const formRef = useRef<HTMLDivElement>(null);
@@ -679,7 +680,7 @@ export default function AuthorsPublicPage() {
                           className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
                         >
                           <option value="">Sélectionner une discipline</option>
-                          {ACADEMIC_DISCIPLINES.map((disc) => (
+                          {disciplineNames.map((disc) => (
                             <option key={disc} value={disc}>
                               {disc}
                             </option>

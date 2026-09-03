@@ -1,29 +1,57 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 
+// Cache mémoire pour éviter les requêtes redondantes au fil de la navigation
+let cachedDisciplines: DisciplineItem[] | null = null;
+let pendingPromise: Promise<DisciplineItem[]> | null = null;
+
 export function useDisciplines() {
-  const [disciplines, setDisciplines] = useState<DisciplineItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [disciplines, setDisciplines] = useState<DisciplineItem[]>(cachedDisciplines || []);
+  const [loading, setLoading] = useState<boolean>(!cachedDisciplines);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchDisciplines = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getDisciplines();
-      setDisciplines(data || []);
-    } catch (err: any) {
-      setError(err?.message || "Erreur lors du chargement des disciplines");
-    } finally {
+  useEffect(() => {
+    if (cachedDisciplines) {
+      setDisciplines(cachedDisciplines);
       setLoading(false);
+      return;
     }
+
+    let isMounted = true;
+
+    if (!pendingPromise) {
+      pendingPromise = getDisciplines()
+        .then((data) => {
+          cachedDisciplines = data;
+          return data;
+        })
+        .finally(() => {
+          pendingPromise = null;
+        });
+    }
+
+    pendingPromise
+      .then((data) => {
+        if (isMounted) {
+          setDisciplines(data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError(err?.message || "Erreur de chargement des disciplines");
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  useEffect(() => {
-    fetchDisciplines();
-  }, [fetchDisciplines]);
+  const disciplineNames = disciplines.map((d) => d.name);
 
-  return { disciplines, loading, error, refetch: fetchDisciplines };
+  return { disciplines, disciplineNames, loading, error };
 }

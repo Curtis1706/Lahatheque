@@ -135,10 +135,25 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
         return Response({"success": False, "data": None, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
 
+from common.pagination import StandardResultsSetPagination
+
+
 class DisciplineViewSet(viewsets.ModelViewSet):
     """CRUD des disciplines — lecture publique, écriture réservée Gestionnaire/Admin."""
     queryset = Discipline.objects.all().order_by('name')
     serializer_class = DisciplineSerializer
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('all') in ('true', '1', 'True') or (self.action == 'list' and not self.request.query_params.get('page')):
+            return None
+        return super().paginate_queryset(queryset)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        active_only = self.request.query_params.get('active_only')
+        if active_only in ('true', '1', 'True'):
+            qs = qs.filter(is_active=True)
+        return qs
 
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):

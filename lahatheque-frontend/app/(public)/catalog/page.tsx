@@ -19,7 +19,7 @@ import { Book } from "@/lib/types/catalog";
 import { searchBooks } from "@/lib/services/catalog";
 import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import { Book as Book3D } from "@/components/ui/book";
-import { ACADEMIC_DISCIPLINES } from "@/lib/constants/classification";
+import { useDisciplines } from "@/lib/hooks/use-disciplines";
 
 // Liste dynamique des années de publication : de l'année en cours jusqu'à 1950
 const CURRENT_YEAR = new Date().getFullYear();
@@ -32,6 +32,7 @@ function CatalogSearchInner() {
   const searchParams = useSearchParams();
   const urlQuery = searchParams.get("q") || "";
 
+  const { disciplineNames } = useDisciplines();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(urlQuery);
@@ -234,8 +235,8 @@ function CatalogSearchInner() {
                 onChange={(e) => setSelectedDiscipline(e.target.value)}
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
-                <option value="">Toutes les disciplines ({ACADEMIC_DISCIPLINES.length})</option>
-                {ACADEMIC_DISCIPLINES.map((discipline) => (
+                <option value="">Toutes les disciplines ({disciplineNames.length})</option>
+                {disciplineNames.map((discipline) => (
                   <option key={discipline} value={discipline}>
                     {discipline}
                   </option>
