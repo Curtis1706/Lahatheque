@@ -25,11 +25,10 @@ import {
   Send
 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { useDisciplines } from "@/lib/hooks/use-disciplines";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { uploadPublicManuscriptToR2 } from "@/lib/services/storage";
 
 export default function AuthorsPublicPage() {
-  const { disciplineNames } = useDisciplines();
   // Stepper state
   const [step, setStep] = useState<number>(1);
   const formRef = useRef<HTMLDivElement>(null);
@@ -672,20 +671,13 @@ export default function AuthorsPublicPage() {
                         <label className="block font-medium text-foreground mb-1">
                           Discipline / Domaine <span className="text-gold">*</span>
                         </label>
-                        <select
-                          required
-                          name="workType"
+                        <DisciplineCombobox
                           value={genre}
-                          onChange={(e) => setGenre(e.target.value)}
-                          className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
-                        >
-                          <option value="">Sélectionner une discipline</option>
-                          {disciplineNames.map((disc) => (
-                            <option key={disc} value={disc}>
-                              {disc}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setGenre}
+                          required={true}
+                          placeholder="Sélectionner une discipline..."
+                          searchPlaceholder="Rechercher parmi les disciplines..."
+                        />
                       </div>
                       <div>
                         <label className="block font-medium text-foreground mb-1">

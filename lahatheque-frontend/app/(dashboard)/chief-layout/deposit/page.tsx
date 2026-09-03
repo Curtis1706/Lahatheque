@@ -36,6 +36,8 @@ import {
   getGenreOptions 
 } from "@/lib/constants/classification";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
+import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
 import { toast } from "sonner";
 
 export default function ChiefLayoutDepositPage() {
@@ -52,6 +54,7 @@ export default function ChiefLayoutDepositPage() {
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [authorsStr, setAuthorsStr] = useState("");
+  const [publisherName, setPublisherName] = useState("LAHA Éditions");
   const [year, setYear] = useState(2026);
   const [language, setLanguage] = useState("Français");
   const [summary, setSummary] = useState("");
@@ -62,6 +65,7 @@ export default function ChiefLayoutDepositPage() {
 
   // Classification State
   const [realDisciplines, setRealDisciplines] = useState<DisciplineItem[]>([]);
+  const [categories, setCategories] = useState<string[]>(["Littérature Africaine & Conte"]);
   const [genreCategory, setGenreCategory] = useState("Littérature Africaine & Conte");
   const [deweyCode, setDeweyCode] = useState("800");
   const [country, setCountry] = useState("BJ");
@@ -106,10 +110,15 @@ export default function ChiefLayoutDepositPage() {
         if (!title || title === file.name.replace(/\.[^/.]+$/, "")) setTitle(result.data.title);
         if (!subtitle && result.data.subtitle) setSubtitle(result.data.subtitle);
         if (!authorsStr && result.data.authors?.length) setAuthorsStr(result.data.authors.join(", "));
+        if (result.data.publisher_name) setPublisherName(result.data.publisher_name);
         if (!summary && result.data.summary) setSummary(result.data.summary);
         if (!isbn && result.data.isbn) setIsbn(result.data.isbn);
         setDeweyCode(result.data.dewey_code || matchedGenre.dewey);
-        setGenreCategory(matchedGenre.label);
+        const aiDiscs = result.data.disciplines && result.data.disciplines.length > 0 
+          ? result.data.disciplines 
+          : [matchedGenre.label];
+        setCategories(aiDiscs);
+        setGenreCategory(aiDiscs[0] || matchedGenre.label);
         setLanguage(matchedLang);
         setCountry(matchedCountry);
         if (result.data.institution_suggestion) setUniversity(result.data.institution_suggestion);
@@ -132,6 +141,7 @@ export default function ChiefLayoutDepositPage() {
     if (aiResult.title) setTitle(aiResult.title);
     if (aiResult.subtitle) setSubtitle(aiResult.subtitle);
     if (aiResult.authors && aiResult.authors.length > 0) setAuthorsStr(aiResult.authors.join(", "));
+    if (aiResult.publisher_name) setPublisherName(aiResult.publisher_name);
     if (aiResult.isbn) setIsbn(aiResult.isbn);
     if (aiResult.summary) setSummary(aiResult.summary);
     if (aiResult.publication_year) setYear(aiResult.publication_year);
@@ -181,7 +191,9 @@ export default function ChiefLayoutDepositPage() {
         {
           metadata: {
             title: title || "Nouveau Dépôt Chef",
+            subtitle,
             authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur LAHA"],
+            publisher_name: publisherName,
             publication_year: year,
             language,
             language_source: aiResult ? "ai_suggested" : "manual",
@@ -193,7 +205,8 @@ export default function ChiefLayoutDepositPage() {
             country,
             university,
             faculty,
-            discipline: genreCategory,
+            discipline: categories[0] || genreCategory,
+            disciplines: categories,
             source: aiResult ? "ai_suggested" : "manual",
           },
           files: {
@@ -233,6 +246,7 @@ export default function ChiefLayoutDepositPage() {
             title,
             subtitle,
             authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur LAHA"],
+            publisher_name: publisherName,
             publication_year: year,
             language,
             language_source: aiResult ? "ai_suggested" : "manual",
@@ -244,7 +258,8 @@ export default function ChiefLayoutDepositPage() {
             country,
             university,
             faculty,
-            discipline: genreCategory,
+            discipline: categories[0] || genreCategory,
+            disciplines: categories,
             source: aiResult ? "ai_suggested" : "manual",
           },
           files: {
@@ -476,8 +491,8 @@ export default function ChiefLayoutDepositPage() {
               />
             </div>
 
-            {/* Auteurs, ISBN, Année */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Auteurs, Éditeur, ISBN, Année */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-navy">Auteur(s) *</label>
                 <input
@@ -487,6 +502,28 @@ export default function ChiefLayoutDepositPage() {
                   value={authorsStr}
                   onChange={(e) => setAuthorsStr(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Maison d&apos;Édition *</label>
+                  {aiResult?.publisher_name && (
+                    <button
+                      type="button"
+                      onClick={() => setPublisherName(aiResult.publisher_name!)}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                      title="Appliquer l'éditeur détecté par l'IA"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.publisher_name}
+                    </button>
+                  )}
+                </div>
+                <PublisherCombobox
+                  value={publisherName}
+                  onChange={(val) => setPublisherName(val)}
+                  placeholder="Sélectionner ou saisir l'éditeur..."
                 />
               </div>
 
@@ -649,36 +686,38 @@ export default function ChiefLayoutDepositPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Genre / Discipline *</label>
-                  {aiResult?.genre_category && (
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                    Catégories / Disciplines * <span className="text-[10px] font-normal text-foreground-muted">(Plusieurs choix possibles)</span>
+                  </label>
+                  {aiResult && (aiResult.disciplines?.length || aiResult.genre_category) && (
                     <button
                       type="button"
-                      onClick={() => handleGenreChange(aiResult.genre_category)}
+                      onClick={() => {
+                        const newDiscs = aiResult.disciplines && aiResult.disciplines.length > 0 
+                          ? aiResult.disciplines 
+                          : [aiResult.genre_category];
+                        setCategories(newDiscs);
+                        setGenreCategory(newDiscs[0] || aiResult.genre_category);
+                      }}
                       className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
-                      title={`Appliquer la discipline IA : ${aiResult.genre_category}`}
+                      title="Appliquer les catégories suggérées par l'IA"
                     >
                       <Wand2 className="w-2.5 h-2.5" />
-                      IA : {aiResult.genre_category}
+                      IA : {aiResult.disciplines && aiResult.disciplines.length > 0 ? aiResult.disciplines.join(", ") : aiResult.genre_category}
                     </button>
                   )}
                 </div>
-                <select
-                  value={genreCategory}
-                  onChange={(e) => handleGenreChange(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                >
-                  {realDisciplines.length > 0
-                    ? realDisciplines.map((d) => (
-                        <option key={d.id} value={d.name}>
-                          {d.name} {d.code_dewey ? `(${d.code_dewey})` : ""}
-                        </option>
-                      ))
-                    : getGenreOptions(aiResult?.genre_category, genreCategory).map((g, i) => (
-                        <option key={i} value={g.label}>
-                          {g.label} ({g.dewey})
-                        </option>
-                      ))}
-                </select>
+                <DisciplineCombobox
+                  multiple={true}
+                  values={categories}
+                  onValuesChange={(newVals) => {
+                    setCategories(newVals);
+                    if (newVals.length > 0) setGenreCategory(newVals[0]);
+                  }}
+                  disciplines={realDisciplines}
+                  placeholder="Sélectionner ou rechercher une discipline..."
+                  searchPlaceholder="Rechercher parmi les disciplines..."
+                />
               </div>
 
               <div className="space-y-1.5">

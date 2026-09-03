@@ -42,6 +42,8 @@ import {
 } from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, type AiBookAnalysisResult } from "@/lib/services/ai";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
+import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
 import { InlineLoader } from "@/components/ui/page-loader";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
@@ -70,6 +72,7 @@ export default function DepositDetailPage() {
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [authorsStr, setAuthorsStr] = useState("");
+  const [publisherName, setPublisherName] = useState("LAHA Éditions");
   const [year, setYear] = useState(2026);
   const [language, setLanguage] = useState("Français");
   const [summary, setSummary] = useState("");
@@ -77,6 +80,7 @@ export default function DepositDetailPage() {
   const [keywordsStr, setKeywordsStr] = useState("");
 
   // Form State - Classification
+  const [categories, setCategories] = useState<string[]>([]);
   const [discipline, setDiscipline] = useState("");
   const [deweyCode, setDeweyCode] = useState("");
   const [country, setCountry] = useState("BJ");
@@ -117,13 +121,18 @@ export default function DepositDetailPage() {
           setTitle(data.metadata.title || "");
           setSubtitle(data.metadata.subtitle || "");
           setAuthorsStr(data.metadata.authors.join(", "));
+          setPublisherName(data.metadata.publisher_name || "LAHA Éditions");
           setYear(data.metadata.publication_year || 2026);
           setLanguage(data.metadata.language || "Français");
           setSummary(data.metadata.summary || "");
           setIsbn(data.metadata.isbn || "");
           setKeywordsStr(data.metadata.keywords?.join(", ") || "");
 
-          setDiscipline(data.classification.discipline || "");
+          const loadedDiscs = data.classification.disciplines && data.classification.disciplines.length > 0
+            ? data.classification.disciplines
+            : (data.classification.discipline ? [data.classification.discipline] : []);
+          setCategories(loadedDiscs);
+          setDiscipline(loadedDiscs[0] || data.classification.discipline || "");
           setDeweyCode(data.classification.dewey_code || "");
           setCountry(data.classification.country || "BJ");
           setUniversity(data.classification.university || "");
@@ -220,13 +229,20 @@ export default function DepositDetailPage() {
     if (!aiResult) return;
     if (aiResult.title) setTitle(aiResult.title);
     if (aiResult.subtitle) setSubtitle(aiResult.subtitle);
-    if (aiResult.authors?.length) setAuthorsStr(aiResult.authors.join(", "));
+    if (aiResult.authors && aiResult.authors.length > 0) setAuthorsStr(aiResult.authors.join(", "));
+    if (aiResult.publisher_name) setPublisherName(aiResult.publisher_name);
     if (aiResult.publication_year) setYear(aiResult.publication_year);
     if (aiResult.language) setLanguage(aiResult.language);
     if (aiResult.summary) setSummary(aiResult.summary);
     if (aiResult.isbn) setIsbn(aiResult.isbn);
     if (aiResult.keywords?.length) setKeywordsStr(aiResult.keywords.join(", "));
-    if (aiResult.genre_category) setDiscipline(aiResult.genre_category);
+    
+    const aiDiscs = aiResult.disciplines && aiResult.disciplines.length > 0
+      ? aiResult.disciplines
+      : (aiResult.genre_category ? [aiResult.genre_category] : []);
+    setCategories(aiDiscs);
+    setDiscipline(aiDiscs[0] || aiResult.genre_category || "");
+    
     if (aiResult.dewey_code) setDeweyCode(aiResult.dewey_code);
     if (aiResult.institution_suggestion) setUniversity(aiResult.institution_suggestion);
     if (aiResult.faculty_suggestion) setFaculty(aiResult.faculty_suggestion);
@@ -293,6 +309,7 @@ export default function DepositDetailPage() {
             title,
             subtitle,
             authors: authorsStr.split(",").map((a) => a.trim()).filter(Boolean),
+            publisher_name: publisherName,
             publication_year: Number(year),
             language,
             summary,
@@ -301,7 +318,8 @@ export default function DepositDetailPage() {
           },
           classification: {
             ...deposit.classification,
-            discipline,
+            discipline: categories[0] || discipline,
+            disciplines: categories,
             dewey_code: deweyCode,
             country,
             university,
@@ -780,6 +798,29 @@ export default function DepositDetailPage() {
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
+                  <label className="block font-semibold text-navy">Maison d&apos;Édition *</label>
+                  {isEditing && aiResult?.publisher_name && (
+                    <button
+                      type="button"
+                      onClick={() => setPublisherName(aiResult.publisher_name!)}
+                      className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                      title="Appliquer l'éditeur détecté par l'IA"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.publisher_name}
+                    </button>
+                  )}
+                </div>
+                <PublisherCombobox
+                  value={publisherName}
+                  onChange={(val) => setPublisherName(val)}
+                  disabled={!isEditing}
+                  placeholder="Sélectionner ou saisir l'éditeur..."
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
                   <label className="block font-semibold text-navy">Année de publication</label>
                   {isEditing && aiResult?.publication_year && (
                     <button
@@ -929,25 +970,37 @@ export default function DepositDetailPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Discipline / Genre *</label>
-                  {isEditing && aiResult?.genre_category && (
+                  <label className="block font-semibold text-navy">
+                    Disciplines / Catégories * <span className="text-[10px] font-normal text-foreground-muted">(Plusieurs choix possibles)</span>
+                  </label>
+                  {isEditing && aiResult && (aiResult.disciplines?.length || aiResult.genre_category) && (
                     <button
                       type="button"
-                      onClick={() => setDiscipline(aiResult.genre_category)}
+                      onClick={() => {
+                        const newDiscs = aiResult.disciplines && aiResult.disciplines.length > 0
+                          ? aiResult.disciplines
+                          : [aiResult.genre_category];
+                        setCategories(newDiscs);
+                        setDiscipline(newDiscs[0] || aiResult.genre_category);
+                      }}
                       className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                      title="Appliquer les disciplines suggérées par l'IA"
                     >
                       <Wand2 className="w-2.5 h-2.5" />
-                      IA : {aiResult.genre_category}
+                      IA : {aiResult.disciplines && aiResult.disciplines.length > 0 ? aiResult.disciplines.join(", ") : aiResult.genre_category}
                     </button>
                   )}
                 </div>
-                <input
-                  type="text"
+                <DisciplineCombobox
+                  multiple={true}
+                  values={categories}
+                  onValuesChange={(newVals) => {
+                    setCategories(newVals);
+                    if (newVals.length > 0) setDiscipline(newVals[0]);
+                  }}
                   disabled={!isEditing}
-                  value={discipline}
-                  onChange={(e) => setDiscipline(e.target.value)}
-                  placeholder="Droit & Sciences Politiques, Littérature..."
-                  className={inputClass}
+                  placeholder="Sélectionner ou rechercher une discipline..."
+                  searchPlaceholder="Rechercher parmi les disciplines..."
                 />
               </div>
 

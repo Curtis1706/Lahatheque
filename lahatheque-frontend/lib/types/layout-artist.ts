@@ -35,6 +35,7 @@ export interface DepositClassification {
   faculty: string;
   department?: string;
   discipline: string;
+  disciplines?: string[];
   target_audience?: string;
   dewey_code?: string;
   collection?: string;
@@ -45,6 +46,7 @@ export interface DepositMetadata {
   title: string;
   subtitle?: string;
   authors: string[];
+  publisher_name?: string;
   publication_year: number;
   language: string;
   language_source: ClassificationSource;

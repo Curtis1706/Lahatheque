@@ -214,6 +214,25 @@ def analyze_document_with_openai(
         logger.warning("[AI Service] OPENAI_API_KEY absente, utilisation du mode heuristique.")
         return _fallback_heuristic_analysis(filename, text_sample, total_pages)
 
+    # Récupération dynamique des disciplines actives en base de données
+    try:
+        from apps.catalog.models import Discipline
+        active_disciplines = list(Discipline.objects.filter(is_active=True).order_by('name').values_list('name', flat=True))
+    except Exception:
+        active_disciplines = []
+
+    # Formatage exhaustif pour l'IA : 100% des disciplines actives de la base de données (sans limitation)
+    disciplines_catalog_sample = ", ".join(active_disciplines)
+
+    # Récupération des éditeurs partenaires en base de données
+    try:
+        from apps.publishers_portal.models import Publisher
+        partner_publishers = list(Publisher.objects.values_list('company_name', flat=True))
+        partner_publishers = [p.strip() for p in partner_publishers if p and p.strip()]
+    except Exception:
+        partner_publishers = []
+    partner_publishers_str = ", ".join(partner_publishers) if partner_publishers else "LAHA Éditions, Éditions MENSAH"
+
     prompt = f"""Tu es le directeur littéraire et éditeur en chef de la prestigieuse maison d'édition LAHAThèque.
 Tu rédiges la quatrième de couverture (summary officiel) des livres du catalogue. Le texte doit être élégant, captivant, fluide et donner immédiatement envie d'acquérir et de lire l'ouvrage.
 
@@ -238,30 +257,46 @@ Directives éditoriales impératives :
    - INTERDICTION ABSOLUE : Ne jamais écrire "ce travail", "ce mémoire", "cette thèse", "ce document", "cet article", "cette recherche".
    - Paragraphe 1 : L'Accroche et le Cœur du récit / sujet (sans phrase banale comme "Dans ce livre...").
    - Paragraphe 2 : Les Apports clés, l'enjeu dramatique ou pédagogique, et le public cible.
-4. Genre & Discipline : Identifie la discipline officielle LAHAThèque ("Philosophie, Psychologie & Sciences Humaines", "Droit & Sciences Politiques", "Sciences Économiques & Gestion", "Médecine & Santé", "Musique, Art & Spectacle", "Littérature Africaine & Conte", "Roman & Fiction", "Manga & Bande Dessinée", "Manuel Scolaire & Pédagogie", "Sciences & Technologies", "Histoire & Civilisations", etc.).
-5. Code Dewey : Détermine le code Dewey (3 chiffres, ex: 510 pour Mathématiques, 780 pour Musique, 340 pour Droit, 330 pour Économie, 610 pour Médecine, 840 pour Littérature, etc.).
-6. Langue & Pays (ANALYSE LINGUISTIQUE DU MANUSCRIT OBLIGATOIRE) :
+4. Genre & Disciplines — RÈGLE ABSOLUE DE CONFORMITÉ BASE DE DONNÉES :
+   Un livre peut être rattaché à 1, 2 ou 3 disciplines universitaires/académiques.
+   Tu dois CHOISIR IMPÉRATIVEMENT 1 à 3 disciplines pertinentes parmi la LISTE OFFICIELLE DES DISCIPLINES ACTIVES EN BASE DE DONNÉES ci-dessous.
+   Tu ne dois JAMAIS inventer un nom de discipline hors de cette liste :
+   --- LISTE OFFICIELLE DES DISCIPLINES ---
+   {disciplines_catalog_sample}
+   --- FIN DE LA LISTE ---
+   - "genre_category" : La discipline principale (celle qui caractérise au mieux l'ouvrage).
+   - "disciplines" : Le tableau contenant 1 à 3 disciplines pertinentes issues de la liste ci-dessus.
+5. Maison d'Édition / Éditeur (`publisher_name`) — DÉTECTION ET VÉRIFICATION EN BASE :
+   - Examine avec précision la page de titre, les mentions légales/copyright (ex: "Published by...", "Copyright © by...", "Éditions...", "Presses...") et le dos du livre.
+   - Vérifie D'ABORD si l'éditeur correspond à un éditeur partenaire officiel enregistré en base de données : [{partner_publishers_str}].
+   - Si le livre appartient à un ÉDITEUR TIERS externe (ex: "Springer", "Elsevier", "Oxford University Press", "Cambridge University Press", "L'Harmattan", "PUF", "Dunod", "Gallimard", etc.), renseigne EXACTEMENT le nom de cet éditeur tiers.
+   - Ne présume JAMAIS que l'éditeur est "LAHA Éditions" si le document provient d'un autre éditeur ou d'une maison tierce.
+   - Si aucune mention d'éditeur n'apparaît nulle part, renvoie "Éditeur indépendant" ou "LAHA Éditions" selon le contexte.
+6. Code Dewey : Détermine le code Dewey (3 chiffres, ex: 510 pour Mathématiques, 780 pour Musique, 340 pour Droit, 330 pour Économie, 610 pour Médecine, 840 pour Littérature, etc.).
+7. Langue & Pays (ANALYSE LINGUISTIQUE DU MANUSCRIT OBLIGATOIRE) :
    Identifie avec précision la langue réelle du texte fourni dans l'échantillon. Ne présume JAMAIS que la langue est le Français par défaut :
    - Si le texte du livre est en Portugais (ex: 'da', 'do', 'criação', 'sala de aula', 'professores', 'ensino') -> language: "Portugais", language_code: "por", country: "BR" ou "PT".
    - Si le texte du livre est en Anglais -> language: "Anglais", language_code: "eng", country: "US" / "GB" / "GLOBAL".
    - Si le texte du livre est en Espagnol -> language: "Espagnol", language_code: "spa", country: "ES" / "GLOBAL".
    - Si le texte du livre est en Français -> language: "Français", language_code: "fre", country: "BJ" ou pays identifié.
    - Si langue nationale africaine (Fon, Yoruba, Wolof, Swahili, etc.) -> renseigner la langue exacte.
-7. Code ISBN : Recherche méticuleuse d'un ISBN dans le document. S'il est absent, générer une proposition standard LAHA ("978-99919-...").
-8. Suggestions académiques : Université, faculté, département et public cible.
-9. Mots-clés : 6 à 10 mots-clés thématiques riches.
-10. Incohérences : Anomalies éventuelles.
+8. Code ISBN : Recherche méticuleuse d'un ISBN dans le document. S'il est absent, générer une proposition standard LAHA ("978-99919-...").
+9. Suggestions académiques : Université, faculté, département et public cible.
+10. Mots-clés : 6 à 10 mots-clés thématiques riches.
+11. Incohérences : Anomalies éventuelles.
 
 Renvoie STRICTEMENT un JSON valide :
 {{
   "title": "Titre exact de l'ouvrage",
   "subtitle": "Sous-titre commercial et explicatif",
   "authors": ["Nom Prénom"],
+  "publisher_name": "Maison d'édition identifiée (partenaire en base ou éditeur tiers)",
   "publication_year": 2026,
   "isbn": "978-...",
   "isbn_found_in_document": true,
   "summary": "Résumé de 4e de couverture captivant et valorisant (512 caractères maximum)...",
-  "genre_category": "Discipline principale",
+  "genre_category": "Discipline principale exacte",
+  "disciplines": ["Discipline principale exacte", "Autre discipline secondaire pertinente"],
   "dewey_code": "510",
   "language": "Portugais",
   "language_code": "por",
@@ -416,17 +451,51 @@ def _fallback_heuristic_analysis(filename: str, text_sample: str, total_pages: i
         target = "Grand Public & Amateurs de Belles-Lettres"
         sub_title = "Récit et anthologie"
     else:
-        genre = "Sciences Humaines & Savoirs"
+        genre = "Sciences humaines"
         dewey = "000"
         faculty = "Faculté des Lettres, Langues, Arts et Communication (FLLAC)"
         dept = "Département des Sciences Humaines"
         inst = "Université d'Abomey-Calavi (UAC)"
         target = "Étudiants Universitaires & Chercheurs"
 
+    # Vérification et correspondance directe avec une discipline active de la base de données
+    try:
+        from apps.catalog.models import Discipline
+        matched_db_disc = None
+        # Chercher d'abord par mot-clé présent dans le texte/titre
+        topic_keywords = ["agriculture", "agronomie", "agroalimentaire", "droit", "juridique", "économie", "gestion", "médecine", "santé", "informatique", "philosophie", "littérature", "histoire"]
+        for kw in topic_keywords:
+            if kw in lower_name:
+                found = Discipline.objects.filter(is_active=True, name__iexact=kw).first() or \
+                        Discipline.objects.filter(is_active=True, name__icontains=kw).first()
+                if found:
+                    matched_db_disc = found
+                    break
+        if not matched_db_disc:
+            # Sinon correspondance exacte avec le genre
+            matched_db_disc = Discipline.objects.filter(is_active=True, name__iexact=genre).first() or \
+                              Discipline.objects.filter(is_active=True, name__icontains=genre).first() or \
+                              Discipline.objects.filter(is_active=True).first()
+        if matched_db_disc:
+            genre = matched_db_disc.name
+            if matched_db_disc.code_dewey:
+                dewey = matched_db_disc.code_dewey
+    except Exception:
+        pass
+
     data = {
         "title": clean_name.title(),
         "subtitle": sub_title,
-        "authors": ["Auteur LAHA"],
+        "authors": ["Auteur LAHAThèque"],
+        "publisher_name": (
+            "Springer" if any(k in lower_name for k in ["springer", "nature"]) else
+            "Elsevier" if "elsevier" in lower_name else
+            "Oxford University Press" if "oxford" in lower_name else
+            "Cambridge University Press" if "cambridge" in lower_name else
+            "L'Harmattan" if "harmattan" in lower_name else
+            "Éditions MENSAH" if "mensah" in lower_name else
+            "LAHA Éditions"
+        ),
         "publication_year": 2026,
         "isbn": extracted_isbn,
         "isbn_found_in_document": isbn_found,
@@ -437,6 +506,7 @@ def _fallback_heuristic_analysis(filename: str, text_sample: str, total_pages: i
             f"Une ressource essentielle conçue pour les {target.lower()}, offrant des perspectives novatrices et des clés d'application concrètes."
         ),
         "genre_category": genre,
+        "disciplines": [genre],
         "dewey_code": dewey,
         "language": "Portugais" if ("linguagem" in lower_name or "produtora" in lower_name) else "Français",
         "language_code": "por" if ("linguagem" in lower_name or "produtora" in lower_name) else "fre",

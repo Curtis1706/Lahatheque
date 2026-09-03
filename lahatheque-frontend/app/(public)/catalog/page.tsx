@@ -19,6 +19,7 @@ import { Book } from "@/lib/types/catalog";
 import { searchBooks } from "@/lib/services/catalog";
 import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import { Book as Book3D } from "@/components/ui/book";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
 
 // Liste dynamique des années de publication : de l'année en cours jusqu'à 1950
@@ -224,24 +225,19 @@ function CatalogSearchInner() {
               </select>
             </div>
 
-            {/* Filtre Discipline Académique & Matières */}
+            {/* Filtre Discipline Académique & Matières avec Recherche */}
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
                 <GraduationCap className="w-3.5 h-3.5 text-gold" />
                 Discipline Universitaire
               </label>
-              <select
+              <DisciplineCombobox
                 value={selectedDiscipline}
-                onChange={(e) => setSelectedDiscipline(e.target.value)}
-                className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
-              >
-                <option value="">Toutes les disciplines ({disciplineNames.length})</option>
-                {disciplineNames.map((discipline) => (
-                  <option key={discipline} value={discipline}>
-                    {discipline}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedDiscipline}
+                includeAllOption={true}
+                placeholder="Toutes les disciplines..."
+                searchPlaceholder="Rechercher parmi les disciplines..."
+              />
             </div>
 
             {/* Filtre Format */}

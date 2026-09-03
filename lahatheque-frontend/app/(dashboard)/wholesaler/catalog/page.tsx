@@ -26,6 +26,7 @@ import { WholesaleCartDrawer } from "@/components/features/wholesaler/wholesale-
 import { BookPreviewModal } from "@/components/features/wholesaler/book-preview-modal";
 import { WholesaleOrderModal } from "@/components/features/wholesaler/wholesale-order-modal";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { getWholesalerBooks } from "@/lib/services/wholesaler";
 import type { WholesalerBookItem, WholesalerCartItem } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
@@ -297,22 +298,17 @@ export default function WholesalerCatalogPage() {
             )}
           </div>
 
-          {/* Sélecteur de Discipline Dropdown */}
-          <div className="relative w-full sm:w-64">
-            <Filter className="w-3.5 h-3.5 text-gold absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <select
-              value={disciplineFilter}
-              onChange={(e) => setDisciplineFilter(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[40px] appearance-none cursor-pointer"
-            >
-              <option value="all">Toutes disciplines ({books.length})</option>
-              {disciplines.map((d) => (
-                <option key={d.id} value={d.name}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-foreground-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          {/* Sélecteur de Discipline Dropdown avec Recherche */}
+          <div className="w-full sm:w-72">
+            <DisciplineCombobox
+              value={disciplineFilter === "all" ? "" : disciplineFilter}
+              onChange={(val) => setDisciplineFilter(val || "all")}
+              disciplines={disciplines}
+              includeAllOption={true}
+              allOptionLabel={`Toutes disciplines (${books.length})`}
+              placeholder="Toutes les disciplines..."
+              searchPlaceholder="Rechercher parmi les disciplines..."
+            />
           </div>
 
           {(disciplineFilter !== "all" || searchQuery) && (

@@ -8,10 +8,12 @@ export interface AiBookAnalysisResult {
   subtitle?: string;
   authors: string[];
   publication_year: number;
+  publisher_name?: string;
   isbn: string;
   isbn_found_in_document?: boolean;
   summary: string;
   genre_category: string;
+  disciplines?: string[];
   dewey_code: string;
   language: string;
   language_code: string;

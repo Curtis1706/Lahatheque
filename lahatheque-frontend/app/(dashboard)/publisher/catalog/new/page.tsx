@@ -25,6 +25,7 @@ import { FileDropzone } from "@/components/features/layout-artist/file-dropzone"
 import { createPublisherBook, extractBookMetadataWithAi } from "@/lib/services/publisher";
 import type { SalesModel, PublisherAiMetadataSuggestion } from "@/lib/types/publisher";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { InlineLoader } from "@/components/ui/page-loader";
 
 export default function NewPublisherBookPage() {
@@ -45,6 +46,7 @@ export default function NewPublisherBookPage() {
 
   // Bloc 3: Classification & IA
   const [disciplinesList, setDisciplinesList] = useState<DisciplineItem[]>([]);
+  const [categories, setCategories] = useState<string[]>(["Droit Public & Administration"]);
   const [discipline, setDiscipline] = useState("Droit Public & Administration");
   const [keywords, setKeywords] = useState("droit, afrique, uac");
   const [targetAudience, setTargetAudience] = useState<"universitaire" | "professionnel" | "grand_public">("universitaire");
@@ -54,6 +56,7 @@ export default function NewPublisherBookPage() {
     getDisciplines().then((list) => {
       if (list && list.length > 0) {
         setDisciplinesList(list);
+        setCategories([list[0].name]);
         setDiscipline(list[0].name);
       }
     });
@@ -103,7 +106,13 @@ export default function NewPublisherBookPage() {
         filename: manuscriptFile?.name,
         file: manuscriptFile || undefined,
       });
-      if (res.discipline) setDiscipline(res.discipline);
+      if ((res as any).disciplines && (res as any).disciplines.length > 0) {
+        setCategories((res as any).disciplines);
+        setDiscipline((res as any).disciplines[0]);
+      } else if (res.discipline) {
+        setCategories([res.discipline]);
+        setDiscipline(res.discipline);
+      }
       if (res.language) setLanguage(res.language);
       if (res.suggested_keywords && res.suggested_keywords.length > 0) {
         setKeywords(res.suggested_keywords.join(", "));
@@ -141,7 +150,8 @@ export default function NewPublisherBookPage() {
           isbn_print: isbnPrint || undefined,
           doi: doi || undefined,
           authors: authors.split(",").map((a) => a.trim()).filter(Boolean),
-          discipline,
+          discipline: categories[0] || discipline,
+          disciplines: categories,
           language,
           keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
           target_audience: targetAudience,
@@ -572,18 +582,20 @@ export default function NewPublisherBookPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">Discipline</label>
-                <select
-                  value={discipline}
-                  onChange={(e) => setDiscipline(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
-                >
-                  {disciplinesList.map((d) => (
-                    <option key={d.id} value={d.name}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
+                <label className="text-xs font-bold text-navy uppercase tracking-wider">
+                  Disciplines / Catégories <span className="text-[10px] font-normal text-foreground-muted">(Plusieurs choix possibles)</span>
+                </label>
+                <DisciplineCombobox
+                  multiple={true}
+                  values={categories}
+                  onValuesChange={(newVals) => {
+                    setCategories(newVals);
+                    if (newVals.length > 0) setDiscipline(newVals[0]);
+                  }}
+                  disciplines={disciplinesList}
+                  placeholder="Sélectionner ou rechercher une discipline..."
+                  searchPlaceholder="Rechercher parmi les disciplines..."
+                />
               </div>
 
               <div className="space-y-1.5">

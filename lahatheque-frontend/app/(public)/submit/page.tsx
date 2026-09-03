@@ -17,11 +17,10 @@ import {
   Check
 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { useDisciplines } from "@/lib/hooks/use-disciplines";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { uploadPublicManuscriptToR2 } from "@/lib/services/storage";
 
 export default function SubmitManuscriptPage() {
-  const { disciplineNames } = useDisciplines();
   const [dragActive, setDragActive] = useState(false);
   const [manuscriptFile, setManuscriptFile] = useState<File | null>(null);
 
@@ -326,25 +325,18 @@ export default function SubmitManuscriptPage() {
               {/* Discipline scientifique & Pays */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {/* Discipline scientifique */}
+                {/* Discipline scientifique avec Recherche */}
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-bold text-navy">
                     Discipline / Domaine <span className="text-gold">*</span>
                   </label>
-                  <select 
-                    name="workType"
-                    className="bg-background border border-border rounded-xl text-sm p-3 focus:border-navy focus:ring-2 focus:ring-navy/20 outline-none transition-all duration-200 w-full cursor-pointer"
-                    required
+                  <DisciplineCombobox
                     value={genre}
-                    onChange={(e) => setGenre(e.target.value)}
-                  >
-                    <option value="">Sélectionner une discipline</option>
-                    {disciplineNames.map((disc) => (
-                      <option key={disc} value={disc}>
-                        {disc}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setGenre}
+                    required={true}
+                    placeholder="Sélectionner une discipline..."
+                    searchPlaceholder="Rechercher parmi les disciplines..."
+                  />
                 </div>
 
                 {/* Pays */}

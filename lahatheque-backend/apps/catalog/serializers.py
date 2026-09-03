@@ -1,5 +1,8 @@
+import logging
 from rest_framework import serializers
 from .models import Ouvrage, BookAuthor, Discipline, Domain, MetadataONIX, Country
+
+logger = logging.getLogger(__name__)
 
 
 class CountrySerializer(serializers.ModelSerializer):
@@ -32,6 +35,9 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
     """Serializer en lecture — utilisé pour lister / détailler les ouvrages."""
     authors_details = BookAuthorSerializer(source='authors', many=True, read_only=True)
     discipline_detail = DisciplineSerializer(source='discipline', read_only=True)
+    discipline_name = serializers.SerializerMethodField()
+    disciplines_details = DisciplineSerializer(source='disciplines', many=True, read_only=True)
+    disciplines_names = serializers.SerializerMethodField()
     publisher_name = serializers.SerializerMethodField()
     institution_name = serializers.SerializerMethodField()
     authors_names = serializers.SerializerMethodField()
@@ -57,10 +63,29 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
         return str(obj.created_by.id) if obj.created_by else ""
 
     def get_publisher_name(self, obj):
-        return obj.publisher.company_name if obj.publisher else 'LAHA Éditions'
+        if getattr(obj, 'publisher_name', None):
+            return obj.publisher_name
+        if obj.publisher:
+            return obj.publisher.company_name or obj.publisher.name or obj.publisher.trade_name
+        return ""
 
     def get_institution_name(self, obj):
         return obj.institution.name if obj.institution else ''
+
+    def get_discipline_name(self, obj):
+        if obj.discipline:
+            return obj.discipline.name
+        if obj.pk and hasattr(obj, 'disciplines') and obj.disciplines.exists():
+            first_d = obj.disciplines.first()
+            return first_d.name if first_d else ""
+        return ""
+
+    def get_disciplines_names(self, obj):
+        if obj.pk and hasattr(obj, 'disciplines') and obj.disciplines.exists():
+            return [d.name for d in obj.disciplines.all()]
+        if obj.discipline:
+            return [obj.discipline.name]
+        return []
 
     def get_authors_names(self, obj):
         if obj.pk and obj.authors.exists():
@@ -117,6 +142,8 @@ class OuvrageCreateSerializer(serializers.Serializer):
     target_audience = serializers.CharField(max_length=128, required=False, allow_blank=True, default='')
     dewey_code = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
     discipline_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+    disciplines = serializers.CharField(required=False, allow_blank=True, default='')
+    discipline_names = serializers.ListField(child=serializers.CharField(), required=False, default=list)
     institution_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
     pre_edition_dossier_id = serializers.CharField(required=False, allow_blank=True, default='')
     authors_emails = serializers.CharField(required=False, allow_blank=True, default='')
@@ -146,14 +173,38 @@ class OuvrageCreateSerializer(serializers.Serializer):
             from apps.rights.models import PreEditionDossier
             dossier = PreEditionDossier.objects.filter(id=dossier_id).first()
 
-        # Résolution de la discipline par nom
+        # Résolution des disciplines multiples & principale
         discipline_obj = None
         discipline_name = validated_data.pop('discipline_name', '')
-        if discipline_name:
+        disciplines_input_list = validated_data.pop('discipline_names', [])
+        disciplines_str = validated_data.pop('disciplines', '')
+
+        all_disc_names = []
+        if isinstance(disciplines_input_list, list):
+            all_disc_names.extend([str(d).strip() for d in disciplines_input_list if str(d).strip()])
+        if isinstance(disciplines_str, str) and disciplines_str.strip():
+            all_disc_names.extend([d.strip() for d in disciplines_str.split(',') if d.strip()])
+        if discipline_name and discipline_name not in all_disc_names:
+            all_disc_names.insert(0, discipline_name)
+
+        disciplines_objs = []
+        for d_name in all_disc_names:
+            d_item = Discipline.objects.filter(name__iexact=d_name).first()
+            if not d_item:
+                d_item, _ = Discipline.objects.get_or_create(
+                    name=d_name,
+                    defaults={'code_dewey': validated_data.get('dewey_code', '')}
+                )
+            disciplines_objs.append(d_item)
+
+        if disciplines_objs:
+            discipline_obj = disciplines_objs[0]
+        elif discipline_name:
             discipline_obj, _ = Discipline.objects.get_or_create(
                 name=discipline_name,
                 defaults={'code_dewey': validated_data.get('dewey_code', '')}
             )
+            disciplines_objs = [discipline_obj]
 
         # Résolution de l'institution par nom
         institution_obj = None
@@ -173,9 +224,11 @@ class OuvrageCreateSerializer(serializers.Serializer):
                 publisher_obj = Publisher.objects.filter(id=publisher_id).first()
             except Exception:
                 publisher_obj = None
-        if not publisher_obj and publisher_name and 'laha' not in publisher_name.lower():
-            publisher_obj = Publisher.objects.filter(company_name__icontains=publisher_name.strip()).first() or \
-                            Publisher.objects.filter(name__icontains=publisher_name.strip()).first()
+        if not publisher_obj and publisher_name:
+            publisher_obj = Publisher.objects.filter(company_name__iexact=publisher_name.strip()).first() or \
+                            Publisher.objects.filter(name__iexact=publisher_name.strip()).first() or \
+                            Publisher.objects.filter(company_name__icontains=publisher_name.strip()).first()
+        resolved_publisher_name = publisher_name.strip() if publisher_name else (publisher_obj.company_name if publisher_obj else "")
 
         # Extraction des identifiants et données d'auteurs
         author_id = validated_data.pop('author_id', '')
@@ -275,10 +328,17 @@ class OuvrageCreateSerializer(serializers.Serializer):
                 discipline=discipline_obj,
                 institution=institution_obj,
                 publisher=publisher_obj,
+                publisher_name=resolved_publisher_name,
                 pre_edition_dossier=dossier,
                 created_by=user,
                 status='draft',
             )
+
+        # Association des disciplines ManyToMany
+        if disciplines_objs:
+            ouvrage.disciplines.set(disciplines_objs)
+        elif discipline_obj:
+            ouvrage.disciplines.set([discipline_obj])
 
         # Attribution de la clé R2 ou du fichier joint
         if file_key:

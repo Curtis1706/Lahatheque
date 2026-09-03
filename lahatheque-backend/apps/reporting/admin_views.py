@@ -403,9 +403,11 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             ) or (
                 b.price_paper is not None and float(b.price_paper) != def_pap
             )
-            pub_name = "Éditions LAHA"
-            if b.publisher:
-                pub_name = b.publisher.company_name or b.publisher.name or "Éditions LAHA"
+            pub_name = b.publisher_name
+            if not pub_name and b.publisher:
+                pub_name = b.publisher.company_name or b.publisher.name or ""
+            if not pub_name and b.institution:
+                pub_name = b.institution.name
 
             authors_list = [f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]
 
@@ -862,10 +864,10 @@ class AdminValidationViewSet(viewsets.ViewSet):
     def _serialize_proof(self, b):
         file_url = b.file.url if b.file and hasattr(b.file, 'url') else None
         cover_url = b.cover_image.url if b.cover_image and hasattr(b.cover_image, 'url') else ""
-        pub_name = "Éditions LAHA"
-        if b.publisher:
-            pub_name = b.publisher.company_name or b.publisher.name or "Éditions LAHA"
-        elif b.institution:
+        pub_name = b.publisher_name
+        if not pub_name and b.publisher:
+            pub_name = b.publisher.company_name or b.publisher.name or ""
+        elif not pub_name and b.institution:
             pub_name = b.institution.name
 
         submitted_by = "Maquettiste assigné"

@@ -44,6 +44,7 @@ export interface PublisherBook {
     orcid?: string;
   }[];
   discipline: string;
+  disciplines?: string[];
   language?: string;
   keywords: string[];
   target_audience: "universitaire" | "professionnel" | "grand_public";

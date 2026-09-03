@@ -376,7 +376,9 @@ export async function createDepositWithFiles(
       country: data.classification?.country || "BJ",
       institution_name: data.classification?.university || "",
       faculty: data.classification?.faculty || "",
-      discipline_name: data.classification?.discipline || "",
+      discipline_name: data.classification?.discipline || (data.classification?.disciplines?.[0] || ""),
+      disciplines: data.classification?.disciplines ? data.classification.disciplines.join(", ") : (data.classification?.discipline || ""),
+      discipline_names: data.classification?.disciplines || (data.classification?.discipline ? [data.classification.discipline] : []),
       classification_source: data.classification?.source || "ai_suggested",
       language_source: data.metadata?.language_source || "ai_suggested",
       summary_source: data.metadata?.summary_source || "ai_suggested",
@@ -418,6 +420,9 @@ export async function createDepositWithFiles(
 
   formData.append("title", data.metadata?.title || "Nouveau Titre");
   formData.append("authors_names", data.metadata?.authors?.join(", ") || "");
+  if (data.metadata?.publisher_name) {
+    formData.append("publisher_name", data.metadata.publisher_name);
+  }
   if (extra?.authors_emails) {
     formData.append("authors_emails", extra.authors_emails);
   }
@@ -439,7 +444,10 @@ export async function createDepositWithFiles(
     formData.append("country", data.classification.country || "BJ");
     formData.append("institution_name", data.classification.university || "");
     formData.append("faculty", data.classification.faculty || "");
-    formData.append("discipline_name", data.classification.discipline || "");
+    formData.append("discipline_name", data.classification.discipline || (data.classification.disciplines?.[0] || ""));
+    if (data.classification.disciplines && data.classification.disciplines.length > 0) {
+      formData.append("disciplines", data.classification.disciplines.join(", "));
+    }
     formData.append("classification_source", data.classification.source || "ai_suggested");
   }
   if (data.metadata?.language_source) {

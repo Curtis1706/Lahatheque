@@ -9,6 +9,7 @@ import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { useAuth } from "@/hooks/use-auth";
 import { ChiefExaminationModal } from "@/components/features/chief-layout/chief-examination-modal";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { getPendingDeposits, validateDeposit, requestRevision } from "@/lib/services/layout-artist";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
@@ -228,35 +229,23 @@ export default function ChefValidationPage() {
           />
         </div>
 
-        {/* Filtre par discipline */}
-        <div className="flex items-center gap-2 pt-2 border-t border-border overflow-x-auto">
+        {/* Filtre par discipline avec recherche */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-2 border-t border-border">
           <span className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider shrink-0 flex items-center gap-1">
             <Filter className="w-3 h-3 text-gold" />
             Discipline :
           </span>
-          <button
-            onClick={() => setDisciplineFilter("all")}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-colors border cursor-pointer ${
-              disciplineFilter === "all"
-                ? "bg-navy text-white border-navy"
-                : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
-            }`}
-          >
-            Toutes les disciplines ({deposits.length})
-          </button>
-          {disciplines.map((d) => (
-            <button
-              key={d.id}
-              onClick={() => setDisciplineFilter(d.name)}
-              className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-colors border cursor-pointer ${
-                disciplineFilter === d.name
-                  ? "bg-navy text-white border-navy"
-                  : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
-              }`}
-            >
-              {d.name}
-            </button>
-          ))}
+          <div className="w-full sm:w-72">
+            <DisciplineCombobox
+              value={disciplineFilter === "all" ? "" : disciplineFilter}
+              onChange={(val) => setDisciplineFilter(val || "all")}
+              disciplines={disciplines}
+              includeAllOption={true}
+              allOptionLabel={`Toutes les disciplines (${deposits.length})`}
+              placeholder="Toutes les disciplines..."
+              searchPlaceholder="Rechercher une discipline..."
+            />
+          </div>
         </div>
       </div>
 

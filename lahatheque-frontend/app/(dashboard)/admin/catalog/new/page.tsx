@@ -31,6 +31,8 @@ import { CreatorSelector } from "@/components/features/catalog/creator-selector"
 import { createAdminCatalogBook } from "@/lib/services/admin";
 import { extractBookMetadataWithAi } from "@/lib/services/publisher";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
+import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
 import type { CreatorOption } from "@/lib/services/creators";
 import { AFRICAN_COUNTRIES_PRESET } from "@/lib/services/countries";
 import { InlineLoader } from "@/components/ui/page-loader";
@@ -46,9 +48,11 @@ export default function AdminNewProductPage() {
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [authorPublisher, setAuthorPublisher] = useState("LAHA Éditions");
+  const [publisherName, setPublisherName] = useState("LAHA Éditions");
   const [selectedCreator, setSelectedCreator] = useState<CreatorOption | null>(null);
   const [country, setCountry] = useState("Tous les pays");
   const [summary, setSummary] = useState("");
+  const [categories, setCategories] = useState<string[]>(["Manuels scolaires"]);
   const [disciplineName, setDisciplineName] = useState("Manuels scolaires");
   const [targetAudience, setTargetAudience] = useState("CM2");
   const [reductionPercent, setReductionPercent] = useState<number>(0);
@@ -116,10 +120,19 @@ export default function AdminNewProductPage() {
         filename: manuscriptFile?.name,
         file: manuscriptFile || undefined,
       });
-      if (res.discipline) setDisciplineName(res.discipline);
+      if ((res as any).disciplines && (res as any).disciplines.length > 0) {
+        setCategories((res as any).disciplines);
+        setDisciplineName((res as any).disciplines[0]);
+      } else if (res.discipline) {
+        setCategories([res.discipline]);
+        setDisciplineName(res.discipline);
+      }
+      if ((res as any).publisher_name) {
+        setPublisherName((res as any).publisher_name);
+      }
       if (res.summary && !summary) setSummary(res.summary);
       if (res.target_audience) setTargetAudience(res.target_audience);
-      toast.success("Classification et résumé suggérés par l'IA appliqués avec succès.");
+      toast.success("Classification, éditeur et résumé suggérés par l'IA appliqués avec succès.");
     } catch {
       toast.error("Erreur lors de l'analyse IA. Vous pouvez remplir les champs manuellement.");
     } finally {
@@ -158,12 +171,15 @@ export default function AdminNewProductPage() {
           if (selectedCreator.user_id) formData.append("author_user_id", selectedCreator.user_id);
         }
       } else {
-        formData.append("publisher_name", authorTrimmed.toLowerCase().includes("laha") ? "LAHA Éditions" : authorTrimmed);
+        formData.append("publisher_name", publisherName || (authorTrimmed.toLowerCase().includes("laha") ? "LAHA Éditions" : authorTrimmed));
       }
 
       // Pays & Classification
       formData.append("country", country === "Tous les pays" ? "GL" : country);
-      formData.append("discipline_name", disciplineName);
+      formData.append("discipline_name", categories[0] || disciplineName);
+      if (categories.length > 0) {
+        formData.append("disciplines", categories.join(", "));
+      }
       formData.append("target_audience", targetAudience);
       formData.append("summary", summary || "Ouvrage ajouté au catalogue officiel.");
       formData.append("keywords", isNewRelease ? "Nouveauté, Catalogue Officiel" : "Catalogue Officiel");
@@ -335,12 +351,29 @@ export default function AdminNewProductPage() {
                     />
                   </div>
 
-                  {/* Sélecteur intelligent Auteur / Éditeur avec attribution automatique des droits */}
+                  {/* Sélecteur intelligent Auteur */}
                   <CreatorSelector
                     value={authorPublisher}
                     onChange={(val) => setAuthorPublisher(val)}
-                    onSelectCreator={(creator) => setSelectedCreator(creator)}
+                    onSelectCreator={(creator) => {
+                      setSelectedCreator(creator);
+                      if (creator.type === "publisher") {
+                        setPublisherName(creator.name);
+                      }
+                    }}
                   />
+
+                  {/* Sélecteur Maison d'Édition (Partenaire en base ou Éditeur tiers libre) */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-xs font-bold text-navy">
+                      Maison d&apos;Édition / Éditeur <span className="text-[10px] font-normal text-foreground-muted">(Partenaire en base ou éditeur tiers externe)</span>
+                    </label>
+                    <PublisherCombobox
+                      value={publisherName}
+                      onChange={(val) => setPublisherName(val)}
+                      placeholder="Sélectionner ou saisir l'éditeur (ex: Springer, LAHA, etc.)..."
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -421,30 +454,20 @@ export default function AdminNewProductPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">Catégorie</label>
-                    <select
-                      value={disciplineName}
-                      onChange={(e) => setDisciplineName(e.target.value)}
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium"
-                    >
-                      {disciplinesList.length > 0 ? (
-                        disciplinesList.map((d) => (
-                          <option key={d.id} value={d.name}>
-                            {d.name}
-                          </option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="Manuels scolaires">Manuels scolaires</option>
-                          <option value="Droit & Sciences Politiques">Droit &amp; Sciences Politiques</option>
-                          <option value="Sciences Économiques & Gestion">Sciences Économiques &amp; Gestion</option>
-                          <option value="Littérature Africaine & Conte">Littérature Africaine &amp; Conte</option>
-                          <option value="Sciences Exactes & Technologies">Sciences Exactes &amp; Technologies</option>
-                          <option value="Philosophie & Sciences Humaines">Philosophie &amp; Sciences Humaines</option>
-                          <option value="Arts, Culture & Musique">Arts, Culture &amp; Musique</option>
-                        </>
-                      )}
-                    </select>
+                    <label className="text-xs font-bold text-navy">
+                      Catégories / Disciplines <span className="text-[10px] font-normal text-foreground-muted">(Plusieurs choix possibles)</span>
+                    </label>
+                    <DisciplineCombobox
+                      multiple={true}
+                      values={categories}
+                      onValuesChange={(newVals) => {
+                        setCategories(newVals);
+                        if (newVals.length > 0) setDisciplineName(newVals[0]);
+                      }}
+                      disciplines={disciplinesList}
+                      placeholder="Sélectionner ou rechercher une catégorie..."
+                      searchPlaceholder="Rechercher parmi les disciplines..."
+                    />
                   </div>
 
                   <div className="space-y-1.5">
