@@ -38,8 +38,8 @@ const PARTNER_PROFILES = [
     title: "La bibliothèque numérique de référence pour vos campus",
     description: "Offrez à vos étudiants et enseignants-chercheurs un accès simultané et illimité à des milliers d'ouvrages académiques africains, validés par des comités scientifiques et conformes au système LMD.",
     stats: [
-      { value: "+160", label: "Établissements Partenaires" },
-      { value: "+120 000", label: "Étudiants Connectés" },
+      { value: "+64", label: "Établissements Partenaires" },
+      { value: "+47 000", label: "Étudiants Connectés" },
       { value: "100%", label: "Sécurité DRM Tatouée" },
       { value: "24/7", label: "Disponibilité Numérique" }
     ],
@@ -75,8 +75,6 @@ const PARTNER_PROFILES = [
     description: "Associez votre maison d'édition à la première plateforme de diffusion numérique d'Afrique francophone. Protégez vos ouvrages du piratage et percevez des redevances transparentes.",
     stats: [
       { value: "+45", label: "Maisons d'Édition Partenaires" },
-      { value: "0 Piratage", label: "Chiffrement & Tatouage Dynamique" },
-      { value: "Semestriel", label: "Paiement des Redevances" },
       { value: "6 Pays", label: "Marchés Actifs Directs" }
     ],
     features: [
@@ -222,7 +220,7 @@ export default function PartnersPublicPage() {
             </div>
 
             {/* Statistiques Profil */}
-            <div className={`grid grid-cols-2 ${currentProfile.stats.length === 3 ? "md:grid-cols-3" : "md:grid-cols-4"} gap-4 pt-4 border-t border-border`}>
+            <div className={`grid grid-cols-2 ${currentProfile.stats.length === 2 ? "md:grid-cols-2 max-w-xl mx-auto" : currentProfile.stats.length === 3 ? "md:grid-cols-3" : "md:grid-cols-4"} gap-4 pt-4 border-t border-border`}>
               {currentProfile.stats.map((st, sIdx) => (
                 <div key={sIdx} className="bg-background p-4 rounded-2xl border border-border text-center space-y-1">
                   <span className="font-serif text-2xl sm:text-3xl font-bold text-navy block">{st.value}</span>

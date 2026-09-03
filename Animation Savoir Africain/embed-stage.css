@@ -1,0 +1,4 @@
+/* Embedded animation stage: neutralize the starter's dark editor shell so the
+   figure reads as a blueprint plate on the light ground. */
+[data-om-starter="animations-v3"] { background: var(--color-bg) !important; }
+[data-om-starter="animations-v3"] svg[data-om-exportable-video-with-duration-secs] { box-shadow: none !important; }

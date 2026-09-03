@@ -6,16 +6,14 @@ import {
   Building2, 
   Check, 
   Sparkles, 
-  ShieldCheck, 
   BookOpen, 
   ArrowRight, 
-  Award,
-  Package,
+  Package, 
+  Truck, 
+  GraduationCap,
   Percent,
-  Truck,
-  Tag,
-  Layers,
-  GraduationCap
+  Calendar,
+  Zap
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { PageLoader } from "@/components/ui/page-loader";
@@ -29,90 +27,82 @@ interface SubscriptionPlan {
   max_concurrent_users: number;
 }
 
-const PAPER_PACKS = [
+const PAPER_DISCOUNT_TIERS = [
   {
-    id: "pack-droit",
-    badge: "Pack Licence Droit",
-    discount: "-20%",
-    title: "Pack Fondamentaux Droit OHADA",
-    subtitle: "3 Manuels de référence indispensables pour L1 / L2 / L3",
-    books: [
-      "Droit des obligations : Régime général & contrats",
-      "Droit constitutionnel & institutions politiques",
-      "Droit des affaires : Sociétés commerciales OHADA"
-    ],
-    originalPrice: 43500,
-    packPrice: 34800,
-    features: [
-      "3 Tomes papier neufs reliés grand format",
+    id: "pack-5-livres",
+    badge: "Pack Cursus (5 Livres)",
+    discount: "-15%",
+    title: "Pack 5 Livres au Choix",
+    subtitle: "Sélectionnez 5 ouvrages papier de votre choix dans tout le catalogue",
+    booksCount: "5 ouvrages papier",
+    ruleDescription: "Remise immédiate de -15% appliquée automatiquement dès 5 livres papier achetés.",
+    highlights: [
+      "Choix 100% libre parmi toutes les disciplines du catalogue",
+      "Équipement complet pour tout un semestre ou cycle d'études",
       "Accès numérique PDF DRM offert (3 mois)",
-      "Livraison express sur votre campus universitaire",
-      "Fiches synthèses d'arrêts de jurisprudence incluses"
-    ]
+      "Livraison express sur votre campus ou point relais"
+    ],
+    ctaText: "Composer mon Pack 5 Livres",
+    ctaLink: "/catalog?format=papier",
+    popular: false,
+    isInstitutional: false
   },
   {
-    id: "pack-eco",
-    badge: "Pack Le Plus Populaire",
+    id: "pack-10-livres",
+    badge: "Formule la plus populaire",
     popular: true,
-    discount: "-25%",
-    title: "Pack Économie & SYSCOHADA",
-    subtitle: "3 Ouvrages majeurs pour les filières FASEG & Écoles de Commerce",
-    books: [
-      "Économie monétaire & politiques UEMOA",
-      "Comptabilité approfondie SYSCOHADA révisé",
-      "Management stratégique des organisations"
-    ],
-    originalPrice: 43500,
-    packPrice: 32600,
-    features: [
-      "3 Manuels papier conformes au référentiel LMD",
+    discount: "-20%",
+    title: "Pack 10 Livres au Choix",
+    subtitle: "Composez votre sélection de 10 ouvrages papier de votre choix",
+    booksCount: "10 ouvrages papier",
+    ruleDescription: "Remise immédiate de -20% sur la totalité de votre sélection de 10 manuels.",
+    highlights: [
+      "Panachage libre de matières, semestres et niveaux académiques",
       "Accès numérique illimité offert (6 mois)",
-      "Livraison offerte à domicile ou point relais",
-      "Cahier d'exercices et cas pratiques corrigés"
-    ]
+      "Livraison prioritaire offerte à domicile ou sur campus",
+      "Idéal pour couvrir une année complète ou étudier en binôme"
+    ],
+    ctaText: "Composer mon Pack 10 Livres",
+    ctaLink: "/catalog?format=papier",
+    isInstitutional: false
   },
   {
-    id: "pack-master",
-    badge: "Pack Excellence",
+    id: "pack-20-livres",
+    badge: "Pack Groupe & Excellence",
     discount: "-30%",
-    title: "Pack Master & Recherche Scientifique",
-    subtitle: "4 Traités d'approfondissement et méthodologie de thèse",
-    books: [
-      "Droit des affaires & procédures collectives",
-      "Finance d'entreprise & marchés internationaux",
-      "Économie monétaire approfondie",
-      "Guide de rédaction et soutenance de mémoire/thèse"
-    ],
-    originalPrice: 61500,
-    packPrice: 43000,
-    features: [
-      "4 Volumes d'excellence reliure rigide",
-      "Pass Annuel Numérique Recherche inclus (valeur 15.000 FCFA)",
+    title: "Pack 20 Livres & Plus",
+    subtitle: "Sélectionnez 20 manuels papier ou plus pour un groupe ou une section",
+    booksCount: "20+ ouvrages papier",
+    ruleDescription: "Remise maximale de -30% appliquée sur l'ensemble des tomes commandés.",
+    highlights: [
+      "Sélection libre sans restriction de filière ni d'éditeur",
+      "Pass Annuel Numérique complet inclus (valeur 15.000 FCFA)",
       "Livraison suivie sécurisée garantie sous 48h",
-      "Assistance méthodologique et annales d'examens"
-    ]
+      "Tarif préférentiel pour groupes d'études et classes préparatoires"
+    ],
+    ctaText: "Composer mon Pack 20 Livres",
+    ctaLink: "/catalog?format=papier",
+    popular: false,
+    isInstitutional: false
   },
   {
     id: "pack-institution",
-    badge: "Institution & Librairie",
+    badge: "Amphi, Institution & Librairie",
     isInstitutional: true,
-    discount: "Sur Devis",
-    title: "Bouquet Établissement & Bibliothèque",
-    subtitle: "Dotation d'ouvrages papier pour institutions, universités, librairies et bibliothèques",
-    books: [
-      "Fonds documentaire complet pluridisciplinaire",
-      "Manuels universitaires et scolaires au choix",
-      "Volumes de recherche, codes et traités",
-      "Réassort flexible selon vos effectifs"
-    ],
-    originalPrice: 0,
-    packPrice: 0,
-    features: [
+    discount: "Jusqu'à -40%",
+    title: "Commandes de Promotion (50+)",
+    subtitle: "À partir de 50 exemplaires pour promotions entières, universités et librairies",
+    booksCount: "50+ exemplaires papier",
+    ruleDescription: "Tarification grossiste spéciale et dégressive selon le volume global de commande.",
+    highlights: [
+      "Remise spéciale promotion & amphi jusqu'à -40%",
+      "Livraison groupée directe en faculté ou amphi sous 48-72h",
       "Facturation pro & bon de commande administratif",
-      "Remise dégressive selon le volume (jusqu'à -35%)",
-      "Livraison groupée sur site ou campus sous 48-72h",
-      "Accompagnement dédié par un chargé de compte"
-    ]
+      "Accompagnement logistique dédié par un chargé de compte"
+    ],
+    ctaText: "Demander un Devis Groupé",
+    ctaLink: "/partners",
+    popular: false
   }
 ];
 
@@ -157,7 +147,7 @@ export default function SubscriptionsPage() {
             Nos Offres &amp; Formules LAHAThèque
           </h1>
           <p className="text-sm sm:text-base text-foreground-muted leading-relaxed">
-            Choisissez la formule qui correspond à votre rythme d'études : abonnements numériques illimités ou packs de livres papier avec réductions exclusives.
+            Choisissez la formule qui correspond à votre rythme d'études : abonnements numériques (mensuel ou annuel à tarif réduit) ou remises par volume de livres papier achetés.
           </p>
         </div>
 
@@ -185,7 +175,7 @@ export default function SubscriptionsPage() {
               }`}
             >
               <Package className={`w-4 h-4 ${activeType === "paper" ? "text-gold" : "text-foreground-muted"}`} />
-              Packs Livres Papier
+              Remises Livres Papier
               <span className="bg-gold text-navy text-[10px] font-bold px-1.5 py-0.2 rounded-full">
                 -30%
               </span>
@@ -221,7 +211,7 @@ export default function SubscriptionsPage() {
           </div>
         )}
 
-        {/* Section 1 : Abonnements Numériques */}
+        {/* Section 1 : Abonnements Numériques (Mensuel vs Annuel avec Réduction) */}
         {activeType === "digital" && (
           <div className="space-y-8 animate-in fade-in duration-300">
             {loading ? (
@@ -229,26 +219,26 @@ export default function SubscriptionsPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
                 
-                {/* Formule Étudiant Individuelle */}
-                <div className="bg-background border-2 border-border hover:border-gold rounded-3xl p-6 space-y-6 flex flex-col justify-between transition-all hover:shadow-lg relative">
+                {/* 1. Formule Mensuelle */}
+                <div className="bg-background border-2 border-border hover:border-navy rounded-3xl p-6 space-y-6 flex flex-col justify-between transition-all hover:shadow-lg relative">
                   <div className="space-y-4">
                     <div>
                       <span className="text-[10px] uppercase font-bold text-navy bg-navy/10 px-2.5 py-1 rounded-md border border-navy/20">
-                        Étudiant Individuel
+                        Abonnement Mensuel
                       </span>
-                      <h3 className="font-serif text-xl font-bold text-navy mt-3">Pass Annuel Recherche</h3>
-                      <p className="text-xs text-foreground-muted">Pour étudiants et chercheurs indépendants</p>
+                      <h3 className="font-serif text-xl font-bold text-navy mt-3">Pass Mensuel</h3>
+                      <p className="text-xs text-foreground-muted">Sans engagement — Idéal pour révisions ciblées et examens</p>
                     </div>
 
                     <div className="flex items-baseline gap-1 pt-2">
-                      <span className="font-serif text-3xl font-bold text-navy">15.000</span>
-                      <span className="text-xs font-bold text-gold-dark">FCFA / an</span>
+                      <span className="font-serif text-3xl font-bold text-navy">2.000</span>
+                      <span className="text-xs font-bold text-gold-dark">FCFA / mois</span>
                     </div>
 
                     <ul className="space-y-2.5 text-xs text-foreground/90 pt-2 border-t border-border">
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-success shrink-0" />
-                        <span>Lecture illimitée sur PDF/EPUB</span>
+                        <span>Accès intégral à tout le catalogue PDF/EPUB</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-success shrink-0" />
@@ -256,7 +246,7 @@ export default function SubscriptionsPage() {
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-success shrink-0" />
-                        <span>Écoute des Livres Audio incluses</span>
+                        <span>Écoute des Livres Audio en streaming</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-success shrink-0" />
@@ -269,43 +259,66 @@ export default function SubscriptionsPage() {
                     href="/cart"
                     className="w-full py-3.5 rounded-xl bg-navy hover:bg-navy-hover text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 text-center shadow min-h-[44px]"
                   >
-                    Souscrire le Pass Annuel
+                    Choisir le Pass Mensuel
                     <ArrowRight className="w-4 h-4 text-gold" />
                   </Link>
                 </div>
 
-                {/* Formule Semestrielle */}
-                <div className="bg-background border-2 border-gold rounded-3xl p-6 space-y-6 flex flex-col justify-between transition-all shadow-md relative">
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gold text-navy font-bold text-[10px] uppercase tracking-wider px-3.5 py-1 rounded-full shadow">
-                    Formule la plus populaire
+                {/* 2. Formule Annuelle (Avec Réduction Importante) */}
+                <div className="bg-background border-2 border-gold rounded-3xl p-6 space-y-6 flex flex-col justify-between transition-all shadow-md relative ring-1 ring-gold/40">
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gold text-navy font-bold text-[10px] uppercase tracking-wider px-3.5 py-1 rounded-full shadow flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3 text-navy" />
+                    Formule la plus populaire — Économisez 38%
                   </div>
 
                   <div className="space-y-4">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-navy bg-gold/20 px-2.5 py-1 rounded-md border border-gold/30">
-                        Pass Semestre
-                      </span>
-                      <h3 className="font-serif text-xl font-bold text-navy mt-3">Pass Examen 6 Mois</h3>
-                      <p className="text-xs text-foreground-muted">Idéal pour la préparation des révisions</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-bold text-navy bg-gold/20 px-2.5 py-1 rounded-md border border-gold/30">
+                          Pass Annuel Cursus
+                        </span>
+                        <span className="text-[10px] font-bold text-white bg-navy px-2 py-0.5 rounded-full">
+                          -38% Réduction
+                        </span>
+                      </div>
+                      <h3 className="font-serif text-xl font-bold text-navy mt-3">Pass Annuel Recherche</h3>
+                      <p className="text-xs text-foreground-muted">La formule complète pour toute votre année académique</p>
                     </div>
 
-                    <div className="flex items-baseline gap-1 pt-2">
-                      <span className="font-serif text-3xl font-bold text-navy">9.000</span>
-                      <span className="text-xs font-bold text-gold-dark">FCFA / 6 mois</span>
+                    <div className="space-y-1 pt-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-foreground-muted line-through font-semibold">
+                          24.000 FCFA
+                        </span>
+                        <span className="text-[10px] font-bold text-navy bg-gold/20 px-2 py-0.5 rounded">
+                          Économisez 9.000 FCFA (soit 4 mois offerts)
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-serif text-3xl font-bold text-navy">15.000</span>
+                        <span className="text-xs font-bold text-gold-dark">FCFA / an</span>
+                        <span className="text-[11px] text-foreground-muted font-medium ml-1">
+                          (~1.250 F/mois)
+                        </span>
+                      </div>
                     </div>
 
                     <ul className="space-y-2.5 text-xs text-foreground/90 pt-2 border-t border-border">
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-success shrink-0" />
-                        <span>Accès intégral au catalogue pendant 6 mois</span>
+                        <span>Accès illimité à tout le catalogue pendant 12 mois</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-success shrink-0" />
-                        <span>Persistance des annotations et extraits</span>
+                        <span>Persistance permanente de vos notes et extraits</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-success shrink-0" />
-                        <span>Streaming Audio HLS sans coupure</span>
+                        <span>Streaming Audio HLS sans interruption</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-success shrink-0" />
+                        <span>Support prioritaire et nouveautés en avant-première</span>
                       </li>
                     </ul>
                   </div>
@@ -314,20 +327,20 @@ export default function SubscriptionsPage() {
                     href="/cart"
                     className="w-full py-3.5 rounded-xl bg-gold hover:bg-gold-hover text-navy font-bold text-xs transition-colors flex items-center justify-center gap-2 text-center shadow-md min-h-[44px]"
                   >
-                    Choisir l'offre 6 Mois
+                    Souscrire le Pass Annuel (-38%)
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
 
-                {/* Bouquet Partenaire */}
+                {/* 3. Bouquet Partenaire & Établissement */}
                 <div className="bg-background border-2 border-border rounded-3xl p-6 space-y-6 flex flex-col justify-between transition-all">
                   <div className="space-y-4">
                     <div>
                       <span className="text-[10px] uppercase font-bold text-navy bg-navy/10 px-2.5 py-1 rounded-md border border-navy/20">
                         Établissement Partenaire
                       </span>
-                      <h3 className="font-serif text-xl font-bold text-navy mt-3">Bouquet Partenaire</h3>
-                      <p className="text-xs text-foreground-muted">Pour les institutions et bibliothèques partenaires</p>
+                      <h3 className="font-serif text-xl font-bold text-navy mt-3">Bouquet Institution</h3>
+                      <p className="text-xs text-foreground-muted">Pour universités, facultés et bibliothèques</p>
                     </div>
 
                     <div className="flex items-baseline gap-1 pt-2">
@@ -338,7 +351,7 @@ export default function SubscriptionsPage() {
                     <ul className="space-y-2.5 text-xs text-foreground/90 pt-2 border-t border-border">
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-success shrink-0" />
-                        <span>Accès tous étudiants illimité</span>
+                        <span>Accès tous étudiants et enseignants illimité</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-success shrink-0" />
@@ -346,7 +359,11 @@ export default function SubscriptionsPage() {
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-success shrink-0" />
-                        <span>Validation des affiliations étudiants</span>
+                        <span>Validation automatique des affiliations étudiants</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-success shrink-0" />
+                        <span>Intégration API &amp; authentification institutionnelle</span>
                       </li>
                     </ul>
                   </div>
@@ -364,128 +381,92 @@ export default function SubscriptionsPage() {
           </div>
         )}
 
-        {/* Section 2 : Packs Livres Papier avec Réductions */}
+        {/* Section 2 : Remises Dégressives par Nombre de Livres Papier Achetés */}
         {activeType === "paper" && (
           <div className="space-y-10 animate-in fade-in duration-300">
             
-            {/* Grille des 4 Packs Papier (2 colonnes x 2 lignes) */}
+            {/* Grille des 4 Formules Dégressives (2 colonnes x 2 lignes) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto pt-2">
-              {PAPER_PACKS.map((pack) => (
+              {PAPER_DISCOUNT_TIERS.map((tier) => (
                 <div
-                  key={pack.id}
+                  key={tier.id}
                   className={`bg-background rounded-3xl p-6 space-y-6 flex flex-col justify-between transition-all relative ${
-                    pack.popular
+                    tier.popular
                       ? "border-2 border-gold shadow-lg ring-1 ring-gold/30"
-                      : pack.isInstitutional
+                      : tier.isInstitutional
                       ? "border-2 border-navy/30 bg-background-secondary/30 hover:border-gold hover:shadow-md"
                       : "border-2 border-border hover:border-gold hover:shadow-md"
                   }`}
                 >
-                  {/* Badge Réduction & Popularité */}
+                  {/* Badge & Taux de Réduction */}
                   <div className="flex items-center justify-between gap-2">
                     <span className={`text-[10px] uppercase font-bold px-2.5 py-1 rounded-md border ${
-                      pack.isInstitutional
+                      tier.isInstitutional
                         ? "text-navy bg-navy/10 border-navy/20"
-                        : "text-navy bg-gold/20 border-gold/30"
+                        : tier.popular
+                        ? "text-navy bg-gold/20 border-gold/30"
+                        : "text-navy bg-navy/10 border-navy/20"
                     }`}>
-                      {pack.badge}
+                      {tier.badge}
                     </span>
-                    <span className={`text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full shadow-sm ${
-                      pack.isInstitutional ? "bg-navy" : "bg-rose-500"
-                    }`}>
-                      {pack.discount}
+                    <span className="text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full shadow-sm bg-navy">
+                      {tier.discount}
                     </span>
                   </div>
 
                   <div className="space-y-4">
                     <div>
-                      <h3 className="font-serif text-lg sm:text-xl font-bold text-navy">
-                        {pack.title}
+                      <h3 className="font-serif text-xl sm:text-2xl font-bold text-navy">
+                        {tier.title}
                       </h3>
                       <p className="text-xs text-foreground-muted mt-1 leading-relaxed">
-                        {pack.subtitle}
+                        {tier.subtitle}
                       </p>
                     </div>
 
-                    {/* Liste des Livres Inclus */}
-                    <div className="bg-background-secondary p-3 rounded-xl border border-border space-y-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-gold block">
-                        Ouvrages inclus dans ce pack :
-                      </span>
-                      <ul className="space-y-1 text-[11px] text-foreground/80 font-medium">
-                        {pack.books.map((b, bIdx) => (
-                          <li key={bIdx} className="flex items-start gap-1.5">
-                            <span className="text-gold font-bold">•</span>
-                            <span>{b}</span>
-                          </li>
-                        ))}
-                      </ul>
+                    {/* Bloc Règle de Remise */}
+                    <div className="bg-background-secondary p-3.5 rounded-xl border border-border space-y-1">
+                      <div className="flex items-center gap-1.5 text-gold font-bold text-xs">
+                        <Percent className="w-3.5 h-3.5" />
+                        <span className="uppercase tracking-wider text-[10px]">
+                          Avantage Volume ({tier.booksCount})
+                        </span>
+                      </div>
+                      <p className="text-xs text-foreground/85 font-medium leading-relaxed">
+                        {tier.ruleDescription}
+                      </p>
                     </div>
 
-                    {/* Prix avec réduction */}
-                    <div className="pt-2 border-t border-border">
-                      {pack.isInstitutional ? (
-                        <div>
-                          <span className="text-[10px] font-bold text-navy bg-navy/5 px-2 py-0.5 rounded block mb-1">
-                            Tarification dégressive au volume
-                          </span>
-                          <div className="flex items-baseline gap-1 mt-1">
-                            <span className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-                              Sur Devis
-                            </span>
-                            <span className="text-xs font-bold text-foreground-muted">/ établissement</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-foreground-muted line-through font-semibold">
-                              {pack.originalPrice.toLocaleString("fr-FR")} FCFA
-                            </span>
-                            <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
-                              Économisez {(pack.originalPrice - pack.packPrice).toLocaleString("fr-FR")} FCFA
-                            </span>
-                          </div>
-                          <div className="flex items-baseline gap-1 mt-1">
-                            <span className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-                              {pack.packPrice.toLocaleString("fr-FR")}
-                            </span>
-                            <span className="text-xs font-bold text-gold-dark">FCFA le pack</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Avantages */}
+                    {/* Avantages & Garanties */}
                     <ul className="space-y-2 text-xs text-foreground/90 pt-2 border-t border-border">
-                      {pack.features.map((f, fIdx) => (
-                        <li key={fIdx} className="flex items-start gap-2">
+                      {tier.highlights.map((h, hIdx) => (
+                        <li key={hIdx} className="flex items-start gap-2">
                           <Check className="w-4 h-4 text-success shrink-0 mt-0.5" />
-                          <span>{f}</span>
+                          <span>{h}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
                   <Link
-                    href={pack.isInstitutional ? "/partners" : "/cart"}
+                    href={tier.ctaLink}
                     className={`w-full py-3.5 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-2 text-center shadow min-h-[44px] ${
-                      pack.popular
+                      tier.popular
                         ? "bg-gold hover:bg-gold-hover text-navy shadow-md"
-                        : pack.isInstitutional
+                        : tier.isInstitutional
                         ? "bg-navy hover:bg-navy-hover text-white"
                         : "bg-navy hover:bg-navy-hover text-white"
                     }`}
                   >
-                    {pack.isInstitutional ? (
+                    {tier.isInstitutional ? (
                       <>
                         <Building2 className="w-4 h-4 text-gold" />
-                        Demander un Devis Pro
+                        {tier.ctaText}
                       </>
                     ) : (
                       <>
                         <Package className="w-4 h-4" />
-                        Commander ce Pack
+                        {tier.ctaText}
                       </>
                     )}
                     <ArrowRight className="w-4 h-4" />
@@ -502,10 +483,10 @@ export default function SubscriptionsPage() {
                   Délégués d'Amphi &amp; Associations Étudiantes
                 </div>
                 <h3 className="font-serif text-2xl font-bold">
-                  Commandes Groupées de Promotion — Jusqu'à -35% de Réduction
+                  Commandes Groupées de Promotion — Jusqu'à -40% de Réduction
                 </h3>
                 <p className="text-xs sm:text-sm text-white/80 leading-relaxed">
-                  Vous souhaitez commander des packs papier pour l'ensemble de votre promotion ou classe préparatoire ? Bénéficiez d'une remise grossiste spéciale et de la livraison groupée offerte directement à votre faculté.
+                  Vous souhaitez équiper l'ensemble de votre promotion ou classe préparatoire ? Regroupez vos commandes et bénéficiez d'une remise grossiste spéciale avec livraison groupée offerte directement à votre faculté.
                 </p>
               </div>
 

@@ -188,7 +188,7 @@ export default function HomePage() {
       {/* Meilleures Ventes */}
       <section className="py-16 px-6 md:px-10 lg:px-12 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-end mb-8 gap-4">
-          <h2 className="font-serif text-2xl md:text-3xl font-bold text-navy">Meilleures ventes</h2>
+          <h2 className="font-serif text-2xl md:text-3xl font-bold text-navy">Nouveautés</h2>
           <Link href="/catalog" className="text-sm font-medium text-foreground-muted hover:text-navy flex items-center gap-1 group transition-colors">
             Voir tous les livres 
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -249,19 +249,19 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
           <div>
             <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
-              +<CountingNumber target={4542} />
+              +<CountingNumber target={20000} />
             </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Ouvrages disponibles</span>
           </div>
           <div>
             <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
-              +<CountingNumber target={1090} />
+              +<CountingNumber target={47000} />
             </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Étudiants inscrits</span>
           </div>
           <div>
             <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
-              +<CountingNumber target={164} />
+              +<CountingNumber target={64} />
             </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Partenaires institutionnels</span>
           </div>
