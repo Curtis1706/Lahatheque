@@ -91,12 +91,34 @@ export default function AdminTracesAccesPage() {
   };
 
   const formatDeviceFingerprint = (fp: string) => {
-    if (!fp || fp === "node") return "Client Web (Navigateur)";
-    if (fp.includes("Windows")) return "Windows • Navigateur Web";
-    if (fp.includes("Macintosh") || fp.includes("Mac OS")) return "macOS • Safari / Web";
-    if (fp.includes("Android")) return "Android • Mobile";
-    if (fp.includes("iPhone") || fp.includes("iPad")) return "iOS • Mobile";
-    if (fp.includes("Linux")) return "Linux Desktop";
+    if (!fp) return "Navigateur Web";
+    if (fp === "node") return "Client Web (Next.js)";
+
+    // Détection précise du Navigateur
+    let browser = "";
+    if (/edg\//i.test(fp)) browser = "Microsoft Edge";
+    else if (/opr\/|opera/i.test(fp)) browser = "Opera";
+    else if (/chrome|crios/i.test(fp)) browser = "Google Chrome";
+    else if (/firefox|fxios/i.test(fp)) browser = "Mozilla Firefox";
+    else if (/safari/i.test(fp) && !/chrome|crios/i.test(fp)) browser = "Apple Safari";
+    else if (fp.startsWith("Web •")) return fp;
+
+    // Détection précise du Système d'Exploitation
+    let os = "";
+    if (/windows nt 10\.0/i.test(fp)) os = "Windows 10/11";
+    else if (/windows nt 6\.3/i.test(fp)) os = "Windows 8.1";
+    else if (/windows nt 6\.1/i.test(fp)) os = "Windows 7";
+    else if (/windows/i.test(fp)) os = "Windows";
+    else if (/macintosh|mac os x/i.test(fp)) os = "macOS";
+    else if (/iphone/i.test(fp)) os = "iPhone (iOS)";
+    else if (/ipad/i.test(fp)) os = "iPad (iPadOS)";
+    else if (/android/i.test(fp)) os = "Android Mobile";
+    else if (/linux/i.test(fp)) os = "Linux";
+
+    if (browser && os) return `${browser} • ${os}`;
+    if (browser) return `${browser} • Web`;
+    if (os) return `Navigateur Web • ${os}`;
+
     return fp;
   };
 
