@@ -162,6 +162,7 @@ class ManuscriptPublicSubmission(models.Model):
     country = models.CharField(max_length=64, verbose_name="Pays")
     summary = models.TextField(verbose_name="Résumé / Description de l'œuvre")
     manuscript_file = models.FileField(upload_to="manuscripts/%Y/%m/", blank=True, null=True, verbose_name="Fichier manuscrit")
+    manuscript_file_key = models.CharField(max_length=500, blank=True, default="", verbose_name="Référence R2 (téléversement direct)")
     file_size_bytes = models.BigIntegerField(default=0, verbose_name="Taille en octets")
     file_size_formatted = models.CharField(max_length=32, blank=True, default="", verbose_name="Taille formatée")
     file_url = models.URLField(max_length=1000, blank=True, default="", verbose_name="URL de téléchargement direct")

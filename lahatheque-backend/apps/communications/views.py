@@ -253,6 +253,7 @@ def submit_public_manuscript_view(request):
     country = request.data.get('country', '').strip()
     summary = request.data.get('summary', '').strip()
     manuscript_file = request.FILES.get('manuscript_file')
+    manuscript_file_key = request.data.get('manuscript_file_key', '').strip()
 
     if not all([first_name, last_name, email, phone, book_title, genre, country]):
         return Response({
@@ -261,15 +262,15 @@ def submit_public_manuscript_view(request):
             'error': "Veuillez remplir tous les champs obligatoires (prénom, nom, email, téléphone, titre, genre, pays)."
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    if not manuscript_file:
+    if not manuscript_file and not manuscript_file_key:
         return Response({
             'success': False,
             'data': {},
             'error': "Le fichier du manuscrit (PDF, DOC ou DOCX) est obligatoire."
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Validation de l'extension
-    ext = os.path.splitext(manuscript_file.name)[1].lower()
+    source_filename = manuscript_file.name if manuscript_file else manuscript_file_key.rsplit('/', 1)[-1]
+    ext = os.path.splitext(source_filename)[1].lower()
     if ext not in ['.pdf', '.doc', '.docx']:
         return Response({
             'success': False,
@@ -277,8 +278,11 @@ def submit_public_manuscript_view(request):
             'error': "Format non supporté. Veuillez joindre un fichier .pdf, .doc ou .docx."
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Calcul et formatage du poids
-    file_size_bytes = manuscript_file.size
+    if manuscript_file:
+        file_size_bytes = manuscript_file.size
+    else:
+        file_size_bytes = int(request.data.get('file_size_bytes', 0) or 0)
+
     if file_size_bytes < 1024 * 1024:
         file_size_formatted = f"{file_size_bytes / 1024:.1f} Ko"
     else:
@@ -300,7 +304,8 @@ def submit_public_manuscript_view(request):
             genre=genre,
             country=country,
             summary=summary,
-            manuscript_file=manuscript_file,
+            manuscript_file=manuscript_file if manuscript_file else None,
+            manuscript_file_key=manuscript_file_key,
             file_size_bytes=file_size_bytes,
             file_size_formatted=file_size_formatted,
         )
@@ -308,6 +313,10 @@ def submit_public_manuscript_view(request):
         # Construction de l'URL absolue de téléchargement direct
         if submission.manuscript_file:
             submission.file_url = request.build_absolute_uri(submission.manuscript_file.url)
+            submission.save(update_fields=['file_url'])
+        elif manuscript_file_key:
+            r2_public_domain = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', '') or getattr(settings, 'CLOUDFLARE_R2_PUBLIC_DOMAIN', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
+            submission.file_url = f"{r2_public_domain.rstrip('/')}/{manuscript_file_key}"
             submission.save(update_fields=['file_url'])
 
         print(f"[MANUSCRIPT] Nouveau dépôt {reference} : « {book_title} » par {first_name} {last_name} ({file_size_formatted})")
@@ -350,7 +359,7 @@ def submit_public_manuscript_view(request):
     admin_attachments = []
     has_attached = False
 
-    if file_size_bytes <= TEN_MB and submission.manuscript_file:
+    if file_size_bytes <= TEN_MB and submission.manuscript_file and not manuscript_file_key:
         try:
             submission.manuscript_file.seek(0)
             file_content = submission.manuscript_file.read()
@@ -366,7 +375,7 @@ def submit_public_manuscript_view(request):
             print(f"[MANUSCRIPT-ATTACH-WARN] Erreur lecture fichier pour pièce jointe: {e}")
 
     # 3. Email d'alerte pour les 3 administrateurs
-    download_url = submission.file_url or f"https://lahatheque.com/media/manuscripts/{manuscript_file.name}"
+    download_url = submission.file_url or (f"https://lahatheque.com/media/manuscripts/{manuscript_file.name}" if manuscript_file else "")
 
     send_transactional_email(
         email_type="manuscript_admin_alert",

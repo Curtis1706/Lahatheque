@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { ACADEMIC_DISCIPLINES } from "@/lib/constants/classification";
+import { uploadPublicManuscriptToR2 } from "@/lib/services/storage";
 
 export default function AuthorsPublicPage() {
   // Stepper state
@@ -104,7 +105,7 @@ export default function AuthorsPublicPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
 
@@ -126,68 +127,49 @@ export default function AuthorsPublicPage() {
     setIsSubmitting(true);
     setUploadProgress(0);
 
-    const formData = new FormData();
-    formData.append("first_name", firstName.trim());
-    formData.append("last_name", lastName.trim());
-    formData.append("email", email.trim());
-    formData.append("phone", phone.trim());
-    formData.append("book_title", bookTitle.trim());
-    formData.append("genre", genre);
-    formData.append("country", country);
-    formData.append("summary", summary.trim());
-    formData.append("manuscript_file", manuscriptFile);
-
-    console.log("[MANUSCRIPT] Début du téléversement du manuscrit...");
-    console.log(`[MANUSCRIPT] Fichier : ${manuscriptFile.name} (${(manuscriptFile.size / (1024 * 1024)).toFixed(2)} Mo / ${manuscriptFile.size} octets)`);
-    console.log("[MANUSCRIPT] Endpoint cible : /api/bff/communications/manuscript/");
-
-    const xhr = new XMLHttpRequest();
-    xhr.timeout = 300000; // 5 minutes pour les gros fichiers (50 Mo - 250 Mo)
-
-    xhr.upload.addEventListener("progress", (event) => {
-      if (event.lengthComputable && event.total > 0) {
-        const percent = Math.min(99, Math.round((event.loaded / event.total) * 100));
+    try {
+      const uploadResult = await uploadPublicManuscriptToR2(manuscriptFile, (percent) => {
         setUploadProgress(percent);
-        console.log(`[MANUSCRIPT PROGRESS] ${percent}% - ${(event.loaded / (1024 * 1024)).toFixed(2)} Mo sur ${(event.total / (1024 * 1024)).toFixed(2)} Mo`);
+      });
+
+      const formData = new FormData();
+      formData.append("first_name", firstName.trim());
+      formData.append("last_name", lastName.trim());
+      formData.append("email", email.trim());
+      formData.append("phone", phone.trim());
+      formData.append("book_title", bookTitle.trim());
+      formData.append("genre", genre);
+      formData.append("country", country);
+      formData.append("summary", summary.trim());
+
+      if (uploadResult.directToR2 && uploadResult.fileKey) {
+        formData.append("manuscript_file_key", uploadResult.fileKey);
+        formData.append("file_size_bytes", String(manuscriptFile.size));
+      } else {
+        formData.append("manuscript_file", manuscriptFile);
       }
-    });
 
-    xhr.addEventListener("load", () => {
-      setIsSubmitting(false);
-      console.log(`[MANUSCRIPT RESPONSE] Statut HTTP: ${xhr.status}`);
-      try {
-        const response = JSON.parse(xhr.responseText);
-        console.log("[MANUSCRIPT RESPONSE BODY]", response);
-        if (xhr.status >= 200 && xhr.status < 300 && response.success) {
-          setUploadProgress(100);
-          setDossierRef(response.data?.reference || `DEP-2026-${Math.floor(1000 + Math.random() * 9000)}`);
-          setSubmitSuccess(true);
-          setStep(3);
-        } else {
-          setSubmitError(response.error || "Une erreur est survenue lors de l'enregistrement de votre manuscrit.");
-        }
-      } catch (err) {
-        console.warn("[MANUSCRIPT PARSE WARN] Réponse brute :", xhr.responseText, err);
-        setDossierRef(`DEP-2026-${Math.floor(1000 + Math.random() * 9000)}`);
-        setSubmitSuccess(true);
-        setStep(3);
+      const res = await fetch("/api/bff/communications/manuscript/", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        setSubmitError(json.error || "Une erreur est survenue lors de l'enregistrement de votre manuscrit.");
+        return;
       }
-    });
 
-    xhr.addEventListener("error", (e) => {
+      setUploadProgress(100);
+      setDossierRef(json.data?.reference || `DEP-2026-${Math.floor(1000 + Math.random() * 9000)}`);
+      setSubmitSuccess(true);
+      setStep(3);
+    } catch (err) {
+      console.error("[MANUSCRIPT ERROR]", err);
+      setSubmitError("Une erreur est survenue. Vérifiez votre connexion et réessayez.");
+    } finally {
       setIsSubmitting(false);
-      console.error("[MANUSCRIPT ERROR] Erreur réseau XHR :", e, xhr.status, xhr.statusText);
-      setSubmitError("Erreur de connexion réseau lors du téléversement du manuscrit. Veuillez vérifier votre connexion et réessayer.");
-    });
-
-    xhr.addEventListener("timeout", () => {
-      setIsSubmitting(false);
-      console.warn("[MANUSCRIPT TIMEOUT] Timeout dépassé (300s)");
-      setSubmitError("Le délai de transmission a expiré (timeout). Merci de vérifier votre connexion ou de réduire la taille du fichier.");
-    });
-
-    xhr.open("POST", "/api/bff/communications/manuscript/");
-    xhr.send(formData);
+    }
   };
 
   const faqs = [
