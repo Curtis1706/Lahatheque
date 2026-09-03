@@ -1,0 +1,85 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}[Manuscrit] Nouveau dépôt : « {{ book_title }} » par {{ first_name }} {{ last_name }}{% endblock %}
+{% block badge_header %}Comité Éditorial • Nouveau Manuscrit Reçu{% endblock %}
+
+{% block email_title %}Dépôt de Manuscrit : « {{ book_title }} »{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 14px;">
+    Un auteur vient de déposer un nouveau manuscrit pour étude éditoriale sur la plateforme LAHAThèque :
+</p>
+
+<!-- Boîte Fiche Signalétique Auteur & Manuscrit -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 14px;">
+        Fiche du Manuscrit &amp; Auteur
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Réf. Dossier :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 700; color: #1B2A4E;" class="text-dark-adapt">{{ reference }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Auteur :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 700; color: #1B2A4E;" class="text-dark-adapt">{{ first_name }} {{ last_name }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Adresse e-mail :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600; color: #B08D42;"><a href="mailto:{{ email }}" style="color: #B08D42; text-decoration: none;">{{ email }}</a></td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Téléphone / WhatsApp :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ phone }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Pays :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ country_name|default:country }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Genre / Discipline :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ genre }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Poids du fichier :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600; color: #B08D42;">{{ file_size_formatted|default:"Non spécifié" }}</td>
+        </tr>
+    </table>
+    
+    {% if summary %}
+    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #F1F5F9;" class="divider-soft">
+        <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #64748B; margin-bottom: 6px;">
+            Synopsis &amp; Thématique de l'œuvre :
+        </div>
+        <div style="font-size: 13px; color: #1E293B; line-height: 1.65;" class="text-dark-adapt">
+            {{ summary|linebreaks }}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Mode de mise à disposition du fichier -->
+{% if has_attached_file %}
+<p style="font-size: 12px; color: #64748B; margin: 0 0 20px 0; line-height: 1.5;" class="text-muted-adapt">
+    Le fichier du manuscrit ({{ file_size_formatted }}) est directement <strong>joint à cet e-mail</strong>. Vous pouvez également le télécharger via le lien sécurisé ci-dessous.
+</p>
+{% else %}
+<p style="font-size: 12px; color: #64748B; margin: 0 0 20px 0; line-height: 1.5;" class="text-muted-adapt">
+    En raison du volume du fichier (<strong>{{ file_size_formatted }}</strong>), le manuscrit est hébergé sur le stockage sécurisé haute disponibilité LAHAThèque pour garantir une délivrabilité optimale sans rejet de boîte mail.
+</p>
+{% endif %}
+
+{% if download_url %}
+<div style="text-align: center; margin: 24px 0 20px 0;">
+    <a href="{{ download_url }}" class="btn-gold" style="background-color: #B08D42; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 13px 28px; border-radius: 6px; display: inline-block; border: 0;">
+        Télécharger le Manuscrit ({{ file_size_formatted }})
+    </a>
+</div>
+{% endif %}
+
+<div style="text-align: center; margin: 10px 0 10px 0;">
+    <a href="mailto:{{ email }}?subject=Re: Votre soumission de manuscrit « {{ book_title }} » (Réf: {{ reference }})" class="btn-navy" style="background-color: #1B2A4E; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block; border: 0;">
+        Répondre à l'Auteur
+    </a>
+</div>
+{% endblock %}

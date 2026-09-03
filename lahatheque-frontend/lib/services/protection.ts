@@ -130,19 +130,25 @@ export async function getAccessTraces(): Promise<TraceRecord[]> {
 
     if (res.ok) {
       const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        return json.data.map((item: any) => ({
+      const rawList = Array.isArray(json)
+        ? json
+        : (Array.isArray(json.data)
+            ? json.data
+            : (json.results || (json.data?.results || [])));
+
+      if (Array.isArray(rawList)) {
+        return rawList.map((item: any) => ({
           id: String(item.id),
-          user_email: item.user_email || item.user || "anonyme@lahatheque.com",
+          user_email: item.user_email || (typeof item.user === "string" ? item.user : item.user?.email) || "lecteur@lahatheque.com",
           user_name: item.user_name || "Lecteur Authentifié",
-          book_title: item.book_title || "Ouvrage LAHA",
+          book_title: item.book_title || item.document_title || "Ouvrage LAHA",
           book_id: String(item.ouvrage || ""),
           access_type: item.access_type || "read_chunk",
           ip_address: item.ip_address || "127.0.0.1",
           country: item.country || "BJ",
-          device_fingerprint: item.device_fingerprint || "Client Web",
+          device_fingerprint: item.device_fingerprint || item.user_agent || "Client Web",
           page_number: item.page_number || undefined,
-          timestamp: item.timestamp || new Date().toISOString(),
+          timestamp: item.timestamp || item.created_at || new Date().toISOString(),
         }));
       }
     }

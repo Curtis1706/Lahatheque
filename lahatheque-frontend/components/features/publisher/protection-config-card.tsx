@@ -222,7 +222,7 @@ export function ProtectionConfigCard({
             </button>
           </div>
           <p className="text-[11px] text-foreground-muted">
-            Empêche la sélection et la copie de texte dans la liseuse web et l&apos;application.
+            Empêche la sélection et la copie de texte dans le lecteur web sécurisé.
           </p>
         </div>
 

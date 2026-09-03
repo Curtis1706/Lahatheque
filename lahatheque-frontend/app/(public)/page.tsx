@@ -331,7 +331,7 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-                  <span>Consultation hors-ligne sur mobile</span>
+                  <span>Lecteur interactif intégré sécurisé</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-gold shrink-0 mt-0.5" />

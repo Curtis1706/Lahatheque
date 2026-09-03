@@ -1,0 +1,54 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Demande de Partenariat Reçue • LAHAThèque{% endblock %}
+{% block badge_header %}Partenariat Institutionnel &amp; B2B{% endblock %}
+
+{% block email_title %}Merci pour votre intérêt pour LAHAThèque{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>{{ contact_name|default:"Cher Partenaire" }}</strong>,
+</p>
+<p style="margin: 0 0 24px 0; line-height: 1.65;">
+    Nous avons bien reçu votre demande de collaboration pour le compte de <strong>{{ organization_name }}</strong>. Notre Direction des Partenariats et du Développement étudie actuellement votre dossier.
+</p>
+
+<!-- Boîte Récapitulatif Soft -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 14px;">
+        Récapitulatif de votre demande
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Organisation / Établissement :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ organization_name }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Type de Partenariat :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ partner_type_display|default:partner_type }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Pays :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ country_name|default:country }}</td>
+        </tr>
+        {% if message %}
+        <tr>
+            <td colspan="2" style="padding-top: 14px; border-top: 1px solid #F1F5F9; font-size: 13px;" class="text-dark-adapt divider-soft">
+                <div style="color: #64748B; font-size: 11px; text-transform: uppercase; margin-bottom: 6px; font-weight: 600;">Projet / Besoins exprimés :</div>
+                <div style="color: #334155; line-height: 1.6;">{{ message|linebreaks }}</div>
+            </td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+<p style="font-size: 13px; color: #475569; margin: 0 0 20px 0; line-height: 1.6;" class="text-dark-adapt">
+    Un conseiller dédié de notre équipe prendra contact avec vous sous <strong>24 à 48 heures ouvrées</strong> pour convenir d'un échange et vous proposer une convention adaptée.
+</p>
+
+<div style="text-align: center; margin: 28px 0 20px 0;">
+    <a href="https://lahatheque.com/partners" class="btn-navy" style="background-color: #1B2A4E; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 13px 28px; border-radius: 6px; display: inline-block; border: 0;">
+        Découvrir nos Solutions Partenaires
+    </a>
+</div>
+{% endblock %}

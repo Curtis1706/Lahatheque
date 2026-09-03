@@ -1,0 +1,62 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}[Partenariat] Nouvelle demande de {{ organization_name }} ({{ contact_name }}){% endblock %}
+{% block badge_header %}Alerte Direction • Nouvelle Demande de Partenariat{% endblock %}
+
+{% block email_title %}Nouvelle Demande de Convention Partenaire{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 14px;">
+    Une nouvelle demande de collaboration a été soumise depuis la page publique <strong>Partenariat</strong> :
+</p>
+
+<!-- Boîte Fiche Synthèse Soft -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 14px;">
+        Fiche Signalétique de l'Organisation
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Organisation :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 700; color: #1B2A4E;" class="text-dark-adapt">{{ organization_name }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Type de structure :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ partner_type_display|default:partner_type }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Contact principal :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ contact_name }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Adresse e-mail :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600; color: #B08D42;"><a href="mailto:{{ contact_email }}" style="color: #B08D42; text-decoration: none;">{{ contact_email }}</a></td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Téléphone / WhatsApp :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ contact_phone }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Pays d'implantation :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ country_name|default:country }}</td>
+        </tr>
+    </table>
+    
+    {% if message %}
+    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #F1F5F9;" class="divider-soft">
+        <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #64748B; margin-bottom: 8px;">
+            Besoins / Détails du Projet :
+        </div>
+        <div style="font-size: 13px; color: #1E293B; line-height: 1.65;" class="text-dark-adapt">
+            {{ message|linebreaks }}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div style="text-align: center; margin: 24px 0 10px 0;">
+    <a href="mailto:{{ contact_email }}?subject=Re: Demande de partenariat LAHAThèque - {{ organization_name }}" class="btn-navy" style="background-color: #1B2A4E; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block; border: 0;">
+        Répondre au Contact
+    </a>
+</div>
+{% endblock %}

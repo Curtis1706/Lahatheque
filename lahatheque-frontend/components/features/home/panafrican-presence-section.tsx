@@ -72,7 +72,7 @@ export function PanafricanPresenceSection() {
                 Innovation &amp; Accès Universel
               </h3>
               <p className="text-sm text-white/80 leading-relaxed">
-                Liseuse ultra-légère sous DRM LCP, synchronisation globale instantanée et lecture hors-ligne complète.
+                Lecteur web haute sécurité sous DRM LCP, streaming de pages instantané et consultation optimisée sur tout navigateur.
               </p>
             </div>
 

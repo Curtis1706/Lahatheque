@@ -1,0 +1,32 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Accusé de réception • Demande d'Assistance LAHAThèque{% endblock %}
+{% block badge_header %}Support &amp; Assistance Client{% endblock %}
+
+{% block email_title %}Nous avons bien reçu votre message{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>{{ recipient_name|default:"Cher Membre" }}</strong>,
+</p>
+<p style="margin: 0 0 24px 0; line-height: 1.65;">
+    Votre demande d'assistance transmise depuis votre espace connecté a été enregistrée par notre équipe support.
+</p>
+
+<!-- Boîte Récapitulatif Soft -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 12px;">
+        Récapitulatif de votre message
+    </div>
+    <div style="font-size: 13px; font-weight: 600; color: #1B2A4E; margin-bottom: 8px;" class="text-dark-adapt">
+        Sujet : {{ subject_text|default:"Demande d'assistance" }}
+    </div>
+    <div style="font-size: 13px; color: #475569; line-height: 1.65;" class="text-muted-adapt">
+        {{ message_body|linebreaks }}
+    </div>
+</div>
+
+<p style="font-size: 12px; color: #64748B; margin: 0; line-height: 1.5;" class="text-muted-adapt">
+    Un conseiller de notre équipe support traite votre demande et vous répondra dans les meilleurs délais.
+</p>
+{% endblock %}

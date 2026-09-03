@@ -1,0 +1,65 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Confirmation de commande #{{ order_number }} • LAHAThèque{% endblock %}
+{% block badge_header %}Achat Confirmé • Facture Jointe{% endblock %}
+
+{% block email_title %}Merci pour votre commande !{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>{{ recipient_name|default:"Cher Client" }}</strong>,
+</p>
+<p style="margin: 0 0 24px 0; line-height: 1.65;">
+    Nous vous confirmons l'enregistrement de votre commande <strong>N° {{ order_number }}</strong> effectuée le {{ order_date|default:"ce jour" }}. Vos ouvrages numériques sont immédiatement disponibles dans votre bibliothèque connectée.
+</p>
+
+<!-- Récapitulatif Soft & Aéré (Zéro Bordure Lourde) -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 14px;">
+        Récapitulatif des achats
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        {% for item in items %}
+        <tr>
+            <td align="left" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px;" class="text-dark-adapt divider-soft">
+                {{ item.title }} <span style="color: #94A3B8; font-size: 12px;">(x{{ item.quantity|default:"1" }})</span>
+            </td>
+            <td align="right" style="padding: 7px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px; font-weight: 600; color: #1B2A4E;" class="text-dark-adapt divider-soft">
+                {{ item.total_price|default:item.total }} {{ currency|default:"FCFA" }}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;">Ouvrages numériques commandés</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;">{{ total_amount }} {{ currency|default:"FCFA" }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+            <td align="left" style="padding-top: 14px; font-size: 14px; font-weight: 600;" class="text-dark-adapt">
+                Total Net Payé :
+            </td>
+            <td align="right" style="padding-top: 14px; font-size: 16px; font-weight: 700; color: #B08D42;">
+                {{ total_amount }} {{ currency|default:"FCFA" }}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- Note Facture PDF Soft -->
+<p style="font-size: 12px; color: #64748B; margin: 0 0 24px 0; line-height: 1.5;" class="text-muted-adapt">
+    Votre facture acquittée certifiée (Réf: Facture_{{ order_number }}.pdf) est jointe à ce courriel au format PDF.
+</p>
+
+<!-- Bouton d'Action Soft -->
+<div style="text-align: center; margin: 28px 0 20px 0;">
+    <a href="{{ site_url }}/student/library" class="btn-gold" style="background-color: #B08D42; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 13px 28px; border-radius: 6px; display: inline-block; border: 0;">
+        Accéder à ma Bibliothèque
+    </a>
+</div>
+
+{% if is_physical %}
+<p style="margin: 20px 0 0 0; font-size: 12px; color: #64748B; line-height: 1.5;" class="text-muted-adapt">
+    Note logistique : Vos exemplaires imprimés sont en cours d'expédition. Vous recevrez un avis de prise en charge par le transporteur.
+</p>
+{% endif %}
+{% endblock %}

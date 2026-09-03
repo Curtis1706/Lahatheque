@@ -1,0 +1,52 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Votre colis est en route • Commande #{{ order_number }}{% endblock %}
+{% block badge_header %}Expédition • Suivi Colis{% endblock %}
+
+{% block email_title %}Votre commande a été expédiée{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>{{ recipient_name|default:"Cher Client" }}</strong>,
+</p>
+<p style="margin: 0 0 24px 0; line-height: 1.65;">
+    Votre commande d'ouvrages imprimés <strong>N° {{ order_number }}</strong> a été emballée avec soin et remise à notre transporteur pour acheminement.
+</p>
+
+<!-- Boîte Suivi Soft -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 14px;">
+        Détails de l'acheminement
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Transporteur :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ carrier_name|default:"Service Logistique LAHA" }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Numéro de Suivi :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600; color: #B08D42;">{{ tracking_number|default:"TRK-EN-COURS" }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Adresse de Réception :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ shipping_address|default:"Adresse de commande" }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Délai indicatif :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ estimated_delivery|default:"24 à 48 heures" }}</td>
+        </tr>
+    </table>
+</div>
+
+<div style="text-align: center; margin: 28px 0 20px 0;">
+    {% if tracking_url %}
+    <a href="{{ tracking_url }}" class="btn-gold" style="background-color: #B08D42; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 13px 28px; border-radius: 6px; display: inline-block; border: 0;">
+        Suivre mon Colis
+    </a>
+    {% else %}
+    <a href="{{ site_url }}/student/orders" class="btn-gold" style="background-color: #B08D42; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 13px 28px; border-radius: 6px; display: inline-block; border: 0;">
+        Voir ma Commande
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
