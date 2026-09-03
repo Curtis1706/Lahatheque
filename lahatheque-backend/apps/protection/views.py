@@ -4,12 +4,16 @@ Conforme au format d'API unifié LAHAThèque: { success, data, error }.
 """
 
 import uuid
+import logging
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.decorators import action
 from rest_framework import status
+
+logger = logging.getLogger(__name__)
 
 from .models import Annotation, ProtectionConfig, TraceAcces, GlobalDrmConfig
 from .serializers import AnnotationSerializer, ProtectionConfigSerializer, TraceAccesSerializer, GlobalDrmConfigSerializer
@@ -86,7 +90,7 @@ class TraceAccesView(APIView):
 
 
 class TraceAccesViewSet(ReadOnlyModelViewSet):
-    """Consultation et filtrage des traces d'accès pour l'Administrateur."""
+    """Consultation et filtrage des traces d'accès et sessions DRM pour l'Administrateur."""
     serializer_class = TraceAccesSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -107,6 +111,74 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
             qs = qs.filter(access_type=access_type)
 
         return qs
+
+    def list(self, request, *args, **kwargs):
+        # 1. Traces d'accès directes TraceAcces
+        traces_qs = self.get_queryset().order_by("-timestamp")[:200]
+        results = []
+
+        for t in traces_qs:
+            u_email = t.user.email if t.user else "lecteur@institution.bj"
+            u_name = f"{t.user.first_name} {t.user.last_name}".strip() if t.user else (t.document_title or "Lecteur Authentifié")
+            b_title = t.ouvrage.title if t.ouvrage else (t.document_title or "Ouvrage Académique")
+            results.append({
+                "id": str(t.id),
+                "user_email": u_email,
+                "user_name": u_name or u_email,
+                "book_title": b_title,
+                "book_id": str(t.ouvrage_id or ""),
+                "access_type": t.access_type or "read_chunk",
+                "ip_address": t.ip_address or "127.0.0.1",
+                "country": t.country or "BJ",
+                "device_fingerprint": t.user_agent or t.device_fingerprint or "Lecteur Web DRM",
+                "page_number": t.page_number or 1,
+                "timestamp": t.timestamp.isoformat() if t.timestamp else timezone.now().isoformat(),
+            })
+
+        # 2. Agrégation dynamique des ReaderSession (sessions partenaires et directes)
+        try:
+            from apps.reader.models import ReaderSession
+            sessions = ReaderSession.objects.select_related("partner", "end_user", "ouvrage").order_by("-created_at")[:200]
+            for s in sessions:
+                # Éviter les doublons stricts si déjà dans les traces
+                s_id = str(s.id)
+                if any(r["id"] == s_id for r in results):
+                    continue
+
+                u_name = s.end_user.display_name if s.end_user else "Lecteur Authentifié"
+                u_email = s.end_user.email if s.end_user else (s.partner.name if s.partner else "lecteur@lahatheque.com")
+                b_title = s.ouvrage.titre if (s.ouvrage and hasattr(s.ouvrage, "titre")) else (s.ouvrage.title if (s.ouvrage and hasattr(s.ouvrage, "title")) else (s.custom_document_title or "Document Sécurisé"))
+                
+                s_ip = "127.0.0.1"
+                s_country = "BJ"
+                if isinstance(s.metadata, dict):
+                    s_ip = str(s.metadata.get("user_ip", "127.0.0.1"))
+                    s_country = str(s.metadata.get("country", "BJ"))
+
+                results.append({
+                    "id": s_id,
+                    "user_email": u_email,
+                    "user_name": u_name,
+                    "book_title": b_title,
+                    "book_id": str(s.ouvrage_id or "byod-doc"),
+                    "access_type": "read_chunk",
+                    "ip_address": s_ip,
+                    "country": s_country,
+                    "device_fingerprint": s.user_agent or f"Session {s.partner.name if s.partner else 'Laha'}",
+                    "page_number": s.last_page or 1,
+                    "timestamp": s.created_at.isoformat() if s.created_at else timezone.now().isoformat(),
+                })
+        except Exception as sess_err:
+            logger.warning(f"Erreur agrégation ReaderSession dans TraceAcces: {sess_err}")
+
+        # Tri chronologique décroissant
+        results.sort(key=lambda x: x["timestamp"], reverse=True)
+
+        return Response({
+            "success": True,
+            "data": results,
+            "error": None
+        })
 
 
 class ProtectionConfigViewSet(ModelViewSet):
