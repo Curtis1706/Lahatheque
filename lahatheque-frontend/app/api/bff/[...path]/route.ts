@@ -71,16 +71,9 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     try {
       if (contentType && contentType.includes('multipart/form-data')) {
-        const incomingFormData = await request.formData()
-        const outgoingFormData = new FormData()
-        for (const [key, value] of incomingFormData.entries()) {
-          outgoingFormData.append(key, value)
-        }
-        body = outgoingFormData
-        // Supprimer content-type et content-length pour laisser fetch calculer le boundary exact
-        headers.delete('content-type')
-        headers.delete('content-length')
-        console.log(`[BFF Proxy] Multipart FormData reconstitué avec succès pour ${targetUrl}`)
+        // Streamer directement le flux brut sans re-bufferisation mémoire pour garantir l'envoi de fichiers 10-250 Mo
+        body = request.body
+        console.log(`[BFF Proxy] Multipart direct streaming vers ${targetUrl}`)
       } else {
         body = await request.text()
         headers.set('content-length', String(Buffer.byteLength(body, 'utf-8')))
@@ -98,6 +91,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
     const timeoutHandle = setTimeout(() => fetchController.abort(), timeoutMs)
 
     try {
+      console.log(`[BFF Proxy] Envoi requête ${request.method} vers ${targetUrl}...`)
       backendRes = await fetch(targetUrl, {
         method: request.method,
         headers: headers,
@@ -108,6 +102,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
         duplex: 'half',
       })
       clearTimeout(timeoutHandle)
+      console.log(`[BFF Proxy] Réponse Django reçue pour ${targetUrl} : HTTP ${backendRes.status}`)
     } catch (netErr: any) {
       clearTimeout(timeoutHandle)
       if (netErr?.name === 'AbortError') {

@@ -137,6 +137,10 @@ export default function AuthorsPublicPage() {
     formData.append("summary", summary.trim());
     formData.append("manuscript_file", manuscriptFile);
 
+    console.log("[MANUSCRIPT] Début du téléversement du manuscrit...");
+    console.log(`[MANUSCRIPT] Fichier : ${manuscriptFile.name} (${(manuscriptFile.size / (1024 * 1024)).toFixed(2)} Mo / ${manuscriptFile.size} octets)`);
+    console.log("[MANUSCRIPT] Endpoint cible : /api/bff/communications/manuscript/");
+
     const xhr = new XMLHttpRequest();
     xhr.timeout = 300000; // 5 minutes pour les gros fichiers (50 Mo - 250 Mo)
 
@@ -144,13 +148,16 @@ export default function AuthorsPublicPage() {
       if (event.lengthComputable && event.total > 0) {
         const percent = Math.min(99, Math.round((event.loaded / event.total) * 100));
         setUploadProgress(percent);
+        console.log(`[MANUSCRIPT PROGRESS] ${percent}% - ${(event.loaded / (1024 * 1024)).toFixed(2)} Mo sur ${(event.total / (1024 * 1024)).toFixed(2)} Mo`);
       }
     });
 
     xhr.addEventListener("load", () => {
       setIsSubmitting(false);
+      console.log(`[MANUSCRIPT RESPONSE] Statut HTTP: ${xhr.status}`);
       try {
         const response = JSON.parse(xhr.responseText);
+        console.log("[MANUSCRIPT RESPONSE BODY]", response);
         if (xhr.status >= 200 && xhr.status < 300 && response.success) {
           setUploadProgress(100);
           setDossierRef(response.data?.reference || `DEP-2026-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -159,20 +166,23 @@ export default function AuthorsPublicPage() {
         } else {
           setSubmitError(response.error || "Une erreur est survenue lors de l'enregistrement de votre manuscrit.");
         }
-      } catch {
+      } catch (err) {
+        console.warn("[MANUSCRIPT PARSE WARN] Réponse brute :", xhr.responseText, err);
         setDossierRef(`DEP-2026-${Math.floor(1000 + Math.random() * 9000)}`);
         setSubmitSuccess(true);
         setStep(3);
       }
     });
 
-    xhr.addEventListener("error", () => {
+    xhr.addEventListener("error", (e) => {
       setIsSubmitting(false);
+      console.error("[MANUSCRIPT ERROR] Erreur réseau XHR :", e, xhr.status, xhr.statusText);
       setSubmitError("Erreur de connexion réseau lors du téléversement du manuscrit. Veuillez vérifier votre connexion et réessayer.");
     });
 
     xhr.addEventListener("timeout", () => {
       setIsSubmitting(false);
+      console.warn("[MANUSCRIPT TIMEOUT] Timeout dépassé (300s)");
       setSubmitError("Le délai de transmission a expiré (timeout). Merci de vérifier votre connexion ou de réduire la taille du fichier.");
     });
 

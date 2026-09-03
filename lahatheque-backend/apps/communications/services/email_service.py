@@ -254,7 +254,35 @@ def send_transactional_email(
                 message_id="queued",
             )
         except Exception as celery_err:
-            logger.warning(f"Celery indisponible ({celery_err}), repli sur envoi synchrone immédiat.")
+            logger.warning(f"Celery indisponible ({celery_err}), délégation de l'envoi en thread d'arrière-plan.")
+            import threading
+
+            def _background_send():
+                try:
+                    EmailService.send(
+                        email_type=email_type,
+                        to_email=to_email,
+                        subject=subject,
+                        template_name=template_name,
+                        context=context,
+                        recipient_name=recipient_name,
+                        from_email=from_email,
+                        reply_to=reply_to,
+                        attachments=attachments,
+                        pdf_invoice_data=pdf_invoice_data,
+                        pdf_royalty_data=pdf_royalty_data,
+                        tags=tags,
+                    )
+                except Exception as bg_err:
+                    logger.error(f"[EMAIL THREAD ERROR] Échec de l'envoi d'e-mail en arrière-plan: {bg_err}")
+
+            t = threading.Thread(target=_background_send, daemon=True)
+            t.start()
+            return EmailSendResult(
+                success=True,
+                provider="thread_async",
+                message_id="thread_started",
+            )
 
     return EmailService.send(
         email_type=email_type,
