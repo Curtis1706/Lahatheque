@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     LoginView, RegisterView, MeView, ProfileView, ChangePasswordView, LogoutView, 
-    MFASetupView, MFAVerifyView, OTPRequestView, OTPVerifyView
+    MFASetupView, MFAVerifyView, OTPRequestView, OTPVerifyView,
+    ForgotPasswordRequestView, ResetPasswordConfirmView
 )
 from .admin_views import AdminUserManagementViewSet
 
@@ -19,6 +20,8 @@ urlpatterns = [
     path('me/', MeView.as_view(), name='auth-me'),
     path('profile/', ProfileView.as_view(), name='auth-profile'),
     path('change-password/', ChangePasswordView.as_view(), name='auth-change-password'),
+    path('forgot-password/', ForgotPasswordRequestView.as_view(), name='forgot-password'),
+    path('reset-password/', ResetPasswordConfirmView.as_view(), name='reset-password-confirm'),
     path('logout/', LogoutView.as_view(), name='auth-logout'),
     path('mfa/setup/', MFASetupView.as_view(), name='mfa-setup'),
     path('mfa/verify/', MFAVerifyView.as_view(), name='mfa-verify'),

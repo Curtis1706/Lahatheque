@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { Mail, Phone, ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -13,14 +12,30 @@ export default function ForgotPasswordPage() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Simulation d'envoi de lien de réinitialisation ou code OTP
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setLoading(false);
-    setSuccess(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/bff/accounts/forgot-password/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setError(json.error || "Une erreur est survenue.");
+        return;
+      }
+      setSuccess(true);
+    } catch {
+      setError("Impossible de contacter le serveur. Vérifiez votre connexion.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -41,9 +56,15 @@ export default function ForgotPasswordPage() {
           <div className="space-y-2 text-center">
             <h1 className="font-serif text-2xl font-bold text-navy">Mot de passe oublié ?</h1>
             <p className="text-xs text-foreground-muted">
-              Saisissez vos coordonnées ci-dessous pour recevoir un code de réinitialisation.
+              Saisissez votre adresse email pour recevoir votre code de réinitialisation sécurisé.
             </p>
           </div>
+
+          {error && (
+            <div className="p-3.5 rounded-xl border border-error/30 bg-error/10 text-error text-xs font-medium animate-in fade-in duration-150">
+              {error}
+            </div>
+          )}
 
           {success ? (
             <div className="space-y-4 text-center py-4">
@@ -51,16 +72,25 @@ export default function ForgotPasswordPage() {
               <h3 className="text-base font-bold text-navy">Demande envoyée !</h3>
               <p className="text-xs text-foreground-muted">
                 {method === "email" 
-                  ? `Un lien de récupération a été envoyé à l'adresse : ${email}`
+                  ? `Si cette adresse est associée à un compte, un code de réinitialisation vient d'être envoyé à : ${email}`
                   : `Un code de validation a été envoyé par SMS au numéro : ${phone}`
                 }
               </p>
-              <Link 
-                href="/login" 
-                className="inline-flex items-center justify-center w-full py-3 bg-navy hover:bg-navy-hover text-white text-xs font-bold rounded shadow-sm transition-colors mt-4"
-              >
-                Retour à la connexion
-              </Link>
+              <div className="space-y-2 pt-2">
+                <Link 
+                  href={`/reset-password?email=${encodeURIComponent(email)}`}
+                  className="inline-flex items-center justify-center w-full py-3.5 bg-navy hover:bg-navy-hover text-white text-xs font-bold rounded-xl shadow-sm transition-colors gap-2"
+                >
+                  <span>Saisir le code reçu</span>
+                  <ArrowRight className="w-4 h-4 text-gold" />
+                </Link>
+                <Link 
+                  href="/login" 
+                  className="inline-flex items-center justify-center w-full py-2.5 text-xs text-foreground-muted hover:text-navy transition-colors font-medium"
+                >
+                  Retour à la connexion
+                </Link>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -125,17 +155,17 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={loading || (method === "email" ? !email : !phone)}
-                className="w-full py-3.5 bg-navy hover:bg-navy-hover text-white text-xs font-bold rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-navy hover:bg-navy-hover text-white text-xs font-bold rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
                   <>
                     <InlineLoader size={16} />
-                    Envoi en cours...
+                    <span>Envoi en cours...</span>
                   </>
                 ) : (
                   <>
-                    Obtenir le lien de réinitialisation
-                    <ArrowRight className="w-4 h-4" />
+                    <span>Envoyer le code de réinitialisation</span>
+                    <ArrowRight className="w-4 h-4 text-gold" />
                   </>
                 )}
               </button>

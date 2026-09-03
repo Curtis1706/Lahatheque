@@ -1,5 +1,8 @@
 """Modèles identités, rôles et authentification (User, MFAConfig, OTP)."""
 import uuid
+import secrets
+from datetime import timedelta
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractUser, UserManager
 
@@ -72,4 +75,29 @@ class OTP(models.Model):
 
     def is_expired(self) -> bool:
         return timezone.now() > self.expires_at
+
+
+class PasswordResetCode(models.Model):
+    """Code de réinitialisation de mot de passe — 6 chiffres, valable 15 minutes, usage unique."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reset_codes')
+    code = models.CharField(max_length=6, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'accounts_password_reset_code'
+
+    @classmethod
+    def generate_for_user(cls, user):
+        code = f"{secrets.randbelow(1000000):06d}"
+        return cls.objects.create(
+            user=user,
+            code=code,
+            expires_at=timezone.now() + timedelta(minutes=15),
+        )
+
+    def is_valid(self):
+        return not self.used and timezone.now() < self.expires_at
 
