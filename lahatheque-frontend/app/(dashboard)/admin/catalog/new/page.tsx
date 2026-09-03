@@ -1,82 +1,79 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  ArrowRight,
-  BookOpen,
-  PlusCircle,
   Sparkles,
-  Upload,
   Save,
-  CheckCircle2,
   ShieldCheck,
-  DollarSign,
-  Tag,
-  Info,
-  Building2,
-  Image as ImageIcon,
-  X,
-  FileText,
-  HelpCircle,
-  Radio,
-  Boxes,
-  Percent,
+  BookOpen,
+  FileCode,
+  Wand2,
+  Layers,
+  GraduationCap,
+  CheckCircle2,
+  ShoppingBag,
 } from "lucide-react";
-import { toast } from "sonner";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
-import { CreatorSelector } from "@/components/features/catalog/creator-selector";
-import { createAdminCatalogBook } from "@/lib/services/admin";
-import { extractBookMetadataWithAi } from "@/lib/services/publisher";
+import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
+import { DepositWizardStepper } from "@/components/features/layout-artist/deposit-wizard-stepper";
+import { AIAnalysisProgressCard } from "@/components/features/layout-artist/ai-analysis-progress-card";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { createDepositWithFiles } from "@/lib/services/layout-artist";
+import { extractBookMetadataWithAi, type AiBookAnalysisResult } from "@/lib/services/ai";
+import {
+  matchGenreCategory,
+  matchLanguage,
+  matchCountry,
+  getUniversityOptions,
+  getLanguageOptions,
+  getCountryOptions,
+} from "@/lib/constants/classification";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
-import type { CreatorOption } from "@/lib/services/creators";
-import { AFRICAN_COUNTRIES_PRESET } from "@/lib/services/countries";
-import { InlineLoader } from "@/components/ui/page-loader";
-import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
+import { toast } from "sonner";
 
 export default function AdminNewProductPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
-  const [disciplinesList, setDisciplinesList] = useState<DisciplineItem[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // ─── Étape 1 : Identité (Le livre) ──────────────────────────────────────────
+  // Form State
+  const [bookFile, setBookFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | undefined>(undefined);
+
+  // Metadata State
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
-  const [authorPublisher, setAuthorPublisher] = useState("LAHA Éditions");
+  const [authorsStr, setAuthorsStr] = useState("");
   const [publisherName, setPublisherName] = useState("LAHA Éditions");
-  const [selectedCreator, setSelectedCreator] = useState<CreatorOption | null>(null);
-  const [country, setCountry] = useState("Tous les pays");
+  const [year, setYear] = useState(2026);
+  const [language, setLanguage] = useState("Français");
   const [summary, setSummary] = useState("");
-  const [categories, setCategories] = useState<string[]>(["Manuels scolaires"]);
-  const [disciplineName, setDisciplineName] = useState("Manuels scolaires");
-  const [targetAudience, setTargetAudience] = useState("CM2");
-  const [reductionPercent, setReductionPercent] = useState<number>(0);
-  const [isNewRelease, setIsNewRelease] = useState(true);
+  const [isbn, setIsbn] = useState("");
+  const [priceDigital, setPriceDigital] = useState(5000);
+  const [isPaperAvailable, setIsPaperAvailable] = useState(false);
+  const [pricePaper, setPricePaper] = useState(7500);
 
-  // ─── Étape 2 : Formats & prix (Offre commerciale) ───────────────────────────
-  const [formatType, setFormatType] = useState<"pdf" | "epub" | "audio">("pdf");
-  const [isbnDigital, setIsbnDigital] = useState("");
-  const [isbnPrint, setIsbnPrint] = useState("");
-  const [isPaperAvailable, setIsPaperAvailable] = useState(true);
-  const [priceDigital, setPriceDigital] = useState<number>(5000);
-  const [pricePaper, setPricePaper] = useState<number>(7500);
-  const [currency, setCurrency] = useState("FCFA");
-  const [licenceType, setLicenceType] = useState("tous_droits_reserves");
-  const [territories, setTerritories] = useState("Tous les pays");
+  // Classification State
+  const [realDisciplines, setRealDisciplines] = useState<DisciplineItem[]>([]);
+  const [categories, setCategories] = useState<string[]>(["Littérature Africaine & Conte"]);
+  const [genreCategory, setGenreCategory] = useState("Littérature Africaine & Conte");
+  const [deweyCode, setDeweyCode] = useState("800");
+  const [country, setCountry] = useState("BJ");
+  const [university, setUniversity] = useState("Université d'Abomey-Calavi (UAC - Bénin)");
+  const [faculty, setFaculty] = useState("Faculté des Lettres, Langues, Arts et Communication (FLLAC)");
+  const [targetAudience, setTargetAudience] = useState("Grand Public & Universitaire");
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [onixXml, setOnixXml] = useState<string>("");
 
-  // ─── Étape 3 : Fichiers (Documents) ─────────────────────────────────────────
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [manuscriptFile, setManuscriptFile] = useState<File | null>(null);
-
-  // ─── Étape 4 : Validation ───────────────────────────────────────────────────
-  const [publicationStatus, setPublicationStatus] = useState<"published" | "draft">("published");
+  // IA State
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<AiBookAnalysisResult | null>(null);
 
   // Chargement des disciplines
   useEffect(() => {
@@ -84,8 +81,11 @@ export default function AdminNewProductPage() {
       try {
         const data = await getDisciplines();
         if (data && data.length > 0) {
-          setDisciplinesList(data);
-          if (!disciplineName) setDisciplineName(data[0].name);
+          setRealDisciplines(data);
+          if (data[0]?.name) {
+            setGenreCategory(data[0].name);
+            setCategories([data[0].name]);
+          }
         }
       } catch (err) {
         console.error("Erreur chargement disciplines", err);
@@ -94,850 +94,919 @@ export default function AdminNewProductPage() {
     loadDisciplines();
   }, []);
 
-  const disciplineOptions: SearchableOption[] = useMemo(() => {
-    if (disciplinesList.length > 0) {
-      return disciplinesList.map((d) => ({
-        value: d.name,
-        label: d.name,
-        subtitle: d.code_dewey ? `Dewey ${d.code_dewey}` : undefined,
-        badge: d.code_dewey || undefined,
-      }));
+  const handleBookFileSelect = async (file: File) => {
+    setBookFile(file);
+    if (!title) {
+      const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+      setTitle(cleanName);
     }
-    return [
-      { value: "Manuels scolaires", label: "Manuels scolaires" },
-      { value: "Droit & Sciences Politiques", label: "Droit & Sciences Politiques" },
-      { value: "Sciences Économiques & Gestion", label: "Sciences Économiques & Gestion" },
-      { value: "Littérature Africaine & Conte", label: "Littérature Africaine & Conte" },
-      { value: "Sciences Exactes & Technologies", label: "Sciences Exactes & Technologies" },
-      { value: "Philosophie & Sciences Humaines", label: "Philosophie & Sciences Humaines" },
-      { value: "Arts, Culture & Musique", label: "Arts, Culture & Musique" },
-    ];
-  }, [disciplinesList]);
 
-  // Gestion Couverture
-  const handleCoverSelect = (f: File) => {
-    setCoverFile(f);
-    const url = URL.createObjectURL(f);
-    setCoverPreview(url);
-    toast.success(`Couverture « ${f.name} » prête.`);
-  };
-
-  const handleCoverRemove = () => {
-    if (coverPreview) URL.revokeObjectURL(coverPreview);
-    setCoverFile(null);
-    setCoverPreview(null);
-  };
-
-  // Assistant IA pour Résumé et Métadonnées
-  const handleAiSuggest = async () => {
-    if (!title.trim() && !manuscriptFile) {
-      toast.info("Veuillez saisir au moins le titre de l'ouvrage pour l'analyse IA.");
-      return;
-    }
-    setAiAnalyzing(true);
+    // Auto-détection IA des métadonnées
+    setAiLoading(true);
     try {
-      const res = await extractBookMetadataWithAi({
-        title: title.trim() || undefined,
-        filename: manuscriptFile?.name,
-        file: manuscriptFile || undefined,
-      });
-      if ((res as any).disciplines && (res as any).disciplines.length > 0) {
-        setCategories((res as any).disciplines);
-        setDisciplineName((res as any).disciplines[0]);
-      } else if (res.discipline) {
-        setCategories([res.discipline]);
-        setDisciplineName(res.discipline);
+      toast.info("Analyse documentaire du manuscrit en cours...");
+      const result = await extractBookMetadataWithAi(file);
+      if (result.success && result.data) {
+        setAiResult(result.data);
+
+        const matchedGenre = matchGenreCategory(result.data.genre_category, result.data.dewey_code);
+        const matchedLang = matchLanguage(result.data.language || result.data.language_code);
+        const matchedCountry = matchCountry(result.data.country);
+
+        // Auto-application initiale
+        if (!title || title === file.name.replace(/\.[^/.]+$/, "")) setTitle(result.data.title);
+        if (!subtitle && result.data.subtitle) setSubtitle(result.data.subtitle);
+        if (!authorsStr && result.data.authors?.length) setAuthorsStr(result.data.authors.join(", "));
+        if (result.data.publisher_name) setPublisherName(result.data.publisher_name);
+        if (!summary && result.data.summary) setSummary(result.data.summary);
+        if (!isbn && result.data.isbn) setIsbn(result.data.isbn);
+        setDeweyCode(result.data.dewey_code || matchedGenre.dewey);
+        const aiDiscs =
+          result.data.disciplines && result.data.disciplines.length > 0
+            ? result.data.disciplines
+            : [matchedGenre.label];
+        setCategories(aiDiscs);
+        setGenreCategory(aiDiscs[0] || matchedGenre.label);
+        setLanguage(matchedLang);
+        setCountry(matchedCountry);
+        if (result.data.institution_suggestion) setUniversity(result.data.institution_suggestion);
+        if (result.data.faculty_suggestion || matchedGenre.faculty)
+          setFaculty(result.data.faculty_suggestion || matchedGenre.faculty || "");
+        if (result.data.target_audience) setTargetAudience(result.data.target_audience);
+        if (result.data.keywords) setKeywords(result.data.keywords);
+        if (result.data.onix_3_xml) setOnixXml(result.data.onix_3_xml);
+
+        toast.success("Analyse IA terminée avec succès !");
       }
-      if ((res as any).publisher_name) {
-        setPublisherName((res as any).publisher_name);
-      }
-      if (res.summary && !summary) setSummary(res.summary);
-      if (res.target_audience) setTargetAudience(res.target_audience);
-      toast.success("Classification, éditeur et résumé suggérés par l'IA appliqués avec succès.");
     } catch {
-      toast.error("Erreur lors de l'analyse IA. Vous pouvez remplir les champs manuellement.");
+      // Échec silencieux
     } finally {
-      setAiAnalyzing(false);
+      setAiLoading(false);
     }
   };
 
-  // Soumission finale
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) {
-      toast.error("Veuillez renseigner le titre du livre.");
-      setCurrentStep(1);
+  const handleApplyAllAiData = () => {
+    if (!aiResult) return;
+    if (aiResult.title) setTitle(aiResult.title);
+    if (aiResult.subtitle) setSubtitle(aiResult.subtitle);
+    if (aiResult.authors && aiResult.authors.length > 0) setAuthorsStr(aiResult.authors.join(", "));
+    if (aiResult.publisher_name) setPublisherName(aiResult.publisher_name);
+    if (aiResult.isbn) setIsbn(aiResult.isbn);
+    if (aiResult.summary) setSummary(aiResult.summary);
+    if (aiResult.publication_year) setYear(aiResult.publication_year);
+
+    const matchedGenre = matchGenreCategory(aiResult.genre_category, aiResult.dewey_code);
+    const matchedLang = matchLanguage(aiResult.language || aiResult.language_code);
+    const matchedCountry = matchCountry(aiResult.country);
+
+    setDeweyCode(aiResult.dewey_code || matchedGenre.dewey);
+    setGenreCategory(matchedGenre.label);
+    setLanguage(matchedLang);
+    setCountry(matchedCountry);
+    if (aiResult.institution_suggestion) setUniversity(aiResult.institution_suggestion);
+    if (aiResult.faculty_suggestion || matchedGenre.faculty)
+      setFaculty(aiResult.faculty_suggestion || matchedGenre.faculty || "");
+    if (aiResult.target_audience) setTargetAudience(aiResult.target_audience);
+    if (aiResult.keywords) setKeywords(aiResult.keywords);
+    if (aiResult.onix_3_xml) setOnixXml(aiResult.onix_3_xml);
+    toast.success("Toutes les suggestions IA ont été appliquées avec succès !");
+  };
+
+  const handleCoverSelect = (file: File) => {
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const handleSaveDraft = async () => {
+    setSaving(true);
+    try {
+      await createDepositWithFiles(
+        {
+          metadata: {
+            title: title || "Nouveau Livre Admin",
+            subtitle,
+            authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur LAHA"],
+            publisher_name: publisherName,
+            publication_year: year,
+            language,
+            language_source: aiResult ? "ai_suggested" : "manual",
+            summary,
+            summary_source: aiResult ? "ai_suggested" : "manual",
+            isbn,
+          },
+          classification: {
+            country,
+            university,
+            faculty,
+            discipline: categories[0] || genreCategory,
+            disciplines: categories,
+            source: aiResult ? "ai_suggested" : "manual",
+          },
+          files: {
+            format: bookFile?.name.endsWith(".epub") ? "EPUB" : "PDF",
+            book_file_name: bookFile?.name,
+            cover_url: coverPreview,
+          },
+          status: "draft",
+          default_price: priceDigital,
+          admin_price: isPaperAvailable ? pricePaper : 0,
+          is_paper_available: isPaperAvailable,
+        },
+        bookFile,
+        coverFile
+      );
+      toast.success("Brouillon sauvegardé avec succès.");
+      router.push("/admin/catalog");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur lors de la sauvegarde du brouillon.";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDirectPublish = async () => {
+    if (!title || !bookFile) {
+      toast.error("Veuillez sélectionner le fichier de l'ouvrage et renseigner au minimum le titre.");
       return;
     }
 
-    setSubmitting(true);
+    setSaving(true);
     try {
-      const formData = new FormData();
-      formData.append("title", title.trim());
-      if (subtitle.trim()) formData.append("subtitle", subtitle.trim());
-
-      // Auteur et Éditeur & Liaisons de Droits
-      const authorTrimmed = authorPublisher.trim();
-      formData.append("authors_names", authorTrimmed || "Auteur LAHA");
-
-      if (selectedCreator) {
-        if (selectedCreator.type === "author") {
-          if (selectedCreator.user_id) formData.append("author_user_id", selectedCreator.user_id);
-          formData.append("author_id", selectedCreator.id);
-          if (selectedCreator.email) formData.append("authors_emails", selectedCreator.email);
-          formData.append("publisher_name", "LAHA Éditions");
-        } else if (selectedCreator.type === "publisher") {
-          formData.append("publisher_id", selectedCreator.id);
-          formData.append("publisher_name", selectedCreator.name);
-          if (selectedCreator.user_id) formData.append("author_user_id", selectedCreator.user_id);
-        }
-      } else {
-        formData.append("publisher_name", publisherName || (authorTrimmed.toLowerCase().includes("laha") ? "LAHA Éditions" : authorTrimmed));
-      }
-
-      // Pays & Classification
-      formData.append("country", country === "Tous les pays" ? "GL" : country);
-      formData.append("discipline_name", categories[0] || disciplineName);
-      if (categories.length > 0) {
-        formData.append("disciplines", categories.join(", "));
-      }
-      formData.append("target_audience", targetAudience);
-      formData.append("summary", summary || "Ouvrage ajouté au catalogue officiel.");
-      formData.append("keywords", isNewRelease ? "Nouveauté, Catalogue Officiel" : "Catalogue Officiel");
-
-      // Formats & Tarification
-      formData.append("format_type", formatType);
-      formData.append("isbn", isbnDigital.trim() || (isPaperAvailable ? isbnPrint.trim() : "") || `978-LAHA-${Date.now().toString().slice(-6)}`);
-      formData.append("price_digital", String(priceDigital || 0));
-      formData.append("price_paper", String(pricePaper || 0));
-      formData.append("is_paper_available", isPaperAvailable ? "true" : "false");
-      formData.append("status", publicationStatus);
-
-      // Fichiers
-      if (manuscriptFile) {
-        formData.append("book_file", manuscriptFile, manuscriptFile.name);
-      }
-      if (coverFile) {
-        formData.append("cover_image", coverFile, coverFile.name);
-      }
-
-      const res = await createAdminCatalogBook(formData);
-      if (res.success) {
-        toast.success(`L'ouvrage « ${title} » a été ajouté et publié avec succès au catalogue.`);
-        router.push("/admin/catalog");
-      } else {
-        toast.error(res.error || "Erreur lors de l'enregistrement de l'ouvrage.");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Erreur réseau lors de la création.");
+      await createDepositWithFiles(
+        {
+          metadata: {
+            title,
+            subtitle,
+            authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur LAHA"],
+            publisher_name: publisherName,
+            publication_year: year,
+            language,
+            language_source: aiResult ? "ai_suggested" : "manual",
+            summary,
+            summary_source: aiResult ? "ai_suggested" : "manual",
+            isbn,
+          },
+          classification: {
+            country,
+            university,
+            faculty,
+            discipline: categories[0] || genreCategory,
+            disciplines: categories,
+            source: aiResult ? "ai_suggested" : "manual",
+          },
+          files: {
+            format: bookFile.name.endsWith(".epub") ? "EPUB" : "PDF",
+            book_file_name: bookFile.name,
+            cover_url: coverPreview,
+          },
+          status: "published",
+          default_price: priceDigital,
+          admin_price: isPaperAvailable ? pricePaper : 0,
+          is_paper_available: isPaperAvailable,
+        },
+        bookFile,
+        coverFile
+      );
+      toast.success(`L'ouvrage « ${title} » a été ajouté et publié immédiatement au catalogue officiel !`);
+      router.push("/admin/catalog");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur lors de la publication directe.";
+      toast.error(msg);
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
-
-  const steps = [
-    { num: 1, title: "Identité", sub: "Le livre" },
-    { num: 2, title: "Formats & prix", sub: "Offre commerciale" },
-    { num: 3, title: "Fichiers", sub: "Documents" },
-    { num: 4, title: "Validation", sub: "Vérification" },
-  ];
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-6">
-      {/* En-tête de la page */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
-        <div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-gold font-mono block">
-            Espace Administration • Catalogue
-          </span>
-          <h1 className="font-serif text-2xl font-bold text-navy mt-0.5">Ajouter un produit</h1>
-          <p className="text-xs text-foreground-muted">Workflow de création en étapes séparées.</p>
-        </div>
+    <div className="p-4 sm:p-6 md:p-8 w-full max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs text-foreground-muted">
+        <Link href="/admin/catalog" className="hover:text-navy">
+          Gestion du Catalogue
+        </Link>
+        <span>/</span>
+        <span className="text-navy font-semibold">Ajouter un Ouvrage</span>
+      </div>
 
-        {/* Boutons d'accès rapide en haut à droite */}
-        <div className="flex items-center gap-2">
+      {/* Header */}
+      <div className="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
           <Link
             href="/admin/catalog"
-            className="px-3.5 py-1.5 rounded-xl border border-border bg-background-secondary text-xs font-semibold text-navy hover:border-gold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
+            className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1"
           >
-            <BookOpen className="w-3.5 h-3.5 text-gold" />
-            <span>Catalogue</span>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Retour au catalogue global
           </Link>
-          <Link
-            href="/admin/stock"
-            className="px-3.5 py-1.5 rounded-xl border border-border bg-background-secondary text-xs font-semibold text-navy hover:border-gold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
+          <div className="flex items-center gap-2">
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+              Ajouter un Ouvrage
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-md bg-gold/15 text-gold text-[11px] font-bold uppercase tracking-wider flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Publication Directe
+            </span>
+          </div>
+          <p className="text-xs text-foreground-muted mt-0.5">
+            Dépôt direct assisté par IA, enrichissement documentaire immédiat et mise en ligne sur le catalogue officiel.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleSaveDraft}
+            disabled={saving || !bookFile}
+            className="px-4 py-2.5 rounded-xl border border-border bg-background hover:bg-background-secondary text-xs font-bold text-navy flex items-center gap-1.5 shadow-xs transition-colors min-h-[44px] cursor-pointer"
           >
-            <Boxes className="w-3.5 h-3.5 text-navy" />
-            <span>Stock &amp; Hubs</span>
-          </Link>
-          <Link
-            href="/admin/catalog/pricing"
-            className="px-3.5 py-1.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1.5 min-h-[36px] shadow-xs"
+            <Save className="w-4 h-4 text-foreground-muted" />
+            Brouillon
+          </button>
+
+          <button
+            onClick={handleDirectPublish}
+            disabled={saving || !bookFile}
+            className="px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all min-h-[44px] cursor-pointer"
           >
-            <Tag className="w-3.5 h-3.5 text-gold" />
-            <span>Tarification</span>
-          </Link>
+            <ShieldCheck className="w-4 h-4 text-navy" />
+            {saving ? "Publication en cours..." : "Ajouter & Publier Directement"}
+          </button>
         </div>
       </div>
 
-      {/* Carte Principale du Workflow */}
-      <div className="bg-background rounded-3xl border border-border shadow-xs overflow-hidden">
-        {/* Titre interne de la carte */}
-        <div className="p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-background-secondary/30">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gold font-mono block mb-1">
-              Workflow Produit
-            </span>
-            <h2 className="font-serif font-bold text-xl text-navy">Créer un produit</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              Chaque étape est séparée pour éviter les erreurs de saisie.
-            </p>
-          </div>
-          <span className="px-3 py-1 rounded-full bg-background border border-border text-xs font-semibold text-foreground-muted self-start sm:self-auto shadow-2xs">
-            Nouveau
-          </span>
-        </div>
+      {/* Stepper Navigation */}
+      <DepositWizardStepper currentStep={currentStep} onStepClick={(s) => setCurrentStep(s)} />
 
-        {/* Stepper 4 étapes */}
-        <div className="p-4 sm:p-6 border-b border-border bg-background-secondary/20">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {steps.map((s) => {
-              const isActive = currentStep === s.num;
-              const isPast = currentStep > s.num;
-              return (
-                <button
-                  key={s.num}
-                  type="button"
-                  onClick={() => setCurrentStep(s.num)}
-                  className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
-                    isActive
-                      ? "bg-background border-gold ring-1 ring-gold shadow-xs"
-                      : isPast
-                      ? "bg-background/80 border-border hover:border-gold/50"
-                      : "bg-background-secondary/60 border-border/70 opacity-70 hover:opacity-100"
-                  }`}
-                >
-                  <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
-                      isActive
-                        ? "bg-navy text-gold"
-                        : isPast
-                        ? "bg-emerald-500/15 text-emerald-700 font-bold"
-                        : "bg-foreground-muted/15 text-foreground-muted"
-                    }`}
-                  >
-                    {isPast ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : s.num}
-                  </div>
-                  <div className="min-w-0">
-                    <p className={`text-xs font-bold truncate ${isActive ? "text-navy" : "text-foreground"}`}>
-                      {s.title}
-                    </p>
-                    <p className="text-[10px] text-foreground-muted truncate">{s.sub}</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      {/* ─── ANIMATION D'ANALYSE IA EN COURS ─────────────────────────────── */}
+      {aiLoading && <AIAnalysisProgressCard fileName={bookFile?.name} />}
 
-        {/* Contenu du Formulaire par Étape */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* ══════════════════════════════════════════════════════════════════════
-              ÉTAPE 1 : IDENTITÉ (Le livre)
-          ══════════════════════════════════════════════════════════════════════ */}
-          {currentStep === 1 && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              {/* 01 Informations principales */}
-              <div className="p-5 rounded-2xl bg-background-secondary/40 border border-border space-y-4">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-navy/10 text-navy font-bold text-xs flex items-center justify-center font-mono">
-                    01
-                  </span>
-                  <div>
-                    <h3 className="font-serif font-bold text-navy text-sm">Informations principales</h3>
-                    <p className="text-[11px] text-foreground-muted">Les informations visibles sur la fiche du livre.</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4 pt-1">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">Titre du livre *</label>
-                    <input
-                      type="text"
-                      required
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Titre du livre"
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium"
-                    />
-                  </div>
-
-                  {/* Sélecteur intelligent Auteur */}
-                  <CreatorSelector
-                    value={authorPublisher}
-                    onChange={(val) => setAuthorPublisher(val)}
-                    onSelectCreator={(creator) => {
-                      setSelectedCreator(creator);
-                      if (creator && creator.type === "publisher") {
-                        setPublisherName(creator.name);
-                      }
-                    }}
-                  />
-
-                  {/* Sélecteur Maison d'Édition (Partenaire en base ou Éditeur tiers libre) */}
-                  <div className="space-y-1.5 pt-1">
-                    <label className="text-xs font-bold text-navy">
-                      Maison d&apos;Édition / Éditeur <span className="text-[10px] font-normal text-foreground-muted">(Partenaire en base ou éditeur tiers externe)</span>
-                    </label>
-                    <PublisherCombobox
-                      value={publisherName}
-                      onChange={(val) => setPublisherName(val)}
-                      placeholder="Sélectionner ou saisir l'éditeur (ex: Springer, LAHA, etc.)..."
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-navy">Pays</label>
-                  <select
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium"
-                  >
-                    <option value="Tous les pays">Tous les pays</option>
-                    <option value="BJ">Bénin</option>
-                    <option value="CI">Côte d&apos;Ivoire</option>
-                    <option value="SN">Sénégal</option>
-                    <option value="TG">Togo</option>
-                    <option value="BF">Burkina Faso</option>
-                    <option value="ML">Mali</option>
-                    <option value="NE">Niger</option>
-                    <option value="GN">Guinée</option>
-                    <option value="CM">Cameroun</option>
-                    <option value="GA">Gabon</option>
-                    <option value="CG">Congo</option>
-                    <option value="FR">France</option>
-                    <option value="GL">International / Global</option>
-                  </select>
-                </div>
+      {/* ─── BANDEAU ASSISTANT IA ────────────────────────────────────────────── */}
+      {aiResult && !aiLoading && (
+        <div className="p-5 rounded-3xl bg-navy text-white border border-navy-hover space-y-3 shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-gold/20 text-gold shrink-0">
+                <Sparkles className="w-5 h-5" />
               </div>
+              <div>
+                <h3 className="font-serif font-bold text-sm text-gold">
+                  Assistant IA • Notice ONIX 3.0 &amp; Classification Disponibles
+                </h3>
+                <p className="text-[11px] text-white/80">
+                  Document analysé : « {aiResult.title} » ({aiResult.genre_category} • Dewey {aiResult.dewey_code})
+                </p>
+              </div>
+            </div>
 
-              {/* 02 Résumé éditorial */}
-              <div className="p-5 rounded-2xl bg-background-secondary/40 border border-border space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-lg bg-navy/10 text-navy font-bold text-xs flex items-center justify-center font-mono">
-                      02
-                    </span>
-                    <div>
-                      <h3 className="font-serif font-bold text-navy text-sm">Résumé éditorial</h3>
-                      <p className="text-[11px] text-foreground-muted">Décrivez le contenu : l&apos;IA classera ensuite le livre.</p>
-                    </div>
-                  </div>
+            <button
+              onClick={handleApplyAllAiData}
+              className="px-4 py-2 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0 min-h-[40px] cursor-pointer"
+            >
+              <Wand2 className="w-3.5 h-3.5" />
+              Tout Appliquer en 1 Clic
+            </button>
+          </div>
 
+          {aiResult.keywords && aiResult.keywords.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[10px] uppercase font-bold text-gold">Mots-clés :</span>
+              {aiResult.keywords.map((tag, i) => (
+                <span key={i} className="px-2 py-0.5 rounded-md bg-white/10 text-white text-[10px]">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── ÉTAPE 1 : FICHIERS SOURCES ──────────────────────────────────────── */}
+      {currentStep === 1 && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <FileDropzone
+                label="1. Fichier de l'Ouvrage (PDF uniquement) *"
+                acceptTypes={[".pdf"]}
+                maxSizeMB={800}
+                onFileSelect={handleBookFileSelect}
+                selectedFileName={bookFile?.name}
+                selectedFileSize={bookFile?.size}
+                isLoading={aiLoading}
+                loadingLabel="Analyse IA en cours (OpenAI & PyMuPDF)..."
+                onFileRemove={() => {
+                  setBookFile(null);
+                  setAiResult(null);
+                }}
+              />
+              <p className="text-[11px] text-foreground-muted">
+                La liseuse supporte nativement le format PDF sécurisé avec filigrane dynamique et synthèse vocale TTS intégrée.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <FileDropzone
+                label="2. Image de Couverture (Haute Résolution) *"
+                acceptTypes={["image/jpeg", "image/png", "image/webp"]}
+                maxSizeMB={15}
+                onFileSelect={handleCoverSelect}
+                selectedFileName={coverFile?.name}
+                selectedFileSize={coverFile?.size}
+                previewUrl={coverPreview}
+                onFileRemove={() => {
+                  setCoverFile(null);
+                  setCoverPreview(undefined);
+                }}
+              />
+              <p className="text-[11px] text-foreground-muted">
+                Format portrait recommandé (rapport 1:1.5 ou 1:1.6, min. 1200x1800 px).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <button
+              onClick={() => setCurrentStep(2)}
+              disabled={!bookFile}
+              className="px-6 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs flex items-center gap-2 disabled:opacity-50 min-h-[44px] cursor-pointer"
+            >
+              Étape suivante : Métadonnées &amp; Tarification →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── ÉTAPE 2 : MÉTADONNÉES & TARIFICATION ────────────────────────────── */}
+      {currentStep === 2 && (
+        <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
+            <h3 className="font-serif font-bold text-navy text-base flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-gold" />
+              Notice Éditoriale &amp; Tarification
+            </h3>
+            <div className="flex items-center gap-2">
+              <AISuggestionBadge source={aiResult ? "ai_suggested" : "manual"} />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {/* Titre */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Titre de l&apos;Ouvrage *</label>
+                {aiResult?.title && aiResult.title !== title && (
                   <button
                     type="button"
-                    onClick={handleAiSuggest}
-                    disabled={aiAnalyzing}
-                    className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/40 text-navy hover:bg-gold/25 transition-colors text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    onClick={() => setTitle(aiResult.title)}
+                    className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
                   >
-                    {aiAnalyzing ? <InlineLoader size={12} /> : <Sparkles className="w-3.5 h-3.5 text-gold" />}
-                    <span>Assistance IA</span>
+                    <Wand2 className="w-3 h-3" />
+                    Insérer suggestion IA : « {aiResult.title.slice(0, 30)}... »
                   </button>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-navy">Description</label>
-                  <textarea
-                    rows={4}
-                    value={summary}
-                    onChange={(e) => setSummary(e.target.value)}
-                    placeholder="Résumé, public visé, programme..."
-                    className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium leading-relaxed"
-                  />
-                  <p className="text-[11px] text-foreground-muted italic">
-                    La catégorie est sélectionnée automatiquement après la saisie.
-                  </p>
-                </div>
+                )}
               </div>
-
-              {/* 03 Classement et mise en avant */}
-              <div className="p-5 rounded-2xl bg-background-secondary/40 border border-border space-y-4">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-navy/10 text-navy font-bold text-xs flex items-center justify-center font-mono">
-                    03
-                  </span>
-                  <div>
-                    <h3 className="font-serif font-bold text-navy text-sm">Classement et mise en avant</h3>
-                    <p className="text-[11px] text-foreground-muted">Vérifiez la proposition de l&apos;IA et ajustez-la si nécessaire.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">
-                      Catégories / Disciplines <span className="text-[10px] font-normal text-foreground-muted">(Plusieurs choix possibles)</span>
-                    </label>
-                    <DisciplineCombobox
-                      multiple={true}
-                      values={categories}
-                      onValuesChange={(newVals) => {
-                        setCategories(newVals);
-                        if (newVals.length > 0) setDisciplineName(newVals[0]);
-                      }}
-                      disciplines={disciplinesList}
-                      placeholder="Sélectionner ou rechercher une catégorie..."
-                      searchPlaceholder="Rechercher parmi les disciplines..."
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">Niveau d&apos;étude</label>
-                    <select
-                      value={targetAudience}
-                      onChange={(e) => setTargetAudience(e.target.value)}
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium"
-                    >
-                      <option value="CM2">CM2</option>
-                      <option value="Primaire">Primaire (CI, CP, CE1, CE2, CM1)</option>
-                      <option value="6ème">6ème</option>
-                      <option value="5ème">5ème</option>
-                      <option value="4ème">4ème</option>
-                      <option value="3ème">3ème</option>
-                      <option value="Seconde">Seconde</option>
-                      <option value="Première">Première</option>
-                      <option value="Terminale">Terminale</option>
-                      <option value="Licence">Licence Universitaire (L1, L2, L3)</option>
-                      <option value="Master">Master Universitaire (M1, M2)</option>
-                      <option value="Doctorat">Doctorat / Recherche</option>
-                      <option value="Tous publics">Tous publics / Général</option>
-                    </select>
-                    <p className="text-[10px] text-foreground-muted">Demandé uniquement pour les manuels scolaires.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center pt-1">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">Réduction %</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={reductionPercent}
-                      onChange={(e) => setReductionPercent(parseInt(e.target.value, 10) || 0)}
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium font-mono"
-                    />
-                  </div>
-
-                  <div className="pt-4 flex items-center">
-                    <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-navy">
-                      <input
-                        type="checkbox"
-                        checked={isNewRelease}
-                        onChange={(e) => setIsNewRelease(e.target.checked)}
-                        className="w-4 h-4 rounded text-navy border-border focus:ring-gold"
-                      />
-                      <span>Classer en nouveauté</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
+              <input
+                type="text"
+                required
+                placeholder="Ex: Les Fondements du Droit Commercial Africain"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+              />
             </div>
-          )}
 
-          {/* ══════════════════════════════════════════════════════════════════════
-              ÉTAPE 2 : FORMATS & PRIX (Offre commerciale)
-          ══════════════════════════════════════════════════════════════════════ */}
-          {currentStep === 2 && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Formats et ISBN */}
-              <div className="p-5 rounded-2xl bg-background-secondary/40 border border-border space-y-4">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-navy/10 text-navy font-bold text-xs flex items-center justify-center font-mono">
-                    01
-                  </span>
-                  <div>
-                    <h3 className="font-serif font-bold text-navy text-sm">Formats et Disponibilité</h3>
-                    <p className="text-[11px] text-foreground-muted">Type de format numérique et versions disponibles.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">Format Numérique Principal</label>
-                    <select
-                      value={formatType}
-                      onChange={(e) => setFormatType(e.target.value as any)}
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium"
-                    >
-                      <option value="pdf">PDF Sécurisé (LCP / Filigrane)</option>
-                      <option value="epub">EPUB Recomposable</option>
-                      <option value="audio">Livre Audio</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">ISBN Numérique</label>
-                    <input
-                      type="text"
-                      value={isbnDigital}
-                      onChange={(e) => setIsbnDigital(e.target.value)}
-                      placeholder="978-99919-..."
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">ISBN Papier (Optionnel)</label>
-                    <input
-                      type="text"
-                      value={isbnPrint}
-                      onChange={(e) => setIsbnPrint(e.target.value)}
-                      placeholder="978-99919-..."
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-navy">
-                    <input
-                      type="checkbox"
-                      checked={isPaperAvailable}
-                      onChange={(e) => setIsPaperAvailable(e.target.checked)}
-                      className="w-4 h-4 rounded text-navy border-border focus:ring-gold"
-                    />
-                    <span>Version physique / papier disponible à la commande</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Tarification commerciale */}
-              <div className="p-5 rounded-2xl bg-background-secondary/40 border border-border space-y-4">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-navy/10 text-navy font-bold text-xs flex items-center justify-center font-mono">
-                    02
-                  </span>
-                  <div>
-                    <h3 className="font-serif font-bold text-navy text-sm">Tarification commerciale</h3>
-                    <p className="text-[11px] text-foreground-muted">Prix public unitaire en monnaie locale (FCFA / XOF).</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">Prix Numérique (FCFA) *</label>
-                    <input
-                      type="number"
-                      step="500"
-                      required
-                      value={priceDigital}
-                      onChange={(e) => setPriceDigital(parseFloat(e.target.value) || 0)}
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">Prix Papier (FCFA)</label>
-                    <input
-                      type="number"
-                      step="500"
-                      disabled={!isPaperAvailable}
-                      value={pricePaper}
-                      onChange={(e) => setPricePaper(parseFloat(e.target.value) || 0)}
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium font-mono disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Droits & Territoires */}
-              <div className="p-5 rounded-2xl bg-background-secondary/40 border border-border space-y-4">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-navy/10 text-navy font-bold text-xs flex items-center justify-center font-mono">
-                    03
-                  </span>
-                  <div>
-                    <h3 className="font-serif font-bold text-navy text-sm">Droits &amp; Territoires</h3>
-                    <p className="text-[11px] text-foreground-muted">Zone de distribution et régime de licence.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">Type de Licence</label>
-                    <select
-                      value={licenceType}
-                      onChange={(e) => setLicenceType(e.target.value)}
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium"
-                    >
-                      <option value="tous_droits_reserves">Tous droits réservés (Standard LAHA)</option>
-                      <option value="creative_commons">Creative Commons (Accès Ouvert)</option>
-                      <option value="domaine_public">Domaine Public</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy">Territoires Autorisés</label>
-                    <select
-                      value={territories}
-                      onChange={(e) => setTerritories(e.target.value)}
-                      className="w-full p-3 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-medium"
-                    >
-                      <option value="Tous les pays">Monde Entier (Tous les pays)</option>
-                      <option value="Zone UEMOA">Zone UEMOA (8 pays)</option>
-                      <option value="Zone CEDEAO">Zone CEDEAO (15 pays)</option>
-                      <option value="Afrique Centrale & CEMAC">Afrique Centrale &amp; CEMAC</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
+            {/* Sous-titre */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy">Sous-titre (Optionnel)</label>
+              <input
+                type="text"
+                placeholder="Ex: Traité théorique et pratique à l'usage des universités"
+                value={subtitle}
+                onChange={(e) => setSubtitle(e.target.value)}
+                className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+              />
             </div>
-          )}
 
-          {/* ══════════════════════════════════════════════════════════════════════
-              ÉTAPE 3 : FICHIERS (Documents)
-          ══════════════════════════════════════════════════════════════════════ */}
-          {currentStep === 3 && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Première de Couverture */}
-                <div className="p-5 rounded-2xl bg-background-secondary/40 border border-border space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ImageIcon className="w-4 h-4 text-gold" />
-                      <h3 className="font-serif font-bold text-navy text-sm">Première de Couverture</h3>
-                    </div>
-                    {coverFile && (
-                      <button
-                        type="button"
-                        onClick={handleCoverRemove}
-                        className="text-[11px] font-semibold text-rose-500 hover:underline inline-flex items-center gap-1"
-                      >
-                        <X className="w-3 h-3" /> Supprimer
-                      </button>
-                    )}
-                  </div>
+            {/* Auteurs, Éditeur, ISBN, Année */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Auteur(s) *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Pr. Jean KOUADIO, Dr. Aminata SOW"
+                  value={authorsStr}
+                  onChange={(e) => setAuthorsStr(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
 
-                  {coverPreview ? (
-                    <div className="flex items-center gap-4 p-3 rounded-xl bg-background border border-border">
-                      <img
-                        src={coverPreview}
-                        alt="Aperçu couverture"
-                        className="w-16 h-22 object-cover rounded-lg border border-border shadow-xs shrink-0"
-                      />
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-xs font-bold text-navy truncate">{coverFile?.name}</p>
-                        <p className="text-[10px] text-foreground-muted font-mono">
-                          {coverFile ? `${(coverFile.size / 1024).toFixed(1)} Ko` : ""}
-                        </p>
-                        <span className="inline-block text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 font-semibold">
-                          Couverture prête
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <FileDropzone
-                      label="Téléverser la Couverture (PNG, JPG, WEBP)"
-                      acceptTypes={[".png", ".jpg", ".jpeg", ".webp"]}
-                      selectedFileName={coverFile?.name}
-                      selectedFileSize={coverFile?.size}
-                      onFileSelect={handleCoverSelect}
-                      onFileRemove={handleCoverRemove}
-                    />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Maison d&apos;Édition *</label>
+                  {aiResult?.publisher_name && (
+                    <button
+                      type="button"
+                      onClick={() => setPublisherName(aiResult.publisher_name!)}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                      title="Appliquer l'éditeur détecté par l'IA"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.publisher_name}
+                    </button>
                   )}
-                  <p className="text-[10px] text-foreground-muted">
-                    Format recommandé : 1600x2400 px (ratio 3:4), max 10 Mo.
-                  </p>
                 </div>
+                <PublisherCombobox
+                  value={publisherName}
+                  onChange={(val) => setPublisherName(val)}
+                  placeholder="Sélectionner ou saisir l'éditeur..."
+                />
+              </div>
 
-                {/* Manuscrit PDF */}
-                <div className="p-5 rounded-2xl bg-background-secondary/40 border border-border space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Upload className="w-4 h-4 text-gold" />
-                    <h3 className="font-serif font-bold text-navy text-sm">Manuscrit &amp; Document Principal</h3>
-                  </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">ISBN-13</label>
+                <input
+                  type="text"
+                  placeholder="978-99919-X-XXX-X"
+                  value={isbn}
+                  onChange={(e) => setIsbn(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
 
-                  <FileDropzone
-                    label="Téléverser le PDF / EPUB"
-                    acceptTypes={[".pdf", ".epub"]}
-                    selectedFileName={manuscriptFile?.name}
-                    selectedFileSize={manuscriptFile?.size}
-                    onFileSelect={(f) => {
-                      setManuscriptFile(f);
-                      toast.success(`Fichier « ${f.name} » sélectionné.`);
-                    }}
-                    onFileRemove={() => setManuscriptFile(null)}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Année de Publication</label>
+                <input
+                  type="number"
+                  value={year}
+                  onChange={(e) => setYear(parseInt(e.target.value) || 2026)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
+            </div>
+
+            {/* Tarification & Disponibilité Papier */}
+            <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-4">
+              <h4 className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                <ShoppingBag className="w-4 h-4 text-gold" />
+                Options de Vente &amp; Disponibilité des Formats
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Prix Numérique */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-navy flex items-center justify-between">
+                    <span>Prix Numérique (FCFA) *</span>
+                    <span className="text-[10px] text-gold font-semibold">Accès Liseuse Immédiat</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="500"
+                    value={priceDigital}
+                    onChange={(e) => setPriceDigital(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                   />
-                  <p className="text-[10px] text-foreground-muted">
-                    Document complet avec table des matières et mentions légales.
+                </div>
+
+                {/* Prix Papier */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-navy flex items-center justify-between">
+                    <span className={!isPaperAvailable ? "text-foreground-muted" : ""}>Prix Version Papier (FCFA)</span>
+                    <span className="text-[10px] text-foreground-muted font-normal">
+                      {isPaperAvailable ? "Vente physique activée" : "Non disponible"}
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    step="500"
+                    disabled={!isPaperAvailable}
+                    value={pricePaper}
+                    onChange={(e) => setPricePaper(parseFloat(e.target.value) || 0)}
+                    className={`w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px] ${
+                      !isPaperAvailable ? "opacity-40 cursor-not-allowed bg-background-secondary" : ""
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Toggle interactif Disponibilité Papier */}
+              <div className="pt-2 border-t border-border flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-navy">Disponible en version papier physique</span>
+                  <p className="text-[11px] text-foreground-muted">
+                    {isPaperAvailable
+                      ? "Les clients pourront commander des exemplaires physiques imprimés depuis le catalogue."
+                      : "Seule la version numérique sera proposée aux lecteurs sur la plateforme."}
                   </p>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsPaperAvailable((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                    isPaperAvailable ? "bg-gold" : "bg-border"
+                  }`}
+                  role="switch"
+                  aria-checked={isPaperAvailable}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      isPaperAvailable ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
-          )}
 
-          {/* ══════════════════════════════════════════════════════════════════════
-              ÉTAPE 4 : VALIDATION (Vérification & Publication)
-          ══════════════════════════════════════════════════════════════════════ */}
-          {currentStep === 4 && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="p-5 rounded-2xl bg-background-secondary/40 border border-border space-y-4">
-                <div className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                  <div>
-                    <h3 className="font-serif font-bold text-navy text-sm">Récapitulatif avant publication</h3>
-                    <p className="text-[11px] text-foreground-muted">Vérifiez les données du produit avant son enregistrement.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-background border border-border text-xs">
-                  <div className="space-y-2">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-foreground-muted block">Titre &amp; Auteur</span>
-                      <p className="font-bold text-navy text-sm">{title || "Sans titre"}</p>
-                      <p className="text-foreground-muted">Par {authorPublisher}</p>
-                      {selectedCreator && (
-                        <span className="inline-block mt-1 text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 font-semibold">
-                          Droits de vente rattachés à : {selectedCreator.name} ({selectedCreator.role_label})
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-foreground-muted block">Catégorie &amp; Niveau</span>
-                      <p className="font-medium text-foreground">{disciplineName} • {targetAudience}</p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-foreground-muted block">Pays &amp; Nouveauté</span>
-                      <p className="font-medium text-foreground">
-                        {country} {isNewRelease && "• Classé en Nouveauté"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-foreground-muted block">Tarification</span>
-                      <p className="font-mono font-bold text-navy">
-                        Numérique : {priceDigital.toLocaleString("fr-FR")} FCFA
-                      </p>
-                      {isPaperAvailable && (
-                        <p className="font-mono text-foreground-muted">
-                          Papier : {pricePaper.toLocaleString("fr-FR")} FCFA
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-foreground-muted block">Fichiers &amp; Protection</span>
-                      <p className="text-foreground">
-                        {manuscriptFile ? `Document : ${manuscriptFile.name}` : "Aucun fichier PDF joint"}
-                      </p>
-                      <p className="text-foreground">
-                        {coverFile ? `Couverture : ${coverFile.name}` : "Couverture par défaut"}
-                      </p>
-                      <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-navy/10 text-navy font-semibold">
-                        Protection DRM LCP &amp; Filigrane activés
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2 pt-2">
-                  <label className="text-xs font-bold text-navy">Statut de Publication Immédiat</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPublicationStatus("published")}
-                      className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer transition-all ${
-                        publicationStatus === "published"
-                          ? "bg-navy/5 border-navy ring-1 ring-navy"
-                          : "bg-background border-border hover:border-gold"
-                      }`}
-                    >
-                      <div>
-                        <p className="text-xs font-bold text-navy">Publier directement</p>
-                        <p className="text-[10px] text-foreground-muted">Visible immédiatement sur le catalogue</p>
-                      </div>
-                      {publicationStatus === "published" && <CheckCircle2 className="w-4 h-4 text-gold" />}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPublicationStatus("draft")}
-                      className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer transition-all ${
-                        publicationStatus === "draft"
-                          ? "bg-navy/5 border-navy ring-1 ring-navy"
-                          : "bg-background border-border hover:border-gold"
-                      }`}
-                    >
-                      <div>
-                        <p className="text-xs font-bold text-navy">Enregistrer comme brouillon</p>
-                        <p className="text-[10px] text-foreground-muted">Non visible publiquement</p>
-                      </div>
-                      {publicationStatus === "draft" && <CheckCircle2 className="w-4 h-4 text-gold" />}
-                    </button>
-                  </div>
-                </div>
+            {/* Résumé */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                  Présentation de l&apos;Ouvrage / Résumé *
+                </label>
+                {aiResult?.summary && (
+                  <button
+                    type="button"
+                    onClick={() => setSummary(aiResult.summary)}
+                    className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    Remplacer par le résumé IA
+                  </button>
+                )}
               </div>
+              <textarea
+                rows={4}
+                required
+                placeholder="Rédigez la présentation de l'ouvrage qui apparaîtra sur le catalogue et dans la liseuse..."
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy"
+              />
             </div>
-          )}
+          </div>
 
-          {/* ══════════════════════════════════════════════════════════════════════
-              BARRE DE NAVIGATION DU STEPPER (En bas)
-          ══════════════════════════════════════════════════════════════════════ */}
-          <div className="flex items-center justify-between pt-4 border-t border-border">
+          <div className="flex justify-between items-center pt-4 border-t border-border">
             <button
-              type="button"
-              onClick={() => {
-                if (currentStep > 1) {
-                  setCurrentStep(currentStep - 1);
-                } else {
-                  router.push("/admin/catalog");
-                }
-              }}
-              className="px-5 py-2.5 rounded-xl border border-border text-xs font-bold text-navy hover:bg-background-secondary transition-colors inline-flex items-center gap-2 cursor-pointer min-h-[40px]"
+              onClick={() => setCurrentStep(1)}
+              className="px-5 py-2.5 rounded-xl border border-border text-xs font-bold text-navy hover:bg-background-secondary min-h-[44px] cursor-pointer"
             >
-              <ArrowLeft className="w-4 h-4 text-gold" />
-              <span>Retour</span>
+              ← Retour aux Fichiers
+            </button>
+            <button
+              onClick={() => setCurrentStep(3)}
+              className="px-6 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[44px] cursor-pointer"
+            >
+              Étape suivante : Classification &amp; Dewey →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── ÉTAPE 3 : CLASSIFICATION & DEWEY ─────────────────────────────────── */}
+      {currentStep === 3 && (
+        <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
+            <h3 className="font-serif font-bold text-navy text-base flex items-center gap-2">
+              <Layers className="w-5 h-5 text-gold" />
+              Classification Universelle &amp; Rattachement Institutionnel
+            </h3>
+            <div className="flex items-center gap-2">
+              <AISuggestionBadge source={aiResult ? "ai_suggested" : "manual"} />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {/* Genre & Dewey */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                    Catégories / Disciplines * <span className="text-[10px] font-normal text-foreground-muted">(Plusieurs choix possibles)</span>
+                  </label>
+                  {aiResult && (aiResult.disciplines?.length || aiResult.genre_category) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newDiscs =
+                          aiResult.disciplines && aiResult.disciplines.length > 0
+                            ? aiResult.disciplines
+                            : [aiResult.genre_category];
+                        setCategories(newDiscs);
+                        setGenreCategory(newDiscs[0] || aiResult.genre_category);
+                      }}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title="Appliquer les catégories suggérées par l'IA"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.disciplines && aiResult.disciplines.length > 0 ? aiResult.disciplines.join(", ") : aiResult.genre_category}
+                    </button>
+                  )}
+                </div>
+                <DisciplineCombobox
+                  multiple={true}
+                  values={categories}
+                  onValuesChange={(newVals) => {
+                    setCategories(newVals);
+                    if (newVals.length > 0) setGenreCategory(newVals[0]);
+                  }}
+                  disciplines={realDisciplines}
+                  placeholder="Sélectionner ou rechercher une discipline..."
+                  searchPlaceholder="Rechercher parmi les disciplines..."
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Code Dewey *</label>
+                  {aiResult?.dewey_code && (
+                    <button
+                      type="button"
+                      onClick={() => setDeweyCode(aiResult.dewey_code)}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer le code Dewey IA : ${aiResult.dewey_code}`}
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.dewey_code}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={deweyCode}
+                  onChange={(e) => setDeweyCode(e.target.value)}
+                  placeholder="Ex: 340, 840, 741.5"
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
+            </div>
+
+            {/* Université & Faculté */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Établissement (Si académique)</label>
+                  {aiResult?.institution_suggestion && (
+                    <button
+                      type="button"
+                      onClick={() => setUniversity(aiResult.institution_suggestion || "")}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer l'université suggérée : ${aiResult.institution_suggestion}`}
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.institution_suggestion.length > 25 ? `${aiResult.institution_suggestion.slice(0, 25)}...` : aiResult.institution_suggestion}
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={university}
+                  onChange={(e) => setUniversity(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                >
+                  {getUniversityOptions(aiResult?.institution_suggestion, university).map((u, i) => (
+                    <option key={i} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Faculté de Rattachement</label>
+                  {aiResult?.faculty_suggestion && (
+                    <button
+                      type="button"
+                      onClick={() => setFaculty(aiResult.faculty_suggestion || "")}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer la faculté suggérée : ${aiResult.faculty_suggestion}`}
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.faculty_suggestion.length > 25 ? `${aiResult.faculty_suggestion.slice(0, 25)}...` : aiResult.faculty_suggestion}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={faculty}
+                  onChange={(e) => setFaculty(e.target.value)}
+                  placeholder="Ex: Faculté de Droit (FADESP) ou vide si roman/manga"
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
+            </div>
+
+            {/* Langue, Pays, Public Cible */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Langue</label>
+                  {aiResult?.language && (
+                    <button
+                      type="button"
+                      onClick={() => setLanguage(matchLanguage(aiResult.language))}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer la langue IA : ${matchLanguage(aiResult.language)}`}
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {matchLanguage(aiResult.language)}
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                >
+                  {getLanguageOptions(aiResult?.language ? matchLanguage(aiResult.language) : null, language).map((lang, i) => (
+                    <option key={i} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays d&apos;Ancrage</label>
+                  {aiResult?.country && (
+                    <button
+                      type="button"
+                      onClick={() => setCountry(matchCountry(aiResult.country))}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer le pays IA : ${matchCountry(aiResult.country)}`}
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {matchCountry(aiResult.country)}
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                >
+                  {getCountryOptions(aiResult?.country ? matchCountry(aiResult.country) : null, country).map((c, i) => (
+                    <option key={i} value={c.code}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Public Cible</label>
+                  {aiResult?.target_audience && (
+                    <button
+                      type="button"
+                      onClick={() => setTargetAudience(aiResult.target_audience)}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      title={`Appliquer le public cible IA : ${aiResult.target_audience}`}
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA : {aiResult.target_audience.length > 18 ? `${aiResult.target_audience.slice(0, 18)}...` : aiResult.target_audience}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={targetAudience}
+                  onChange={(e) => setTargetAudience(e.target.value)}
+                  placeholder="Grand Public, Étudiants, etc."
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center pt-4 border-t border-border">
+            <button
+              onClick={() => setCurrentStep(2)}
+              className="px-5 py-2.5 rounded-xl border border-border text-xs font-bold text-navy hover:bg-background-secondary min-h-[44px] cursor-pointer"
+            >
+              ← Retour aux Métadonnées
+            </button>
+            <button
+              onClick={() => setCurrentStep(4)}
+              className="px-6 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[44px] cursor-pointer"
+            >
+              Étape suivante : Récapitulatif &amp; Publication →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── ÉTAPE 4 : RÉCAPITULATIF & PUBLICATION DIRECTE ────────────────────── */}
+      {currentStep === 4 && (
+        <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <h3 className="font-serif font-bold text-navy text-base flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-gold" />
+              Récapitulatif &amp; Publication Directe
+            </h3>
+            <div className="flex items-center gap-2">
+              <AISuggestionBadge source={aiResult ? "ai_suggested" : "manual"} />
+              <span className="px-3 py-1 rounded-full bg-gold/15 text-navy text-xs font-bold uppercase tracking-wider border border-gold/30 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-gold" />
+                Publication Immédiate
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start">
+            {/* Aperçu Couverture 3D */}
+            <div className="w-full flex flex-col items-center justify-center p-4 rounded-2xl bg-navy/5 border border-border shadow-xs">
+              <BookCover3D
+                title={title || "Titre de l'ouvrage"}
+                authors={authorsStr || "Auteur LAHA"}
+                discipline={faculty || genreCategory}
+                coverUrl={coverPreview}
+                size="md"
+              />
+              <span className="text-[10px] text-navy font-bold uppercase tracking-wider mt-2 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-gold" />
+                Rendu Vitrine 3D
+              </span>
+            </div>
+
+            {/* Fiche Technique */}
+            <div className="sm:col-span-2 space-y-3 text-xs">
+              <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-serif font-bold text-navy text-base">{title}</h4>
+                    {subtitle && <p className="text-foreground-muted">{subtitle}</p>}
+                  </div>
+                  <span className="text-[10px] font-bold text-gold uppercase px-2 py-0.5 rounded bg-gold/10">
+                    Dewey {deweyCode}
+                  </span>
+                </div>
+                <p className="text-foreground font-semibold">Auteur(s) : {authorsStr || "Auteur LAHA"}</p>
+                <p className="text-foreground font-semibold">
+                  Maison d&apos;Édition : <span className="text-gold">{publisherName || "Non spécifiée"}</span>
+                </p>
+                <p className="text-foreground-muted">Genre : {genreCategory}</p>
+
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border">
+                  <div>
+                    <span className="text-[10px] text-foreground-muted uppercase font-bold">Prix Numérique</span>
+                    <p className="text-xs font-bold text-navy font-mono">{priceDigital.toLocaleString("fr-FR")} XOF</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-foreground-muted uppercase font-bold">Version Papier</span>
+                    <p className="text-xs font-bold text-navy font-mono">
+                      {isPaperAvailable ? `${pricePaper.toLocaleString("fr-FR")} XOF (Disponible)` : "Non disponible"}
+                    </p>
+                  </div>
+                </div>
+
+                {university && university !== "Non affilié (Grand Public / Fiction / Scolaire)" && (
+                  <p className="text-navy font-bold flex items-center gap-1 pt-1 border-t border-border">
+                    <GraduationCap className="w-3.5 h-3.5 text-gold" />
+                    {university} {faculty ? `• ${faculty}` : ""}
+                  </p>
+                )}
+                <p className="text-foreground-muted leading-relaxed line-clamp-3 pt-1 border-t border-border">
+                  {summary || "Aucun résumé fourni."}
+                </p>
+              </div>
+
+              {/* Notice ONIX XML */}
+              {onixXml && (
+                <div className="p-3 rounded-xl bg-navy/5 border border-border space-y-1">
+                  <div className="flex items-center gap-1.5 text-navy font-bold text-[11px]">
+                    <FileCode className="w-3.5 h-3.5 text-gold" />
+                    Notice XML ONIX 3.0 prête pour l&apos;export
+                  </div>
+                  <pre className="text-[10px] text-foreground-muted max-h-24 overflow-y-auto font-mono bg-background p-2 rounded border border-border">
+                    {onixXml}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center pt-4 border-t border-border">
+            <button
+              onClick={() => setCurrentStep(3)}
+              className="px-5 py-2.5 rounded-xl border border-border text-xs font-bold text-navy hover:bg-background-secondary min-h-[44px] cursor-pointer"
+            >
+              ← Modifier la Classification
             </button>
 
-            {currentStep < 4 ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (currentStep === 1 && !title.trim()) {
-                    toast.error("Veuillez renseigner le titre du livre.");
-                    return;
-                  }
-                  setCurrentStep(currentStep + 1);
-                }}
-                className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 cursor-pointer shadow-xs min-h-[40px]"
-              >
-                <span>Continuer</span>
-                <ArrowRight className="w-4 h-4 text-gold" />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 cursor-pointer shadow-xs min-h-[40px]"
-              >
-                {submitting ? (
-                  <InlineLoader size={16} />
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 text-gold" />
-                    <span>Créer et publier le produit</span>
-                  </>
-                )}
-              </button>
-            )}
+            <button
+              onClick={handleDirectPublish}
+              disabled={saving}
+              className="px-6 py-3 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs sm:text-sm font-bold flex items-center gap-2 shadow-md transition-all min-h-[44px] cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4 text-navy" />
+              {saving ? "Publication en cours..." : "Ajouter & Publier Immédiatement au Catalogue"}
+            </button>
           </div>
-        </form>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
