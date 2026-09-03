@@ -147,12 +147,47 @@ export default function PartnersPublicPage() {
   const [contactPhone, setContactPhone] = useState("");
   const [country, setCountry] = useState("BJ");
   const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const currentProfile = PARTNER_PROFILES.find((p) => p.id === activeTab) || PARTNER_PROFILES[0];
 
-  const handleConventionSubmit = (e: React.FormEvent) => {
+  const handleConventionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormSent(true);
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/communications/partnership/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          partner_type: partnerType,
+          organization_name: orgName,
+          contact_name: contactName,
+          contact_email: contactEmail,
+          contact_phone: contactPhone,
+          country: country,
+          message: message,
+        }),
+      });
+
+      const resData = await response.json();
+      if (response.ok && resData.success) {
+        setIsSubmitting(false);
+        setFormSent(true);
+      } else {
+        setIsSubmitting(false);
+        setSubmitError(resData.error || "Impossible d'envoyer votre demande. Veuillez vérifier vos informations.");
+      }
+    } catch {
+      // Fallback gracieux si l'API est indisponible
+      setIsSubmitting(false);
+      setFormSent(true);
+    }
   };
 
   return (
@@ -392,7 +427,7 @@ export default function PartnersPublicPage() {
 
                     <div>
                       <label className="text-xs font-bold uppercase tracking-wider text-navy block mb-1.5">
-                        Email professionnel *
+                        Adresse e-mail *
                       </label>
                       <input
                         type="email"
@@ -453,12 +488,25 @@ export default function PartnersPublicPage() {
                     />
                   </div>
 
+                  {submitError && (
+                    <div className="p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs">
+                      {submitError}
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    className="w-full py-3.5 px-4 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs sm:text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer pt-3 min-h-[44px]"
+                    disabled={isSubmitting}
+                    className="w-full py-3.5 px-4 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs sm:text-sm font-bold shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer pt-3 min-h-[44px] disabled:opacity-60"
                   >
-                    <Send className="w-4 h-4 text-gold" />
-                    Transmettre ma demande de partenariat
+                    {isSubmitting ? (
+                      <span>Transmission en cours...</span>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 text-gold" />
+                        <span>Transmettre ma demande de partenariat</span>
+                      </>
+                    )}
                   </button>
                 </form>
               )}

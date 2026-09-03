@@ -1,0 +1,50 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Bordereau de Droits d'Auteur • LAHAThèque{% endblock %}
+{% block badge_header %}Droits d'Auteur • Bordereau Joint{% endblock %}
+
+{% block email_title %}Votre Relevé de Droits d'Auteur est disponible{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>{{ recipient_name|default:"Cher Auteur" }}</strong>,
+</p>
+<p style="margin: 0 0 24px 0; line-height: 1.65;">
+    La direction financière de LAHAThèque a clôturé le décompte de vos droits d'auteur pour la période : <strong>{{ period|default:"Trimestre en cours" }}</strong>.
+</p>
+
+<!-- Boîte Synthèse Soft -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 14px;">
+        Synthèse Financière
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Réf. Bordereau :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ reference }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Taux Contractuel :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600; color: #B08D42;">{{ royalty_rate|default:"15" }} %</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding-top: 14px; border-top: 1px solid #F1F5F9; font-size: 14px; font-weight: 600;" class="text-dark-adapt divider-soft">
+                Montant Net Viré :
+            </td>
+            <td align="right" style="padding-top: 14px; border-top: 1px solid #F1F5F9; font-size: 16px; font-weight: 700; color: #B08D42;" class="divider-soft">
+                {{ net_amount }} {{ currency|default:"FCFA" }}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<p style="font-size: 12px; color: #64748B; margin: 0 0 24px 0; line-height: 1.5;" class="text-muted-adapt">
+    Le bordereau officiel certifié (Réf: Bordereau_{{ reference }}.pdf) est attaché à ce courriel au format PDF.
+</p>
+
+<div style="text-align: center; margin: 28px 0 20px 0;">
+    <a href="{{ site_url }}/author/royalties" class="btn-navy" style="background-color: #1B2A4E; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 13px 28px; border-radius: 6px; display: inline-block; border: 0;">
+        Consulter mon Espace Auteur
+    </a>
+</div>
+{% endblock %}

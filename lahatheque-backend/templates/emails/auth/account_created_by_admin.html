@@ -1,0 +1,42 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Vos accès à la plateforme LAHAThèque{% endblock %}
+{% block badge_header %}Création de Compte Officielle{% endblock %}
+
+{% block email_title %}Bienvenue sur LAHAThèque{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>{{ recipient_name|default:"Cher Membre" }}</strong>,
+</p>
+<p style="margin: 0 0 24px 0; line-height: 1.65;">
+    Un compte d'accès officiel vous a été créé par l'administration LAHAThèque avec le rôle : <strong>{{ role_display|default:"Utilisateur" }}</strong>.
+</p>
+
+<!-- Boîte Identifiants Soft -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 14px;">
+        Vos Identifiants de Connexion
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Adresse Email :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600; font-family: monospace;" class="text-dark-adapt">{{ email }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Mot de passe temporaire :</td>
+            <td align="right" style="padding: 7px 0; font-size: 14px; font-weight: 700; color: #B08D42; font-family: monospace; letter-spacing: 1px;">{{ temporary_password }}</td>
+        </tr>
+    </table>
+</div>
+
+<p style="font-size: 12px; color: #64748B; margin: 0 0 24px 0; line-height: 1.5;" class="text-muted-adapt">
+    Pour votre sécurité, nous vous invitons à modifier ce mot de passe temporaire dès votre première connexion.
+</p>
+
+<div style="text-align: center; margin: 28px 0 20px 0;">
+    <a href="{{ login_url|default:site_url }}" class="btn-gold" style="background-color: #B08D42; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 13px 28px; border-radius: 6px; display: inline-block; border: 0;">
+        Se Connecter
+    </a>
+</div>
+{% endblock %}

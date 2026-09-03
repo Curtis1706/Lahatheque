@@ -1,0 +1,68 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Dépôt de Manuscrit Confirmé • Dossier #{{ reference }} • LAHAThèque{% endblock %}
+{% block badge_header %}Comité de Lecture • Dépôt Enregistré{% endblock %}
+
+{% block email_title %}Votre manuscrit a été transmis au Comité Éditorial{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>{{ first_name }} {{ last_name }}</strong>,
+</p>
+<p style="margin: 0 0 24px 0; line-height: 1.65;">
+    Nous accusons bonne réception de votre manuscrit intitulé <strong>« {{ book_title }} »</strong>. Votre soumission a été enregistrée sous la référence de dossier : <strong>{{ reference }}</strong>.
+</p>
+
+<!-- Boîte Récapitulatif de l'Œuvre Soft -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 14px;">
+        Détails de votre Dépôt
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Numéro de dossier :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 700; color: #1B2A4E;" class="text-dark-adapt">{{ reference }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Titre de l'ouvrage :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ book_title }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Genre littéraire / Discipline :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ genre }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 7px 0; font-size: 13px;" class="text-muted-adapt">Pays :</td>
+            <td align="right" style="padding: 7px 0; font-size: 13px; font-weight: 600;" class="text-dark-adapt">{{ country_name|default:country }}</td>
+        </tr>
+    </table>
+    
+    {% if summary %}
+    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #F1F5F9;" class="divider-soft">
+        <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #64748B; margin-bottom: 6px;">
+            Synopsis / Résumé transmis :
+        </div>
+        <div style="font-size: 13px; color: #334155; line-height: 1.6;" class="text-muted-adapt">
+            {{ summary|linebreaks }}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Étapes du Parcours Éditorial Soft -->
+<div style="margin-bottom: 24px;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #1B2A4E; letter-spacing: 0.8px; margin-bottom: 12px;">
+        Prochaines étapes de votre parcours éditorial
+    </div>
+    <div style="font-size: 13px; color: #475569; line-height: 1.65;">
+        <strong>1. Dépôt &amp; Enregistrement</strong> : Terminé avec succès.<br>
+        <strong>2. Analyse Éditoriale</strong> : Étude du texte par notre comité de lecture (délai indicatif de <strong>15 à 30 jours</strong>).<br>
+        <strong>3. Définition du Cadre Éditorial</strong> : Proposition du contrat d'édition adapté (Compte d'éditeur, Compte d'auteur ou Coproduction).<br>
+        <strong>4. Publication &amp; Diffusion Panafricaine</strong> : Préparation graphique, validation BAT et mise en ligne protégée DRM.
+    </div>
+</div>
+
+<p style="font-size: 12px; color: #64748B; margin: 0 0 20px 0; line-height: 1.5;" class="text-muted-adapt">
+    Vos droits d'auteur et la confidentialité de votre manuscrit sont strictement protégés dès cet enregistrement conforme aux traités internationaux (OAPI / OMPI).
+</p>
+{% endblock %}

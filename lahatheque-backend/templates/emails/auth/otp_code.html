@@ -1,0 +1,26 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Votre code de sécurité • LAHAThèque{% endblock %}
+{% block badge_header %}Vérification Sécurisée{% endblock %}
+
+{% block email_title %}Votre Code d'Authentification{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>{{ recipient_name|default:"Cher Membre" }}</strong>,
+</p>
+<p style="margin: 0 0 24px 0; line-height: 1.65;">
+    Voici votre code de sécurité à usage unique pour valider votre opération sur LAHAThèque :
+</p>
+
+<!-- Bloc Code OTP Soft (Zéro Bordure Agressive) -->
+<div style="text-align: center; margin: 24px 0 28px 0;">
+    <div style="display: inline-block; background-color: #1B2A4E; color: #FFFFFF; font-family: monospace; font-size: 30px; font-weight: 700; letter-spacing: 6px; padding: 16px 32px; border-radius: 6px; border: 0;">
+        {{ otp_code }}
+    </div>
+</div>
+
+<p style="margin: 0; font-size: 12px; color: #64748B; text-align: center; line-height: 1.5;" class="text-muted-adapt">
+    Ce code est strictement personnel et expire dans <strong>10 minutes</strong>.
+</p>
+{% endblock %}

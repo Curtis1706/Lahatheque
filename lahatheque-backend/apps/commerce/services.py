@@ -56,6 +56,10 @@ def _unlock_order_content(commande):
 def _notify_order_finalized(commande, context_label):
     from apps.reporting.services import notify_user
     from apps.reporting.models import Notification
+    from apps.communications.services.email_service import send_transactional_email
+    from .models import LigneCommande
+
+    # 1. Notification in-app interne
     try:
         notify_user(
             user=commande.user,
@@ -69,7 +73,63 @@ def _notify_order_finalized(commande, context_label):
             resource_id=str(commande.id),
         )
     except Exception as e:
-        logger.warning(f"[Commerce] Erreur notification: {e}")
+        logger.warning(f"[Commerce] Erreur notification in-app: {e}")
+
+    # 2. Envoi d'email transactionnel officiel avec Facture PDF jointe
+    try:
+        if commande.user and commande.user.email:
+            lignes = LigneCommande.objects.filter(commande=commande).select_related('ouvrage')
+            items_list = []
+            has_physical = False
+            for l in lignes:
+                if l.format_type in ('paper', 'papier'):
+                    has_physical = True
+                items_list.append({
+                    "title": l.ouvrage.title if l.ouvrage else "Ouvrage LAHAThèque",
+                    "quantity": l.quantity,
+                    "unit_price": float(l.unit_price or 0.0),
+                    "total": float(l.total_price or (l.quantity * (l.unit_price or 0))),
+                })
+
+            order_num = str(getattr(commande, 'numero_commande', '') or str(commande.id)[:8])
+            full_name = f"{commande.user.first_name or ''} {commande.user.last_name or ''}".strip() or str(commande.user.email)
+            total_amt = float(getattr(commande, 'total_ttc', 0.0) or getattr(commande, 'total_amount', 0.0) or 0.0)
+
+            pdf_invoice_data = {
+                "order_number": order_num,
+                "customer_name": full_name,
+                "customer_email": str(commande.user.email),
+                "customer_address": getattr(commande, 'shipping_address', 'Cotonou, Bénin') or 'Cotonou, Bénin',
+                "date": commande.created_at.strftime("%d/%m/%Y") if hasattr(commande, 'created_at') and commande.created_at else timezone.now().strftime("%d/%m/%Y"),
+                "items": items_list,
+                "total_amount": total_amt,
+                "currency": getattr(commande, 'currency', 'FCFA') or 'FCFA',
+                "payment_method": context_label,
+                "is_paid": (commande.statut_paiement == 'paid'),
+            }
+
+            send_transactional_email(
+                email_type="order_confirmation_client",
+                to_email=str(commande.user.email),
+                subject=f"Confirmation de commande #{order_num} • Facture Acquittée",
+                template_name="emails/orders/confirmation_client.html",
+                context={
+                    "recipient_name": full_name,
+                    "order_number": order_num,
+                    "order_date": pdf_invoice_data["date"],
+                    "items": items_list,
+                    "total_amount": f"{total_amt:,.0f}".replace(",", " "),
+                    "currency": pdf_invoice_data["currency"],
+                    "is_physical": has_physical,
+                },
+                recipient_name=full_name,
+                pdf_invoice_data=pdf_invoice_data,
+                async_send=True,
+            )
+            logger.info(f"[Commerce] Email de confirmation avec facture PDF déclenché pour commande {order_num} vers {commande.user.email}")
+    except Exception as mail_err:
+        logger.error(f"[Commerce] Erreur envoi email facture pour commande {commande.id}: {mail_err}")
+
 
 
 def handle_payment_success(payment_tx):

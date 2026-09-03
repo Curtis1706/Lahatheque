@@ -54,205 +54,53 @@ def send_account_creation_welcome_email(user: User, temporary_password: str) -> 
     Envoie un email de bienvenue officiel, complet et élégant à l'utilisateur lors de la création de son compte.
     Charte graphique LAHAThèque (Navy #1B2A4E & Or #B08D42).
     """
-    role_label = ROLE_LABELS.get(user.role, user.role.capitalize())
-    role_guide = ROLE_GUIDES.get(user.role, "Bienvenue sur votre espace connecté LAHAThèque.")
+    from apps.communications.services.email_service import send_transactional_email
+
+    user_role_str = str(user.role or "student")
+    role_label = ROLE_LABELS.get(user_role_str, user_role_str.capitalize())
+    full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or str(user.email)
+    user_email_str = str(user.email)
     login_url = "https://lahatheque.com/login"
 
-    full_name = f"{user.first_name} {user.last_name}".strip() or user.email
-    subject = f"Bienvenue sur LAHAThèque — Vos identifiants d'accès ({role_label})"
-    
-    text_content = f"""Bonjour {full_name},
+    res = send_transactional_email(
+        email_type="account_created_by_admin",
+        to_email=user_email_str,
+        subject=f"Bienvenue sur LAHAThèque — Vos identifiants d'accès ({role_label})",
+        template_name="emails/auth/account_created_by_admin.html",
+        context={
+            "recipient_name": full_name,
+            "email": user_email_str,
+            "temporary_password": temporary_password,
+            "role_display": role_label,
+            "login_url": login_url,
+        },
+        recipient_name=full_name,
+        async_send=True,
+    )
+    return res.success
 
-L'équipe LAHAThèque a le plaisir de vous annoncer la création de votre compte d'accès officiel sur notre plateforme académique et universitaire.
-
-Voici vos identifiants de connexion confidentiels :
-==================================================
-• Adresse e-mail de connexion : {user.email}
-• Mot de passe temporaire : {temporary_password}
-• Rôle attribué : {role_label}
-• Page de connexion : {login_url}
-==================================================
-
-VOTRE GUIDE D'ACCÈS MÉTIER :
-{role_guide}
-
-CONSIGNES DE SÉCURITÉ :
-Pour garantir la stricte confidentialité et la sécurité de vos données, nous vous recommandons de remplacer ce mot de passe temporaire dès votre première ouverture de session via la rubrique Mon Profil.
-
-Cordialement,
-L'équipe LAHAThèque
-Éditions LAHA & Partenaires Académiques
-contact@lahacademia.com
-"""
-
-    html_content = f"""
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{subject}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#F5F7FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1E293B;">
-  <table role="presentation" style="width:100%;border-collapse:collapse;background-color:#F5F7FA;padding:35px 15px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" style="max-width:600px;width:100%;border-collapse:collapse;background-color:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.06);border:1px solid #E2E8F0;">
-          <!-- Header Banner -->
-          <tr>
-            <td style="background-color:#1B2A4E;padding:32px 30px;text-align:center;">
-              <h1 style="color:#FFFFFF;font-size:24px;font-weight:bold;margin:0;letter-spacing:0.5px;">LAHAThèque</h1>
-              <p style="color:#B08D42;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;margin:6px 0 0 0;">Bibliothèque Numérique & Académique Africaine</p>
-            </td>
-          </tr>
-
-          <!-- Body Content -->
-          <tr>
-            <td style="padding:32px 30px;">
-              <h2 style="color:#0F1A33;font-size:18px;font-weight:bold;margin:0 0 12px 0;">Bonjour {full_name},</h2>
-              <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 20px 0;">
-                L'équipe <strong>LAHAThèque</strong> a le plaisir de vous annoncer la création de votre compte officiel avec le profil de <span style="display:inline-block;padding:2px 10px;background-color:#EBF3FF;color:#1B2A4E;border-radius:999px;font-weight:bold;font-size:12px;">{role_label}</span>.
-              </p>
-
-              <!-- Credentials Box -->
-              <table role="presentation" style="width:100%;background-color:#F8FAFC;border:1px solid #CBD5E1;border-radius:12px;margin:0 0 24px 0;padding:18px;">
-                <tr>
-                  <td>
-                    <div style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;margin-bottom:12px;letter-spacing:0.5px;">Vos Paramètres d'Accès Sécurisés</div>
-                    <table role="presentation" style="width:100%;font-size:13px;">
-                      <tr>
-                        <td style="color:#64748B;padding:4px 0;width:150px;">E-mail de connexion :</td>
-                        <td style="color:#0F1A33;font-weight:bold;padding:4px 0;font-family:monospace;">{user.email}</td>
-                      </tr>
-                      <tr>
-                        <td style="color:#64748B;padding:4px 0;">Mot de passe temporaire :</td>
-                        <td style="color:#92400E;font-weight:bold;padding:4px 0;font-family:monospace;background-color:#FEF3C7;display:inline-block;padding:2px 8px;border-radius:6px;">{temporary_password}</td>
-                      </tr>
-                      <tr>
-                        <td style="color:#64748B;padding:4px 0;">Rôle assigné :</td>
-                        <td style="color:#1B2A4E;font-weight:bold;padding:4px 0;">{role_label}</td>
-                      </tr>
-                      <tr>
-                        <td style="color:#64748B;padding:4px 0;">Statut :</td>
-                        <td style="color:#16A34A;font-weight:bold;padding:4px 0;">Actif & Validé</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Role Context Guide -->
-              <div style="background-color:#FFFBEB;border-left:4px solid #B08D42;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px 0;">
-                <p style="color:#78350F;font-size:13px;line-height:1.5;margin:0;">
-                  <strong>Ce que vous pouvez faire :</strong> {role_guide}
-                </p>
-              </div>
-
-              <!-- Action CTA Button -->
-              <table role="presentation" style="width:100%;text-align:center;margin:0 0 24px 0;">
-                <tr>
-                  <td align="center">
-                    <a href="{login_url}" target="_blank" style="display:inline-block;background-color:#1B2A4E;color:#FFFFFF;padding:14px 32px;font-size:14px;font-weight:bold;text-decoration:none;border-radius:10px;box-shadow:0 4px 12px rgba(27,42,78,0.25);">
-                      Accéder à mon Espace Connecté
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="color:#94A3B8;font-size:12px;line-height:1.5;margin:0;border-top:1px solid #E2E8F0;padding-top:16px;">
-                <strong>Consigne de sécurité :</strong> Pour des raisons de confidentialité, nous vous recommandons de remplacer ce mot de passe temporaire dès votre première connexion dans les réglages de votre profil.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background-color:#F8FAFC;padding:20px 30px;border-top:1px solid #E2E8F0;text-align:center;">
-              <p style="color:#94A3B8;font-size:11px;margin:0;">
-                LAHAThèque • Éditions LAHA & Réseau Universitaire Africain<br>
-                Pour toute question ou assistance technique : <a href="mailto:contact@lahacademia.com" style="color:#B08D42;text-decoration:none;">contact@lahacademia.com</a>
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-"""
-
-    try:
-        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'LAHATHEQUE <contact@lahacademia.com>')
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=text_content,
-            from_email=from_email,
-            to=[user.email]
-        )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send(fail_silently=False)
-        logger.info(f"Email de bienvenue avec accès transmis avec succès à {user.email}")
-        return True
-    except Exception as e:
-        logger.error(f"Erreur lors de l'envoi de l'email de bienvenue à {user.email}: {e}")
-        return False
 
 
 def send_custom_notification_email(recipient_email: str, recipient_name: str, subject: str, body_text: str) -> bool:
     """
-    Envoie un email personnalisé rédigé par l'administrateur.
+    Envoie un email personnalisé rédigé par l'administrateur depuis SendEmailModal.
     """
-    html_content = f"""
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>{subject}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#F5F7FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1E293B;">
-  <table role="presentation" style="width:100%;border-collapse:collapse;background-color:#F5F7FA;padding:30px 15px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" style="max-width:600px;width:100%;border-collapse:collapse;background-color:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.06);border:1px solid #E2E8F0;">
-          <tr>
-            <td style="background-color:#1B2A4E;padding:24px 30px;text-align:center;">
-              <h1 style="color:#FFFFFF;font-size:22px;font-weight:bold;margin:0;">LAHAThèque</h1>
-              <p style="color:#B08D42;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:4px 0 0 0;">Communication Administrative Officielle</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:30px;">
-              <h2 style="color:#0F1A33;font-size:16px;font-weight:bold;margin:0 0 16px 0;">Bonjour {recipient_name},</h2>
-              <div style="color:#334155;font-size:14px;line-height:1.6;white-space:pre-wrap;background-color:#F8FAFC;padding:16px;border-radius:10px;border:1px solid #E2E8F0;">{body_text}</div>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#F8FAFC;padding:16px 30px;border-top:1px solid #E2E8F0;text-align:center;">
-              <p style="color:#94A3B8;font-size:11px;margin:0;">LAHAThèque • contact@lahacademia.com</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
- </body>
-</html>
-"""
-    try:
-        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'LAHATHEQUE <contact@lahacademia.com>')
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=body_text,
-            from_email=from_email,
-            to=[recipient_email]
-        )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send(fail_silently=False)
-        return True
-    except Exception as e:
-        logger.error(f"Erreur envoi email personnalisé à {recipient_email}: {e}")
-        return False
+    from apps.communications.services.email_service import send_transactional_email
+
+    res = send_transactional_email(
+        email_type="admin_custom_user_email",
+        to_email=recipient_email,
+        subject=subject,
+        template_name="emails/admin/custom_message.html",
+        context={
+            "recipient_name": recipient_name,
+            "custom_subject": subject,
+            "message_body": body_text,
+        },
+        recipient_name=recipient_name,
+        async_send=True,
+    )
+    return res.success
 
 
 class StandardResultsSetPagination(PageNumberPagination):

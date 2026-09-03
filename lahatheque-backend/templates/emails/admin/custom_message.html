@@ -1,0 +1,29 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}{{ custom_subject|default:"Message officiel de la Direction LAHAThèque" }}{% endblock %}
+{% block badge_header %}Communication Officielle{% endblock %}
+
+{% block email_title %}{{ custom_subject|default:"Communication Officielle" }}{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>{{ recipient_name|default:"Cher Membre" }}</strong>,
+</p>
+
+<!-- Corps du Message Soft -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; font-size: 14px; line-height: 1.7; color: #1E293B; border: 0;">
+    {{ message_body|linebreaks }}
+</div>
+
+{% if action_url %}
+<div style="text-align: center; margin: 28px 0 20px 0;">
+    <a href="{{ action_url }}" class="btn-gold" style="background-color: #B08D42; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 13px 28px; border-radius: 6px; display: inline-block; border: 0;">
+        {{ action_text|default:"Accéder à la Plateforme" }}
+    </a>
+</div>
+{% endif %}
+
+<p style="margin: 20px 0 0 0; font-size: 12px; color: #64748B; line-height: 1.5;" class="text-muted-adapt">
+    Pour toute question, vous pouvez répondre directement à ce message ou écrire à <a href="mailto:contact@mail.lahalex.com" style="color: #B08D42; text-decoration: none;">contact@mail.lahalex.com</a>.
+</p>
+{% endblock %}
