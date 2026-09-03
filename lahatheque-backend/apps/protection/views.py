@@ -168,7 +168,7 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
                     "access_type": "read_chunk",
                     "ip_address": student_ip,
                     "country": country,
-                    "device_fingerprint": s.user_agent or f"Web ({partner_name})",
+                    "device_fingerprint": (s.metadata.get("user_agent") if isinstance(s.metadata, dict) else None) or f"Web ({partner_name})",
                     "current_page": current_page,
                     "total_pages": total_pages,
                     "progress_percent": progress_percent,
