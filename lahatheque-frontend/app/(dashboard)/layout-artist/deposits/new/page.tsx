@@ -52,7 +52,8 @@ import {
   getCountryOptions, 
   getGenreOptions 
 } from "@/lib/constants/classification";
-import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
+import { type DisciplineItem } from "@/lib/services/classification";
+import { useDisciplines } from "@/lib/hooks/use-disciplines";
 
 export default function NewDepositPage() {
   const router = useRouter();
@@ -98,7 +99,7 @@ export default function NewDepositPage() {
   const [pricePaper, setPricePaper] = useState(7500);
 
   // Classification State
-  const [realDisciplines, setRealDisciplines] = useState<DisciplineItem[]>([]);
+  const { disciplines: realDisciplines, loading: disciplinesLoading } = useDisciplines();
   const [genreCategory, setGenreCategory] = useState("Littérature Africaine & Conte");
   const [deweyCode, setDeweyCode] = useState("800");
   const [country, setCountry] = useState("BJ");
@@ -113,13 +114,33 @@ export default function NewDepositPage() {
   const [aiResult, setAiResult] = useState<AiBookAnalysisResult | null>(null);
   const [hasAppliedAi, setHasAppliedAi] = useState(false);
 
-  React.useEffect(() => {
-    getDisciplines().then((res) => {
-      if (res && res.length > 0) {
-        setRealDisciplines(res);
-      }
-    });
+  const disciplineOptions: SearchableOption[] = React.useMemo(() => {
+    const list: SearchableOption[] = realDisciplines.length > 0
+      ? realDisciplines.map((d) => ({
+          value: d.name,
+          label: d.name,
+          subtitle: d.code_dewey ? `Dewey ${d.code_dewey}` : undefined,
+          badge: d.code_dewey || undefined,
+        }))
+      : getGenreOptions(aiResult?.genre_category, genreCategory).map((g) => ({
+          value: g.label,
+          label: g.label,
+          subtitle: g.dewey ? `Dewey ${g.dewey}` : undefined,
+          badge: g.dewey || undefined,
+        }));
 
+    if (genreCategory && !list.some((o) => o.value === genreCategory)) {
+      list.unshift({
+        value: genreCategory,
+        label: genreCategory,
+        subtitle: deweyCode ? `Dewey ${deweyCode}` : undefined,
+        badge: deweyCode || undefined,
+      });
+    }
+    return list;
+  }, [realDisciplines, aiResult?.genre_category, genreCategory, deweyCode]);
+
+  React.useEffect(() => {
     // Préchargement automatique des dossiers de pré-édition et auteurs
     setLoadingPreEditions(true);
     Promise.all([
@@ -1130,23 +1151,15 @@ export default function NewDepositPage() {
                     </button>
                   )}
                 </div>
-                <select
+                <SearchableSelect
+                  options={disciplineOptions}
                   value={genreCategory}
-                  onChange={(e) => handleGenreChange(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                >
-                  {realDisciplines.length > 0
-                    ? realDisciplines.map((d) => (
-                        <option key={d.id} value={d.name}>
-                          {d.name} {d.code_dewey ? `(${d.code_dewey})` : ""}
-                        </option>
-                      ))
-                    : getGenreOptions(aiResult?.genre_category, genreCategory).map((g, i) => (
-                        <option key={i} value={g.label}>
-                          {g.label} ({g.dewey})
-                        </option>
-                      ))}
-                </select>
+                  onChange={(val) => handleGenreChange(val)}
+                  placeholder={disciplinesLoading && realDisciplines.length === 0 ? "Chargement des disciplines..." : "Sélectionner ou rechercher une discipline..."}
+                  searchPlaceholder="Rechercher parmi les 900+ disciplines (nom, Dewey)..."
+                  emptyMessage="Aucune discipline trouvée pour cette recherche."
+                  disabled={disciplinesLoading && realDisciplines.length === 0}
+                />
               </div>
 
               <div className="space-y-1.5">
