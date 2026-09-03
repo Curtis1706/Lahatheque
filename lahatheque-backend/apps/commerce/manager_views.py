@@ -271,6 +271,15 @@ class StockRestockView(APIView):
         )
 
         s.refresh_from_db()
+
+        # Le réapprovisionnement réel est le signal le plus fiable qu'un livre est
+        # désormais disponible en version papier — l'activer automatiquement s'il ne
+        # l'était pas déjà, pour ne jamais laisser du stock réel invisible côté Client.
+        target_ouvrage = s.ouvrage
+        if target_ouvrage and not target_ouvrage.is_paper_available:
+            target_ouvrage.is_paper_available = True
+            target_ouvrage.save(update_fields=['is_paper_available'])
+
         return Response({"success": True, "data": {"quantite_reelle": s.quantite_reelle, "statut": s.statut}, "error": None})
 
 
