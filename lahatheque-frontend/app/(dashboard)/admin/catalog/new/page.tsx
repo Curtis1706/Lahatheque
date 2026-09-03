@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -36,6 +36,7 @@ import { PublisherCombobox } from "@/components/features/catalog/publisher-combo
 import type { CreatorOption } from "@/lib/services/creators";
 import { AFRICAN_COUNTRIES_PRESET } from "@/lib/services/countries";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 
 export default function AdminNewProductPage() {
   const router = useRouter();
@@ -92,6 +93,26 @@ export default function AdminNewProductPage() {
     }
     loadDisciplines();
   }, []);
+
+  const disciplineOptions: SearchableOption[] = useMemo(() => {
+    if (disciplinesList.length > 0) {
+      return disciplinesList.map((d) => ({
+        value: d.name,
+        label: d.name,
+        subtitle: d.code_dewey ? `Dewey ${d.code_dewey}` : undefined,
+        badge: d.code_dewey || undefined,
+      }));
+    }
+    return [
+      { value: "Manuels scolaires", label: "Manuels scolaires" },
+      { value: "Droit & Sciences Politiques", label: "Droit & Sciences Politiques" },
+      { value: "Sciences Économiques & Gestion", label: "Sciences Économiques & Gestion" },
+      { value: "Littérature Africaine & Conte", label: "Littérature Africaine & Conte" },
+      { value: "Sciences Exactes & Technologies", label: "Sciences Exactes & Technologies" },
+      { value: "Philosophie & Sciences Humaines", label: "Philosophie & Sciences Humaines" },
+      { value: "Arts, Culture & Musique", label: "Arts, Culture & Musique" },
+    ];
+  }, [disciplinesList]);
 
   // Gestion Couverture
   const handleCoverSelect = (f: File) => {
@@ -357,7 +378,7 @@ export default function AdminNewProductPage() {
                     onChange={(val) => setAuthorPublisher(val)}
                     onSelectCreator={(creator) => {
                       setSelectedCreator(creator);
-                      if (creator.type === "publisher") {
+                      if (creator && creator.type === "publisher") {
                         setPublisherName(creator.name);
                       }
                     }}

@@ -127,7 +127,7 @@ class DerivedCacheRegistry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
-        return f"DerivedCache {self.cache_key[:8]} ({self.profil})"
+        return f"DerivedCache {str(self.cache_key)[:8]} ({self.profil})"
 
 
 class Annotation(models.Model):

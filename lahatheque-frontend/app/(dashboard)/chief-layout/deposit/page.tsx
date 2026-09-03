@@ -75,17 +75,11 @@ export default function ChiefLayoutDepositPage() {
   const [keywords, setKeywords] = useState<string[]>([]);
   const [onixXml, setOnixXml] = useState<string>("");
 
-  React.useEffect(() => {
-    getDisciplines().then((res) => {
-      if (res && res.length > 0) {
-        setRealDisciplines(res);
-      }
-    });
-  }, []);
-
   // IA State
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<AiBookAnalysisResult | null>(null);
+
+
 
   const handleBookFileSelect = async (file: File) => {
     setBookFile(file);

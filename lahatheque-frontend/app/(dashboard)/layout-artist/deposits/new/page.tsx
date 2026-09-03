@@ -118,12 +118,6 @@ export default function NewDepositPage() {
   const [hasAppliedAi, setHasAppliedAi] = useState(false);
 
   React.useEffect(() => {
-    getDisciplines().then((res) => {
-      if (res && res.length > 0) {
-        setRealDisciplines(res);
-      }
-    });
-
     // Préchargement automatique des dossiers de pré-édition et auteurs
     setLoadingPreEditions(true);
     Promise.all([
