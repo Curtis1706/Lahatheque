@@ -20,7 +20,7 @@ import { CountingNumber } from "@/components/ui/counting-number";
 import { PanafricanPresenceSection } from "@/components/features/home/panafrican-presence-section";
 import { WhyChooseSection } from "@/components/features/home/why-choose-section";
 import { PartnerLogoMarquee } from "@/components/ui/partner-logo-marquee";
-import { VisionSection } from "@/components/features/home/vision-section";
+import { SavoirAfriqueSection } from "@/components/features/about/savoir-afrique-section";
 
 const bestSellers = [
   {
@@ -312,7 +312,7 @@ export default function HomePage() {
       </section>
 
       {/* Notre Vision */}
-      <VisionSection />
+      <SavoirAfriqueSection />
 
       {/* Audiences */}
       <section className="py-20 px-6 md:px-10 bg-background">

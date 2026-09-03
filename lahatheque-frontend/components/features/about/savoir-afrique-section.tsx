@@ -290,10 +290,10 @@ export function SavoirAfriqueSection() {
   }, [T]);
 
   return (
-    <section className="w-full space-y-10 sm:space-y-14 overflow-hidden py-4">
-      <div className="w-full space-y-10 sm:space-y-14">
+    <section className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 overflow-hidden">
+      <div className="w-full space-y-6 sm:space-y-8">
         {/* En-tête de section */}
-        <div className="text-center max-w-3xl mx-auto space-y-3">
+        <div className="text-center max-w-3xl mx-auto space-y-2.5">
           <span className="inline-block text-xs font-bold tracking-[0.2em] uppercase text-gold">
             NOTRE VISION
           </span>
@@ -610,17 +610,17 @@ export function SavoirAfriqueSection() {
         </figure>
 
         {/* Section inférieure en 2 colonnes */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-6 md:gap-10 items-start">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-4 sm:gap-6 items-stretch">
           {/* Colonne Gauche : Cadre Blueprint avec le texte narratif */}
-          <div className="relative p-6 sm:p-8 md:p-10 border border-border rounded-3xl bg-background shadow-xs space-y-4">
+          <div className="relative p-5 sm:p-6 border border-border rounded-2xl sm:rounded-3xl bg-background shadow-xs space-y-3 sm:space-y-3.5 flex flex-col justify-center">
             <CornerMarks />
-            <p className="text-sm sm:text-base text-foreground-muted leading-relaxed font-sans">
+            <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed font-sans">
               Pendant longtemps, une grande partie des connaissances consommées sur notre continent
               a été importée d’autres horizons. Aujourd’hui, nous souhaitons contribuer à changer
               cette dynamique : produire, valoriser et transmettre un savoir issu de notre
               intelligence, de nos talents et de nos réalités.
             </p>
-            <p className="text-sm sm:text-base text-foreground-muted leading-relaxed font-sans">
+            <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed font-sans">
               Notre ambition est de faire de la connaissance un vecteur de rayonnement, en
               développant des contenus et des solutions capables de dépasser nos frontières et de
               trouver leur place à l’échelle internationale.
@@ -628,7 +628,7 @@ export function SavoirAfriqueSection() {
           </div>
 
           {/* Colonne Droite : Étapes numérotées synchronisées + Encart Sombre */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 sm:gap-3.5 justify-between">
             {/* 3 Étapes synchronisées avec clic interactif pour sauter à la phase */}
             <div className="border border-border rounded-2xl overflow-hidden divide-y divide-border bg-background shadow-xs">
               {[
@@ -642,21 +642,21 @@ export function SavoirAfriqueSection() {
                     key={step.num}
                     type="button"
                     onClick={() => handleStepClick(idx)}
-                    className={`w-full flex items-baseline gap-4 px-5 py-3.5 sm:px-6 sm:py-4 transition-all duration-300 text-left cursor-pointer ${
+                    className={`w-full flex items-baseline gap-3.5 px-4 py-2.5 sm:px-5 sm:py-3 transition-all duration-300 text-left cursor-pointer ${
                       isActive
-                        ? "bg-navy/5 border-l-4 border-l-navy"
+                        ? "bg-gold/10 text-navy font-bold"
                         : "bg-transparent hover:bg-navy/5 opacity-70 hover:opacity-100"
                     }`}
                   >
                     <span
                       className={`font-mono text-xs font-bold tracking-wider ${
-                        isActive ? "text-navy" : "text-foreground-muted"
+                        isActive ? "text-gold" : "text-foreground-muted"
                       }`}
                     >
                       {step.num}
                     </span>
                     <span
-                      className={`font-serif text-base sm:text-lg font-bold tracking-wider ${
+                      className={`font-serif text-sm sm:text-base font-bold tracking-wider ${
                         isActive ? "text-navy" : "text-foreground-muted"
                       }`}
                     >
@@ -669,12 +669,12 @@ export function SavoirAfriqueSection() {
 
             {/* Encart sombre d'emphase finale */}
             <div
-              className={`relative p-6 sm:p-7 md:p-8 border border-navy rounded-3xl bg-navy text-white shadow-md transition-all duration-500 ${
+              className={`relative p-4 sm:p-5 border border-navy rounded-2xl sm:rounded-3xl bg-navy text-white shadow-md transition-all duration-500 ${
                 activeStep === 2 ? "ring-2 ring-gold/40 shadow-lg scale-[1.01]" : ""
               }`}
             >
               <CornerMarks color="rgba(176,141,66,0.6)" />
-              <p className="font-serif font-bold text-lg sm:text-xl md:text-2xl leading-snug">
+              <p className="font-serif font-bold text-base sm:text-lg leading-snug">
                 Parce que l’Afrique ne doit pas seulement être une destination du savoir :{" "}
                 <span className="text-gold">elle peut aussi en devenir une source.</span>
               </p>
