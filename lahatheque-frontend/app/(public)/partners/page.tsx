@@ -157,6 +157,16 @@ export default function PartnersPublicPage() {
     setSubmitError(null);
     setIsSubmitting(true);
 
+    console.log("[PARTNERSHIP] Début d'envoi de la demande de partenariat...");
+    console.log("[PARTNERSHIP] Données :", {
+      partner_type: partnerType,
+      organization_name: orgName,
+      contact_name: contactName,
+      contact_email: contactEmail,
+      contact_phone: contactPhone,
+      country: country,
+    });
+
     try {
       const response = await fetch("/api/bff/communications/partnership/", {
         method: "POST",
@@ -174,7 +184,10 @@ export default function PartnersPublicPage() {
         }),
       });
 
+      console.log(`[PARTNERSHIP RESPONSE] Statut HTTP: ${response.status}`);
       const resData = await response.json();
+      console.log("[PARTNERSHIP RESPONSE BODY]", resData);
+
       if (response.ok && resData.success) {
         setIsSubmitting(false);
         setFormSent(true);
@@ -182,7 +195,8 @@ export default function PartnersPublicPage() {
         setIsSubmitting(false);
         setSubmitError(resData.error || "Impossible d'envoyer votre demande. Veuillez vérifier vos informations.");
       }
-    } catch {
+    } catch (err) {
+      console.error("[PARTNERSHIP ERROR] Erreur lors de la requête :", err);
       // Fallback gracieux si l'API est indisponible
       setIsSubmitting(false);
       setFormSent(true);
