@@ -78,8 +78,54 @@ const DEFAULT_GLOBAL_SETTINGS: DrmGlobalSettings = {
 
 /**
  * Récupère le journal d'audit légal TraceAccès depuis le backend Django.
+ * Agrège en priorité les sessions de lecture réelles et exclut les pings internes.
  */
 export async function getAccessTraces(): Promise<TraceRecord[]> {
+  const traces: TraceRecord[] = [];
+
+  // 1. Récupération prioritaire des sessions de lecture réelles hébergées
+  try {
+    const res = await fetch("/api/bff/partners/sessions", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const list = Array.isArray(json) ? json : (json.data || json.results || []);
+      for (const s of list) {
+        const uName = s.studentName || s.userName || "Lecteur Authentifié";
+        const pName = s.partnerName || "LAHAThèque";
+        const emailFallback = uName && uName !== "Lecteur Authentifié"
+          ? `${uName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@univ.bj`
+          : "etudiant@univ.bj";
+
+        traces.push({
+          id: String(s.id),
+          user_name: uName,
+          user_email: s.studentEmail || s.userEmail || emailFallback,
+          partner_name: pName,
+          book_title: s.bookTitle || s.documentTitle || "Ouvrage Académique",
+          book_id: String(s.bookId || s.id),
+          access_type: "read_chunk",
+          ip_address: s.studentIp || s.userIp || "127.0.0.1",
+          country: "BJ",
+          device_fingerprint: `Web • ${pName}`,
+          current_page: s.currentPage || 1,
+          total_pages: s.totalPages || 1,
+          progress_percent: s.progressPercent || 0,
+          reading_time_minutes: s.durationMinutes ?? s.readingTimeMinutes ?? 1,
+          page_number: s.currentPage || 1,
+          timestamp: s.startedAt || s.createdAt || new Date().toISOString(),
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[Traces] Erreur chargement sessions partenaires:", err);
+  }
+
+  // 2. Récupération des traces audit directes si disponibles
   try {
     const res = await fetch("/api/bff/protection/audit-traces/", {
       method: "GET",
@@ -96,32 +142,45 @@ export async function getAccessTraces(): Promise<TraceRecord[]> {
             : (json.results || (json.data?.results || [])));
 
       if (Array.isArray(rawList)) {
-        return rawList.map((item: any) => ({
-          id: String(item.id),
-          user_email: item.user_email || (typeof item.user === "string" ? item.user : item.user?.email) || "lecteur@lahatheque.com",
-          user_name: item.user_name || "Lecteur Authentifié",
-          partner_name: item.partner_name || "LAHAThèque",
-          book_title: item.book_title || item.document_title || "Ouvrage LAHA",
-          book_id: String(item.book_id || item.ouvrage || ""),
-          access_type: item.access_type || "read_chunk",
-          ip_address: item.ip_address || "127.0.0.1",
-          country: item.country || "BJ",
-          device_fingerprint: item.device_fingerprint || item.user_agent || "Client Web",
-          current_page: item.current_page || item.page_number || 1,
-          total_pages: item.total_pages || 1,
-          progress_percent: item.progress_percent || 0,
-          reading_time_minutes: item.reading_time_minutes || 0,
-          page_number: item.current_page || item.page_number || 1,
-          timestamp: item.timestamp || item.created_at || new Date().toISOString(),
-        }));
+        for (const item of rawList) {
+          const tId = String(item.id);
+          // Éviter les doublons
+          if (traces.some((t) => t.id === tId)) continue;
+
+          // Ignorer les pings internes 10.0.1.1 ou "Lecteur Client" générique si nous avons des sessions réelles
+          if ((item.ip_address === "10.0.1.1" || item.user_name === "Lecteur Client") && traces.length > 0) {
+            continue;
+          }
+
+          traces.push({
+            id: tId,
+            user_email: item.user_email || "lecteur@lahatheque.com",
+            user_name: item.user_name || "Lecteur Authentifié",
+            partner_name: item.partner_name || "Accès Direct",
+            book_title: item.book_title || item.document_title || "Ouvrage LAHA",
+            book_id: String(item.book_id || item.ouvrage || ""),
+            access_type: item.access_type || "read_chunk",
+            ip_address: item.ip_address || "127.0.0.1",
+            country: item.country || "BJ",
+            device_fingerprint: item.device_fingerprint || "Client Web (Navigateur)",
+            current_page: item.current_page || item.page_number || 1,
+            total_pages: item.total_pages || 1,
+            progress_percent: item.progress_percent || 0,
+            reading_time_minutes: item.reading_time_minutes || 0,
+            page_number: item.current_page || item.page_number || 1,
+            timestamp: item.timestamp || item.created_at || new Date().toISOString(),
+          });
+        }
       }
     }
   } catch {
     // Mode déconnecté
   }
 
-  // Si le backend n'est pas joint, renvoyer liste vide
-  return [];
+  // Tri chronologique décroissant
+  traces.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  return traces;
 }
 
 
