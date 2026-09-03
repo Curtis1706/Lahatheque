@@ -3,7 +3,9 @@
  * Conforme aux standards comptables SYSCOHADA, aux normes graphiques Navy/Gold et aux exigences légales UEMOA.
  */
 
+// @ts-ignore
 import jsPDF from "jspdf";
+// @ts-ignore
 import autoTable from "jspdf-autotable";
 
 export interface CompanyLegalInfo {
@@ -246,14 +248,14 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
       lineWidth: 0.1,
       overflow: "linebreak",
     },
-    didDrawPage: (data) => {
+    didDrawPage: (_data: any) => {
       // En-tête de pagination sur chaque page
     },
   });
 
   // Position finale après tableau
-  // @ts-expect-error - jsPDF autoTable injecte lastAutoTable sur l'instance
-  const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 6 : y + 40;
+  const lastTable = (doc as any).lastAutoTable;
+  const finalY = lastTable ? lastTable.finalY + 6 : y + 40;
 
   // ── 6. Bloc Total & Mentions Fiscales / Notes
   let footerBlockY = finalY;

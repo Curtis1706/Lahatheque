@@ -2,82 +2,19 @@
 
 import Link from "next/link";
 import { 
-  Gavel, 
-  TrendingUp, 
-  Compass, 
-  Stethoscope, 
-  BarChart3, 
-  Code, 
   BookOpen, 
   GraduationCap, 
-  Landmark,
-  Sparkles,
-  Book,
-  Sun,
-  ArrowRight,
-  ShieldCheck,
-  Globe,
-  Award,
-  Users,
-  Mail
+  Sparkles, 
+  Book, 
+  Sun, 
+  ArrowRight, 
+  ShieldCheck, 
+  Globe, 
+  Award, 
+  Users, 
+  Mail 
 } from "lucide-react";
-
-const domains = [
-  {
-    id: "01",
-    name: "Droit & Sciences Politiques",
-    description: "Ouvrages juridiques, législation OHADA, droit public, privé, pénal et international.",
-    icon: Gavel,
-  },
-  {
-    id: "02",
-    name: "Économie & Gestion",
-    description: "Analyses économiques, comptabilité SYSCOHADA, finance, développement et politiques publiques.",
-    icon: TrendingUp,
-  },
-  {
-    id: "03",
-    name: "Sciences Humaines & Sociales",
-    description: "Ressources en sociologie, philosophie, histoire, anthropologie et patrimoine africain.",
-    icon: Compass,
-  },
-  {
-    id: "04",
-    name: "Médecine & Santé Publique",
-    description: "Références médicales, pharmacopée, épidémiologie et sciences biomédicales tropicales.",
-    icon: Stethoscope,
-  },
-  {
-    id: "05",
-    name: "Sciences de l'Ingénieur & BTP",
-    description: "Génie civil, électrotechnique, mécanique, agronomie et énergies renouvelables.",
-    icon: BarChart3,
-  },
-  {
-    id: "06",
-    name: "Informatique & Télécoms",
-    description: "Algorithmique, génie logiciel, intelligence artificielle, cybersécurité et réseaux.",
-    icon: Code,
-  },
-  {
-    id: "07",
-    name: "Lettres & Langues",
-    description: "Lettres modernes, linguistique, langues africaines et communication des organisations.",
-    icon: BookOpen,
-  },
-  {
-    id: "08",
-    name: "Sciences de l'Éducation",
-    description: "Pédagogie universitaire, didactique des disciplines et technologies éducatives.",
-    icon: GraduationCap,
-  },
-  {
-    id: "09",
-    name: "Gouvernance & Relations Internationales",
-    description: "Institutions, politiques publiques, diplomatie et intégration régionale africaine.",
-    icon: Landmark,
-  },
-];
+import { SavoirAfriqueSection } from "@/components/features/about/savoir-afrique-section";
 
 export default function AboutPage() {
   return (
@@ -240,41 +177,8 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* 3. DOMAINES D'EXPERTISE */}
-        <section className="space-y-10">
-          <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="text-xs font-bold text-gold uppercase tracking-widest block">
-              Fonds académique et universitaire
-            </span>
-            <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-navy">
-              Les disciplines couvertes par LAHAThèque
-            </h2>
-            <p className="text-xs sm:text-sm text-foreground-muted">
-              Une sélection rigoureuse d'ouvrages conformes aux programmes LMD et aux réalités du continent.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {domains.map((dom) => {
-              const IconComponent = dom.icon;
-              return (
-                <div 
-                  key={dom.id} 
-                  className="border border-border rounded-2xl p-6 bg-background hover:shadow-md hover:border-gold/50 transition-all duration-300 flex flex-col gap-4 group"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-gold/10 text-gold flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <IconComponent className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-gold uppercase tracking-widest">{dom.id}</span>
-                    <h3 className="font-serif text-lg font-bold text-navy mb-2 mt-1">{dom.name}</h3>
-                    <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed">{dom.description}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        {/* 3. SCÈNE ANIMÉE SAVOIR AFRIQUE (Option B : remplace la section des disciplines) */}
+        <SavoirAfriqueSection />
 
         {/* 4. NOTRE ENGAGEMENT POUR L'AVENIR */}
         <section className="bg-navy text-white rounded-3xl p-8 sm:p-12 lg:p-16 border border-navy-hover shadow-xl">
