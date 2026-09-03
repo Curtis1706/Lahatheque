@@ -167,6 +167,8 @@ class EmailService:
         except Exception as log_err:
             logger.warning(f"Impossible de créer le log initial d'email: {log_err}")
 
+        print(f"[EMAIL-SERVICE] Début traitement e-mail '{email_type}' vers {to_email} (Provider principal: {primary_provider_name})")
+
         # 4. Envoi via le fournisseur principal
         result = provider.send_email(
             to_email=to_email,
@@ -181,8 +183,10 @@ class EmailService:
 
         # 5. Failover automatique si échec
         if not result.success:
+            print(f"[EMAIL-SERVICE-WARN] Échec fournisseur principal {primary_provider_name}: {result.error}")
             fallback_provider = cls.get_fallback_provider(primary_provider_name)
             if fallback_provider:
+                print("[EMAIL-SERVICE] Basculement immédiat vers le fournisseur de secours...")
                 logger.warning(f"Échec {primary_provider_name} ({result.error}). Tentative de secours via fallback...")
                 result = fallback_provider.send_email(
                     to_email=to_email,
@@ -194,6 +198,8 @@ class EmailService:
                     attachments=final_attachments,
                     tags=tags,
                 )
+
+        print(f"[EMAIL-SERVICE-RESULT] Statut final: {'SUCCÈS' if result.success else 'ÉCHEC'} | Provider: {result.provider} | ID/Error: {result.message_id or result.error}")
 
         # 6. Mise à jour du log
         if log_entry:
@@ -236,41 +242,24 @@ def send_transactional_email(
         import threading
 
         def _async_dispatcher():
-            # 1. Tentative Celery en arrière-plan
             try:
-                from apps.communications.tasks import task_send_transactional_email
-                task_send_transactional_email.delay(
+                EmailService.send(
                     email_type=email_type,
                     to_email=to_email,
                     subject=subject,
                     template_name=template_name,
-                    context=context or {},
+                    context=context,
                     recipient_name=recipient_name,
                     from_email=from_email,
                     reply_to=reply_to,
+                    attachments=attachments,
                     pdf_invoice_data=pdf_invoice_data,
                     pdf_royalty_data=pdf_royalty_data,
                     tags=tags,
                 )
-            except Exception as celery_err:
-                logger.warning(f"Celery non joignable ({celery_err}), repli sur EmailService direct en thread.")
-                try:
-                    EmailService.send(
-                        email_type=email_type,
-                        to_email=to_email,
-                        subject=subject,
-                        template_name=template_name,
-                        context=context,
-                        recipient_name=recipient_name,
-                        from_email=from_email,
-                        reply_to=reply_to,
-                        attachments=attachments,
-                        pdf_invoice_data=pdf_invoice_data,
-                        pdf_royalty_data=pdf_royalty_data,
-                        tags=tags,
-                    )
-                except Exception as send_err:
-                    logger.error(f"[EMAIL THREAD ERROR] Échec de l'envoi d'e-mail: {send_err}")
+            except Exception as send_err:
+                print(f"[EMAIL-THREAD-ERROR] Échec de l'envoi d'e-mail en tâche de fond: {send_err}")
+                logger.error(f"[EMAIL THREAD ERROR] Échec de l'envoi d'e-mail: {send_err}")
 
         # Lancement instantané du thread pour libérer immédiatement le worker HTTP Gunicorn / Traefik
         t = threading.Thread(target=_async_dispatcher, daemon=True)
