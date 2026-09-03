@@ -1,0 +1,44 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Confirmation de réception de votre manuscrit • LAHAThèque{% endblock %}
+{% block badge_header %}Comité Éditorial • Dépôt Enregistré{% endblock %}
+
+{% block email_title %}Votre manuscrit a bien été reçu{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>{{ recipient_name|default:"Cher Auteur" }}</strong>,
+</p>
+<p style="margin: 0 0 24px 0; line-height: 1.65;">
+    Nous accusons bonne réception de votre proposition de publication pour l'ouvrage intitulé <strong>« {{ book_title }} »</strong>.
+</p>
+
+<!-- Boîte Récapitulatif Soft -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 12px;">
+        Récapitulatif de votre soumission
+    </div>
+    <div style="font-size: 14px; font-weight: 700; color: #1B2A4E; margin-bottom: 8px;" class="text-dark-adapt">
+        Titre de l'œuvre : « {{ book_title }} »
+    </div>
+    <p style="font-size: 13px; color: #475569; margin: 0; line-height: 1.65;" class="text-muted-adapt">
+        Votre manuscrit a été transmis avec succès à notre comité de lecture et à la direction éditoriale de LAHA Éditions.
+    </p>
+</div>
+
+<!-- Étapes du Parcours Éditorial -->
+<div style="margin-bottom: 24px;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #1B2A4E; letter-spacing: 0.8px; margin-bottom: 12px;">
+        Prochaines étapes
+    </div>
+    <div style="font-size: 13px; color: #475569; line-height: 1.65;">
+        <strong>1. Examen éditorial</strong> : Notre comité étudie votre manuscrit selon nos critères académiques et littéraires.<br>
+        <strong>2. Retour sous 10 jours ouvrés</strong> : Vous recevrez un avis circonstancié par e-mail.<br>
+        <strong>3. Création de votre espace Auteur</strong> : En cas d'acceptation, un compte officiel vous sera ouvert pour la contractualisation et la préparation de la maquette.
+    </div>
+</div>
+
+<p style="font-size: 12px; color: #64748B; margin: 0; line-height: 1.5;" class="text-muted-adapt">
+    Vos droits d'auteur et la confidentialité de votre œuvre sont strictement protégés dès cet enregistrement conformément aux normes de propriété intellectuelle (OAPI / OMPI).
+</p>
+{% endblock %}

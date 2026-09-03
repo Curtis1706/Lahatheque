@@ -1,0 +1,33 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Alerte Interne • Nouveau Dépôt de Manuscrit • LAHAThèque{% endblock %}
+{% block badge_header %}Alerte Interne • Comité Éditorial{% endblock %}
+
+{% block email_title %}Nouveau Manuscrit Reçu{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 14px;">
+    Bonjour <strong>{{ recipient_name|default:"Équipe LAHA" }}</strong>,
+</p>
+<p style="margin: 0 0 20px 0; line-height: 1.65;">
+    Une nouvelle soumission de manuscrit vient d'être enregistrée sur la plateforme LAHAThèque :
+</p>
+
+<!-- Boîte Détail Soft -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">
+    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 10px;">
+        Informations sur le dépôt
+    </div>
+    <div style="font-size: 14px; font-weight: 600; color: #1B2A4E; line-height: 1.6;" class="text-dark-adapt">
+        {{ message|linebreaks }}
+    </div>
+</div>
+
+{% if action_url %}
+<div style="text-align: center; margin: 24px 0 10px 0;">
+    <a href="{{ action_url }}" class="btn-navy" style="background-color: #1B2A4E; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block; border: 0;">
+        Consulter le Dossier
+    </a>
+</div>
+{% endif %}
+{% endblock %}

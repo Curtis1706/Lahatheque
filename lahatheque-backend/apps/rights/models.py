@@ -301,3 +301,30 @@ class DebtReminderConfig(models.Model):
     def get_or_create_singleton(cls):
         obj, _ = cls.objects.get_or_create(id='00000000-0000-0000-0000-000000000001')
         return obj
+
+
+class PublicManuscriptLead(models.Model):
+    """Soumission de manuscrit via le formulaire public — avant toute création de compte."""
+    STATUS_CHOICES = [
+        ('new', 'Nouvelle'),
+        ('contacted', 'Contactée'),
+        ('converted', 'Compte auteur créé'),
+        ('rejected', 'Non retenue'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=30, blank=True, default='')
+    book_title = models.CharField(max_length=255)
+    genre = models.CharField(max_length=100, blank=True, default='')
+    country = models.CharField(max_length=100, blank=True, default='')
+    summary = models.TextField(blank=True, default='')
+    manuscript_file = models.FileField(upload_to='public_manuscript_leads/%Y/%m/')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'rights_public_manuscript_lead'
+        ordering = ['-created_at']

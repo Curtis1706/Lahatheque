@@ -2090,3 +2090,74 @@ class AuthorOrderReturnView(APIView):
             "data": {"id": str(commande.id), "statut_commande": "returned"}
         })
 
+
+class PublicManuscriptSubmitView(APIView):
+    """POST /api/v1/rights/public/manuscript-submit/ - Réception réelle d'un manuscrit public."""
+    permission_classes = [permissions.AllowAny]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        from .models import PublicManuscriptLead
+        from apps.communications.services.email_service import send_transactional_email
+        from apps.accounts.models import User
+
+        data = request.data
+        required = ['first_name', 'last_name', 'email', 'book_title', 'phone', 'country', 'genre']
+        missing = [f for f in required if not data.get(f, '').strip()]
+        if missing:
+            return Response({
+                'success': False,
+                'error': f"Champs obligatoires manquants : {', '.join(missing)}."
+            }, status=400)
+
+        manuscript_file = request.FILES.get('manuscript_file')
+        if not manuscript_file:
+            return Response({'success': False, 'error': "Le fichier du manuscrit est requis."}, status=400)
+
+        lead = PublicManuscriptLead.objects.create(
+            first_name=data.get('first_name', '').strip(),
+            last_name=data.get('last_name', '').strip(),
+            email=data.get('email', '').strip().lower(),
+            phone=data.get('phone', '').strip(),
+            book_title=data.get('book_title', '').strip(),
+            genre=data.get('genre', '').strip(),
+            country=data.get('country', '').strip(),
+            summary=data.get('summary', '').strip(),
+            manuscript_file=manuscript_file,
+        )
+
+        send_transactional_email(
+            email_type="manuscript_submission_received",
+            to_email=lead.email,
+            subject=f"Manuscrit bien reçu — « {lead.book_title} »",
+            template_name="emails/authors/submission_received.html",
+            recipient_name=f"{lead.first_name} {lead.last_name}",
+            context={"book_title": lead.book_title},
+        )
+
+        staff_emails = list(
+            User.objects.filter(role__in=['admin', 'super_admin', 'chief_layout'], is_active=True)
+            .exclude(email='').values_list('email', flat=True)
+        )
+        for staff_email in staff_emails:
+            send_transactional_email(
+                email_type="internal_new_manuscript_lead",
+                to_email=staff_email,
+                subject=f"Nouveau manuscrit soumis — « {lead.book_title} »",
+                template_name="emails/internal_alert.html",
+                recipient_name="Équipe LAHA Éditions",
+                context={
+                    "message": f"{lead.first_name} {lead.last_name} ({lead.email}) a soumis "
+                               f"« {lead.book_title} » ({lead.genre}, {lead.country}).",
+                    "action_url": "/admin/manuscript-leads",
+                },
+            )
+
+        return Response({
+            'success': True,
+            'message': "Votre manuscrit a bien été transmis à notre équipe éditoriale. "
+                       "Vous recevrez une confirmation par email sous peu.",
+            'data': {'id': str(lead.id)}
+        }, status=status.HTTP_201_CREATED)
+
+

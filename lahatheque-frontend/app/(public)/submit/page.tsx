@@ -96,7 +96,29 @@ export default function SubmitManuscriptPage() {
 
     setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const formData = new FormData();
+      formData.append("first_name", firstName.trim());
+      formData.append("last_name", lastName.trim());
+      formData.append("email", email.trim());
+      formData.append("phone", phone.trim());
+      formData.append("book_title", bookTitle.trim());
+      formData.append("genre", genre.trim());
+      formData.append("country", country.trim());
+      formData.append("summary", summary.trim());
+      formData.append("manuscript_file", manuscriptFile as File);
+
+      const res = await fetch("/api/bff/rights/public/manuscript-submit/", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+
+      if (!json.success) {
+        setSubmitError(json.error || "Une erreur est survenue lors de l'envoi.");
+        setIsSubmitting(false);
+        return;
+      }
+
       setIsSubmitting(false);
       setSubmitSuccess(true);
     } catch {

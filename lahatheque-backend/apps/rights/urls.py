@@ -25,11 +25,15 @@ from .views import (
     LegalPreEditionDetailView,
     DebtReminderConfigView,
     LegalRelancesListView,
+    PublicManuscriptSubmitView,
 )
 
 app_name = 'rights'
 
 urlpatterns = [
+    # Soumission Publique de Manuscrit
+    path('public/manuscript-submit/', PublicManuscriptSubmitView.as_view(), name='public-manuscript-submit'),
+
     # Auteur & Redevances
     path('author/kpis/', AuthorDashboardKPIsView.as_view(), name='author-kpis'),
     path('author/books/', AuthorBooksListView.as_view(), name='author-books'),
