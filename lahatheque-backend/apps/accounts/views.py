@@ -197,3 +197,76 @@ class OTPVerifyView(APIView):
         return Response({"detail": "OTP verify stub"})
 
 
+class ForgotPasswordRequestView(APIView):
+    """POST /api/v1/accounts/forgot-password/ - Envoie un code de réinitialisation par email."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from .models import User, PasswordResetCode
+        from apps.communications.services.email_service import send_transactional_email
+
+        email = request.data.get("email", "").strip().lower()
+        if not email:
+            return Response({"success": False, "error": "Adresse email requise."}, status=400)
+
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+
+        if user:
+            reset_code = PasswordResetCode.generate_for_user(user)
+            send_transactional_email(
+                email_type="password_reset_code",
+                to_email=user.email,
+                subject="Votre code de réinitialisation LAHAThèque",
+                template_name="emails/accounts/password_reset_code.html",
+                recipient_name=f"{user.first_name} {user.last_name}".strip() or user.username,
+                context={"reset_code": reset_code.code, "valid_minutes": 15},
+            )
+
+        return Response({
+            "success": True,
+            "message": "Si cette adresse est associée à un compte, un code de réinitialisation vient d'être envoyé."
+        })
+
+
+class ResetPasswordConfirmView(APIView):
+    """POST /api/v1/accounts/reset-password/ - Vérifie le code et change réellement le mot de passe."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from .models import User, PasswordResetCode
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError
+
+        email = request.data.get("email", "").strip().lower()
+        code = request.data.get("code", "").strip()
+        new_password = request.data.get("new_password", "")
+
+        if not (email and code and new_password):
+            return Response({"success": False, "error": "Email, code et nouveau mot de passe requis."}, status=400)
+
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if not user:
+            return Response({"success": False, "error": "Code invalide ou expiré."}, status=400)
+
+        reset_code = PasswordResetCode.objects.filter(
+            user=user, code=code
+        ).order_by('-created_at').first()
+
+        if not reset_code or not reset_code.is_valid():
+            return Response({"success": False, "error": "Code invalide ou expiré."}, status=400)
+
+        try:
+            validate_password(new_password, user=user)
+        except ValidationError as e:
+            return Response({"success": False, "error": " ".join(e.messages)}, status=400)
+
+        user.set_password(new_password)
+        user.save(update_fields=["password"])
+
+        reset_code.used = True
+        reset_code.save(update_fields=["used"])
+
+        return Response({"success": True, "message": "Mot de passe réinitialisé avec succès."})
+
+
+
