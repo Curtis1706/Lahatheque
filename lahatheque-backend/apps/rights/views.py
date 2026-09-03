@@ -213,12 +213,17 @@ class AuthorBookDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAuthor]
 
     def get(self, request, id):
-        try:
-            b = Ouvrage.objects.select_related('discipline', 'publisher').prefetch_related('authors').get(id=id)
-        except Ouvrage.DoesNotExist:
-            return Response({"success": False, "error": "Ouvrage introuvable"}, status=404)
-
         user = request.user
+
+        try:
+            b = Ouvrage.objects.select_related('discipline', 'publisher').prefetch_related('authors').get(
+                id=id, authors__user=user
+            )
+        except Ouvrage.DoesNotExist:
+            return Response({
+                "success": False,
+                "error": "Ouvrage introuvable, ou vous n'êtes pas répertorié comme auteur de cet ouvrage."
+            }, status=404)
         lignes = LigneCommande.objects.filter(
             ouvrage=b, commande__statut_paiement='paid'
         )
@@ -2067,14 +2072,26 @@ class AuthorOrderReturnView(APIView):
                 elif ligne.format_type in ('paper', 'papier'):
                     stock = StockOuvrage.objects.filter(ouvrage=ligne.ouvrage).first()
                     if stock:
-                        stock.quantite_reelle += ligne.quantity
-                        stock.save(update_fields=['quantite_reelle'])
+                        livraison = getattr(commande, 'livraison', None)
+                        deja_livre = livraison and livraison.statut == 'livre'
+
+                        if deja_livre:
+                            stock.quantite_reelle = F('quantite_reelle') + ligne.quantity
+                            stock.save(update_fields=['quantite_reelle'])
+                            mouvement_qty = ligne.quantity
+                            motif_detail = "Retour physique après livraison — achat à crédit annulé"
+                        else:
+                            stock.quantite_reservee = F('quantite_reservee') - ligne.quantity
+                            stock.save(update_fields=['quantite_reservee'])
+                            mouvement_qty = ligne.quantity
+                            motif_detail = "Libération de réservation — achat à crédit annulé avant expédition"
+
                         MouvementStock.objects.create(
-                            stock=stock,
+                            stock=StockOuvrage.objects.get(pk=stock.pk),
                             type_mouvement='return',
-                            quantite=ligne.quantity,
+                            quantite=mouvement_qty,
                             reference_document=f"Retour commande #{commande.id}",
-                            motif=reason or "Retour par l'auteur — achat à crédit annulé",
+                            motif=reason or motif_detail,
                             auteur=commande.user,
                         )
 

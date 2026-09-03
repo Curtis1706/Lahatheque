@@ -56,7 +56,7 @@ def task_scan_and_send_deposit_reminders():
     Scan des dépôts de maquettes en attente ou incomplets depuis plus de N jours.
     """
     config = _get_platform_config()
-    cutoff_date = timezone.now() - timedelta(days=config.delai_relance_depots_jours)
+    cutoff_date = timezone.now() - timedelta(days=int(config.delai_relance_depots_jours or 7))
     results = {"processed": 0, "sent": 0, "errors": 0}
 
     try:
@@ -133,7 +133,7 @@ def task_scan_and_send_unpaid_reminders():
     Scan des commandes et factures impayées depuis plus de N jours.
     """
     config = _get_platform_config()
-    cutoff_date = timezone.now() - timedelta(days=config.delai_relance_impayes_jours)
+    cutoff_date = timezone.now() - timedelta(days=int(config.delai_relance_impayes_jours or 7))
     results = {"processed": 0, "sent": 0, "errors": 0}
 
     try:
@@ -212,7 +212,7 @@ def task_scan_and_send_subscription_expiry_reminders():
     Scan des abonnements et bouquets arrivant à expiration sous N jours.
     """
     config = _get_platform_config()
-    target_date_max = timezone.now() + timedelta(days=config.delai_relance_abonnements_jours)
+    target_date_max = timezone.now() + timedelta(days=int(config.delai_relance_abonnements_jours or 15))
     results = {"processed": 0, "sent": 0, "errors": 0}
 
     try:
@@ -306,66 +306,111 @@ def run_all_automated_reminders() -> dict:
 @shared_task
 def task_calculate_monthly_royalties():
     """
-    Calcul mensuel automatique des redevances pour tous les ouvrages vendus.
-    Exécuté le 1er de chaque mois par Celery Beat.
+    Calcul mensuel automatique des redevances : part université (ventes directes hors bouquet
+    partagé), part éditeur tiers, part auteur sur le reste. Exécuté le 1er de chaque mois.
     """
     from decimal import Decimal
     from django.db.models import Sum, Count
     from apps.catalog.models import Ouvrage
     from apps.commerce.models import LigneCommande
-    from apps.rights.models import RoyaltyCalculation
+    from apps.rights.models import RoyaltyCalculation, RoyaltyPayoutLine, AuthorRight
+    from apps.partners.models import UniversityRoyaltyStatement
 
     now = timezone.now()
-    period = now.strftime("%Y-%m")
     last_month_start = (now.replace(day=1) - timedelta(days=1)).replace(day=1)
     last_month_end = now.replace(day=1) - timedelta(days=1)
-
-    created_count = 0
+    period_month_date = last_month_start.date()
+    period_label = period_month_date.strftime("%Y-%m")
 
     lignes = LigneCommande.objects.filter(
         commande__created_at__gte=last_month_start,
         commande__created_at__lte=last_month_end,
-        commande__status__in=['paid', 'completed', 'delivered'],
+        commande__statut_paiement='paid',
     ).values('ouvrage').annotate(
-        total_sales=Sum('prix_total'),
+        total_sales=Sum('unit_price'),
         units_sold=Count('id'),
     )
+
+    calculations_created = 0
+    payout_lines_created = 0
+    payout_lines_corrected = 0
+    university_statements_created = 0
 
     for ligne in lignes:
         ouvrage = Ouvrage.objects.filter(id=ligne['ouvrage']).select_related('institution', 'publisher').first()
         if not ouvrage:
             continue
 
-        total_sales = float(ligne['total_sales'] or 0)
+        total_sales = Decimal(str(ligne['total_sales'] or 0))
 
-        # Redevance universitaire (15% par défaut)
-        univ_rate = 0.15
-        if ouvrage.institution and hasattr(ouvrage.institution, 'royalty_rate'):
-            univ_rate = float(ouvrage.institution.royalty_rate) / 100.0
-        university_royalty = total_sales * univ_rate if ouvrage.institution else 0
+        university_payout = Decimal("0.00")
+        if ouvrage.institution:
+            univ_rate = Decimal(str(getattr(ouvrage.institution, 'royalty_rate', 15))) / Decimal("100")
+            university_payout = (total_sales * univ_rate).quantize(Decimal("0.01"))
 
-        # Redevance éditeur tiers (taux contractuel)
-        publisher_royalty = 0
+            if university_payout > 0:
+                ref = f"REP-DIRECT-{period_label}-{str(ouvrage.id)[:8]}"
+                UniversityRoyaltyStatement.objects.get_or_create(
+                    institution=ouvrage.institution,
+                    reference=ref,
+                    defaults={
+                        "period": f"{period_label}-direct-{str(ouvrage.id)[:8]}",
+                        "total_sales_catalog": total_sales,
+                        "royalty_rate": getattr(ouvrage.institution, 'royalty_rate', Decimal("15.00")),
+                        "net_royalty_amount": university_payout,
+                        "status": "available",
+                    }
+                )
+                university_statements_created += 1
+
+        publisher_payout = Decimal("0.00")
         if ouvrage.publisher and hasattr(ouvrage.publisher, 'contractual_royalty_rate'):
-            pub_rate = float(ouvrage.publisher.contractual_royalty_rate) / 100.0
-            publisher_royalty = total_sales * pub_rate
+            pub_rate = Decimal(str(ouvrage.publisher.contractual_royalty_rate)) / Decimal("100")
+            publisher_payout = (total_sales * pub_rate).quantize(Decimal("0.01"))
 
-        # Droits d'auteur (le reste après université et éditeur)
-        author_royalty = max(0.0, total_sales - university_royalty - publisher_royalty)
-
-        RoyaltyCalculation.objects.update_or_create(
+        calculation, _ = RoyaltyCalculation.objects.update_or_create(
             ouvrage=ouvrage,
-            period=period,
+            period_month=period_month_date,
             defaults={
-                'total_sales': Decimal(str(round(total_sales, 2))),
-                'author_royalty': Decimal(str(round(author_royalty, 2))),
-                'university_royalty': Decimal(str(round(university_royalty, 2))),
-                'publisher_royalty': Decimal(str(round(publisher_royalty, 2))),
+                'total_reads_count': ligne['units_sold'],
+                'total_revenue': total_sales,
+                'publisher_payout_amount': publisher_payout,
             }
         )
-        created_count += 1
+        calculations_created += 1
 
-    return {"period": period, "calculations_created": created_count}
+        author_pool = total_sales - university_payout - publisher_payout
+        if author_pool <= 0:
+            continue
+
+        author_rights = AuthorRight.objects.filter(ouvrage=ouvrage, user__isnull=False)
+        for right in author_rights:
+            share = Decimal(str(right.pool_share_percent)) / Decimal("100")
+            amount = (author_pool * share).quantize(Decimal("0.01"))
+            if amount <= 0:
+                continue
+
+            existing_line = RoyaltyPayoutLine.objects.filter(calculation=calculation, author_right=right).first()
+
+            if existing_line:
+                if not existing_line.is_settled and existing_line.payout_amount != amount:
+                    existing_line.payout_amount = amount
+                    existing_line.save(update_fields=['payout_amount'])
+                    payout_lines_corrected += 1
+            else:
+                RoyaltyPayoutLine.objects.create(
+                    calculation=calculation, author_right=right,
+                    payout_amount=amount, is_settled=False
+                )
+                payout_lines_created += 1
+
+    return {
+        "period": period_label,
+        "calculations_created": calculations_created,
+        "payout_lines_created": payout_lines_created,
+        "payout_lines_corrected": payout_lines_corrected,
+        "university_statements_created": university_statements_created,
+    }
 
 
 @shared_task
@@ -517,7 +562,7 @@ def check_and_generate_legal_notifications(user=None):
     # 5. Créances et impayés clients
     config = DebtReminderConfig.get_or_create_singleton()
     if config.auto_remind_enabled:
-        cutoff = now - timedelta(days=config.first_reminder_days)
+        cutoff = now - timedelta(days=int(config.first_reminder_days or 7))
         unpaid_orders = Order.objects.filter(
             statut_paiement='pending',
             created_at__lte=cutoff,

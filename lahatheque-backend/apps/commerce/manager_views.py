@@ -742,6 +742,26 @@ class DeliveryDetailView(APIView):
                 elif d.statut == 'livre':
                     d.commande.statut_commande = 'completed'
                     d.commande.save(update_fields=['statut_commande'])
+
+                    try:
+                        from .models import StockOuvrage, MouvementStock
+                        for ligne in d.commande.lignes.filter(format_type__in=('paper', 'papier')):
+                            stock = StockOuvrage.objects.filter(ouvrage=ligne.ouvrage).first()
+                            if stock and stock.quantite_reservee >= ligne.quantity:
+                                stock.quantite_reservee = F('quantite_reservee') - ligne.quantity
+                                stock.quantite_reelle = F('quantite_reelle') - ligne.quantity
+                                stock.save(update_fields=['quantite_reservee', 'quantite_reelle'])
+                                MouvementStock.objects.create(
+                                    stock=StockOuvrage.objects.get(pk=stock.pk),
+                                    type_mouvement='sale',
+                                    quantite=-ligne.quantity,
+                                    reference_document=f"Livraison commande #{d.commande_id}",
+                                    motif="Sortie réelle de stock à la livraison confirmée",
+                                    auteur=request.user,
+                                )
+                    except Exception:
+                        pass
+
                     try:
                         notify_user(
                             user=d.commande.user,
