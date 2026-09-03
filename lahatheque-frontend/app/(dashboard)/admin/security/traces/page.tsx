@@ -90,6 +90,33 @@ export default function AdminTracesAccesPage() {
     }
   };
 
+  const COUNTRY_MAP: Record<string, string> = {
+    BJ: "Bénin",
+    SN: "Sénégal",
+    CI: "Côte d'Ivoire",
+    CM: "Cameroun",
+    CD: "RDC",
+    CG: "Congo",
+    GA: "Gabon",
+    TG: "Togo",
+    NE: "Niger",
+    BF: "Burkina Faso",
+    ML: "Mali",
+    GN: "Guinée",
+    MG: "Madagascar",
+    TD: "Tchad",
+    CF: "Centrafrique",
+    FR: "France",
+    CA: "Canada",
+    US: "États-Unis",
+  };
+
+  const formatCountryName = (code: string) => {
+    if (!code) return "Bénin";
+    const upper = code.trim().toUpperCase();
+    return COUNTRY_MAP[upper] || code;
+  };
+
   const formatDeviceFingerprint = (fp: string) => {
     if (!fp) return "Navigateur Web";
     if (fp === "node") return "Client Web (Next.js)";
@@ -166,7 +193,7 @@ export default function AdminTracesAccesPage() {
                   ID_Livre: t.book_id,
                   Type_Flux: t.access_type,
                   Adresse_IP: t.ip_address,
-                  Pays: t.country,
+                  Pays: formatCountryName(t.country),
                   Page_Actuelle: t.current_page || t.page_number || 1,
                   Total_Pages: t.total_pages || 1,
                   Progression_Pct: `${t.progress_percent || 0}%`,
@@ -197,10 +224,10 @@ export default function AdminTracesAccesPage() {
         <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-1">
           <p className="text-[11px] font-medium text-foreground-muted">Pays / Territoires Détectés</p>
           <p className="text-xl font-bold text-gold font-mono">
-            {new Set(traces.map((t) => t.country)).size} Territoire(s)
+            {new Set(traces.map((t) => formatCountryName(t.country))).size} Territoire(s)
           </p>
           <p className="text-[10px] text-foreground-muted">
-            {traces.length > 0 ? Array.from(new Set(traces.map((t) => t.country))).join(", ") : "En attente"}
+            {traces.length > 0 ? Array.from(new Set(traces.map((t) => formatCountryName(t.country)))).join(", ") : "En attente"}
           </p>
         </div>
 
@@ -396,8 +423,8 @@ export default function AdminTracesAccesPage() {
                       {/* Origine (IP & Pays) */}
                       <td className="py-5 px-5 whitespace-nowrap align-middle">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-background border border-border text-navy font-mono">
-                            {trace.country || "BJ"}
+                          <span className="font-bold text-[11px] px-2.5 py-0.5 rounded-md bg-background border border-border text-navy">
+                            {formatCountryName(trace.country)}
                           </span>
                           <span className="font-mono text-xs md:text-sm font-semibold text-navy">
                             {trace.ip_address}
@@ -427,8 +454,8 @@ export default function AdminTracesAccesPage() {
                 <div key={trace.id} className="p-4 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-background border border-border text-navy font-mono">
-                        {trace.country || "BJ"}
+                      <span className="font-bold text-[11px] px-2.5 py-0.5 rounded-md bg-background border border-border text-navy">
+                        {formatCountryName(trace.country)}
                       </span>
                       <span className="font-mono text-xs font-bold text-navy">
                         {trace.ip_address}
