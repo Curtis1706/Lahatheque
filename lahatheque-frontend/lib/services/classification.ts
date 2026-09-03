@@ -17,7 +17,7 @@ export interface DomainItem {
 const BASE = "/api/bff/catalog";
 
 export async function getDisciplines(): Promise<DisciplineItem[]> {
-  const res = await fetch(`${BASE}/disciplines/`, { credentials: "include", cache: "no-store" });
+  const res = await fetch(`${BASE}/disciplines/?all=true`, { credentials: "include", cache: "no-store" });
   if (!res.ok) return [];
   const json = await res.json();
   return Array.isArray(json) ? json : json.results || [];

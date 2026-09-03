@@ -17,10 +17,11 @@ import {
   Check
 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { ACADEMIC_DISCIPLINES } from "@/lib/constants/classification";
+import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import { uploadPublicManuscriptToR2 } from "@/lib/services/storage";
 
 export default function SubmitManuscriptPage() {
+  const { disciplineNames } = useDisciplines();
   const [dragActive, setDragActive] = useState(false);
   const [manuscriptFile, setManuscriptFile] = useState<File | null>(null);
 
@@ -338,7 +339,7 @@ export default function SubmitManuscriptPage() {
                     onChange={(e) => setGenre(e.target.value)}
                   >
                     <option value="">Sélectionner une discipline</option>
-                    {ACADEMIC_DISCIPLINES.map((disc) => (
+                    {disciplineNames.map((disc) => (
                       <option key={disc} value={disc}>
                         {disc}
                       </option>
