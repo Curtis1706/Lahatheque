@@ -870,3 +870,43 @@ export async function deleteBouquetOffering(id: string): Promise<boolean> {
   return res.ok;
 }
 
+// =========================================================================
+// SOUMISSIONS DE MANUSCRITS PUBLICS (LEADS)
+// =========================================================================
+
+export interface ManuscriptLead {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  book_title: string;
+  genre: string;
+  country: string;
+  summary: string;
+  manuscript_file_url: string | null;
+  status: "new" | "contacted" | "converted" | "rejected";
+  status_display: string;
+  created_at: string;
+}
+
+export async function getManuscriptLeads(statusFilter?: string): Promise<ManuscriptLead[]> {
+  const params = statusFilter && statusFilter !== "all" ? `?status=${statusFilter}` : "";
+  const res = await fetch(`/api/bff/rights/admin/manuscript-leads/${params}`, {
+    credentials: "include", cache: "no-store",
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data || [];
+}
+
+export async function updateManuscriptLeadStatus(id: string, status: string): Promise<boolean> {
+  const res = await fetch(`/api/bff/rights/admin/manuscript-leads/${id}/`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  return res.ok;
+}
+
+

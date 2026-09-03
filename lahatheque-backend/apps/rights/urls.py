@@ -26,13 +26,19 @@ from .views import (
     DebtReminderConfigView,
     LegalRelancesListView,
     PublicManuscriptSubmitView,
+    AdminManuscriptLeadsListView,
+    AdminManuscriptLeadDecisionView,
+    PublicManuscriptPresignedUrlView,
 )
 
 app_name = 'rights'
 
 urlpatterns = [
-    # Soumission Publique de Manuscrit
+    # Soumission Publique de Manuscrit & Suivi Admin
     path('public/manuscript-submit/', PublicManuscriptSubmitView.as_view(), name='public-manuscript-submit'),
+    path('public/manuscript-presigned-url/', PublicManuscriptPresignedUrlView.as_view(), name='public-manuscript-presigned-url'),
+    path('admin/manuscript-leads/', AdminManuscriptLeadsListView.as_view(), name='admin-manuscript-leads-list'),
+    path('admin/manuscript-leads/<str:id>/', AdminManuscriptLeadDecisionView.as_view(), name='admin-manuscript-lead-decision'),
 
     # Auteur & Redevances
     path('author/kpis/', AuthorDashboardKPIsView.as_view(), name='author-kpis'),

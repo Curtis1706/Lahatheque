@@ -98,3 +98,39 @@ export async function uploadFileDirectlyToR2(
     xhr.send(file);
   });
 }
+
+/**
+ * Téléversement direct d'un manuscrit public vers Cloudflare R2 via URL présignée (bypass limite serveur).
+ */
+export async function uploadPublicManuscriptToR2(
+  file: File,
+  onProgress?: UploadProgressCallback
+): Promise<{ fileKey?: string; directToR2: boolean }> {
+  const res = await fetch("/api/bff/rights/public/manuscript-presigned-url/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name, content_type: file.type || "application/pdf" }),
+  });
+  if (!res.ok) return { directToR2: false };
+  const json = await res.json();
+  const { upload_url: uploadUrl, file_key: fileKey, direct_to_r2: directToR2 } = json.data || {};
+  if (!directToR2 || !uploadUrl || !fileKey) return { directToR2: false };
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl, true);
+    xhr.setRequestHeader("Content-Type", file.type || "application/pdf");
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100), event.loaded, event.total);
+      };
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve({ fileKey, directToR2: true });
+      else reject(new Error(`Échec du téléversement (HTTP ${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error("Erreur réseau lors du téléversement."));
+    xhr.send(file);
+  });
+}
+

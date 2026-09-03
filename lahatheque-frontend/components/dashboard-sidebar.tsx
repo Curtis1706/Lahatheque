@@ -324,6 +324,7 @@ export function DashboardSidebar() {
                 ],
               },
               { label: "Validation BAT & Maquettes", href: "/admin/validation", icon: <FileCheck2 className="size-4" /> },
+              { label: "Manuscrits Reçus (Public)", href: "/admin/manuscript-leads", icon: <Mail className="size-4" /> },
               { label: "Dépôts Éditeurs Tiers", href: "/admin/publisher-deposits", icon: <BookOpen className="size-4" /> },
               { label: "Contrats & Droits d'Auteur", href: "/admin/contracts", icon: <Scale className="size-4" /> },
               {

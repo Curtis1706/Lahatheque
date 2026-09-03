@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { ACADEMIC_DISCIPLINES } from "@/lib/constants/classification";
+import { uploadPublicManuscriptToR2 } from "@/lib/services/storage";
 
 export default function SubmitManuscriptPage() {
   const [dragActive, setDragActive] = useState(false);
@@ -96,6 +97,8 @@ export default function SubmitManuscriptPage() {
 
     setIsSubmitting(true);
     try {
+      const uploadResult = await uploadPublicManuscriptToR2(manuscriptFile as File);
+
       const formData = new FormData();
       formData.append("first_name", firstName.trim());
       formData.append("last_name", lastName.trim());
@@ -105,7 +108,12 @@ export default function SubmitManuscriptPage() {
       formData.append("genre", genre.trim());
       formData.append("country", country.trim());
       formData.append("summary", summary.trim());
-      formData.append("manuscript_file", manuscriptFile as File);
+
+      if (uploadResult.directToR2 && uploadResult.fileKey) {
+        formData.append("manuscript_file_key", uploadResult.fileKey);
+      } else {
+        formData.append("manuscript_file", manuscriptFile as File);
+      }
 
       const res = await fetch("/api/bff/rights/public/manuscript-submit/", {
         method: "POST",

@@ -2111,7 +2111,9 @@ class PublicManuscriptSubmitView(APIView):
             }, status=400)
 
         manuscript_file = request.FILES.get('manuscript_file')
-        if not manuscript_file:
+        file_key = data.get('manuscript_file_key', '').strip()
+
+        if not manuscript_file and not file_key:
             return Response({'success': False, 'error': "Le fichier du manuscrit est requis."}, status=400)
 
         lead = PublicManuscriptLead.objects.create(
@@ -2123,7 +2125,8 @@ class PublicManuscriptSubmitView(APIView):
             genre=data.get('genre', '').strip(),
             country=data.get('country', '').strip(),
             summary=data.get('summary', '').strip(),
-            manuscript_file=manuscript_file,
+            manuscript_file=manuscript_file if manuscript_file else None,
+            manuscript_file_key=file_key,
         )
 
         send_transactional_email(
@@ -2159,5 +2162,143 @@ class PublicManuscriptSubmitView(APIView):
                        "Vous recevrez une confirmation par email sous peu.",
             'data': {'id': str(lead.id)}
         }, status=status.HTTP_201_CREATED)
+
+
+class AdminManuscriptLeadsListView(APIView):
+    """GET /api/v1/rights/admin/manuscript-leads/ - Manuscrits reçus via le formulaire public."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from .models import PublicManuscriptLead
+        from django.conf import settings
+
+        status_filter = request.query_params.get('status', '')
+        qs = PublicManuscriptLead.objects.all()
+        if status_filter and status_filter != 'all':
+            qs = qs.filter(status=status_filter)
+
+        public_r2_url = (
+            getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', '')
+            or getattr(settings, 'CLOUDFLARE_R2_PUBLIC_DOMAIN', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
+        )
+
+        data = [{
+            "id": str(lead.id),
+            "full_name": f"{lead.first_name} {lead.last_name}",
+            "email": lead.email,
+            "phone": lead.phone,
+            "book_title": lead.book_title,
+            "genre": lead.genre,
+            "country": lead.country,
+            "summary": lead.summary,
+            "manuscript_file_url": (
+                lead.manuscript_file.url if lead.manuscript_file
+                else (f"{public_r2_url.rstrip('/')}/{lead.manuscript_file_key}"
+                      if lead.manuscript_file_key else None)
+            ),
+            "status": lead.status,
+            "status_display": lead.get_status_display(),
+            "created_at": lead.created_at.isoformat(),
+        } for lead in qs]
+
+        return Response({"success": True, "data": data})
+
+
+class AdminManuscriptLeadDecisionView(APIView):
+    """PATCH /api/v1/rights/admin/manuscript-leads/<id>/ - Change le statut d'une soumission."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def patch(self, request, id):
+        from .models import PublicManuscriptLead
+
+        new_status = request.data.get("status")
+        valid_statuses = [s[0] for s in PublicManuscriptLead.STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return Response({
+                "success": False,
+                "error": f"Statut invalide. Valeurs possibles : {', '.join(valid_statuses)}."
+            }, status=400)
+
+        try:
+            lead = PublicManuscriptLead.objects.get(id=id)
+        except PublicManuscriptLead.DoesNotExist:
+            return Response({"success": False, "error": "Soumission introuvable."}, status=404)
+
+        lead.status = new_status
+        lead.save(update_fields=["status"])
+
+        return Response({
+            "success": True,
+            "message": f"Statut mis à jour : {lead.get_status_display()}.",
+            "data": {"id": str(lead.id), "status": lead.status}
+        })
+
+
+class PublicManuscriptPresignedUrlView(APIView):
+    """
+    POST /api/v1/rights/public/manuscript-presigned-url/
+    Génère une URL signée R2 pour téléverser un manuscrit directement depuis le navigateur
+    d'un prospect non authentifié, en contournant la limite de taille de requête du serveur
+    applicatif.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        import uuid
+        import re
+        from django.conf import settings
+
+        filename = request.data.get('filename', 'manuscrit.pdf')
+        content_type = request.data.get('content_type', 'application/pdf')
+
+        bucket_name = getattr(settings, 'CLOUDFLARE_R2_BUCKET_NAME', 'lahatheque')
+        endpoint_url = getattr(settings, 'CLOUDFLARE_R2_ENDPOINT', '')
+        access_key = getattr(settings, 'CLOUDFLARE_R2_ACCESS_KEY_ID', '')
+        secret_key = getattr(settings, 'CLOUDFLARE_R2_SECRET_ACCESS_KEY', '')
+
+        if not (endpoint_url and access_key and secret_key):
+            return Response({"success": False, "error": "Stockage R2 non configuré."}, status=503)
+
+        try:
+            import boto3
+            from botocore.client import Config
+
+            clean_name = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', filename)
+            name_parts = clean_name.rsplit('.', 1)
+            base_part = name_parts[0][:40]
+            ext_part = f".{name_parts[1]}" if len(name_parts) > 1 else ""
+            clean_name = f"{base_part}{ext_part}"
+
+            unique_id = uuid.uuid4().hex[:12]
+            key = f"public_manuscript_leads/{unique_id}_{clean_name}"
+
+            s3_client = boto3.client(
+                's3',
+                endpoint_url=endpoint_url,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name='auto',
+                config=Config(signature_version='s3v4', s3={'addressing_style': 'path'})
+            )
+
+            upload_url = s3_client.generate_presigned_url(
+                'put_object',
+                Params={'Bucket': bucket_name, 'Key': key, 'ContentType': content_type},
+                ExpiresIn=3600
+            )
+
+            return Response({
+                "success": True,
+                "data": {
+                    "direct_to_r2": True,
+                    "upload_url": upload_url,
+                    "file_key": key,
+                    "bucket": bucket_name,
+                }
+            })
+        except Exception as e:
+            return Response({"success": False, "error": f"Impossible de générer l'URL de téléversement : {e}"}, status=500)
+
+
 
 

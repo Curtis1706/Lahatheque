@@ -321,7 +321,8 @@ class PublicManuscriptLead(models.Model):
     genre = models.CharField(max_length=100, blank=True, default='')
     country = models.CharField(max_length=100, blank=True, default='')
     summary = models.TextField(blank=True, default='')
-    manuscript_file = models.FileField(upload_to='public_manuscript_leads/%Y/%m/')
+    manuscript_file = models.FileField(upload_to='public_manuscript_leads/%Y/%m/', blank=True, null=True)
+    manuscript_file_key = models.CharField(max_length=500, blank=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
     created_at = models.DateTimeField(auto_now_add=True)
 
