@@ -90,3 +90,42 @@ export const INITIAL_GUIDES: MockGuideArticle[] = [
     created_at: "2026-09-01T11:00:00Z",
   },
 ];
+
+// Singleton mémoire global pour le process Node / Next.js
+declare global {
+  var __GUIDES_STORE__: MockGuideArticle[] | undefined;
+}
+
+if (!globalThis.__GUIDES_STORE__) {
+  globalThis.__GUIDES_STORE__ = [...INITIAL_GUIDES];
+}
+
+export function getGuidesStore(): MockGuideArticle[] {
+  return globalThis.__GUIDES_STORE__ || INITIAL_GUIDES;
+}
+
+export function addGuideToStore(guide: MockGuideArticle): MockGuideArticle {
+  const store = getGuidesStore();
+  store.unshift(guide);
+  return guide;
+}
+
+export function updateGuideInStore(id: string, partial: Partial<MockGuideArticle>): MockGuideArticle | null {
+  const store = getGuidesStore();
+  const index = store.findIndex((g) => g.id === id);
+  if (index !== -1) {
+    store[index] = { ...store[index], ...partial };
+    return store[index];
+  }
+  return null;
+}
+
+export function deleteGuideFromStore(id: string): boolean {
+  const store = getGuidesStore();
+  const index = store.findIndex((g) => g.id === id);
+  if (index !== -1) {
+    store.splice(index, 1);
+    return true;
+  }
+  return false;
+}

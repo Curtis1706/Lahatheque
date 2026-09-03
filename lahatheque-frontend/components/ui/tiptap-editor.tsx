@@ -15,7 +15,7 @@ import Link from "@tiptap/extension-link"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Node, mergeAttributes } from "@tiptap/core"
 import { ReactNodeViewRenderer } from "@tiptap/react"
-import { useRef, useCallback, useState } from "react"
+import { useRef, useCallback, useState, useEffect } from "react"
 import { uploadToCloudflare } from "@/lib/cloudflare"
 import { CLOUDFLARE_STREAM_SUBDOMAIN } from "@/lib/constants/cloudflare"
 import {
@@ -58,13 +58,95 @@ const VideoEmbed = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: "div[data-video-embed]" }]
+    return [
+      {
+        tag: "div[data-video-embed]",
+        getAttrs: (element: any) => ({
+          video_url: element.getAttribute("data-video-url") || element.getAttribute("video_url"),
+          stream_id: element.getAttribute("data-stream-id") || element.getAttribute("stream_id"),
+          title: element.getAttribute("data-title") || element.getAttribute("title"),
+        }),
+      },
+      {
+        tag: "video",
+        getAttrs: (element: any) => ({
+          video_url: element.getAttribute("src"),
+          title: element.getAttribute("title") || "",
+        }),
+      },
+      {
+        tag: "iframe",
+        getAttrs: (element: any) => ({
+          video_url: element.getAttribute("src"),
+          title: element.getAttribute("title") || "",
+        }),
+      },
+    ]
   },
 
   renderHTML({ HTMLAttributes }: { HTMLAttributes: any }) {
+    const videoUrl = HTMLAttributes.video_url || HTMLAttributes["data-video-url"] || ""
+    const streamId = HTMLAttributes.stream_id || HTMLAttributes["data-stream-id"] || ""
+    const title = HTMLAttributes.title || HTMLAttributes["data-title"] || ""
+    const rawSrc = videoUrl || streamId || ""
+
+    if (
+      rawSrc.includes("youtube.com") ||
+      rawSrc.includes("youtu.be") ||
+      rawSrc.includes("vimeo.com")
+    ) {
+      let iframeSrc = rawSrc
+      if (rawSrc.includes("youtube.com/watch?v=")) {
+        const videoId = rawSrc.split("v=")[1]?.split("&")[0]
+        iframeSrc = `https://www.youtube.com/embed/${videoId}`
+      } else if (rawSrc.includes("youtu.be/")) {
+        const videoId = rawSrc.split("youtu.be/")[1]?.split("?")[0]
+        iframeSrc = `https://www.youtube.com/embed/${videoId}`
+      } else if (rawSrc.includes("vimeo.com/")) {
+        const videoId = rawSrc.split("vimeo.com/")[1]?.split("?")[0]
+        iframeSrc = `https://player.vimeo.com/video/${videoId}`
+      }
+
+      return [
+        "div",
+        {
+          "data-video-embed": "",
+          "data-video-url": videoUrl,
+          "data-stream-id": streamId,
+          "data-title": title,
+          class: "my-4 w-full max-w-2xl overflow-hidden rounded-2xl bg-black aspect-video mx-auto border-0",
+        },
+        [
+          "iframe",
+          {
+            src: iframeSrc,
+            class: "w-full h-full border-none rounded-2xl",
+            allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+            allowfullscreen: "true",
+          },
+        ],
+      ]
+    }
+
     return [
       "div",
-      mergeAttributes({ "data-video-embed": "" }, HTMLAttributes),
+      {
+        "data-video-embed": "",
+        "data-video-url": videoUrl,
+        "data-stream-id": streamId,
+        "data-title": title,
+        class: "my-4 w-full max-w-2xl overflow-hidden rounded-2xl bg-black mx-auto border-0",
+      },
+      [
+        "video",
+        {
+          src: rawSrc,
+          controls: "true",
+          playsinline: "true",
+          preload: "metadata",
+          class: "w-full max-h-[520px] h-auto object-contain mx-auto block rounded-2xl bg-black border-0 outline-none",
+        },
+      ],
     ]
   },
 
@@ -87,7 +169,8 @@ function VideoEmbedView({ node, deleteNode }: NodeViewProps) {
     rawSrc.includes(".webm") ||
     rawSrc.includes(".r2.cloudflarestorage.com") ||
     rawSrc.includes(".r2.dev") ||
-    rawSrc.includes("/media/")
+    rawSrc.includes("/media/") ||
+    rawSrc.includes("/uploads/")
   ) {
     isDirectVideo = true
     src = rawSrc
@@ -109,20 +192,22 @@ function VideoEmbedView({ node, deleteNode }: NodeViewProps) {
 
   return (
     <NodeViewWrapper className="my-4 relative group">
-      <div className="relative rounded-2xl overflow-hidden border border-border bg-black aspect-video max-w-2xl mx-auto shadow-md">
+      <div className="relative rounded-2xl overflow-hidden bg-black max-w-2xl mx-auto border-0">
         {src ? (
           isDirectVideo ? (
-            <video src={src} controls playsInline className="w-full h-full object-cover rounded-2xl" />
+            <video src={src} controls playsInline className="w-full max-h-[520px] h-auto object-contain rounded-2xl bg-black block mx-auto border-0 outline-none" />
           ) : (
-            <iframe
-              src={src}
-              className="w-full h-full border-none rounded-2xl"
-              allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+            <div className="aspect-video w-full">
+              <iframe
+                src={src}
+                className="w-full h-full border-none rounded-2xl"
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
           )
         ) : (
-          <div className="flex items-center justify-center h-full text-foreground-muted text-xs">
+          <div className="flex items-center justify-center h-48 text-foreground-muted text-xs">
             Vidéo non disponible
           </div>
         )}
@@ -267,63 +352,106 @@ export function TiptapEditor({
     },
   })
 
+  // Synchronisation du contenu asynchrone lors de l'ouverture/édition d'un article
+  useEffect(() => {
+    if (editor && content !== undefined && editor.getHTML() !== content) {
+      editor.commands.setContent(content, false)
+    }
+  }, [content, editor])
+
   const handleImageUpload = useCallback(
     async (file: File) => {
       if (!editor) return
-      const toastId = toast.loading("Téléversement vers Cloudflare R2...")
+      const toastId = toast.loading("Téléversement de l'image...")
       try {
         const res = await uploadToCloudflare(file, undefined, "guides", "image")
-        if (res.secure_url) {
+        const targetSrc = res?.secure_url
+        if (targetSrc) {
           editor
             .chain()
             .focus()
-            .setImage({ src: res.secure_url, alt: file.name })
-            .insertContent({ type: "paragraph" })
-            .focus("end")
+            .insertContent(`<p><img src="${targetSrc}" alt="${file.name}" class="rounded-2xl max-w-full h-auto my-4 block shadow-xs" /></p><p></p>`)
             .run()
+          onChange(editor.getHTML())
           toast.success("Image insérée avec succès !", { id: toastId })
           setActiveModal(null)
-        } else {
-          toast.error("Impossible de charger l'image", { id: toastId })
+          return
         }
-      } catch {
-        toast.error("Échec du téléversement de l'image", { id: toastId })
+      } catch (err) {
+        console.warn("Upload R2 direct échoué, fallback local DataURL", err)
       }
+
+      // Fallback DataURL immédiat
+      const reader = new FileReader()
+      reader.onload = () => {
+        const localDataUrl = reader.result as string
+        editor
+          .chain()
+          .focus()
+          .insertContent(`<p><img src="${localDataUrl}" alt="${file.name}" class="rounded-2xl max-w-full h-auto my-4 block shadow-xs" /></p><p></p>`)
+          .run()
+        onChange(editor.getHTML())
+        toast.success("Image insérée !", { id: toastId })
+        setActiveModal(null)
+      }
+      reader.readAsDataURL(file)
     },
-    [editor]
+    [editor, onChange]
   )
 
   const handleVideoUpload = useCallback(
     async (file: File) => {
       if (!editor) return
-      const toastId = toast.loading("Téléversement de la vidéo vers Cloudflare R2...")
+      const toastId = toast.loading("Téléversement de la vidéo...")
       try {
         const res = await uploadToCloudflare(file, undefined, "guides", "video")
-        if (res.secure_url) {
+        const targetSrc = res?.secure_url
+        if (targetSrc) {
           editor
             .chain()
             .focus()
             .insertContent([
               {
                 type: "videoEmbed",
-                attrs: { video_url: res.secure_url, stream_id: null, title: file.name },
+                attrs: { video_url: targetSrc, stream_id: null, title: file.name },
               },
               {
                 type: "paragraph",
               },
             ])
-            .focus("end")
             .run()
+          onChange(editor.getHTML())
           toast.success("Vidéo insérée avec succès !", { id: toastId })
           setActiveModal(null)
-        } else {
-          toast.error("Impossible de charger la vidéo", { id: toastId })
+          return
         }
-      } catch {
-        toast.error("Échec du téléversement de la vidéo", { id: toastId })
+      } catch (err) {
+        console.warn("Upload R2 vidéo échoué, fallback direct", err)
       }
+
+      const reader = new FileReader()
+      reader.onload = () => {
+        const localVideoUrl = reader.result as string
+        editor
+          .chain()
+          .focus()
+          .insertContent([
+            {
+              type: "videoEmbed",
+              attrs: { video_url: localVideoUrl, stream_id: null, title: file.name },
+            },
+            {
+              type: "paragraph",
+            },
+          ])
+          .run()
+        onChange(editor.getHTML())
+        toast.success("Vidéo insérée !", { id: toastId })
+        setActiveModal(null)
+      }
+      reader.readAsDataURL(file)
     },
-    [editor]
+    [editor, onChange]
   )
 
   const applyLink = () => {
@@ -337,22 +465,22 @@ export function TiptapEditor({
       }
       editor.chain().focus().setLink({ href }).run()
     }
+    onChange(editor.getHTML())
     setActiveModal(null)
   }
 
   const applyImageUrl = () => {
     if (!editor || !imageUrl.trim()) return
     let src = imageUrl.trim()
-    if (!src.startsWith("http://") && !src.startsWith("https://")) {
+    if (!src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("/uploads/")) {
       src = `https://${src}`
     }
     editor
       .chain()
       .focus()
-      .setImage({ src, alt: "Image" })
-      .insertContent({ type: "paragraph" })
-      .focus("end")
+      .insertContent(`<p><img src="${src}" alt="Image" class="rounded-2xl max-w-full h-auto my-4 block shadow-xs" /></p><p></p>`)
       .run()
+    onChange(editor.getHTML())
     setImageUrl("")
     setActiveModal(null)
   }
@@ -375,8 +503,8 @@ export function TiptapEditor({
           type: "paragraph",
         },
       ])
-      .focus("end")
       .run()
+    onChange(editor.getHTML())
     setVideoInput("")
     setActiveModal(null)
   }

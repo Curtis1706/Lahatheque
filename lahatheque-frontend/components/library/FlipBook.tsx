@@ -373,30 +373,14 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
           const absoluteUrl = (fileUrl.startsWith('http') || fileUrl.startsWith('blob:'))
             ? fileUrl
             : `${origin}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
-          try {
-            const res = await fetch(absoluteUrl, {
-              headers: { Accept: 'application/octet-stream' },
-              credentials: 'include',
-            });
-            if (res.ok) {
-              const contentType = res.headers.get('content-type') || '';
-              if (!contentType.includes('json') && !contentType.includes('html')) {
-                const buffer = await res.arrayBuffer();
-                const bytes = new Uint8Array(buffer);
-                if (bytes.length > 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
-                  pdfSource = { data: bytes };
-                } else {
-                  pdfSource = absoluteUrl;
-                }
-              } else {
-                pdfSource = absoluteUrl;
-              }
-            } else {
-              pdfSource = absoluteUrl;
-            }
-          } catch {
-            pdfSource = absoluteUrl;
-          }
+
+          pdfSource = {
+            url: absoluteUrl,
+            withCredentials: true,
+            rangeChunkSize: 65536, // Streaming par blocs de 64 Ko
+            disableAutoFetch: true, // Évite de télécharger tout le document en avance
+            disableStream: false,  // Active le streaming par morceaux HTTP 206
+          };
         } else if (typeof fileUrl === 'object' && fileUrl !== null) {
           pdfSource = { data: fileUrl };
         } else {
@@ -414,24 +398,40 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
         onDocumentLoadRef.current?.(total);
 
         const renderPage = async (idx: number): Promise<string> => {
-          const page     = await pdf.getPage(idx + 1);
-          const viewport = page.getViewport({ scale: 1.5 });
-          const canvas   = document.createElement('canvas');
-          const ctx      = canvas.getContext('2d', { willReadFrequently: true });
-          if (!ctx) return '';
-          canvas.height = viewport.height;
-          canvas.width  = viewport.width;
-          await page.render({ canvasContext: ctx, viewport }).promise;
-          return new Promise<string>(res => canvas.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.9));
+          try {
+            const page = await pdf.getPage(idx + 1);
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (!ctx) return '';
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            page.cleanup();
+            return new Promise<string>(res => canvas.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.9));
+          } catch (e) {
+            console.warn(`[FlipBook] Erreur rendu page ${idx + 1}:`, e);
+            return '';
+          }
         };
 
         const initialWindow = getPageRenderWindow(initialPageRef.current, total);
-        for (let i = initialWindow.start; i <= initialWindow.end; i++) {
+        
+        // Rendu prioritaire de la première page visible
+        const firstPageUrl = await renderPage(initialWindow.start);
+        if (isCancelled) return;
+
+        setPages(prev => { const next = [...prev]; next[initialWindow.start] = firstPageUrl; return next; });
+        
+        // Libération immédiate du chargement pour affichage instantané (< 400ms)
+        setIsLoading(false);
+
+        // Préchargement asynchrone des autres pages de la fenêtre initiale
+        for (let i = initialWindow.start + 1; i <= initialWindow.end; i++) {
           if (isCancelled) return;
           const url = await renderPage(i);
           setPages(prev => { const next = [...prev]; next[i] = url; return next; });
         }
-        if (!isCancelled) setIsLoading(false);
       } catch (err) {
         console.error('[FlipBook] PDF load error:', err);
         if (!isCancelled) setIsLoading(false);
@@ -453,18 +453,21 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
         if (pages[i] || renderingIndices.current.has(i)) continue;
         try {
           renderingIndices.current.add(i);
-          const page     = await pdfInstance.current.getPage(i + 1);
+          const page = await pdfInstance.current.getPage(i + 1);
           const viewport = page.getViewport({ scale: 1.5 });
-          const canvas   = document.createElement('canvas');
-          const ctx      = canvas.getContext('2d', { willReadFrequently: true });
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
           if (ctx) {
             canvas.height = viewport.height;
-            canvas.width  = viewport.width;
+            canvas.width = viewport.width;
             await page.render({ canvasContext: ctx, viewport }).promise;
+            page.cleanup();
 
             const url = await new Promise<string>(res => canvas.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.9));
             setPages(prev => { if (prev[i]) return prev; const next = [...prev]; next[i] = url; return next; });
           }
+        } catch (e) {
+          console.warn(`[FlipBook] Lazy load error on page ${i + 1}:`, e);
         } finally {
           renderingIndices.current.delete(i);
         }
@@ -588,7 +591,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
               {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
             </button>
 
-            {/* TTS Read Aloud */}
+            {/* TTS Read Aloud (Masqué)
             {onToggleTts && (
               <button
                 type="button"
@@ -605,6 +608,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
                 <span className="hidden md:inline">{isTtsActive ? 'Arrêter TTS' : 'Lecture Vocale'}</span>
               </button>
             )}
+            */}
 
             {/* Audio Narrator */}
             {hasAudio && (

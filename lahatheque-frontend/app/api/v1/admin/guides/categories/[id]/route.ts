@@ -32,17 +32,20 @@ export async function PUT(
   try {
     const body = await request.json();
     const headers = getForwardHeaders(request);
-    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
+    console.log(`[API /admin/guides/categories/${id}/] PUT vers Django:`, body);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/admin/guides/categories/${id}/`, {
       method: "PUT",
       headers,
       body: JSON.stringify(body),
     });
 
     const data = await djangoRes.json();
+    console.log(`[API /admin/guides/categories/${id}/] PUT réponse (${djangoRes.status}):`, data);
     return NextResponse.json(data, { status: djangoRes.status });
-  } catch {
+  } catch (err: any) {
+    console.error(`[API /admin/guides/categories/${id}/] Erreur PUT:`, err);
     return NextResponse.json(
-      { error: "Impossible de modifier l'article dans la base de données." },
+      { error: "Impossible de modifier la catégorie en base de données." },
       { status: 502 }
     );
   }
@@ -59,7 +62,8 @@ export async function PATCH(
   try {
     const body = await request.json();
     const headers = getForwardHeaders(request);
-    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
+    console.log(`[API /admin/guides/categories/${id}/] PATCH vers Django:`, body);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/admin/guides/categories/${id}/`, {
       method: "PATCH",
       headers,
       body: JSON.stringify(body),
@@ -67,9 +71,9 @@ export async function PATCH(
 
     const data = await djangoRes.json();
     return NextResponse.json(data, { status: djangoRes.status });
-  } catch {
+  } catch (err: any) {
     return NextResponse.json(
-      { error: "Impossible de modifier l'article dans la base de données." },
+      { error: "Impossible de modifier la catégorie en base de données." },
       { status: 502 }
     );
   }
@@ -85,19 +89,22 @@ export async function DELETE(
 
   try {
     const headers = getForwardHeaders(request);
-    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
+    console.log(`[API /admin/guides/categories/${id}/] DELETE vers Django`);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/admin/guides/categories/${id}/`, {
       method: "DELETE",
       headers,
     });
 
     if (djangoRes.status === 204 || djangoRes.ok) {
+      console.log(`[API /admin/guides/categories/${id}/] DELETE réussi`);
       return NextResponse.json({ success: true });
     }
     const data = await djangoRes.json().catch(() => ({}));
     return NextResponse.json(data, { status: djangoRes.status });
-  } catch {
+  } catch (err: any) {
+    console.error(`[API /admin/guides/categories/${id}/] Erreur DELETE:`, err);
     return NextResponse.json(
-      { error: "Impossible de supprimer l'article de la base de données." },
+      { error: "Impossible de supprimer la catégorie de la base de données." },
       { status: 502 }
     );
   }

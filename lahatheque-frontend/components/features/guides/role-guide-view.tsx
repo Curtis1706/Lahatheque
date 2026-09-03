@@ -85,17 +85,38 @@ export function RoleGuideView({ role, roleLabel, initialArticles }: RoleGuideVie
     const fetchRoleGuides = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/v1/communications/guides/?role=${role}`);
+        console.log(`[ROLE GUIDE UI] Chargement des guides pour rôle "${role}" depuis /api/v1/guides/?role=${role}...`);
+        const res = await fetch(`/api/v1/guides/?role=${role}`);
         if (res.ok) {
           const data = await res.json();
-          const list: GuideArticle[] = Array.isArray(data) ? data : (data?.results || []);
-          const roleList = list.filter((g) => g.target_role === role || g.target_role === "all");
-          setArticles(roleList);
-          if (roleList.length > 0) {
-            setActiveArticleId(roleList[0].id);
+          const rawList = Array.isArray(data) ? data : (data?.results || []);
+          console.log(`[ROLE GUIDE UI] Données reçues depuis PostgreSQL:`, rawList);
+
+          const flattenedArticles: GuideArticle[] = [];
+          rawList.forEach((catItem: any) => {
+            if (Array.isArray(catItem.articles)) {
+              catItem.articles.forEach((art: any) => {
+                flattenedArticles.push({
+                  ...art,
+                  category_label: catItem.title || "Général",
+                  target_role: role,
+                  steps: art.steps || [],
+                  faq: art.faq || [],
+                });
+              });
+            } else if (catItem.title && catItem.content !== undefined) {
+              flattenedArticles.push(catItem);
+            }
+          });
+
+          console.log(`[ROLE GUIDE UI] ${flattenedArticles.length} articles disponibles pour "${role}":`, flattenedArticles);
+          setArticles(flattenedArticles);
+          if (flattenedArticles.length > 0) {
+            setActiveArticleId(flattenedArticles[0].id);
           }
         }
-      } catch {
+      } catch (err) {
+        console.error("[ROLE GUIDE UI] Erreur:", err);
         setArticles([]);
       } finally {
         setLoading(false);
@@ -341,7 +362,7 @@ export function RoleGuideView({ role, roleLabel, initialArticles }: RoleGuideVie
                           {/* Contenu Enrichi Tiptap (contenant tout : texte, listes, images R2 et vidéos) */}
                           {art.content ? (
                             <div
-                              className="tiptap-content text-xs sm:text-sm text-foreground-muted leading-relaxed space-y-4 [&_img]:rounded-2xl [&_img]:border [&_img]:border-border [&_img]:my-4 [&_img]:max-w-full [&_video]:rounded-2xl [&_video]:border [&_video]:border-border [&_video]:my-4 [&_video]:w-full [&_video]:max-w-2xl [&_h2]:text-navy [&_h2]:font-bold [&_h2]:text-base [&_h2]:mt-4 [&_h3]:text-navy [&_h3]:font-bold [&_h3]:text-sm [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_p]:leading-relaxed"
+                              className="tiptap-content text-xs sm:text-sm text-foreground-muted leading-relaxed space-y-4 [&_img]:rounded-2xl [&_img]:my-4 [&_img]:max-w-full [&_img]:h-auto [&_img]:block [&_img]:shadow-xs [&_video]:rounded-2xl [&_video]:border-0 [&_video]:my-4 [&_video]:w-full [&_video]:max-w-2xl [&_video]:bg-black [&_video]:outline-none [&_video]:block [&_video]:mx-auto [&_div[data-video-embed]]:border-0 [&_div[data-video-embed]]:bg-black [&_div[data-video-embed]]:rounded-2xl [&_div[data-video-embed]]:overflow-hidden [&_h2]:text-navy [&_h2]:font-bold [&_h2]:text-base [&_h2]:mt-4 [&_h3]:text-navy [&_h3]:font-bold [&_h3]:text-sm [&_h3]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_p]:leading-relaxed"
                               dangerouslySetInnerHTML={{ __html: art.content }}
                             />
                           ) : (

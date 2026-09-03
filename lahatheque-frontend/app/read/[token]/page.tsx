@@ -654,7 +654,7 @@ export default function HostedReaderPage() {
 
         {/* Droite : Outils, Switchers Bimodal & TTS */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Bouton Synthèse Vocale (TTS) */}
+          {/* Bouton Synthèse Vocale (TTS) (Masqué)
           <button
             onClick={handleToggleTts}
             title="Lecture à voix haute (TTS)"
@@ -667,8 +667,9 @@ export default function HostedReaderPage() {
             <Headphones className="w-3.5 h-3.5" />
             <span className="hidden lg:inline">{isTtsActive ? "Arrêter" : "Vocale"}</span>
           </button>
+          */}
 
-          {/* Bouton Mode Nuit / Jour */}
+          {/* Bouton Mode Nuit / Jour (Masqué)
           <button
             onClick={() => setIsNightMode(!isNightMode)}
             title={isNightMode ? "Passer en mode jour" : "Passer en mode sombre"}
@@ -676,6 +677,7 @@ export default function HostedReaderPage() {
           >
             {isNightMode ? <Sun className="w-3.5 h-3.5 text-amber-300" /> : <Moon className="w-3.5 h-3.5" />}
           </button>
+          */}
 
           {/* Bouton Plein Écran */}
           <button

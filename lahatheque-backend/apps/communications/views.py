@@ -1,11 +1,16 @@
 import logging
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, status, viewsets, filters
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import ContactMessage, GuideItem
-from .serializers import GuideItemSerializer
+from .models import ContactMessage, GuideCategory, GuideArticle
+from .serializers import (
+    GuideCategorySerializer,
+    AdminGuideCategorySerializer,
+    AdminGuideArticleSerializer,
+    GuideArticleSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +34,6 @@ def submit_contact_view(request):
             'error': 'Tous les champs (nom, email, sujet, message) sont obligatoires.'
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    # 1. Enregistrement en base de données
     try:
         contact_record = ContactMessage.objects.create(
             name=name,
@@ -46,7 +50,6 @@ def submit_contact_view(request):
             'error': "Impossible d'enregistrer votre message. Veuillez réessayer."
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # 2. Notification email (silencieuse si SMTP non configuré en dev)
     admin_recipients = getattr(settings, 'SUPPORT_EMAIL_RECIPIENTS', ["contact@lahatheque.bj", "support@lahatheque.bj"])
     email_subject = f"[Support LAHAThèque] Nouveau message ({role}) : {subject}"
     html_body = f"""
@@ -81,48 +84,48 @@ def submit_contact_view(request):
     }, status=status.HTTP_201_CREATED)
 
 
+class GuideCategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Vue publique / utilisateur connecté pour consulter les guides d'utilisation.
+    Filtre automatiquement par le rôle passé en query param ou extrait du compte utilisateur.
+    """
+    serializer_class = GuideCategorySerializer
+    permission_classes = [permissions.AllowAny]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['title', 'description', 'articles__title', 'articles__content']
+
+    def get_queryset(self):
+        role_param = self.request.query_params.get('role')
+        if role_param and role_param != 'all':
+            return GuideCategory.objects.filter(is_active=True, roles__contains=role_param).order_by('order').distinct()
+
+        user = getattr(self.request, 'user', None)
+        user_role = getattr(user, 'role', '') if user and hasattr(user, 'is_authenticated') and user.is_authenticated else ''
+        
+        if user_role and user_role not in ['admin', 'super_admin']:
+            qs = GuideCategory.objects.filter(is_active=True, roles__contains=user_role).order_by('order').distinct()
+            if qs.exists():
+                return qs
+
+        return GuideCategory.objects.filter(is_active=True).order_by('order').distinct()
+
+
 class IsAdminOrReadOnly(permissions.BasePermission):
-    """
-    Seul l'Administrateur peut créer, modifier ou supprimer des guides.
-    Tout utilisateur (ou visiteur) peut lire les guides autorisés pour son rôle.
-    """
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
             return True
-        return bool(request.user and request.user.is_authenticated and (request.user.role in ['admin', 'super_admin'] or request.user.is_staff))
+        return bool(request.user and request.user.is_authenticated and (getattr(request.user, 'role', '') in ['admin', 'super_admin'] or request.user.is_staff))
 
 
-class GuideViewSet(viewsets.ModelViewSet):
-    """
-    CRUD complet pour les Guides d'utilisation.
-    - Filtrage automatique selon le rôle de l'utilisateur connecté
-    - L'Admin accède à l'intégralité des guides pour création / édition / suppression.
-    """
-    queryset = GuideItem.objects.all()
-    serializer_class = GuideItemSerializer
-    permission_classes = [IsAdminOrReadOnly]
+class AdminGuideCategoryViewSet(viewsets.ModelViewSet):
+    """Vue CRUD admin pour gérer les catégories de guide."""
+    queryset = GuideCategory.objects.all().order_by('order')
+    serializer_class = AdminGuideCategorySerializer
+    permission_classes = [permissions.AllowAny]
 
-    def get_queryset(self):
-        user = self.request.user
-        role_filter = self.request.query_params.get('role', None)
 
-        # Si l'Admin souhaite filtrer ou lister
-        if user.is_authenticated and user.role in ['admin', 'super_admin']:
-            if role_filter and role_filter != 'all':
-                return GuideItem.objects.filter(target_role=role_filter)
-            return GuideItem.objects.all()
-
-        # Utilisateur connecté spécifique (non-admin) : il ne voit QUE les guides de son rôle
-        if user.is_authenticated:
-            user_role = user.role
-            # Mappe le rôle réel vers les guides
-            allowed_roles = [user_role, 'public']
-            return GuideItem.objects.filter(is_published=True, target_role__in=allowed_roles)
-
-        # Visiteur non-connecté public
-        if role_filter:
-            return GuideItem.objects.filter(is_published=True, target_role=role_filter)
-        return GuideItem.objects.filter(is_published=True, target_role__in=['public', 'student'])
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user if self.request.user.is_authenticated else None)
+class AdminGuideArticleViewSet(viewsets.ModelViewSet):
+    """Vue CRUD admin pour créer, modifier et supprimer les articles."""
+    queryset = GuideArticle.objects.all().order_by('category', 'order')
+    serializer_class = AdminGuideArticleSerializer
+    permission_classes = [permissions.AllowAny]

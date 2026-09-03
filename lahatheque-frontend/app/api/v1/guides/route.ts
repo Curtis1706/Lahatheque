@@ -27,40 +27,21 @@ export async function GET(request: NextRequest) {
 
   try {
     const headers = getForwardHeaders(request);
-    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${request.nextUrl.search}`, {
+    const search = request.nextUrl.search || "";
+    console.log(`[API /api/v1/guides/] GET vers Django: ${djangoBaseUrl}/api/v1/communications/guides/${search}`);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${search}`, {
       method: "GET",
       headers,
       cache: "no-store",
     });
 
     const data = await djangoRes.json();
+    console.log(`[API /api/v1/guides/] Réponse Django (status: ${djangoRes.status}):`, Array.isArray(data) ? `${data.length} catégories` : data);
     return NextResponse.json(data, { status: djangoRes.status });
-  } catch (err) {
+  } catch (err: any) {
+    console.error("[API /api/v1/guides/] Erreur:", err);
     return NextResponse.json(
       { error: "Impossible de joindre la base de données Django PostgreSQL." },
-      { status: 502 }
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const rawApiUrl = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
-  const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
-
-  try {
-    const body = await request.json();
-    const headers = getForwardHeaders(request);
-    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    const data = await djangoRes.json();
-    return NextResponse.json(data, { status: djangoRes.status });
-  } catch (err) {
-    return NextResponse.json(
-      { error: "Échec de l'enregistrement dans la base de données Django PostgreSQL." },
       { status: 502 }
     );
   }

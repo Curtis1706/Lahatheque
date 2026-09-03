@@ -471,8 +471,9 @@ export default function DocumentReaderPage() {
               <div style={{ padding: '0px 2px' }}><ZoomOut /></div>
               <div style={{ padding: '0px 2px' }}><Zoom /></div>
               <div style={{ padding: '0px 2px' }}><ZoomIn /></div>
+              {/* <div className="rpv-toolbar__divider" style={{ borderRight: '1px solid #2E3F66', height: '20px', margin: '0 4px' }} />
+              <div style={{ padding: '0px 2px' }}><SwitchTheme /></div> */}
               <div className="rpv-toolbar__divider" style={{ borderRight: '1px solid #2E3F66', height: '20px', margin: '0 4px' }} />
-              <div style={{ padding: '0px 2px' }}><SwitchTheme /></div>
               <div style={{ padding: '0px 2px' }}><EnterFullScreen /></div>
             </div>
           );
@@ -603,35 +604,18 @@ export default function DocumentReaderPage() {
           setCurrentPage(data.progress.last_page || 0)
         }
 
-        // --- CHARGEMENT SÉCURISÉ EN MÉMOIRE (BLOB URL) ---
-        // Empêche les extensions comme Internet Download Manager (IDM) d'intercepter la requête
-        // et garantit un affichage instantané dans le lecteur normal sans erreur 204
+        // --- CHARGEMENT PROGRESSIF HAUTE PERFORMANCE (STREAMING HTTP 206) ---
+        // Transmet directement l'URL de streaming au lecteur sans télécharger tout le fichier à l'avance
         const targetStreamUrl = isSampleMode
           ? `/api/bff/catalog/books/${id}/sample/`
           : ((data && data.file) ? data.file : (id === 'lesson_pdf' ? '' : `/api/bff/catalog/books/${id}/stream/`));
 
         if (targetStreamUrl) {
-          try {
-            const streamRes = await fetch(targetStreamUrl, {
-              headers: { Accept: 'application/pdf' },
-              credentials: 'include',
-            });
-            if (streamRes.ok) {
-              const blob = await streamRes.blob();
-              const blobUrl = URL.createObjectURL(blob);
-              setRawPdfData(blobUrl);
-            } else {
-              setPdfLoadError(
-                streamRes.status === 403
-                  ? "Vous n'avez pas accès à cet ouvrage. Achetez-le ou vérifiez votre abonnement."
-                  : (isSampleMode
-                      ? "Impossible de charger l'extrait gratuit pour cet ouvrage."
-                      : "Ce document est introuvable ou n'a pas encore été mis en ligne.")
-              );
-            }
-          } catch {
-            setPdfLoadError("Impossible de contacter le serveur de documents. Vérifiez votre connexion et réessayez.");
-          }
+          setRawPdfData(targetStreamUrl);
+          setIsLoading(false);
+        } else {
+          setPdfLoadError("Ce document est introuvable ou n'a pas encore été mis en ligne.");
+          setIsLoading(false);
         }
 
 
@@ -992,6 +976,7 @@ export default function DocumentReaderPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* Bouton Mode Nuit / Jour (Masqué)
           <Button
             onClick={() => setIsNightMode(!isNightMode)}
             variant="outline"
@@ -1000,6 +985,7 @@ export default function DocumentReaderPage() {
             {isNightMode ? <Sun size={15} /> : <Moon size={15} />}
             <span className="hidden md:inline">{isNightMode ? "Jour" : "Nuit"}</span>
           </Button>
+          */}
 
           <Button
             onClick={() => {
@@ -1016,7 +1002,7 @@ export default function DocumentReaderPage() {
             <span className="hidden sm:inline">Sauvegarder</span>
           </Button>
 
-          {/* 🔊 Lire à voix haute (TTS) */}
+          {/* 🔊 Lire à voix haute (TTS) (Masqué)
           {book.file && !book.file.match(/\.(docx|doc|pptx|ppt|xlsx|xls)$/i) && (
             <Button
               onClick={handleTtsToggle}
@@ -1036,6 +1022,7 @@ export default function DocumentReaderPage() {
               </span>
             </Button>
           )}
+          */}
 
           {!isMobile && !book.file?.match(/\.(docx|doc|pptx|ppt|xlsx|xls)$/i) && (
             <Button

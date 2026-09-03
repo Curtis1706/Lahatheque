@@ -21,6 +21,30 @@ function getForwardHeaders(request: NextRequest): Headers {
   return headers;
 }
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const rawApiUrl = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
+  const djangoBaseUrl = rawApiUrl.replace(/\/api$/, "").replace("localhost:8000", "127.0.0.1:8000");
+
+  try {
+    const headers = getForwardHeaders(request);
+    console.log(`[API /admin/guides/articles/${id}/] GET vers Django`);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/admin/guides/articles/${id}/`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+    });
+
+    const data = await djangoRes.json();
+    return NextResponse.json(data, { status: djangoRes.status });
+  } catch {
+    return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -32,17 +56,20 @@ export async function PUT(
   try {
     const body = await request.json();
     const headers = getForwardHeaders(request);
-    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
+    console.log(`[API /admin/guides/articles/${id}/] PUT vers Django:`, body);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/admin/guides/articles/${id}/`, {
       method: "PUT",
       headers,
       body: JSON.stringify(body),
     });
 
     const data = await djangoRes.json();
+    console.log(`[API /admin/guides/articles/${id}/] PUT réponse (${djangoRes.status}):`, data);
     return NextResponse.json(data, { status: djangoRes.status });
-  } catch {
+  } catch (err: any) {
+    console.error(`[API /admin/guides/articles/${id}/] Erreur PUT:`, err);
     return NextResponse.json(
-      { error: "Impossible de modifier l'article dans la base de données." },
+      { error: "Impossible de modifier l'article en base de données." },
       { status: 502 }
     );
   }
@@ -59,7 +86,8 @@ export async function PATCH(
   try {
     const body = await request.json();
     const headers = getForwardHeaders(request);
-    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
+    console.log(`[API /admin/guides/articles/${id}/] PATCH vers Django:`, body);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/admin/guides/articles/${id}/`, {
       method: "PATCH",
       headers,
       body: JSON.stringify(body),
@@ -67,9 +95,9 @@ export async function PATCH(
 
     const data = await djangoRes.json();
     return NextResponse.json(data, { status: djangoRes.status });
-  } catch {
+  } catch (err: any) {
     return NextResponse.json(
-      { error: "Impossible de modifier l'article dans la base de données." },
+      { error: "Impossible de modifier l'article en base de données." },
       { status: 502 }
     );
   }
@@ -85,17 +113,20 @@ export async function DELETE(
 
   try {
     const headers = getForwardHeaders(request);
-    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/guides/${id}/`, {
+    console.log(`[API /admin/guides/articles/${id}/] DELETE vers Django`);
+    const djangoRes = await fetch(`${djangoBaseUrl}/api/v1/communications/admin/guides/articles/${id}/`, {
       method: "DELETE",
       headers,
     });
 
     if (djangoRes.status === 204 || djangoRes.ok) {
+      console.log(`[API /admin/guides/articles/${id}/] DELETE réussi`);
       return NextResponse.json({ success: true });
     }
     const data = await djangoRes.json().catch(() => ({}));
     return NextResponse.json(data, { status: djangoRes.status });
-  } catch {
+  } catch (err: any) {
+    console.error(`[API /admin/guides/articles/${id}/] Erreur DELETE:`, err);
     return NextResponse.json(
       { error: "Impossible de supprimer l'article de la base de données." },
       { status: 502 }

@@ -16,18 +16,11 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
 
-const DEFAULT_ROLES = [
-  { value: "student", label: "Lecteur & Étudiant" },
-  { value: "wholesaler", label: "Libraire & Grossiste" },
-  { value: "university", label: "Université & Campus" },
-  { value: "publisher", label: "Éditeur Tiers" },
-  { value: "author", label: "Auteur & Chercheur" },
-  { value: "manager", label: "Gestionnaire Logistique" },
-  { value: "layout_artist", label: "Maquettiste" },
-  { value: "chief_layout", label: "Chef Maquettiste" },
-  { value: "legal_reviewer", label: "Juriste & Relecteur" },
-  { value: "admin", label: "Administrateur" },
-];
+interface CategoryOption {
+  id: string;
+  title: string;
+  roles: string[];
+}
 
 function GuideArticleEditorContent() {
   const router = useRouter();
@@ -35,70 +28,61 @@ function GuideArticleEditorContent() {
   const { user } = useAuth();
 
   const articleId = searchParams.get("id");
-  const initialCategory = searchParams.get("category") || "";
+  const initialCategoryId = searchParams.get("category") || "";
   const initialRole = searchParams.get("role") || "student";
 
-  const [loading, setLoading] = useState(false);
-  const [categoriesList, setCategoriesList] = useState<{ label: string; role: string }[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Form states matching Screenshot 3
-  const [targetRole, setTargetRole] = useState(initialRole);
-  const [categoryLabel, setCategoryLabel] = useState(initialCategory || "Mon compte et connexion");
+  // Form states
+  const [categoryId, setCategoryId] = useState<string>(initialCategoryId);
   const [title, setTitle] = useState("");
   const [order, setOrder] = useState<number>(0);
   const [content, setContent] = useState("");
   const [isPublished, setIsPublished] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
 
-  // Charger les catégories existantes et l'article si id présent
+  // Charger les catégories et l'article depuis la base PostgreSQL
   useEffect(() => {
-    const loadData = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/v1/communications/guides/");
-        if (res.ok) {
-          const data = await res.json();
-          const allGuides: any[] = Array.isArray(data) ? data : (data?.results || []);
-          
-          // Extraire les catégories uniques
-          const catsMap = new Map<string, string>();
-          allGuides.forEach((g) => {
-            const cat = g.category_label || "Général";
-            catsMap.set(`${cat}___${g.target_role}`, cat);
-          });
+        console.log("[GUIDE EDITOR] Chargement des catégories depuis /api/v1/admin/guides/categories/...");
+        const catRes = await fetch("/api/v1/admin/guides/categories/");
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          const cats: CategoryOption[] = Array.isArray(catData) ? catData : (catData?.results || []);
+          console.log(`[GUIDE EDITOR] ${cats.length} catégories chargées:`, cats);
+          setCategories(cats);
 
-          const distinctCats = Array.from(catsMap.entries()).map(([key, label]) => {
-            const role = key.split("___")[1];
-            return { label, role };
-          });
-
-          if (distinctCats.length === 0) {
-            distinctCats.push({ label: "Mon compte et connexion", role: targetRole });
-          }
-
-          setCategoriesList(distinctCats);
-
-          // Si édition d'un article existant
-          if (articleId) {
-            const found = allGuides.find((g) => g.id === articleId);
-            if (found) {
-              setTargetRole(found.target_role);
-              setCategoryLabel(found.category_label);
-              setTitle(found.title);
-              setContent(found.content || "");
-              setOrder(found.order || 0);
-              setIsPublished(found.is_published);
-            }
+          if (!categoryId && cats.length > 0) {
+            setCategoryId(cats[0].id);
           }
         }
-      } catch {
-        // Mode hors-ligne / fallback
+
+        // Si modification d'un article existant
+        if (articleId) {
+          console.log(`[GUIDE EDITOR] Chargement de l'article ID ${articleId}...`);
+          const artRes = await fetch(`/api/v1/admin/guides/articles/${articleId}/`);
+          if (artRes.ok) {
+            const art = await artRes.json();
+            console.log("[GUIDE EDITOR] Article chargé:", art);
+            setTitle(art.title || "");
+            setContent(art.content || "");
+            setCategoryId(art.category || "");
+            setOrder(art.order || 0);
+            setIsPublished(art.is_published ?? true);
+          }
+        }
+      } catch (err) {
+        console.error("[GUIDE EDITOR] Erreur chargement:", err);
+        toast.error("Erreur lors de la récupération des données.");
       } finally {
         setLoading(false);
       }
     };
 
-    loadData();
+    fetchData();
   }, [articleId]);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -109,221 +93,201 @@ function GuideArticleEditorContent() {
       return;
     }
 
-    if (!categoryLabel.trim()) {
-      toast.error("Veuillez sélectionner ou renseigner une catégorie.");
+    if (!categoryId) {
+      toast.error("Veuillez sélectionner une catégorie de rattachement.");
       return;
     }
 
-    setIsSaving(true);
-    const toastId = toast.loading("Enregistrement de l'article...");
+    setSaving(true);
+    const toastId = toast.loading("Enregistrement de l'article dans PostgreSQL...");
 
     const payload = {
-      target_role: targetRole,
-      category_label: categoryLabel.trim(),
+      category: categoryId,
       title: title.trim(),
-      summary: title.trim(), // Synthèse par défaut = titre
       content: content.trim(),
-      icon_name: "BookOpen",
       order: Number(order) || 0,
       is_published: isPublished,
     };
 
-    try {
-      if (articleId) {
-        // Mise à jour
-        await fetch(`/api/v1/communications/guides/${articleId}/`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        toast.success("Article de guide mis à jour avec succès !", { id: toastId });
-      } else {
-        // Création
-        await fetch("/api/v1/communications/guides/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        toast.success("Nouvel article créé et enregistré !", { id: toastId });
-      }
+    console.log("[GUIDE EDITOR] Envoi du payload vers Django PostgreSQL:", payload);
 
-      router.push("/admin/guides?mode=manage");
-    } catch {
-      toast.success("Article enregistré !", { id: toastId });
-      router.push("/admin/guides?mode=manage");
+    try {
+      const url = articleId
+        ? `/api/v1/admin/guides/articles/${articleId}/`
+        : "/api/v1/admin/guides/articles/";
+      const method = articleId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const resData = await res.json().catch(() => ({}));
+      if (res.ok) {
+        console.log("[GUIDE EDITOR] Succès enregistrement article:", resData);
+        toast.success(articleId ? "Article mis à jour avec succès !" : "Nouvel article créé et enregistré dans PostgreSQL !", { id: toastId });
+        router.push("/admin/guides?mode=manage");
+      } else {
+        console.error("[GUIDE EDITOR] Erreur retournée:", resData);
+        const errorMsg =
+          resData.detail ||
+          resData.error ||
+          resData.message ||
+          (typeof resData === "object" ? JSON.stringify(resData) : "Erreur lors de l'enregistrement");
+        toast.error(`Échec : ${errorMsg}`, { id: toastId });
+      }
+    } catch (err: any) {
+      console.error("[GUIDE EDITOR] Exception:", err);
+      toast.error(err?.message || "Erreur de communication avec le serveur", { id: toastId });
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="py-32 text-center text-xs font-semibold text-foreground-muted">
+        Chargement de l&apos;éditeur de guide depuis la base de données...
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
-      {/* ─── BARRE SUPÉRIEURE D'ACTION & TITRE (Reproduction Screenshot 3) ─── */}
+      {/* ─── BARRE SUPÉRIEURE D'ACTION & TITRE ─── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-5">
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3.5 min-w-0">
           <Link
             href="/admin/guides?mode=manage"
-            className="p-2 rounded-xl bg-background-secondary border border-border hover:border-gold text-foreground-muted hover:text-navy transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-background-secondary border border-border hover:border-gold text-foreground-muted hover:text-navy transition-colors cursor-pointer shrink-0"
             title="Retour à la gestion des guides"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <div>
+          <div className="min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-gold font-mono block">
-              {articleId ? "ÉDITION ARTICLE" : "NOUVEL ARTICLE"}
+              {articleId ? "Édition Article" : "Nouvel Article de Guide"}
             </span>
-            <h1 className="font-serif text-xl sm:text-2xl font-bold text-navy truncate max-w-lg">
-              {title.trim() || "Sans titre"}
+            <h1 className="font-serif text-xl sm:text-2xl font-bold text-navy truncate">
+              {title || "Sans titre"}
             </h1>
           </div>
         </div>
 
-        {/* Switch Publication & Bouton Enregistrer (Screenshot 3) */}
-        <div className="flex items-center gap-4 shrink-0">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isPublished ? "bg-emerald-500" : "bg-foreground-muted"
-              }`}
-            />
-            <span className="text-xs font-semibold text-foreground">
-              {isPublished ? "Publié" : "Brouillon"}
-            </span>
+        <div className="flex items-center gap-3 shrink-0">
+          <label className="flex items-center gap-2 cursor-pointer bg-background-secondary px-3 py-1.5 rounded-xl border border-border">
             <input
               type="checkbox"
               checked={isPublished}
               onChange={(e) => setIsPublished(e.target.checked)}
-              className="sr-only"
+              className="rounded text-navy focus:ring-navy"
             />
+            <div className={`w-2.5 h-2.5 rounded-full ${isPublished ? "bg-emerald-500" : "bg-amber-500"}`} />
+            <span className="text-xs font-bold text-navy">
+              {isPublished ? "Publié" : "Brouillon"}
+            </span>
           </label>
 
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSaving}
-            className="h-10 px-5 rounded-xl bg-navy hover:bg-navy-dark text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+            disabled={saving}
+            className="h-10 px-5 rounded-xl bg-navy hover:bg-navy-dark text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
           >
             <Save className="w-4 h-4 text-gold" />
-            <span>{isSaving ? "Enregistrement..." : "Enregistrer"}</span>
+            <span>{saving ? "Enregistrement..." : "Enregistrer"}</span>
           </button>
         </div>
       </div>
 
-      {/* ─── FORMULAIRE PRINCIPAL SPACIEUX (Reproduction Screenshot 3) ─── */}
+      {/* ─── FORMULAIRE PRINCIPAL ─── */}
       <form onSubmit={handleSave} className="space-y-6">
-        
-        {/* Ligne 1 : Catégorie de rattachement & Ordre d'affichage */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 bg-background-secondary rounded-3xl border border-border p-6 shadow-xs">
-          <div className="md:col-span-8 space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-navy block font-mono">
-              Catégorie rattachement *
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-background-secondary border border-border p-5 rounded-3xl shadow-xs">
+          <div className="sm:col-span-2 space-y-1.5">
+            <label className="text-xs font-bold text-navy uppercase font-mono">
+              Catégorie de rattachement *
             </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={categoryLabel}
-                onChange={(e) => setCategoryLabel(e.target.value)}
-                placeholder="Ex: Mon compte et connexion"
-                className="flex-1 h-11 px-3.5 rounded-xl text-xs sm:text-sm bg-background border border-border focus:border-navy focus:outline-none font-medium"
-                required
-              />
+            {categories.length === 0 ? (
+              <div className="p-3 bg-background rounded-xl border border-dashed border-border text-xs text-foreground-muted">
+                Aucune catégorie existante. Veuillez d&apos;abord créer une catégorie depuis la page des guides.
+              </div>
+            ) : (
               <select
-                value={targetRole}
-                onChange={(e) => setTargetRole(e.target.value)}
-                className="h-11 px-3 rounded-xl text-xs bg-background border border-border focus:border-navy focus:outline-none font-medium"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                required
+                className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm font-medium focus:outline-none focus:border-navy cursor-pointer"
               >
-                {DEFAULT_ROLES.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title} ({c.roles?.join(", ")})
                   </option>
                 ))}
               </select>
-            </div>
-            {categoriesList.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                <span className="text-[10px] text-foreground-muted">Suggestions :</span>
-                {categoriesList
-                  .filter((c) => c.role === targetRole)
-                  .map((c, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setCategoryLabel(c.label)}
-                      className="text-[10px] px-2 py-0.5 rounded-md bg-background border border-border hover:border-gold text-foreground-muted hover:text-navy cursor-pointer transition-colors"
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-              </div>
             )}
           </div>
 
-          <div className="md:col-span-4 space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-navy block font-mono">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-navy uppercase font-mono">
               Ordre d&apos;affichage
             </label>
             <input
               type="number"
               value={order}
-              onChange={(e) => setOrder(parseInt(e.target.value, 10) || 0)}
-              className="w-full h-11 px-3.5 rounded-xl text-xs sm:text-sm bg-background border border-border focus:border-navy focus:outline-none font-medium"
+              onChange={(e) => setOrder(parseInt(e.target.value) || 0)}
               min={0}
+              className="w-full h-11 px-4 bg-background border border-border rounded-xl text-sm font-medium focus:outline-none focus:border-navy"
             />
           </div>
         </div>
 
-        {/* Ligne 2 : Titre / Question de l'article */}
-        <div className="bg-background-secondary rounded-3xl border border-border p-6 space-y-2 shadow-xs">
-          <label className="text-xs font-bold uppercase tracking-wider text-navy block font-mono">
+        {/* Titre / Question */}
+        <div className="bg-background-secondary border border-border p-5 rounded-3xl space-y-1.5 shadow-xs">
+          <label className="text-xs font-bold text-navy uppercase font-mono">
             Titre / Question de l&apos;article *
           </label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Ex: Comment réinitialiser mon mot de passe ?"
-            className="w-full h-12 px-4 rounded-xl text-sm sm:text-base bg-background border border-border focus:border-navy focus:outline-none font-semibold text-navy shadow-2xs"
+            placeholder="Ex: Comment réinitialiser mon mot de passe en cas d'oubli ?"
             required
-            autoFocus
+            className="w-full h-12 px-4 bg-background border border-border rounded-xl text-base font-bold text-navy focus:outline-none focus:border-navy"
           />
         </div>
 
-        {/* Ligne 3 : Contenu de la réponse (TiptapEditor Spacieux) */}
-        <div className="bg-background-secondary rounded-3xl border border-border p-6 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold uppercase tracking-wider text-navy block font-mono">
+        {/* Éditeur Riche Tiptap avec Images et Vidéos */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <label className="text-xs font-bold text-navy uppercase font-mono">
               Contenu de la réponse *
             </label>
             <span className="text-[11px] text-foreground-muted">
-              Rédigez la réponse, insérez des images R2 et vidéos au fil du texte
+              Rédigez la réponse, insérez des images et vidéos au fil du texte
             </span>
           </div>
 
-          <div className="rounded-2xl border border-border overflow-hidden bg-background shadow-xs">
-            <TiptapEditor
-              content={content}
-              onChange={setContent}
-              placeholder="Rédigez la réponse détaillée ici... Utilisez la barre d'outils pour insérer des titres, puces, images de captures d'écran et vidéos Cloudflare R2."
-              minHeight="350px"
-            />
-          </div>
+          <TiptapEditor
+            content={content}
+            onChange={(html) => setContent(html)}
+          />
         </div>
 
-        {/* Bouton de Validation Bas de Page */}
-        <div className="flex items-center justify-end gap-3 pt-2">
+        {/* Boutons d'Action Inférieurs */}
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
           <Link
             href="/admin/guides?mode=manage"
-            className="h-10 px-5 rounded-xl border border-border hover:bg-background-secondary text-xs font-semibold text-foreground cursor-pointer transition-colors"
+            className="h-10 px-5 rounded-xl border border-border hover:bg-background-secondary text-foreground-muted hover:text-navy font-bold text-xs transition-colors flex items-center"
           >
             Annuler
           </Link>
           <button
             type="submit"
-            disabled={isSaving}
-            className="h-10 px-6 rounded-xl bg-navy hover:bg-navy-dark text-white font-bold text-xs flex items-center gap-2 shadow-xs cursor-pointer transition-colors"
+            disabled={saving}
+            className="h-10 px-6 rounded-xl bg-navy hover:bg-navy-dark text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
           >
-            <Save className="w-4 h-4 text-gold" />
-            <span>{isSaving ? "Enregistrement..." : "Enregistrer l'article"}</span>
+            {saving ? "Enregistrement..." : "Enregistrer l'article"}
           </button>
         </div>
       </form>
@@ -333,7 +297,7 @@ function GuideArticleEditorContent() {
 
 export default function GuideArticleEditorPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-foreground-muted">Chargement de l&apos;éditeur...</div>}>
+    <Suspense fallback={<div className="py-20 text-center text-xs">Chargement...</div>}>
       <GuideArticleEditorContent />
     </Suspense>
   );
