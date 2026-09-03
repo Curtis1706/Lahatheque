@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+export const maxDuration = 300
+
 const rawApiUrl = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api').replace(/\/+$/, '')
 const DJANGO_API_URL = rawApiUrl.replace('localhost:8000', '127.0.0.1:8000').replace(/\/v1$/, '').replace(/\/api$/, '') + '/api'
 
@@ -71,9 +74,11 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     try {
       if (contentType && contentType.includes('multipart/form-data')) {
-        // Streamer directement le flux brut sans re-bufferisation mémoire pour garantir l'envoi de fichiers 10-250 Mo
-        body = request.body
-        console.log(`[BFF Proxy] Multipart direct streaming vers ${targetUrl}`)
+        // Pour les uploads multipart, lire le Buffer complet et définir le Content-Length exact requis par WSGI/Django
+        const arrayBuffer = await request.arrayBuffer()
+        body = Buffer.from(arrayBuffer)
+        headers.set('content-length', String(body.byteLength))
+        console.log(`[BFF Proxy] Multipart reçu (${(body.byteLength / (1024 * 1024)).toFixed(2)} Mo) -> transmission avec Content-Length vers ${targetUrl}`)
       } else {
         body = await request.text()
         headers.set('content-length', String(Buffer.byteLength(body, 'utf-8')))
