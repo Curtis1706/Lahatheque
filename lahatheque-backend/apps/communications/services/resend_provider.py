@@ -38,6 +38,7 @@ class ResendEmailProvider(EmailProviderBase):
         Envoi d'un email via l'API REST de Resend.
         """
         if not self.api_key:
+            print("[RESEND-WARN] Aucune clé API Resend configurée (RESEND_API_KEY vide ou absente dans l'environnement).")
             logger.error("ResendEmailProvider: Aucune clé API Resend configurée (RESEND_API_KEY).")
             return EmailSendResult(
                 success=False,
@@ -82,6 +83,7 @@ class ResendEmailProvider(EmailProviderBase):
             payload["tags"] = [{"name": k, "value": str(v)} for k, v in tags.items()]
 
         try:
+            print(f"[RESEND-SEND] Expédition e-mail via Resend API -> Destinataires: {recipients} | From: {sender} | Sujet: {subject}")
             response = requests.post(
                 self.API_URL,
                 headers=headers,
@@ -97,6 +99,7 @@ class ResendEmailProvider(EmailProviderBase):
 
             if response.status_code in [200, 201]:
                 message_id = response_data.get("id", "")
+                print(f"[RESEND-SUCCESS] E-mail délivré à Resend avec succès (Message ID: {message_id}) pour {recipients}")
                 logger.info(f"Email Resend envoyé avec succès à {recipients} (ID: {message_id})")
                 return EmailSendResult(
                     success=True,
@@ -107,6 +110,7 @@ class ResendEmailProvider(EmailProviderBase):
                 )
             else:
                 error_msg = response_data.get("message") or response_data.get("error") or response.text
+                print(f"[RESEND-ERROR] Échec API Resend HTTP {response.status_code} : {error_msg}")
                 logger.error(f"Erreur API Resend ({response.status_code}): {error_msg}")
                 return EmailSendResult(
                     success=False,
@@ -117,6 +121,7 @@ class ResendEmailProvider(EmailProviderBase):
                 )
 
         except requests.exceptions.RequestException as req_err:
+            print(f"[RESEND-NET-ERROR] Exception réseau Resend : {req_err}")
             logger.error(f"Exception réseau lors de l'appel Resend: {req_err}")
             return EmailSendResult(
                 success=False,

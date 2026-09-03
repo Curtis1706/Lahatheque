@@ -67,6 +67,7 @@ class SmtpEmailProvider(EmailProviderBase):
         body_text = text_content or "Ce message nécessite un client de messagerie supportant le format HTML."
 
         try:
+            print(f"[SMTP-SEND] Expédition e-mail via SMTP {self.host}:{self.port} -> Destinataires: {recipients} | From: {sender} | Sujet: {subject}")
             connection = self._get_connection()
             msg = EmailMultiAlternatives(
                 subject=subject,
@@ -88,18 +89,21 @@ class SmtpEmailProvider(EmailProviderBase):
                     )
 
             msg.send(fail_silently=False)
-            logger.info(f"Email SMTP envoyé avec succès à {recipients}: {subject}")
+            print(f"[SMTP-SUCCESS] E-mail SMTP envoyé avec succès à {recipients}")
+            logger.info(f"Email SMTP envoyé avec succès à {recipients}")
 
             return EmailSendResult(
                 success=True,
                 provider="smtp",
-                message_id="smtp-delivered",
+                message_id="smtp_sent",
             )
 
         except Exception as smtp_err:
+            print(f"[SMTP-ERROR] Échec envoi SMTP : {smtp_err}")
             logger.error(f"Erreur lors de l'envoi SMTP à {recipients}: {smtp_err}")
             return EmailSendResult(
                 success=False,
                 provider="smtp",
-                error=str(smtp_err),
+                error=f"Erreur SMTP: {str(smtp_err)}",
+                status_code=500,
             )
