@@ -19,6 +19,7 @@ import { Book } from "@/lib/types/catalog";
 import { searchBooks } from "@/lib/services/catalog";
 import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import { Book as Book3D } from "@/components/ui/book";
+import { ACADEMIC_DISCIPLINES } from "@/lib/constants/classification";
 
 // Liste dynamique des années de publication : de l'année en cours jusqu'à 1950
 const CURRENT_YEAR = new Date().getFullYear();
@@ -194,9 +195,11 @@ function CatalogSearchInner() {
                 <option value="UP">Université de Parakou (UP)</option>
                 <option value="UNSTIM">Université Nationale des Sciences, Technologies, Ingénierie et Mathématiques (UNSTIM)</option>
                 <option value="UNA">Université Nationale d'Agriculture (UNA)</option>
+                {/* 
                 <option value="UFHB">Université Félix Houphouët-Boigny (UFHB)</option>
                 <option value="UCAD">Université Cheikh Anta Diop (UCAD)</option>
                 <option value="UL">Université de Lomé (UL)</option>
+                */}
               </select>
             </div>
 
@@ -231,71 +234,12 @@ function CatalogSearchInner() {
                 onChange={(e) => setSelectedDiscipline(e.target.value)}
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
-                <option value="">Toutes les disciplines</option>
-
-                <optgroup label="Droit, Sciences Politiques &amp; Criminologie (FADESP)">
-                  <option value="Droit des Affaires">Droit Privé &amp; Droit des Affaires (OHADA)</option>
-                  <option value="Droit Public">Droit Public, Administratif &amp; Constitutionnel</option>
-                  <option value="Droit International">Droit International &amp; Droits de l'Homme</option>
-                  <option value="Droit Pénal">Droit Pénal, Criminologie &amp; Procédure</option>
-                  <option value="Sciences Politiques">Sciences Politiques &amp; Relations Internationales</option>
-                </optgroup>
-
-                <optgroup label="Économie, Gestion &amp; Finance (FASEG)">
-                  <option value="Économie">Sciences Économiques &amp; Économétrie</option>
-                  <option value="Comptabilité">Comptabilité, Audit &amp; Finance (SYSCOHADA)</option>
-                  <option value="Banque">Banque, Assurance &amp; Marchés Financiers</option>
-                  <option value="Management">Management, Stratégie &amp; Ressources Humaines</option>
-                  <option value="Marketing">Marketing, Commerce International &amp; Logistique</option>
-                  <option value="Économie du Développement">Économie du Développement &amp; Politiques Publiques</option>
-                </optgroup>
-
-                <optgroup label="Médecine, Pharmacie &amp; Santé (FSS)">
-                  <option value="Médecine">Médecine Générale &amp; Spécialités Cliniques</option>
-                  <option value="Chirurgie">Chirurgie, Anesthésie &amp; Urgences</option>
-                  <option value="Pharmacie">Pharmacie, Pharmacologie &amp; Pharmacopée</option>
-                  <option value="Santé Publique">Santé Publique, Épidémiologie &amp; Médecine Tropicale</option>
-                  <option value="Odonto-Stomatologie">Odonto-Stomatologie &amp; Soins Dentaires</option>
-                  <option value="Sciences Infirmières">Sciences Infirmières &amp; Obstétricales</option>
-                </optgroup>
-
-                <optgroup label="Sciences Exactes, Informatique &amp; Ingénierie (FAST / EPAC)">
-                  <option value="Mathématiques">Mathématiques Pures &amp; Appliquées</option>
-                  <option value="Physique">Physique Fondamentale, Quantique &amp; Énergétique</option>
-                  <option value="Chimie">Chimie Organique, Minérale &amp; Analytique</option>
-                  <option value="Informatique">Informatique, Génie Logiciel, Télécoms &amp; IA</option>
-                  <option value="Génie Civil">Génie Civil, BTP &amp; Architecture</option>
-                  <option value="Génie Électrique">Génie Électrique, Électronique &amp; Automatique</option>
-                  <option value="Génie Mécanique">Génie Mécanique &amp; Énergétique Industrielle</option>
-                  <option value="Géologie">Sciences de la Terre, Géologie &amp; Mines</option>
-                  <option value="Biologie">Biologie, Biochimie &amp; Génétique</option>
-                </optgroup>
-
-                <optgroup label="Sciences Agronomiques &amp; Environnement (FSA / UNA)">
-                  <option value="Agriculture">Production Végétale, Phytotechnie &amp; Agronomie</option>
-                  <option value="Élevage">Production Animale &amp; Médecine Vétérinaire</option>
-                  <option value="Agroéconomie">Agroéconomie, Sociologie Rurale &amp; Vulgarisation</option>
-                  <option value="Foresterie">Foresterie, Biodiversité &amp; Ressources Naturelles</option>
-                  <option value="Hydrologie">Génie Rural, Eau, Climat &amp; Assainissement</option>
-                  <option value="Nutrition">Nutrition &amp; Technologies Agroalimentaires</option>
-                </optgroup>
-
-                <optgroup label="Lettres, Langues &amp; Communication (FLLAC)">
-                  <option value="Lettres">Lettres Modernes &amp; Littérature Comparée</option>
-                  <option value="Linguistique">Linguistique Générale &amp; Langues Africaines</option>
-                  <option value="Langues Étrangères">Études Anglophones &amp; Langues Vivantes</option>
-                  <option value="Communication">Sciences de l'Information &amp; de la Communication (SIC)</option>
-                  <option value="Journalisme">Journalisme &amp; Médias Numériques</option>
-                </optgroup>
-
-                <optgroup label="Sciences Humaines &amp; Sociales (FASHS)">
-                  <option value="Philosophie">Philosophie, Éthique &amp; Épistémologie</option>
-                  <option value="Sociologie">Sociologie, Anthropologie &amp; Démographie</option>
-                  <option value="Histoire">Histoire, Archéologie &amp; Patrimoine Africain</option>
-                  <option value="Géographie">Géographie, Aménagement du Territoire &amp; SIG</option>
-                  <option value="Psychologie">Psychologie Clinique &amp; Sciences Cognitives</option>
-                  <option value="Sciences de l'Éducation">Sciences de l'Éducation &amp; Didactique Universitaire</option>
-                </optgroup>
+                <option value="">Toutes les disciplines ({ACADEMIC_DISCIPLINES.length})</option>
+                {ACADEMIC_DISCIPLINES.map((discipline) => (
+                  <option key={discipline} value={discipline}>
+                    {discipline}
+                  </option>
+                ))}
               </select>
             </div>
 
