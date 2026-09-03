@@ -321,6 +321,28 @@ def submit_public_manuscript_view(request):
 
         print(f"[MANUSCRIPT] Nouveau dépôt {reference} : « {book_title} » par {first_name} {last_name} ({file_size_formatted})")
         logger.info(f"Nouveau dépôt manuscrit {reference} : « {book_title} » par {first_name} {last_name} ({file_size_formatted})")
+
+        # Synchronisation automatique dans PublicManuscriptLead pour visibilité admin instantanée
+        try:
+            from apps.rights.models import PublicManuscriptLead
+            PublicManuscriptLead.objects.get_or_create(
+                id=submission.id,
+                defaults={
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "email": email,
+                    "phone": phone,
+                    "book_title": book_title,
+                    "genre": genre,
+                    "country": country,
+                    "summary": summary,
+                    "manuscript_file": submission.manuscript_file,
+                    "manuscript_file_key": manuscript_file_key,
+                    "status": "new",
+                }
+            )
+        except Exception as sync_err:
+            logger.warning(f"[MANUSCRIPT-SYNC-WARN] Erreur synchro PublicManuscriptLead: {sync_err}")
     except Exception as e:
         print(f"[MANUSCRIPT-ERROR] Erreur enregistrement manuscrit: {e}")
         logger.error(f"Erreur enregistrement manuscrit: {e}")

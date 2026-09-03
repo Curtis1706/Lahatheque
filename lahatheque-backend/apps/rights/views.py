@@ -2170,10 +2170,34 @@ class AdminManuscriptLeadsListView(APIView):
 
     def get(self, request):
         from .models import PublicManuscriptLead
+        from apps.communications.models import ManuscriptPublicSubmission
         from django.conf import settings
 
+        # Auto-synchronisation des soumissions reçues via le formulaire public /authors
+        try:
+            for sub in ManuscriptPublicSubmission.objects.all():
+                PublicManuscriptLead.objects.get_or_create(
+                    id=sub.id,
+                    defaults={
+                        "first_name": sub.first_name,
+                        "last_name": sub.last_name,
+                        "email": sub.email,
+                        "phone": sub.phone or "",
+                        "book_title": sub.book_title,
+                        "genre": sub.genre or "",
+                        "country": sub.country or "",
+                        "summary": sub.summary or "",
+                        "manuscript_file": sub.manuscript_file,
+                        "manuscript_file_key": sub.manuscript_file_key or "",
+                        "status": "new" if sub.status in ["pending", "new", ""] else sub.status,
+                        "created_at": sub.created_at,
+                    }
+                )
+        except Exception:
+            pass
+
         status_filter = request.query_params.get('status', '')
-        qs = PublicManuscriptLead.objects.all()
+        qs = PublicManuscriptLead.objects.all().order_by('-created_at')
         if status_filter and status_filter != 'all':
             qs = qs.filter(status=status_filter)
 
@@ -2210,6 +2234,7 @@ class AdminManuscriptLeadDecisionView(APIView):
 
     def patch(self, request, id):
         from .models import PublicManuscriptLead
+        from apps.communications.models import ManuscriptPublicSubmission
 
         new_status = request.data.get("status")
         valid_statuses = [s[0] for s in PublicManuscriptLead.STATUS_CHOICES]
@@ -2226,6 +2251,11 @@ class AdminManuscriptLeadDecisionView(APIView):
 
         lead.status = new_status
         lead.save(update_fields=["status"])
+
+        try:
+            ManuscriptPublicSubmission.objects.filter(id=id).update(status=new_status)
+        except Exception:
+            pass
 
         return Response({
             "success": True,
