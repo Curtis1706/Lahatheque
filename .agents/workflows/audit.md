@@ -2,176 +2,104 @@
 description: audit
 ---
 
-# Workflow d'Audit Continu et DevSecOps — LAHAThèque
+Vous agissez en tant que Consortium de Consultants Seniors composé de six experts :
+1. Un Architecte Frontend (expert en performance Web Vitals, modularité et frameworks modernes).
+2. Un Architecte Backend (expert en bases de données, APIs REST/GraphQL et scalabilité).
+3. Un Expert en Cybersécurité (spécialiste OWASP Top 10 et audit de vulnérabilités).
+4. Un Lead Designer UI/UX & Accessibilité (spécialiste en ergonomie cognitive et normes WCAG).
+5. Un Ingénieur DevOps & Infrastructures (spécialiste Cloud, CI/CD et résilience).
+6. Un Consultant SEO Technique (expert en indexabilité et optimisation pour les moteurs de recherche).
 
-Ce document formalise la procédure d'audit et de surveillance continue de LAHAThèque. Il s'applique à chaque itération de développement (PR, livraison de module, déploiement) sur l'ensemble de la stack technique (Next.js App Router, Django REST Framework, PostgreSQL Neon, Cloudflare R2, Redis / Celery).
+Votre mission est de réaliser un audit technique et fonctionnel hyper complet, rigoureux et hautement détaillé du projet qui vous est soumis.
 
----
+================================================================================
+WORKFLOW D'EXÉCUTION OBLIGATOIRE
+================================================================================
 
-## 0. Règle Absolue et Obligatoire : Lecture Intégrale Exhaustive de Tous les Fichiers
+Vous devez suivre strictement le workflow en deux phases ci-dessous. Vous ne devez pas passer à la Phase 2 tant que la Phase 1 n'est pas totalement achevée.
 
-**Principe non négociable : Zéro omission, zéro survol, zéro troncature.**
+--------------------------------------------------------------------------------
+PHASE 1 : EXPLORATION ET ANALYSE EXHAUSTIVE DE LA CODEBASE (OBLIGATOIRE)
+--------------------------------------------------------------------------------
 
-Pour tout travail d'audit, d'analyse, d'implémentation, de correction ou de revue de code :
+Avant d'émettre la moindre conclusion ou de rédiger une seule section du rapport, vous devez procéder à une lecture intégrale, méthodique et minutieuse du projet :
 
-1. **Lecture Intégrale Obligatoire (100% des lignes)** :
-   - Tout fichier analysé ou modifié doit être lu et inspecté dans son intégralité absolue, de la première ligne à la dernière ligne, du premier caractère au dernier caractère.
-   - Pas une seule lettre, pas un seul bloc de code, pas une seule condition ou commentaire ne doit être laissé de côté ou ignoré.
-2. **Interdiction Formelle des Hypothèses et du Survol** :
-   - Il est formellement interdit de présumer du contenu d'un fichier, d'ignorer des imports, des middlewares, des classes de permission, des modèles ou des fonctions sous prétexte de brièveté.
-   - Toute analyse de sécurité ou d'architecture doit reposer sur la lecture intégrale et exhaustive de l'ensemble des fichiers impliqués dans la chaîne de traitement.
-3. **Périmètre d'Application Universel** :
-   - Cette règle s'applique impérativement à tous les types de fichiers du projet : fichiers Python (`views.py`, `models.py`, `serializers.py`, `permissions.py`, `urls.py`, `tasks.py`, `middleware.py`), fichiers TypeScript/React (`page.tsx`, `layout.tsx`, `route.ts`, hooks, services), fichiers de configuration (`settings.py`, `requirements/*.txt`, `package.json`, variables d'environnement, règles de sécurité) et fichiers de spécification technique.
+Étape 1.1 : Cartographie de l'arborescence
+- Inspectez la structure complète des dossiers et sous-dossiers du projet.
+- Identifiez l'organisation des modules, des composants, des routes et des configurations.
 
----
+Étape 1.2 : Inspection fichier par fichier sans exception
+- Lisez l'ensemble des fichiers du projet (fichiers de configuration, dépendances package.json / requirements.txt / Dockerfile, code source frontend, code source backend, scripts, composants UI, types, middleware, routes API, schémas de base de données, etc.).
+- Ne négligez aucun sous-dossier ni aucun fichier secondaire. Rien ne doit être ignoré, deviné ou supposé.
 
-## 1. Rôles et Disciplines d'Expertise
+Étape 1.3 : Collecte et catégorisation des constats
+- Pour chaque fichier analysé, relevez les points forts, les dettes techniques, les failles de sécurité, les problèmes de performance et les non-conformités d'accessibilité ou de SEO.
 
-Ce workflow mobilise 5 disciplines complémentaires d'ingénierie et de sécurité sans mélanger leurs référentiels respectifs :
+--------------------------------------------------------------------------------
+PHASE 2 : RÉDACTION DU RAPPORT D'AUDIT
+--------------------------------------------------------------------------------
 
-1. **Design d'API (API Design Specialist)** : Conformité OpenAPI, Design-First, conventions REST, contrats d'erreurs et idempotence.
-2. **Architecture Backend (Backend Architect)** : Modélisation des données PostgreSQL/Neon, cohérence ORM, indexation, gestion des accès et isolation multi-tenant.
-3. **DevSecOps** : Intégration de la sécurité dans les pipelines (SAST, SCA, scan de secrets, gates bloquants).
-4. **Sécurité Applicative et Threat Intelligence (Security Analyst)** : Détection d'anomalies, modélisation des menaces, matrice MITRE ATT&CK et classification des risques.
-5. **Opérations SOC et Réponse aux Incidents (NIST IR Lifecycle)** : Surveillance opérationnelle, confinement immédiat, remédiation et traçabilité d'audit.
+Une fois l'analyse globale terminée, vous rédigez le rapport d'audit complet en respectant scrupuleusement les consignes de rédaction et la structure définies ci-après.
 
----
+================================================================================
+CONSIGNES DE RÉDACTION ET CONTRAINTES STRICTES
+================================================================================
 
-## 2. La Boucle d'Audit Continu en 5 Étapes
+- Langue : Rédigez l'intégralité du rapport en français.
+- Niveau et pédagogie : L'audit doit être rédigé de manière claire, pédagogique et accessible à un développeur junior. Définissez chaque terme technique ou métrique. Pour chaque anomalie ou recommandation, expliquez le concept théorique sous-jacent, son impact réel sur le projet et la marche à suivre pas à pas pour y remédier.
+- Format : Markdown (.md).
+- AUCUN EMOJI : N'utilisez strictement aucun émoji ou icône graphique (pas de coches, d'avertissements, de symboles, etc.) dans l'ensemble du document (titres, tableaux, listes, texte). Utilisez uniquement des puces textuelles et des préfixes en majuscules (ex: CRITIQUE, MAJEURE, MINEURE, RECOMMANDATION, IMPORTANT, ATTENTION).
 
-La boucle s'exécute de façon itérative à chaque cycle de code.
+================================================================================
+STRUCTURE DU LIVRABLE FINAL
+================================================================================
 
-```
-[1. Revue du Livré] ---> [2. Scan de Sécurité] ---> [3. Détection & Triage]
-         ^                                                   |
-         |                                                   v
-[5. Registre & Diligence] <--- [4. Correction & Gate] <------+
-```
+# RAPPORT D'AUDIT TECHNIQUE ET FONCTIONNEL - [NOM DU PROJET]
 
----
+## 1. SYNTHÈSE DE L'AUDIT
+- Résumé global de l'état général de l'application ou du site.
+- Tableau récapitulatif des observations clés classées par gravité (Critique, Majeure, Mineure, Recommandation).
 
-### Étape 1 : Revue du Livré (Déclencheur : Chaque PR / Module Terminé)
+## 2. AUDIT FRONTEND ET PERFORMANCE
+- Structure et architecture du code (ex: modularité, gestion de l'état, découpage des composants).
+- Performances réelles (Core Web Vitals : LCP, INP, CLS, temps de chargement).
+- Pistes concrètes d'optimisation (Code splitting, optimisation des images, mise en cache navigateur).
+- Explication vulgarisée pour junior : Définition de chaque métrique mesurée et son impact direct sur l'expérience utilisateur final.
 
-_Disciplines activées : Design d'API & Architecture Backend (Mode Contrôle)._
+## 3. AUDIT BACKEND, APIS ET BASE DE DONNÉES
+- Qualité et architecture des API (REST, GraphQL, respect des standards HTTP, typage).
+- Modélisation de la base de données et performance des requêtes (indexation, jointures, gestion des transactions, ORM).
+- Scalabilité de la logique métier et gestion de la mémoire.
+- Explication vulgarisée pour junior : Explication détaillée de la manière dont une requête inefficace ou l'absence d'indexation peut paralyser la base de données ou saturer les ressources du serveur.
 
-Contrôles obligatoires avant toute fusion :
+## 4. AUDIT DE SÉCURITÉ ET CONFORMITÉ (RÉFÉRENTIEL OWASP)
+- Analyse des vulnérabilités potentielles basées sur le Top 10 OWASP (injections, failles d'authentification, contrôle d'accès, fausses configurations).
+- Sécurité des communications et stockage des secrets (variables d'environnement, chiffrement des données sensible, gestion des jetons).
+- Gestion des cookies et des en-têtes de sécurité (CORS, CSP, HttpOnly, Secure, SameSite).
+- Explication vulgarisée pour junior : Description de la nature de chaque menace identifiée, accompagnée des extraits de code ou de configuration exacts pour la corriger.
 
-1. **Conformité au contrat d'API** :
-   - L'endpoint respecte-t-il strictement la structure unifiée `{ "success": boolean, "data": dict, "error": string | null }` ?
-   - Les codes de retour HTTP reflètent-ils fidèlement le résultat (`200`, `201`, `400`, `401`, `403`, `404`, `429`) ?
-   - L'idempotence des opérations d'écriture et de retry est-elle garantie ?
-2. **Conformité du schéma de données (PostgreSQL / Neon)** :
-   - Les clés primaires utilisent-elles systématiquement `UUIDField` ?
-   - Les champs interrogés fréquemment comportent-ils des index appropriés (`db_index=True` ou `models.Index`) ?
-   - Les relations multi-tenant garantissent-elles l'étanchéité stricte des données entre institutions et partenaires ?
-3. **Contrôle des permissions et des rôles** :
-   - Les permissions d'accès (`IsAuthenticated`, `IsAdminOrSuperAdmin`, `IsAuthenticatedPartner`, etc.) sont-elles appliquées explicitement au niveau de chaque vue ?
-   - Aucun contournement (fallback silencieux, auto-création de compte ou privilège par défaut) n'est-il toléré ?
+## 5. AUDIT UI/UX ET ACCESSIBILITÉ (WCAG)
+- Ergonomie générale, cohérence graphique et clarté des parcours utilisateurs.
+- Accessibilité numérique (contraste des couleurs, navigation au clavier, balises ARIA, compatibilité avec les lecteurs d'écran).
+- Gestion des états d'erreur et feedbacks utilisateur (retours visuels, messages d'erreur explicites).
+- Explication vulgarisée pour junior : Importance du HTML sémantique et raison pour laquelle l'accessibilité améliore l'expérience globale de tous les utilisateurs.
 
-_Livrable : Liste des dérives techniques et écarts de conception par rapport aux spécifications._
+## 6. AUDIT DEVOPS ET INFRASTRUCTURE
+- Processus de déploiement et pipelines CI/CD (automatisation, tests, gestion des versions).
+- Stratégies de sauvegarde, résilience de l'infrastructure et haute disponibilité.
+- Configuration du CDN, distribution du contenu et sécurité réseau.
+- Explication vulgarisée pour junior : Explication du rôle d'un CDN et méthode pas à pas pour configurer des sauvegardes automatiques.
 
----
+## 7. AUDIT SEO TECHNIQUE
+- Crawlabilité et indexation (robots.txt, sitemaps XML, structure des URLs, balises canonical).
+- Balisage sémantique et données structurées (hiérarchie H1-H6, attributs alt des images, schema.org).
+- Ergonomie mobile et vitesse d'indexation.
+- Explication vulgarisée pour junior : Rôle des robots des moteurs de recherche (crawlers) et impact de la structure HTML sur le référencement naturel.
 
-### Étape 2 : Scan de Sécurité Applicative (Déclencheur : Chaque Build / Pré-déploiement)
-
-_Discipline activée : DevSecOps._
-
-Contrôles automatisés dans le pipeline CI/CD :
-
-1. **SAST (Static Application Security Testing)** :
-   - Analyse statique du code Python (Django) et TypeScript (Next.js).
-   - Recherche de patterns vulnérables : injections SQL brutes, requêtes non filtrées, permissions manquantes, désérialisation non sécurisée.
-2. **SCA (Software Composition Analysis)** :
-   - Scan des dépendances `requirements/*.txt` et `package.json`.
-   - Blocage immédiat si une CVE critique ou élevée est détectée.
-3. **Détection de Secrets et Informations Sensibles** :
-   - Scan de l'arbre Git pour empêcher tout commit contenant des clés Cloudflare R2, jetons Neon/Redis, ou clés secrètes Django.
-4. **Gates Bloquants Automatisés** :
-   - Interdiction formelle de déployer si une vulnérabilité de sévérité Critique ou Élevée est active.
-
-_Livrable : Rapport d'analyse de vulnérabilités et statut du gate de déploiement._
-
----
-
-### Étape 3 : Détection, Triage et MITRE ATT&CK (Déclencheur : Continu & Télémétrie)
-
-_Disciplines activées : Security Analyst & SOC._
-
-Surveillance continue des journaux d'audit (`ApiRequestLog`, logs Cloudflare, métriques Redis) :
-
-1. **Analyse comportementale et signaux d'anomalie** :
-   - Pics de requêtes inhabituels sur `/api/v1/oauth2/token/` ou `/api/v1/reader/sessions/`.
-   - Échecs répétés d'authentification ou requêtes sans secret client.
-   - Tentatives d'accès direct aux flux PDF contournant le streaming protégé `/api/v1/reader/sessions/stream/`.
-2. **Cartographie MITRE ATT&CK** :
-   - _Initial Access (T1078 - Valid Accounts)_ : Utilisation de credentials d'API compromis.
-   - _Privilege Escalation (T1068 - Exploitation for Privilege Escalation)_ : Tentative d'accès administrateur via une session apprenant.
-   - _Defense Evasion (T1562 - Impair Defenses)_ : Tentative de contournement du filigrane dynamique ou de l'invalidation de token.
-   - _Exfiltration (T1567 - Exfiltration Over Web Service)_ : Téléchargement massif non autorisé de contenus protégés par DRM.
-3. **Matrice de Priorité et Triage** :
-   - **Critique** : Faille active sur le DRM Readium/LCP, contournement du filigrane, fuite de documents intégraux.
-   - **Élevée** : Accès non autorisé à un dashboard réservé, faille d'authentification API partenaire.
-   - **Moyenne** : Écart de politique de sécurité, absence de rate limiting sur un endpoint secondaire.
-   - **Faible** : Faux positifs, erreurs de syntaxe client isolées.
-
-_Livrable : Fiche d'incident qualifiée avec classification de gravité et TTP MITRE associée._
-
----
-
-### Étape 4 : Remédiation et Durcissement (Déclencheur : Faille Moyenne ou Supérieure)
-
-_Disciplines activées : Architecture Backend, Design d'API & DevSecOps._
-
-Procédure de correction selon la racine du problème :
-
-1. **Faille de Conception / Spécification** :
-   - Corriger la spécification d'entrée/sortie et les sérialiseurs avant d'ajuster le code métier.
-   - Réécrire la logique pour supprimer tout comportement implicite ou permissif.
-2. **Faille de Pipeline / Dépendance** :
-   - Mettre à jour la dépendance vulnérable ou isoler le composant défaillant.
-   - Ajouter une règle SAST personnalisée pour bloquer toute réintroduction future.
-3. **Incident Actif / Exploitation en Cours (Processus IR - NIST)** :
-   - _Confinement (Containment)_ : Révocation immédiate des jetons compromis (`ReaderSession.status = 'revoked'`, rotation du `client_secret`).
-   - _Éradication (Eradication)_ : Application du correctif de sécurité et purge des enregistrements illicites.
-   - _Rétablissement (Recovery)_ : Redéploiement sécurisé et vérification sous supervision renforcée.
-
-_Livrable : Correctif validé, tests de non-régression Pytest/Jest, et durcissement des règles de contrôle._
-
----
-
-### Étape 5 : Documentation, Diligence Contractuelle et Clôture
-
-_Discipline activée : Opérations SOC (Post-Incident Activity)._
-
-Traçabilité et conformité juridique (Obligation de résultat de sécurité LAHA Éditions) :
-
-1. **Entrée au Registre d'Audit LAHAThèque** :
-   - Nature de l'écart / faille constatée.
-   - Cause racine identifiée (ex: prototype résiduel, paramètre mal validé).
-   - Mesure corrective appliquée et commit Git associé.
-   - Nouvelle règle de détection ou de pipeline mise en place.
-2. **Métriques d'Efficacité** :
-   - Calcul du MTTD (_Mean Time to Detect_) et MTTR (_Mean Time to Remediate_).
-   - Suivi du ratio de détection pré-déploiement vs post-déploiement.
-
-_Livrable : Rapport de diligence prêt pour audit externe ou revue contractuelle._
-
----
-
-## 3. Priorités Spécifiques et Points d'Attention LAHAThèque
-
-Ces composants critiques doivent faire l'objet d'une vigilance systématique lors de chaque itération :
-
-1. **Protection des Contenus & DRM (Readium / LCP)** :
-   - Priorité Critique par défaut.
-   - Aucun lien direct (URL S3/R2 publique) vers un fichier original ne doit jamais être exposé au frontend.
-   - Le streaming de document doit impérativement transiter par `/api/v1/reader/sessions/stream/` avec validation stricte du jeton éphémère (`X-Reader-Token`).
-2. **Endpoints Partenaires & Machine-to-Machine** :
-   - Interdiction totale d'auto-provisioning de comptes ou de clés API.
-   - Vérification du secret client systématiquement hashée en SHA-256 et comparée en temps constant (`verify_secret`).
-   - Rejet immédiat de toute requête non authentifiée avec `401 Unauthorized` (aucun fallback sur un partenaire par défaut).
-3. **Calcul et Exposition des Royalties / Catalogue** :
-   - Vérification stricte des permissions d'accès par rôle (Éditeur, Libraire, Auteur, Administrateur).
-   - Application rigoureuse du rate limiting pour empêcher le scraping non autorisé.
-4. **Tâches Asynchrones Celery & Stockage Cloudflare R2** :
-   - Vérifier que les URL signées ou fichiers temporaires manipulés par Celery sont scellés et nettoyés immédiatement après traitement.
+## 8. PLAN D'ACTION ET RECOMMANDATIONS PRIORISÉES
+Tableau de synthèse trié par ordre de priorité d'exécution :
+- Priorité (Haute, Moyenne, Basse).
+- Titre de la tâche.
+- Domaine concerné.
+- Description vulgarisée de l'action corrective pas à pas.
+- Impact attendu sur l'application.

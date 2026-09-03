@@ -32,6 +32,10 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   if (referer) {
     headers.set('referer', referer)
   }
+  const userAgent = request.headers.get('user-agent')
+  if (userAgent) {
+    headers.set('user-agent', userAgent)
+  }
 
   // 🌐 Transmission de la véritable IP publique cliente à Django
   const cfConnectingIp = request.headers.get('cf-connecting-ip')
@@ -67,16 +71,9 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     try {
       if (contentType && contentType.includes('multipart/form-data')) {
-        const incomingFormData = await request.formData()
-        const outgoingFormData = new FormData()
-        for (const [key, value] of incomingFormData.entries()) {
-          outgoingFormData.append(key, value)
-        }
-        body = outgoingFormData
-        // Supprimer content-type et content-length pour laisser fetch calculer le boundary exact
-        headers.delete('content-type')
-        headers.delete('content-length')
-        console.log(`[BFF Proxy] Multipart FormData reconstitué avec succès pour ${targetUrl}`)
+        // Streamer directement le flux brut sans re-bufferisation mémoire pour garantir l'envoi de fichiers 10-250 Mo
+        body = request.body
+        console.log(`[BFF Proxy] Multipart direct streaming vers ${targetUrl}`)
       } else {
         body = await request.text()
         headers.set('content-length', String(Buffer.byteLength(body, 'utf-8')))
@@ -89,10 +86,12 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
 
   try {
     let backendRes: Response | null = null
+    const timeoutMs = (contentType && contentType.includes('multipart/form-data')) ? 300000 : 30000
     const fetchController = new AbortController()
-    const timeoutHandle = setTimeout(() => fetchController.abort(), 20000)
+    const timeoutHandle = setTimeout(() => fetchController.abort(), timeoutMs)
 
     try {
+      console.log(`[BFF Proxy] Envoi requête ${request.method} vers ${targetUrl}...`)
       backendRes = await fetch(targetUrl, {
         method: request.method,
         headers: headers,
@@ -103,12 +102,13 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
         duplex: 'half',
       })
       clearTimeout(timeoutHandle)
+      console.log(`[BFF Proxy] Réponse Django reçue pour ${targetUrl} : HTTP ${backendRes.status}`)
     } catch (netErr: any) {
       clearTimeout(timeoutHandle)
       if (netErr?.name === 'AbortError') {
-        console.error(`[BFF Proxy TIMEOUT] Le backend Django à ${targetUrl} n'a pas répondu en 20s.`)
+        console.error(`[BFF Proxy TIMEOUT] Le backend Django à ${targetUrl} n'a pas répondu en ${timeoutMs / 1000}s.`)
         return NextResponse.json(
-          { error: "Le serveur backend Django n'a pas répondu dans les délais (20s)." },
+          { error: `Le serveur backend n'a pas répondu dans les délais (${timeoutMs / 1000}s).` },
           { status: 504 }
         )
       }

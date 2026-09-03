@@ -233,28 +233,53 @@ def send_transactional_email(
     Si Celery est disponible et async_send=True, délègue à la tâche asynchrone.
     """
     if async_send:
-        try:
-            from apps.communications.tasks import task_send_transactional_email
-            task_send_transactional_email.delay(
-                email_type=email_type,
-                to_email=to_email,
-                subject=subject,
-                template_name=template_name,
-                context=context or {},
-                recipient_name=recipient_name,
-                from_email=from_email,
-                reply_to=reply_to,
-                pdf_invoice_data=pdf_invoice_data,
-                pdf_royalty_data=pdf_royalty_data,
-                tags=tags,
-            )
-            return EmailSendResult(
-                success=True,
-                provider="celery_async",
-                message_id="queued",
-            )
-        except Exception as celery_err:
-            logger.warning(f"Celery indisponible ({celery_err}), repli sur envoi synchrone immédiat.")
+        import threading
+
+        def _async_dispatcher():
+            # 1. Tentative Celery en arrière-plan
+            try:
+                from apps.communications.tasks import task_send_transactional_email
+                task_send_transactional_email.delay(
+                    email_type=email_type,
+                    to_email=to_email,
+                    subject=subject,
+                    template_name=template_name,
+                    context=context or {},
+                    recipient_name=recipient_name,
+                    from_email=from_email,
+                    reply_to=reply_to,
+                    pdf_invoice_data=pdf_invoice_data,
+                    pdf_royalty_data=pdf_royalty_data,
+                    tags=tags,
+                )
+            except Exception as celery_err:
+                logger.warning(f"Celery non joignable ({celery_err}), repli sur EmailService direct en thread.")
+                try:
+                    EmailService.send(
+                        email_type=email_type,
+                        to_email=to_email,
+                        subject=subject,
+                        template_name=template_name,
+                        context=context,
+                        recipient_name=recipient_name,
+                        from_email=from_email,
+                        reply_to=reply_to,
+                        attachments=attachments,
+                        pdf_invoice_data=pdf_invoice_data,
+                        pdf_royalty_data=pdf_royalty_data,
+                        tags=tags,
+                    )
+                except Exception as send_err:
+                    logger.error(f"[EMAIL THREAD ERROR] Échec de l'envoi d'e-mail: {send_err}")
+
+        # Lancement instantané du thread pour libérer immédiatement le worker HTTP Gunicorn / Traefik
+        t = threading.Thread(target=_async_dispatcher, daemon=True)
+        t.start()
+        return EmailSendResult(
+            success=True,
+            provider="thread_async",
+            message_id="thread_dispatched",
+        )
 
     return EmailService.send(
         email_type=email_type,

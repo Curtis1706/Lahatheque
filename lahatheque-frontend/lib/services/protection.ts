@@ -9,12 +9,18 @@ export interface TraceRecord {
   id: string;
   user_email: string;
   user_name: string;
+  partner_name?: string;
   book_title: string;
   book_id: string;
+  cover_url?: string;
   access_type: "read_chunk" | "read_online" | "text_request" | "audio_stream";
   ip_address: string;
   country: string;
   device_fingerprint: string;
+  current_page?: number;
+  total_pages?: number;
+  progress_percent?: number;
+  reading_time_minutes?: number;
   page_number?: number;
   timestamp: string;
 }
@@ -40,65 +46,19 @@ const MOCK_TRACES: TraceRecord[] = [
     id: "trc-001",
     user_email: "mensah.koffi@univ-abomey.bj",
     user_name: "Koffi Mensah",
+    partner_name: "UNSTIM",
     book_title: "Droit des Affaires et Traité OHADA",
     book_id: "book-ohada-01",
     access_type: "read_chunk",
     ip_address: "197.234.221.14",
     country: "BJ",
     device_fingerprint: "Chrome/124.0.0.0 (Win64; x64) / fp_8a7d",
+    current_page: 42,
+    total_pages: 280,
+    progress_percent: 15,
+    reading_time_minutes: 12,
     page_number: 42,
     timestamp: "2026-08-18T19:42:15Z",
-  },
-  {
-    id: "trc-002",
-    user_email: "fatou.diop@ucad.edu.sn",
-    user_name: "Fatou Diop",
-    book_title: "Principes d'Économie Monétaire Africaine",
-    book_id: "book-eco-02",
-    access_type: "read_chunk",
-    ip_address: "154.124.71.90",
-    country: "SN",
-    device_fingerprint: "Safari/17.4 (Macintosh; Intel Mac OS X) / fp_3b91",
-    page_number: 18,
-    timestamp: "2026-08-18T19:40:02Z",
-  },
-  {
-    id: "trc-003",
-    user_email: "kouame.jean@inphb.ci",
-    user_name: "Jean-Yves Kouamé",
-    book_title: "Hydrologie Appliquée et Bassins Fluviaux",
-    book_id: "book-hydro-03",
-    access_type: "text_request",
-    ip_address: "41.207.210.5",
-    country: "CI",
-    device_fingerprint: "Firefox/125.0 (Android 14; Mobile) / fp_9c12",
-    page_number: 88,
-    timestamp: "2026-08-18T19:35:50Z",
-  },
-  {
-    id: "trc-004",
-    user_email: "mouandjo.alain@univ-yaounde1.cm",
-    user_name: "Alain Mouandjo",
-    book_title: "Précis de Droit Pénal Camerounais",
-    book_id: "book-penal-04",
-    access_type: "audio_stream",
-    ip_address: "129.0.214.88",
-    country: "CM",
-    device_fingerprint: "Edge/124.0.0.0 (Win64; x64) / fp_4d77",
-    timestamp: "2026-08-18T19:28:10Z",
-  },
-  {
-    id: "trc-005",
-    user_email: "kabongo.michel@unikin.cd",
-    user_name: "Michel Kabongo",
-    book_title: "Géologie Minière du Katanga",
-    book_id: "book-geol-05",
-    access_type: "read_chunk",
-    ip_address: "105.101.44.12",
-    country: "CD",
-    device_fingerprint: "Chrome/124.0.0.0 (Linux; Android 13) / fp_1e00",
-    page_number: 104,
-    timestamp: "2026-08-18T19:15:30Z",
   },
 ];
 
@@ -119,8 +79,58 @@ const DEFAULT_GLOBAL_SETTINGS: DrmGlobalSettings = {
 
 /**
  * Récupère le journal d'audit légal TraceAccès depuis le backend Django.
+ * Agrège en priorité les sessions de lecture réelles et exclut les pings internes.
  */
 export async function getAccessTraces(): Promise<TraceRecord[]> {
+  const traces: TraceRecord[] = [];
+
+  // 1. Récupération prioritaire des sessions de lecture réelles hébergées
+  try {
+    const res = await fetch("/api/bff/partners/sessions", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const list = Array.isArray(json) ? json : (json.data || json.results || []);
+      for (const s of list) {
+        const uName = s.studentName || s.userName || "Lecteur Authentifié";
+        const pName = s.partnerName || "LAHAThèque";
+        const emailFallback = uName && uName !== "Lecteur Authentifié"
+          ? `${uName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@univ.bj`
+          : "etudiant@univ.bj";
+
+        const bookId = String(s.bookId || s.book_id || s.ouvrage || s.id || "");
+        const coverUrl = s.coverUrl || s.cover_url || (bookId && !bookId.startsWith("byod") ? `/api/bff/catalog/books/${bookId}/cover/` : "");
+
+        traces.push({
+          id: String(s.id),
+          user_name: uName,
+          user_email: s.studentEmail || s.userEmail || emailFallback,
+          partner_name: pName,
+          book_title: s.bookTitle || s.documentTitle || "Ouvrage Académique",
+          book_id: bookId,
+          cover_url: coverUrl,
+          access_type: "read_chunk",
+          ip_address: s.studentIp || s.userIp || "127.0.0.1",
+          country: "BJ",
+          device_fingerprint: `Web • ${pName}`,
+          current_page: s.currentPage || 1,
+          total_pages: s.totalPages || 1,
+          progress_percent: s.progressPercent || 0,
+          reading_time_minutes: s.durationMinutes ?? s.readingTimeMinutes ?? 1,
+          page_number: s.currentPage || 1,
+          timestamp: s.startedAt || s.createdAt || new Date().toISOString(),
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[Traces] Erreur chargement sessions partenaires:", err);
+  }
+
+  // 2. Récupération des traces audit directes si disponibles
   try {
     const res = await fetch("/api/bff/protection/audit-traces/", {
       method: "GET",
@@ -137,27 +147,45 @@ export async function getAccessTraces(): Promise<TraceRecord[]> {
             : (json.results || (json.data?.results || [])));
 
       if (Array.isArray(rawList)) {
-        return rawList.map((item: any) => ({
-          id: String(item.id),
-          user_email: item.user_email || (typeof item.user === "string" ? item.user : item.user?.email) || "lecteur@lahatheque.com",
-          user_name: item.user_name || "Lecteur Authentifié",
-          book_title: item.book_title || item.document_title || "Ouvrage LAHA",
-          book_id: String(item.ouvrage || ""),
-          access_type: item.access_type || "read_chunk",
-          ip_address: item.ip_address || "127.0.0.1",
-          country: item.country || "BJ",
-          device_fingerprint: item.device_fingerprint || item.user_agent || "Client Web",
-          page_number: item.page_number || undefined,
-          timestamp: item.timestamp || item.created_at || new Date().toISOString(),
-        }));
+        for (const item of rawList) {
+          const tId = String(item.id);
+          // Éviter les doublons
+          if (traces.some((t) => t.id === tId)) continue;
+
+          // Ignorer les pings internes 10.0.1.1 ou "Lecteur Client" générique si nous avons des sessions réelles
+          if ((item.ip_address === "10.0.1.1" || item.user_name === "Lecteur Client") && traces.length > 0) {
+            continue;
+          }
+
+          traces.push({
+            id: tId,
+            user_email: item.user_email || "lecteur@lahatheque.com",
+            user_name: item.user_name || "Lecteur Authentifié",
+            partner_name: item.partner_name || "Accès Direct",
+            book_title: item.book_title || item.document_title || "Ouvrage LAHA",
+            book_id: String(item.book_id || item.ouvrage || ""),
+            access_type: item.access_type || "read_chunk",
+            ip_address: item.ip_address || "127.0.0.1",
+            country: item.country || "BJ",
+            device_fingerprint: item.device_fingerprint || "Client Web (Navigateur)",
+            current_page: item.current_page || item.page_number || 1,
+            total_pages: item.total_pages || 1,
+            progress_percent: item.progress_percent || 0,
+            reading_time_minutes: item.reading_time_minutes || 0,
+            page_number: item.current_page || item.page_number || 1,
+            timestamp: item.timestamp || item.created_at || new Date().toISOString(),
+          });
+        }
       }
     }
   } catch {
     // Mode déconnecté
   }
 
-  // Si le backend n'est pas joint, renvoyer liste vide ou fallback
-  return [];
+  // Tri chronologique décroissant
+  traces.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  return traces;
 }
 
 
