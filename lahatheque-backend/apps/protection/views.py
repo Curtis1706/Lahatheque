@@ -113,63 +113,99 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
         return qs
 
     def list(self, request, *args, **kwargs):
-        # 1. Traces d'accès directes TraceAcces
-        traces_qs = self.get_queryset().order_by("-timestamp")[:200]
         results = []
 
+        # 1. Agrégation prioritaire des sessions de lecture réelles ReaderSession (31+ sessions actives)
+        try:
+            from apps.reader.models import ReaderSession
+            sessions = ReaderSession.objects.select_related("partner", "end_user", "ouvrage").order_by("-created_at")[:300]
+            for s in sessions:
+                title = s.ouvrage.titre if (s.ouvrage and hasattr(s.ouvrage, "titre") and s.ouvrage.titre) else (
+                    s.ouvrage.title if (s.ouvrage and hasattr(s.ouvrage, "title") and s.ouvrage.title) else (
+                        s.custom_document_title or "Document Sécurisé"
+                    )
+                )
+                partner_name = s.partner.name if s.partner else "LAHAThèque"
+                u_name = s.end_user.display_name if (s.end_user and s.end_user.display_name) else (
+                    partner_name if s.partner else "Lecteur Authentifié"
+                )
+                u_email = s.end_user.email if (s.end_user and s.end_user.email) else (
+                    f"contact@{partner_name.lower().replace(' ', '')}.com"
+                )
+
+                student_ip = "127.0.0.1"
+                country = "BJ"
+                if isinstance(s.metadata, dict):
+                    student_ip = str(s.metadata.get("user_ip") or s.metadata.get("ip") or "127.0.0.1")
+                    country = str(s.metadata.get("country") or "BJ")
+
+                total_pages = 1
+                if s.ouvrage and hasattr(s.ouvrage, "nombre_pages") and s.ouvrage.nombre_pages:
+                    total_pages = s.ouvrage.nombre_pages
+                elif isinstance(s.metadata, dict) and s.metadata.get("total_pages"):
+                    try:
+                        total_pages = int(s.metadata["total_pages"])
+                    except (ValueError, TypeError):
+                        total_pages = 1
+
+                current_page = s.last_page or 1
+                if total_pages <= 1 and current_page > 1:
+                    total_pages = current_page
+
+                progress_percent = int((current_page / max(total_pages, 1)) * 100)
+                if progress_percent > 100:
+                    progress_percent = 100
+
+                duration_minutes = int(s.reading_time_seconds / 60) if s.reading_time_seconds else 0
+
+                results.append({
+                    "id": str(s.id),
+                    "user_email": u_email,
+                    "user_name": u_name,
+                    "partner_name": partner_name,
+                    "book_title": title,
+                    "book_id": str(s.ouvrage_id or "byod-doc"),
+                    "access_type": "read_chunk",
+                    "ip_address": student_ip,
+                    "country": country,
+                    "device_fingerprint": s.user_agent or f"Web ({partner_name})",
+                    "current_page": current_page,
+                    "total_pages": total_pages,
+                    "progress_percent": progress_percent,
+                    "reading_time_minutes": duration_minutes,
+                    "timestamp": s.created_at.isoformat() if s.created_at else timezone.now().isoformat(),
+                })
+        except Exception as sess_err:
+            logger.warning(f"Erreur agrégation ReaderSession dans TraceAcces: {sess_err}")
+
+        # 2. Ajout des traces d'accès TraceAcces sans doublon
+        traces_qs = self.get_queryset().order_by("-timestamp")[:100]
         for t in traces_qs:
-            u_email = t.user.email if t.user else "lecteur@institution.bj"
-            u_name = f"{t.user.first_name} {t.user.last_name}".strip() if t.user else (t.document_title or "Lecteur Authentifié")
-            b_title = t.ouvrage.title if t.ouvrage else (t.document_title or "Ouvrage Académique")
+            t_id = str(t.id)
+            if any(r["id"] == t_id for r in results):
+                continue
+
+            u_email = t.user.email if t.user else "lecteur@lahatheque.com"
+            u_name = f"{t.user.first_name} {t.user.last_name}".strip() if t.user else "Lecteur Client"
+            b_title = t.ouvrage.title if (t.ouvrage and hasattr(t.ouvrage, "title")) else (t.document_title or "Ouvrage Académique")
+
             results.append({
-                "id": str(t.id),
+                "id": t_id,
                 "user_email": u_email,
                 "user_name": u_name or u_email,
+                "partner_name": "Accès Direct",
                 "book_title": b_title,
                 "book_id": str(t.ouvrage_id or ""),
                 "access_type": t.access_type or "read_chunk",
                 "ip_address": t.ip_address or "127.0.0.1",
                 "country": t.country or "BJ",
                 "device_fingerprint": t.user_agent or t.device_fingerprint or "Lecteur Web DRM",
-                "page_number": t.page_number or 1,
+                "current_page": t.page_number or 1,
+                "total_pages": 1,
+                "progress_percent": 100,
+                "reading_time_minutes": 0,
                 "timestamp": t.timestamp.isoformat() if t.timestamp else timezone.now().isoformat(),
             })
-
-        # 2. Agrégation dynamique des ReaderSession (sessions partenaires et directes)
-        try:
-            from apps.reader.models import ReaderSession
-            sessions = ReaderSession.objects.select_related("partner", "end_user", "ouvrage").order_by("-created_at")[:200]
-            for s in sessions:
-                # Éviter les doublons stricts si déjà dans les traces
-                s_id = str(s.id)
-                if any(r["id"] == s_id for r in results):
-                    continue
-
-                u_name = s.end_user.display_name if s.end_user else "Lecteur Authentifié"
-                u_email = s.end_user.email if s.end_user else (s.partner.name if s.partner else "lecteur@lahatheque.com")
-                b_title = s.ouvrage.titre if (s.ouvrage and hasattr(s.ouvrage, "titre")) else (s.ouvrage.title if (s.ouvrage and hasattr(s.ouvrage, "title")) else (s.custom_document_title or "Document Sécurisé"))
-                
-                s_ip = "127.0.0.1"
-                s_country = "BJ"
-                if isinstance(s.metadata, dict):
-                    s_ip = str(s.metadata.get("user_ip", "127.0.0.1"))
-                    s_country = str(s.metadata.get("country", "BJ"))
-
-                results.append({
-                    "id": s_id,
-                    "user_email": u_email,
-                    "user_name": u_name,
-                    "book_title": b_title,
-                    "book_id": str(s.ouvrage_id or "byod-doc"),
-                    "access_type": "read_chunk",
-                    "ip_address": s_ip,
-                    "country": s_country,
-                    "device_fingerprint": s.user_agent or f"Session {s.partner.name if s.partner else 'Laha'}",
-                    "page_number": s.last_page or 1,
-                    "timestamp": s.created_at.isoformat() if s.created_at else timezone.now().isoformat(),
-                })
-        except Exception as sess_err:
-            logger.warning(f"Erreur agrégation ReaderSession dans TraceAcces: {sess_err}")
 
         # Tri chronologique décroissant
         results.sort(key=lambda x: x["timestamp"], reverse=True)

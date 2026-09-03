@@ -32,6 +32,10 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   if (referer) {
     headers.set('referer', referer)
   }
+  const userAgent = request.headers.get('user-agent')
+  if (userAgent) {
+    headers.set('user-agent', userAgent)
+  }
 
   // 🌐 Transmission de la véritable IP publique cliente à Django
   const cfConnectingIp = request.headers.get('cf-connecting-ip')
