@@ -91,7 +91,7 @@ export function ActionSearchBar({
       id: "inst-1",
       label: "Université d'Abomey-Calavi (UAC)",
       icon: <Building2 className="w-4 h-4 text-gold" />,
-      description: "Établissement",
+      description: "Université",
       category: "institution",
       value: "UAC"
     },
@@ -99,9 +99,25 @@ export function ActionSearchBar({
       id: "inst-2",
       label: "Université de Parakou (UP)",
       icon: <Building2 className="w-4 h-4 text-gold" />,
-      description: "Établissement",
+      description: "Université",
       category: "institution",
       value: "UP"
+    },
+    {
+      id: "inst-3",
+      label: "Université Nationale des Sciences, Technologies, Ingénierie et Mathématiques (UNSTIM)",
+      icon: <Building2 className="w-4 h-4 text-gold" />,
+      description: "Université",
+      category: "institution",
+      value: "UNSTIM"
+    },
+    {
+      id: "inst-4",
+      label: "Université Nationale d'Agriculture (UNA)",
+      icon: <Building2 className="w-4 h-4 text-gold" />,
+      description: "Université",
+      category: "institution",
+      value: "UNA"
     }
   ];
 

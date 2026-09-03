@@ -16,7 +16,7 @@ import {
   Calendar
 } from "lucide-react";
 import { Book } from "@/lib/types/catalog";
-import { searchBooks } from "@/lib/services/catalog";
+import { searchBooks, getInstitutions, type InstitutionOption } from "@/lib/services/catalog";
 import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import { Book as Book3D } from "@/components/ui/book";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
@@ -35,6 +35,7 @@ function CatalogSearchInner() {
 
   const { disciplineNames } = useDisciplines();
   const [books, setBooks] = useState<Book[]>([]);
+  const [institutions, setInstitutions] = useState<InstitutionOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(urlQuery);
   const [authorQuery, setAuthorQuery] = useState("");
@@ -44,6 +45,15 @@ function CatalogSearchInner() {
   const [selectedFormat, setSelectedFormat] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  // Chargement dynamique des universités de la base de données
+  useEffect(() => {
+    getInstitutions().then((data) => {
+      if (data && data.length > 0) {
+        setInstitutions(data);
+      }
+    });
+  }, []);
 
   // Sync searchQuery when URL query parameter changes
   useEffect(() => {
@@ -193,15 +203,11 @@ function CatalogSearchInner() {
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
                 <option value="">Toutes les universités</option>
-                <option value="UAC">Université d'Abomey-Calavi (UAC)</option>
-                <option value="UP">Université de Parakou (UP)</option>
-                <option value="UNSTIM">Université Nationale des Sciences, Technologies, Ingénierie et Mathématiques (UNSTIM)</option>
-                <option value="UNA">Université Nationale d'Agriculture (UNA)</option>
-                {/* 
-                <option value="UFHB">Université Félix Houphouët-Boigny (UFHB)</option>
-                <option value="UCAD">Université Cheikh Anta Diop (UCAD)</option>
-                <option value="UL">Université de Lomé (UL)</option>
-                */}
+                {institutions.map((inst) => (
+                  <option key={inst.id} value={inst.code}>
+                    {inst.name} ({inst.code})
+                  </option>
+                ))}
               </select>
             </div>
 
