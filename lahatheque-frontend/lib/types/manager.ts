@@ -149,7 +149,12 @@ export interface EscalatedOutage {
   book_id: string;
   book_title: string;
   isbn: string;
+  authors?: string[];
+  discipline?: string;
+  cover_url?: string;
   warehouse: string;
+  warehouse_nom?: string;
+  pays?: string;
   reported_at: string;
   admin_status: AdminOutageStatus;
   impact_description: string;

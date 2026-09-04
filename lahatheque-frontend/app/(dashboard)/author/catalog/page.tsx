@@ -87,8 +87,8 @@ function AuthorCatalogBookCard({
       <div className="mt-auto p-5 pt-3 space-y-3">
         <div className="border-t border-border pt-3">
           {book.is_owned || book.has_digital_access ? (
-            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 w-fit">
-              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Déjà acquis
+            <span className="text-[10px] font-bold text-success bg-success/10 border border-success/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 w-fit">
+              <CheckCircle2 className="w-3 h-3 text-success" /> Déjà acquis
             </span>
           ) : (
             <div className="flex items-center gap-3 flex-wrap">

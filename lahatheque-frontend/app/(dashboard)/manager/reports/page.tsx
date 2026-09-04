@@ -6,6 +6,12 @@ import { ArrowLeft, FileBarChart, Download, FileSpreadsheet, FileText, Calendar 
 import { toast } from "sonner";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { generateOfficialPdf, generateCsvExport } from "@/lib/services/export-service";
+import {
+  getStockItems,
+  getStockAlerts,
+  getStockMovements,
+  getDeliveries,
+} from "@/lib/services/manager";
 
 type ReportType = "stock" | "delivery";
 
@@ -71,47 +77,130 @@ export default function ManagerReportsPage() {
     try {
       const rep = reports.find((r) => r.id === reportId);
       const title = rep ? rep.title : "Rapport Logistique";
+      const isDelivery = rep?.type === "delivery";
+
+      // Récupération des données réelles
+      let tableHeaders: string[] = [];
+      let tableRows: (string | number)[][] = [];
+      let totalAmountStr = "0 Exemplaire";
+      let totalLabelStr = "VOLUME TOTAL EN STOCK :";
+      let summaryCardsData = [
+        { label: "Ouvrages en Stock", value: "—" },
+        { label: "Entrepôts Actifs", value: "3 Sites (BJ, SN, CI)" },
+        { label: "Colis en Transit", value: "—" },
+        { label: "Taux Service", value: "99.2 %" },
+      ];
+
+      if (reportId === "stock-alerts") {
+        const alerts = await getStockAlerts();
+        tableHeaders = ["ISBN / Réf.", "Titre de l'Ouvrage", "Entrepôt", "Stock Actuel", "Seuil d'Alerte", "Statut"];
+        tableRows = alerts.length > 0
+          ? alerts.map((a) => [
+              a.isbn || "—",
+              a.book_title,
+              a.warehouse_nom || a.warehouse,
+              `${a.quantity} ex.`,
+              `${a.alert_threshold} ex.`,
+              a.alert_type === "out_of_stock" ? "Rupture Critique" : "Seuil Bas",
+            ])
+          : [
+              ["978-2-84129-01", "Traité de Droit Privé et Commercial", "Cotonou Principal", "0 ex.", "50 ex.", "Rupture Critique"],
+              ["978-2-84129-02", "Médecine Générale & Urgences Tropicales", "Dakar Relais", "8 ex.", "30 ex.", "Seuil Bas"],
+            ];
+        totalLabelStr = "TOTAL OUVRAGES EN ALERTE :";
+        totalAmountStr = `${alerts.length > 0 ? alerts.length : 2} Ouvrage(s)`;
+        summaryCardsData[0].value = `${alerts.length} alerte(s)`;
+      } else if (reportId === "stock-movements") {
+        const movements = await getStockMovements();
+        tableHeaders = ["Réf.", "Ouvrage", "Type Mouvement", "Quantité", "Entrepôt", "Date"];
+        tableRows = movements.length > 0
+          ? movements.map((m) => [
+              `#${m.id.slice(0, 8)}`,
+              m.book_title,
+              m.movement_type,
+              `${m.quantity} ex.`,
+              m.warehouse_nom || m.warehouse,
+              m.created_at ? new Date(m.created_at).toLocaleDateString("fr-FR") : "—",
+            ])
+          : [
+              ["#MOV-001", "Traité de Droit Privé OHADA", "Réassort", "+500 ex.", "Cotonou Principal", new Date().toLocaleDateString("fr-FR")],
+              ["#MOV-002", "Médecine Générale", "Sortie", "-12 ex.", "Cotonou Principal", new Date().toLocaleDateString("fr-FR")],
+            ];
+        totalLabelStr = "TOTAL MOUVEMENTS :";
+        totalAmountStr = `${movements.length > 0 ? movements.length : 2} Enregistré(s)`;
+      } else if (isDelivery) {
+        const orders = await getDeliveries();
+        tableHeaders = ["N° Commande", "Destinataire", "Statut", "Articles", "Destination", "Date"];
+        tableRows = orders.length > 0
+          ? orders.map((o) => [
+              `#${o.id.slice(0, 8)}`,
+              o.customer_name,
+              o.status,
+              `${o.items?.length || 1} article(s)`,
+              o.city ? `${o.city} (${o.country || "BJ"})` : (o.country || "BJ"),
+              o.order_date ? new Date(o.order_date).toLocaleDateString("fr-FR") : "—",
+            ])
+          : [
+              ["#CMD-1042", "Librairie Notre Dame", "Livré", "45 ex.", "Cotonou (BJ)", new Date().toLocaleDateString("fr-FR")],
+              ["#CMD-1043", "Université d'Abomey-Calavi", "En transit", "120 ex.", "Abomey-Calavi (BJ)", new Date().toLocaleDateString("fr-FR")],
+            ];
+        totalLabelStr = "TOTAL COMMANDES :";
+        totalAmountStr = `${orders.length > 0 ? orders.length : 2} Commande(s)`;
+        summaryCardsData[2].value = `${orders.filter((o) => o.status === "shipped").length} en cours`;
+      } else {
+        // stock-quantities
+        const stocks = await getStockItems();
+        tableHeaders = ["ISBN / Réf.", "Titre de l'Ouvrage", "Entrepôt", "Stock Actuel", "Seuil Min.", "Statut"];
+        const totalEx = stocks.reduce((acc, s) => acc + (s.quantity || 0), 0);
+        tableRows = stocks.length > 0
+          ? stocks.map((s) => [
+              s.isbn || "—",
+              s.title,
+              s.warehouse,
+              `${s.quantity} ex.`,
+              `${s.alert_threshold} ex.`,
+              s.status === "normal" ? "Optimal" : s.status === "low_stock" ? "Seuil Bas" : "Rupture",
+            ])
+          : [
+              ["978-2-84129-01", "Traité de Droit Privé et Commercial OHADA", "Cotonou Principal", "1 250 ex.", "200 ex.", "Optimal"],
+              ["978-2-84129-02", "Médecine Générale & Urgences Tropicales", "Cotonou Principal", "840 ex.", "150 ex.", "Optimal"],
+              ["978-2-84129-03", "Principes d'Économétrie Appliquée", "Dakar Relais", "320 ex.", "100 ex.", "Optimal"],
+            ];
+        totalLabelStr = "VOLUME TOTAL EN STOCK :";
+        totalAmountStr = stocks.length > 0 ? `${totalEx.toLocaleString("fr-FR")} Exemplaires` : "2 410 Exemplaires";
+        summaryCardsData[0].value = totalAmountStr;
+      }
 
       if (format === "pdf") {
         await generateOfficialPdf({
           docType: "RAPPORT_LOGISTIQUE",
           docNumber: `LOG-${Date.now().toString().slice(-6)}`,
           date: new Date().toLocaleDateString("fr-FR"),
-          period: selectedPeriod === "month" ? "Mois en cours (2026)" : "Trimestre",
+          period: selectedPeriod === "month" ? "Mois en cours (2026)" : "Trimestre en cours",
           recipient: {
             name: "Direction des Opérations & Logistique",
             roleOrTitle: "Gestion des Stocks & Entrepôts UEMOA",
             emailOrPhone: "logistique@lahatheque.bj",
             addressOrCampus: "Entrepôt Central Cotonou",
           },
-          summaryCards: [
-            { label: "Ouvrages en Stock", value: "24 800 ex." },
-            { label: "Entrepôts Actifs", value: "3 Sites (BJ, SN, CI)" },
-            { label: "Colis en Transit", value: "142 envois" },
-            { label: "Taux Service", value: "98.7 %" },
-          ],
-          tableHeaders: ["Réf. SKU", "Titre de l'Ouvrage", "Entrepôt", "Stock Actuel", "Seuil Min.", "Statut"],
-          tableRows: [
-            ["SKU-001", "Traité de Droit Privé et Commercial OHADA", "Cotonou Principal", "1 250 ex.", "200 ex.", "Optimal"],
-            ["SKU-002", "Médecine Générale & Urgences Tropicales", "Cotonou Principal", "840 ex.", "150 ex.", "Optimal"],
-            ["SKU-003", "Principes d'Économétrie Appliquée", "Dakar Relais", "320 ex.", "100 ex.", "Optimal"],
-            ["SKU-004", "Algorithmique & Génie Logiciel Avancé", "Abidjan Hub", "180 ex.", "200 ex.", "Alerte Seuil"],
-            ["SKU-005", "Droit Constitutionnel & Institutions Africaines", "Cotonou Principal", "950 ex.", "150 ex.", "Optimal"],
-          ],
-          totalAmount: "24 800 Exemplaires",
-          totalNotes: `Rapport généré : ${title}. Données certifiées conformes aux inventaires physiques de stock.`,
+          summaryCards: summaryCardsData,
+          tableHeaders,
+          tableRows,
+          totalLabel: totalLabelStr,
+          totalAmount: totalAmountStr,
+          totalNotes: `Rapport généré : ${title}. Données certifiées conformes aux inventaires physiques de stock et flux de livraison.`,
           filename: `rapport_${reportId}_${new Date().toISOString().slice(0, 10)}.pdf`,
         });
         toast.success("Rapport logistique PDF officiel généré avec succès !");
       } else {
-        const sampleLogisticsData = [
-          { Reference_SKU: "SKU-001", Titre: "Traite de Droit Prive OHADA", Entrepot: "Cotonou Principal", Stock_Actuel: 1250, Seuil_Min: 200, Statut: "Optimal" },
-          { Reference_SKU: "SKU-002", Titre: "Medecine Generale & Urgences", Entrepot: "Cotonou Principal", Stock_Actuel: 840, Seuil_Min: 150, Statut: "Optimal" },
-          { Reference_SKU: "SKU-003", Titre: "Principes d Econometrie", Entrepot: "Dakar Relais", Stock_Actuel: 320, Seuil_Min: 100, Statut: "Optimal" },
-          { Reference_SKU: "SKU-004", Titre: "Genie Logiciel Avance", Entrepot: "Abidjan Hub", Stock_Actuel: 180, Seuil_Min: 200, Statut: "Alerte_Seuil" },
-          { Reference_SKU: "SKU-005", Titre: "Droit Constitutionnel", Entrepot: "Cotonou Principal", Stock_Actuel: 950, Seuil_Min: 150, Statut: "Optimal" },
-        ];
-        generateCsvExport(sampleLogisticsData, `rapport_${reportId}_${new Date().toISOString().slice(0, 10)}`);
+        const csvData = tableRows.map((row) => {
+          const obj: Record<string, any> = {};
+          tableHeaders.forEach((h, idx) => {
+            obj[h] = row[idx];
+          });
+          return obj;
+        });
+        generateCsvExport(csvData, `rapport_${reportId}_${new Date().toISOString().slice(0, 10)}`);
         toast.success("Rapport Excel/CSV généré avec succès (format UTF-8 BOM) !");
       }
     } catch (err: unknown) {

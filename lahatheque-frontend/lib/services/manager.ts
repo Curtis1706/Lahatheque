@@ -471,21 +471,24 @@ export async function getWarehouseDistribution(): Promise<import("@/lib/types/ma
 /** Récupère les ruptures escaladées vers l'Admin. */
 export async function getEscalatedOutages(): Promise<EscalatedOutage[]> {
   try {
-    // On réutilise l'endpoint des alertes et on filtre les escaladées côté client
-    const alerts = await bffGet<any[]>("/stock/alerts/");
-    return alerts
-      .filter((a) => a.escalation_status && a.escalation_status !== "not_escalated")
-      .map((a) => ({
-        id: a.id,
-        book_id: a.id,
-        book_title: a.title ?? "",
-        isbn: a.isbn ?? "",
-        warehouse: a.warehouse ?? "",
-        reported_at: a.last_restock_at ?? new Date().toISOString(),
-        admin_status: (a.escalation_status === "escalated" ? "reported" : "acknowledged") as "reported" | "acknowledged" | "resolved",
-        impact_description: `${a.statut === "out_of_stock" ? "Rupture totale" : "Seuil bas"} — ${a.quantite_disponible ?? 0} ex. disponibles`,
-        reported_by: "Gestionnaire",
-      }));
+    const raw = await bffGet<any[]>("/stock/escalate/");
+    const list = Array.isArray(raw) ? raw : (raw as any)?.results || (raw as any)?.data || [];
+    return list.map((a: any) => ({
+      id: a.id,
+      book_id: a.book_id || a.stock_id || a.id,
+      book_title: a.book_title ?? a.title ?? "",
+      isbn: a.isbn ?? "",
+      authors: a.authors ?? [],
+      discipline: a.discipline ?? "",
+      cover_url: a.cover_url || (a.book_id ? `/api/bff/catalog/books/${a.book_id}/cover/` : (a.id ? `/api/bff/catalog/books/${a.id}/cover/` : "")),
+      warehouse: a.warehouse ?? "",
+      warehouse_nom: a.warehouse_nom,
+      pays: a.pays,
+      reported_at: a.reported_at ?? a.created_at ?? new Date().toISOString(),
+      admin_status: (a.admin_status ?? "reported") as EscalatedOutage["admin_status"],
+      impact_description: a.impact_description || "Rupture signalée pour réapprovisionnement urgent.",
+      reported_by: a.reported_by ?? "Gestionnaire",
+    }));
   } catch {
     return [];
   }
@@ -493,18 +496,22 @@ export async function getEscalatedOutages(): Promise<EscalatedOutage[]> {
 
 /** Escalade une rupture vers l'Admin et retourne l'EscalatedOutage créé. */
 export async function escalateToAdmin(alertId: string, impactDescription: string): Promise<EscalatedOutage> {
-  await bffPost("/stock/escalate/", { stock_id: alertId, impact_description: impactDescription });
-  // Retourne un objet synthétique — le détail sera rechargé par la page
+  const res = await bffPost<any>("/stock/escalate/", { stock_id: alertId, impact_description: impactDescription });
   return {
-    id: alertId,
-    book_id: alertId,
-    book_title: "—",
-    isbn: "—",
-    warehouse: "—",
-    reported_at: new Date().toISOString(),
-    admin_status: "reported" as const,
-    impact_description: impactDescription,
-    reported_by: "Gestionnaire",
+    id: res?.id || alertId,
+    book_id: res?.book_id || alertId,
+    book_title: res?.book_title || "Ouvrage",
+    isbn: res?.isbn || "—",
+    authors: res?.authors || [],
+    discipline: res?.discipline || "",
+    cover_url: res?.cover_url || (res?.book_id ? `/api/bff/catalog/books/${res.book_id}/cover/` : undefined),
+    warehouse: res?.warehouse || "—",
+    warehouse_nom: res?.warehouse_nom,
+    pays: res?.pays,
+    reported_at: res?.reported_at || new Date().toISOString(),
+    admin_status: (res?.admin_status ?? "reported") as EscalatedOutage["admin_status"],
+    impact_description: res?.impact_description || impactDescription,
+    reported_by: res?.reported_by || "Gestionnaire",
   };
 }
 
@@ -547,22 +554,24 @@ export async function confirmManualPayment(orderId: string): Promise<boolean> {
 
 // ─── Rapport Financier Gestionnaire ───────────────────────────────────────────
 
+export interface CreditOrder {
+  id: string;
+  author_name: string;
+  amount: number;
+  due_date: string | null;
+  is_overdue: boolean;
+  statut_paiement: string;
+  statut_commande: string;
+  created_at: string;
+}
+
 export interface ManagerFinanceReport {
   revenue_by_payment_method: { method: string; total: number; count: number }[];
   total_revenue_paid: number;
   credit_outstanding_total: number;
   credit_settled_total: number;
   credit_overdue_count: number;
-  credit_orders: {
-    id: string;
-    author_name: string;
-    amount: number;
-    due_date: string | null;
-    is_overdue: boolean;
-    statut_paiement: string;
-    statut_commande: string;
-    created_at: string;
-  }[];
+  credit_orders: CreditOrder[];
 }
 
 export async function getManagerFinanceReport(): Promise<ManagerFinanceReport | null> {

@@ -43,6 +43,7 @@ export interface PdfDocumentOptions {
   summaryCards?: Array<{ label: string; value: string }>;
   tableHeaders: string[];
   tableRows: (string | number)[][];
+  totalLabel?: string;
   totalAmount?: string;
   totalNotes?: string;
   filename?: string;
@@ -287,19 +288,33 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
   }
 
   if (options.totalAmount) {
-    const totalBoxWidth = 75;
+    const defaultLabel =
+      options.docType === "RAPPORT_LOGISTIQUE"
+        ? "VOLUME GLOBAL DU STOCK :"
+        : options.docType === "REGISTRE_AUDIT"
+        ? "TOTAL DES ENTRÉES :"
+        : options.docType === "BON_COMMANDE"
+        ? "TOTAL COMMANDE :"
+        : options.docType === "BORDEREAU_REDEVANCES"
+        ? "TOTAL DES REDEVANCES :"
+        : options.docType === "RAPPORT_FINANCIER"
+        ? "TOTAL CONSOLIDÉ :"
+        : "TOTAL NET À PAYER :";
+
+    const label = options.totalLabel || defaultLabel;
+    const totalBoxWidth = 85;
     const totalX = pageWidth - margin - totalBoxWidth;
     
     doc.setFillColor(...navyRgb);
     doc.roundedRect(totalX, footerBlockY, totalBoxWidth, 14, 1.5, 1.5, "F");
     
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(220, 225, 235);
-    doc.text("TOTAL NET À PAYER :", totalX + 4, footerBlockY + 5.5);
+    doc.text(label, totalX + 4, footerBlockY + 5.5);
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setTextColor(...goldRgb);
     doc.text(options.totalAmount, totalX + 4, footerBlockY + 11);
   }
