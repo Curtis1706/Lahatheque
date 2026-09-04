@@ -21,6 +21,7 @@ export interface TotalSalesChartProps {
   curvePoints?: number[];
   className?: string;
   onReportClick?: () => void;
+  unit?: string;
 }
 
 type Period = "1d" | "1w" | "1m" | "3m" | "1y";
@@ -70,6 +71,7 @@ export function TotalSalesChart({
   curvePoints,
   className,
   onReportClick,
+  unit = "FCFA",
 }: TotalSalesChartProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<Period>("1m");
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
@@ -184,7 +186,7 @@ export function TotalSalesChart({
             <span className="text-foreground-muted font-medium truncate max-w-[200px]">{ch.name}</span>
             <div className="flex items-center gap-2 font-mono">
               <span className="font-semibold text-foreground">
-                {ch.amount.toLocaleString("fr-FR")} FCFA
+                {ch.amount.toLocaleString("fr-FR")} {unit}
               </span>
               <span
                 className={cn(

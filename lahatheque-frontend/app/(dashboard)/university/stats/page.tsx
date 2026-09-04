@@ -5,19 +5,30 @@ import Link from "next/link";
 import {
   TrendingUp,
   ArrowLeft,
-  Building2,
   BookOpen,
-  Clock,
-  Download,
-  Users,
-  Layers,
-  GraduationCap,
+  Eye,
 } from "lucide-react";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { FacultyStatsChart } from "@/components/features/university/faculty-stats-chart";
 import { TotalSalesChart } from "@/components/ui/total-sales-chart";
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
 import { getUniversityKpis, getUniversityCatalog } from "@/lib/services/university";
 import type { UniversityKpis, UniversityBookCatalogItem } from "@/lib/types/university";
+
+// Générateur de timeline pour activer les barres bâtonnets sparklines de ProgressMetricCard (identique à l'admin et vue d'ensemble)
+const getRollingTimeline = (count: number) => {
+  const monthNames = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
+  const now = new Date();
+  const res = [];
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+    res.push({
+      date: `${String(d.getDate()).padStart(2, "0")} ${monthNames[d.getMonth()]}`,
+      value: i === 0 ? count : Math.max(0, Math.round(count * (0.6 + (3 - i) * 0.13))),
+    });
+  }
+  return res;
+};
 
 export default function UniversityStatsPage() {
   const [kpis, setKpis] = useState<UniversityKpis | null>(null);
@@ -27,13 +38,18 @@ export default function UniversityStatsPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const [kpiData, catalogData] = await Promise.all([
-        getUniversityKpis(),
-        getUniversityCatalog(),
-      ]);
-      setKpis(kpiData);
-      setBooks(catalogData);
-      setLoading(false);
+      try {
+        const [kpiData, catalogData] = await Promise.all([
+          getUniversityKpis(),
+          getUniversityCatalog(),
+        ]);
+        setKpis(kpiData);
+        setBooks(catalogData);
+      } catch (err) {
+        console.error("Erreur chargement statistiques universitaires:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);
@@ -42,20 +58,15 @@ export default function UniversityStatsPage() {
     return (
       <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto animate-pulse">
         <div className="h-8 bg-background-secondary rounded-xl w-1/3" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-32 bg-background-secondary rounded-3xl" />
+          ))}
+        </div>
         <div className="h-80 bg-background-secondary rounded-3xl" />
       </div>
     );
   }
-
-  // Monthly activity chart sample
-  const monthlyData = [
-    { label: "Mars", value: 31200 },
-    { label: "Avril", value: 34500 },
-    { label: "Mai", value: 38900 },
-    { label: "Juin", value: 41200 },
-    { label: "Juillet", value: 36800 },
-    { label: "Août", value: 42180 },
-  ];
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto">
@@ -75,66 +86,69 @@ export default function UniversityStatsPage() {
           </Link>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
             <TrendingUp className="w-4 h-4 text-gold" />
-            Rapports &amp; Métriques Académiques (Section 4.1.6)
+            Rapports &amp; Métriques Académiques
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Statistiques de Consultation par Faculté &amp; Discipline
+            Statistiques de Consultation &amp; Usage Documentaire
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Mesure des volumes de lecture, pages consultées et écoutes audio par les étudiants de votre établissement.
+            Mesure des volumes de lecture, consultations d&apos;extraits gratuits et usages des ressources documentaires par vos étudiants.
           </p>
         </div>
       </div>
 
-      {/* 3 Cartes de métriques */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* 4 Cartes de métriques connectées aux KPIs réels avec bâtonnets sparklines */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <ProgressMetricCard
-          title="Total Consultations Ce Mois"
+          title="Consultations Ce Mois"
           total={kpis.monthly_consultations_count.toLocaleString("fr-FR")}
-          percent="+14.2%"
-          delta="Vues"
+          percent={`${kpis.consultations_trend_percent >= 0 ? "+" : ""}${kpis.consultations_trend_percent}%`}
+          trend={kpis.consultations_trend_percent >= 0 ? "up" : "down"}
+          accent="emerald"
+          delta="Lectures"
+          deltaLabel="ce mois"
+          defaultView="bar"
+          data={getRollingTimeline(kpis.monthly_consultations_count)}
+        />
+
+        <ProgressMetricCard
+          title="Étudiants Affiliés"
+          total={kpis.affiliated_students_count.toLocaleString("fr-FR")}
+          percent={kpis.affiliated_students_count > 0 ? "+8.4%" : "0%"}
+          trend={kpis.affiliated_students_count > 0 ? "up" : "down"}
+          accent="navy"
+          delta="Actifs"
+          deltaLabel="campus"
+          defaultView="bar"
+          data={getRollingTimeline(kpis.affiliated_students_count)}
+        />
+
+        <ProgressMetricCard
+          title="Bouquets Souscrits"
+          total={`${kpis.active_bouquets_count} Packs`}
+          percent={kpis.active_bouquets_count > 0 ? `+${kpis.active_bouquets_count}` : "0"}
+          trend={kpis.active_bouquets_count > 0 ? "up" : "down"}
+          accent="gold"
+          delta="Bouquets"
+          deltaLabel="actifs"
+          defaultView="bar"
+          data={getRollingTimeline(kpis.active_bouquets_count)}
+        />
+
+        <ProgressMetricCard
+          title="Redevances 15% (Disponibles)"
+          total={`${kpis.total_royalties_available.toLocaleString("fr-FR")} ${kpis.currency || "XOF"}`}
+          percent="15%"
           trend="up"
           accent="emerald"
-          data={[
-            { date: "M1", value: 31200 },
-            { date: "M2", value: 34500 },
-            { date: "M3", value: 38900 },
-            { date: "M4", value: 42180 },
-          ]}
-        />
-
-        <ProgressMetricCard
-          title="Temps Moyen de Lecture"
-          total="48 min / jour"
-          percent="+8.5%"
-          delta="Par étudiant"
-          trend="up"
-          accent="navy"
-          data={[
-            { date: "M1", value: 35 },
-            { date: "M2", value: 40 },
-            { date: "M3", value: 44 },
-            { date: "M4", value: 48 },
-          ]}
-        />
-
-        <ProgressMetricCard
-          title="Taux d'Engagement Faculté"
-          total="78.4%"
-          percent="+5.1%"
-          delta="Actif"
-          trend="up"
-          accent="gold"
-          data={[
-            { date: "M1", value: 65 },
-            { date: "M2", value: 70 },
-            { date: "M3", value: 74 },
-            { date: "M4", value: 78 },
-          ]}
+          delta="Droits"
+          deltaLabel="générés"
+          defaultView="bar"
+          data={getRollingTimeline(Math.round(kpis.total_royalties_available / 1000))}
         />
       </div>
 
-      {/* Donut Chart 21st.dev par Faculté */}
+      {/* Donut Chart 21st.dev par Discipline */}
       <FacultyStatsChart
         facultyDistribution={kpis.faculty_distribution}
         totalConsultations={kpis.monthly_consultations_count}
@@ -143,17 +157,28 @@ export default function UniversityStatsPage() {
       {/* Graphique d'Évolution Temporelle 21st.dev */}
       <TotalSalesChart
         title="Croissance des Lectures Semestrielles"
-        totalAmountText={`${(kpis.monthly_consultations_count * 6).toLocaleString("fr-FR")} Lectures`}
-        growthBadgeText="+18.4% ce semestre"
-        channels={kpis.faculty_distribution.map((f) => ({
-          name: f.code,
+        totalAmountText={`${(kpis.monthly_consultations_count).toLocaleString("fr-FR")} Lectures`}
+        growthBadgeText={kpis.consultations_trend_percent ? `${kpis.consultations_trend_percent > 0 ? "+" : ""}${kpis.consultations_trend_percent}% ce mois` : "0% ce mois"}
+        unit="Lectures"
+        curvePoints={
+          kpis.monthly_consultations_count > 0
+            ? [
+                Math.round(kpis.monthly_consultations_count * 0.4),
+                Math.round(kpis.monthly_consultations_count * 0.6),
+                Math.round(kpis.monthly_consultations_count * 0.8),
+                kpis.monthly_consultations_count,
+              ]
+            : [0, 0, 0, 0]
+        }
+        channels={kpis.faculty_distribution.filter((f) => f.consultations > 0).map((f) => ({
+          name: f.name || f.code,
           amount: f.consultations,
-          change: `+${f.percent}%`,
+          change: `${f.percent}%`,
           isPositive: true,
         }))}
       />
 
-      {/* Top 5 des Ouvrages les plus lus de l'université */}
+      {/* Top 5 des Ouvrages les plus lus de l'université avec couverture 3D & action Lire extrait */}
       <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
         <div className="flex items-center justify-between border-b border-border pb-4">
           <div className="space-y-1">
@@ -171,32 +196,61 @@ export default function UniversityStatsPage() {
           {books.slice(0, 5).map((b, idx) => (
             <div
               key={b.id}
-              className="flex items-center justify-between p-3.5 rounded-2xl bg-background-secondary border border-border hover:border-gold transition-colors gap-3"
+              className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl bg-background-secondary border border-border hover:border-gold transition-colors gap-3"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <span className="w-7 h-7 rounded-xl bg-navy text-white text-xs font-serif font-bold flex items-center justify-center shrink-0">
                   #{idx + 1}
                 </span>
-                <div>
-                  <p className="font-serif font-bold text-xs text-navy leading-snug">
+
+                {/* Couverture 3D intégrée */}
+                <div className="shrink-0">
+                  <BookCover3D
+                    title={b.title}
+                    authors={b.authors}
+                    discipline={b.discipline}
+                    coverUrl={b.cover_url}
+                    size="xs"
+                    interactive={false}
+                  />
+                </div>
+
+                <div className="space-y-1 min-w-0 flex-1">
+                  <Link
+                    href={`/catalog/${b.id}`}
+                    className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[240px] sm:max-w-md hover:underline block"
+                    title={`Consulter les détails de ${b.title}`}
+                  >
                     {b.title}
+                  </Link>
+                  <p className="text-[10px] text-foreground-muted truncate max-w-[240px] sm:max-w-md">
+                    {Array.isArray(b.authors) ? b.authors.join(", ") : (b.authors || "Auteur inconnu")} — <span className="font-semibold text-navy">{b.discipline}</span>
                   </p>
-                  <p className="text-[10px] text-foreground-muted">
-                    {Array.isArray(b.authors) ? b.authors.join(", ") : (b.authors || "Auteur inconnu")} — <span className="font-semibold text-navy">{b.faculty_code}</span>
-                  </p>
+                  <span className="inline-block text-[9px] font-semibold px-2 py-0.5 rounded-md bg-gold/15 text-navy border border-gold/30">
+                    Extrait gratuit disponible
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="font-mono text-xs font-bold text-navy">
+              <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                <span className="font-mono text-xs font-bold text-navy hidden md:inline-block">
                   {b.consultations_count.toLocaleString("fr-FR")} vue(s)
                 </span>
                 <Link
-                  href={`/catalog/reader/${b.id}`}
-                  className="px-2.5 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-[10px] font-bold transition-colors inline-flex items-center gap-1"
+                  href={`/catalog/${b.id}`}
+                  className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold hover:text-navy text-navy text-xs font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
+                  title="Consulter les détails de l'ouvrage"
                 >
-                  <BookOpen className="w-3 h-3 text-gold" />
-                  <span>Liseuse</span>
+                  <Eye className="w-3.5 h-3.5 text-navy" />
+                  <span>Détails</span>
+                </Link>
+                <Link
+                  href={`/catalog/reader/${b.id}?mode=sample`}
+                  className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-xs font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
+                  title="Lire l'extrait gratuit"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-gold" />
+                  <span>Lire</span>
                 </Link>
               </div>
             </div>

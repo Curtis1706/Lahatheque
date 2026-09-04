@@ -1,4 +1,7 @@
 export interface UniversityKpis {
+  institution_id?: string;
+  institution_name?: string;
+  institution_code?: string;
   affiliated_students_count: number;
   active_bouquets_count: number;
   monthly_consultations_count: number;
