@@ -95,16 +95,36 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
   // ── 2. En-tête : Marque et Coordonnées Émetteur
   let y = 16;
   
+  // Intégration du logo officiel LAHAThèque
+  let textStartX = margin;
+  try {
+    if (typeof window !== "undefined") {
+      const img = new (window as any).Image();
+      img.src = "/logo.png";
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+        setTimeout(resolve, 400);
+      });
+      if (img.complete && img.naturalWidth > 0) {
+        doc.addImage(img, "PNG", margin, y - 6.5, 14, 14);
+        textStartX = margin + 17;
+      }
+    }
+  } catch {
+    textStartX = margin;
+  }
+
   // Titre / Logo textuel de marque
   doc.setFont("times", "bold");
-  doc.setFontSize(22);
+  doc.setFontSize(21);
   doc.setTextColor(...navyRgb);
-  doc.text("LAHATHÈQUE", margin, y);
+  doc.text("LAHATHÈQUE", textStartX, y);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(...goldRgb);
-  doc.text("ÉDITIONS & BIBLIOTHÈQUE NUMÉRIQUE UNIVERSITAIRE", margin, y + 4.5);
+  doc.text("ÉDITIONS & BIBLIOTHÈQUE NUMÉRIQUE UNIVERSITAIRE", textStartX, y + 4.5);
 
   // Coordonnées légales à droite
   doc.setFont("helvetica", "normal");

@@ -2,126 +2,149 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  ShoppingBag,
   ArrowLeft,
-  CheckCircle2,
+  ShoppingCart,
   Building2,
+  Send,
   Plus,
-  Minus,
   Trash2,
+  BookOpen,
+  AlertCircle,
   Truck,
-  Sparkles,
 } from "lucide-react";
-import { toast } from "sonner";
-import { InlineLoader } from "@/components/ui/page-loader";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { PhoneInput } from "@/components/ui/phone-input";
 import {
   getUniversityCatalog,
   createUniversityPaperOrder,
 } from "@/lib/services/university";
 import type { UniversityBookCatalogItem } from "@/lib/types/university";
+import { toast } from "sonner";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 
-interface SelectedItem {
+interface UniversityCartItem {
+  book_id: string;
   book: UniversityBookCatalogItem;
   quantity: number;
 }
 
 export default function NewUniversityPaperOrderPage() {
   const router = useRouter();
-  const [catalog, setCatalog] = useState<UniversityBookCatalogItem[]>([]);
-  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
-  const [deliveryCampus, setDeliveryCampus] = useState("Bibliothèque Centrale — Campus Universitaire d'Abomey-Calavi");
-  const [contactPerson, setContactPerson] = useState("M. SOSSOU Théophile (Conservateur en Chef)");
-  const [contactPhone, setContactPhone] = useState("+229 97 33 44 55");
-  const [loading, setLoading] = useState(false);
+  const [catalogBooks, setCatalogBooks] = useState<UniversityBookCatalogItem[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  const [selectedBookId, setSelectedBookId] = useState<string>("");
+  const [cartItems, setCartItems] = useState<UniversityCartItem[]>([]);
+
+  const [deliveryCampus, setDeliveryCampus] = useState(
+    "Bibliothèque Centrale — Campus Universitaire d'Abomey-Calavi"
+  );
+  const [contactPerson, setContactPerson] = useState(
+    "M. SOSSOU Théophile (Conservateur en Chef)"
+  );
+  const [contactPhone, setContactPhone] = useState("+229 97 33 44 55");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    async function loadData() {
+    async function loadCatalog() {
       setLoadingCatalog(true);
-      const data = await getUniversityCatalog();
-      setCatalog(data);
-      if (data.length > 0) {
-        setSelectedItems([
-          { book: data[0], quantity: 20 },
-          ...(data[1] ? [{ book: data[1], quantity: 15 }] : []),
-        ]);
+      setCatalogError(null);
+      try {
+        const books = await getUniversityCatalog();
+        setCatalogBooks(books);
+        if (books.length > 0) {
+          setSelectedBookId(books[0].id);
+        }
+      } catch {
+        setCatalogError("Impossible de charger le catalogue académique. Veuillez réessayer.");
+      } finally {
+        setLoadingCatalog(false);
       }
-      setLoadingCatalog(false);
     }
-    loadData();
+    loadCatalog();
   }, []);
 
-  const handleAddBook = (book: UniversityBookCatalogItem) => {
-    setSelectedItems((prev) => {
-      const existing = prev.find((it) => it.book.id === book.id);
-      if (existing) {
-        return prev.map((it) =>
-          it.book.id === book.id ? { ...it, quantity: it.quantity + 5 } : it
-        );
-      }
-      return [...prev, { book, quantity: 10 }];
-    });
-    toast.success(`Ajouté : ${book.title}`);
+  const handleAddBookToCart = () => {
+    if (!selectedBookId) return;
+    const targetBook = catalogBooks.find((b) => b.id === selectedBookId);
+    if (!targetBook) return;
+
+    if (cartItems.some((ci) => ci.book_id === targetBook.id)) {
+      toast.info(`« ${targetBook.title} » est déjà présent dans la commande.`);
+      return;
+    }
+
+    setCartItems((prev) => [
+      ...prev,
+      {
+        book_id: targetBook.id,
+        book: targetBook,
+        quantity: 10,
+      },
+    ]);
+    toast.success(`« ${targetBook.title} » ajouté à la commande.`);
   };
 
-  const handleUpdateQuantity = (bookId: string, delta: number) => {
-    setSelectedItems((prev) =>
-      prev
-        .map((it) =>
-          it.book.id === bookId
-            ? { ...it, quantity: Math.max(1, it.quantity + delta) }
-            : it
-        )
-        .filter((it) => it.quantity > 0)
+  const handleUpdateQty = (bookId: string, val: number) => {
+    const qty = Math.max(1, val);
+    setCartItems((prev) =>
+      prev.map((ci) => (ci.book_id === bookId ? { ...ci, quantity: qty } : ci))
     );
   };
 
-  const handleRemove = (bookId: string) => {
-    setSelectedItems((prev) => prev.filter((it) => it.book.id !== bookId));
+  const handleRemoveItem = (bookId: string) => {
+    setCartItems((prev) => prev.filter((ci) => ci.book_id !== bookId));
+    toast.info("Article retiré de la commande.");
   };
 
-  const totalAmount = selectedItems.reduce(
-    (sum, it) => sum + it.book.price_paper * it.quantity,
+  const totalCopies = cartItems.reduce((acc, ci) => acc + ci.quantity, 0);
+  const totalAmount = cartItems.reduce(
+    (acc, ci) => acc + ci.quantity * (ci.book.price_paper || 0),
     0
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedItems.length === 0) {
-      toast.error("Veuillez sélectionner au moins un ouvrage.");
+    if (cartItems.length === 0) {
+      toast.error("Veuillez ajouter au moins un ouvrage à la commande.");
+      return;
+    }
+    if (!deliveryCampus.trim() || !contactPerson.trim() || !contactPhone.trim()) {
+      toast.error("Veuillez renseigner le campus de livraison, le réceptionnaire et le téléphone.");
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
     try {
-      const order = await createUniversityPaperOrder({
-        delivery_campus: deliveryCampus,
-        contact_person: contactPerson,
-        contact_phone: contactPhone,
-        items: selectedItems.map((it) => ({
-          book_id: it.book.id,
-          title: it.book.title,
-          quantity: it.quantity,
-          unit_price: it.book.price_paper,
+      const orderPayload = {
+        items: cartItems.map((ci) => ({
+          book_id: ci.book_id,
+          quantity: ci.quantity,
+          title: ci.book.title,
+          unit_price: ci.book.price_paper,
         })),
-        total_amount: totalAmount,
-      });
+        delivery_campus: deliveryCampus.trim(),
+        contact_person: contactPerson.trim(),
+        contact_phone: contactPhone.trim(),
+      };
 
-      toast.success(`Commande ${order.order_number} transmise au service logistique.`);
+      const newOrder = await createUniversityPaperOrder(orderPayload);
+      toast.success(
+        `Bon de commande ${newOrder.order_number || newOrder.id} enregistré avec succès !`
+      );
       router.push("/university/purchases");
     } catch {
-      toast.error("Erreur lors de la validation de la commande.");
+      toast.error("Une erreur est survenue lors de la transmission du bon de commande.");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-4xl mx-auto animate-in fade-in duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/university" className="hover:text-navy">Vue d&apos;ensemble</Link>
@@ -132,201 +155,221 @@ export default function NewUniversityPaperOrderPage() {
       </div>
 
       {/* Header */}
-      <div className="border-b border-border pb-6">
-        <Link href="/university/purchases" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-2">
+      <div className="border-b border-border pb-4">
+        <Link
+          href="/university/purchases"
+          className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-2"
+        >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Retour aux Commandes
+          Retour aux Commandes Papier
         </Link>
-        <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
-          <ShoppingBag className="w-4 h-4 text-gold" />
-          Bon de Commande Institutionnel (Section 4.1.6)
-        </div>
-        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-          Passation de Commande de Livres Papier
+        <h1 className="font-serif text-2xl font-bold text-navy">
+          Passation de Commande de Livres Papier pour l&apos;Établissement
         </h1>
         <p className="text-xs text-foreground-muted mt-1">
-          Sélectionnez les volumes et indiquez le lieu de livraison pour équiper les bibliothèques de vos facultés.
+          Sélectionnez les ouvrages du catalogue académique, ajustez les volumes papier souhaités et vos coordonnées de livraison sur le campus.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Paramètres de Livraison */}
-        <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider">
-            <Truck className="w-4 h-4 text-gold" />
-            Lieu de Livraison &amp; Réceptionnaire sur le Campus
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                Campus, Bâtiment &amp; Bibliothèque Destinataire <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={deliveryCampus}
-                onChange={(e) => setDeliveryCampus(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                Téléphone Contact <span className="text-gold">*</span>
-              </label>
-              <PhoneInput
-                value={contactPhone}
-                onChange={setContactPhone}
-                className="bg-background-secondary min-h-[44px]"
-              />
-            </div>
-
-            <div className="sm:col-span-3 space-y-1.5">
-              <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                Nom du Réceptionnaire / Responsable Bibliothèque
-              </label>
-              <input
-                type="text"
-                required
-                value={contactPerson}
-                onChange={(e) => setContactPerson(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
-              />
-            </div>
-          </div>
+      {loadingCatalog ? (
+        <div className="p-12 text-center rounded-3xl bg-background border border-border">
+          <PageLoader label="Chargement du catalogue académique" />
         </div>
-
-        {/* Liste des Ouvrages Sélectionnés */}
-        <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <h3 className="font-serif font-bold text-navy text-base">
-              Articles Sélectionnés ({selectedItems.length})
+      ) : catalogError ? (
+        <div className="p-6 rounded-3xl bg-background border border-border flex items-center gap-3 text-red-600">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <p className="text-xs font-semibold">{catalogError}</p>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Sélecteur d'ouvrages du catalogue réel (même design que chez le grossiste) */}
+          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
+            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-gold" />
+              Sélectionner un Ouvrage du Catalogue
             </h3>
-            <span className="font-mono text-sm font-bold text-navy">
-              Total HT : {totalAmount.toLocaleString("fr-FR")} XOF
-            </span>
-          </div>
 
-          {selectedItems.length === 0 ? (
-            <p className="text-xs text-foreground-muted py-4 text-center">
-              Aucun ouvrage sélectionné. Choisissez des titres dans le catalogue ci-dessous.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {selectedItems.map((it) => (
-                <div
-                  key={it.book.id}
-                  className="flex items-center justify-between p-3.5 rounded-2xl bg-background-secondary border border-border gap-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-10 h-14 rounded bg-navy/10 overflow-hidden shrink-0 border border-border">
-                      {it.book.cover_url ? (
-                        <Image src={it.book.cover_url} alt={it.book.title} fill className="object-cover" />
-                      ) : null}
-                    </div>
-                    <div>
-                      <p className="font-serif font-bold text-xs text-navy leading-snug">{it.book.title}</p>
-                      <p className="text-[10px] text-foreground-muted">{it.book.faculty_code} — {it.book.price_paper.toLocaleString("fr-FR")} XOF / unité</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 bg-background border border-border rounded-xl p-1">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateQuantity(it.book.id, -5)}
-                        className="p-1 text-foreground-muted hover:text-navy"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="font-mono text-xs font-bold px-2 text-navy">
-                        {it.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateQuantity(it.book.id, 5)}
-                        className="p-1 text-foreground-muted hover:text-navy"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <span className="font-mono text-xs font-bold text-navy w-24 text-right">
-                      {(it.book.price_paper * it.quantity).toLocaleString("fr-FR")} XOF
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(it.book.id)}
-                      className="p-1 text-foreground-muted hover:text-rose-600 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Sélection depuis le Catalogue */}
-        <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-          <h3 className="font-serif font-bold text-navy text-base border-b border-border pb-3">
-            Ajouter d&apos;autres Titres du Catalogue
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {catalog.map((book) => (
-              <div
-                key={book.id}
-                className="p-3 rounded-2xl bg-background-secondary border border-border flex items-center justify-between gap-3 hover:border-gold transition-colors"
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <select
+                value={selectedBookId}
+                onChange={(e) => setSelectedBookId(e.target.value)}
+                className="flex-1 px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
               >
-                <div className="flex items-center gap-2.5 overflow-hidden">
-                  <div className="relative w-8 h-11 rounded bg-navy/10 overflow-hidden shrink-0 border border-border">
-                    {book.cover_url ? <Image src={book.cover_url} alt={book.title} fill className="object-cover" /> : null}
-                  </div>
-                  <div className="overflow-hidden">
-                    <p className="font-serif font-bold text-xs text-navy truncate">{book.title}</p>
-                    <p className="text-[10px] text-foreground-muted">{book.price_paper.toLocaleString("fr-FR")} XOF</p>
-                  </div>
-                </div>
+                {catalogBooks.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.title} — {b.discipline} ({b.price_paper.toLocaleString("fr-FR")} XOF / ex. papier)
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleAddBookToCart}
+                disabled={!selectedBookId}
+                className="px-4 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold/90 transition-colors flex items-center justify-center gap-2 min-h-[44px] shrink-0 cursor-pointer disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" />
+                Ajouter à la commande
+              </button>
+            </div>
+          </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleAddBook(book)}
-                  className="px-2.5 py-1.5 rounded-xl bg-navy text-white text-[11px] font-bold hover:bg-navy-hover transition-colors shrink-0"
-                >
-                  + Ajouter
-                </button>
+          {/* Récapitulatif des articles sélectionnés */}
+          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
+            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4 text-gold" />
+              Récapitulatif des Articles de la Commande ({cartItems.length})
+            </h3>
+
+            {cartItems.length === 0 ? (
+              <div className="p-8 text-center border border-dashed border-border rounded-2xl text-xs text-foreground-muted space-y-1">
+                <p className="font-semibold text-navy">Aucun ouvrage sélectionné pour l&apos;instant.</p>
+                <p>Utilisez le sélecteur ci-dessus pour ajouter des ouvrages du catalogue.</p>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Submit */}
-        <div className="flex items-center justify-between p-4 rounded-2xl bg-navy text-white">
-          <div>
-            <p className="text-xs text-slate-300">Total de la Commande Campus</p>
-            <p className="text-xl font-serif font-bold text-gold">
-              {totalAmount.toLocaleString("fr-FR")} XOF
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || selectedItems.length === 0}
-            className="px-6 py-3 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs font-bold transition-all inline-flex items-center gap-2 shadow-xs min-h-[44px] disabled:opacity-50"
-          >
-            {loading ? (
-              <InlineLoader size={16} />
             ) : (
-              <CheckCircle2 className="w-4 h-4" />
+              <div className="space-y-3">
+                {cartItems.map((ci) => (
+                  <div
+                    key={ci.book_id}
+                    className="p-4 rounded-2xl bg-background-secondary border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <BookCover3D
+                        title={ci.book.title}
+                        authors={ci.book.authors}
+                        discipline={ci.book.discipline}
+                        coverUrl={ci.book.cover_url}
+                        size="xs"
+                        interactive={false}
+                      />
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="font-serif font-bold text-navy line-clamp-1">{ci.book.title}</p>
+                        <p className="text-[10px] text-foreground-muted">
+                          {Array.isArray(ci.book.authors) ? ci.book.authors.join(", ") : (ci.book.authors || "Auteur")} — <span className="font-semibold text-navy">{ci.book.discipline}</span>
+                        </p>
+                        <p className="text-[9px] text-foreground-muted font-mono">ISBN : {ci.book.isbn_print || ci.book.isbn_digital}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between sm:justify-end gap-4 text-right shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                      <div>
+                        <label className="text-[10px] text-foreground-muted block font-bold mb-0.5">
+                          Exemplaires Papier
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={ci.quantity}
+                          onChange={(e) =>
+                            handleUpdateQty(ci.book_id, parseInt(e.target.value) || 1)
+                          }
+                          className="w-24 px-2.5 py-1.5 bg-background border border-border rounded-lg text-center font-mono font-bold text-navy text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-foreground-muted block font-bold mb-0.5">
+                          Sous-Total
+                        </label>
+                        <span className="font-mono font-bold text-navy text-xs inline-block pt-1">
+                          {(ci.quantity * ci.book.price_paper).toLocaleString("fr-FR")} XOF
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(ci.book_id)}
+                        className="p-2 text-foreground-muted hover:text-rose-600 transition-colors cursor-pointer"
+                        title="Retirer de la commande"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-            <span>Transmettre le Bon de Commande</span>
-          </button>
-        </div>
-      </form>
+
+            {cartItems.length > 0 && (
+              <div className="p-4 rounded-2xl bg-navy/5 border border-navy/20 space-y-2 text-xs text-navy">
+                <div className="flex justify-between">
+                  <span>Volume Total Exemplaires Papier :</span>
+                  <span className="font-mono font-bold">{totalCopies} ex.</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold pt-2 border-t border-navy/20">
+                  <span className="text-navy">Montant Total du Bon de Commande :</span>
+                  <span className="font-mono text-gold text-base">
+                    {totalAmount.toLocaleString("fr-FR")} XOF
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Coordonnées de Livraison & Réception sur Campus */}
+          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
+            <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-gold" />
+              Lieu de Livraison &amp; Réception sur le Campus
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                  Campus, Bâtiment &amp; Bibliothèque Destinataire *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={deliveryCampus}
+                  onChange={(e) => setDeliveryCampus(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                  Nom du Réceptionnaire / Responsable Bibliothèque *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={contactPerson}
+                  onChange={(e) => setContactPerson(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                  Téléphone Direct Réceptionnaire *
+                </label>
+                <PhoneInput
+                  value={contactPhone}
+                  onChange={setContactPhone}
+                  className="bg-background-secondary min-h-[44px]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={submitting || cartItems.length === 0}
+                className="px-6 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                {submitting ? (
+                  <InlineLoader size={16} />
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 text-gold" />
+                    <span>Transmettre le Bon de Commande</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

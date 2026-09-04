@@ -62,6 +62,8 @@ export interface UniversityPaperOrderItem {
   title: string;
   quantity: number;
   unit_price: number;
+  line_total?: number;
+  faculty_code?: string;
 }
 
 export interface UniversityPaperOrder {
