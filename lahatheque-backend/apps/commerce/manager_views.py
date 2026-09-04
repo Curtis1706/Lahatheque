@@ -4,6 +4,7 @@ Périmètre : stocks papier uniquement (Entrepôt, StockOuvrage, MouvementStock,
 Format JSON unifié : { "success": bool, "data": ..., "error": null|str }
 Permission : rôle manager ou admin uniquement.
 """
+import logging
 import math
 from datetime import timedelta
 from django.utils import timezone
@@ -13,6 +14,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     Entrepot, StockOuvrage, MouvementStock,
@@ -91,7 +94,7 @@ class StockListView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
 
-        qs = StockOuvrage.objects.select_related("ouvrage", "entrepot").all()
+        qs = StockOuvrage.objects.select_related("ouvrage", "entrepot", "ouvrage__discipline").prefetch_related("ouvrage__authors").all()
 
         # Filtres
         warehouse = request.query_params.get("warehouse")
@@ -111,11 +114,19 @@ class StockListView(APIView):
             item_status = s.statut
             if status_filter and status_filter != "all" and item_status != status_filter:
                 continue
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in s.ouvrage.authors.all()] if s.ouvrage else []
+            discipline_name = s.ouvrage.discipline.name if (s.ouvrage and s.ouvrage.discipline) else ""
+            cover_url = s.ouvrage.cover_url if s.ouvrage else ""
+            if not cover_url and s.ouvrage:
+                cover_url = f"/api/bff/catalog/books/{s.ouvrage.id}/cover/"
             items.append({
                 "id": str(s.id),
-                "isbn": s.ouvrage.isbn,
-                "title": s.ouvrage.title,
-                "cover_url": s.ouvrage.cover_url,
+                "book_id": str(s.ouvrage.id) if s.ouvrage else "",
+                "isbn": s.ouvrage.isbn if s.ouvrage else "",
+                "title": s.ouvrage.title if s.ouvrage else "",
+                "authors": authors_list,
+                "discipline": discipline_name,
+                "cover_url": cover_url,
                 "warehouse": s.entrepot.code,
                 "warehouse_nom": s.entrepot.nom,
                 "pays": s.entrepot.pays,
@@ -138,16 +149,28 @@ class StockDetailView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
         try:
-            s = StockOuvrage.objects.select_related("ouvrage", "entrepot").get(pk=pk)
+            s = StockOuvrage.objects.select_related("ouvrage", "entrepot", "ouvrage__discipline", "ouvrage__publisher").prefetch_related("ouvrage__authors").get(pk=pk)
         except StockOuvrage.DoesNotExist:
             return Response({"success": False, "data": None, "error": "Stock introuvable."}, status=404)
 
         mouvements = MouvementStock.objects.filter(stock=s).order_by("-created_at")[:15]
+        authors_list = [f"{a.first_name} {a.last_name}".strip() for a in s.ouvrage.authors.all()] if s.ouvrage else []
+        discipline_name = s.ouvrage.discipline.name if (s.ouvrage and s.ouvrage.discipline) else ""
+        cover_url = s.ouvrage.cover_url if s.ouvrage else ""
+        if not cover_url and s.ouvrage:
+            cover_url = f"/api/bff/catalog/books/{s.ouvrage.id}/cover/"
+        pub_name = ""
+        if s.ouvrage:
+            pub_name = s.ouvrage.publisher_name or (s.ouvrage.publisher.company_name if s.ouvrage.publisher else "LAHA Éditions")
         data = {
             "id": str(s.id),
-            "isbn": s.ouvrage.isbn,
-            "title": s.ouvrage.title,
-            "cover_url": s.ouvrage.cover_url,
+            "book_id": str(s.ouvrage.id) if s.ouvrage else "",
+            "isbn": s.ouvrage.isbn if s.ouvrage else "",
+            "title": s.ouvrage.title if s.ouvrage else "",
+            "authors": authors_list,
+            "discipline": discipline_name,
+            "cover_url": cover_url,
+            "publisher_name": pub_name,
             "warehouse": s.entrepot.code,
             "warehouse_nom": s.entrepot.nom,
             "pays": s.entrepot.pays,
@@ -330,6 +353,15 @@ class StockManualExitView(APIView):
         )
 
         s.refresh_from_db()
+
+        # Vérification et alerte automatique si seuil bas ou rupture atteint
+        if s.quantite_disponible <= s.seuil_alerte:
+            try:
+                from apps.reporting.tasks import check_and_generate_stock_notifications
+                check_and_generate_stock_notifications()
+            except Exception as exc:
+                logger.warning(f"Stock alert notification failed: {exc}")
+
         return Response({"success": True, "data": {"quantite_reelle": s.quantite_reelle, "statut": s.statut}, "error": None})
 
 
@@ -340,28 +372,41 @@ class StockMovementsView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
 
-        qs = MouvementStock.objects.select_related("stock__ouvrage", "stock__entrepot", "auteur").order_by("-created_at")
+        qs = MouvementStock.objects.select_related(
+            "stock__ouvrage",
+            "stock__entrepot",
+            "stock__ouvrage__discipline",
+            "auteur"
+        ).prefetch_related(
+            "stock__ouvrage__book_authors__author"
+        ).order_by("-created_at")
 
         stock_id = request.query_params.get("stock_id")
         if stock_id:
             qs = qs.filter(stock__id=stock_id)
 
-        data = [
-            {
+        data = []
+        for m in qs[:100]:
+            ouvrage = m.stock.ouvrage if (m.stock and m.stock.ouvrage) else None
+            authors = [ba.author.name for ba in ouvrage.book_authors.all()] if (ouvrage and hasattr(ouvrage, 'book_authors')) else []
+            data.append({
                 "id": str(m.id),
-                "title": m.stock.ouvrage.title,
-                "isbn": m.stock.ouvrage.isbn,
-                "warehouse": m.stock.entrepot.code,
-                "pays": m.stock.entrepot.pays,
+                "book_id": str(ouvrage.id) if ouvrage else "",
+                "title": ouvrage.title if ouvrage else "Ouvrage",
+                "isbn": ouvrage.isbn if ouvrage else "",
+                "authors": authors,
+                "discipline": ouvrage.discipline.name if (ouvrage and ouvrage.discipline) else "",
+                "cover_url": ouvrage.cover_url if ouvrage else (f"/api/bff/catalog/books/{ouvrage.id}/cover/" if ouvrage else ""),
+                "warehouse": m.stock.entrepot.code if (m.stock and m.stock.entrepot) else "",
+                "warehouse_nom": m.stock.entrepot.nom if (m.stock and m.stock.entrepot) else "",
+                "pays": m.stock.entrepot.pays if (m.stock and m.stock.entrepot) else "",
                 "type_mouvement": m.type_mouvement,
                 "quantite": m.quantite,
                 "reference_document": m.reference_document,
                 "motif": m.motif,
                 "created_at": m.created_at.isoformat(),
                 "created_by": m.auteur.get_full_name() if m.auteur else "Système",
-            }
-            for m in qs[:100]
-        ]
+            })
         return Response({"success": True, "data": data, "error": None})
 
 
@@ -372,24 +417,34 @@ class StockAlertsView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
 
-        stocks = StockOuvrage.objects.select_related("ouvrage", "entrepot").all()
-        alerts = [
-            {
-                "id": str(s.id),
-                "isbn": s.ouvrage.isbn,
-                "title": s.ouvrage.title,
-                "cover_url": s.ouvrage.cover_url,
-                "warehouse": s.entrepot.code,
-                "warehouse_nom": s.entrepot.nom,
-                "pays": s.entrepot.pays,
-                "quantite_disponible": s.quantite_disponible,
-                "seuil_alerte": s.seuil_alerte,
-                "statut": s.statut,
-                "last_restock_at": s.last_restock_at.isoformat() if s.last_restock_at else None,
-            }
-            for s in stocks
-            if s.statut in ("out_of_stock", "low_stock")
-        ]
+        stocks = StockOuvrage.objects.select_related(
+            "ouvrage",
+            "entrepot",
+            "ouvrage__discipline"
+        ).prefetch_related(
+            "ouvrage__book_authors__author"
+        ).all()
+
+        alerts = []
+        for s in stocks:
+            if s.statut in ("out_of_stock", "low_stock"):
+                authors = [ba.author.name for ba in s.ouvrage.book_authors.all()] if (s.ouvrage and hasattr(s.ouvrage, 'book_authors')) else []
+                alerts.append({
+                    "id": str(s.id),
+                    "book_id": str(s.ouvrage.id) if s.ouvrage else "",
+                    "isbn": s.ouvrage.isbn if s.ouvrage else "",
+                    "title": s.ouvrage.title if s.ouvrage else "",
+                    "authors": authors,
+                    "discipline": s.ouvrage.discipline.name if (s.ouvrage and s.ouvrage.discipline) else "",
+                    "cover_url": s.ouvrage.cover_url if s.ouvrage else (f"/api/bff/catalog/books/{s.ouvrage.id}/cover/" if s.ouvrage else ""),
+                    "warehouse": s.entrepot.code,
+                    "warehouse_nom": s.entrepot.nom,
+                    "pays": s.entrepot.pays,
+                    "quantite_disponible": s.quantite_disponible,
+                    "seuil_alerte": s.seuil_alerte,
+                    "statut": s.statut,
+                    "last_restock_at": s.last_restock_at.isoformat() if s.last_restock_at else None,
+                })
         return Response({"success": True, "data": alerts, "error": None})
 
 

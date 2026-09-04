@@ -123,10 +123,12 @@ export async function getStockItems(filters?: {
     const list = Array.isArray(raw) ? raw : (raw as any)?.results || (raw as any)?.data || [];
     return list.map((s: any) => ({
       id: s.id,
+      book_id: s.book_id || (s.id ? String(s.id) : ""),
       isbn: s.isbn ?? "",
       title: s.title ?? "",
       authors: s.authors ?? [],
       discipline: s.discipline ?? "",
+      cover_url: s.cover_url || (s.book_id ? `/api/bff/catalog/books/${s.book_id}/cover/` : (s.id ? `/api/bff/catalog/books/${s.id}/cover/` : "")),
       warehouse: s.warehouse ?? "",
       country: s.pays ?? s.country ?? "",
       quantity: s.quantite_disponible ?? s.quantity ?? 0,
@@ -154,10 +156,12 @@ export async function getStockItemDetail(id: string): Promise<StockItemDetail | 
     const s = await bffGet<any>(`/stock/${id}/`);
     return {
       id: s.id,
+      book_id: s.book_id || (s.id ? String(s.id) : ""),
       isbn: s.isbn ?? "",
       title: s.title ?? "",
       authors: s.authors ?? [],
       discipline: s.discipline ?? "",
+      cover_url: s.cover_url || (s.book_id ? `/api/bff/catalog/books/${s.book_id}/cover/` : (s.id ? `/api/bff/catalog/books/${s.id}/cover/` : "")),
       warehouse: s.warehouse ?? "",
       country: s.pays ?? s.country ?? "",
       quantity: s.quantite_disponible ?? s.quantity ?? 0,
@@ -254,9 +258,15 @@ export async function getStockMovements(stockId?: string): Promise<StockMovement
     const list = Array.isArray(raw) ? raw : (raw as any)?.results || (raw as any)?.data || [];
     return list.map((m: any) => ({
       id: m.id,
-      book_id: m.stock_id ?? m.book_id ?? m.id,
+      book_id: m.book_id ?? m.stock_id ?? m.id,
       book_title: m.title ?? m.book_title ?? "",
+      isbn: m.isbn ?? "",
+      authors: m.authors ?? [],
+      discipline: m.discipline ?? "",
+      cover_url: m.cover_url || (m.book_id ? `/api/bff/catalog/books/${m.book_id}/cover/` : (m.id ? `/api/bff/catalog/books/${m.id}/cover/` : "")),
       warehouse: m.warehouse ?? "",
+      warehouse_nom: m.warehouse_nom,
+      pays: m.pays,
       movement_type: (m.type_mouvement ?? m.movement_type ?? "restock") as StockMovement["movement_type"],
       quantity: m.quantite ?? m.quantity ?? 0,
       reason: m.motif ?? m.reason,
@@ -278,10 +288,14 @@ export async function getStockAlerts(): Promise<StockAlert[]> {
     const list = Array.isArray(raw) ? raw : (raw as any)?.results || (raw as any)?.data || [];
     return list.map((a: any) => ({
       id: a.id,
-      book_id: a.id,
+      book_id: a.book_id || a.id,
       book_title: a.title ?? "",
       isbn: a.isbn ?? "",
+      authors: a.authors ?? [],
+      discipline: a.discipline ?? "",
+      cover_url: a.cover_url || (a.book_id ? `/api/bff/catalog/books/${a.book_id}/cover/` : (a.id ? `/api/bff/catalog/books/${a.id}/cover/` : "")),
       warehouse: a.warehouse ?? "",
+      warehouse_nom: a.warehouse_nom,
       country: a.pays ?? a.country ?? "",
       quantity: a.quantite_disponible ?? a.quantity ?? 0,
       alert_threshold: a.seuil_alerte ?? a.alert_threshold ?? 0,

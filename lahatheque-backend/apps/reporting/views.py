@@ -18,12 +18,19 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user and user.is_authenticated and user.role in ['legal_reviewer', 'admin', 'super_admin']:
-            try:
-                from .tasks import check_and_generate_legal_notifications
-                check_and_generate_legal_notifications(user)
-            except Exception:
-                pass
+        if user and user.is_authenticated:
+            if user.role in ['legal_reviewer', 'admin', 'super_admin']:
+                try:
+                    from .tasks import check_and_generate_legal_notifications
+                    check_and_generate_legal_notifications(user)
+                except Exception:
+                    pass
+            if user.role in ['manager', 'admin', 'super_admin']:
+                try:
+                    from .tasks import check_and_generate_stock_notifications
+                    check_and_generate_stock_notifications(user)
+                except Exception:
+                    pass
         return Notification.objects.filter(user=user).order_by('-created_at')
 
     def list(self, request, *args, **kwargs):

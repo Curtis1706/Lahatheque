@@ -413,55 +413,103 @@ def task_calculate_monthly_royalties():
     }
 
 
+def check_and_generate_stock_notifications(user=None, force_email=False):
+    """
+    Vérifie les stocks en alerte (rupture critique ou seuil bas) et notifie automatiquement
+    les administrateurs et gestionnaires via notifications in-app et emails immédiats.
+    """
+    from apps.commerce.models import StockOuvrage
+    from apps.accounts.models import User
+    from apps.reporting.models import Notification
+    from apps.reporting.services import notify_user
+    from django.utils import timezone
+    from django.core.mail import send_mail
+    from django.conf import settings
+
+    stocks = StockOuvrage.objects.select_related('ouvrage', 'entrepot').all()
+    alert_stocks = [s for s in stocks if s.quantite_disponible <= s.seuil_alerte]
+
+    if not alert_stocks:
+        return {"alerts_sent": 0, "articles_en_alerte": 0}
+
+    recipients = [user] if user else list(User.objects.filter(role__in=['manager', 'admin', 'super_admin'], is_active=True))
+    if not recipients:
+        return {"alerts_sent": 0, "warning": "Aucun gestionnaire/admin actif trouvé."}
+
+    today = timezone.now().strftime('%Y-%m-%d')
+    sent = 0
+
+    for stock in alert_stocks:
+        is_rupture = (stock.quantite_disponible == 0)
+        statut_label = "Rupture de stock critique" if is_rupture else "Alerte seuil de stock bas"
+        res_id = f"stock_alert_{stock.id}_{'rupture' if is_rupture else 'low'}_{today}"
+
+        title = f"{statut_label} : {stock.ouvrage.title}"
+        message = (
+            f"L'ouvrage « {stock.ouvrage.title} » (ISBN : {stock.ouvrage.isbn or 'N/A'}) "
+            f"est à {stock.quantite_disponible} exemplaire(s) disponible(s) à l'entrepôt {stock.entrepot.nom} "
+            f"(seuil d'alerte configuré : {stock.seuil_alerte} ex.). "
+            f"Une intervention rapide de réassort est recommandée."
+        )
+
+        # 1. Envoi / création des notifications In-App
+        email_destinataires = []
+        for r in recipients:
+            if not Notification.objects.filter(user=r, resource_id=res_id).exists():
+                try:
+                    notify_user(
+                        user=r,
+                        notification_type=Notification.NotificationType.SYSTEM,
+                        title=title,
+                        message=message,
+                        action_url="/manager/stock/alerts",
+                        resource_id=res_id,
+                    )
+                    sent += 1
+                    if r.email and r.role in ['admin', 'super_admin']:
+                        email_destinataires.append(r.email)
+                except Exception as exc:
+                    logger.warning(f"Erreur notification user {r.id}: {exc}")
+
+        # 2. Envoi d'un email dédié si de nouveaux administrateurs sont concernés
+        if email_destinataires:
+            email_subject = f"[LAHAThèque Alerte Logistique] {statut_label} : {stock.ouvrage.title}"
+            email_body = (
+                f"Bonjour,\n\n"
+                f"Ceci est une alerte logistique automatique de la plateforme LAHAThèque.\n\n"
+                f"Statut : {statut_label.upper()}\n"
+                f"Ouvrage : {stock.ouvrage.title}\n"
+                f"ISBN : {stock.ouvrage.isbn or 'N/A'}\n"
+                f"Entrepôt : {stock.entrepot.nom} ({stock.entrepot.ville}, {stock.entrepot.pays})\n"
+                f"Quantité restante disponible : {stock.quantite_disponible} exemplaire(s)\n"
+                f"Seuil d'alerte configuré : {stock.seuil_alerte} exemplaire(s)\n\n"
+                f"Pour consulter les détails et valider un réassort express, connectez-vous au tableau de bord logistique :\n"
+                f"{getattr(settings, 'FRONTEND_URL', 'https://lahatheque.com')}/manager/stock/alerts\n\n"
+                f"Cordialement,\n"
+                f"Système Logistique LAHAThèque"
+            )
+            sender = getattr(settings, 'DEFAULT_FROM_EMAIL', 'LAHATHEQUE <contact@lahacademia.com>')
+            try:
+                send_mail(
+                    subject=email_subject,
+                    message=email_body,
+                    from_email=sender,
+                    recipient_list=list(set(email_destinataires)),
+                    fail_silently=True,
+                )
+            except Exception as mail_err:
+                logger.warning(f"Erreur envoi email alerte stock: {mail_err}")
+
+    return {"alerts_sent": sent, "articles_en_alerte": len(alert_stocks)}
+
+
 @shared_task
 def task_check_stock_alerts():
     """
     Vérifie les stocks sous le seuil d'alerte et notifie Gestionnaires + Administrateurs.
     Exécutée périodiquement (toutes les 6h).
     """
-    from apps.commerce.models import StockOuvrage
-    from apps.accounts.models import User
-    from apps.reporting.models import Notification
-    from apps.reporting.services import notify_user
-
-    stocks = StockOuvrage.objects.select_related('ouvrage', 'entrepot').all()
-    alert_stocks = [s for s in stocks if s.quantite_disponible <= s.seuil_alerte]
-
-    if not alert_stocks:
-        return {"alerts_sent": 0}
-
-    recipients = User.objects.filter(role__in=['manager', 'admin', 'super_admin'], is_active=True)
-    if not recipients.exists():
-        return {"alerts_sent": 0, "warning": "Aucun gestionnaire/admin actif trouvé."}
-
-    sent = 0
-    for stock in alert_stocks:
-        already_notified = Notification.objects.filter(
-            notification_type='system',
-            resource_id=str(stock.id),
-            is_read=False,
-        ).exists()
-        if already_notified:
-            continue
-
-        for recipient in recipients:
-            try:
-                notify_user(
-                    user=recipient,
-                    notification_type=Notification.NotificationType.SYSTEM,
-                    title="Alerte de stock bas" if stock.quantite_disponible > 0 else "Rupture de stock",
-                    message=(
-                        f"« {stock.ouvrage.title} » — {stock.quantite_disponible} exemplaire(s) "
-                        f"disponible(s) à {stock.entrepot.nom} (seuil : {stock.seuil_alerte})."
-                    ),
-                    action_url="/manager/stock/alerts",
-                    resource_id=str(stock.id),
-                )
-                sent += 1
-            except Exception:
-                pass
-
-    return {"alerts_sent": sent, "articles_en_alerte": len(alert_stocks)}
+    return check_and_generate_stock_notifications()
 
 
 def check_and_generate_legal_notifications(user=None):

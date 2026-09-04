@@ -8,10 +8,12 @@ export type StockStatus = "normal" | "low_stock" | "out_of_stock";
 
 export interface StockItem {
   id: string;
+  book_id?: string;
   isbn: string;
   title: string;
   authors: string[];
   discipline: string;
+  cover_url?: string;
   warehouse: string;
   country: string;
   quantity: number;
@@ -36,7 +38,13 @@ export interface StockMovement {
   id: string;
   book_id: string;
   book_title: string;
+  isbn?: string;
+  authors?: string[];
+  discipline?: string;
+  cover_url?: string;
   warehouse: string;
+  warehouse_nom?: string;
+  pays?: string;
   movement_type: MovementType;
   quantity: number;
   reason?: string;
@@ -70,7 +78,11 @@ export interface StockAlert {
   book_id: string;
   book_title: string;
   isbn: string;
+  authors?: string[];
+  discipline?: string;
+  cover_url?: string;
   warehouse: string;
+  warehouse_nom?: string;
   country: string;
   quantity: number;
   alert_threshold: number;
