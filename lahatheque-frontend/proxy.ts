@@ -76,6 +76,7 @@ export default function proxy(request: NextRequest) {
       case 'publisher':
         return '/publisher'
       case 'wholesaler':
+      case 'super_client':
         return '/wholesaler'
       case 'legal_reviewer':
         return '/legal-reviewer'
@@ -86,17 +87,32 @@ export default function proxy(request: NextRequest) {
       case 'manager':
         return '/manager'
       case 'admin':
-        return '/admin'
       case 'super_admin':
-        return '/super-admin'
+        return '/admin'
       default:
-        return ''
+        return '/student'
     }
   }
 
-  // 4. Si connecté et tente d'accéder aux pages d'auth (/login, /register)
+  // 4. Si connecté et tente d'accéder aux pages d'auth (/login, /register) ou aux pages publiques
   const isAuthPage = pathname === '/login' || pathname.startsWith('/register')
-  if (isLoggedIn && isAuthPage && role) {
+  const isPublicShowcase =
+    pathname === '/' ||
+    pathname === '/about' || pathname.startsWith('/about/') ||
+    pathname === '/authors' || pathname.startsWith('/authors/') ||
+    pathname === '/partners' || pathname.startsWith('/partners/') ||
+    pathname === '/prestations' || pathname.startsWith('/prestations/') ||
+    pathname === '/subscriptions' || pathname.startsWith('/subscriptions/') ||
+    (pathname === '/catalog' || (pathname.startsWith('/catalog/') && !pathname.startsWith('/catalog/reader'))) ||
+    pathname === '/legal' || pathname.startsWith('/legal/') ||
+    pathname === '/cgu' || pathname.startsWith('/cgu/') ||
+    pathname === '/cgv' || pathname.startsWith('/cgv/') ||
+    pathname === '/contact' || pathname.startsWith('/contact/') ||
+    pathname === '/submit' || pathname.startsWith('/submit/') ||
+    pathname === '/guide' || pathname.startsWith('/guide/') ||
+    pathname === '/checkout' || pathname.startsWith('/checkout/')
+
+  if (isLoggedIn && (isAuthPage || isPublicShowcase) && role) {
     const dashboardUrl = getRoleDashboardUrl(role)
     if (dashboardUrl && dashboardUrl !== pathname) {
       console.log(`[HTTP Auth ${now}] Redirection auto ${userIdentifier} (${role}) -> ${dashboardUrl}`)
@@ -106,17 +122,16 @@ export default function proxy(request: NextRequest) {
 
   // 5. Si non connecté et tente d'accéder à un espace protégé
   const protectedRoutes = [
+    '/university',
     '/student',
     '/wholesaler',
-    '/librarian',
     '/publisher',
     '/author',
     '/legal-reviewer',
     '/layout-artist',
     '/chief-layout',
     '/manager',
-    '/admin',
-    '/super-admin'
+    '/admin'
   ]
   const isProtectedRoute = protectedRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
   

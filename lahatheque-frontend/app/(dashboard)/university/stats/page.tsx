@@ -12,6 +12,7 @@ import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { FacultyStatsChart } from "@/components/features/university/faculty-stats-chart";
 import { TotalSalesChart } from "@/components/ui/total-sales-chart";
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
+import { UniversityBookDetailModal } from "@/components/features/university/university-book-detail-modal";
 import { getUniversityKpis, getUniversityCatalog } from "@/lib/services/university";
 import type { UniversityKpis, UniversityBookCatalogItem } from "@/lib/types/university";
 
@@ -34,6 +35,7 @@ export default function UniversityStatsPage() {
   const [kpis, setKpis] = useState<UniversityKpis | null>(null);
   const [books, setBooks] = useState<UniversityBookCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBook, setSelectedBook] = useState<UniversityBookCatalogItem | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -204,7 +206,11 @@ export default function UniversityStatsPage() {
                 </span>
 
                 {/* Couverture 3D intégrée */}
-                <div className="shrink-0">
+                <div
+                  onClick={() => setSelectedBook(b)}
+                  className="shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+                  title="Cliquez pour voir les détails"
+                >
                   <BookCover3D
                     title={b.title}
                     authors={b.authors}
@@ -216,13 +222,14 @@ export default function UniversityStatsPage() {
                 </div>
 
                 <div className="space-y-1 min-w-0 flex-1">
-                  <Link
-                    href={`/catalog/${b.id}`}
-                    className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[240px] sm:max-w-md hover:underline block"
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBook(b)}
+                    className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[240px] sm:max-w-md hover:underline block text-left cursor-pointer"
                     title={`Consulter les détails de ${b.title}`}
                   >
                     {b.title}
-                  </Link>
+                  </button>
                   <p className="text-[10px] text-foreground-muted truncate max-w-[240px] sm:max-w-md">
                     {Array.isArray(b.authors) ? b.authors.join(", ") : (b.authors || "Auteur inconnu")} — <span className="font-semibold text-navy">{b.discipline}</span>
                   </p>
@@ -236,14 +243,15 @@ export default function UniversityStatsPage() {
                 <span className="font-mono text-xs font-bold text-navy hidden md:inline-block">
                   {b.consultations_count.toLocaleString("fr-FR")} vue(s)
                 </span>
-                <Link
-                  href={`/catalog/${b.id}`}
-                  className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold hover:text-navy text-navy text-xs font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
+                <button
+                  type="button"
+                  onClick={() => setSelectedBook(b)}
+                  className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold hover:text-navy text-navy text-xs font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px] cursor-pointer"
                   title="Consulter les détails de l'ouvrage"
                 >
                   <Eye className="w-3.5 h-3.5 text-navy" />
                   <span>Détails</span>
-                </Link>
+                </button>
                 <Link
                   href={`/catalog/reader/${b.id}?mode=sample`}
                   className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-xs font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
@@ -257,6 +265,13 @@ export default function UniversityStatsPage() {
           ))}
         </div>
       </div>
+
+      {/* Modale de détails d'ouvrage sécurisée */}
+      <UniversityBookDetailModal
+        book={selectedBook}
+        isOpen={!!selectedBook}
+        onClose={() => setSelectedBook(null)}
+      />
     </div>
   );
 }
