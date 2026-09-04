@@ -349,7 +349,7 @@ export default function StudentProfilePage() {
           <ChangePasswordCard />
 
           {/* ── Affiliation Universitaire ──────────────────────────────── */}
-          <div className="space-y-3">
+         {/*  <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-serif font-bold text-navy text-sm flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-gold" />
@@ -382,7 +382,7 @@ export default function StudentProfilePage() {
                 </Link>
               </div>
             )}
-          </div>
+          </div> */}
         </>
       )}
     </div>

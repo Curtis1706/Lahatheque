@@ -395,9 +395,9 @@ export default function StudentOverviewPage() {
                   <BookMarked className="w-4 h-4 text-gold" />
                 </div>
                 <div>
-                  <p className="font-serif font-bold text-navy text-xs">
+                {/*   <p className="font-serif font-bold text-navy text-xs">
                     Mes Surlignages &amp; Notes
-                  </p>
+                  </p> */}
                   <p className="text-[10px] text-foreground-muted">
                     Citations et fiches enregistrées
                   </p>
@@ -416,7 +416,7 @@ export default function StudentOverviewPage() {
                 </div>
                 <div>
                   <p className="font-serif font-bold text-navy text-xs">
-                    Mes Commandes Papier
+                    Mes Commandes
                   </p>
                   <p className="text-[10px] text-foreground-muted">
                     Suivi d&apos;expédition d&apos;exemplaires
