@@ -364,7 +364,7 @@ export default function AdminPublisherDepositsPage() {
             File d'examen — Éditeurs Tiers
           </h1>
           <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">
-            Deux volets distincts par dépôt : conformité éditoriale (Chef Maquettiste) et vérification des droits (Juriste). La publication n'est possible que lorsque les deux sont validés.
+            Deux volets distincts par dépôt : conformité éditoriale et vérification des droits (Juriste). La publication n&apos;est possible que lorsque les deux sont validés.
           </p>
         </div>
       </div>
@@ -442,7 +442,7 @@ export default function AdminPublisherDepositsPage() {
           <div className="flex items-center gap-3 p-3.5 rounded-xl bg-gold/10 border border-gold/20">
             <FileCheck2 className="w-5 h-5 text-gold shrink-0" />
             <div>
-              <p className="text-xs font-bold text-navy">Volet éditorial — Chef Maquettiste</p>
+              <p className="text-xs font-bold text-navy">Volet éditorial (Mise en page &amp; Structure)</p>
               <p className="text-[11px] text-foreground">{selected?.title}</p>
               <p className="text-[10px] text-foreground-muted">{selected?.publisher_name}</p>
             </div>

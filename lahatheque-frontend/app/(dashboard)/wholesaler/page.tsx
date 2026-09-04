@@ -63,10 +63,13 @@ export default function WholesalerOverviewPage() {
       {/* Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
         <div>
+          {/* Badge Espace Grossiste & Achat en Gros (Masqué à la demande client) */}
+          {/*
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-bold mb-2 uppercase tracking-wider">
             <Building2 className="w-3.5 h-3.5" />
             Espace Grossiste & Achat en Gros
           </div>
+          */}
           <h1 className="text-xl sm:text-2xl font-bold font-serif tracking-tight">
             Bienvenue, {user?.first_name || "Librairie Partenaire"}
           </h1>

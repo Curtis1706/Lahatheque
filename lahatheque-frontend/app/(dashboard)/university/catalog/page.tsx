@@ -171,7 +171,7 @@ export default function UniversityCatalogPage() {
             Ressources Documentaires &amp; Fonds Académique
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Catalogue d&apos;Ouvrages de l&apos;Université
+            Catalogue d&apos;Ouvrages de Votre Université
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
             Consultez les ouvrages du fonds académique, lisez leurs extraits gratuits ou commandez des exemplaires papier pour votre campus.
@@ -183,7 +183,7 @@ export default function UniversityCatalogPage() {
           className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
         >
           <ShoppingBag className="w-4 h-4 text-gold" />
-          Passer Commande Papier
+          Passer Commande
         </Link>
       </div>
 

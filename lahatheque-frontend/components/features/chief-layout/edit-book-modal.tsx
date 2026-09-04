@@ -578,36 +578,21 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">
-                    Pays d&apos;Ancrage
-                  </label>
-                  <select
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                  >
-                    {getCountryOptions(null, country).map((c, i) => (
-                      <option key={i} value={c.code}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">
-                    Public Cible
-                  </label>
-                  <input
-                    type="text"
-                    value={targetAudience}
-                    onChange={(e) => setTargetAudience(e.target.value)}
-                    placeholder="Grand Public, Étudiants Licence/Master..."
-                    className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                  Pays d&apos;Ancrage
+                </label>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                >
+                  {getCountryOptions(null, country).map((c, i) => (
+                    <option key={i} value={c.code}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           )}

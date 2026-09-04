@@ -92,7 +92,7 @@ export default function UniversityRoyaltiesPage() {
     },
     {
       key: "net_royalty_amount",
-      header: "Redevance Nette (15%)",
+      header: "Redevance Nette",
       cell: (row) => (
         <span className="font-mono text-xs font-bold text-navy">
           {row.net_royalty_amount.toLocaleString("fr-FR")} {row.currency}
@@ -213,7 +213,7 @@ export default function UniversityRoyaltiesPage() {
             Rémunération Institutionnelle (Section 4.1.6 &amp; 7)
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Redevances de l&apos;Établissement (15% HT)
+            Redevances de l&apos;Établissement ({data.contractual_rate}% HT)
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
             Suivi des droits reversés à l&apos;université sur les ventes et consultations d&apos;ouvrages de votre catalogue affilié.

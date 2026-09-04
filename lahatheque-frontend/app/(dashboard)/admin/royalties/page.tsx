@@ -386,7 +386,7 @@ export default function AdminRoyaltiesManagementPage() {
             className="px-3 py-2 rounded-xl bg-background-secondary border border-border hover:border-gold text-foreground text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs"
           >
             <Building2 className="w-3.5 h-3.5 text-navy" />
-            Universités (15%)
+            Universités ({royalties.filter((r) => r.beneficiary_type === "university").length})
           </Link>
         </div>
       </div>

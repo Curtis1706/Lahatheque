@@ -103,7 +103,7 @@ export function DashboardHeader() {
     if (path.startsWith("/university/bouquets")) return { section: "Espace Université", title: "Bouquets Documentaires" };
     if (path.startsWith("/university/affiliations")) return { section: "Espace Université", title: "Affiliations Étudiants" };
     if (path.startsWith("/university/purchases")) return { section: "Espace Université", title: "Achats Livres Papier Campus" };
-    if (path.startsWith("/university/royalties")) return { section: "Espace Université", title: "Redevances 15%" };
+    if (path.startsWith("/university/royalties")) return { section: "Espace Université", title: "Redevances Universitaires" };
     if (path.startsWith("/university/profile")) return { section: "Espace Université", title: "Profil Établissement" };
     if (path === "/university") return { section: "Espace Université", title: "Vue d'ensemble Université" };
 

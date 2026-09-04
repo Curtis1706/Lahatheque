@@ -16,15 +16,21 @@ import {
   Layers,
   GraduationCap,
   CheckCircle2,
-  ShoppingBag
+  ShoppingBag,
+  FileText,
+  Search,
+  ChevronDown,
+  X
 } from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper } from "@/components/features/layout-artist/deposit-wizard-stepper";
 import { AIAnalysisProgressCard } from "@/components/features/layout-artist/ai-analysis-progress-card";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
-import { createDepositWithFiles } from "@/lib/services/layout-artist";
+import { createDepositWithFiles, searchPreEditions, type PreEditionSearchResult } from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, type AiBookAnalysisResult } from "@/lib/services/ai";
+import { InlineLoader } from "@/components/ui/page-loader";
+import { cn } from "@/lib/utils";
 import { 
   GENRE_CATEGORIES, 
   matchGenreCategory, 
@@ -75,9 +81,54 @@ export default function ChiefLayoutDepositPage() {
   const [keywords, setKeywords] = useState<string[]>([]);
   const [onixXml, setOnixXml] = useState<string>("");
 
+  // Pre-Edition State
+  const [preEditionSearch, setPreEditionSearch] = useState("");
+  const [allPreEditions, setAllPreEditions] = useState<PreEditionSearchResult[]>([]);
+  const [isPreEditionOpen, setIsPreEditionOpen] = useState(false);
+  const [selectedPreEdition, setSelectedPreEdition] = useState<PreEditionSearchResult | null>(null);
+  const [loadingPreEditions, setLoadingPreEditions] = useState(false);
+
   // IA State
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<AiBookAnalysisResult | null>(null);
+
+  React.useEffect(() => {
+    setLoadingPreEditions(true);
+    searchPreEditions("")
+      .then((res) => {
+        setAllPreEditions(res || []);
+        setLoadingPreEditions(false);
+      })
+      .catch(() => {
+        setLoadingPreEditions(false);
+      });
+  }, []);
+
+  const handleSelectPreEdition = (dossier: PreEditionSearchResult | null) => {
+    setSelectedPreEdition(dossier);
+    setIsPreEditionOpen(false);
+    setPreEditionSearch("");
+    if (dossier) {
+      if (dossier.titre_previsionnel) setTitle(dossier.titre_previsionnel);
+      if (dossier.auteur_nom) setAuthorsStr(dossier.auteur_nom);
+      if (dossier.universite_nom) setUniversity(dossier.universite_nom);
+      if (dossier.faculte_nom) setFaculty(dossier.faculte_nom);
+      toast.success(`Dossier ${dossier.code_dossier} rattaché ! Métadonnées pré-remplies.`);
+    } else {
+      toast.info("Veuillez sélectionner un dossier de pré-édition valide.");
+    }
+  };
+
+  const filteredPreEditions = allPreEditions.filter((d) => {
+    if (!preEditionSearch.trim()) return true;
+    const q = preEditionSearch.toLowerCase();
+    return (
+      d.code_dossier.toLowerCase().includes(q) ||
+      d.titre_previsionnel.toLowerCase().includes(q) ||
+      d.auteur_nom.toLowerCase().includes(q) ||
+      (d.universite_nom && d.universite_nom.toLowerCase().includes(q))
+    );
+  });
 
 
 
@@ -179,6 +230,11 @@ export default function ChiefLayoutDepositPage() {
   };
 
   const handleSaveDraft = async () => {
+    if (!selectedPreEdition) {
+      toast.error("Veuillez sélectionner un dossier de pré-édition instruit par le Juriste.");
+      setCurrentStep(2);
+      return;
+    }
     setSaving(true);
     try {
       await createDepositWithFiles(
@@ -214,7 +270,10 @@ export default function ChiefLayoutDepositPage() {
           is_paper_available: isPaperAvailable,
         },
         bookFile,
-        coverFile
+        coverFile,
+        {
+          pre_edition_dossier_id: selectedPreEdition.id,
+        }
       );
       toast.success("Brouillon sauvegardé avec succès.");
       router.push("/chief-layout");
@@ -227,8 +286,19 @@ export default function ChiefLayoutDepositPage() {
   };
 
   const handleDirectPublish = async () => {
-    if (!title || !bookFile) {
-      toast.error("Veuillez sélectionner le fichier de l'ouvrage et renseigner au minimum le titre.");
+    if (!bookFile) {
+      toast.error("Veuillez sélectionner le fichier PDF de l'ouvrage.");
+      setCurrentStep(1);
+      return;
+    }
+    if (!selectedPreEdition) {
+      toast.error("Le rattachement à un dossier de pré-édition Juriste est obligatoire.");
+      setCurrentStep(2);
+      return;
+    }
+    if (!title) {
+      toast.error("Veuillez renseigner le titre de l'ouvrage.");
+      setCurrentStep(2);
       return;
     }
 
@@ -267,7 +337,10 @@ export default function ChiefLayoutDepositPage() {
           is_paper_available: isPaperAvailable,
         },
         bookFile,
-        coverFile
+        coverFile,
+        {
+          pre_edition_dossier_id: selectedPreEdition.id,
+        }
       );
       toast.success(`L'ouvrage « ${title} » a été déposé, validé et publié immédiatement sur le catalogue officiel !`);
       router.push("/chief-layout/history");
@@ -448,6 +521,123 @@ export default function ChiefLayoutDepositPage() {
           </div>
 
           <div className="space-y-4">
+            {/* Rattachement Pré-édition Obligatoire */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-gold" />
+                  Dossier de pré-édition Juriste *
+                </label>
+                {allPreEditions.length > 0 && (
+                  <span className="text-[11px] font-semibold text-gold">
+                    {allPreEditions.length} dossier{allPreEditions.length > 1 ? "s" : ""} instruit{allPreEditions.length > 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+
+              {selectedPreEdition ? (
+                <div className="p-3.5 bg-navy/5 border border-gold/30 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-gold/10 text-gold flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-mono font-bold text-gold uppercase px-1.5 py-0.5 bg-gold/10 rounded">
+                          {selectedPreEdition.code_dossier}
+                        </span>
+                        <span className="text-xs font-bold text-navy">{selectedPreEdition.titre_previsionnel}</span>
+                      </div>
+                      <p className="text-[11px] text-foreground-muted">
+                        Auteur : <strong className="text-foreground">{selectedPreEdition.auteur_nom}</strong>
+                        {selectedPreEdition.auteur_email ? ` (${selectedPreEdition.auteur_email})` : ""} · {selectedPreEdition.universite_nom}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsPreEditionOpen(true)}
+                      className="px-2.5 py-1.5 text-[11px] font-bold text-gold bg-gold/10 hover:bg-gold/20 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Changer
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  {/* Select Trigger Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsPreEditionOpen(!isPreEditionOpen)}
+                    className="w-full bg-background-secondary border border-border rounded-xl px-3.5 py-2.5 text-xs text-left flex items-center justify-between gap-2 hover:border-navy focus:ring-2 focus:ring-navy min-h-[44px] transition-colors cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2 text-foreground-muted truncate">
+                      <Search className="w-4 h-4 text-foreground-muted shrink-0" />
+                      {loadingPreEditions ? "Chargement des dossiers pré-enregistrés..." : "Sélectionner le dossier de pré-édition obligatoire..."}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0 text-foreground-muted">
+                      {loadingPreEditions && <InlineLoader size={12} />}
+                      <ChevronDown className={cn("w-4 h-4 transition-transform", isPreEditionOpen && "rotate-180")} />
+                    </div>
+                  </button>
+
+                  {/* Dropdown with Search Input & List */}
+                  {isPreEditionOpen && (
+                    <div className="absolute z-30 top-full mt-1.5 left-0 right-0 bg-background border border-border rounded-2xl shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+                      {/* Search Bar inside dropdown */}
+                      <div className="p-2.5 border-b border-border bg-background-secondary">
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Filtrer par titre, nom d'auteur ou code dossier..."
+                            value={preEditionSearch}
+                            onChange={(e) => setPreEditionSearch(e.target.value)}
+                            autoFocus
+                            className="w-full bg-background border border-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[36px]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* List */}
+                      <div className="max-h-60 overflow-y-auto divide-y divide-border">
+                        {filteredPreEditions.length > 0 ? (
+                          filteredPreEditions.map((dossier) => (
+                            <button
+                              key={dossier.id}
+                              type="button"
+                              onClick={() => handleSelectPreEdition(dossier)}
+                              className="w-full text-left p-3 hover:bg-navy/5 transition-colors flex items-center justify-between gap-3 text-xs cursor-pointer"
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-[10px] font-bold text-gold px-1.5 py-0.5 bg-gold/10 rounded">
+                                    {dossier.code_dossier}
+                                  </span>
+                                  <span className="font-semibold text-navy">{dossier.titre_previsionnel}</span>
+                                </div>
+                                <p className="text-[11px] text-foreground-muted mt-0.5">
+                                  Auteur : <strong className="text-foreground">{dossier.auteur_nom}</strong>
+                                  {dossier.universite_nom ? ` · ${dossier.universite_nom}` : ""}
+                                </p>
+                              </div>
+                              <span className="text-[11px] font-bold text-gold shrink-0 bg-gold/10 hover:bg-gold hover:text-navy px-2.5 py-1 rounded-lg transition-colors">
+                                Rattacher →
+                              </span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-xs text-foreground-muted">
+                            Aucun dossier trouvé pour &quot;{preEditionSearch}&quot;.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             {/* Titre */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
@@ -794,8 +984,8 @@ export default function ChiefLayoutDepositPage() {
               </div>
             </div>
 
-            {/* Langue, Pays, Public Cible */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Langue et Pays d'Ancrage */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">Langue</label>
@@ -850,30 +1040,6 @@ export default function ChiefLayoutDepositPage() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Public Cible</label>
-                  {aiResult?.target_audience && (
-                    <button
-                      type="button"
-                      onClick={() => setTargetAudience(aiResult.target_audience)}
-                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
-                      title={`Appliquer le public cible IA : ${aiResult.target_audience}`}
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      IA : {aiResult.target_audience.length > 18 ? `${aiResult.target_audience.slice(0, 18)}...` : aiResult.target_audience}
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={targetAudience}
-                  onChange={(e) => setTargetAudience(e.target.value)}
-                  placeholder="Grand Public, Étudiants, etc."
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                />
               </div>
             </div>
           </div>

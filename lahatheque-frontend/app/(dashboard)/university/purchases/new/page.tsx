@@ -149,7 +149,7 @@ export default function NewUniversityPaperOrderPage() {
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/university" className="hover:text-navy">Vue d&apos;ensemble</Link>
         <span>/</span>
-        <Link href="/university/purchases" className="hover:text-navy">Commandes Papier</Link>
+        <Link href="/university/purchases" className="hover:text-navy">Commandes</Link>
         <span>/</span>
         <span className="text-navy font-semibold">Nouvelle Commande</span>
       </div>
@@ -161,13 +161,13 @@ export default function NewUniversityPaperOrderPage() {
           className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-2"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Retour aux Commandes Papier
+          Retour aux Commandes
         </Link>
         <h1 className="font-serif text-2xl font-bold text-navy">
-          Passation de Commande de Livres Papier pour l&apos;Établissement
+          Passation de Commande pour l&apos;Établissement
         </h1>
         <p className="text-xs text-foreground-muted mt-1">
-          Sélectionnez les ouvrages du catalogue académique, ajustez les volumes papier souhaités et vos coordonnées de livraison sur le campus.
+          Sélectionnez les ouvrages du catalogue académique, ajustez les volumes souhaités et vos coordonnées de livraison sur le campus.
         </p>
       </div>
 

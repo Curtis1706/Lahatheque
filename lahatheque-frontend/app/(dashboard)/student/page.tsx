@@ -224,6 +224,8 @@ export default function StudentOverviewPage() {
           </p>
         </div>
 
+        {/* Bloc Affiliation Campus (Masqué à la demande client) */}
+        {/*
         <div className="flex items-center gap-3 shrink-0">
           {kpis?.affiliation ? (
             <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-white/10 border border-white/20 text-xs">
@@ -244,6 +246,7 @@ export default function StudentOverviewPage() {
             </div>
           )}
         </div>
+        */}
       </div>
 
       {/* ── Erreur ────────────────────────────────────────────────────── */}
@@ -260,7 +263,8 @@ export default function StudentOverviewPage() {
         <ReadingHeroCard currentReading={kpis?.currentReading ?? null} />
       )}
 
-      {/* ── Statistiques & Assiduité d'Étude (Grille Bespoke) ── */}
+      {/* ── Statistiques & Assiduité d'Étude (Masqué / Mis en commentaire à la demande client) ── */}
+      {/*
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-serif font-bold text-navy text-lg flex items-center gap-2">
@@ -312,6 +316,7 @@ export default function StudentOverviewPage() {
           />
         )}
       </div>
+      */}
 
       {/* ── Filet fin séparateur (Tranche dorée) ── */}
       <div className="gilt-divider my-2" />

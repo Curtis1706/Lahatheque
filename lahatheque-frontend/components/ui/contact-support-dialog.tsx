@@ -211,11 +211,11 @@ export function ContactSupportDialog({
                       </div>
                       <div className="flex items-center gap-2 pt-1">
                         <span className="text-xs font-mono font-bold text-navy select-all bg-background px-2.5 py-1 rounded-lg border border-border">
-                          +229 01 53 00 00 00
+                          +229 01 47 33 63 72
                         </span>
                         <button
                           type="button"
-                          onClick={() => handleCopyPhone("+229 01 53 00 00 00")}
+                          onClick={() => handleCopyPhone("+229 01 47 33 63 72")}
                           className="p-1.5 rounded-lg border border-border hover:bg-background transition-colors text-foreground-muted hover:text-navy cursor-pointer"
                           title="Copier le numéro"
                         >

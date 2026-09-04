@@ -1242,20 +1242,6 @@ export default function NewPublisherBookPage() {
                 </p>
               </div>
 
-              {/* Public Cible via SearchableSelect Combobox */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                  Public Cible (Combobox)
-                </label>
-                <SearchableSelect
-                  options={TARGET_AUDIENCE_OPTIONS}
-                  value={targetAudience}
-                  onChange={(val) => setTargetAudience(val as any)}
-                  placeholder="Sélectionner le public cible..."
-                  searchPlaceholder="Rechercher (ex: Universitaire, Professionnel)..."
-                />
-              </div>
-
               {/* Mots-Clés Thématiques */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">

@@ -215,7 +215,7 @@ export default function UniversityPurchasesPage() {
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/university" className="hover:text-navy">Vue d&apos;ensemble</Link>
         <span>/</span>
-        <span className="text-navy font-semibold">Commandes Papier Campus</span>
+        <span className="text-navy font-semibold">Commandes</span>
       </div>
 
       {/* Header */}
@@ -227,13 +227,13 @@ export default function UniversityPurchasesPage() {
           </Link>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
             <ShoppingBag className="w-4 h-4 text-gold" />
-            Approvisionnement des Bibliothèques Physiques
+            Approvisionnement &amp; Commandes
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Commandes de Livres Papier pour l&apos;Établissement
+            Commandes de l&apos;Établissement
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Suivi des commandes d&apos;ouvrages physiques passées pour approvisionner les bibliothèques et départements de votre université.
+            Suivi des commandes passées pour approvisionner les bibliothèques et départements de votre université.
           </p>
         </div>
 
@@ -242,7 +242,7 @@ export default function UniversityPurchasesPage() {
           className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
         >
           <PlusCircle className="w-4 h-4 text-gold" />
-          Nouvelle Commande Papier
+          Nouvelle Commande
         </Link>
       </div>
 
@@ -252,7 +252,7 @@ export default function UniversityPurchasesPage() {
         columns={columns}
         rowKey="id"
         loading={loading}
-        emptyMessage="Aucune commande de livre papier n'a été passée pour le moment."
+        emptyMessage="Aucune commande n'a été passée pour le moment."
         pageSize={10}
         mobileCard={(row) => (
           <div className="space-y-3 text-xs">

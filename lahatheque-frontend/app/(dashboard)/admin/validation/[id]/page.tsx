@@ -357,10 +357,6 @@ export default function AdminValidationDetailPage() {
               <span className="text-foreground-muted">Discipline académique :</span>
               <span className="font-semibold text-navy text-right">{proof.discipline}</span>
             </p>
-            <p className="flex justify-between py-1 border-b border-border">
-              <span className="text-foreground-muted">Public cible :</span>
-              <span className="font-medium text-foreground text-right">{proof.target_audience || "Étudiants Universitaires"}</span>
-            </p>
 
             {proof.keywords && proof.keywords.length > 0 && (
               <div className="py-1 border-b border-border">

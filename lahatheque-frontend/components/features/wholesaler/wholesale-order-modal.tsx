@@ -55,13 +55,14 @@ export function WholesaleOrderModal({
 
   if (!isOpen || !book) return null;
 
-  const unitPaperPrice = book.print_wholesale_price;
+  const isSinglePaperUnit = format === "paper" && paperQty === 1;
+  const unitPaperPrice = isSinglePaperUnit ? (book.public_price || book.print_wholesale_price) : book.print_wholesale_price;
   const unitDigitalPrice = book.digital_wholesale_price;
   const unitPrice = format === "paper" ? unitPaperPrice : unitDigitalPrice;
   const qty = format === "paper" ? paperQty : 1;
   const totalAmount = unitPrice * qty;
 
-  const quickQuantities = [5, 10, 25, 50, 100];
+  const quickQuantities = [1, 5, 10, 25, 50, 100];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,15 +186,23 @@ export function WholesaleOrderModal({
                     <Truck className="size-3.5 text-gold" />
                     Exemplaires Papier
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gold/20 text-gold font-bold font-mono">
-                    -{book.paper_discount_pct ?? 32}%
-                  </span>
+                  {isSinglePaperUnit ? (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-navy/10 text-navy font-bold font-mono">
+                      Tarif Unitaire
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gold/20 text-gold font-bold font-mono">
+                      -{book.paper_discount_pct ?? 32}%
+                    </span>
+                  )}
                 </div>
                 <div>
                   <p className="font-mono font-bold text-navy text-sm">
-                    {book.print_wholesale_price.toLocaleString("fr-FR")} XOF
+                    {unitPaperPrice.toLocaleString("fr-FR")} XOF
                   </p>
-                  <p className="text-[10px] text-foreground-muted">par exemplaire physique</p>
+                  <p className="text-[10px] text-foreground-muted">
+                    {isSinglePaperUnit ? "tarif public standard" : "par ex. (remise grossiste)"}
+                  </p>
                 </div>
               </button>
 
@@ -244,7 +253,7 @@ export function WholesaleOrderModal({
                         : "bg-background text-navy border-border hover:border-gold"
                     }`}
                   >
-                    {q} ex.
+                    {q} ex.{q === 1 ? " (unitaire)" : ""}
                   </button>
                 ))}
                 <div className="flex items-center gap-2 ml-auto">
@@ -258,6 +267,29 @@ export function WholesaleOrderModal({
                   />
                 </div>
               </div>
+
+              {/* Message d'explication tarification unitaire vs de gros */}
+              {isSinglePaperUnit ? (
+                <div className="p-2.5 rounded-xl bg-gold/10 border border-gold/25 text-navy text-[11px] space-y-0.5 mt-2">
+                  <div className="flex items-center gap-1.5 font-bold text-navy">
+                    <AlertCircle className="size-3.5 text-gold shrink-0" />
+                    <span>Achat unitaire : 1 seul exemplaire</span>
+                  </div>
+                  <p className="text-foreground-muted text-[10px] leading-relaxed">
+                    Le tarif public standard ({book.public_price ? book.public_price.toLocaleString("fr-FR") : unitPaperPrice.toLocaleString("fr-FR")} XOF) s&apos;applique sans remise grossiste. La remise grossiste (-{book.paper_discount_pct ?? 32}%) est active dès 2 exemplaires.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 text-[11px] space-y-0.5 mt-2">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
+                    <span>Tarif grossiste appliqué (-{book.paper_discount_pct ?? 32}%)</span>
+                  </div>
+                  <p className="text-emerald-700/80 text-[10px]">
+                    {book.print_wholesale_price.toLocaleString("fr-FR")} XOF par exemplaire physique pour {paperQty} exemplaires commandés.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="p-3.5 rounded-2xl bg-background-secondary border border-border flex items-center justify-between text-xs">

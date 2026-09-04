@@ -69,7 +69,7 @@ export function UniversityRoyaltyCard({
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs font-bold text-gold uppercase tracking-wider">
               <DollarSign className="w-4 h-4" />
-              Redevance Partenaire Universitaire (15% HT)
+              Redevance Partenaire Universitaire ({contractualRate}% HT)
             </div>
             <h3 className="font-serif text-xl sm:text-2xl font-bold">
               Solde de Redevance Disponible
@@ -78,7 +78,7 @@ export function UniversityRoyaltyCard({
 
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-full bg-gold/15 border border-gold/30 text-gold text-xs font-bold">
-              Taux Fixe : {contractualRate}%
+              Taux Conventionné : {contractualRate}%
             </span>
           </div>
         </div>

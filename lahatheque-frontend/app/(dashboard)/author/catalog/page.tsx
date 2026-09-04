@@ -20,6 +20,7 @@ import {
 } from "@/lib/services/student";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
 import { AuthorCatalogOrderModal } from "@/components/features/author/author-catalog-order-modal";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 
 function SkeletonBook() {
   return (
@@ -188,7 +189,6 @@ export default function AuthorCatalogPage() {
   }, [fetchCatalog]);
 
   const allBooks = catalog?.books || [];
-  const disciplines = catalog?.disciplines || [];
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto pb-16 animate-in fade-in duration-300">
@@ -232,20 +232,15 @@ export default function AuthorCatalogPage() {
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <Filter className="w-4 h-4 text-foreground-muted shrink-0 ml-1" />
-          <select
-            value={selectedDiscipline}
-            onChange={(e) => setSelectedDiscipline(e.target.value)}
-            className="px-3.5 py-2.5 text-xs font-semibold rounded-2xl border border-border bg-background-secondary text-navy focus:outline-none focus:border-gold min-h-[44px]"
-          >
-            <option value="all">Toutes les disciplines</option>
-            {disciplines.map((d) => (
-              <option key={d.id} value={d.name}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+        <div className="w-full sm:w-72">
+          <DisciplineCombobox
+            value={selectedDiscipline === "all" ? "" : selectedDiscipline}
+            onChange={(val) => setSelectedDiscipline(val || "all")}
+            placeholder="Toutes les disciplines"
+            searchPlaceholder="Rechercher une discipline..."
+            includeAllOption={true}
+            allOptionLabel="Toutes les disciplines"
+          />
         </div>
       </div>
 

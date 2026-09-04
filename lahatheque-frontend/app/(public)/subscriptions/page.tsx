@@ -13,7 +13,8 @@ import {
   GraduationCap,
   Percent,
   Calendar,
-  Zap
+  Zap,
+  Clock
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { PageLoader } from "@/components/ui/page-loader";
@@ -168,16 +169,20 @@ export default function SubscriptionsPage() {
 
             <button
               onClick={() => setActiveType("paper")}
-              className={`py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer min-h-[44px] flex items-center justify-center gap-2 ${
+              className={`py-3 px-3.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer min-h-[44px] flex items-center justify-center gap-1.5 ${
                 activeType === "paper"
                   ? "bg-navy text-white shadow-md"
                   : "text-foreground-muted hover:text-navy"
               }`}
             >
               <Package className={`w-4 h-4 ${activeType === "paper" ? "text-gold" : "text-foreground-muted"}`} />
-              Remises Livres Papier
-              <span className="bg-gold text-navy text-[10px] font-bold px-1.5 py-0.2 rounded-full">
-                -30%
+              <span>Livres Papier</span>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                activeType === "paper"
+                  ? "bg-gold/20 text-gold-light border-gold/40"
+                  : "bg-background border-border text-foreground-muted"
+              }`}>
+                Bientôt disponible
               </span>
             </button>
           </div>
@@ -381,42 +386,48 @@ export default function SubscriptionsPage() {
           </div>
         )}
 
-        {/* Section 2 : Remises Dégressives par Nombre de Livres Papier Achetés */}
+        {/* Section 2 : Remises Dégressives par Nombre de Livres Papier Achetés (Grisée / Bientôt disponible) */}
         {activeType === "paper" && (
-          <div className="space-y-10 animate-in fade-in duration-300">
+          <div className="space-y-8 animate-in fade-in duration-300">
             
-            {/* Grille des 4 Formules Dégressives (2 colonnes x 2 lignes) */}
+            {/* Bannière d'avertissement Bientôt Disponible */}
+            <div className="bg-background-secondary border border-border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 max-w-3xl mx-auto text-center sm:text-left">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-navy/10 text-navy shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-navy">Offre bientôt disponible</h3>
+                  <p className="text-xs text-foreground-muted mt-0.5">
+                    Les commandes groupées et les remises sur les livres papier physiques ouvriront très prochainement sur LAHAThèque.
+                  </p>
+                </div>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-navy/10 text-navy border border-navy/20 text-xs font-bold shrink-0">
+                En préparation
+              </span>
+            </div>
+
+            {/* Grille des 4 Formules Dégressives (Grisées et désactivées) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto pt-2">
               {PAPER_DISCOUNT_TIERS.map((tier) => (
                 <div
                   key={tier.id}
-                  className={`bg-background rounded-3xl p-6 space-y-6 flex flex-col justify-between transition-all relative ${
-                    tier.popular
-                      ? "border-2 border-gold shadow-lg ring-1 ring-gold/30"
-                      : tier.isInstitutional
-                      ? "border-2 border-navy/30 bg-background-secondary/30 hover:border-gold hover:shadow-md"
-                      : "border-2 border-border hover:border-gold hover:shadow-md"
-                  }`}
+                  className="bg-background/80 opacity-70 border-2 border-border rounded-3xl p-6 space-y-6 flex flex-col justify-between transition-all relative select-none"
                 >
                   {/* Badge & Taux de Réduction */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className={`text-[10px] uppercase font-bold px-2.5 py-1 rounded-md border ${
-                      tier.isInstitutional
-                        ? "text-navy bg-navy/10 border-navy/20"
-                        : tier.popular
-                        ? "text-navy bg-gold/20 border-gold/30"
-                        : "text-navy bg-navy/10 border-navy/20"
-                    }`}>
+                    <span className="text-[10px] uppercase font-bold px-2.5 py-1 rounded-md border text-foreground-muted bg-background-secondary border-border">
                       {tier.badge}
                     </span>
-                    <span className="text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full shadow-sm bg-navy">
+                    <span className="text-foreground-muted font-bold text-xs px-2.5 py-0.5 rounded-full bg-background-secondary border border-border">
                       {tier.discount}
                     </span>
                   </div>
 
                   <div className="space-y-4">
                     <div>
-                      <h3 className="font-serif text-xl sm:text-2xl font-bold text-navy">
+                      <h3 className="font-serif text-xl sm:text-2xl font-bold text-foreground/80">
                         {tier.title}
                       </h3>
                       <p className="text-xs text-foreground-muted mt-1 leading-relaxed">
@@ -425,58 +436,44 @@ export default function SubscriptionsPage() {
                     </div>
 
                     {/* Bloc Règle de Remise */}
-                    <div className="bg-background-secondary p-3.5 rounded-xl border border-border space-y-1">
-                      <div className="flex items-center gap-1.5 text-gold font-bold text-xs">
+                    <div className="bg-background-secondary/60 p-3.5 rounded-xl border border-border space-y-1">
+                      <div className="flex items-center gap-1.5 text-foreground-muted font-bold text-xs">
                         <Percent className="w-3.5 h-3.5" />
                         <span className="uppercase tracking-wider text-[10px]">
                           Avantage Volume ({tier.booksCount})
                         </span>
                       </div>
-                      <p className="text-xs text-foreground/85 font-medium leading-relaxed">
+                      <p className="text-xs text-foreground-muted font-medium leading-relaxed">
                         {tier.ruleDescription}
                       </p>
                     </div>
 
                     {/* Avantages & Garanties */}
-                    <ul className="space-y-2 text-xs text-foreground/90 pt-2 border-t border-border">
+                    <ul className="space-y-2 text-xs text-foreground-muted pt-2 border-t border-border">
                       {tier.highlights.map((h, hIdx) => (
                         <li key={hIdx} className="flex items-start gap-2">
-                          <Check className="w-4 h-4 text-success shrink-0 mt-0.5" />
+                          <Check className="w-4 h-4 text-foreground-muted shrink-0 mt-0.5" />
                           <span>{h}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  <Link
-                    href={tier.ctaLink}
-                    className={`w-full py-3.5 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-2 text-center shadow min-h-[44px] ${
-                      tier.popular
-                        ? "bg-gold hover:bg-gold-hover text-navy shadow-md"
-                        : tier.isInstitutional
-                        ? "bg-navy hover:bg-navy-hover text-white"
-                        : "bg-navy hover:bg-navy-hover text-white"
-                    }`}
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    className="w-full py-3.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 text-center min-h-[44px] bg-background-secondary border border-border text-foreground-muted cursor-not-allowed"
                   >
-                    {tier.isInstitutional ? (
-                      <>
-                        <Building2 className="w-4 h-4 text-gold" />
-                        {tier.ctaText}
-                      </>
-                    ) : (
-                      <>
-                        <Package className="w-4 h-4" />
-                        {tier.ctaText}
-                      </>
-                    )}
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
+                    <Clock className="w-4 h-4" />
+                    <span>Bientôt disponible</span>
+                  </button>
                 </div>
               ))}
             </div>
 
             {/* Bannière Commandes Groupées Amphi & Délégués */}
-            <div className="bg-navy text-white rounded-3xl p-8 sm:p-10 border border-gold/30 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="bg-navy text-white rounded-3xl p-8 sm:p-10 border border-gold/30 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6 opacity-85">
               <div className="space-y-3 max-w-2xl">
                 <div className="inline-flex items-center gap-2 text-gold text-xs font-bold uppercase tracking-wider">
                   <GraduationCap className="w-4 h-4" />

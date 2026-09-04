@@ -24,6 +24,7 @@ import {
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { getCatalogBooks } from "@/lib/services/layout-artist";
 import { EditBookModal } from "@/components/features/chief-layout/edit-book-modal";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { toast } from "sonner";
 
 export default function ChiefLayoutCatalogPage() {
@@ -72,10 +73,6 @@ export default function ChiefLayoutCatalogPage() {
   const publishedCount = books.filter((b) => b.status === "published").length;
   const paperAvailableCount = books.filter((b) => b.is_paper_available).length;
   const pendingCount = books.filter((b) => b.status === "pending_validation").length;
-
-  const disciplines = Array.from(
-    new Set(books.map((b) => b.classification.discipline).filter(Boolean))
-  );
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto animate-in fade-in duration-300">
@@ -173,20 +170,16 @@ export default function ChiefLayoutCatalogPage() {
             />
           </div>
 
-          {/* Discipline filter */}
-          <div>
-            <select
-              value={selectedDiscipline}
-              onChange={(e) => setSelectedDiscipline(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-xs text-navy font-semibold focus:ring-2 focus:ring-navy min-h-[44px]"
-            >
-              <option value="all">Toutes les disciplines</option>
-              {disciplines.map((d, i) => (
-                <option key={i} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
+          {/* Discipline filter avec Combobox recherche + sélection de toutes les disciplines en base */}
+          <div className="w-full">
+            <DisciplineCombobox
+              value={selectedDiscipline === "all" ? "" : selectedDiscipline}
+              onChange={(val) => setSelectedDiscipline(val || "all")}
+              placeholder="Toutes les disciplines"
+              searchPlaceholder="Rechercher une discipline..."
+              includeAllOption={true}
+              allOptionLabel="Toutes les disciplines"
+            />
           </div>
 
           {/* Paper Availability filter */}

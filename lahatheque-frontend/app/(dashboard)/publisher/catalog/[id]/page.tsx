@@ -148,11 +148,6 @@ export default function PublisherBookDetailPage({ params }: { params: Promise<{ 
               </div>
 
               <div>
-                <span className="text-foreground-muted text-[10px] uppercase font-bold block">Public Cible</span>
-                <span className="font-semibold text-navy capitalize">{book.target_audience}</span>
-              </div>
-
-              <div>
                 <span className="text-foreground-muted text-[10px] uppercase font-bold block">Licence</span>
                 <span className="font-semibold text-navy">{book.licence_type === "tous_droits_reserves" ? "Tous Droits Réservés" : "Creative Commons"}</span>
               </div>

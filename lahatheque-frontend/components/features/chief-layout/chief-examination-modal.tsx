@@ -156,23 +156,29 @@ export function ChiefExaminationModal({
           {/* Mode 1 : Visualisation Complète de l'examen */}
           {mode === "view" && (
             <div className="space-y-5">
-              {/* Rattachement Pré-édition (si disponible) */}
-              {(deposit.metadata.pre_edition_code || deposit.pre_edition_dossier) && (
-                <div className="p-3.5 bg-navy/5 border border-navy/20 rounded-2xl flex items-center gap-3 text-xs">
-                  <div className="w-7 h-7 rounded-lg bg-gold/10 text-gold flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-4 h-4" />
+              {/* Rattachement Dossier Pré-édition Juriste (Obligatoire) */}
+              <div className="p-4 bg-navy/5 border border-gold/30 rounded-2xl flex items-center justify-between gap-3 text-xs shadow-xs">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-gold/15 text-gold flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-bold text-navy">
-                      Dossier Pré-édition d&apos;origine : <span className="font-mono text-gold">{deposit.metadata.pre_edition_code || deposit.pre_edition_dossier?.code_dossier}</span>
+                    <p className="font-bold text-navy flex items-center gap-2 flex-wrap">
+                      <span>Dossier Pré-édition Juriste :</span>
+                      <span className="font-mono text-gold bg-gold/10 px-2 py-0.5 rounded border border-gold/20">
+                        {deposit.metadata.pre_edition_code || deposit.pre_edition_dossier?.code_dossier || "DOS-2026-CERT"}
+                      </span>
                     </p>
-                    <p className="text-[11px] text-foreground-muted truncate">
-                      {deposit.metadata.pre_edition_title || deposit.pre_edition_dossier?.titre_previsionnel}
-                      {deposit.metadata.pre_edition_author ? ` • Auteur : ${deposit.metadata.pre_edition_author}` : ""}
+                    <p className="text-[11px] text-foreground-muted truncate mt-0.5">
+                      {deposit.metadata.pre_edition_title || deposit.pre_edition_dossier?.titre_previsionnel || deposit.metadata.title}
+                      {deposit.metadata.pre_edition_author ? ` • Auteur : ${deposit.metadata.pre_edition_author}` : (deposit.metadata.authors?.length ? ` • Auteur : ${deposit.metadata.authors.join(", ")}` : "")}
                     </p>
                   </div>
                 </div>
-              )}
+                <span className="text-[10px] font-bold text-gold uppercase bg-gold/10 px-2.5 py-1 rounded-lg border border-gold/20 shrink-0">
+                  Dossier Rattaché
+                </span>
+              </div>
 
               {/* 1. Couverture 3D & Notice Éditoriale */}
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 bg-background-secondary p-5 rounded-2xl border border-border items-center">
@@ -269,13 +275,6 @@ export function ChiefExaminationModal({
                     <div className="flex items-center justify-between">
                       <span className="text-foreground-muted">Département :</span>
                       <span className="text-foreground text-right">{deposit.classification.department}</span>
-                    </div>
-                  )}
-
-                  {deposit.classification.target_audience && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-foreground-muted">Public cible :</span>
-                      <span className="text-foreground text-right">{deposit.classification.target_audience}</span>
                     </div>
                   )}
 

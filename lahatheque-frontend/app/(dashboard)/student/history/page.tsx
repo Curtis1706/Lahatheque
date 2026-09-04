@@ -1,6 +1,24 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+/**
+ * PAGE HISTORIQUE & STATISTIQUES ÉTUDIANT (MASQUÉE / MISE EN COMMENTAIRE)
+ * Désactivée à la demande du client. Redirection automatique vers /student.
+ */
+export default function StudentHistoryPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/student");
+  }, [router]);
+
+  return null;
+}
+
+/*
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   History,
@@ -18,8 +36,6 @@ import { StudentKpiCharts } from "@/components/features/student/student-kpi-char
 import { BookCover } from "@/components/features/student/book-cover";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("fr-FR", {
     day: "numeric",
@@ -36,21 +52,15 @@ function formatStudyDuration(minutes: number): string {
   return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
-
 function SkeletonBlock({ h = "h-32" }: { h?: string }) {
   return (
     <div className={`${h} rounded-3xl bg-background border border-border animate-pulse`} />
   );
 }
 
-// ─── Type pour la DataTable des Sessions ──────────────────────────────────────
-
 type SessionRow = HistoryStatsAPI["recent_sessions_timeline"][0];
 
-// ─── Page Principale ──────────────────────────────────────────────────────────
-
-export default function StudentHistoryPage() {
+function ArchivedStudentHistoryPage() {
   const [stats, setStats] = useState<HistoryStatsAPI | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +88,6 @@ export default function StudentHistoryPage() {
     [stats]
   );
 
-  // Colonnes DataTable
   const columns: DataTableColumn<SessionRow>[] = [
     {
       key: "session_date",
@@ -198,7 +207,6 @@ export default function StudentHistoryPage() {
     },
   ];
 
-  // Carte responsive mobile pour chaque session
   const renderMobileCard = (row: SessionRow) => {
     const pct = row.progress_percent ?? 0;
     const cur = row.current_page ?? row.pages_read ?? 1;
@@ -235,7 +243,6 @@ export default function StudentHistoryPage() {
           </div>
         </div>
 
-        {/* Progression mobile */}
         <div className="space-y-1 pt-1">
           <div className="flex items-center justify-between text-[11px]">
             <span className="font-mono font-bold text-navy">
@@ -254,7 +261,7 @@ export default function StudentHistoryPage() {
         <div className="pt-2 border-t border-border flex items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 font-mono font-bold text-navy text-xs">
             <Clock className="w-3.5 h-3.5 text-gold" />
-            <span>{formatStudyDuration(row.duration_minutes)} d&apos;étude</span>
+            <span>{formatStudyDuration(row.duration_minutes)} d'étude</span>
           </div>
 
           <Link
@@ -271,7 +278,6 @@ export default function StudentHistoryPage() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto min-w-0 pr-14 sm:pr-8">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/student" className="hover:text-navy transition-colors">
           Mon Espace
@@ -280,7 +286,6 @@ export default function StudentHistoryPage() {
         <span className="text-navy font-semibold">Historique &amp; Statistiques</span>
       </div>
 
-      {/* Header */}
       <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <Link
@@ -288,17 +293,17 @@ export default function StudentHistoryPage() {
             className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline mb-2"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Retour à l&apos;espace étudiant</span>
+            <span>Retour à l'espace étudiant</span>
           </Link>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1.5">
             <History className="w-4 h-4 text-gold" />
             <span>Suivi Pédagogique &amp; Assiduité</span>
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-navy">
-            Historique &amp; Statistiques d&apos;Étude
+            Historique &amp; Statistiques d'Étude
           </h1>
           <p className="text-xs sm:text-sm text-foreground-muted mt-1.5 max-w-2xl leading-relaxed">
-            Consultez votre assiduité, vos heures d&apos;étude active et la progression détaillée de chaque ouvrage.
+            Consultez votre assiduité, vos heures d'étude active et la progression détaillée de chaque ouvrage.
           </p>
         </div>
 
@@ -311,14 +316,12 @@ export default function StudentHistoryPage() {
         </Link>
       </div>
 
-      {/* ── Erreur ────────────────────────────────────────────────────── */}
       {error && (
         <div className="p-4 rounded-2xl border border-error/30 bg-error/10 text-error text-xs sm:text-sm font-medium">
           {error}
         </div>
       )}
 
-      {/* ── KPIs & Graphiques Dynamiques ──────────────────────────────── */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -329,7 +332,6 @@ export default function StudentHistoryPage() {
         <StudentKpiCharts stats={stats} />
       ) : null}
 
-      {/* ── DataTable Officielle des Ouvrages en Cours d'Étude ─────────── */}
       <div className="space-y-4 pt-2">
         <DataTable<SessionRow>
           data={allSessions}
@@ -369,3 +371,5 @@ export default function StudentHistoryPage() {
     </div>
   );
 }
+*/
+

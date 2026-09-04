@@ -113,7 +113,7 @@ export default function UniversityOverviewPage() {
               : "Université d'Abomey-Calavi (UAC)"}
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Supervision académique, gestion des bouquets documentaires et suivi des 15% de redevance.
+            Supervision académique, gestion des bouquets documentaires et suivi des redevances conventionnées.
           </p>
         </div>
 
@@ -123,7 +123,7 @@ export default function UniversityOverviewPage() {
             className="px-4 py-2.5 rounded-xl bg-background border border-border hover:border-gold text-navy text-xs font-bold transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
           >
             <ShoppingBag className="w-4 h-4 text-gold" />
-            Commande Papier Campus
+            Passer Commande
           </Link>
           <Link
             href="/university/bouquets"
@@ -135,8 +135,10 @@ export default function UniversityOverviewPage() {
         </div>
       </div>
 
-      {/* 4 KPI Cards avec barres bâtonnets sparklines (identique à l'admin) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Cards avec barres bâtonnets sparklines */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* KPI Étudiants Affiliés (Masqué à la demande client) */}
+        {/*
         <ProgressMetricCard
           title="Étudiants Affiliés"
           total={kpis.affiliated_students_count.toLocaleString("fr-FR")}
@@ -148,6 +150,7 @@ export default function UniversityOverviewPage() {
           defaultView="bar"
           data={getRollingTimeline(kpis.affiliated_students_count)}
         />
+        */}
 
         <ProgressMetricCard
           title="Bouquets Souscrits"
@@ -161,6 +164,8 @@ export default function UniversityOverviewPage() {
           data={getRollingTimeline(kpis.active_bouquets_count)}
         />
 
+        {/* KPI Consultations Ce Mois (Masqué à la demande client) */}
+        {/*
         <ProgressMetricCard
           title="Consultations Ce Mois"
           total={kpis.monthly_consultations_count.toLocaleString("fr-FR")}
@@ -172,11 +177,12 @@ export default function UniversityOverviewPage() {
           defaultView="bar"
           data={getRollingTimeline(kpis.monthly_consultations_count)}
         />
+        */}
 
         <ProgressMetricCard
-          title="Redevances 15% (Disponibles)"
+          title="Redevances Disponibles"
           total={`${kpis.total_royalties_available.toLocaleString("fr-FR")} ${kpis.currency || "XOF"}`}
-          percent="15%"
+          percent="Droits"
           trend="up"
           accent="gold"
           delta="Disponibles"
@@ -186,11 +192,13 @@ export default function UniversityOverviewPage() {
         />
       </div>
 
-      {/* Graphique Donut 21st.dev par Faculté */}
+      {/* Graphique Donut par Faculté (Masqué à la demande client) */}
+      {/*
       <FacultyStatsChart
         facultyDistribution={kpis.faculty_distribution}
         totalConsultations={kpis.monthly_consultations_count}
       />
+      */}
 
       {/* Bouquets Documentaires en Vedette */}
       <div className="space-y-4">
@@ -225,7 +233,9 @@ export default function UniversityOverviewPage() {
       </div>
 
       {/* Raccourcis Rapides */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+        {/* Raccourci Affiliations Étudiants (Masqué à la demande client) */}
+        {/*
         <Link
           href="/university/affiliations"
           className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
@@ -241,6 +251,7 @@ export default function UniversityOverviewPage() {
           </div>
           <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors" />
         </Link>
+        */}
 
         <Link
           href="/university/catalog"
@@ -267,7 +278,7 @@ export default function UniversityOverviewPage() {
               <DollarSign className="w-5 h-5 text-gold" />
             </div>
             <div>
-              <p className="font-serif font-bold text-sm text-navy">Redevances (15%)</p>
+              <p className="font-serif font-bold text-sm text-navy">Redevances Institutionnelles</p>
               <p className="text-[11px] text-foreground-muted">Relevés et demande de virement</p>
             </div>
           </div>

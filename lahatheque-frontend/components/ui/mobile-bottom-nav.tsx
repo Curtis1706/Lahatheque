@@ -180,7 +180,7 @@ export function MobileBottomNav() {
           centerCta: { label: "Catalogue", href: "/student/catalog", icon: <Briefcase className="w-6 h-6" /> },
           rightItems: [
             { label: "Commandes", href: "/student/orders", icon: <PackageCheck className="w-5 h-5" /> },
-            { label: "Stats", href: "/student/history", icon: <History className="w-5 h-5" /> },
+            { label: "Profil", href: "/student/profile", icon: <UserIcon className="w-5 h-5" /> },
           ]
         };
     }
@@ -279,7 +279,7 @@ export function MobileBottomNav() {
           { label: "Statistiques d'Usage", href: "/university/stats", icon: <FileCheck className="w-4 h-4" /> },
           { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="w-4 h-4" /> },
           { label: "Achats Livres Papier", href: "/university/purchases", icon: <ShoppingBag className="w-4 h-4" /> },
-          { label: "Redevances 15%", href: "/university/royalties", icon: <DollarSign className="w-4 h-4" /> },
+          { label: "Redevances", href: "/university/royalties", icon: <DollarSign className="w-4 h-4" /> },
           { label: "Profil Établissement", href: "/university/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
       default:
@@ -288,9 +288,9 @@ export function MobileBottomNav() {
           { label: "Mon Espace Lecteur", href: "/student", icon: <LayoutDashboard className="w-4 h-4" /> },
           { label: "Catalogue & Découverte", href: "/student/catalog", icon: <Briefcase className="w-4 h-4" /> },
           { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="w-4 h-4" /> },
+          // { label: "Bouquets Documentaires", href: "/student/bouquets", icon: <Sparkles className="w-4 h-4" /> },
           { label: "Achats & Livraisons", href: "/student/orders", icon: <PackageCheck className="w-4 h-4" /> },
-          { label: "Historique & Stats", href: "/student/history", icon: <History className="w-4 h-4" /> },
-          { label: "Mon Université", href: "/student/university", icon: <GraduationCap className="w-4 h-4" /> },
+          // { label: "Historique & Stats", href: "/student/history", icon: <History className="w-4 h-4" /> },
           { label: "Mon Profil", href: "/student/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
     }

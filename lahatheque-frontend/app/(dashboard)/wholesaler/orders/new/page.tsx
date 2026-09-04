@@ -59,7 +59,7 @@ export default function NewWholesalerOrderPage() {
         book_id: targetBook.id,
         book: targetBook,
         digital_licenses_qty: 1,
-        print_copies_qty: 5,
+        print_copies_qty: 1,
       },
     ]);
     toast.success(`"${targetBook.title}" ajouté à la commande.`);
@@ -77,12 +77,19 @@ export default function NewWholesalerOrderPage() {
     toast.info("Article retiré de la commande.");
   };
 
+  const getPaperUnitPrice = (ci: WholesalerCartItem) => {
+    if (ci.print_copies_qty === 1) {
+      return ci.book.public_price || ci.book.print_wholesale_price || 0;
+    }
+    return ci.book.print_wholesale_price || 0;
+  };
+
   const totalDigitalSubtotal = cartItems.reduce(
     (acc, ci) => acc + ci.digital_licenses_qty * (ci.book.digital_wholesale_price || 0),
     0
   );
   const totalPrintSubtotal = cartItems.reduce(
-    (acc, ci) => acc + ci.print_copies_qty * (ci.book.print_wholesale_price || 0),
+    (acc, ci) => acc + ci.print_copies_qty * getPaperUnitPrice(ci),
     0
   );
   const totalAmount = totalDigitalSubtotal + totalPrintSubtotal;
@@ -225,18 +232,28 @@ export default function NewWholesalerOrderPage() {
                       </div>
                       <div>
                         <label className="text-[10px] text-foreground-muted block font-bold">Exemplaires Papier</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={ci.print_copies_qty}
-                          onChange={(e) => handleUpdateQty(ci.book_id, "print_copies_qty", parseInt(e.target.value) || 0)}
-                          className="w-20 px-2 py-1 bg-background border border-border rounded-lg text-center font-mono font-bold text-navy text-xs"
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            value={ci.print_copies_qty}
+                            onChange={(e) => handleUpdateQty(ci.book_id, "print_copies_qty", parseInt(e.target.value) || 0)}
+                            className="w-16 px-2 py-1 bg-background border border-border rounded-lg text-center font-mono font-bold text-navy text-xs"
+                          />
+                          <span className="text-[10px] font-mono font-semibold text-foreground-muted">
+                            ({(ci.print_copies_qty === 1 ? (ci.book.public_price || ci.book.print_wholesale_price) : ci.book.print_wholesale_price).toLocaleString("fr-FR")} XOF/u)
+                          </span>
+                        </div>
+                        {ci.print_copies_qty === 1 && (
+                          <span className="text-[9px] text-amber-700 block font-medium">
+                            Tarif public sans remise (remise dès 2 ex.)
+                          </span>
+                        )}
                       </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(ci.book_id)}
-                        className="p-2 text-foreground-muted hover:text-error transition-colors"
+                        className="p-2 text-foreground-muted hover:text-error transition-colors cursor-pointer"
                         title="Retirer"
                       >
                         <Trash2 className="w-4 h-4" />

@@ -162,19 +162,12 @@ export default function DepositDetailPage() {
   const isEditing = Boolean(canEdit && searchParams.get("mode") === "edit");
 
   // Options pour le SearchableSelect de Pré-Édition
-  const preEditionOptions: SearchableOption[] = [
-    {
-      value: "",
-      label: "Aucun dossier lié (Saisie manuelle libre)",
-      subtitle: "Dépôt indépendant hors circuit pré-édition",
-    },
-    ...preEditionsList.map((pe) => ({
-      value: pe.id,
-      label: pe.titre_previsionnel,
-      subtitle: `${pe.auteur_nom}${pe.universite_nom ? ` • ${pe.universite_nom}` : ""}`,
-      badge: pe.code_dossier,
-    })),
-  ];
+  const preEditionOptions: SearchableOption[] = preEditionsList.map((pe) => ({
+    value: pe.id,
+    label: pe.titre_previsionnel,
+    subtitle: `${pe.auteur_nom}${pe.universite_nom ? ` • ${pe.universite_nom}` : ""}`,
+    badge: pe.code_dossier,
+  }));
 
   // Options pour le SearchableSelect d'Auteurs
   const authorOptions: SearchableOption[] = authorsList.map((a) => ({
@@ -679,7 +672,7 @@ export default function DepositDetailPage() {
 
           {/* Dossier de Pré-édition avec SearchableSelect */}
           <div className="space-y-1.5 text-xs">
-            <label className="block font-semibold text-navy">Dossier de Pré-édition associé</label>
+            <label className="block font-semibold text-navy">Dossier de Pré-édition associé *</label>
             {isEditing ? (
               <SearchableSelect
                 options={preEditionOptions}
@@ -1104,32 +1097,8 @@ export default function DepositDetailPage() {
               </div>
             </div>
 
-            {/* Public Cible & Code Pays */}
+            {/* Code Pays */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Public Cible</label>
-                  {isEditing && aiResult?.target_audience && (
-                    <button
-                      type="button"
-                      onClick={() => setTargetAudience(aiResult.target_audience)}
-                      className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      IA
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  disabled={!isEditing}
-                  value={targetAudience}
-                  onChange={(e) => setTargetAudience(e.target.value)}
-                  placeholder="Ex : Licence, Master, Doctorat, Grand Public"
-                  className={inputClass}
-                />
-              </div>
-
               <div className="space-y-1.5">
                 <label className="block font-semibold text-navy">Code Pays (ISO)</label>
                 <input
