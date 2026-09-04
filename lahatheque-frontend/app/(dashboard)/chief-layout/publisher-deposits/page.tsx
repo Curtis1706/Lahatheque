@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/use-auth";
 import {
   CheckSquare,
   CheckCircle2,
@@ -41,6 +43,8 @@ function StatusChip({ value }: { value: string }) {
 }
 
 export default function ChiefLayoutPublisherDepositsPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [deposits, setDeposits] = useState<PublisherDepositForReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -49,6 +53,12 @@ export default function ChiefLayoutPublisherDepositsPage() {
   const [decision, setDecision] = useState<"approved" | "revision_requested">("approved");
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (user && user.role !== "admin" && user.role !== "super_admin") {
+      router.replace("/chief-layout");
+    }
+  }, [user, router]);
 
   const load = async () => {
     try {

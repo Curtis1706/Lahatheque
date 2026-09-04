@@ -610,13 +610,19 @@ class WholesalerProfileView(APIView):
             }
         )
 
+        from apps.reporting.pricing_service import get_platform_config
+        config = get_platform_config()
+
+        default_digital_discount = float(config.remise_grossiste_numerique_pct)
+        default_print_discount = float(config.remise_grossiste_papier_pct)
+
         tier_data = {
             "id": str(prof.tier.id) if prof.tier else "tier-grand-compte",
             "name": prof.tier.name if prof.tier else "Grand Compte Librairies Partenaires",
             "min_quantity": prof.tier.min_quantity if prof.tier else 20,
-            "digital_discount_percent": float(prof.tier.digital_discount_percent) if prof.tier else 25.0,
-            "print_discount_percent": float(prof.tier.print_discount_percent) if prof.tier else 30.0,
-            "description": prof.tier.description if prof.tier else "Remise standard B2B dès 20 exemplaires par commande.",
+            "digital_discount_percent": float(prof.tier.digital_discount_percent) if prof.tier else default_digital_discount,
+            "print_discount_percent": float(prof.tier.print_discount_percent) if prof.tier else default_print_discount,
+            "description": prof.tier.description if prof.tier else f"Remise standard B2B dès {prof.tier.min_quantity if prof.tier else 20} exemplaires par commande.",
         }
 
         return Response({

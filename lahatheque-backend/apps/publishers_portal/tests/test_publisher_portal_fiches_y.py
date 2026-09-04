@@ -131,10 +131,9 @@ class PublisherPortalFichesYTestCase(TestCase):
 
     def test_y3_two_step_review_and_publish(self):
         """
-        Fiche Y3 (Corrigée) :
-        - Conformité éditoriale (Chef Maquettiste)
-        - Vérification des droits (Juriste)
-        - Publication finale uniquement si les deux volets sont 'approved'
+        Gestion des dépôts éditeurs tiers : gérée exclusivement par l'Administrateur.
+        Le Chef Maquettiste et le Juriste n'ont pas accès (403).
+        L'Admin examine les volets éditorial et droits, puis publie.
         """
         chief_layout_user = User.objects.create_user(
             username="chief_layout_test",
@@ -162,24 +161,25 @@ class PublisherPortalFichesYTestCase(TestCase):
             validation_step=PublisherValidationStep.STEP_1,
         )
 
-        # 1. File d'examen accessible au Chef Maquettiste et au Juriste
+        # 1. Le Chef Maquettiste et le Juriste n'ont pas accès (403)
         self.client.force_authenticate(user=chief_layout_user)
+        res_chief = self.client.get("/api/v1/publishers/admin/deposits/")
+        self.assertEqual(res_chief.status_code, 403)
+
+        self.client.force_authenticate(user=legal_reviewer_user)
+        res_legal = self.client.get("/api/v1/publishers/admin/deposits/")
+        self.assertEqual(res_legal.status_code, 403)
+
+        # 2. File d'examen accessible uniquement à l'Admin
+        self.client.force_authenticate(user=self.admin_user)
         res_list = self.client.get("/api/v1/publishers/admin/deposits/")
         self.assertEqual(res_list.status_code, 200)
         self.assertTrue(any(d["id"] == str(deposit.id) for d in res_list.data["data"]))
 
-        # 2. Le Chef Maquettiste ne peut pas valider les droits (403)
-        res_forbidden = self.client.post(
-            f"/api/v1/publishers/admin/deposits/{deposit.id}/rights-decision/",
-            {"decision": "approved", "comment": "Tentative non autorisée"},
-            format="json"
-        )
-        self.assertEqual(res_forbidden.status_code, 403)
-
-        # 3. Le Chef Maquettiste valide la conformité éditoriale
+        # 3. L'Admin valide la conformité éditoriale
         res_edit = self.client.post(
             f"/api/v1/publishers/admin/deposits/{deposit.id}/editorial-decision/",
-            {"decision": "approved", "comment": "Mise en page et maquette validées."},
+            {"decision": "approved", "comment": "Mise en page et maquette validées par Admin."},
             format="json"
         )
         self.assertEqual(res_edit.status_code, 200)
@@ -191,11 +191,10 @@ class PublisherPortalFichesYTestCase(TestCase):
         self.assertEqual(res_pub_fail.status_code, 400)
         self.assertIn("Publication impossible", res_pub_fail.data["error"])
 
-        # 5. Le Juriste valide la vérification des droits
-        self.client.force_authenticate(user=legal_reviewer_user)
+        # 5. L'Admin valide la vérification des droits
         res_rights = self.client.post(
             f"/api/v1/publishers/admin/deposits/{deposit.id}/rights-decision/",
-            {"decision": "approved", "comment": "Contrat et cession des droits vérifiés."},
+            {"decision": "approved", "comment": "Contrat et cession des droits vérifiés par Admin."},
             format="json"
         )
         self.assertEqual(res_rights.status_code, 200)

@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Scale,
   CheckCircle2,
@@ -40,6 +42,8 @@ function StatusChip({ value }: { value: string }) {
 }
 
 export default function LegalReviewerPublisherDepositsPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [deposits, setDeposits] = useState<PublisherDepositForReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -48,6 +52,12 @@ export default function LegalReviewerPublisherDepositsPage() {
   const [decision, setDecision] = useState<"approved" | "revision_requested">("approved");
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (user && user.role !== "admin" && user.role !== "super_admin") {
+      router.replace("/legal-reviewer");
+    }
+  }, [user, router]);
 
   const load = async () => {
     try {

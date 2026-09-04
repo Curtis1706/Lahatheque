@@ -433,22 +433,22 @@ export default function WholesalerProfilePage() {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="p-2.5 rounded-xl bg-navy-dark/60 border border-white/5">
                   <span className="text-navy-light block text-[10px]">Remise Papier</span>
-                  <span className="font-bold text-base text-gold">-{profile?.tier.print_discount_percent || 30}%</span>
+                  <span className="font-bold text-base text-gold">-{profile?.tier.print_discount_percent ?? 32}%</span>
                 </div>
                 <div className="p-2.5 rounded-xl bg-navy-dark/60 border border-white/5">
                   <span className="text-navy-light block text-[10px]">Remise Licences</span>
-                  <span className="font-bold text-base text-gold">-{profile?.tier.digital_discount_percent || 25}%</span>
+                  <span className="font-bold text-base text-gold">-{profile?.tier.digital_discount_percent ?? 25}%</span>
                 </div>
               </div>
               <p className="text-[11px] text-navy-light leading-relaxed">
-                {profile?.tier.description || "Remise dégressive applicable dès 20 exemplaires par commande."}
+                {profile?.tier.description || "Remise standard B2B dès 20 exemplaires par commande."}
               </p>
             </div>
 
             <ul className="space-y-2.5 text-xs text-navy-light">
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-                <span>Seuil minimum : <strong>{profile?.tier.min_quantity || 20} exemplaires</strong> par référence</span>
+                <span>Seuil minimum : <strong>{profile?.tier.min_quantity ?? 20} exemplaires</strong> par référence</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-gold shrink-0 mt-0.5" />

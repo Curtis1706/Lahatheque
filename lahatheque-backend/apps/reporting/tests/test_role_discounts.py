@@ -185,3 +185,34 @@ class RoleDiscountsTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         # Vérification du total calculé côté serveur (10 x 5625 XOF = 56 250 XOF)
         self.assertEqual(response.json()["data"]["total_amount"], 56250.0)
+
+    def test_06_wholesaler_profile_api_dynamic_pricing(self):
+        """Vérifie que /api/v1/commerce/wholesaler/profile/ renvoie les remises dynamiques définies par l'admin."""
+        self.client.force_authenticate(user=self.wholesaler)
+
+        # 1. Vérification avec les taux par défaut (papier: 32%, digital: 25%)
+        res = self.client.get("/api/v1/commerce/wholesaler/profile/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        tier = res.json()["data"]["tier"]
+        self.assertEqual(tier["print_discount_percent"], 32.0)
+        self.assertEqual(tier["digital_discount_percent"], 25.0)
+
+        # 2. Modification par l'administrateur (papier: 38%, digital: 28%)
+        self.client.force_authenticate(user=self.admin)
+        patch_res = self.client.patch(
+            "/api/v1/admin/catalog/pricing/role-discounts/",
+            {
+                "wholesaler": {"paper_pct": 38.0, "digital_pct": 28.0},
+            },
+            format="json"
+        )
+        self.assertEqual(patch_res.status_code, status.HTTP_200_OK)
+
+        # 3. Vérification immédiate côté grossiste
+        self.client.force_authenticate(user=self.wholesaler)
+        res_updated = self.client.get("/api/v1/commerce/wholesaler/profile/")
+        self.assertEqual(res_updated.status_code, status.HTTP_200_OK)
+        tier_updated = res_updated.json()["data"]["tier"]
+        self.assertEqual(tier_updated["print_discount_percent"], 38.0)
+        self.assertEqual(tier_updated["digital_discount_percent"], 28.0)
+

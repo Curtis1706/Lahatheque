@@ -1007,34 +1007,29 @@ class PublisherExternalDepositStatusView(APIView):
 
 
 class PublisherDepositEditorialReviewPermission(permissions.BasePermission):
-    """Conformité éditoriale — rôle explicitement attribué au Chef Maquettiste par le CDC
-    ("Chef Maquettiste (validateur) — Validation des livres mis en ligne"), avec supervision
-    de l'Admin ("Vision globale & statistiques — Accès à tous les tableaux de bord")."""
+    """Conformité éditoriale des dépôts éditeurs tiers — gérée uniquement par l'administrateur."""
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return request.user.role in ('chief_layout', 'admin', 'super_admin')
+        return request.user.role in ('admin', 'super_admin')
 
 
 class PublisherDepositRightsReviewPermission(permissions.BasePermission):
-    """Vérification des droits — rôle explicitement attribué au Juriste par le CDC
-    ("Droits d'auteur & pourcentages — Définition et enregistrement des pourcentages de
-    droits d'auteur pour chaque livre"), avec supervision de l'Admin."""
+    """Vérification des droits des dépôts éditeurs tiers — gérée uniquement par l'administrateur."""
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return request.user.role in ('legal_reviewer', 'admin', 'super_admin')
+        return request.user.role in ('admin', 'super_admin')
 
 
 class PublisherDepositReviewListView(APIView):
     """GET /api/v1/publishers/admin/deposits/ - File d'examen des dépôts éditeurs tiers.
-    Accessible en lecture au Chef Maquettiste, au Juriste, et à l'Admin — chacun y voit
-    l'état des deux volets, mais ne peut agir que sur le sien (vues suivantes)."""
+    Accessible uniquement aux administrateurs."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        if request.user.role not in ('chief_layout', 'legal_reviewer', 'admin', 'super_admin'):
-            return Response({"success": False, "error": "Accès réservé au Chef Maquettiste, au Juriste ou à l'Admin."}, status=403)
+        if request.user.role not in ('admin', 'super_admin'):
+            return Response({"success": False, "error": "Accès réservé aux administrateurs."}, status=403)
 
         status_filter = request.query_params.get('status', '')
         qs = PublisherBookDeposit.objects.select_related('publisher').order_by('-created_at')
@@ -1129,7 +1124,7 @@ class PublisherDepositPublishView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, id):
-        if request.user.role not in ('chief_layout', 'legal_reviewer', 'admin', 'super_admin'):
+        if request.user.role not in ('admin', 'super_admin'):
             return Response({"success": False, "error": "Accès refusé."}, status=403)
 
         from apps.catalog.models import Ouvrage, Discipline, BookAuthor
