@@ -488,9 +488,11 @@ export function DashboardSidebar() {
               <span className="font-serif font-bold text-sm tracking-wide text-white block truncate">
                 LAHA<span className="text-gold">Thèque</span>
               </span>
-              <span className="text-[10px] text-white/50 block font-mono truncate uppercase">
-                {user?.role ? user.role.replace("_", " ") : "Espace Numérique"}
-              </span>
+              {user?.role !== "student" && (
+                <span className="text-[10px] text-white/50 block font-mono truncate uppercase">
+                  {user?.role ? user.role.replace("_", " ") : "Espace Numérique"}
+                </span>
+              )}
             </div>
           </Link>
 
