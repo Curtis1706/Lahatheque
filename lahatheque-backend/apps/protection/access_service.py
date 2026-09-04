@@ -47,31 +47,54 @@ class AccessService:
         if not user or not user.is_authenticated:
             return {"access_granted": False, "reason": "unauthenticated"}
 
-        # Privilèges administratifs, éditoriaux, auteurs, réviseurs & mode développement
-        privileged_roles = [
-            'admin', 'author', 'publisher', 'chief_layout',
-            'layout_artist', 'legal_reviewer', 'manager'
-        ]
-        is_privileged = (
+        # Privilèges administratifs & réviseurs légaux / éditoriaux de plateforme
+        platform_roles = ['admin', 'super_admin', 'chief_layout', 'legal_reviewer']
+        is_platform_admin = (
             user.is_superuser
             or user.is_staff
-            or getattr(user, 'role', '') in privileged_roles
+            or getattr(user, 'role', '') in platform_roles
             or getattr(settings, 'DEV_UNLOCK_ALL_BOOKS', False)
         )
 
-        if is_privileged:
+        if is_platform_admin:
             return {
                 "access_granted": True,
                 "reason": "privilege_access" if (user.is_superuser or user.is_staff) else "development_access",
                 "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
             }
 
-        # Achat individuel payé (LigneCommande avec statut_paiement='paid')
-        # Remarque : Débloqué indépendamment du statut de livraison physique
+        # Auteur de cet ouvrage spécifique
+        if getattr(user, 'role', '') == 'author':
+            from apps.catalog.models import Ouvrage
+            from django.db.models import Q
+            is_own_book = Ouvrage.objects.filter(id=book_id).filter(
+                Q(authors__user=user) | Q(created_by=user)
+            ).exists()
+            if is_own_book:
+                return {
+                    "access_granted": True,
+                    "reason": "author_own_book",
+                    "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
+                }
+
+        # Éditeur de cet ouvrage spécifique
+        if getattr(user, 'role', '') == 'publisher':
+            from apps.catalog.models import Ouvrage
+            is_own_published = Ouvrage.objects.filter(id=book_id, publisher__user=user).exists()
+            if is_own_published:
+                return {
+                    "access_granted": True,
+                    "reason": "publisher_own_book",
+                    "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
+                }
+
+        # Achat individuel payé ou achat à crédit accordé
+        from django.db.models import Q
         has_purchased = LigneCommande.objects.filter(
             commande__user=user,
-            commande__statut_paiement='paid',
             ouvrage_id=book_id
+        ).filter(
+            Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
         ).exists()
 
         if has_purchased:

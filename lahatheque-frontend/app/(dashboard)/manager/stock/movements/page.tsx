@@ -12,10 +12,12 @@ import {
   Check,
   BookOpen,
   Search,
+  Warehouse,
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import {
   getStockMovements,
   createRestock,
@@ -446,11 +448,43 @@ export default function StockMovementsPage() {
     {
       key: "book_title",
       header: "Ouvrage",
-      cell: (row) => (
-        <span className="text-xs font-semibold text-navy truncate max-w-[180px] block">
-          {row.book_title}
-        </span>
-      ),
+      cell: (row) => {
+        const coverUrl =
+          row.cover_url ||
+          (row.book_id ? `/api/bff/catalog/books/${row.book_id}/cover/` : undefined);
+        return (
+          <Link
+            href={`/manager/stock/${row.book_id}`}
+            className="flex items-center gap-3 group py-1"
+          >
+            <BookCover3D
+              title={row.book_title}
+              authors={row.authors}
+              discipline={row.discipline}
+              coverUrl={coverUrl}
+              size="xs"
+            />
+            <div className="min-w-0">
+              <p className="font-semibold text-xs text-navy group-hover:text-gold transition-colors truncate max-w-[200px]">
+                {row.book_title}
+              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                {row.isbn && (
+                  <span className="text-[10px] text-foreground-muted font-mono">
+                    {row.isbn}
+                  </span>
+                )}
+                {row.warehouse && (
+                  <span className="text-[10px] text-foreground-muted flex items-center gap-0.5">
+                    <Warehouse className="w-2.5 h-2.5 text-gold shrink-0" />
+                    {row.warehouse_nom || row.warehouse}
+                  </span>
+                )}
+              </div>
+            </div>
+          </Link>
+        );
+      },
     },
     {
       key: "movement_type",
@@ -600,6 +634,68 @@ export default function StockMovementsPage() {
         loading={loading}
         emptyMessage="Aucun mouvement enregistré pour le moment."
         pageSize={20}
+        mobileCard={(row) => {
+          const coverUrl =
+            row.cover_url ||
+            (row.book_id ? `/api/bff/catalog/books/${row.book_id}/cover/` : undefined);
+          return (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <BookCover3D
+                  title={row.book_title}
+                  authors={row.authors}
+                  discipline={row.discipline}
+                  coverUrl={coverUrl}
+                  size="xs"
+                  interactive={false}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <StatusBadge status={row.movement_type} />
+                    <span
+                      className={`font-mono font-bold text-xs ${
+                        row.quantity > 0 ? "text-success" : "text-error"
+                      }`}
+                    >
+                      {row.quantity > 0 ? `+${row.quantity}` : row.quantity} ex.
+                    </span>
+                  </div>
+                  <h4 className="font-serif font-bold text-navy text-sm leading-snug line-clamp-2">
+                    {row.book_title}
+                  </h4>
+                  {row.authors && row.authors.length > 0 && (
+                    <p className="text-xs text-foreground-muted mt-0.5 line-clamp-1">
+                      {row.authors.join(", ")}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-foreground-muted font-mono mt-0.5">
+                    {new Date(row.created_at).toLocaleDateString("fr-FR", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
+                <span className="text-foreground-muted flex items-center gap-1">
+                  <Warehouse className="w-3 h-3 text-gold shrink-0" />
+                  {row.warehouse_nom || row.warehouse}
+                </span>
+                <span className="text-[11px] text-foreground-muted">
+                  Par {row.created_by}
+                </span>
+              </div>
+              {row.reason && (
+                <p className="text-[11px] text-foreground-muted italic bg-background-secondary p-2 rounded-lg border border-border">
+                  Motif : {row.reason}
+                </p>
+              )}
+            </div>
+          );
+        }}
       />
 
       {/* Modales */}

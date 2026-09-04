@@ -109,7 +109,7 @@ export function MobileBottomNav() {
           centerCta: { label: "Nouveau", href: "/publisher/catalog/new", icon: <PenTool className="w-6 h-6" /> },
           rightItems: [
             { label: "Revenus", href: "/publisher/royalties", icon: <DollarSign className="w-5 h-5" /> },
-            { label: "API", href: "/publisher/api", icon: <ShieldCheck className="w-5 h-5" /> },
+            { label: "Stats", href: "/publisher/stats", icon: <Activity className="w-5 h-5" /> },
           ]
         };
       case "author":
@@ -224,7 +224,6 @@ export function MobileBottomNav() {
           { label: "Dépôt ONIX 3.0", href: "/publisher/catalog/batch", icon: <UploadCloud className="w-4 h-4" /> },
           { label: "Statistiques", href: "/publisher/stats", icon: <Activity className="w-4 h-4" /> },
           { label: "Redevances & Droits", href: "/publisher/royalties", icon: <DollarSign className="w-4 h-4" /> },
-          { label: "Clés API", href: "/publisher/api", icon: <ShieldCheck className="w-4 h-4" /> },
           { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
       case "wholesaler":

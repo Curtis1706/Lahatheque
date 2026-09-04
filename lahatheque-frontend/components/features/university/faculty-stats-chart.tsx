@@ -19,6 +19,8 @@ export function FacultyStatsChart({
   facultyDistribution,
   totalConsultations,
 }: FacultyStatsChartProps) {
+  const hasConsultations = totalConsultations > 0 && facultyDistribution.some((fac) => fac.consultations > 0);
+
   const donutSegments: DonutChartSegment[] = facultyDistribution.map((fac) => ({
     value: fac.consultations,
     label: `${fac.code} - ${fac.name}`,
@@ -32,19 +34,30 @@ export function FacultyStatsChart({
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
             <Building2 className="w-4 h-4 text-gold" />
-            Répartition par Faculté / UFR
+            Répartition Académique &amp; Disciplines
           </div>
           <h3 className="font-serif text-lg font-bold text-navy">
-            Usage Académique des Facultés
+            Usage des Ressources Documentaires Campus
           </h3>
         </div>
-        <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full w-fit">
-          <TrendingUp className="w-3.5 h-3.5" />
-          <span>+14.2% ce mois</span>
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-navy bg-navy/5 px-3 py-1 rounded-full w-fit border border-border">
+          <TrendingUp className="w-3.5 h-3.5 text-gold" />
+          <span>{totalConsultations > 0 ? "Activité en direct" : "Temps réel"}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+      {!hasConsultations ? (
+        <div className="py-12 px-4 text-center space-y-3 bg-background-secondary rounded-2xl border border-border">
+          <BookOpen className="w-10 h-10 text-gold mx-auto opacity-75" />
+          <h4 className="font-serif font-bold text-navy text-sm">
+            Aucune session de lecture enregistrée ce mois
+          </h4>
+          <p className="text-xs text-foreground-muted max-w-md mx-auto">
+            Les consultations des étudiants affiliés et les lectures sur les bouquets souscrits apparaîtront ici dès l&apos;ouverture des premières sessions.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
         {/* Donut Chart 21st.dev */}
         <div className="lg:col-span-5 flex flex-col items-center justify-center p-4">
           <DonutChart
@@ -105,6 +118,7 @@ export function FacultyStatsChart({
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 }

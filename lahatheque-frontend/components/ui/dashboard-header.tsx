@@ -95,8 +95,6 @@ export function DashboardHeader() {
     if (path.startsWith("/publisher/submissions")) return { section: "Espace Éditeur", title: "Suivi des Dépôts & Validation" };
     if (path.startsWith("/publisher/stats")) return { section: "Espace Éditeur", title: "Statistiques & Lectorat" };
     if (path.startsWith("/publisher/royalties")) return { section: "Espace Éditeur", title: "Redevances & Ventes" };
-    if (path.startsWith("/publisher/api")) return { section: "Espace Éditeur", title: "Clés API & Intégration REST" };
-    if (path.startsWith("/publisher/logs")) return { section: "Espace Éditeur", title: "Journaux & Traçabilité DRM" };
     if (path.startsWith("/publisher/profile")) return { section: "Espace Éditeur", title: "Profil & Mandat d'Édition" };
     if (path === "/publisher") return { section: "Espace Éditeur", title: "Vue d'ensemble Éditeur Tiers" };
 

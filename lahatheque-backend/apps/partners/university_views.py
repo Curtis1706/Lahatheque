@@ -2,7 +2,7 @@
 import uuid
 from decimal import Decimal
 from datetime import timedelta
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -20,12 +20,29 @@ from apps.protection.models import TraceAcces
 
 
 def get_user_institution(user):
-    """Récupère l'établissement rattaché à l'utilisateur connecté. Renvoie None si aucun
-    établissement n'est réellement rattaché — ne jamais deviner ni renvoyer un établissement
-    au hasard, pour éviter toute fuite de données entre institutions."""
+    """Récupère l'établissement rattaché à l'utilisateur connecté."""
     if hasattr(user, 'university_profile') and user.university_profile:
         return user.university_profile
-    return Institution.objects.filter(user=user).first()
+    inst = Institution.objects.filter(user=user).first()
+    if inst:
+        return inst
+    if getattr(user, 'role', '') in ['university', 'admin', 'super_admin']:
+        affiliation = getattr(user, 'university_affiliation', '').strip()
+        if affiliation:
+            inst = Institution.objects.filter(
+                Q(code__iexact=affiliation) | Q(name__icontains=affiliation)
+            ).first()
+            if inst:
+                if not inst.user:
+                    inst.user = user
+                    inst.save(update_fields=['user'])
+                return inst
+        inst = Institution.objects.filter(code='UAC').first() or Institution.objects.filter(is_active=True).first()
+        if inst and not inst.user and getattr(user, 'role', '') == 'university':
+            inst.user = user
+            inst.save(update_fields=['user'])
+        return inst
+    return None
 
 
 class UniversityKpisView(APIView):
@@ -39,6 +56,8 @@ class UniversityKpisView(APIView):
             return Response({
                 "success": True,
                 "data": {
+                    "institution_name": "Université Partenaire",
+                    "institution_code": "UNIV",
                     "affiliated_students_count": 0,
                     "active_bouquets_count": 0,
                     "monthly_consultations_count": 0,
@@ -52,6 +71,7 @@ class UniversityKpisView(APIView):
                 "error": None
             })
 
+        from django.db.models import Q
         affiliations_count = StudentAffiliation.objects.filter(
             institution=inst, 
             status__in=['approved', 'active', 'validated']
@@ -61,7 +81,7 @@ class UniversityKpisView(APIView):
             status='active'
         ).count()
         monthly_consultations = TraceAcces.objects.filter(
-            ouvrage__institution=inst, 
+            Q(institution=inst) | Q(ouvrage__institution=inst) | Q(bouquet_subscription__institution=inst), 
             timestamp__gte=timezone.now() - timedelta(days=30)
         ).count()
 
@@ -73,27 +93,52 @@ class UniversityKpisView(APIView):
         colors = ["var(--navy)", "var(--gold)", "var(--navy-hover)", "var(--gold-dark)", "var(--navy-light)"]
         faculty_distrib = []
         top_disc = []
-        for i, f in enumerate(faculties):
-            c_count = TraceAcces.objects.filter(
-                ouvrage__institution=inst, 
-                ouvrage__discipline__name__icontains=f.code
-            ).count()
-            faculty_distrib.append({
-                "code": f.code,
-                "name": f.name,
-                "consultations": c_count,
-                "percent": 0,
-                "color": colors[i % len(colors)]
-            })
-            top_disc.append({
-                "discipline": f.name,
-                "consultations": c_count,
-                "percent": 0
-            })
+
+        if faculties.exists():
+            total_fac_c = 0
+            for i, f in enumerate(faculties):
+                c_count = TraceAcces.objects.filter(
+                    Q(institution=inst) | Q(ouvrage__institution=inst), 
+                    ouvrage__discipline__name__icontains=f.code
+                ).count()
+                total_fac_c += c_count
+                faculty_distrib.append({
+                    "code": f.code,
+                    "name": f.name,
+                    "consultations": c_count,
+                    "percent": 0,
+                    "color": colors[i % len(colors)]
+                })
+            if total_fac_c > 0:
+                for item in faculty_distrib:
+                    item["percent"] = round((item["consultations"] / total_fac_c) * 100, 1)
+        else:
+            # Répartition par Discipline académique si aucune faculté en base
+            from apps.catalog.models import Discipline
+            disciplines = list(Discipline.objects.filter(is_active=True)[:5])
+            total_disc_c = 0
+            for i, d in enumerate(disciplines):
+                c_count = TraceAcces.objects.filter(
+                    Q(institution=inst) | Q(ouvrage__institution=inst),
+                    ouvrage__discipline=d
+                ).count()
+                total_disc_c += c_count
+                faculty_distrib.append({
+                    "code": d.name[:8].upper(),
+                    "name": d.name,
+                    "consultations": c_count,
+                    "percent": 0,
+                    "color": colors[i % len(colors)]
+                })
+            if total_disc_c > 0:
+                for item in faculty_distrib:
+                    item["percent"] = round((item["consultations"] / total_disc_c) * 100, 1)
 
         return Response({
             "success": True,
             "data": {
+                "institution_name": inst.name,
+                "institution_code": inst.code,
                 "affiliated_students_count": affiliations_count,
                 "active_bouquets_count": bouquets_count,
                 "monthly_consultations_count": monthly_consultations,

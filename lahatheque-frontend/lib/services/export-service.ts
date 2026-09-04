@@ -43,6 +43,7 @@ export interface PdfDocumentOptions {
   summaryCards?: Array<{ label: string; value: string }>;
   tableHeaders: string[];
   tableRows: (string | number)[][];
+  totalLabel?: string;
   totalAmount?: string;
   totalNotes?: string;
   filename?: string;
@@ -95,16 +96,36 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
   // ── 2. En-tête : Marque et Coordonnées Émetteur
   let y = 16;
   
+  // Intégration du logo officiel LAHAThèque
+  let textStartX = margin;
+  try {
+    if (typeof window !== "undefined") {
+      const img = new (window as any).Image();
+      img.src = "/logo.png";
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+        setTimeout(resolve, 400);
+      });
+      if (img.complete && img.naturalWidth > 0) {
+        doc.addImage(img, "PNG", margin, y - 6.5, 14, 14);
+        textStartX = margin + 17;
+      }
+    }
+  } catch {
+    textStartX = margin;
+  }
+
   // Titre / Logo textuel de marque
   doc.setFont("times", "bold");
-  doc.setFontSize(22);
+  doc.setFontSize(21);
   doc.setTextColor(...navyRgb);
-  doc.text("LAHATHÈQUE", margin, y);
+  doc.text("LAHATHÈQUE", textStartX, y);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(...goldRgb);
-  doc.text("ÉDITIONS & BIBLIOTHÈQUE NUMÉRIQUE UNIVERSITAIRE", margin, y + 4.5);
+  doc.text("ÉDITIONS & BIBLIOTHÈQUE NUMÉRIQUE UNIVERSITAIRE", textStartX, y + 4.5);
 
   // Coordonnées légales à droite
   doc.setFont("helvetica", "normal");
@@ -267,19 +288,33 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
   }
 
   if (options.totalAmount) {
-    const totalBoxWidth = 75;
+    const defaultLabel =
+      options.docType === "RAPPORT_LOGISTIQUE"
+        ? "VOLUME GLOBAL DU STOCK :"
+        : options.docType === "REGISTRE_AUDIT"
+        ? "TOTAL DES ENTRÉES :"
+        : options.docType === "BON_COMMANDE"
+        ? "TOTAL COMMANDE :"
+        : options.docType === "BORDEREAU_REDEVANCES"
+        ? "TOTAL DES REDEVANCES :"
+        : options.docType === "RAPPORT_FINANCIER"
+        ? "TOTAL CONSOLIDÉ :"
+        : "TOTAL NET À PAYER :";
+
+    const label = options.totalLabel || defaultLabel;
+    const totalBoxWidth = 85;
     const totalX = pageWidth - margin - totalBoxWidth;
     
     doc.setFillColor(...navyRgb);
     doc.roundedRect(totalX, footerBlockY, totalBoxWidth, 14, 1.5, 1.5, "F");
     
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(220, 225, 235);
-    doc.text("TOTAL NET À PAYER :", totalX + 4, footerBlockY + 5.5);
+    doc.text(label, totalX + 4, footerBlockY + 5.5);
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setTextColor(...goldRgb);
     doc.text(options.totalAmount, totalX + 4, footerBlockY + 11);
   }

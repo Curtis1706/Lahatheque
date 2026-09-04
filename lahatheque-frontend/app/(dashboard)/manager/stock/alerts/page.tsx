@@ -95,27 +95,40 @@ export default function StockAlertsPage() {
     {
       key: "book_title",
       header: "Ouvrage en Alerte",
-      cell: (row) => (
-        <Link
-          href={`/manager/stock/${row.book_id}`}
-          className="flex items-center gap-3 group py-1"
-        >
-          <BookCover3D
-            title={row.book_title}
-            size="xs"
-            discipline={(row as any).discipline}
-            coverUrl={(row as any).cover_url}
-          />
-          <div className="min-w-0">
-            <p className="font-semibold text-xs text-navy group-hover:text-gold transition-colors truncate max-w-[200px]">
-              {row.book_title}
-            </p>
-            <p className="text-[10px] text-foreground-muted font-mono mt-0.5">
-              {row.isbn}
-            </p>
-          </div>
-        </Link>
-      ),
+      cell: (row) => {
+        const coverUrl =
+          row.cover_url ||
+          (row.book_id ? `/api/bff/catalog/books/${row.book_id}/cover/` : undefined);
+        return (
+          <Link
+            href={`/manager/stock/${row.book_id}`}
+            className="flex items-center gap-3 group py-1"
+          >
+            <BookCover3D
+              title={row.book_title}
+              authors={row.authors}
+              discipline={row.discipline}
+              coverUrl={coverUrl}
+              size="xs"
+            />
+            <div className="min-w-0">
+              <p className="font-semibold text-xs text-navy group-hover:text-gold transition-colors truncate max-w-[200px]">
+                {row.book_title}
+              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] text-foreground-muted font-mono">
+                  {row.isbn}
+                </span>
+                {row.discipline && (
+                  <span className="text-[9px] font-semibold text-navy bg-navy-light px-1.5 py-0.2 rounded">
+                    {row.discipline}
+                  </span>
+                )}
+              </div>
+            </div>
+          </Link>
+        );
+      },
     },
     {
       key: "alert_type",
@@ -301,6 +314,73 @@ export default function StockAlertsPage() {
         loading={loading}
         emptyMessage="Aucune alerte active — tous les stocks physiques sont satisfaisants."
         pageSize={10}
+        mobileCard={(row) => {
+          const coverUrl =
+            row.cover_url ||
+            (row.book_id ? `/api/bff/catalog/books/${row.book_id}/cover/` : undefined);
+          return (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <BookCover3D
+                  title={row.book_title}
+                  authors={row.authors}
+                  discipline={row.discipline}
+                  coverUrl={coverUrl}
+                  size="xs"
+                  interactive={false}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <StatusBadge status={row.alert_type} />
+                    <span
+                      className={`font-mono font-bold text-xs ${
+                        row.quantity === 0 ? "text-error" : "text-gold"
+                      }`}
+                    >
+                      {row.quantity} ex. restant{row.quantity > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <h4 className="font-serif font-bold text-navy text-sm leading-snug line-clamp-2">
+                    {row.book_title}
+                  </h4>
+                  {row.authors && row.authors.length > 0 && (
+                    <p className="text-xs text-foreground-muted mt-0.5 line-clamp-1">
+                      {row.authors.join(", ")}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-foreground-muted font-mono mt-0.5">
+                    Seuil d&apos;alerte : {row.alert_threshold} ex.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
+                <span className="text-foreground-muted flex items-center gap-1">
+                  <Warehouse className="w-3 h-3 text-gold shrink-0" />
+                  {(row as any).warehouse_nom || row.warehouse} ({row.country})
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      setRestockTarget(row);
+                      setRestockQty(Math.max(20, row.alert_threshold * 2));
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-navy text-white text-[11px] font-semibold hover:bg-navy-hover"
+                  >
+                    Réassort
+                  </button>
+                  {row.escalation_status !== "escalated" && (
+                    <button
+                      onClick={() => setEscalateTarget(row)}
+                      className="px-2.5 py-1 rounded-lg border border-gold/40 text-gold text-[11px] font-semibold hover:bg-gold/10"
+                    >
+                      Escalader
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }}
       />
 
       {/* Modale d'escalade */}

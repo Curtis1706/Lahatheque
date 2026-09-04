@@ -56,28 +56,33 @@ export default function StockGlobalPage() {
     {
       key: "title",
       header: "Ouvrage & Couverture",
-      cell: (row) => (
-        <Link
-          href={`/manager/stock/${row.id}`}
-          className="flex items-center gap-3 group py-1"
-        >
-          <BookCover3D
-            title={row.title}
-            authors={row.authors}
-            discipline={row.discipline}
-            coverUrl={(row as any).cover_url}
-            size="xs"
-          />
-          <div className="min-w-0">
-            <p className="font-semibold text-xs text-navy group-hover:text-gold transition-colors truncate max-w-[220px]">
-              {row.title}
-            </p>
-            <p className="text-[10px] text-foreground-muted font-mono mt-0.5">
-              ISBN : {row.isbn}
-            </p>
-          </div>
-        </Link>
-      ),
+      cell: (row) => {
+        const coverUrl =
+          row.cover_url ||
+          (row.book_id ? `/api/bff/catalog/books/${row.book_id}/cover/` : undefined);
+        return (
+          <Link
+            href={`/manager/stock/${row.id}`}
+            className="flex items-center gap-3 group py-1"
+          >
+            <BookCover3D
+              title={row.title}
+              authors={row.authors}
+              discipline={row.discipline}
+              coverUrl={coverUrl}
+              size="xs"
+            />
+            <div className="min-w-0">
+              <p className="font-semibold text-xs text-navy group-hover:text-gold transition-colors truncate max-w-[220px]">
+                {row.title}
+              </p>
+              <p className="text-[10px] text-foreground-muted font-mono mt-0.5">
+                ISBN : {row.isbn}
+              </p>
+            </div>
+          </Link>
+        );
+      },
     },
     {
       key: "discipline",
@@ -291,6 +296,52 @@ export default function StockGlobalPage() {
           window.location.href = `/manager/stock/${row.id}`;
         }}
         pageSize={10}
+        mobileCard={(row) => {
+          const coverUrl =
+            row.cover_url ||
+            (row.book_id ? `/api/bff/catalog/books/${row.book_id}/cover/` : undefined);
+          return (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <BookCover3D
+                  title={row.title}
+                  authors={row.authors}
+                  discipline={row.discipline}
+                  coverUrl={coverUrl}
+                  size="xs"
+                  interactive={false}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <StatusBadge status={row.status} />
+                    {row.discipline && (
+                      <span className="text-[10px] font-semibold text-navy bg-navy-light px-2 py-0.5 rounded-md">
+                        {row.discipline}
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="font-serif font-bold text-navy text-sm leading-snug line-clamp-2">
+                    {row.title}
+                  </h4>
+                  <p className="text-xs text-foreground-muted mt-0.5 line-clamp-1">
+                    {row.authors?.length > 0 ? row.authors.join(", ") : "—"}
+                  </p>
+                  <p className="text-[10px] font-mono text-foreground-muted mt-0.5">
+                    ISBN : {row.isbn}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
+                <span className="text-foreground-muted">
+                  {(row as any).warehouse_nom || row.warehouse} ({row.country})
+                </span>
+                <span className="font-mono font-bold text-navy">
+                  {row.quantity} ex. dispo
+                </span>
+              </div>
+            </div>
+          );
+        }}
       />
     </div>
   );

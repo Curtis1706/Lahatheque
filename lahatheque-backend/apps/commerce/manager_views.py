@@ -4,6 +4,7 @@ Périmètre : stocks papier uniquement (Entrepôt, StockOuvrage, MouvementStock,
 Format JSON unifié : { "success": bool, "data": ..., "error": null|str }
 Permission : rôle manager ou admin uniquement.
 """
+import logging
 import math
 from datetime import timedelta
 from django.utils import timezone
@@ -13,6 +14,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     Entrepot, StockOuvrage, MouvementStock,
@@ -91,7 +94,7 @@ class StockListView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
 
-        qs = StockOuvrage.objects.select_related("ouvrage", "entrepot").all()
+        qs = StockOuvrage.objects.select_related("ouvrage", "entrepot", "ouvrage__discipline").prefetch_related("ouvrage__authors").all()
 
         # Filtres
         warehouse = request.query_params.get("warehouse")
@@ -111,11 +114,19 @@ class StockListView(APIView):
             item_status = s.statut
             if status_filter and status_filter != "all" and item_status != status_filter:
                 continue
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in s.ouvrage.authors.all()] if s.ouvrage else []
+            discipline_name = s.ouvrage.discipline.name if (s.ouvrage and s.ouvrage.discipline) else ""
+            cover_url = s.ouvrage.cover_url if s.ouvrage else ""
+            if not cover_url and s.ouvrage:
+                cover_url = f"/api/bff/catalog/books/{s.ouvrage.id}/cover/"
             items.append({
                 "id": str(s.id),
-                "isbn": s.ouvrage.isbn,
-                "title": s.ouvrage.title,
-                "cover_url": s.ouvrage.cover_url,
+                "book_id": str(s.ouvrage.id) if s.ouvrage else "",
+                "isbn": s.ouvrage.isbn if s.ouvrage else "",
+                "title": s.ouvrage.title if s.ouvrage else "",
+                "authors": authors_list,
+                "discipline": discipline_name,
+                "cover_url": cover_url,
                 "warehouse": s.entrepot.code,
                 "warehouse_nom": s.entrepot.nom,
                 "pays": s.entrepot.pays,
@@ -138,16 +149,28 @@ class StockDetailView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
         try:
-            s = StockOuvrage.objects.select_related("ouvrage", "entrepot").get(pk=pk)
+            s = StockOuvrage.objects.select_related("ouvrage", "entrepot", "ouvrage__discipline", "ouvrage__publisher").prefetch_related("ouvrage__authors").get(pk=pk)
         except StockOuvrage.DoesNotExist:
             return Response({"success": False, "data": None, "error": "Stock introuvable."}, status=404)
 
         mouvements = MouvementStock.objects.filter(stock=s).order_by("-created_at")[:15]
+        authors_list = [f"{a.first_name} {a.last_name}".strip() for a in s.ouvrage.authors.all()] if s.ouvrage else []
+        discipline_name = s.ouvrage.discipline.name if (s.ouvrage and s.ouvrage.discipline) else ""
+        cover_url = s.ouvrage.cover_url if s.ouvrage else ""
+        if not cover_url and s.ouvrage:
+            cover_url = f"/api/bff/catalog/books/{s.ouvrage.id}/cover/"
+        pub_name = ""
+        if s.ouvrage:
+            pub_name = s.ouvrage.publisher_name or (s.ouvrage.publisher.company_name if s.ouvrage.publisher else "LAHA Éditions")
         data = {
             "id": str(s.id),
-            "isbn": s.ouvrage.isbn,
-            "title": s.ouvrage.title,
-            "cover_url": s.ouvrage.cover_url,
+            "book_id": str(s.ouvrage.id) if s.ouvrage else "",
+            "isbn": s.ouvrage.isbn if s.ouvrage else "",
+            "title": s.ouvrage.title if s.ouvrage else "",
+            "authors": authors_list,
+            "discipline": discipline_name,
+            "cover_url": cover_url,
+            "publisher_name": pub_name,
             "warehouse": s.entrepot.code,
             "warehouse_nom": s.entrepot.nom,
             "pays": s.entrepot.pays,
@@ -330,6 +353,15 @@ class StockManualExitView(APIView):
         )
 
         s.refresh_from_db()
+
+        # Vérification et alerte automatique si seuil bas ou rupture atteint
+        if s.quantite_disponible <= s.seuil_alerte:
+            try:
+                from apps.reporting.tasks import check_and_generate_stock_notifications
+                check_and_generate_stock_notifications()
+            except Exception as exc:
+                logger.warning(f"Stock alert notification failed: {exc}")
+
         return Response({"success": True, "data": {"quantite_reelle": s.quantite_reelle, "statut": s.statut}, "error": None})
 
 
@@ -340,28 +372,41 @@ class StockMovementsView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
 
-        qs = MouvementStock.objects.select_related("stock__ouvrage", "stock__entrepot", "auteur").order_by("-created_at")
+        qs = MouvementStock.objects.select_related(
+            "stock__ouvrage",
+            "stock__entrepot",
+            "stock__ouvrage__discipline",
+            "auteur"
+        ).prefetch_related(
+            "stock__ouvrage__authors"
+        ).order_by("-created_at")
 
         stock_id = request.query_params.get("stock_id")
         if stock_id:
             qs = qs.filter(stock__id=stock_id)
 
-        data = [
-            {
+        data = []
+        for m in qs[:100]:
+            ouvrage = m.stock.ouvrage if (m.stock and m.stock.ouvrage) else None
+            authors = [f"{a.first_name} {a.last_name}".strip() for a in ouvrage.authors.all()] if (ouvrage and hasattr(ouvrage, 'authors')) else []
+            data.append({
                 "id": str(m.id),
-                "title": m.stock.ouvrage.title,
-                "isbn": m.stock.ouvrage.isbn,
-                "warehouse": m.stock.entrepot.code,
-                "pays": m.stock.entrepot.pays,
+                "book_id": str(ouvrage.id) if ouvrage else "",
+                "title": ouvrage.title if ouvrage else "Ouvrage",
+                "isbn": ouvrage.isbn if ouvrage else "",
+                "authors": authors,
+                "discipline": ouvrage.discipline.name if (ouvrage and ouvrage.discipline) else "",
+                "cover_url": ouvrage.cover_url if ouvrage else (f"/api/bff/catalog/books/{ouvrage.id}/cover/" if ouvrage else ""),
+                "warehouse": m.stock.entrepot.code if (m.stock and m.stock.entrepot) else "",
+                "warehouse_nom": m.stock.entrepot.nom if (m.stock and m.stock.entrepot) else "",
+                "pays": m.stock.entrepot.pays if (m.stock and m.stock.entrepot) else "",
                 "type_mouvement": m.type_mouvement,
                 "quantite": m.quantite,
                 "reference_document": m.reference_document,
                 "motif": m.motif,
                 "created_at": m.created_at.isoformat(),
                 "created_by": m.auteur.get_full_name() if m.auteur else "Système",
-            }
-            for m in qs[:100]
-        ]
+            })
         return Response({"success": True, "data": data, "error": None})
 
 
@@ -372,24 +417,42 @@ class StockAlertsView(APIView):
         if not _is_manager_or_admin(request.user):
             return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
 
-        stocks = StockOuvrage.objects.select_related("ouvrage", "entrepot").all()
-        alerts = [
-            {
-                "id": str(s.id),
-                "isbn": s.ouvrage.isbn,
-                "title": s.ouvrage.title,
-                "cover_url": s.ouvrage.cover_url,
-                "warehouse": s.entrepot.code,
-                "warehouse_nom": s.entrepot.nom,
-                "pays": s.entrepot.pays,
-                "quantite_disponible": s.quantite_disponible,
-                "seuil_alerte": s.seuil_alerte,
-                "statut": s.statut,
-                "last_restock_at": s.last_restock_at.isoformat() if s.last_restock_at else None,
-            }
-            for s in stocks
-            if s.statut in ("out_of_stock", "low_stock")
-        ]
+        stocks = StockOuvrage.objects.select_related(
+            "ouvrage",
+            "entrepot",
+            "ouvrage__discipline"
+        ).prefetch_related(
+            "ouvrage__authors"
+        ).all()
+
+        # Identifier les ruptures déjà signalées/escaladées
+        escalated_stock_ids = set(
+            MouvementStock.objects.filter(
+                motif__startswith="[ESCALADE ADMIN]"
+            ).values_list("stock_id", flat=True)
+        )
+
+        alerts = []
+        for s in stocks:
+            if s.statut in ("out_of_stock", "low_stock"):
+                authors = [f"{a.first_name} {a.last_name}".strip() for a in s.ouvrage.authors.all()] if (s.ouvrage and hasattr(s.ouvrage, 'authors')) else []
+                alerts.append({
+                    "id": str(s.id),
+                    "book_id": str(s.ouvrage.id) if s.ouvrage else "",
+                    "isbn": s.ouvrage.isbn if s.ouvrage else "",
+                    "title": s.ouvrage.title if s.ouvrage else "",
+                    "authors": authors,
+                    "discipline": s.ouvrage.discipline.name if (s.ouvrage and s.ouvrage.discipline) else "",
+                    "cover_url": s.ouvrage.cover_url if s.ouvrage else (f"/api/bff/catalog/books/{s.ouvrage.id}/cover/" if s.ouvrage else ""),
+                    "warehouse": s.entrepot.code,
+                    "warehouse_nom": s.entrepot.nom,
+                    "pays": s.entrepot.pays,
+                    "quantite_disponible": s.quantite_disponible,
+                    "seuil_alerte": s.seuil_alerte,
+                    "statut": s.statut,
+                    "escalation_status": "escalated" if s.id in escalated_stock_ids else "not_escalated",
+                    "last_restock_at": s.last_restock_at.isoformat() if s.last_restock_at else None,
+                })
         return Response({"success": True, "data": alerts, "error": None})
 
 
@@ -418,13 +481,13 @@ class DeliveriesListView(APIView):
 
         data = []
         for d in qs:
-            lignes = d.commande.lignes.select_related('ouvrage').all() if d.commande else []
+            lignes = d.commande.lignes.select_related('ouvrage').filter(ouvrage__isnull=False).all() if d.commande else []
             items = [
                 {
                     "id": str(l.id),
                     "book_id": str(l.ouvrage_id) if l.ouvrage_id else "",
                     "book_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
-                    "cover_url": l.ouvrage.cover_image.url if l.ouvrage and l.ouvrage.cover_image else None,
+                    "cover_url": l.ouvrage.cover_url if (l.ouvrage and l.ouvrage.cover_url) else (f"/api/bff/catalog/books/{l.ouvrage.id}/cover/" if l.ouvrage else None),
                     "isbn": (l.ouvrage.isbn if l.ouvrage else "") or "—",
                     "quantity": l.quantity or 1,
                     "format_type": l.format_type,
@@ -433,6 +496,9 @@ class DeliveriesListView(APIView):
                 }
                 for l in lignes
             ]
+            if not items:
+                continue
+
             client_user = d.commande.user if d.commande else None
             role_label = ""
             if client_user and hasattr(client_user, "role"):
@@ -479,7 +545,11 @@ class DeliveriesListView(APIView):
 
         # Commandes grossistes (WholesaleOrder) avec exemplaires physiques
         from .models import WholesaleOrder, WholesaleOrderStatus
-        w_qs = WholesaleOrder.objects.filter(total_print_copies__gt=0).select_related("user").prefetch_related("items__book").all().order_by("-created_at")
+        w_qs = WholesaleOrder.objects.filter(
+            total_print_copies__gt=0
+        ).exclude(
+            status=WholesaleOrderStatus.CANCELLED
+        ).select_related("user").prefetch_related("items__book").all().order_by("-created_at")
 
         for wo in w_qs:
             if wo.status == WholesaleOrderStatus.DELIVERED:
@@ -495,17 +565,19 @@ class DeliveriesListView(APIView):
             w_items = [
                 {
                     "id": str(it.id),
-                    "book_id": str(it.book_id),
-                    "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
-                    "cover_url": it.book.cover_url if it.book and it.book.cover_url else (it.book.cover_image.url if it.book and it.book.cover_image else None),
-                    "isbn": it.isbn or (it.book.isbn if it.book else "—"),
+                    "book_id": str(it.book_id) if it.book_id else "",
+                    "book_title": it.book.title if it.book else it.title,
+                    "cover_url": it.book.cover_url if (it.book and it.book.cover_url) else (f"/api/bff/catalog/books/{it.book.id}/cover/" if it.book else None),
+                    "isbn": (it.book.isbn if it.book else it.isbn) or "—",
                     "quantity": it.print_copies_qty,
                     "format_type": "paper",
                     "unit_price": float(it.print_unit_price),
                     "total_price": float(it.print_unit_price * it.print_copies_qty),
                 }
-                for it in wo.items.filter(print_copies_qty__gt=0)
+                for it in wo.items.filter(print_copies_qty__gt=0, book__isnull=False)
             ]
+            if not w_items:
+                continue
 
             user_name = wo.user.get_full_name() if wo.user else ""
             client_label = f"{wo.company_name} (Grossiste - {user_name or wo.user.email})" if user_name else f"{wo.company_name} (Grossiste)"
@@ -864,8 +936,50 @@ class EntrepotsListView(APIView):
 
 
 class StockEscalateView(APIView):
-    """Escalade une alerte de rupture vers l'administrateur."""
+    """Escalade et consultation des alertes de rupture vers l'administrateur."""
     permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not _is_manager_or_admin(request.user):
+            return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
+
+        escalations = MouvementStock.objects.filter(
+            motif__startswith="[ESCALADE ADMIN]"
+        ).select_related(
+            "stock__ouvrage",
+            "stock__entrepot",
+            "stock__ouvrage__discipline",
+            "auteur"
+        ).prefetch_related(
+            "stock__ouvrage__authors"
+        ).order_by("-created_at")
+
+        data = []
+        for m in escalations:
+            s = m.stock
+            ouvrage = s.ouvrage if (s and s.ouvrage) else None
+            entrepot = s.entrepot if (s and s.entrepot) else None
+            authors = [f"{a.first_name} {a.last_name}".strip() for a in ouvrage.authors.all()] if (ouvrage and hasattr(ouvrage, 'authors')) else []
+            impact = m.motif.replace("[ESCALADE ADMIN]", "").strip()
+
+            data.append({
+                "id": str(m.id),
+                "stock_id": str(s.id) if s else "",
+                "book_id": str(ouvrage.id) if ouvrage else "",
+                "book_title": ouvrage.title if ouvrage else "Ouvrage",
+                "isbn": (ouvrage.isbn if ouvrage else "") or "—",
+                "authors": authors,
+                "discipline": ouvrage.discipline.name if (ouvrage and ouvrage.discipline) else "",
+                "cover_url": ouvrage.cover_url if (ouvrage and ouvrage.cover_url) else (f"/api/bff/catalog/books/{ouvrage.id}/cover/" if ouvrage else None),
+                "warehouse": entrepot.code if entrepot else "—",
+                "warehouse_nom": entrepot.nom if entrepot else "—",
+                "pays": entrepot.pays if entrepot else "—",
+                "reported_at": m.created_at.isoformat(),
+                "admin_status": "reported",
+                "impact_description": impact or "Rupture signalée pour réapprovisionnement urgent.",
+                "reported_by": m.auteur.get_full_name() if m.auteur else "Gestionnaire",
+            })
+        return Response({"success": True, "data": data, "error": None})
 
     def post(self, request):
         if not _is_manager_or_admin(request.user):
@@ -878,12 +992,12 @@ class StockEscalateView(APIView):
             return Response({"success": False, "data": None, "error": "stock_id est requis."}, status=400)
 
         try:
-            s = StockOuvrage.objects.select_related("ouvrage", "entrepot").get(pk=stock_id)
+            s = StockOuvrage.objects.select_related("ouvrage", "entrepot", "ouvrage__discipline").prefetch_related("ouvrage__authors").get(pk=stock_id)
         except StockOuvrage.DoesNotExist:
             return Response({"success": False, "data": None, "error": "Stock introuvable."}, status=404)
 
         # Crée un mouvement de type "adjustment" pour traçabilité
-        MouvementStock.objects.create(
+        m = MouvementStock.objects.create(
             stock=s,
             type_mouvement="adjustment",
             quantite=0,
@@ -891,13 +1005,42 @@ class StockEscalateView(APIView):
             auteur=request.user,
         )
 
+        # Notification in-app immédiate pour les administrateurs
+        try:
+            from apps.accounts.models import User
+            from apps.reporting.models import Notification
+            from apps.reporting.services import notify_user
+            admins = User.objects.filter(role__in=['admin', 'super_admin'], is_active=True)
+            for adm in admins:
+                notify_user(
+                    user=adm,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title=f"Rupture escaladée : {s.ouvrage.title}",
+                    message=f"Le gestionnaire a remonté une alerte sur « {s.ouvrage.title} » ({s.entrepot.nom}). Motif : {impact_description or 'Rupture imminente'}.",
+                    action_url="/manager/coordination",
+                    resource_id=f"escalate_{m.id}",
+                )
+        except Exception as notif_err:
+            logger.warning(f"Erreur notification escalade admin: {notif_err}")
+
+        authors = [f"{a.first_name} {a.last_name}".strip() for a in s.ouvrage.authors.all()] if (s.ouvrage and hasattr(s.ouvrage, 'authors')) else []
+
         data = {
-            "id": str(s.id),
-            "book_title": s.ouvrage.title,
-            "isbn": s.ouvrage.isbn,
-            "warehouse": s.entrepot.code,
-            "escalated_at": timezone.now().isoformat(),
-            "impact_description": impact_description,
+            "id": str(m.id),
+            "stock_id": str(s.id),
+            "book_id": str(s.ouvrage.id) if s.ouvrage else "",
+            "book_title": s.ouvrage.title if s.ouvrage else "Ouvrage",
+            "isbn": (s.ouvrage.isbn if s.ouvrage else "") or "—",
+            "authors": authors,
+            "discipline": s.ouvrage.discipline.name if (s.ouvrage and s.ouvrage.discipline) else "",
+            "cover_url": s.ouvrage.cover_url if (s.ouvrage and s.ouvrage.cover_url) else (f"/api/bff/catalog/books/{s.ouvrage.id}/cover/" if s.ouvrage else None),
+            "warehouse": s.entrepot.code if s.entrepot else "—",
+            "warehouse_nom": s.entrepot.nom if s.entrepot else "—",
+            "pays": s.entrepot.pays if s.entrepot else "—",
+            "reported_at": m.created_at.isoformat(),
+            "admin_status": "reported",
+            "impact_description": impact_description or "Rupture signalée pour réapprovisionnement urgent.",
+            "reported_by": request.user.get_full_name() or "Gestionnaire",
         }
         return Response({"success": True, "data": data, "error": None})
 

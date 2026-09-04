@@ -2,17 +2,11 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   BookOpen,
   ArrowLeft,
-  Search,
-  Filter,
-  Eye,
   ShoppingBag,
-  Building2,
-  GraduationCap,
-  Sparkles,
+  Eye,
 } from "lucide-react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -22,39 +16,26 @@ import type { UniversityBookCatalogItem } from "@/lib/types/university";
 export default function UniversityCatalogPage() {
   const [books, setBooks] = useState<UniversityBookCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [facultyFilter, setFacultyFilter] = useState("all");
 
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await getUniversityCatalog();
-      setBooks(data);
-      setLoading(false);
+      try {
+        const data = await getUniversityCatalog();
+        setBooks(data);
+      } catch (err) {
+        console.error("Erreur chargement catalogue universitaire:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);
 
-  const faculties = useMemo(() => {
-    const set = new Set(books.map((b) => b.faculty_code));
-    return Array.from(set);
+  const disciplines = useMemo(() => {
+    const set = new Set(books.map((b) => b.discipline).filter(Boolean));
+    return Array.from(set).sort();
   }, [books]);
-
-  const filteredBooks = useMemo(() => {
-    return books.filter((b) => {
-      if (facultyFilter !== "all" && b.faculty_code !== facultyFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchTitle = b.title.toLowerCase().includes(q);
-        const matchAuthor = Array.isArray(b.authors)
-          ? b.authors.some((a) => a.toLowerCase().includes(q))
-          : String(b.authors || "").toLowerCase().includes(q);
-        const matchIsbn = (b.isbn_digital || "").toLowerCase().includes(q) || (b.isbn_print || "").toLowerCase().includes(q);
-        if (!matchTitle && !matchAuthor && !matchIsbn) return false;
-      }
-      return true;
-    });
-  }, [books, searchQuery, facultyFilter]);
 
   const columns: DataTableColumn<UniversityBookCatalogItem>[] = [
     {
@@ -72,10 +53,14 @@ export default function UniversityCatalogPage() {
             interactive={false}
           />
           <div className="space-y-0.5 min-w-0">
-            <p className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[240px]">
+            <Link
+              href={`/catalog/${row.id}`}
+              className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[240px] hover:underline block"
+              title={`Consulter la fiche détaillée : ${row.title}`}
+            >
               {row.title}
-            </p>
-            <p className="text-[10px] text-foreground-muted">
+            </Link>
+            <p className="text-[10px] text-foreground-muted truncate max-w-[240px]">
               {Array.isArray(row.authors) ? row.authors.join(", ") : (row.authors || "Auteur inconnu")}
             </p>
             <p className="text-[9px] font-mono text-foreground-muted">ISBN : {row.isbn_digital}</p>
@@ -84,16 +69,13 @@ export default function UniversityCatalogPage() {
       ),
     },
     {
-      key: "faculty_name",
-      header: "Faculté & Discipline",
+      key: "discipline",
+      header: "Discipline",
       hideOnMobile: true,
       cell: (row) => (
-        <div>
-          <span className="px-2 py-0.5 rounded-md bg-navy-light text-navy text-[11px] font-bold border border-navy-hover/20">
-            {row.faculty_code}
-          </span>
-          <p className="text-[10px] text-foreground-muted mt-1">{row.discipline}</p>
-        </div>
+        <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-navy/5 text-navy text-xs font-semibold border border-border">
+          {row.discipline || "Général"}
+        </span>
       ),
     },
     {
@@ -123,21 +105,32 @@ export default function UniversityCatalogPage() {
     },
     {
       key: "actions" as keyof UniversityBookCatalogItem,
-      header: "",
+      header: "Actions",
+      className: "text-right min-w-[270px]",
       cell: (row) => (
         <div className="flex items-center gap-2 justify-end">
           <Link
-            href={`/catalog/reader/${row.id}`}
+            href={`/catalog/${row.id}`}
+            className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold hover:text-navy text-foreground-muted text-[11px] font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
+            title="Consulter les détails de l'ouvrage"
+          >
+            <Eye className="w-3.5 h-3.5 text-navy" />
+            <span>Détails</span>
+          </Link>
+
+          <Link
+            href={`/catalog/reader/${row.id}?mode=sample`}
             className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-[11px] font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
-            title="Prévisualiser dans la Liseuse LAHA"
+            title="Lire l'extrait gratuit"
           >
             <BookOpen className="w-3.5 h-3.5 text-gold" />
-            <span>Liseuse</span>
+            <span>Lire</span>
           </Link>
 
           <Link
             href={`/university/purchases/new`}
             className="px-3 py-1.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-[11px] font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
+            title="Commander des exemplaires papier"
           >
             <ShoppingBag className="w-3.5 h-3.5 text-gold" />
             <span>Commander</span>
@@ -171,7 +164,7 @@ export default function UniversityCatalogPage() {
             Catalogue d&apos;Ouvrages de l&apos;Université
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Consultez les ouvrages affiliés à votre établissement, ouvrez-les dans la liseuse LAHA ou commandez des exemplaires papier.
+            Consultez les ouvrages du fonds académique, lisez leurs extraits gratuits ou commandez des exemplaires papier pour votre campus.
           </p>
         </div>
 
@@ -184,43 +177,88 @@ export default function UniversityCatalogPage() {
         </Link>
       </div>
 
-      {/* Filtres & Recherche */}
-      <div className="p-4 rounded-2xl bg-background border border-border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher par titre, auteur ou ISBN..."
-            className="w-full pl-9 pr-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
-          <select
-            value={facultyFilter}
-            onChange={(e) => setFacultyFilter(e.target.value)}
-            className="px-3 py-2 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
-          >
-            <option value="all">Toutes les Facultés</option>
-            {faculties.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Table DataTable 21st.dev paginée */}
+      {/* Table DataTable 21st.dev paginée avec recherche et filtre par discipline intégrés */}
       <DataTable
-        data={filteredBooks}
+        data={books}
         columns={columns}
         rowKey="id"
         loading={loading}
+        searchable={true}
+        searchPlaceholder="Rechercher par titre, auteur ou ISBN..."
+        filterKey="discipline"
+        filterOptions={disciplines.map((d) => ({ value: d, label: d }))}
+        filterPlaceholder="Toutes les disciplines"
         emptyMessage="Aucun ouvrage ne correspond à votre recherche."
         pageSize={10}
+        mobileCard={(row) => (
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <BookCover3D
+                title={row.title}
+                authors={row.authors}
+                discipline={row.discipline}
+                coverUrl={row.cover_url}
+                size="xs"
+                interactive={false}
+              />
+              <div className="space-y-1 min-w-0 flex-1">
+                <Link
+                  href={`/catalog/${row.id}`}
+                  className="font-serif font-bold text-sm text-navy leading-snug hover:underline block"
+                >
+                  {row.title}
+                </Link>
+                <p className="text-xs text-foreground-muted">
+                  {Array.isArray(row.authors) ? row.authors.join(", ") : (row.authors || "Auteur inconnu")}
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-navy/5 text-navy text-[10px] font-semibold border border-border">
+                    {row.discipline || "Général"}
+                  </span>
+                  <span className="text-[10px] font-mono text-foreground-muted">
+                    ISBN : {row.isbn_digital}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/50 text-xs">
+              <div>
+                <p className="font-mono font-semibold text-navy">
+                  Numérique : {row.price_digital.toLocaleString("fr-FR")} {row.currency}
+                </p>
+                <p className="font-mono text-[11px] text-foreground-muted">
+                  Papier : {row.price_paper.toLocaleString("fr-FR")} {row.currency}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/catalog/${row.id}`}
+                  className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold text-navy text-xs font-semibold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
+                  title="Consulter les détails"
+                >
+                  <Eye className="w-3.5 h-3.5 text-navy" />
+                  <span>Détails</span>
+                </Link>
+                <Link
+                  href={`/catalog/reader/${row.id}?mode=sample`}
+                  className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-xs font-bold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
+                  title="Lire l'extrait gratuit"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-gold" />
+                  <span>Lire</span>
+                </Link>
+                <Link
+                  href="/university/purchases/new"
+                  className="px-3 py-1.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5 text-gold" />
+                  <span>Commander</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       />
     </div>
   );

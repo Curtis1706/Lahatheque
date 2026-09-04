@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Wallet,
   CheckCircle2,
@@ -10,24 +11,52 @@ import {
   Building2,
   Coins,
   RefreshCw,
-  Search,
+  ArrowLeft,
   Calendar,
   User,
+  TrendingUp,
 } from "lucide-react";
-import { getManagerFinanceReport, type ManagerFinanceReport } from "@/lib/services/manager";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  getManagerFinanceReport,
+  type ManagerFinanceReport,
+  type CreditOrder,
+} from "@/lib/services/manager";
 
-const PAYMENT_METHOD_LABELS: Record<string, { label: string; icon: React.ElementType }> = {
-  mobile_money: { label: "Mobile Money (MTN / Moov)", icon: Coins },
-  virement: { label: "Virement Bancaire", icon: Building2 },
-  especes: { label: "Espèces à la livraison", icon: Wallet },
-  carte: { label: "Carte Bancaire", icon: CreditCard },
+const PAYMENT_METHOD_CONFIG: Record<
+  string,
+  { label: string; icon: React.ElementType; colorClass: string; bgClass: string }
+> = {
+  mobile_money: {
+    label: "Mobile Money (MTN / Moov)",
+    icon: Coins,
+    colorClass: "text-gold",
+    bgClass: "bg-gold/10",
+  },
+  carte: {
+    label: "Carte Bancaire",
+    icon: CreditCard,
+    colorClass: "text-navy",
+    bgClass: "bg-navy/10",
+  },
+  virement: {
+    label: "Virement Bancaire",
+    icon: Building2,
+    colorClass: "text-info",
+    bgClass: "bg-info/10",
+  },
+  especes: {
+    label: "Espèces à la livraison",
+    icon: Wallet,
+    colorClass: "text-success",
+    bgClass: "bg-success/10",
+  },
 };
 
 export default function ManagerFinancePage() {
   const [report, setReport] = useState<ManagerFinanceReport | null>(null);
   const [loading, setLoading] = useState(true);
-  const [searchCredit, setSearchCredit] = useState("");
 
   const loadData = async () => {
     setLoading(true);
@@ -35,7 +64,7 @@ export default function ManagerFinancePage() {
       const data = await getManagerFinanceReport();
       setReport(data);
     } catch {
-      // Fallback empty
+      // Keep state clean on network failure
     } finally {
       setLoading(false);
     }
@@ -45,259 +74,459 @@ export default function ManagerFinancePage() {
     loadData();
   }, []);
 
-  const filteredCredits = (report?.credit_orders || []).filter((o) => {
-    const q = searchCredit.toLowerCase();
-    return o.author_name.toLowerCase().includes(q) || o.id.toLowerCase().includes(q);
-  });
+  const totalPaid = report?.total_revenue_paid || 0;
+  const overdueCount = report?.credit_overdue_count || 0;
+  const paymentMethods = report?.revenue_by_payment_method || [];
+
+  const columns: DataTableColumn<CreditOrder>[] = [
+    {
+      key: "id",
+      header: "Référence",
+      cell: (row) => (
+        <span className="font-mono text-xs font-bold text-navy bg-navy/5 px-2.5 py-1 rounded-md border border-border inline-block">
+          #{row.id.slice(0, 8)}
+        </span>
+      ),
+    },
+    {
+      key: "author_name",
+      header: "Partenaire / Bénéficiaire",
+      cell: (row) => {
+        const isWholesale = row.author_name.startsWith("[Grossiste]");
+        const cleanName = isWholesale
+          ? row.author_name.replace("[Grossiste]", "").trim()
+          : row.author_name;
+
+        return (
+          <div className="flex items-center gap-2.5 py-0.5">
+            <div className="w-7 h-7 rounded-lg bg-navy/5 flex items-center justify-center shrink-0 border border-border">
+              {isWholesale ? (
+                <Building2 className="w-3.5 h-3.5 text-navy" />
+              ) : (
+                <User className="w-3.5 h-3.5 text-gold" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-xs text-navy truncate max-w-[240px]">
+                  {cleanName}
+                </span>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider bg-background-secondary text-foreground-muted border border-border">
+                  {isWholesale ? "Grossiste" : "Auteur"}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "amount",
+      header: "Montant Dû",
+      className: "text-right",
+      cell: (row) => (
+        <span className="font-mono font-bold text-xs text-navy whitespace-nowrap">
+          {row.amount.toLocaleString("fr-FR")}{" "}
+          <span className="text-[10px] font-normal text-foreground-muted">FCFA</span>
+        </span>
+      ),
+    },
+    {
+      key: "due_date",
+      header: "Échéance",
+      className: "text-center",
+      cell: (row) => {
+        if (!row.due_date) {
+          return <span className="text-xs text-foreground-muted font-mono">—</span>;
+        }
+        const isOverdue = row.is_overdue && row.statut_paiement === "pending";
+        return (
+          <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+            <Calendar className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+            <span
+              className={`text-xs font-mono ${
+                isOverdue ? "text-error font-bold" : "text-foreground"
+              }`}
+            >
+              {new Date(row.due_date).toLocaleDateString("fr-FR", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              })}
+            </span>
+            {isOverdue && (
+              <span className="text-[9px] font-bold text-error bg-error/10 border border-error/20 px-1.5 py-0.2 rounded">
+                Retard
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "statut_paiement",
+      header: "Paiement",
+      className: "text-center",
+      cell: (row) => (
+        <div className="flex justify-center">
+          <StatusBadge status={row.statut_paiement === "paid" ? "paid" : "pending"} />
+        </div>
+      ),
+    },
+    {
+      key: "statut_commande",
+      header: "Livraison",
+      className: "text-center",
+      cell: (row) => (
+        <div className="flex justify-center">
+          <StatusBadge status={row.statut_commande} />
+        </div>
+      ),
+    },
+    {
+      key: "created_at",
+      header: "Émis le",
+      hideOnMobile: true,
+      className: "text-right",
+      cell: (row) => (
+        <span className="text-xs text-foreground-muted font-mono whitespace-nowrap">
+          {new Date(row.created_at).toLocaleDateString("fr-FR", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })}
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-8 pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5 text-xs text-foreground-muted mb-1">
-            <span>Gestionnaire</span>
-            <span>/</span>
-            <span className="text-navy font-semibold">Supervision Financière</span>
-          </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Rapports & Flux Financiers
-          </h1>
-          <p className="text-sm text-foreground-muted mt-1">
-            Supervision des encaissements réels, modes de paiement et achats à crédit des auteurs
-          </p>
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto">
+      {/* Breadcrumb & Navigation */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-xs text-foreground-muted">
+          <Link href="/manager" className="hover:text-navy transition-colors">
+            Vue d&apos;ensemble
+          </Link>
+          <span>/</span>
+          <span className="text-navy font-semibold">Supervision Financière</span>
         </div>
 
-        <button
-          type="button"
-          onClick={loadData}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-background-secondary border border-border text-navy hover:border-gold/40 text-xs font-bold transition-all min-h-[44px]"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-gold" : "text-foreground-muted"}`} />
-          <span>Actualiser</span>
-        </button>
+        <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <Link
+              href="/manager"
+              className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline mb-2"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Vue d&apos;ensemble
+            </Link>
+            <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+              <Coins className="w-4 h-4 text-gold" />
+              Trésorerie & Règlements
+            </div>
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+              Rapports & Flux Financiers
+            </h1>
+            <p className="text-xs sm:text-sm text-foreground-muted mt-1">
+              Supervision des encaissements réels, modes de paiement et achats à crédit des auteurs et partenaires.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadData}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-background border border-border text-navy hover:border-gold/40 text-xs font-bold transition-all min-h-[42px] shrink-0 shadow-xs"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${loading ? "animate-spin text-gold" : "text-foreground-muted"}`}
+            />
+            <span>Actualiser</span>
+          </button>
+        </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards (4 métriques alignées) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-3xl bg-background border border-border space-y-3">
+        {/* Encaissé Réel */}
+        <div className="p-5 rounded-2xl bg-background border border-border shadow-xs hover:border-gold/30 transition-all space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Encaissé Réel</span>
-            <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-              <CheckCircle2 className="w-5 h-5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">
+              Encaissé Réel
+            </span>
+            <div className="p-2 rounded-xl bg-success/10 text-success border border-success/20">
+              <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="font-serif text-2xl font-bold text-navy">
-              {(report?.total_revenue_paid || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
+            <div className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+              {totalPaid.toLocaleString("fr-FR")}
+              <span className="text-xs font-normal text-foreground-muted font-sans ml-1">FCFA</span>
             </div>
             <p className="text-xs text-foreground-muted mt-1">Total des commandes payées</p>
           </div>
         </div>
 
-        <div className="p-5 rounded-3xl bg-background border border-border space-y-3">
+        {/* Crédits en Cours */}
+        <div className="p-5 rounded-2xl bg-background border border-border shadow-xs hover:border-gold/30 transition-all space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Crédits en Cours</span>
-            <div className="p-2.5 rounded-2xl bg-gold/10 text-gold border border-gold/20">
-              <Clock className="w-5 h-5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">
+              Crédits en Cours
+            </span>
+            <div className="p-2 rounded-xl bg-gold/10 text-gold border border-gold/20">
+              <Clock className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="font-serif text-2xl font-bold text-navy">
-              {(report?.credit_outstanding_total || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
+            <div className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+              {(report?.credit_outstanding_total || 0).toLocaleString("fr-FR")}
+              <span className="text-xs font-normal text-foreground-muted font-sans ml-1">FCFA</span>
             </div>
             <p className="text-xs text-foreground-muted mt-1">Achats auteurs en attente de règlement</p>
           </div>
         </div>
 
-        <div className="p-5 rounded-3xl bg-background border border-border space-y-3">
+        {/* Crédits Réglés */}
+        <div className="p-5 rounded-2xl bg-background border border-border shadow-xs hover:border-gold/30 transition-all space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Crédits Réglés</span>
-            <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-600 border border-blue-500/20">
-              <Wallet className="w-5 h-5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">
+              Crédits Réglés
+            </span>
+            <div className="p-2 rounded-xl bg-info/10 text-info border border-info/20">
+              <Wallet className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className="font-serif text-2xl font-bold text-navy">
-              {(report?.credit_settled_total || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
+            <div className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+              {(report?.credit_settled_total || 0).toLocaleString("fr-FR")}
+              <span className="text-xs font-normal text-foreground-muted font-sans ml-1">FCFA</span>
             </div>
             <p className="text-xs text-foreground-muted mt-1">Anciens crédits apurés avec succès</p>
           </div>
         </div>
 
-        <div className="p-5 rounded-3xl bg-background border border-border space-y-3">
+        {/* Crédits en Retard */}
+        <div className="p-5 rounded-2xl bg-background border border-border shadow-xs hover:border-gold/30 transition-all space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Crédits en Retard</span>
-            <div className={`p-2.5 rounded-2xl border ${(report?.credit_overdue_count || 0) > 0 ? "bg-rose-500/10 text-rose-600 border-rose-500/20" : "bg-background-secondary text-foreground-muted border-border"}`}>
-              <AlertTriangle className="w-5 h-5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">
+              Crédits en Retard
+            </span>
+            <div
+              className={`p-2 rounded-xl border ${
+                overdueCount > 0
+                  ? "bg-error/10 text-error border-error/20"
+                  : "bg-background-secondary text-foreground-muted border-border"
+              }`}
+            >
+              <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <div className={`font-serif text-2xl font-bold ${(report?.credit_overdue_count || 0) > 0 ? "text-rose-600" : "text-navy"}`}>
-              {report?.credit_overdue_count || 0} <span className="text-xs font-normal text-foreground-muted">dossier{(report?.credit_overdue_count || 0) > 1 ? "s" : ""}</span>
+            <div
+              className={`font-serif text-2xl sm:text-3xl font-bold ${
+                overdueCount > 0 ? "text-error" : "text-navy"
+              }`}
+            >
+              {overdueCount}
+              <span className="text-xs font-normal text-foreground-muted font-sans ml-1">
+                dossier{overdueCount > 1 ? "s" : ""}
+              </span>
             </div>
             <p className="text-xs text-foreground-muted mt-1">Échéance de paiement dépassée</p>
           </div>
         </div>
       </div>
 
-      {/* Breakdown by Payment Method */}
-      <div className="p-6 rounded-3xl bg-background border border-border space-y-5">
-        <div>
-          <h2 className="font-serif text-lg font-bold text-navy">Répartition par Mode de Paiement</h2>
-          <p className="text-xs text-foreground-muted mt-0.5">Encaissements réels validés par canal financier</p>
+      {/* Répartition par Mode de Paiement */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-background border border-border shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-4">
+          <div>
+            <h2 className="font-serif text-lg font-bold text-navy flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-gold" />
+              Répartition par Mode de Paiement
+            </h2>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              Quote-part et volume des encaissements réels validés par canal financier.
+            </p>
+          </div>
+          <div className="text-xs text-foreground-muted font-mono">
+            Total validé : <strong className="text-navy">{totalPaid.toLocaleString("fr-FR")} FCFA</strong>
+          </div>
         </div>
 
+        {/* Barre de répartition visuelle */}
+        {totalPaid > 0 && paymentMethods.length > 0 && (
+          <div className="space-y-2">
+            <div className="h-2.5 w-full bg-background-secondary rounded-full overflow-hidden flex border border-border">
+              {paymentMethods.map((item) => {
+                const pct = (item.total / totalPaid) * 100;
+                const isMobileMoney = item.method === "mobile_money";
+                return (
+                  <div
+                    key={item.method}
+                    style={{ width: `${pct}%` }}
+                    className={`h-full ${isMobileMoney ? "bg-gold" : "bg-navy"}`}
+                    title={`${item.method}: ${pct.toFixed(1)}%`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Grille adaptative des modes de paiement */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {(report?.revenue_by_payment_method || []).map((item) => {
-            const config = PAYMENT_METHOD_LABELS[item.method] || { label: item.method, icon: CreditCard };
+          {paymentMethods.map((item) => {
+            const config = PAYMENT_METHOD_CONFIG[item.method] || {
+              label: item.method,
+              icon: CreditCard,
+              colorClass: "text-navy",
+              bgClass: "bg-navy/10",
+            };
             const Icon = config.icon;
+            const pct = totalPaid > 0 ? (item.total / totalPaid) * 100 : 0;
+
             return (
-              <div key={item.method} className="p-4 rounded-2xl bg-background-secondary border border-border flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-navy/5 text-navy border border-border">
-                  <Icon className="w-5 h-5 text-gold" />
+              <div
+                key={item.method}
+                className="p-4 rounded-xl bg-background-secondary border border-border flex items-center gap-3.5 hover:border-gold/30 transition-all"
+              >
+                <div
+                  className={`w-10 h-10 rounded-xl ${config.bgClass} ${config.colorClass} border border-border flex items-center justify-center shrink-0`}
+                >
+                  <Icon className="w-5 h-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-foreground-muted truncate">{config.label}</p>
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="text-xs font-semibold text-navy truncate">{config.label}</p>
+                    <span className="text-[10px] font-mono font-bold text-navy bg-background px-1.5 py-0.2 rounded border border-border">
+                      {pct.toFixed(0)}%
+                    </span>
+                  </div>
                   <p className="font-serif font-bold text-navy text-base mt-0.5">
-                    {item.total.toLocaleString("fr-FR")} <span className="text-[10px] font-normal">FCFA</span>
+                    {item.total.toLocaleString("fr-FR")}{" "}
+                    <span className="text-[10px] font-normal font-sans text-foreground-muted">FCFA</span>
                   </p>
-                  <p className="text-[11px] text-foreground-muted">{item.count} commande{item.count > 1 ? "s" : ""}</p>
+                  <p className="text-[10px] text-foreground-muted mt-0.5">
+                    {item.count} commande{item.count > 1 ? "s" : ""}
+                  </p>
                 </div>
               </div>
             );
           })}
-          {(report?.revenue_by_payment_method || []).length === 0 && (
+
+          {paymentMethods.length === 0 && (
             <div className="col-span-full py-8 text-center text-xs text-foreground-muted">
-              Aucune commande payée enregistrée pour le moment.
+              Aucun encaissement enregistré pour le moment.
             </div>
           )}
         </div>
       </div>
 
-      {/* Credit Orders Detailed List */}
-      <div className="p-6 rounded-3xl bg-background border border-border space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="font-serif text-lg font-bold text-navy">Registre des Commandes à Crédit Auteurs</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              Suivi des sorties de stock et accès numériques accordés sur échéancier
-            </p>
-          </div>
-
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Rechercher un auteur ou réf..."
-              value={searchCredit}
-              onChange={(e) => setSearchCredit(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-border bg-background-secondary text-navy placeholder:text-foreground-muted focus:outline-none focus:border-gold min-h-[40px]"
-            />
-          </div>
+      {/* Registre des Commandes à Crédit Auteurs & Grossistes */}
+      <div className="space-y-3">
+        <div>
+          <h2 className="font-serif text-lg font-bold text-navy">
+            Registre des Commandes à Crédit Auteurs & Grossistes
+          </h2>
+          <p className="text-xs text-foreground-muted mt-0.5">
+            Suivi des sorties de stock et facilités de paiement accordées sur échéancier.
+          </p>
         </div>
 
-        {/* Mobile View: Cards */}
-        <div className="block lg:hidden space-y-3">
-          {filteredCredits.map((c) => (
-            <div key={c.id} className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs font-bold text-navy">#{c.id.slice(0, 8)}</span>
-                {c.is_overdue && c.statut_paiement === "pending" ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
-                    <AlertTriangle className="w-3 h-3" /> En retard
+        <DataTable<CreditOrder>
+          data={report?.credit_orders || []}
+          columns={columns}
+          rowKey="id"
+          searchable={true}
+          searchPlaceholder="Rechercher par partenaire, montant, référence..."
+          filterKey="statut_paiement"
+          filterPlaceholder="Tous les paiements"
+          filterOptions={[
+            { value: "pending", label: "En attente" },
+            { value: "paid", label: "Réglé" },
+          ]}
+          pageSize={10}
+          pageSizeOptions={[10, 20, 50]}
+          showPagination={true}
+          loading={loading}
+          skeletonRows={4}
+          emptyMessage="Aucune commande à crédit enregistrée pour le moment."
+          mobileCard={(row) => {
+            const isWholesale = row.author_name.startsWith("[Grossiste]");
+            const cleanName = isWholesale
+              ? row.author_name.replace("[Grossiste]", "").trim()
+              : row.author_name;
+            const isOverdue = row.is_overdue && row.statut_paiement === "pending";
+
+            return (
+              <div className="space-y-3 p-1">
+                {/* Header card */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs font-bold text-navy bg-navy/5 px-2 py-0.5 rounded border border-border">
+                    #{row.id.slice(0, 8)}
                   </span>
-                ) : (
-                  <StatusBadge status={c.statut_paiement === "paid" ? "paid" : "pending"} />
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs text-navy font-semibold">
-                  <User className="w-3.5 h-3.5 text-gold" />
-                  <span>{c.author_name}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-foreground-muted pt-1">
-                  <span>Montant dû :</span>
-                  <span className="font-mono font-bold text-navy">{c.amount.toLocaleString("fr-FR")} FCFA</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-foreground-muted">
-                  <span>Échéance :</span>
-                  <span className={`font-medium ${c.is_overdue && c.statut_paiement === "pending" ? "text-rose-600 font-bold" : "text-navy"}`}>
-                    {c.due_date ? new Date(c.due_date).toLocaleDateString("fr-FR") : "Non définie"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {filteredCredits.length === 0 && (
-            <div className="p-8 text-center text-xs text-foreground-muted">
-              Aucun paiement en dépôt trouvé.
-            </div>
-          )}
-        </div>
-
-        {/* Desktop View: Table */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-border text-foreground-muted">
-                <th className="pb-3 font-semibold uppercase tracking-wider">Référence</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider">Auteur Partenaire</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-right">Montant</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-center">Échéance</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-center">Statut Paiement</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-center">Statut Commande</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-right">Date d&apos;émission</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredCredits.map((c) => (
-                <tr key={c.id} className="hover:bg-background-secondary/50 transition-colors">
-                  <td className="py-3.5 font-mono font-bold text-navy">#{c.id.slice(0, 8)}</td>
-                  <td className="py-3.5 font-medium text-navy">{c.author_name}</td>
-                  <td className="py-3.5 font-mono font-bold text-navy text-right">{c.amount.toLocaleString("fr-FR")} FCFA</td>
-                  <td className="py-3.5 text-center">
-                    {c.due_date ? (
-                      <div className="inline-flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-foreground-muted" />
-                        <span className={c.is_overdue && c.statut_paiement === "pending" ? "text-rose-600 font-bold" : "text-navy"}>
-                          {new Date(c.due_date).toLocaleDateString("fr-FR")}
-                        </span>
-                        {c.is_overdue && c.statut_paiement === "pending" && (
-                          <span className="text-[10px] text-rose-600 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
-                            Retard
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-foreground-muted">—</span>
+                  <div className="flex items-center gap-1.5">
+                    {isOverdue && (
+                      <span className="text-[10px] font-bold text-error bg-error/10 border border-error/20 px-1.5 py-0.5 rounded">
+                        Retard
+                      </span>
                     )}
-                  </td>
-                  <td className="py-3.5 text-center">
-                    <StatusBadge status={c.statut_paiement === "paid" ? "paid" : "pending"} />
-                  </td>
-                  <td className="py-3.5 text-center">
-                    <StatusBadge status={c.statut_commande} />
-                  </td>
-                  <td className="py-3.5 text-right text-foreground-muted">
-                    {new Date(c.created_at).toLocaleDateString("fr-FR")}
-                  </td>
-                </tr>
-              ))}
+                    <StatusBadge status={row.statut_paiement === "paid" ? "paid" : "pending"} />
+                  </div>
+                </div>
 
-              {filteredCredits.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-foreground-muted">
-                    Aucun achat à crédit trouvé.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                {/* Info Bénéficiaire */}
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="w-6 h-6 rounded bg-navy/5 flex items-center justify-center shrink-0 border border-border">
+                    {isWholesale ? (
+                      <Building2 className="w-3 h-3 text-navy" />
+                    ) : (
+                      <User className="w-3 h-3 text-gold" />
+                    )}
+                  </div>
+                  <span className="font-semibold text-navy truncate">{cleanName}</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded uppercase bg-background-secondary text-foreground-muted border border-border ml-auto">
+                    {isWholesale ? "Grossiste" : "Auteur"}
+                  </span>
+                </div>
+
+                {/* Métriques */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-foreground-muted block">
+                      Montant
+                    </span>
+                    <span className="font-mono font-bold text-navy">
+                      {row.amount.toLocaleString("fr-FR")} FCFA
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-foreground-muted block">
+                      Échéance
+                    </span>
+                    <span
+                      className={`font-mono text-xs ${
+                        isOverdue ? "text-error font-bold" : "text-foreground"
+                      }`}
+                    >
+                      {row.due_date
+                        ? new Date(row.due_date).toLocaleDateString("fr-FR")
+                        : "Non définie"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Footer card */}
+                <div className="flex items-center justify-between pt-2 border-t border-border/60 text-[11px] text-foreground-muted">
+                  <span>Livraison :</span>
+                  <StatusBadge status={row.statut_commande} />
+                </div>
+              </div>
+            );
+          }}
+        />
       </div>
     </div>
   );
