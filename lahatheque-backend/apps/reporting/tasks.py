@@ -331,6 +331,17 @@ def task_calculate_monthly_royalties():
         units_sold=Count('id'),
     )
 
+    ventes_par_format = {}
+    for row in LigneCommande.objects.filter(
+        commande__created_at__gte=last_month_start,
+        commande__created_at__lte=last_month_end,
+        commande__statut_paiement='paid',
+    ).values('ouvrage', 'format_type').annotate(sous_total=Sum('unit_price')):
+        ouvrage_id = row['ouvrage']
+        ventes_par_format.setdefault(ouvrage_id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00')})
+        fmt = row['format_type'] if row['format_type'] in ('digital', 'paper') else 'digital'
+        ventes_par_format[ouvrage_id][fmt] += Decimal(str(row['sous_total'] or 0))
+
     calculations_created = 0
     payout_lines_created = 0
     payout_lines_corrected = 0
@@ -363,8 +374,15 @@ def task_calculate_monthly_royalties():
                 )
                 university_statements_created += 1
 
+        from apps.rights.models import RoyaltyRate
+
         publisher_payout = Decimal("0.00")
-        if ouvrage.publisher and hasattr(ouvrage.publisher, 'contractual_royalty_rate'):
+        book_specific_rate = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
+
+        if book_specific_rate:
+            pub_rate = Decimal(str(book_specific_rate.publisher_share_percent)) / Decimal("100")
+            publisher_payout = (total_sales * pub_rate).quantize(Decimal("0.01"))
+        elif ouvrage.publisher and hasattr(ouvrage.publisher, 'contractual_royalty_rate'):
             pub_rate = Decimal(str(ouvrage.publisher.contractual_royalty_rate)) / Decimal("100")
             publisher_payout = (total_sales * pub_rate).quantize(Decimal("0.01"))
 
@@ -383,10 +401,31 @@ def task_calculate_monthly_royalties():
         if author_pool <= 0:
             continue
 
+        from apps.rights.models import RepartitionDroits
+
+        ventes_fmt = ventes_par_format.get(ouvrage.id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00')})
+
         author_rights = AuthorRight.objects.filter(ouvrage=ouvrage, user__isnull=False)
         for right in author_rights:
-            share = Decimal(str(right.pool_share_percent)) / Decimal("100")
-            amount = (author_pool * share).quantize(Decimal("0.01"))
+            repartition = RepartitionDroits.objects.filter(ouvrage=ouvrage, beneficiaire=right.user).first()
+
+            if repartition and (repartition.taux_papier is not None or repartition.taux_numerique is not None):
+                taux_papier = Decimal(str(repartition.taux_papier)) / Decimal("100") if repartition.taux_papier is not None else Decimal("0")
+                taux_numerique = Decimal(str(repartition.taux_numerique)) / Decimal("100") if repartition.taux_numerique is not None else Decimal("0")
+
+                if total_sales > 0:
+                    ratio_retenue = author_pool / total_sales
+                else:
+                    ratio_retenue = Decimal("1")
+
+                amount = (
+                    (ventes_fmt['paper'] * ratio_retenue * taux_papier) +
+                    (ventes_fmt['digital'] * ratio_retenue * taux_numerique)
+                ).quantize(Decimal("0.01"))
+            else:
+                share = Decimal(str(right.pool_share_percent)) / Decimal("100")
+                amount = (author_pool * share).quantize(Decimal("0.01"))
+
             if amount <= 0:
                 continue
 
