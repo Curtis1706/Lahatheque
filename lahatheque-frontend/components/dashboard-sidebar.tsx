@@ -465,13 +465,34 @@ export function DashboardSidebar() {
     }
   }, [pathname]);
 
+  const getDashboardRoot = () => {
+    if (!user) return "/student";
+    const roleDashboardMap: Record<string, string> = {
+      admin: "/admin",
+      super_admin: "/admin",
+      university: "/university",
+      publisher: "/publisher",
+      author: "/author",
+      teacher: "/teacher",
+      student: "/student",
+      parent: "/student",
+      wholesaler: "/wholesaler",
+      super_client: "/wholesaler",
+      legal_reviewer: "/legal-reviewer",
+      layout_artist: "/layout-artist",
+      chief_layout: "/chief-layout",
+      manager: "/manager",
+    };
+    return (user.role && roleDashboardMap[user.role]) || `/${user.role}`;
+  };
+
   return (
     <AnimatedSidebar ariaLabel="Menu de navigation principal" collapsible="icon">
       {/* Header avec Logo responsive */}
       <AnimatedSidebarHeader className="p-3 pb-2">
         <div className="flex min-h-11 items-center justify-between gap-2 overflow-hidden px-1 group-data-[state=collapsed]/sidebar:justify-center">
           <Link
-            href="/"
+            href={getDashboardRoot()}
             className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-xl py-1 overflow-hidden"
           >
             <div className="size-8 shrink-0 flex items-center justify-center rounded-lg bg-gold/15">

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   Menu, 
   X, 
@@ -19,12 +19,38 @@ import { HeaderSearchBar } from "@/components/features/search/header-search-bar"
 import { useCart } from "@/context/cart-context";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { ContactSupportDialog } from "@/components/ui/contact-support-dialog";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const { totalCount, toggleDrawer } = useCart();
+
+  useEffect(() => {
+    if (!loading && user) {
+      const roleDashboardMap: Record<string, string> = {
+        admin: "/admin",
+        super_admin: "/admin",
+        university: "/university",
+        publisher: "/publisher",
+        author: "/author",
+        teacher: "/teacher",
+        student: "/student",
+        parent: "/student",
+        wholesaler: "/wholesaler",
+        super_client: "/wholesaler",
+        legal_reviewer: "/legal-reviewer",
+        layout_artist: "/layout-artist",
+        chief_layout: "/chief-layout",
+        manager: "/manager",
+      };
+      const dashboardUrl = (user.role && roleDashboardMap[user.role]) || `/${user.role || "student"}`;
+      router.replace(dashboardUrl);
+    }
+  }, [user, loading, router]);
 
   const toggleDropdown = (name: string) => {
     if (activeDropdown === name) {
@@ -33,6 +59,19 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       setActiveDropdown(name);
     }
   };
+
+  // Si l'utilisateur est connecté, bloquer l'accès aux pages publiques et afficher un écran de transition
+  if (user) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-10 h-10 rounded-full border-2 border-gold border-t-transparent animate-spin" />
+        <p className="font-serif text-lg font-bold text-navy">Redirection vers votre espace de travail...</p>
+        <p className="text-xs text-foreground-muted font-sans">
+          Vous êtes connecté. Accès réservé à votre tableau de bord.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">

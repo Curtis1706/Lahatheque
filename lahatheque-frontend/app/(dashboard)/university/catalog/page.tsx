@@ -10,12 +10,14 @@ import {
 } from "lucide-react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
+import { UniversityBookDetailModal } from "@/components/features/university/university-book-detail-modal";
 import { getUniversityCatalog } from "@/lib/services/university";
 import type { UniversityBookCatalogItem } from "@/lib/types/university";
 
 export default function UniversityCatalogPage() {
   const [books, setBooks] = useState<UniversityBookCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBook, setSelectedBook] = useState<UniversityBookCatalogItem | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -44,22 +46,29 @@ export default function UniversityCatalogPage() {
       className: "min-w-[320px]",
       cell: (row) => (
         <div className="flex items-center gap-3 py-1">
-          <BookCover3D
-            title={row.title}
-            authors={row.authors}
-            discipline={row.discipline}
-            coverUrl={row.cover_url}
-            size="xs"
-            interactive={false}
-          />
+          <div
+            onClick={() => setSelectedBook(row)}
+            className="cursor-pointer hover:opacity-90 transition-opacity"
+            title="Cliquez pour voir les détails"
+          >
+            <BookCover3D
+              title={row.title}
+              authors={row.authors}
+              discipline={row.discipline}
+              coverUrl={row.cover_url}
+              size="xs"
+              interactive={false}
+            />
+          </div>
           <div className="space-y-0.5 min-w-0">
-            <Link
-              href={`/catalog/${row.id}`}
-              className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[240px] hover:underline block"
+            <button
+              type="button"
+              onClick={() => setSelectedBook(row)}
+              className="font-serif font-bold text-xs text-navy leading-snug truncate max-w-[240px] hover:underline text-left cursor-pointer block"
               title={`Consulter la fiche détaillée : ${row.title}`}
             >
               {row.title}
-            </Link>
+            </button>
             <p className="text-[10px] text-foreground-muted truncate max-w-[240px]">
               {Array.isArray(row.authors) ? row.authors.join(", ") : (row.authors || "Auteur inconnu")}
             </p>
@@ -109,14 +118,15 @@ export default function UniversityCatalogPage() {
       className: "text-right min-w-[270px]",
       cell: (row) => (
         <div className="flex items-center gap-2 justify-end">
-          <Link
-            href={`/catalog/${row.id}`}
-            className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold hover:text-navy text-foreground-muted text-[11px] font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
+          <button
+            type="button"
+            onClick={() => setSelectedBook(row)}
+            className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold hover:text-navy text-foreground-muted text-[11px] font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px] cursor-pointer"
             title="Consulter les détails de l'ouvrage"
           >
             <Eye className="w-3.5 h-3.5 text-navy" />
             <span>Détails</span>
-          </Link>
+          </button>
 
           <Link
             href={`/catalog/reader/${row.id}?mode=sample`}
@@ -193,21 +203,27 @@ export default function UniversityCatalogPage() {
         mobileCard={(row) => (
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <BookCover3D
-                title={row.title}
-                authors={row.authors}
-                discipline={row.discipline}
-                coverUrl={row.cover_url}
-                size="xs"
-                interactive={false}
-              />
+              <div
+                onClick={() => setSelectedBook(row)}
+                className="cursor-pointer hover:opacity-90 transition-opacity shrink-0"
+              >
+                <BookCover3D
+                  title={row.title}
+                  authors={row.authors}
+                  discipline={row.discipline}
+                  coverUrl={row.cover_url}
+                  size="xs"
+                  interactive={false}
+                />
+              </div>
               <div className="space-y-1 min-w-0 flex-1">
-                <Link
-                  href={`/catalog/${row.id}`}
-                  className="font-serif font-bold text-sm text-navy leading-snug hover:underline block"
+                <button
+                  type="button"
+                  onClick={() => setSelectedBook(row)}
+                  className="font-serif font-bold text-sm text-navy leading-snug hover:underline text-left cursor-pointer block"
                 >
                   {row.title}
-                </Link>
+                </button>
                 <p className="text-xs text-foreground-muted">
                   {Array.isArray(row.authors) ? row.authors.join(", ") : (row.authors || "Auteur inconnu")}
                 </p>
@@ -232,14 +248,15 @@ export default function UniversityCatalogPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href={`/catalog/${row.id}`}
-                  className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold text-navy text-xs font-semibold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
+                <button
+                  type="button"
+                  onClick={() => setSelectedBook(row)}
+                  className="px-3 py-1.5 rounded-xl bg-background-secondary border border-border hover:border-gold text-navy text-xs font-semibold transition-colors inline-flex items-center gap-1.5 min-h-[36px] cursor-pointer"
                   title="Consulter les détails"
                 >
                   <Eye className="w-3.5 h-3.5 text-navy" />
                   <span>Détails</span>
-                </Link>
+                </button>
                 <Link
                   href={`/catalog/reader/${row.id}?mode=sample`}
                   className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-xs font-bold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
@@ -259,6 +276,13 @@ export default function UniversityCatalogPage() {
             </div>
           </div>
         )}
+      />
+
+      {/* Modale de détails d'ouvrage sécurisée en interne */}
+      <UniversityBookDetailModal
+        book={selectedBook}
+        isOpen={!!selectedBook}
+        onClose={() => setSelectedBook(null)}
       />
     </div>
   );
