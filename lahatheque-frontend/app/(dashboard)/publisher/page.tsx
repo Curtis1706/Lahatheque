@@ -178,10 +178,10 @@ export default function PublisherOverviewPage() {
               href: "/publisher/catalog/batch",
             },
             {
-              label: "Gestion des Clés API",
-              desc: "Client Credentials OAuth 2.0 pour votre ERP",
-              icon: Key,
-              href: "/publisher/api",
+              label: "Suivi des Dépôts",
+              desc: "Circuit de validation éditoriale en 5 étapes",
+              icon: Clock,
+              href: "/publisher/submissions",
             },
             {
               label: "Protections Anti-Piratage",
@@ -196,9 +196,9 @@ export default function PublisherOverviewPage() {
               href: "/publisher/royalties",
             },
             {
-              label: "Journaux de Traçabilité",
-              desc: "Inspecter les accès et tatouages par utilisateur",
-              icon: Clock,
+              label: "Statistiques & Lectorat",
+              desc: "Consultations et téléchargements détaillés",
+              icon: BookOpen,
               href: "/publisher/stats",
             },
           ].map((item) => (
