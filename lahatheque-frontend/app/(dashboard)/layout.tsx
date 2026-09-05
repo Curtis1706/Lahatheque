@@ -62,7 +62,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <NotificationBell />
             <DashboardSidebar />
             <AnimatedSidebarInset className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-background">
-              <div className="flex-1 min-w-0">{children}</div>
+              <div className="flex-1 min-w-0">
+                <React.Suspense
+                  fallback={
+                    <div className="p-6 space-y-4 animate-pulse max-w-7xl mx-auto w-full">
+                      <div className="h-8 bg-background-secondary rounded-xl w-1/4" />
+                      <div className="h-64 bg-background-secondary rounded-3xl" />
+                    </div>
+                  }
+                >
+                  {children}
+                </React.Suspense>
+              </div>
             </AnimatedSidebarInset>
             {/* Floating Dock Bottom Navigation for Mobile (21st.dev Floating Nav) */}
             <MobileBottomNav />

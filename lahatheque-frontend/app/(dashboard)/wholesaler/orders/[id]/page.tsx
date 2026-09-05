@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, PackageCheck, Download, FileText, AlertTriangle, ShieldCheck, XCircle, RotateCcw, Clock, Calendar, CheckCircle2 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -12,8 +13,9 @@ import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { generateOfficialPdf } from "@/lib/services/export-service";
 
-export default function WholesalerOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
+export default function WholesalerOrderDetailPage() {
+  const params = useParams();
+  const orderId = (params?.id as string) || "";
   const [order, setOrder] = useState<WholesalerOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
@@ -25,10 +27,11 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
   const [returning, setReturning] = useState(false);
 
   useEffect(() => {
+    if (!orderId) return;
     async function loadData() {
       setLoading(true);
       try {
-        const data = await getWholesalerOrderDetail(resolvedParams.id);
+        const data = await getWholesalerOrderDetail(orderId);
         setOrder(data);
       } catch (err) {
         console.error("Erreur de chargement du détail de la commande", err);
@@ -37,7 +40,7 @@ export default function WholesalerOrderDetailPage({ params }: { params: Promise<
       }
     }
     loadData();
-  }, [resolvedParams.id]);
+  }, [orderId]);
 
   const handleConfirmCancel = async (orderId: string, reason: string) => {
     const success = await requestOrderCancellation(orderId, reason);

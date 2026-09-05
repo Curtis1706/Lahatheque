@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, BookOpen, ShieldCheck, Eye, Download, Tag, DollarSign, Lock, Edit3 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -8,20 +9,22 @@ import { ValidationStepTracker } from "@/components/features/publisher/validatio
 import { getPublisherBookDetail } from "@/lib/services/publisher";
 import type { PublisherBook } from "@/lib/types/publisher";
 
-export default function PublisherBookDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
+export default function PublisherBookDetailPage() {
+  const params = useParams();
+  const bookId = (params?.id as string) || "";
   const [book, setBook] = useState<PublisherBook | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!bookId) return;
     async function loadData() {
       setLoading(true);
-      const data = await getPublisherBookDetail(resolvedParams.id);
+      const data = await getPublisherBookDetail(bookId);
       setBook(data);
       setLoading(false);
     }
     loadData();
-  }, [resolvedParams.id]);
+  }, [bookId]);
 
   if (loading) {
     return (

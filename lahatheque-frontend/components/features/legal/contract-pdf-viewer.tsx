@@ -1,22 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  FileText, 
-  ShieldCheck, 
+import {
+  FileText,
+  ShieldCheck,
   CheckCircle2,
   FileCode,
   AlignLeft,
   Maximize2,
   Minimize2,
-  X,
+  ExternalLink,
+  Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Viewer, Worker as PdfWorker, SpecialZoomLevel } from "@react-pdf-viewer/core";
-import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
-import "@react-pdf-viewer/core/lib/styles/index.css";
-import "@react-pdf-viewer/default-layout/lib/styles/index.css";
-import { PageLoader } from "@/components/ui/page-loader";
 
 interface ContractPdfViewerProps {
   contractId?: string;
@@ -57,58 +53,18 @@ export function ContractPdfViewer({
   };
 
   const [viewMode, setViewMode] = useState<"preview" | "summary">("preview");
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [loadingPdf, setLoadingPdf] = useState(true);
 
-  const isDocx = fileName.toLowerCase().endsWith(".docx") || fileName.toLowerCase().endsWith(".doc");
+  const isDocx =
+    fileName.toLowerCase().endsWith(".docx") ||
+    fileName.toLowerCase().endsWith(".doc");
 
-  const targetPdfUrl = React.useMemo(() => {
+  const targetPdfUrl = useMemo(() => {
     if (streamUrl) return streamUrl;
     if (contractId) return `/api/bff/rights/legal/contracts/${contractId}/stream`;
     if (!fileUrl) return "";
     if (fileUrl.startsWith("http") || fileUrl.startsWith("/")) return fileUrl;
     return `/uploads/${fileUrl}`;
   }, [contractId, streamUrl, fileUrl]);
-
-  useEffect(() => {
-    let isCancelled = false;
-    setLoadingPdf(true);
-    fetch(targetPdfUrl, {
-      headers: { Accept: "application/pdf" },
-      credentials: "include",
-    })
-      .then(async (res) => {
-        if (res.ok) {
-          const blob = await res.blob();
-          if (!isCancelled) {
-            setBlobUrl(URL.createObjectURL(blob));
-          }
-        } else if (fileUrl && fileUrl !== targetPdfUrl) {
-          // Fallback sur le fichier direct si le stream échoue
-          const fallbackRes = await fetch(fileUrl.startsWith("http") || fileUrl.startsWith("/") ? fileUrl : `/uploads/${fileUrl}`);
-          if (fallbackRes.ok && !isCancelled) {
-            const fallbackBlob = await fallbackRes.blob();
-            setBlobUrl(URL.createObjectURL(fallbackBlob));
-          }
-        }
-      })
-      .catch((err) => console.warn("[ContractPdfViewer] Erreur chargement stream DRM:", err))
-      .finally(() => {
-        if (!isCancelled) setLoadingPdf(false);
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [targetPdfUrl, fileUrl]);
-
-  useEffect(() => {
-    return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
-    };
-  }, [blobUrl]);
 
   // Écoute de la touche Échap pour quitter le mode Grand Écran
   useEffect(() => {
@@ -134,63 +90,6 @@ export function ContractPdfViewer({
     };
   }, [isGrandEcran]);
 
-  const defaultLayoutPluginInstance = useMemo(
-    () =>
-      defaultLayoutPlugin({
-        toolbarPlugin: {
-          searchPlugin: {
-            keyword: "",
-          },
-        },
-        sidebarTabs: () => [], // Pleine largeur dédiée à la lecture directe du contrat
-        renderToolbar: (Toolbar: any) => (
-          <Toolbar>
-            {(props: any) => {
-              const {
-                CurrentPageInput,
-                EnterFullScreen,
-                GoToNextPage,
-                GoToPreviousPage,
-                NumberOfPages,
-                ShowSearchPopover,
-                Zoom,
-                ZoomIn,
-                ZoomOut,
-                Rotate,
-              } = props;
-              return (
-                <div className="rpv-contract-toolbar flex items-center justify-between w-full px-3 py-2 bg-background-secondary border-b border-border text-navy text-xs flex-wrap gap-2">
-                  <div className="flex items-center gap-1">
-                    <ShowSearchPopover />
-                    <Rotate />
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <GoToPreviousPage />
-                    <div className="w-12 text-center">
-                      <CurrentPageInput />
-                    </div>
-                    <span className="text-foreground-muted text-[11px] font-semibold">sur</span>
-                    <NumberOfPages />
-                    <GoToNextPage />
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <ZoomOut />
-                    <Zoom />
-                    <ZoomIn />
-                    <div className="w-px h-4 bg-border mx-1" />
-                    <EnterFullScreen />
-                  </div>
-                </div>
-              );
-            }}
-          </Toolbar>
-        ),
-      }),
-    []
-  );
-
   const formatSize = (bytes?: number) => {
     if (!bytes) return "";
     if (bytes > 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
@@ -200,28 +99,24 @@ export function ContractPdfViewer({
   const renderViewerContent = (isFull: boolean) => {
     if (viewMode === "preview" && !isDocx) {
       return (
-        <div className={cn(
-          "relative bg-background-secondary w-full flex flex-col border border-border overflow-hidden rpv-contract-viewer",
-          isFull ? "flex-1 h-full rounded-none border-0" : "rounded-2xl h-[820px] md:h-[880px] shadow-xs"
-        )}>
-          {loadingPdf ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-gold">
-              <PageLoader label="Chargement du document contractuel..." />
-            </div>
-          ) : blobUrl ? (
-            <div className="w-full h-full overflow-hidden">
-              <PdfWorker workerUrl="/pdf.worker.min.js">
-                <Viewer
-                  fileUrl={blobUrl}
-                  plugins={[defaultLayoutPluginInstance]}
-                  defaultScale={SpecialZoomLevel.PageWidth}
-                />
-              </PdfWorker>
-            </div>
+        <div
+          className={cn(
+            "relative bg-background-secondary w-full flex flex-col border border-border overflow-hidden",
+            isFull
+              ? "flex-1 h-full rounded-none border-0"
+              : "rounded-2xl h-[700px] md:h-[820px] shadow-xs"
+          )}
+        >
+          {targetPdfUrl ? (
+            <iframe
+              src={`${targetPdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+              className="w-full h-full border-none bg-background-secondary"
+              title={`Lecture directe du contrat - ${title}`}
+            />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-foreground-muted text-xs p-6 space-y-2">
               <FileText className="w-8 h-8 text-gold/50" />
-              <p>Impossible de charger le flux du document contractuel.</p>
+              <p>Aucun flux de document disponible pour ce contrat.</p>
             </div>
           )}
         </div>
@@ -229,13 +124,19 @@ export function ContractPdfViewer({
     }
 
     return (
-      <div className={cn(
-        "bg-background w-full p-6 sm:p-8 border border-border overflow-y-auto space-y-4",
-        isFull ? "flex-1 h-full rounded-none border-0" : "rounded-2xl h-[820px] md:h-[880px]"
-      )}>
+      <div
+        className={cn(
+          "bg-background w-full p-6 sm:p-8 border border-border overflow-y-auto space-y-4",
+          isFull
+            ? "flex-1 h-full rounded-none border-0"
+            : "rounded-2xl h-[700px] md:h-[820px]"
+        )}
+      >
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div>
-            <span className="text-[10px] font-mono font-bold text-gold uppercase">{reference}</span>
+            <span className="text-[10px] font-mono font-bold text-gold uppercase">
+              {reference}
+            </span>
             <h4 className="font-serif font-bold text-navy text-base">{title}</h4>
           </div>
           <span className="text-[10px] font-bold text-success uppercase tracking-wider bg-success/10 px-2.5 py-1 rounded-full border border-success/20 flex items-center gap-1">
@@ -256,6 +157,16 @@ export function ContractPdfViewer({
                 ? "Fichier Word DOCX archivé dans le coffre juridique LAHAThèque."
                 : "Contrat juridique signé et archivé dans la base certifiée LAHAThèque."}
             </p>
+            {targetPdfUrl && (
+              <a
+                href={targetPdfUrl}
+                download={fileName || "contrat.pdf"}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-navy text-gold text-xs font-bold hover:bg-navy-dark transition-colors border border-gold/30 mt-2"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Télécharger le document
+              </a>
+            )}
           </div>
         )}
       </div>
@@ -275,10 +186,16 @@ export function ContractPdfViewer({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-xs text-gold">{reference}</span>
-                  <span className="text-[10px] uppercase font-bold text-white/70">• Mode Grand Écran</span>
+                  <span className="font-mono font-bold text-xs text-gold">
+                    {reference}
+                  </span>
+                  <span className="text-[10px] uppercase font-bold text-white/70">
+                    Mode Grand Écran
+                  </span>
                 </div>
-                <h2 className="font-serif font-bold text-sm sm:text-base text-white truncate">{title}</h2>
+                <h2 className="font-serif font-bold text-sm sm:text-base text-white truncate">
+                  {title}
+                </h2>
               </div>
             </div>
 
@@ -290,24 +207,41 @@ export function ContractPdfViewer({
                     onClick={() => setViewMode("preview")}
                     className={cn(
                       "px-3 py-1.5 rounded-lg font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1.5",
-                      viewMode === "preview" ? "bg-gold text-navy font-bold shadow-xs" : "text-white/70 hover:text-white"
+                      viewMode === "preview"
+                        ? "bg-gold text-navy font-bold shadow-xs"
+                        : "text-white/70 hover:text-white"
                     )}
                   >
                     <FileText className="w-3.5 h-3.5" />
-                    <span>PDF</span>
+                    <span>Document</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setViewMode("summary")}
                     className={cn(
                       "px-3 py-1.5 rounded-lg font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1.5",
-                      viewMode === "summary" ? "bg-gold text-navy font-bold shadow-xs" : "text-white/70 hover:text-white"
+                      viewMode === "summary"
+                        ? "bg-gold text-navy font-bold shadow-xs"
+                        : "text-white/70 hover:text-white"
                     )}
                   >
                     <AlignLeft className="w-3.5 h-3.5" />
                     <span>Texte &amp; Clauses</span>
                   </button>
                 </div>
+              )}
+
+              {targetPdfUrl && (
+                <a
+                  href={targetPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2 rounded-xl bg-navy-dark hover:bg-navy-hover text-white text-xs font-semibold transition-colors inline-flex items-center gap-1.5 border border-border"
+                  title="Ouvrir dans un nouvel onglet"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Nouvel onglet</span>
+                </a>
               )}
 
               <button
@@ -318,7 +252,9 @@ export function ContractPdfViewer({
               >
                 <Minimize2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Quitter le Grand Écran</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-navy/15 text-navy font-bold">Échap</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-navy/15 text-navy font-bold">
+                  Échap
+                </span>
               </button>
             </div>
           </div>
@@ -331,11 +267,16 @@ export function ContractPdfViewer({
       )}
 
       {/* Cadre In-Page Pleine Largeur */}
-      <div className={cn("p-4 sm:p-5 rounded-3xl bg-background border border-border shadow-xs space-y-4", className)}>
+      <div
+        className={cn(
+          "p-4 sm:p-5 rounded-3xl bg-background border border-border shadow-xs space-y-4",
+          className
+        )}
+      >
         {/* Barre d'en-tête du document */}
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-navy-light text-navy shrink-0">
+            <div className="p-2.5 rounded-xl bg-navy/5 text-navy shrink-0 border border-border">
               {isDocx ? (
                 <FileCode className="w-5 h-5 text-gold" />
               ) : (
@@ -343,16 +284,20 @@ export function ContractPdfViewer({
               )}
             </div>
             <div className="min-w-0">
-              <p className="font-serif font-bold text-xs sm:text-sm text-navy truncate">{title}</p>
+              <p className="font-serif font-bold text-xs sm:text-sm text-navy truncate">
+                {title}
+              </p>
               <div className="flex items-center gap-2 text-[10px] text-foreground-muted font-mono flex-wrap">
                 <span>{reference}</span>
                 <span>•</span>
                 <span className="truncate">{fileName}</span>
                 {fileSize ? <span>({formatSize(fileSize)})</span> : null}
-                <span className={cn(
-                  "px-1.5 py-0.5 rounded font-bold uppercase text-[9px]",
-                  isDocx ? "bg-info/10 text-info" : "bg-gold/10 text-gold"
-                )}>
+                <span
+                  className={cn(
+                    "px-1.5 py-0.5 rounded font-bold uppercase text-[9px]",
+                    isDocx ? "bg-info/10 text-info" : "bg-gold/10 text-gold"
+                  )}
+                >
                   {isDocx ? "Format DOCX" : "Format PDF Numérisé"}
                 </span>
               </div>
@@ -368,24 +313,41 @@ export function ContractPdfViewer({
                   onClick={() => setViewMode("preview")}
                   className={cn(
                     "px-3 py-1.5 rounded-lg font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1.5",
-                    viewMode === "preview" ? "bg-navy text-white shadow-xs" : "text-foreground-muted hover:text-navy"
+                    viewMode === "preview"
+                      ? "bg-navy text-white shadow-xs"
+                      : "text-foreground-muted hover:text-navy"
                   )}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  <span>PDF</span>
+                  <span>Document</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode("summary")}
                   className={cn(
                     "px-3 py-1.5 rounded-lg font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1.5",
-                    viewMode === "summary" ? "bg-navy text-white shadow-xs" : "text-foreground-muted hover:text-navy"
+                    viewMode === "summary"
+                      ? "bg-navy text-white shadow-xs"
+                      : "text-foreground-muted hover:text-navy"
                   )}
                 >
                   <AlignLeft className="w-3.5 h-3.5" />
                   <span>Texte</span>
                 </button>
               </div>
+            )}
+
+            {targetPdfUrl && (
+              <a
+                href={targetPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-xl bg-background hover:bg-background-secondary border border-border text-navy font-bold text-xs transition-colors inline-flex items-center gap-1.5"
+                title="Ouvrir le document dans un nouvel onglet"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-navy" />
+                <span className="hidden sm:inline">Nouvel onglet</span>
+              </a>
             )}
 
             <button
@@ -401,53 +363,18 @@ export function ContractPdfViewer({
         </div>
 
         {/* Cadre de Lecture Directe In-Page */}
-        {renderViewerContent(false)}
+        {!isGrandEcran && renderViewerContent(false)}
 
         {/* Footer Sécurité & Archivage */}
         <div className="flex items-center justify-between pt-2 text-xs border-t border-border">
           <span className="text-foreground-muted flex items-center gap-1.5 text-[11px]">
             <ShieldCheck className="w-3.5 h-3.5 text-success" />
-            Filigrane dynamique DRM &amp; Sécurité anti-capture activés
+            Lecture directe certifiée &amp; filigrane juridique LAHAThèque
           </span>
           <span className="text-[10px] text-foreground-muted font-mono hidden sm:inline">
             Stockage permanent certifié LAHAThèque
           </span>
         </div>
-
-        {/* Styles pour adapter la barre d'outils aux tokens de design LAHAThèque */}
-        <style jsx global>{`
-          .rpv-contract-toolbar .rpv-core__button {
-            color: var(--navy) !important;
-            background: transparent !important;
-            border-radius: 8px !important;
-            padding: 6px !important;
-            transition: background-color 150ms, color 150ms !important;
-          }
-          .rpv-contract-toolbar .rpv-core__button:hover {
-            color: var(--gold) !important;
-            background-color: var(--navy-light) !important;
-          }
-          .rpv-contract-toolbar .rpv-core__textbox {
-            background-color: var(--background) !important;
-            border: 1px solid var(--border) !important;
-            color: var(--navy) !important;
-            border-radius: 8px !important;
-            text-align: center !important;
-            font-weight: 600 !important;
-            font-size: 11px !important;
-            padding: 3px 6px !important;
-          }
-          .rpv-contract-toolbar .rpv-core__popover-body {
-            background-color: var(--background) !important;
-            border: 1px solid var(--border) !important;
-            color: var(--foreground) !important;
-            border-radius: 12px !important;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
-          }
-          .rpv-contract-viewer .rpv-core__inner-pages {
-            background-color: var(--background-secondary) !important;
-          }
-        `}</style>
       </div>
     </>
   );

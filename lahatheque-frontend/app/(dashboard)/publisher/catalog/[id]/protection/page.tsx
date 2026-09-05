@@ -1,26 +1,29 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck, Lock } from "lucide-react";
 import { ProtectionConfigCard } from "@/components/features/publisher/protection-config-card";
 import { getPublisherBookDetail, updatePublisherBookProtection } from "@/lib/services/publisher";
 import type { PublisherBook, ProtectionConfig } from "@/lib/types/publisher";
 
-export default function BookProtectionPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
+export default function BookProtectionPage() {
+  const params = useParams();
+  const bookId = (params?.id as string) || "";
   const [book, setBook] = useState<PublisherBook | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!bookId) return;
     async function loadData() {
       setLoading(true);
-      const data = await getPublisherBookDetail(resolvedParams.id);
+      const data = await getPublisherBookDetail(bookId);
       setBook(data);
       setLoading(false);
     }
     loadData();
-  }, [resolvedParams.id]);
+  }, [bookId]);
 
   const handleSaveProtection = async (newConfig: ProtectionConfig) => {
     if (!book) return;

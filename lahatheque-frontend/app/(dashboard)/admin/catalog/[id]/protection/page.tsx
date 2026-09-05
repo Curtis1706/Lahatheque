@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck, BookOpen } from "lucide-react";
 import { ProtectionConfigCard } from "@/components/features/publisher/protection-config-card";
@@ -9,21 +10,23 @@ import { getBookProtectionConfig, saveBookProtectionConfig } from "@/lib/service
 import type { AdminCatalogBook } from "@/lib/types/admin";
 import type { ProtectionConfig } from "@/lib/types/publisher";
 
-export default function AdminBookProtectionPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
+export default function AdminBookProtectionPage() {
+  const params = useParams();
+  const bookId = (params?.id as string) || "";
   const [book, setBook] = useState<AdminCatalogBook | null>(null);
   const [protectionConfig, setProtectionConfig] = useState<ProtectionConfig | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!bookId) return;
     async function loadData() {
       setLoading(true);
       try {
         const [books, config] = await Promise.all([
           getAdminCatalog(),
-          getBookProtectionConfig(resolvedParams.id),
+          getBookProtectionConfig(bookId),
         ]);
-        const found = books.find((b) => b.id === resolvedParams.id) || null;
+        const found = books.find((b) => b.id === bookId) || null;
         setBook(found);
         setProtectionConfig(config);
       } catch (err) {
@@ -33,11 +36,11 @@ export default function AdminBookProtectionPage({ params }: { params: Promise<{ 
       }
     }
     loadData();
-  }, [resolvedParams.id]);
+  }, [bookId]);
 
   const handleSaveProtection = async (newConfig: ProtectionConfig) => {
-    if (!resolvedParams.id) return;
-    const success = await saveBookProtectionConfig(resolvedParams.id, newConfig);
+    if (!bookId) return;
+    const success = await saveBookProtectionConfig(bookId, newConfig);
     if (success) {
       setProtectionConfig(newConfig);
     }
@@ -71,7 +74,7 @@ export default function AdminBookProtectionPage({ params }: { params: Promise<{ 
             {bookTitle}
           </Link>
         ) : (
-          <span className="truncate max-w-[200px]">{resolvedParams.id}</span>
+          <span className="truncate max-w-[200px]">{bookId}</span>
         )}
         <span>/</span>
         <span className="text-navy font-semibold">Protection Anti-Piratage</span>

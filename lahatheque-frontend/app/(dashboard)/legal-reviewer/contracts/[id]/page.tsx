@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -24,8 +25,9 @@ import { ContractPdfViewer } from "@/components/features/legal/contract-pdf-view
 import { getContractDetail, updateContract } from "@/lib/services/legal";
 import type { LegalContract } from "@/lib/types/legal";
 
-export default function ContractDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
+export default function ContractDetailPage() {
+  const params = useParams();
+  const contractId = (params?.id as string) || "";
   const [contract, setContract] = useState<LegalContract | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGrandEcran, setIsGrandEcran] = useState(false);
@@ -55,14 +57,15 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
   }
 
   useEffect(() => {
+    if (!contractId) return;
     async function loadData() {
       setLoading(true);
-      const data = await getContractDetail(resolvedParams.id);
+      const data = await getContractDetail(contractId);
       setContract(data);
       setLoading(false);
     }
     loadData();
-  }, [resolvedParams.id]);
+  }, [contractId]);
 
   if (loading) {
     return (
