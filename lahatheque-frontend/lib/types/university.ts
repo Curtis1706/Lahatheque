@@ -30,6 +30,7 @@ export interface UniversityBouquet {
   faculty_code?: string;
   discipline?: string;
   books_count: number;
+  my_books_count?: number;
   annual_price: number;
   currency: string;
   status: "active" | "pending" | "expired" | "available";
@@ -107,6 +108,64 @@ export interface UniversityRoyaltyStatementData {
   status: "paid" | "pending" | "available";
   pdf_statement_url?: string;
   created_at: string;
+}
+
+// ─── Détail Analytique des Redevances Universitaires ────────────────────────
+
+export interface UniversityUnitSaleRoyalty {
+  id: string;
+  transaction_ref: string;
+  book_id: string;
+  book_title: string;
+  authors: string[];
+  discipline: string;
+  format: "paper" | "digital";
+  quantity: number;
+  unit_price: number;
+  gross_amount: number;
+  royalty_rate: number; // Pourcentage contractuel (ex: 15%)
+  royalty_amount: number; // Montant net de la redevance (ex: gross_amount * 0.15)
+  currency: string;
+  buyer_type: "etudiant" | "particulier" | "institution" | "grossiste";
+  date: string;
+}
+
+export interface UniversityBouquetUsageRoyalty {
+  id: string;
+  bouquet_id: string;
+  bouquet_title: string;
+  faculty_code?: string;
+  period: string;
+  books_included_count: number; // Nombre d'ouvrages de l'université dans ce bouquet (ex: 10)
+  total_bouquet_consultations: number; // Consultations globales du bouquet par tous les abonnés
+  university_consultations: number; // Consultations spécifiques aux ouvrages de cette université
+  consultation_share_percent: number; // Pourcentage comparé aux consultations globales (ex: 34.8%)
+  bouquet_revenue_allocated: number; // Assiette de CA répartie au prorata d'usage (XOF)
+  royalty_rate: number; // Taux de redevance conventionné (ex: 15%)
+  net_royalty_amount: number; // Redevance nette reversée à l'établissement (XOF)
+  currency: string;
+}
+
+export interface UniversityRoyaltiesDetailData {
+  available_balance: number;
+  total_paid: number;
+  contractual_rate: number;
+  currency: string;
+  min_withdrawal_threshold: number;
+  totals_summary: {
+    paper_sales_count: number;
+    paper_royalties_total: number;
+    paper_gross_total: number;
+    digital_sales_count: number;
+    digital_royalties_total: number;
+    digital_gross_total: number;
+    bouquet_consultations_count: number;
+    bouquet_royalties_total: number;
+    bouquet_gross_allocated: number;
+  };
+  unit_sales: UniversityUnitSaleRoyalty[];
+  bouquet_royalties: UniversityBouquetUsageRoyalty[];
+  statements?: UniversityRoyaltyStatementData[];
 }
 
 export interface UniversityProfileData {

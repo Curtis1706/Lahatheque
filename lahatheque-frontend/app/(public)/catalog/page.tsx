@@ -371,24 +371,31 @@ function CatalogSearchInner() {
                                 {book.publication_year}
                               </span>
                             )}
+                            <span className="text-[10px] font-medium text-foreground-muted bg-background-secondary px-2 py-0.5 rounded border border-border">
+                              {book.is_paper_available !== false && book.is_digital_available !== false
+                                ? "Papier & Numérique"
+                                : book.is_paper_available !== false
+                                ? "Livre Papier"
+                                : "Livre Numérique"}
+                            </span>
                           </div>
                         </div>
 
-                        {/* Prix & Action */}
-                        <div className="pt-3 border-t border-border flex items-center justify-between">
+                        {/* Prix & Action Achat à l'unité */}
+                        <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
                           <div>
-                            <span className="text-xs font-bold text-navy block">
-                              {book.price ? `${book.price.toLocaleString("fr-FR")} FCFA` : "Inclus abonnement"}
+                            <span className="text-xs sm:text-sm font-bold font-mono text-navy block">
+                              {(book.price || 2500).toLocaleString("fr-FR")} FCFA
                             </span>
-                            <span className="text-[10px] text-gold font-medium">
-                              Accès Partenaire
+                            <span className="text-[10px] text-foreground-muted font-medium">
+                              Achat à l'unité
                             </span>
                           </div>
                           <Link
                             href={`/catalog/${book.id}`}
-                            className="px-4 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
+                            className="px-3.5 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs shrink-0"
                           >
-                            Consulter
+                            <span>Acheter / Détails</span>
                             <ArrowRight className="w-3.5 h-3.5 text-gold" />
                           </Link>
                         </div>

@@ -19,6 +19,7 @@ from .university_views import (
     UniversityRoyaltyWithdrawView,
     UniversityProfileView,
     ExportBouquetWordView,
+    UniversityBouquetDistributionView,
 )
 
 app_name = 'partners'
@@ -35,6 +36,7 @@ urlpatterns = [
     path('university/kpis/', UniversityKpisView.as_view(), name='university-kpis'),
     path('university/faculties/', UniversityFacultiesView.as_view(), name='university-faculties'),
     path('university/bouquets/', UniversityBouquetsView.as_view(), name='university-bouquets'),
+    path('university/bouquets/<str:pk>/distribution/', UniversityBouquetDistributionView.as_view(), name='university-bouquet-distribution'),
     path('university/bouquets/<str:pk>/subscribe/', UniversityBouquetSubscribeView.as_view(), name='university-bouquet-subscribe'),
     path('university/bouquets/<str:pk>/export-word/', ExportBouquetWordView.as_view(), name='university-bouquet-export-word'),
     path('university/affiliations/', UniversityAffiliationsView.as_view(), name='university-affiliations-list'),

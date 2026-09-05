@@ -12,12 +12,14 @@ import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { UniversityBookDetailModal } from "@/components/features/university/university-book-detail-modal";
 import { getUniversityCatalog } from "@/lib/services/university";
+import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import type { UniversityBookCatalogItem } from "@/lib/types/university";
 
 export default function UniversityCatalogPage() {
   const [books, setBooks] = useState<UniversityBookCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBook, setSelectedBook] = useState<UniversityBookCatalogItem | null>(null);
+  const { disciplineNames } = useDisciplines();
 
   useEffect(() => {
     async function loadData() {
@@ -33,11 +35,6 @@ export default function UniversityCatalogPage() {
     }
     loadData();
   }, []);
-
-  const disciplines = useMemo(() => {
-    const set = new Set(books.map((b) => b.discipline).filter(Boolean));
-    return Array.from(set).sort();
-  }, [books]);
 
   const columns: DataTableColumn<UniversityBookCatalogItem>[] = [
     {
@@ -171,7 +168,7 @@ export default function UniversityCatalogPage() {
             Ressources Documentaires &amp; Fonds Académique
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Catalogue d&apos;Ouvrages de l&apos;Université
+            Catalogue d&apos;Ouvrages de Votre Université
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
             Consultez les ouvrages du fonds académique, lisez leurs extraits gratuits ou commandez des exemplaires papier pour votre campus.
@@ -183,7 +180,7 @@ export default function UniversityCatalogPage() {
           className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
         >
           <ShoppingBag className="w-4 h-4 text-gold" />
-          Passer Commande Papier
+          Passer Commande
         </Link>
       </div>
 
@@ -196,7 +193,7 @@ export default function UniversityCatalogPage() {
         searchable={true}
         searchPlaceholder="Rechercher par titre, auteur ou ISBN..."
         filterKey="discipline"
-        filterOptions={disciplines.map((d) => ({ value: d, label: d }))}
+        filterOptions={disciplineNames.map((d) => ({ value: d, label: d }))}
         filterPlaceholder="Toutes les disciplines"
         emptyMessage="Aucun ouvrage ne correspond à votre recherche."
         pageSize={10}

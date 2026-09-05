@@ -27,6 +27,7 @@ import {
   updateRoleDiscounts,
 } from "@/lib/services/admin";
 import { AdminCatalogBook, GlobalPricingConfig } from "@/lib/types/admin";
+import { getBouquetRoyaltyRate, setBouquetRoyaltyRate } from "@/lib/services/bouquet-distribution";
 import { toast } from "sonner";
 
 export default function AdminPricingCascadePage() {
@@ -56,6 +57,7 @@ export default function AdminPricingCascadePage() {
 
   const [universityDigitalDiscount, setUniversityDigitalDiscount] = useState<number>(35);
   const [universityPaperDiscount, setUniversityPaperDiscount] = useState<number>(25);
+  const [universityBouquetRoyaltyRate, setUniversityBouquetRoyaltyRate] = useState<number>(15);
 
   const [savingPolicy, setSavingPolicy] = useState(false);
 
@@ -88,6 +90,7 @@ export default function AdminPricingCascadePage() {
           setUniversityDigitalDiscount(roleDiscountsData.university.digital_pct ?? 35);
         }
       }
+      setUniversityBouquetRoyaltyRate(getBouquetRoyaltyRate());
     } catch (err) {
       toast.error("Erreur de chargement de la cascade tarifaire.");
     } finally {
@@ -138,9 +141,10 @@ export default function AdminPricingCascadePage() {
           digital_pct: Number(universityDigitalDiscount),
         },
       });
+      setBouquetRoyaltyRate(Number(universityBouquetRoyaltyRate));
       if (res.success) {
         toast.success(
-          res.message || "Grille tarifaire multi-rôles mise à jour pour tous les profils (Auteurs, Grossistes, Universités)."
+          res.message || "Grille tarifaire et taux de redevance bouquets mis à jour pour tous les profils."
         );
       } else {
         toast.error(res.error || "Erreur lors de la mise à jour des remises.");
@@ -725,6 +729,21 @@ export default function AdminPricingCascadePage() {
                     className="w-full p-2 text-xs font-mono font-bold rounded-lg bg-background border border-border text-navy focus:border-gold focus:outline-none"
                   />
                   <span className="text-[10px] font-bold text-foreground-muted">%</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-navy block">Redevance Bouquets (Prorata)</label>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={universityBouquetRoyaltyRate}
+                    onChange={(e) => setUniversityBouquetRoyaltyRate(Number(e.target.value))}
+                    className="w-full p-2 text-xs font-mono font-bold rounded-lg bg-background border border-gold text-navy focus:border-gold focus:outline-none"
+                  />
+                  <span className="text-[10px] font-bold text-gold">%</span>
                 </div>
               </div>
             </div>

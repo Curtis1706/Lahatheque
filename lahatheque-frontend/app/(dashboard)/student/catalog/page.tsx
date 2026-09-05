@@ -26,6 +26,7 @@ import { UnifiedBookOrderModal } from "@/components/features/student/unified-boo
 import { BookCover } from "@/components/features/student/book-cover";
 import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle, type ViewMode } from "@/components/features/student/view-toggle";
+import { useDisciplines } from "@/lib/hooks/use-disciplines";
 
 // ─── Skeletons ────────────────────────────────────────────────────────────────
 
@@ -392,8 +393,9 @@ export default function StudentCatalogPage() {
     router.push(`/catalog/reader/${book.id}?mode=sample`);
   };
 
+  const { disciplines: dbDisciplines } = useDisciplines();
   const allBooks = catalogData?.books || [];
-  const disciplines = catalogData?.disciplines || [];
+  const disciplines = dbDisciplines && dbDisciplines.length > 0 ? dbDisciplines : (catalogData?.disciplines || []);
 
   // Pagination calculée
   const totalBooks = allBooks.length;
@@ -513,9 +515,9 @@ export default function StudentCatalogPage() {
               <button
                 key={d.id}
                 type="button"
-                onClick={() => handleDisciplineSelect(d.id, d.name)}
+                onClick={() => handleDisciplineSelect(String(d.id), d.name)}
                 className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors border shrink-0 min-h-[40px] cursor-pointer ${
-                  selectedDiscipline === d.id
+                  selectedDiscipline === String(d.id)
                     ? "bg-navy text-white border-navy shadow-xs"
                     : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
                 }`}

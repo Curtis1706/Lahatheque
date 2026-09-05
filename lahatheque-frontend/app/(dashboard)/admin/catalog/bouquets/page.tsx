@@ -19,6 +19,7 @@ import {
   X,
   AlertCircle,
   Check,
+  PieChart,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -32,6 +33,7 @@ import {
 } from "@/lib/services/admin";
 import { searchBooks } from "@/lib/services/catalog";
 import { Book } from "@/lib/types/catalog";
+import { BouquetDistributionModal } from "@/components/features/bouquets/bouquet-distribution-modal";
 
 const BOUQUET_TYPES = [
   { value: "discipline", label: "Par Discipline", desc: "Tous les ouvrages rattachés à une discipline académique" },
@@ -63,6 +65,7 @@ export default function AdminBouquetsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOffering, setEditingOffering] = useState<BouquetOfferingAdmin | null>(null);
+  const [selectedDistributionBouquet, setSelectedDistributionBouquet] = useState<BouquetOfferingAdmin | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Form State
@@ -751,6 +754,13 @@ export default function AdminBouquetsPage() {
           </div>
         </div>
       )}
+
+      {/* Modale Répartition Multi-Universités & Statistiques */}
+      <BouquetDistributionModal
+        open={!!selectedDistributionBouquet}
+        onClose={() => setSelectedDistributionBouquet(null)}
+        bouquet={selectedDistributionBouquet}
+      />
     </div>
   );
 }

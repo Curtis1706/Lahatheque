@@ -104,9 +104,9 @@ export function DashboardSidebar() {
               { label: "Espace Lecteur", href: "/student", icon: <LayoutDashboard className="size-4" /> },
               { label: "Catalogue & Recherche", href: "/student/catalog", icon: <Search className="size-4" /> },
               { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="size-4" /> },
-              { label: "Bouquets Documentaires", href: "/student/bouquets", icon: <Layers className="size-4" /> },
+              // { label: "Bouquets Documentaires", href: "/student/bouquets", icon: <Layers className="size-4" /> },
               { label: "Achats & Commandes", href: "/student/orders", icon: <PackageCheck className="size-4" /> },
-              { label: "Historique & Stats", href: "/student/history", icon: <History className="size-4" /> },
+              // { label: "Historique & Stats", href: "/student/history", icon: <History className="size-4" /> },
               // Désactivé conformément au CDC v3.2 (le Client souscrit directement aux
               // bouquets, sans affiliation universitaire — voir Fiches X1-X4). Réactiver
               // cette ligne si le besoin métier évolue.
@@ -147,11 +147,12 @@ export function DashboardSidebar() {
               { label: "Vue d'ensemble", href: "/university", icon: <LayoutDashboard className="size-4" /> },
               { label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="size-4" /> },
               { label: "Catalogue Universitaire", href: "/university/catalog", icon: <BookOpen className="size-4" /> },
-              { label: "Statistiques & Usage", href: "/university/stats", icon: <FileBarChart className="size-4" /> },
+              // Masqué temporairement à la demande utilisateur :
+              // { label: "Statistiques & Usage", href: "/university/stats", icon: <FileBarChart className="size-4" /> },
               // Désactivé conformément au CDC v3.2 — voir Fiches X1-X4.
               // { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="size-4" /> },
-              { label: "Commandes Papier", href: "/university/purchases", icon: <PackageCheck className="size-4" /> },
-              { label: "Redevances (15%)", href: "/university/royalties", icon: <DollarSign className="size-4" /> },
+              { label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="size-4" /> },
+              { label: "Redevances", href: "/university/royalties", icon: <DollarSign className="size-4" /> },
               { label: "Profil & Paramètres", href: "/university/profile", icon: <Building2 className="size-4" /> },
             ],
           },
@@ -209,7 +210,6 @@ export function DashboardSidebar() {
                   { label: "Dépôt en Lot ONIX 3.0", href: "/publisher/catalog/batch", icon: <UploadCloud className="size-3.5" /> },
                 ],
               },
-              { label: "Suivi des Dépôts", href: "/publisher/submissions", icon: <Clock className="size-4" /> },
               { label: "Statistiques & Lectorat", href: "/publisher/stats", icon: <FileBarChart className="size-4" /> },
               { label: "Redevances & Ventes", href: "/publisher/royalties", icon: <DollarSign className="size-4" /> },
               { label: "Profil & Mandat", href: "/publisher/profile", icon: <Building2 className="size-4" /> },

@@ -268,7 +268,7 @@ export default function NewDepositPage() {
       if (dossier.faculte_nom) setFaculty(dossier.faculte_nom);
       toast.success(`Dossier ${dossier.code_dossier} rattaché ! Métadonnées pré-remplies.`);
     } else {
-      toast.info("Rattachement retiré. Saisie libre activée.");
+      toast.info("Veuillez sélectionner un dossier de pré-édition valide.");
     }
   };
 
@@ -364,8 +364,19 @@ export default function NewDepositPage() {
   };
 
   const handleSubmitValidation = async () => {
-    if (!title || !bookFile) {
-      toast.error("Veuillez sélectionner le fichier du livre et renseigner au minimum le titre.");
+    if (!bookFile) {
+      toast.error("Veuillez sélectionner le fichier PDF de l'ouvrage.");
+      setCurrentStep(1);
+      return;
+    }
+    if (!selectedPreEdition) {
+      toast.error("Le rattachement à un dossier de pré-édition Juriste est obligatoire.");
+      setCurrentStep(2);
+      return;
+    }
+    if (!title) {
+      toast.error("Veuillez renseigner le titre de l'ouvrage.");
+      setCurrentStep(2);
       return;
     }
 
@@ -672,11 +683,11 @@ export default function NewDepositPage() {
               <div className="flex items-center justify-between gap-1.5 mb-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-gold" />
-                  Dossier de pré-édition Juriste (Facultatif)
+                  Dossier de pré-édition Juriste *
                 </label>
                 {allPreEditions.length > 0 && (
                   <span className="text-[11px] font-semibold text-gold">
-                    {allPreEditions.length} dossier{allPreEditions.length > 1 ? "s" : ""} disponible{allPreEditions.length > 1 ? "s" : ""}
+                    {allPreEditions.length} dossier{allPreEditions.length > 1 ? "s" : ""} instruit{allPreEditions.length > 1 ? "s" : ""}
                   </span>
                 )}
               </div>
@@ -708,14 +719,6 @@ export default function NewDepositPage() {
                     >
                       Changer
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectPreEdition(null)}
-                      className="p-1.5 text-foreground-muted hover:text-red-500 rounded-lg hover:bg-background transition-colors cursor-pointer"
-                      title="Détacher le dossier"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
                   </div>
                 </div>
               ) : (
@@ -728,7 +731,7 @@ export default function NewDepositPage() {
                   >
                     <span className="flex items-center gap-2 text-foreground-muted truncate">
                       <Search className="w-4 h-4 text-foreground-muted shrink-0" />
-                      {loadingPreEditions ? "Chargement des dossiers pré-enregistrés..." : "Sélectionner ou rechercher un dossier de pré-édition..."}
+                      {loadingPreEditions ? "Chargement des dossiers pré-enregistrés..." : "Sélectionner le dossier de pré-édition obligatoire..."}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0 text-foreground-muted">
                       {loadingPreEditions && <InlineLoader size={12} />}
@@ -756,14 +759,6 @@ export default function NewDepositPage() {
 
                       {/* List */}
                       <div className="max-h-60 overflow-y-auto divide-y divide-border">
-                        <button
-                          type="button"
-                          onClick={() => handleSelectPreEdition(null)}
-                          className="w-full text-left p-3 hover:bg-navy/5 transition-colors flex items-center justify-between text-xs text-foreground-muted italic cursor-pointer"
-                        >
-                          <span>Aucun dossier (Saisie manuelle libre)</span>
-                        </button>
-
                         {filteredPreEditions.length > 0 ? (
                           filteredPreEditions.map((dossier) => (
                             <button
@@ -1263,8 +1258,8 @@ export default function NewDepositPage() {
               </div>
             </div>
 
-            {/* Langue, Pays, Public Cible */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Langue & Pays d'Ancrage */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">Langue</label>
@@ -1319,30 +1314,6 @@ export default function NewDepositPage() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Public Cible</label>
-                  {aiResult?.target_audience && (
-                    <button
-                      type="button"
-                      onClick={() => setTargetAudience(aiResult.target_audience)}
-                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
-                      title={`Appliquer le public cible IA : ${aiResult.target_audience}`}
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      IA : {aiResult.target_audience.length > 18 ? `${aiResult.target_audience.slice(0, 18)}...` : aiResult.target_audience}
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={targetAudience}
-                  onChange={(e) => setTargetAudience(e.target.value)}
-                  placeholder="Grand Public, Étudiants, etc."
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                />
               </div>
             </div>
           </div>

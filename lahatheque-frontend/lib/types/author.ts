@@ -15,6 +15,8 @@ export interface AuthorPublishedBook {
   isbn_digital: string;
   isbn_print?: string;
   discipline: string;
+  stock_remaining?: number;
+  stock_initial?: number;
 }
 
 export interface AuthorSubmission {
@@ -39,14 +41,20 @@ export interface AuthorSubmission {
 
 export interface AuthorRoyaltyPayment {
   id: string;
-  period: string;
+  period: string; // Ex: "1er Trimestre 2026 (Janvier - Mars)"
+  quarter?: 1 | 2 | 3 | 4;
+  year?: number;
+  start_date?: string; // Ex: "2026-01-01"
+  end_date?: string;   // Ex: "2026-03-31"
   total_sales_count: number;
+  paper_sales_count?: number;
+  digital_sales_count?: number;
   gross_revenue: number;
   author_percentage_rate: number;
-  author_earned_amount: number; // Part propre à cet auteur
+  author_earned_amount: number; // Part propre rétribuée à cet auteur
   status: "paid" | "pending";
   payment_date: string;
-  receipt_url: string;
+  receipt_url?: string | null;
 }
 
 // Interfaces de rétrocompatibilité pour composants hérités
@@ -92,8 +100,12 @@ export interface AuthorKpis {
   activeSubmissionsCount: number;
   publishedBooksCount: number;
   authorName: string;
+  stockRemaining?: number;
+  stockInitial?: number;
+  paperSalesCount?: number;
   timelines?: {
     sales: { date: string; value: number }[];
     royalties: { date: string; value: number }[];
+    stock?: { date: string; value: number }[];
   };
 }

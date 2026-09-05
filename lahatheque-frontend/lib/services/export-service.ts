@@ -419,9 +419,10 @@ export function generateWordDocument(options: WordDocumentOptions): void {
     year: "numeric",
   });
 
-  const tableRowsHtml = options.items
-    .map(
-      (item, idx) => `
+  const tableRowsHtml = options.items.length > 0
+    ? options.items
+        .map(
+          (item, idx) => `
       <tr style="background-color: ${idx % 2 === 0 ? "#ffffff" : "#f8f9fa"};">
         <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: bold; color: #1B2A4E;">${idx + 1}</td>
         <td style="padding: 8px 12px; border: 1px solid #e5e7eb; font-weight: bold; color: #1B2A4E;">${item.title}</td>
@@ -430,8 +431,14 @@ export function generateWordDocument(options: WordDocumentOptions): void {
         <td style="padding: 8px 12px; border: 1px solid #e5e7eb; color: #4B5563;">${item.discipline || "Général"}</td>
         <td style="padding: 8px 12px; border: 1px solid #e5e7eb; text-align: center; color: #4B5563;">${item.year || "2026"}</td>
       </tr>`
-    )
-    .join("");
+        )
+        .join("")
+    : `
+      <tr>
+        <td colspan="6" style="padding: 16px; text-align: center; color: #6B7280; font-style: italic; border: 1px solid #e5e7eb;">
+          Aucun ouvrage spécifique n'est actuellement indexé dans ce bouquet.
+        </td>
+      </tr>`;
 
   const docHtml = `
     <!DOCTYPE html>

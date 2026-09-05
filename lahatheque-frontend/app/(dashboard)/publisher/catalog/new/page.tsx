@@ -109,20 +109,7 @@ const SALES_MODEL_OPTIONS: SearchableOption[] = [
   },
 ];
 
-const LICENCE_TYPE_OPTIONS: SearchableOption[] = [
-  {
-    value: "tous_droits_reserves",
-    label: "Tous Droits Réservés (Convention LAHA)",
-    subtitle: "Protection intégrale DRM LCP, filigrane nominatif dynamique",
-    badge: "Standard LAHA",
-  },
-  {
-    value: "creative_commons",
-    label: "Creative Commons (CC-BY-NC)",
-    subtitle: "Attribution - Utilisation commerciale interdite",
-    badge: "CC-BY-NC",
-  },
-];
+
 
 // Helper pour faire correspondre strictement les suggestions IA aux disciplines réelles de la BD (1 à 3)
 function matchAiToDbDisciplines(
@@ -247,7 +234,6 @@ export default function NewPublisherBookPage() {
   const [targetAudience, setTargetAudience] = useState<"universitaire" | "professionnel" | "grand_public">("universitaire");
 
   // Droits & Protection (Étape 6)
-  const [licenceType, setLicenceType] = useState<"tous_droits_reserves" | "creative_commons">("tous_droits_reserves");
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
 
   // États globaux IA & Soumission
@@ -477,7 +463,7 @@ export default function NewPublisherBookPage() {
           allowed_territories: territories.split(",").map((t) => t.trim()).filter(Boolean),
           summary: summary || "Ouvrage déposé pour examen éditorial.",
           authors_bio: authorsBio,
-          licence_type: licenceType,
+          licence_type: "tous_droits_reserves",
           protection_config: {
             watermark_enabled: watermarkEnabled,
             watermark_position: "bottom-right",
@@ -1242,20 +1228,6 @@ export default function NewPublisherBookPage() {
                 </p>
               </div>
 
-              {/* Public Cible via SearchableSelect Combobox */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                  Public Cible (Combobox)
-                </label>
-                <SearchableSelect
-                  options={TARGET_AUDIENCE_OPTIONS}
-                  value={targetAudience}
-                  onChange={(val) => setTargetAudience(val as any)}
-                  placeholder="Sélectionner le public cible..."
-                  searchPlaceholder="Rechercher (ex: Universitaire, Professionnel)..."
-                />
-              </div>
-
               {/* Mots-Clés Thématiques */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -1295,18 +1267,15 @@ export default function NewPublisherBookPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Type de Licence via SearchableSelect Combobox */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy uppercase tracking-wider">
-                  Type de Licence Juridique (Combobox)
-                </label>
-                <SearchableSelect
-                  options={LICENCE_TYPE_OPTIONS}
-                  value={licenceType}
-                  onChange={(val) => setLicenceType(val as any)}
-                  placeholder="Sélectionner la licence..."
-                  searchPlaceholder="Rechercher (ex: Convention LAHA, Creative Commons)..."
-                />
+              {/* Note informative Convention LAHA (Automatique) */}
+              <div className="p-4 rounded-2xl bg-navy-light border border-navy-hover/20 space-y-1">
+                <div className="flex items-center gap-2 text-xs font-bold text-navy">
+                  <ShieldCheck className="w-4 h-4 text-gold" />
+                  <span>Tous Droits Réservés &bull; Convention Partenaire LAHA</span>
+                </div>
+                <p className="text-[11px] text-foreground-muted leading-relaxed">
+                  L&apos;ouvrage déposé est automatiquement protégé par le système DRM LCP (Readium) conformément aux dispositions contractuelles de votre convention d&apos;édition.
+                </p>
               </div>
 
               {/* Tatouage Numérique Visible Personnalisé */}

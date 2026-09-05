@@ -78,13 +78,13 @@ export default function LegalRedevancesPage() {
     },
     {
       key: "fixed_rate_percentage",
-      header: "Taux Fixe Institutionnel (Section 10.2)",
+      header: "Taux Fixe Institutionnel",
       cell: (row) => (
         <div className="flex items-center gap-1.5">
           <span className="font-mono font-bold text-navy text-xs px-2.5 py-1 rounded-xl bg-navy-light border border-navy/20">
             {row.fixed_rate_percentage}%
           </span>
-          <span className="text-[10px] text-foreground-muted flex items-center gap-0.5" title="Fixé par le cahier des charges v3.2 (Non modifiable)">
+          <span className="text-[10px] text-foreground-muted flex items-center gap-0.5" title="Taux fixe conventionné (Non modifiable)">
             <Lock className="w-3 h-3 text-foreground-muted" />
             Taux Fixe
           </span>
@@ -183,7 +183,7 @@ export default function LegalRedevancesPage() {
             Redevances Universités &amp; Éditeurs Tiers
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Sections 10.2 &amp; 10.3 du Cahier des charges — 15% fixe institutionnel pour les universités et taux contractuels négociés pour les éditeurs tiers.
+            Barème officiel conventionné : 15% fixe institutionnel pour les universités et taux contractuels négociés pour les éditeurs tiers.
           </p>
         </div>
       </div>

@@ -39,7 +39,7 @@ const AI_STEPS = [
   {
     icon: Cpu,
     title: "3. Détection du titre, des auteurs & de la discipline",
-    desc: "Analyse sémantique pour identifier le domaine, le public cible et la faculté de rattachement...",
+    desc: "Analyse sémantique pour identifier le domaine, la discipline et la faculté de rattachement...",
     tag: "Analyse documentaire",
     minProgress: 60,
     maxProgress: 85,

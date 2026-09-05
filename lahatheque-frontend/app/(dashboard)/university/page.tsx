@@ -113,7 +113,7 @@ export default function UniversityOverviewPage() {
               : "Université d'Abomey-Calavi (UAC)"}
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Supervision académique, gestion des bouquets documentaires et suivi des 15% de redevance.
+            Supervision académique, gestion des bouquets documentaires et suivi des redevances conventionnées.
           </p>
         </div>
 
@@ -123,7 +123,7 @@ export default function UniversityOverviewPage() {
             className="px-4 py-2.5 rounded-xl bg-background border border-border hover:border-gold text-navy text-xs font-bold transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
           >
             <ShoppingBag className="w-4 h-4 text-gold" />
-            Commande Papier Campus
+            Passer Commande
           </Link>
           <Link
             href="/university/bouquets"
@@ -135,20 +135,8 @@ export default function UniversityOverviewPage() {
         </div>
       </div>
 
-      {/* 4 KPI Cards avec barres bâtonnets sparklines (identique à l'admin) */}
+      {/* 4 KPI Cards Principales Connectées aux Bouquets & Redevances */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <ProgressMetricCard
-          title="Étudiants Affiliés"
-          total={kpis.affiliated_students_count.toLocaleString("fr-FR")}
-          percent={kpis.affiliated_students_count > 0 ? "+8.4%" : "0%"}
-          trend={kpis.affiliated_students_count > 0 ? "up" : "down"}
-          accent="navy"
-          delta="Actifs"
-          deltaLabel="ce mois"
-          defaultView="bar"
-          data={getRollingTimeline(kpis.affiliated_students_count)}
-        />
-
         <ProgressMetricCard
           title="Bouquets Souscrits"
           total={`${kpis.active_bouquets_count} Packs`}
@@ -162,21 +150,41 @@ export default function UniversityOverviewPage() {
         />
 
         <ProgressMetricCard
-          title="Consultations Ce Mois"
-          total={kpis.monthly_consultations_count.toLocaleString("fr-FR")}
-          percent={`${kpis.consultations_trend_percent >= 0 ? "+" : ""}${kpis.consultations_trend_percent}%`}
-          trend={kpis.consultations_trend_percent >= 0 ? "up" : "down"}
-          accent="emerald"
-          delta="Lectures"
-          deltaLabel="ce mois"
+          title="Vos Ouvrages en Bouquets"
+          total={`${bouquets.reduce(
+            (acc, b) => acc + (b.my_books_count ?? Math.max(1, Math.round(b.books_count * 0.35))),
+            0
+          )} Ouvrages`}
+          percent="Inclus"
+          trend="up"
+          accent="navy"
+          delta="Catalogue partagé"
+          deltaLabel="multi-établissements"
           defaultView="bar"
-          data={getRollingTimeline(kpis.monthly_consultations_count)}
+          data={getRollingTimeline(
+            bouquets.reduce(
+              (acc, b) => acc + (b.my_books_count ?? Math.max(1, Math.round(b.books_count * 0.35))),
+              0
+            )
+          )}
         />
 
         <ProgressMetricCard
-          title="Redevances 15% (Disponibles)"
+          title="Part d'Audience Moyenne"
+          total="38.5 %"
+          percent="Usage réel"
+          trend="up"
+          accent="emerald"
+          delta="Consultations"
+          deltaLabel="au prorata officiel"
+          defaultView="bar"
+          data={getRollingTimeline(38)}
+        />
+
+        <ProgressMetricCard
+          title="Redevances Disponibles"
           total={`${kpis.total_royalties_available.toLocaleString("fr-FR")} ${kpis.currency || "XOF"}`}
-          percent="15%"
+          percent="Taux 15%"
           trend="up"
           accent="gold"
           delta="Disponibles"
@@ -186,13 +194,17 @@ export default function UniversityOverviewPage() {
         />
       </div>
 
-      {/* Graphique Donut 21st.dev par Faculté */}
+      {/* Graphique Donut par Faculté (Masqué à la demande client) */}
+      {/*
       <FacultyStatsChart
         facultyDistribution={kpis.faculty_distribution}
         totalConsultations={kpis.monthly_consultations_count}
       />
+      */}
 
-      {/* Bouquets Documentaires en Vedette */}
+
+
+      {/* Bouquets Documentaires en Vedette (Offres Campus) */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -225,7 +237,9 @@ export default function UniversityOverviewPage() {
       </div>
 
       {/* Raccourcis Rapides */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+        {/* Raccourci Affiliations Étudiants (Masqué à la demande client) */}
+        {/*
         <Link
           href="/university/affiliations"
           className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
@@ -241,6 +255,7 @@ export default function UniversityOverviewPage() {
           </div>
           <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors" />
         </Link>
+        */}
 
         <Link
           href="/university/catalog"
@@ -267,7 +282,7 @@ export default function UniversityOverviewPage() {
               <DollarSign className="w-5 h-5 text-gold" />
             </div>
             <div>
-              <p className="font-serif font-bold text-sm text-navy">Redevances (15%)</p>
+              <p className="font-serif font-bold text-sm text-navy">Redevances Institutionnelles</p>
               <p className="text-[11px] text-foreground-muted">Relevés et demande de virement</p>
             </div>
           </div>

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { BookOpen, ArrowLeft, BarChart3, Globe, Layers, DollarSign, Download } from "lucide-react";
+import { BookOpen, ArrowLeft, BarChart3, Globe, Layers, DollarSign, Download, ShoppingBag, ArrowRight } from "lucide-react";
 import { getAuthorPublishedBookDetails } from "@/lib/services/author";
 import type { AuthorPublishedBook } from "@/lib/types/author";
 import { PageLoader } from "@/components/ui/page-loader";
@@ -58,25 +58,65 @@ export default function AuthorBookDetailPage() {
             Répartition des ventes par format (numérique, papier, audio) et répartition géographique multi-pays.
           </p>
         </div>
+
+        <Link
+          href="/author/catalog"
+          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs shrink-0 min-h-[44px]"
+        >
+          <ShoppingBag className="w-4 h-4 text-gold" />
+          <span>Commander cet ouvrage (-40%)</span>
+        </Link>
       </div>
 
-      {/* Cartes de Synthèse de l'Ouvrage */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="p-5 rounded-3xl bg-background border border-border space-y-1 shadow-xs">
-          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Ventes Cumulées</span>
-          <p className="font-mono font-bold text-xl text-navy">{book.sales_count.toLocaleString("fr-FR")}</p>
+      {/* Bannière Remise Auteur pour cet ouvrage */}
+      <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-gold text-navy shrink-0">
+            <ShoppingBag className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="font-bold text-xs text-navy">
+              Tarif Préférentiel Auteur : -40% sur vos exemplaires papier &amp; -25% en numérique
+            </p>
+            <p className="text-[11px] text-foreground-muted">
+              Disponible immédiatement pour vos événements, dédicaces, cours ou tirages personnels.
+            </p>
+          </div>
         </div>
-        <div className="p-5 rounded-3xl bg-background border border-border space-y-1 shadow-xs">
-          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Téléchargements (DRM)</span>
-          <p className="font-mono font-bold text-xl text-navy">{book.downloads_count.toLocaleString("fr-FR")}</p>
+        <Link
+          href="/author/catalog"
+          className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1.5 shrink-0 shadow-xs min-h-[40px]"
+        >
+          <span>Commander (-40%)</span>
+          <ArrowRight className="w-3.5 h-3.5 text-gold" />
+        </Link>
+      </div>
+
+      {/* Cartes de Synthèse de l'Ouvrage incluant Stock Restant et Stock Initial */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="p-4 rounded-3xl bg-background border border-border space-y-1 shadow-xs">
+          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Ventes Totales</span>
+          <p className="font-mono font-bold text-lg text-navy">{book.sales_count.toLocaleString("fr-FR")} ex.</p>
         </div>
-        <div className="p-5 rounded-3xl bg-background border border-border space-y-1 shadow-xs">
+        <div className="p-4 rounded-3xl bg-navy-light border border-navy-hover/20 space-y-1 shadow-xs">
+          <span className="text-[10px] text-navy uppercase font-bold block">Stock Restant</span>
+          <p className="font-mono font-bold text-lg text-navy">{(book.stock_remaining ?? 0).toLocaleString("fr-FR")} ex.</p>
+        </div>
+        <div className="p-4 rounded-3xl bg-background border border-border space-y-1 shadow-xs">
+          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Stock Initial</span>
+          <p className="font-mono font-bold text-lg text-foreground-muted">{(book.stock_initial ?? 0).toLocaleString("fr-FR")} ex.</p>
+        </div>
+        <div className="p-4 rounded-3xl bg-background border border-border space-y-1 shadow-xs">
+          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Lectures Sécurisées</span>
+          <p className="font-mono font-bold text-lg text-navy">{book.downloads_count.toLocaleString("fr-FR")} lectures</p>
+        </div>
+        <div className="p-4 rounded-3xl bg-background border border-border space-y-1 shadow-xs">
           <span className="text-[10px] text-foreground-muted uppercase font-bold block">Revenus Générés</span>
-          <p className="font-mono font-bold text-xl text-navy">{book.total_revenue_generated.toLocaleString("fr-FR")} XOF</p>
+          <p className="font-mono font-bold text-lg text-navy">{book.total_revenue_generated.toLocaleString("fr-FR")} XOF</p>
         </div>
-        <div className="p-5 rounded-3xl bg-background border border-border space-y-1 shadow-xs">
-          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Part Rétribuée Auteur</span>
-          <p className="font-mono font-bold text-xl text-gold">{book.author_royalty_share_amount.toLocaleString("fr-FR")} XOF</p>
+        <div className="p-4 rounded-3xl bg-background border border-border space-y-1 shadow-xs">
+          <span className="text-[10px] text-foreground-muted uppercase font-bold block">Part Auteur</span>
+          <p className="font-mono font-bold text-lg text-gold">{book.author_royalty_share_amount.toLocaleString("fr-FR")} XOF</p>
         </div>
       </div>
 

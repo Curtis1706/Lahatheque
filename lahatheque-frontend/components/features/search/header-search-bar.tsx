@@ -274,15 +274,12 @@ export function HeaderSearchBar({
 
                       {/* Prix / Badge */}
                       <div className="shrink-0 text-right">
-                        {book.price ? (
-                          <span className="text-xs font-bold text-navy">
-                            {book.price.toLocaleString("fr-FR")} {book.currency || "FCFA"}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gold/10 text-gold font-bold border border-gold/20">
-                            Inclus abonnement
-                          </span>
-                        )}
+                        <span className="text-xs font-bold text-navy block font-mono">
+                          {(book.price || 2500).toLocaleString("fr-FR")} {book.currency || "FCFA"}
+                        </span>
+                        <span className="text-[10px] text-foreground-muted font-medium">
+                          Achat à l'unité
+                        </span>
                       </div>
                     </Link>
                   );

@@ -119,11 +119,11 @@ export default function PublisherBookDetailPage({ params }: { params: Promise<{ 
             <div className="grid grid-cols-2 gap-2 text-center text-xs pt-2 border-t border-border">
               <div className="p-2 bg-background-secondary rounded-xl">
                 <span className="text-foreground-muted text-[10px] uppercase font-bold block">Consultations</span>
-                <span className="font-mono font-bold text-navy text-sm">{book.consultations_count}</span>
+                <span className="font-mono font-bold text-navy text-sm">{(book.consultations_count || 0).toLocaleString("fr-FR")}</span>
               </div>
               <div className="p-2 bg-background-secondary rounded-xl">
-                <span className="text-foreground-muted text-[10px] uppercase font-bold block">Téléchargements</span>
-                <span className="font-mono font-bold text-navy text-sm">{book.downloads_count}</span>
+                <span className="text-foreground-muted text-[10px] uppercase font-bold block">Revenus Générés</span>
+                <span className="font-mono font-bold text-gold text-sm">{(book.revenue_generated || 0).toLocaleString("fr-FR")} XOF</span>
               </div>
             </div>
           </div>
@@ -145,11 +145,6 @@ export default function PublisherBookDetailPage({ params }: { params: Promise<{ 
               <div>
                 <span className="text-foreground-muted text-[10px] uppercase font-bold block">Prix Unitaire</span>
                 <span className="font-mono font-bold text-gold text-sm">{book.price.toLocaleString("fr-FR")} {book.currency}</span>
-              </div>
-
-              <div>
-                <span className="text-foreground-muted text-[10px] uppercase font-bold block">Public Cible</span>
-                <span className="font-semibold text-navy capitalize">{book.target_audience}</span>
               </div>
 
               <div>

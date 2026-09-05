@@ -23,12 +23,19 @@ export function WholesaleCartDrawer({
 }: WholesaleCartDrawerProps) {
   if (!isOpen) return null;
 
+  const getPaperUnitPrice = (item: WholesalerCartItem) => {
+    if (item.print_copies_qty === 1) {
+      return item.book.public_price || item.book.print_wholesale_price;
+    }
+    return item.book.print_wholesale_price;
+  };
+
   const totalDigitalSubtotal = items.reduce(
     (acc, item) => acc + item.digital_licenses_qty * item.book.digital_wholesale_price,
     0
   );
   const totalPrintSubtotal = items.reduce(
-    (acc, item) => acc + item.print_copies_qty * item.book.print_wholesale_price,
+    (acc, item) => acc + item.print_copies_qty * getPaperUnitPrice(item),
     0
   );
   const totalAmount = totalDigitalSubtotal + totalPrintSubtotal;
@@ -67,102 +74,123 @@ export function WholesaleCartDrawer({
               <p className="text-xs">Parcourez le catalogue grossiste pour sélectionner des titres.</p>
             </div>
           ) : (
-            items.map((item) => (
-              <div
-                key={item.book_id}
-                className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3 shadow-xs"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={item.book.cover_url}
-                      alt={item.book.title}
-                      className="w-12 h-16 object-cover rounded-lg border border-border shrink-0 shadow-xs"
-                    />
-                    <div>
-                      <p className="font-serif font-bold text-xs text-navy leading-snug">{item.book.title}</p>
-                      <p className="text-[10px] text-foreground-muted font-mono">{item.book.isbn_digital}</p>
-                      <span className="text-[10px] font-bold text-gold">{item.book.publisher_name}</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onRemoveItem(item.book_id)}
-                    className="text-foreground-muted hover:text-rose-600 p-1 transition-colors"
-                    title="Supprimer du panier"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+            items.map((item) => {
+              const currentPaperUnitPrice = getPaperUnitPrice(item);
+              const isSinglePaperCopy = item.print_copies_qty === 1;
 
-                {/* Sélecteurs 21st.dev Quantity Stepper (id: 20055) */}
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 text-xs">
-                  {/* Licence Numérique (1 unité max) */}
-                  <div className="p-2.5 rounded-xl bg-background border border-border space-y-1.5 flex flex-col justify-between">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-navy block">Licence Numérique</span>
-                      <span className="font-mono text-[10px] text-navy block font-bold">
-                        {item.book.digital_wholesale_price.toLocaleString("fr-FR")} XOF
-                      </span>
+              return (
+                <div
+                  key={item.book_id}
+                  className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3 shadow-xs"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={item.book.cover_url}
+                        alt={item.book.title}
+                        className="w-12 h-16 object-cover rounded-lg border border-border shrink-0 shadow-xs"
+                      />
+                      <div>
+                        <p className="font-serif font-bold text-xs text-navy leading-snug">{item.book.title}</p>
+                        <p className="text-[10px] text-foreground-muted font-mono">{item.book.isbn_digital}</p>
+                        <span className="text-[10px] font-bold text-gold">{item.book.publisher_name}</span>
+                      </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        onUpdateQty(
-                          item.book_id,
-                          "digital",
-                          item.digital_licenses_qty > 0 ? 0 : 1
-                        )
-                      }
-                      className={`text-[11px] font-bold px-2 py-1 rounded-lg border text-center transition-colors cursor-pointer w-full flex items-center justify-center gap-1 ${
-                        item.digital_licenses_qty > 0
-                          ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
-                          : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
-                      }`}
+                      onClick={() => onRemoveItem(item.book_id)}
+                      className="text-foreground-muted hover:text-rose-600 p-1 transition-colors"
+                      title="Supprimer du panier"
                     >
-                      {item.digital_licenses_qty > 0 ? "✓ 1 licence incluse" : "+ Inclure (1 unité)"}
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
 
-                  {/* Exemplaires Papier */}
-                  <div className="p-2.5 rounded-xl bg-background border border-border space-y-1.5">
-                    <span className="text-[10px] uppercase font-bold text-navy block">Exemplaires Papier</span>
-                    <span className="font-mono text-[10px] text-gold block font-bold">
-                      {item.book.print_wholesale_price.toLocaleString("fr-FR")} XOF / u
-                    </span>
-                    <div className="flex items-center justify-between bg-background-secondary rounded-lg border border-border p-1">
+                  {/* Sélecteurs 21st.dev Quantity Stepper */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 text-xs">
+                    {/* Licence Numérique (1 unité max) */}
+                    <div className="p-2.5 rounded-xl bg-background border border-border space-y-1.5 flex flex-col justify-between">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-navy block">Licence Numérique</span>
+                        <span className="font-mono text-[10px] text-navy block font-bold">
+                          {item.book.digital_wholesale_price.toLocaleString("fr-FR")} XOF
+                        </span>
+                      </div>
                       <button
                         type="button"
                         onClick={() =>
                           onUpdateQty(
                             item.book_id,
-                            "print",
-                            Math.max(0, item.print_copies_qty - 5)
+                            "digital",
+                            item.digital_licenses_qty > 0 ? 0 : 1
                           )
                         }
-                        className="p-1 hover:bg-border rounded text-navy"
+                        className={`text-[11px] font-bold px-2 py-1 rounded-lg border text-center transition-colors cursor-pointer w-full flex items-center justify-center gap-1 ${
+                          item.digital_licenses_qty > 0
+                            ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                            : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
+                        }`}
                       >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="font-mono font-bold text-xs text-navy">{item.print_copies_qty}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onUpdateQty(
-                            item.book_id,
-                            "print",
-                            item.print_copies_qty + 5
-                          )
-                        }
-                        className="p-1 hover:bg-border rounded text-navy"
-                      >
-                        <Plus className="w-3 h-3" />
+                        {item.digital_licenses_qty > 0 ? "✓ 1 licence incluse" : "+ Inclure (1 unité)"}
                       </button>
                     </div>
+
+                    {/* Exemplaires Papier */}
+                    <div className="p-2.5 rounded-xl bg-background border border-border space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-navy block">Exemplaires Papier</span>
+                        {isSinglePaperCopy && (
+                          <span className="text-[9px] font-bold text-amber-600 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20">
+                            Tarif normal
+                          </span>
+                        )}
+                      </div>
+                      <span className={`font-mono text-[10px] block font-bold ${isSinglePaperCopy ? "text-navy" : "text-gold"}`}>
+                        {currentPaperUnitPrice.toLocaleString("fr-FR")} XOF / u
+                      </span>
+                      <div className="flex items-center justify-between bg-background-secondary rounded-lg border border-border p-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onUpdateQty(
+                              item.book_id,
+                              "print",
+                              Math.max(0, item.print_copies_qty - 1)
+                            )
+                          }
+                          className="p-1 hover:bg-border rounded text-navy cursor-pointer"
+                          title="Diminuer d'un exemplaire"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="font-mono font-bold text-xs text-navy">{item.print_copies_qty}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onUpdateQty(
+                              item.book_id,
+                              "print",
+                              item.print_copies_qty + 1
+                            )
+                          }
+                          className="p-1 hover:bg-border rounded text-navy cursor-pointer"
+                          title="Ajouter un exemplaire"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Note explicative remise si 1 seul exemplaire papier */}
+                  {isSinglePaperCopy && (
+                    <p className="text-[10px] text-amber-700 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20 font-medium">
+                      Achat unitaire (1 ex.) : le tarif public standard s&apos;applique. La remise grossiste s&apos;active automatiquement dès 2 exemplaires.
+                    </p>
+                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 

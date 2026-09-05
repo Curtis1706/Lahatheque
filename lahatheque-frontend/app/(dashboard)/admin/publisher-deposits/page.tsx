@@ -11,6 +11,7 @@ import {
   Send,
   Download,
   FileText,
+  Eye,
 } from "lucide-react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -50,7 +51,7 @@ export default function AdminPublisherDepositsPage() {
   const [editComment, setEditComment] = useState("");
   const [rightsDecision, setRightsDecision] = useState<"approved" | "revision_requested">("approved");
   const [rightsComment, setRightsComment] = useState("");
-  const [activeModal, setActiveModal] = useState<"editorial" | "rights" | "publish" | null>(null);
+  const [activeModal, setActiveModal] = useState<"editorial" | "rights" | "publish" | "details" | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const load = async () => {
@@ -78,7 +79,7 @@ export default function AdminPublisherDepositsPage() {
   const readyCount = deposits.filter((d) => d.editorial_status === "approved" && d.rights_status === "approved" && d.status !== "published").length;
   const publishedCount = deposits.filter((d) => d.status === "published").length;
 
-  const openModal = (dep: PublisherDepositForReview, modal: "editorial" | "rights" | "publish") => {
+  const openModal = (dep: PublisherDepositForReview, modal: "editorial" | "rights" | "publish" | "details") => {
     setSelected(dep);
     setEditComment(dep.editorial_comment || "");
     setRightsComment(dep.rights_comment || "");
@@ -204,6 +205,13 @@ export default function AdminPublisherDepositsPage() {
           )}
           <button
             type="button"
+            onClick={() => openModal(row, "details")}
+            className="px-2.5 py-1.5 rounded-xl bg-background border border-border text-navy text-xs font-semibold hover:border-gold cursor-pointer transition-colors"
+          >
+            Détails
+          </button>
+          <button
+            type="button"
             onClick={() => openModal(row, "editorial")}
             className="px-2.5 py-1.5 rounded-xl bg-background border border-border text-foreground text-xs font-semibold hover:border-gold cursor-pointer transition-colors"
           >
@@ -310,6 +318,16 @@ export default function AdminPublisherDepositsPage() {
             </span>
           )}
 
+          {/* Bouton Consulter / Dossier Complet */}
+          <button
+            type="button"
+            onClick={() => openModal(row, "details")}
+            className="p-2 rounded-xl bg-background border border-border hover:border-gold hover:text-navy text-foreground text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shrink-0 shadow-2xs"
+            title="Consulter le dossier complet"
+          >
+            <Eye className="w-4 h-4 text-navy" />
+          </button>
+
           {/* Bouton Examen Éditorial */}
           <button
             type="button"
@@ -364,7 +382,7 @@ export default function AdminPublisherDepositsPage() {
             File d'examen — Éditeurs Tiers
           </h1>
           <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">
-            Deux volets distincts par dépôt : conformité éditoriale (Chef Maquettiste) et vérification des droits (Juriste). La publication n'est possible que lorsque les deux sont validés.
+            Deux volets distincts par dépôt : conformité éditoriale et vérification des droits (Juriste). La publication n&apos;est possible que lorsque les deux sont validés.
           </p>
         </div>
       </div>
@@ -432,6 +450,7 @@ export default function AdminPublisherDepositsPage() {
         searchable={true}
         searchPlaceholder="Rechercher par titre, éditeur ou ISBN..."
         mobileCard={renderMobileCard}
+        onRowClick={(row) => openModal(row, "details")}
         pageSize={10}
         emptyMessage="Aucun dépôt éditeur tiers à examiner."
       />
@@ -442,7 +461,7 @@ export default function AdminPublisherDepositsPage() {
           <div className="flex items-center gap-3 p-3.5 rounded-xl bg-gold/10 border border-gold/20">
             <FileCheck2 className="w-5 h-5 text-gold shrink-0" />
             <div>
-              <p className="text-xs font-bold text-navy">Volet éditorial — Chef Maquettiste</p>
+              <p className="text-xs font-bold text-navy">Volet éditorial (Mise en page &amp; Structure)</p>
               <p className="text-[11px] text-foreground">{selected?.title}</p>
               <p className="text-[10px] text-foreground-muted">{selected?.publisher_name}</p>
             </div>
@@ -677,6 +696,143 @@ export default function AdminPublisherDepositsPage() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Modale — Dossier complet / Détails */}
+      <Modal open={activeModal === "details"} onClose={closeModal} title="Dossier Dépôt Éditeur Tiers">
+        {selected && (
+          <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+            {/* Header Ouvrage */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-2xl bg-navy/5 border border-navy/10">
+              <BookCover3D
+                title={selected.title}
+                authors={selected.publisher_name}
+                discipline={selected.discipline}
+                coverUrl={selected.cover_url}
+                size="sm"
+                interactive={false}
+              />
+              <div className="space-y-1 min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-navy/10 text-navy font-semibold">
+                    {selected.discipline}
+                  </span>
+                  <StatusBadge status={selected.status} />
+                </div>
+                <h3 className="font-serif font-bold text-base sm:text-lg text-navy leading-snug">
+                  {selected.title}
+                </h3>
+                <p className="text-xs text-gold font-semibold">
+                  Maison d&apos;édition : {selected.publisher_name}
+                </p>
+                <div className="flex items-center gap-4 text-xs text-foreground-muted font-mono pt-1">
+                  <span>ISBN : {selected.isbn_digital}</span>
+                  {selected.price > 0 && (
+                    <span className="font-bold text-navy">
+                      {selected.price.toLocaleString("fr-FR")} XOF
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Téléchargement Manuscrit */}
+            <div className="p-4 rounded-2xl bg-background border border-border flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 rounded-xl bg-gold/15 text-gold shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-xs text-navy">Fichier Manuscrit &amp; Épreuve</p>
+                  <p className="text-[11px] text-foreground-muted">Format PDF complet soumis par l&apos;éditeur</p>
+                </div>
+              </div>
+              {selected.file_url ? (
+                <a
+                  href={selected.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="px-3.5 py-2 rounded-xl bg-gold text-navy hover:bg-gold-light font-bold text-xs transition-colors inline-flex items-center gap-1.5 shadow-xs shrink-0"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Télécharger</span>
+                </a>
+              ) : (
+                <span className="text-xs text-foreground-muted italic">Aucun PDF joint</span>
+              )}
+            </div>
+
+            {/* Suivi des deux volets */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Volet Éditorial */}
+              <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                    <FileCheck2 className="w-4 h-4 text-gold" />
+                    Volet Éditorial
+                  </span>
+                  <StatusChip value={selected.editorial_status} />
+                </div>
+                <p className="text-xs text-foreground-muted">
+                  {selected.editorial_comment || "Aucun commentaire éditorial renseigné."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openModal(selected, "editorial")}
+                  className="w-full py-2 rounded-xl bg-background border border-border hover:border-gold text-xs font-semibold text-navy transition-colors text-center cursor-pointer"
+                >
+                  Modifier la décision éditoriale
+                </button>
+              </div>
+
+              {/* Volet Droits */}
+              <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                    <FileCheck2 className="w-4 h-4 text-gold" />
+                    Volet Juridique (Droits)
+                  </span>
+                  <StatusChip value={selected.rights_status} />
+                </div>
+                <p className="text-xs text-foreground-muted">
+                  {selected.rights_comment || "Aucune observation juridique renseignée."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openModal(selected, "rights")}
+                  className="w-full py-2 rounded-xl bg-background border border-border hover:border-gold text-xs font-semibold text-navy transition-colors text-center cursor-pointer"
+                >
+                  Modifier la décision droits
+                </button>
+              </div>
+            </div>
+
+            {/* Footer Modal Actions */}
+            <div className="pt-4 border-t border-border flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-foreground-muted hover:bg-background-secondary"
+              >
+                Fermer
+              </button>
+
+              {selected.editorial_status === "approved" &&
+                selected.rights_status === "approved" &&
+                selected.status !== "published" && (
+                  <button
+                    type="button"
+                    onClick={() => openModal(selected, "publish")}
+                    className="px-4 py-2 rounded-xl bg-success text-white text-xs font-semibold hover:bg-success/90 transition-colors flex items-center gap-1.5 shadow-xs"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Publier sur la vitrine</span>
+                  </button>
+                )}
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

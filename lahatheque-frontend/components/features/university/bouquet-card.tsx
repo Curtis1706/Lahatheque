@@ -2,18 +2,18 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import {
   Layers,
   BookOpen,
   CheckCircle2,
   Download,
   Calendar,
-  FileText,
   Building2,
-  GraduationCap,
   Sparkles,
+  PieChart,
+  TrendingUp,
 } from "lucide-react";
+import { getInstitutionBouquetMetrics } from "@/lib/services/bouquet-distribution";
 import { toast } from "sonner";
 import { exportBouquetCatalogWord } from "@/lib/services/university";
 import type { UniversityBouquet } from "@/lib/types/university";
@@ -27,6 +27,8 @@ interface BouquetCardProps {
 export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  const metrics = getInstitutionBouquetMetrics(bouquet);
 
   const handleSubscribe = async () => {
     if (!onSubscribe) return;
@@ -45,15 +47,15 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
     }
   };
 
-  const handleExportWord = () => {
+  const handleExportWord = async () => {
     setExporting(true);
     try {
-      exportBouquetCatalogWord(bouquet);
+      await exportBouquetCatalogWord(bouquet);
       toast.success("Document Word (.doc) généré et téléchargé.");
     } catch {
       toast.error("Erreur lors de la génération du document.");
     } finally {
-      setTimeout(() => setExporting(false), 500);
+      setExporting(false);
     }
   };
 
@@ -106,6 +108,42 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
             </span>
             <p className="font-mono text-sm font-bold text-navy">
               {bouquet.annual_price.toLocaleString("fr-FR")} {bouquet.currency}
+            </p>
+          </div>
+        </div>
+
+        {/* Grille de 3 Cards KPI du Bouquet (Zéro Modale) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="p-3 rounded-2xl bg-gold/10 border border-gold/25 space-y-0.5">
+            <span className="text-[10px] text-navy font-bold uppercase tracking-wider flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-gold shrink-0" />
+              <span>Vos Ouvrages</span>
+            </span>
+            <p className="font-mono text-base font-bold text-navy">
+              {metrics.books_count}{" "}
+              <span className="text-[11px] font-sans font-normal text-foreground-muted">
+                ({metrics.books_percentage}%)
+              </span>
+            </p>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-background-secondary border border-border space-y-0.5">
+            <span className="text-[10px] text-foreground-muted font-bold uppercase tracking-wider flex items-center gap-1">
+              <PieChart className="w-3.5 h-3.5 text-gold shrink-0" />
+              <span>Part d&apos;Audience</span>
+            </span>
+            <p className="font-mono text-base font-bold text-navy">
+              {metrics.usage_share_percent}%
+            </p>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-0.5">
+            <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider flex items-center gap-1">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Redevance ({metrics.royalty_rate}%)</span>
+            </span>
+            <p className="font-mono text-base font-bold text-emerald-700 truncate">
+              {metrics.royalty_amount.toLocaleString("fr-FR")} {metrics.currency}
             </p>
           </div>
         </div>
@@ -185,7 +223,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
           type="button"
           onClick={handleExportWord}
           disabled={exporting}
-          className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-background-secondary border border-border hover:border-gold text-navy text-xs font-bold transition-colors inline-flex items-center justify-center gap-2 min-h-[44px] disabled:opacity-50"
+          className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-background-secondary border border-border hover:border-gold text-navy text-xs font-bold transition-colors inline-flex items-center justify-center gap-2 min-h-[44px] disabled:opacity-50 cursor-pointer"
           title="Exporter la liste des ouvrages du bouquet en Word (.doc)"
         >
           {exporting ? (

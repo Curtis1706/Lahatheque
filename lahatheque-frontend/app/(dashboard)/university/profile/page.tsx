@@ -247,11 +247,11 @@ export default function UniversityProfilePage() {
           </div>
         </div>
 
-        {/* 2. Coordonnées Bancaires Trésorerie (Redevances 15%) */}
+        {/* 2. Coordonnées Bancaires Trésorerie (Redevances) */}
         <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider border-b border-border pb-3">
             <DollarSign className="w-4 h-4 text-gold" />
-            Coordonnées Bancaires de Trésorerie (Reversement des 15%)
+            Coordonnées Bancaires de Trésorerie (Reversement des Redevances)
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

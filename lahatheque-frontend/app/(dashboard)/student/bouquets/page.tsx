@@ -1,13 +1,31 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+/**
+ * PAGE BOUQUETS DOCUMENTAIRES CLIENT (MASQUÉE / MISE EN COMMENTAIRE)
+ * Désactivée à la demande du client. Redirection automatique vers /student.
+ */
+export default function StudentBouquetsPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/student");
+  }, [router]);
+
+  return null;
+}
+
+/*
+import React, { useState } from "react";
 import { Layers, BookOpen, Check, Sparkles, ArrowRight, ShieldCheck, Clock, CheckCircle2, Loader2, Info } from "lucide-react";
 import { getClientBouquets, subscribeToClientBouquet, ClientBouquet } from "@/lib/services/bouquets";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "sonner";
 import Link from "next/link";
 
-export default function StudentBouquetsPage() {
+function ArchivedStudentBouquetsPage() {
   const [bouquets, setBouquets] = useState<ClientBouquet[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBouquet, setSelectedBouquet] = useState<ClientBouquet | null>(null);
@@ -58,7 +76,6 @@ export default function StudentBouquetsPage() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-16 animate-in fade-in duration-300">
-      {/* En-tête */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
@@ -70,7 +87,7 @@ export default function StudentBouquetsPage() {
                 Bouquets Documentaires
               </h1>
               <p className="font-sans text-xs sm:text-sm text-foreground-muted">
-                Accédez en illimité à des collections complètes d&apos;ouvrages par discipline ou thématique.
+                Accédez en illimité à des collections complètes d'ouvrages par discipline ou thématique.
               </p>
             </div>
           </div>
@@ -87,7 +104,6 @@ export default function StudentBouquetsPage() {
         </div>
       </div>
 
-      {/* Bannière information CDC */}
       <div className="bg-navy/5 border border-navy/15 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
           <ShieldCheck className="size-5 text-gold shrink-0 mt-0.5" />
@@ -102,7 +118,6 @@ export default function StudentBouquetsPage() {
         </div>
       </div>
 
-      {/* Grille des bouquets */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((n) => (
@@ -173,7 +188,7 @@ export default function StudentBouquetsPage() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="size-3.5" />
-                      1 an d&apos;accès
+                      1 an d'accès
                     </span>
                   </div>
 
@@ -203,7 +218,7 @@ export default function StudentBouquetsPage() {
                     className="w-full py-2.5 px-4 rounded-xl bg-navy hover:bg-navy-hover text-white font-sans text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-sm"
                   >
                     <Sparkles className="size-4 text-gold" />
-                    S&apos;abonner maintenant
+                    S'abonner maintenant
                   </button>
                 )}
               </div>
@@ -212,7 +227,6 @@ export default function StudentBouquetsPage() {
         </div>
       )}
 
-      {/* Modale de confirmation de souscription */}
       {selectedBouquet && (
         <Modal
           open={Boolean(selectedBouquet)}
@@ -252,7 +266,7 @@ export default function StudentBouquetsPage() {
             <div className="flex items-center gap-2 p-3 rounded-lg bg-navy/5 border border-navy/10 text-xs font-sans text-foreground-muted">
               <Info className="size-4 text-navy shrink-0" />
               <span>
-                L&apos;accès à tous les livres du bouquet sera immédiatement actif dans votre bibliothèque.
+                L'accès à tous les livres du bouquet sera immédiatement actif dans votre bibliothèque.
               </span>
             </div>
 
@@ -278,7 +292,7 @@ export default function StudentBouquetsPage() {
                   </>
                 ) : (
                   <>
-                    Confirmer l&apos;abonnement
+                    Confirmer l'abonnement
                     <ArrowRight className="size-4" />
                   </>
                 )}
@@ -290,3 +304,5 @@ export default function StudentBouquetsPage() {
     </div>
   );
 }
+*/
+

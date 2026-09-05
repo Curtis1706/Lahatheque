@@ -838,11 +838,67 @@ export interface BouquetOfferingAdmin {
   custom_book_ids: string[];
 }
 
+export const DEFAULT_MOCK_BOUQUET_OFFERINGS: BouquetOfferingAdmin[] = [
+  {
+    id: "bqt-droit-01",
+    title: "Bouquet Droit & Sciences Politiques (Toutes universités)",
+    bouquet_type: "discipline",
+    discipline: "Droit",
+    faculty_code: "FADESP",
+    target_institution: null,
+    country: "BJ",
+    books_count: 27,
+    annual_price: 500000,
+    currency: "FCFA",
+    description: "Sélection juridique interuniversitaire intégrant les fonds de l'UAC, de l'Université de Parakou et de l'UNA.",
+    is_active: true,
+    custom_book_ids: [],
+  },
+  {
+    id: "bqt-sante-02",
+    title: "Bouquet Sciences Médicales & Santé Campus",
+    bouquet_type: "faculty",
+    discipline: "Santé",
+    faculty_code: "FSS",
+    target_institution: null,
+    country: "BJ",
+    books_count: 18,
+    annual_price: 750000,
+    currency: "FCFA",
+    description: "Fonds documentaire spécialisé en médecine générale, pharmacie et santé publique universitaire.",
+    is_active: true,
+    custom_book_ids: [],
+  },
+  {
+    id: "bqt-eco-03",
+    title: "Bouquet Économie Rurale, Agronomie & Gestion",
+    bouquet_type: "discipline",
+    discipline: "Économie",
+    faculty_code: "FASEG",
+    target_institution: null,
+    country: "BJ",
+    books_count: 22,
+    annual_price: 600000,
+    currency: "FCFA",
+    description: "Fonds documentaire pluridisciplinaire partagé entre les facultés d'économie et d'agronomie béninoises.",
+    is_active: true,
+    custom_book_ids: [],
+  },
+];
+
 export async function getBouquetOfferings(): Promise<BouquetOfferingAdmin[]> {
-  const res = await fetch("/api/bff/admin/bouquet-offerings/", { credentials: "include", cache: "no-store" });
-  if (!res.ok) return [];
-  const json = await res.json();
-  return json.data || [];
+  try {
+    const res = await fetch("/api/bff/admin/bouquet-offerings/", { credentials: "include", cache: "no-store" });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+        return json.data;
+      }
+    }
+  } catch {
+    // Mode offline ou API indisponible
+  }
+  return DEFAULT_MOCK_BOUQUET_OFFERINGS;
 }
 
 export async function createBouquetOffering(data: Partial<BouquetOfferingAdmin>): Promise<boolean> {

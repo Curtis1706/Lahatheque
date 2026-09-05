@@ -279,6 +279,30 @@ export default function AuthorPurchasesPage() {
         </Link>
       </div>
 
+      {/* Encart Avantage Tarif Auteur */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-gold/10 border border-gold/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-2xl bg-gold text-navy shrink-0">
+            <Coins className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="font-bold text-xs text-navy">
+              Avantage Auteur Actif : Remise de 40% sur le papier et 25% sur le numérique
+            </p>
+            <p className="text-[11px] text-foreground-muted">
+              Vos réductions conventionnées sont appliquées automatiquement à toutes vos commandes d&apos;exemplaires, réglables immédiatement ou en dépôt (à crédit sous 30 jours).
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/author/catalog"
+          className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1.5 shrink-0 shadow-xs min-h-[40px]"
+        >
+          <span>Nouvelle commande (-40%)</span>
+          <ArrowUpRight className="w-3.5 h-3.5 text-gold" />
+        </Link>
+      </div>
+
       {/* Cartes KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-3xl bg-background border border-border space-y-2">

@@ -92,7 +92,6 @@ export function DashboardHeader() {
     if (path === "/author") return { section: "Espace Auteur", title: "Vue d'ensemble Auteur" };
 
     if (path.startsWith("/publisher/catalog")) return { section: "Espace Éditeur", title: "Mon Catalogue Éditeur" };
-    if (path.startsWith("/publisher/submissions")) return { section: "Espace Éditeur", title: "Suivi des Dépôts & Validation" };
     if (path.startsWith("/publisher/stats")) return { section: "Espace Éditeur", title: "Statistiques & Lectorat" };
     if (path.startsWith("/publisher/royalties")) return { section: "Espace Éditeur", title: "Redevances & Ventes" };
     if (path.startsWith("/publisher/profile")) return { section: "Espace Éditeur", title: "Profil & Mandat d'Édition" };
@@ -103,7 +102,7 @@ export function DashboardHeader() {
     if (path.startsWith("/university/bouquets")) return { section: "Espace Université", title: "Bouquets Documentaires" };
     if (path.startsWith("/university/affiliations")) return { section: "Espace Université", title: "Affiliations Étudiants" };
     if (path.startsWith("/university/purchases")) return { section: "Espace Université", title: "Achats Livres Papier Campus" };
-    if (path.startsWith("/university/royalties")) return { section: "Espace Université", title: "Redevances 15%" };
+    if (path.startsWith("/university/royalties")) return { section: "Espace Université", title: "Redevances Universitaires" };
     if (path.startsWith("/university/profile")) return { section: "Espace Université", title: "Profil Établissement" };
     if (path === "/university") return { section: "Espace Université", title: "Vue d'ensemble Université" };
 

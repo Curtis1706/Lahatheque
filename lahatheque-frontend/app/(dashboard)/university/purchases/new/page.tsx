@@ -149,7 +149,7 @@ export default function NewUniversityPaperOrderPage() {
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/university" className="hover:text-navy">Vue d&apos;ensemble</Link>
         <span>/</span>
-        <Link href="/university/purchases" className="hover:text-navy">Commandes Papier</Link>
+        <Link href="/university/purchases" className="hover:text-navy">Commandes</Link>
         <span>/</span>
         <span className="text-navy font-semibold">Nouvelle Commande</span>
       </div>
@@ -161,13 +161,13 @@ export default function NewUniversityPaperOrderPage() {
           className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-2"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Retour aux Commandes Papier
+          Retour aux Commandes
         </Link>
-        <h1 className="font-serif text-2xl font-bold text-navy">
-          Passation de Commande de Livres Papier pour l&apos;Établissement
+        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+          Nouvelle Commande
         </h1>
         <p className="text-xs text-foreground-muted mt-1">
-          Sélectionnez les ouvrages du catalogue académique, ajustez les volumes papier souhaités et vos coordonnées de livraison sur le campus.
+          Sélectionnez les ouvrages du catalogue, ajustez les quantités et vos coordonnées de livraison.
         </p>
       </div>
 
@@ -181,34 +181,36 @@ export default function NewUniversityPaperOrderPage() {
           <p className="text-xs font-semibold">{catalogError}</p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Sélecteur d'ouvrages du catalogue réel (même design que chez le grossiste) */}
-          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
+        <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-full overflow-hidden">
+          {/* Sélecteur d'ouvrages du catalogue réel */}
+          <div className="p-5 sm:p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs overflow-hidden w-full max-w-full">
             <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-gold" />
               Sélectionner un Ouvrage du Catalogue
             </h3>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <select
-                value={selectedBookId}
-                onChange={(e) => setSelectedBookId(e.target.value)}
-                className="flex-1 px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
-              >
-                {catalogBooks.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.title} — {b.discipline} ({b.price_paper.toLocaleString("fr-FR")} XOF / ex. papier)
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full max-w-full min-w-0 overflow-hidden">
+              <div className="min-w-0 flex-1 w-full overflow-hidden">
+                <select
+                  value={selectedBookId}
+                  onChange={(e) => setSelectedBookId(e.target.value)}
+                  className="w-full max-w-full min-w-0 px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px] truncate block"
+                >
+                  {catalogBooks.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.title} — {b.discipline} ({b.price_paper.toLocaleString("fr-FR")} XOF / ex. papier)
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button
                 type="button"
                 onClick={handleAddBookToCart}
                 disabled={!selectedBookId}
-                className="px-4 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold/90 transition-colors flex items-center justify-center gap-2 min-h-[44px] shrink-0 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold/90 transition-colors flex items-center justify-center gap-2 min-h-[44px] shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-50 shadow-xs"
               >
-                <Plus className="w-4 h-4" />
-                Ajouter à la commande
+                <Plus className="w-4 h-4 shrink-0" />
+                <span>Ajouter à la commande</span>
               </button>
             </div>
           </div>

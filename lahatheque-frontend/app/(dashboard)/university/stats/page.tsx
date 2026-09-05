@@ -1,3 +1,11 @@
+import { notFound } from "next/navigation";
+
+// Page Statistiques & Usage Universités masquée temporairement à la demande utilisateur.
+export default function UniversityStatsPage() {
+  notFound();
+}
+
+/*
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -16,7 +24,6 @@ import { UniversityBookDetailModal } from "@/components/features/university/univ
 import { getUniversityKpis, getUniversityCatalog } from "@/lib/services/university";
 import type { UniversityKpis, UniversityBookCatalogItem } from "@/lib/types/university";
 
-// Générateur de timeline pour activer les barres bâtonnets sparklines de ProgressMetricCard (identique à l'admin et vue d'ensemble)
 const getRollingTimeline = (count: number) => {
   const monthNames = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
   const now = new Date();
@@ -72,59 +79,32 @@ export default function UniversityStatsPage() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
-        <Link href="/university" className="hover:text-navy">Vue d&apos;ensemble</Link>
+        <Link href="/university" className="hover:text-navy">Vue d'ensemble</Link>
         <span>/</span>
-        <span className="text-navy font-semibold">Statistiques d&apos;Usage</span>
+        <span className="text-navy font-semibold">Statistiques d'Usage</span>
       </div>
 
-      {/* Header */}
       <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <Link href="/university" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Vue d&apos;ensemble
+            Vue d'ensemble
           </Link>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
             <TrendingUp className="w-4 h-4 text-gold" />
-            Rapports &amp; Métriques Académiques
+            Rapports & Métriques Académiques
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Statistiques de Consultation &amp; Usage Documentaire
+            Statistiques de Consultation & Usage Documentaire
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Mesure des volumes de lecture, consultations d&apos;extraits gratuits et usages des ressources documentaires par vos étudiants.
+            Mesure des volumes de lecture, consultations d'extraits gratuits et usages des ressources documentaires par vos étudiants.
           </p>
         </div>
       </div>
 
-      {/* 4 Cartes de métriques connectées aux KPIs réels avec bâtonnets sparklines */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <ProgressMetricCard
-          title="Consultations Ce Mois"
-          total={kpis.monthly_consultations_count.toLocaleString("fr-FR")}
-          percent={`${kpis.consultations_trend_percent >= 0 ? "+" : ""}${kpis.consultations_trend_percent}%`}
-          trend={kpis.consultations_trend_percent >= 0 ? "up" : "down"}
-          accent="emerald"
-          delta="Lectures"
-          deltaLabel="ce mois"
-          defaultView="bar"
-          data={getRollingTimeline(kpis.monthly_consultations_count)}
-        />
-
-        <ProgressMetricCard
-          title="Étudiants Affiliés"
-          total={kpis.affiliated_students_count.toLocaleString("fr-FR")}
-          percent={kpis.affiliated_students_count > 0 ? "+8.4%" : "0%"}
-          trend={kpis.affiliated_students_count > 0 ? "up" : "down"}
-          accent="navy"
-          delta="Actifs"
-          deltaLabel="campus"
-          defaultView="bar"
-          data={getRollingTimeline(kpis.affiliated_students_count)}
-        />
-
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <ProgressMetricCard
           title="Bouquets Souscrits"
           total={`${kpis.active_bouquets_count} Packs`}
@@ -138,9 +118,9 @@ export default function UniversityStatsPage() {
         />
 
         <ProgressMetricCard
-          title="Redevances 15% (Disponibles)"
+          title="Redevances Disponibles"
           total={`${kpis.total_royalties_available.toLocaleString("fr-FR")} ${kpis.currency || "XOF"}`}
-          percent="15%"
+          percent="Droits"
           trend="up"
           accent="emerald"
           delta="Droits"
@@ -150,37 +130,6 @@ export default function UniversityStatsPage() {
         />
       </div>
 
-      {/* Donut Chart 21st.dev par Discipline */}
-      <FacultyStatsChart
-        facultyDistribution={kpis.faculty_distribution}
-        totalConsultations={kpis.monthly_consultations_count}
-      />
-
-      {/* Graphique d'Évolution Temporelle 21st.dev */}
-      <TotalSalesChart
-        title="Croissance des Lectures Semestrielles"
-        totalAmountText={`${(kpis.monthly_consultations_count).toLocaleString("fr-FR")} Lectures`}
-        growthBadgeText={kpis.consultations_trend_percent ? `${kpis.consultations_trend_percent > 0 ? "+" : ""}${kpis.consultations_trend_percent}% ce mois` : "0% ce mois"}
-        unit="Lectures"
-        curvePoints={
-          kpis.monthly_consultations_count > 0
-            ? [
-                Math.round(kpis.monthly_consultations_count * 0.4),
-                Math.round(kpis.monthly_consultations_count * 0.6),
-                Math.round(kpis.monthly_consultations_count * 0.8),
-                kpis.monthly_consultations_count,
-              ]
-            : [0, 0, 0, 0]
-        }
-        channels={kpis.faculty_distribution.filter((f) => f.consultations > 0).map((f) => ({
-          name: f.name || f.code,
-          amount: f.consultations,
-          change: `${f.percent}%`,
-          isPositive: true,
-        }))}
-      />
-
-      {/* Top 5 des Ouvrages les plus lus de l'université avec couverture 3D & action Lire extrait */}
       <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
         <div className="flex items-center justify-between border-b border-border pb-4">
           <div className="space-y-1">
@@ -205,7 +154,6 @@ export default function UniversityStatsPage() {
                   #{idx + 1}
                 </span>
 
-                {/* Couverture 3D intégrée */}
                 <div
                   onClick={() => setSelectedBook(b)}
                   className="shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
@@ -266,7 +214,6 @@ export default function UniversityStatsPage() {
         </div>
       </div>
 
-      {/* Modale de détails d'ouvrage sécurisée */}
       <UniversityBookDetailModal
         book={selectedBook}
         isOpen={!!selectedBook}
@@ -275,3 +222,4 @@ export default function UniversityStatsPage() {
     </div>
   );
 }
+*/

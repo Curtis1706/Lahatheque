@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   FileText,
   CreditCard,
+  ShoppingBag,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 
@@ -91,34 +92,56 @@ export default function AuthorOverviewPage() {
         </div>
       </div>
 
-      {/* 4 KPI Cards Connectées au Backend */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Bannière Avantage Tarif Auteur */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-gold/10 border border-gold/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="p-3 rounded-2xl bg-gold text-navy shrink-0 shadow-2xs">
+            <ShoppingBag className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-navy text-white uppercase tracking-wider">
+                Avantage Partenaire Auteur
+              </span>
+              <span className="text-xs font-bold text-gold font-mono">
+                -40% Papier &bull; -25% Numérique
+              </span>
+            </div>
+            <h2 className="font-serif font-bold text-base sm:text-lg text-navy">
+              Tarif Préférentiel Auteur &ndash; Réduction Exclusive sur vos Ouvrages
+            </h2>
+            <p className="text-xs text-foreground-muted">
+              Commandez vos exemplaires imprimés pour vos séances de dédicaces, cours ou proches avec une réduction automatique configurée par l&apos;administration.
+            </p>
+          </div>
+        </div>
+
+        <Link
+          href="/author/catalog"
+          className="px-5 py-2.5 rounded-xl bg-navy text-white font-bold text-xs hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs shrink-0 self-start sm:self-auto min-h-[44px]"
+        >
+          <span>Commander mes livres (-40%)</span>
+          <ArrowRight className="w-3.5 h-3.5 text-gold" />
+        </Link>
+      </div>
+
+      {/* 3 KPI Cards Principaux Connectés au Backend */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Ventes Réalisées */}
         <Link href="/author/books" className="block">
           <ProgressMetricCard
             title="Ventes Réalisées"
-            total={`${kpis?.totalSales ?? 0} ex.`}
+            total={`${(kpis?.totalSales ?? 0).toLocaleString("fr-FR")} ex.`}
             percent="En hausse"
             trend="up"
-            accent="gold"
-            delta={`${kpis?.publishedBooksCount ?? 0} livres`}
+            accent="emerald"
+            delta={`${kpis?.publishedBooksCount ?? 0} ouvrages`}
             deltaLabel="au catalogue"
             data={kpis?.timelines?.sales || getRollingTimeline(kpis?.totalSales ?? 0)}
           />
         </Link>
 
-        <Link href="/author/books" className="block">
-          <ProgressMetricCard
-            title="Lectures &amp; DRM"
-            total={`${kpis?.totalDownloads ?? 0} lectures`}
-            percent="Streaming"
-            trend="up"
-            accent="neutral"
-            delta="Filigrane actif"
-            deltaLabel="sécurisé"
-            data={getRollingTimeline(kpis?.totalDownloads ?? 0)}
-          />
-        </Link>
-
+        {/* Droits d'Auteur en Attente */}
         <Link href="/author/royalties" className="block">
           <ProgressMetricCard
             title="Droits d'Auteur en Attente"
@@ -132,6 +155,7 @@ export default function AuthorOverviewPage() {
           />
         </Link>
 
+        {/* Total Droits Rétribués */}
         <Link href="/author/royalties" className="block">
           <ProgressMetricCard
             title="Total Droits Rétribués"
@@ -145,6 +169,103 @@ export default function AuthorOverviewPage() {
           />
         </Link>
       </div>
+
+      {/* Synthèse Logistique des Stocks & Tirages Papier */}
+      {kpis && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-navy-light text-navy">
+                <BookOpen className="w-4 h-4 text-gold" />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-bold font-serif text-navy">
+                  Suivi des Stocks &amp; Tirages Papier
+                </h2>
+                <p className="text-[11px] text-foreground-muted mt-0.5">
+                  Situation en temps réel de vos tirages physiques dans le réseau de distribution LAHA
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/author/books"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-navy hover:text-gold transition-colors"
+            >
+              <span>Voir le stock par ouvrage</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-foreground-muted">
+                Taux d&apos;écoulement du tirage physique :
+              </span>
+              <span className="font-mono font-bold text-navy">
+                {kpis.stockInitial && kpis.stockInitial > 0
+                  ? `${Math.min(100, Math.round(((kpis.stockInitial - (kpis.stockRemaining ?? 0)) / kpis.stockInitial) * 100))}% écoulé`
+                  : "0% écoulé"}
+              </span>
+            </div>
+
+            {/* Barre de progression visuelle */}
+            <div className="w-full h-3 bg-background rounded-full overflow-hidden border border-border">
+              <div
+                className="h-full bg-gold rounded-full transition-all duration-500"
+                style={{
+                  width: `${
+                    kpis.stockInitial && kpis.stockInitial > 0
+                      ? Math.min(
+                          100,
+                          Math.max(
+                            0,
+                            Math.round(
+                              ((kpis.stockInitial - (kpis.stockRemaining ?? 0)) /
+                                kpis.stockInitial) *
+                                100
+                            )
+                          )
+                        )
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div className="p-3.5 rounded-2xl bg-background border border-border space-y-1">
+              <span className="text-[10px] text-foreground-muted uppercase tracking-wider font-bold block">
+                Stock Initial (Tirage Global)
+              </span>
+              <p className="font-mono text-lg font-bold text-navy">
+                {(kpis.stockInitial ?? 0).toLocaleString("fr-FR")}{" "}
+                <span className="text-xs font-sans text-foreground-muted">ex.</span>
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-background border border-border space-y-1">
+              <span className="text-[10px] text-foreground-muted uppercase tracking-wider font-bold block">
+                Exemplaires Papier Écoulés
+              </span>
+              <p className="font-mono text-lg font-bold text-emerald-600">
+                {Math.max(0, (kpis.stockInitial ?? 0) - (kpis.stockRemaining ?? 0)).toLocaleString("fr-FR")}{" "}
+                <span className="text-xs font-sans text-foreground-muted">ex.</span>
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-navy-light border border-navy-hover/20 space-y-1">
+              <span className="text-[10px] text-navy uppercase tracking-wider font-bold block">
+                Stock Restant Disponible
+              </span>
+              <p className="font-mono text-lg font-bold text-navy">
+                {(kpis.stockRemaining ?? 0).toLocaleString("fr-FR")}{" "}
+                <span className="text-xs font-sans text-gold">ex.</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2 Colonnes : Raccourcis & Manuscrits récents */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -165,6 +286,12 @@ export default function AuthorOverviewPage() {
                   desc: "Statistiques et ventes par ouvrage",
                   icon: BookOpen,
                   href: "/author/books",
+                },
+                {
+                  label: "Commander mes Livres",
+                  desc: "Tarif préférentiel (-40% papier, -25% numérique)",
+                  icon: ShoppingBag,
+                  href: "/author/catalog",
                 },
                 {
                   label: "Relevés de Redevances",
