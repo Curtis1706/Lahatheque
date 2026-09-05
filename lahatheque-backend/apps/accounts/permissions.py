@@ -45,3 +45,20 @@ class IsManagerOrAdmin(BasePermission):
                  or 'super_admin' in active)
         )
 
+
+class IsAdminOrLegalReviewer(BasePermission):
+    """Autorise uniquement les Administrateurs, Super Admins et Juristes."""
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        active = request.user.active_roles if isinstance(getattr(request.user, 'active_roles', None), list) else []
+        role = getattr(request.user, 'role', '')
+        return bool(
+            role in ('admin', 'super_admin', 'legal_reviewer')
+            or 'admin' in active
+            or 'super_admin' in active
+            or 'legal_reviewer' in active
+            or getattr(request.user, 'is_staff', False)
+        )
+
+

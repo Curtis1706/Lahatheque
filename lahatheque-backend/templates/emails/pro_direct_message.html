@@ -1,0 +1,35 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}{{ subject_text|default:"Communication Officielle • LAHAThèque" }}{% endblock %}
+
+{% block badge_header %}Communication Officielle • LAHAThèque{% endblock %}
+
+{% block email_header %}
+<h1 class="font-playfair text-dark-adapt" style="font-size: 20px; font-weight: 700; color: #1B2A4E; margin: 0 0 18px 0; line-height: 1.35;">
+    {{ subject_text }}
+</h1>
+{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1E293B;">
+    Bonjour {{ recipient_name|default:"Madame, Monsieur" }},
+</p>
+
+<div style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.7; color: #334155; white-space: pre-line;">
+    {{ message_body }}
+</div>
+
+<div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #E2E8F0;">
+    <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #1B2A4E;">
+        {{ sender_name|default:"L'équipe LAHAThèque" }}
+    </p>
+    <p style="margin: 0 0 2px 0; font-size: 12px; color: #64748B;">
+        {{ sender_role_display|default:"Direction Générale & Relations Institutionnelles" }}
+    </p>
+    {% if sender_email %}
+    <p style="margin: 0; font-size: 12px; color: #B08D42;">
+        {{ sender_email }}
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -178,3 +178,85 @@ class ManuscriptPublicSubmission(models.Model):
     def __str__(self) -> str:
         return f"[{self.reference}] {self.book_title} - {self.first_name} {self.last_name}"
 
+
+class ProfessionalContact(models.Model):
+    """
+    Carnet de contacts professionnels et institutionnels partagé entre l'Administration et les Juristes.
+    Permet le suivi relationnel, l'envoi d'e-mails officiels et l'import/export massif.
+    """
+    class Category(models.TextChoices):
+        UNIVERSITY = "university", "Université / Académie"
+        AUTHOR = "author", "Auteur / Écrivain"
+        PUBLISHER = "publisher", "Éditeur Tiers / Partenaire"
+        INSTITUTION = "institution", "Ministère / Institution Publique"
+        PARTNER = "partner", "Diffuseur / Libraire / Partenaire B2B"
+        PRESS = "press", "Presse & Média"
+        OTHER = "other", "Autre contact"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    first_name = models.CharField(max_length=128, verbose_name="Prénom")
+    last_name = models.CharField(max_length=128, verbose_name="Nom")
+    email = models.EmailField(db_index=True, verbose_name="Adresse email professionnelle")
+    phone = models.CharField(max_length=64, blank=True, default="", verbose_name="Téléphone / WhatsApp")
+    organization = models.CharField(max_length=255, blank=True, default="", verbose_name="Organisation / Établissement")
+    role_or_title = models.CharField(max_length=128, blank=True, default="", verbose_name="Fonction / Qualité")
+    category = models.CharField(max_length=32, choices=Category.choices, default=Category.OTHER, verbose_name="Catégorie")
+    notes = models.TextField(blank=True, default="", verbose_name="Notes internes & historique")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="managed_professional_contacts",
+        verbose_name="Créé par"
+    )
+    last_contacted_at = models.DateTimeField(null=True, blank=True, verbose_name="Dernier contact")
+    emails_sent_count = models.PositiveIntegerField(default=0, verbose_name="Nombre d'emails envoyés")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Dernière modification")
+
+    class Meta:
+        db_table = "communications_professional_contact"
+        ordering = ["-created_at"]
+        verbose_name = "Contact Professionnel"
+        verbose_name_plural = "Contacts Professionnels"
+
+    def __str__(self) -> str:
+        org_str = f" ({self.organization})" if self.organization else ""
+        return f"{self.first_name} {self.last_name}{org_str} <{self.email}>"
+
+
+class ContactEmailDispatch(models.Model):
+    """
+    Journalisation des e-mails officiels expédiés à un contact professionnel.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contact = models.ForeignKey(
+        ProfessionalContact,
+        on_delete=models.CASCADE,
+        related_name="dispatched_emails",
+        verbose_name="Contact destinataire"
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_contact_emails",
+        verbose_name="Expéditeur (Admin / Juriste)"
+    )
+    subject = models.CharField(max_length=255, verbose_name="Objet")
+    body_snippet = models.TextField(verbose_name="Extrait du message")
+    status = models.CharField(max_length=32, default="sent", verbose_name="Statut")
+    sent_at = models.DateTimeField(auto_now_add=True, verbose_name="Date d'envoi")
+
+    class Meta:
+        db_table = "communications_contact_email_dispatch"
+        ordering = ["-sent_at"]
+        verbose_name = "Envoi d'Email Contact"
+        verbose_name_plural = "Envois d'Emails Contacts"
+
+    def __str__(self) -> str:
+        return f"[{self.status}] {self.subject} -> {self.contact.email} ({self.sent_at.strftime('%d/%m/%Y %H:%M')})"
+
+
