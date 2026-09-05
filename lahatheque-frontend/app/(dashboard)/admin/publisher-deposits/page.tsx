@@ -60,7 +60,7 @@ export default function AdminPublisherDepositsPage() {
   const [editComment, setEditComment] = useState("");
   const [rightsDecision, setRightsDecision] = useState<"approved" | "revision_requested">("approved");
   const [rightsComment, setRightsComment] = useState("");
-  const [activeModal, setActiveModal] = useState<"editorial" | "rights" | "publish" | "details" | null>(null);
+  const [activeModal, setActiveModal] = useState<"editorial" | "rights" | "publish" | "details" | "protection" | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // État de la modale de sécurisation & protection DRM
@@ -75,7 +75,6 @@ export default function AdminPublisherDepositsPage() {
   });
   const [loadingProtection, setLoadingProtection] = useState(false);
   const [submittingProtection, setSubmittingProtection] = useState(false);
-  const [isProtectionModalOpen, setIsProtectionModalOpen] = useState(false);
 
   const load = async () => {
     try {
@@ -102,7 +101,7 @@ export default function AdminPublisherDepositsPage() {
   const readyCount = deposits.filter((d) => d.editorial_status === "approved" && d.rights_status === "approved" && d.status !== "published").length;
   const publishedCount = deposits.filter((d) => d.status === "published").length;
 
-  const openModal = (dep: PublisherDepositForReview, modal: "editorial" | "rights" | "publish" | "details") => {
+  const openModal = (dep: PublisherDepositForReview, modal: "editorial" | "rights" | "publish" | "details" | "protection") => {
     setSelected(dep);
     setEditComment(dep.editorial_comment || "");
     setRightsComment(dep.rights_comment || "");
@@ -113,12 +112,14 @@ export default function AdminPublisherDepositsPage() {
 
   const closeModal = () => {
     setSelected(null);
+    setProtectionDeposit(null);
     setActiveModal(null);
   };
 
   const openProtectionModal = async (deposit: PublisherDepositForReview) => {
+    setSelected(deposit);
     setProtectionDeposit(deposit);
-    setIsProtectionModalOpen(true);
+    setActiveModal("protection");
     setLoadingProtection(true);
     try {
       const cfg = await getDepositProtectionConfig(deposit.id);
@@ -146,7 +147,7 @@ export default function AdminPublisherDepositsPage() {
       const ok = await updateDepositProtectionConfig(protectionDeposit.id, protectionConfig);
       if (ok) {
         toast.success("Configuration de sécurité mise à jour avec succès.");
-        setIsProtectionModalOpen(false);
+        closeModal();
       } else {
         toast.error("Erreur lors de la mise à jour de la sécurité.");
       }
@@ -260,6 +261,7 @@ export default function AdminPublisherDepositsPage() {
               target="_blank"
               rel="noopener noreferrer"
               download
+              onClick={(e) => e.stopPropagation()}
               className="p-2 rounded-xl bg-background border border-border text-foreground hover:border-gold hover:text-navy transition-colors cursor-pointer"
               title="Télécharger le PDF"
               aria-label="Télécharger le PDF"
@@ -269,28 +271,40 @@ export default function AdminPublisherDepositsPage() {
           )}
           <button
             type="button"
-            onClick={() => openModal(row, "details")}
+            onClick={(e) => {
+              e.stopPropagation();
+              openModal(row, "details");
+            }}
             className="px-2.5 py-1.5 rounded-xl bg-background border border-border text-navy text-xs font-semibold hover:border-gold cursor-pointer transition-colors"
           >
             Détails
           </button>
           <button
             type="button"
-            onClick={() => openModal(row, "editorial")}
+            onClick={(e) => {
+              e.stopPropagation();
+              openModal(row, "editorial");
+            }}
             className="px-2.5 py-1.5 rounded-xl bg-background border border-border text-foreground text-xs font-semibold hover:border-gold cursor-pointer transition-colors"
           >
             Éditorial
           </button>
           <button
             type="button"
-            onClick={() => openModal(row, "rights")}
+            onClick={(e) => {
+              e.stopPropagation();
+              openModal(row, "rights");
+            }}
             className="px-2.5 py-1.5 rounded-xl bg-background border border-border text-foreground text-xs font-semibold hover:border-gold cursor-pointer transition-colors"
           >
             Droits
           </button>
           <button
             type="button"
-            onClick={() => openProtectionModal(row)}
+            onClick={(e) => {
+              e.stopPropagation();
+              openProtectionModal(row);
+            }}
             className="px-2.5 py-1.5 rounded-xl bg-background border border-border text-navy text-xs font-semibold hover:border-gold cursor-pointer transition-colors"
           >
             Sécuriser
@@ -298,7 +312,10 @@ export default function AdminPublisherDepositsPage() {
           {row.editorial_status === "approved" && row.rights_status === "approved" && row.status !== "published" && (
             <button
               type="button"
-              onClick={() => openModal(row, "publish")}
+              onClick={(e) => {
+                e.stopPropagation();
+                openModal(row, "publish");
+              }}
               className="px-3 py-1.5 rounded-xl bg-success text-white text-xs font-semibold hover:bg-success/90 cursor-pointer shadow-xs"
             >
               Publier
@@ -373,6 +390,7 @@ export default function AdminPublisherDepositsPage() {
               target="_blank"
               rel="noopener noreferrer"
               download
+              onClick={(e) => e.stopPropagation()}
               className="p-2 rounded-xl bg-background border border-border hover:border-gold hover:text-navy text-foreground transition-colors inline-flex items-center justify-center shrink-0 cursor-pointer"
               title="Télécharger le fichier PDF soumis"
               aria-label="Télécharger le PDF"
@@ -392,7 +410,10 @@ export default function AdminPublisherDepositsPage() {
           {/* Bouton Consulter / Dossier Complet */}
           <button
             type="button"
-            onClick={() => openModal(row, "details")}
+            onClick={(e) => {
+              e.stopPropagation();
+              openModal(row, "details");
+            }}
             className="p-2 rounded-xl bg-background border border-border hover:border-gold hover:text-navy text-foreground text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shrink-0 shadow-2xs"
             title="Consulter le dossier complet"
           >
@@ -402,7 +423,10 @@ export default function AdminPublisherDepositsPage() {
           {/* Bouton Examen Éditorial */}
           <button
             type="button"
-            onClick={() => openModal(row, "editorial")}
+            onClick={(e) => {
+              e.stopPropagation();
+              openModal(row, "editorial");
+            }}
             className="px-2.5 py-1.5 rounded-xl bg-background border border-border hover:border-gold hover:text-navy text-foreground text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
             title="Décision éditoriale (Chef Maquettiste)"
           >
@@ -413,7 +437,10 @@ export default function AdminPublisherDepositsPage() {
           {/* Bouton Examen Droits */}
           <button
             type="button"
-            onClick={() => openModal(row, "rights")}
+            onClick={(e) => {
+              e.stopPropagation();
+              openModal(row, "rights");
+            }}
             className="px-2.5 py-1.5 rounded-xl bg-background border border-border hover:border-gold hover:text-navy text-foreground text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
             title="Décision juridique (Juriste)"
           >
@@ -424,7 +451,10 @@ export default function AdminPublisherDepositsPage() {
           {/* Bouton Sécuriser */}
           <button
             type="button"
-            onClick={() => openProtectionModal(row)}
+            onClick={(e) => {
+              e.stopPropagation();
+              openProtectionModal(row);
+            }}
             className="px-2.5 py-1.5 rounded-xl bg-background border border-border hover:border-gold hover:text-navy text-navy text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
             title="Sécuriser (Filigrane & DRM LCP)"
           >
@@ -436,7 +466,10 @@ export default function AdminPublisherDepositsPage() {
           {row.editorial_status === "approved" && row.rights_status === "approved" && row.status !== "published" && (
             <button
               type="button"
-              onClick={() => openModal(row, "publish")}
+              onClick={(e) => {
+                e.stopPropagation();
+                openModal(row, "publish");
+              }}
               className="px-3 py-1.5 rounded-xl bg-success text-white text-xs font-semibold flex items-center gap-1 hover:bg-success/90 transition-colors shadow-xs cursor-pointer shrink-0"
               title="Publier l'ouvrage sur la vitrine"
             >
@@ -919,11 +952,13 @@ export default function AdminPublisherDepositsPage() {
 
       {/* Modale — Sécurisation & Protection DRM */}
       <Modal
-        open={isProtectionModalOpen}
-        onClose={() => setIsProtectionModalOpen(false)}
+        open={activeModal === "protection"}
+        onClose={closeModal}
+        maxWidth={580}
+        maxHeight="min(90vh, 760px)"
         title="Sécurisation & Protection DRM"
       >
-        <div className="p-6 space-y-5">
+        <div className="space-y-4 text-xs">
           <div className="flex items-center gap-3 p-3.5 rounded-xl bg-gold/10 border border-gold/20">
             <ShieldCheck className="w-5 h-5 text-gold shrink-0" />
             <div>
@@ -944,12 +979,20 @@ export default function AdminPublisherDepositsPage() {
               <InlineLoader size={24} />
             </div>
           ) : (
-            <div className="space-y-4 text-xs">
+            <>
               {/* 1. Filigrane Visible */}
-              <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3">
+              <div
+                onClick={() =>
+                  setProtectionConfig((prev) => ({
+                    ...prev,
+                    watermark_enabled: !prev.watermark_enabled,
+                  }))
+                }
+                className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3 cursor-pointer hover:border-gold/40 transition-colors"
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-gold" />
+                    <Eye className="w-4 h-4 text-gold shrink-0" />
                     <div>
                       <p className="font-bold text-navy">Filigrane Visuel Personnalisé</p>
                       <p className="text-[11px] text-foreground-muted">
@@ -960,18 +1003,23 @@ export default function AdminPublisherDepositsPage() {
                   <input
                     type="checkbox"
                     checked={protectionConfig.watermark_enabled}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      e.stopPropagation();
                       setProtectionConfig((prev) => ({
                         ...prev,
                         watermark_enabled: e.target.checked,
-                      }))
-                    }
+                      }));
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                     className="w-4 h-4 accent-navy cursor-pointer shrink-0"
                   />
                 </div>
 
                 {protectionConfig.watermark_enabled && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/60">
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/60"
+                  >
                     <div>
                       <label className="text-[10px] uppercase font-bold text-navy block mb-1">
                         Position du filigrane
@@ -984,7 +1032,7 @@ export default function AdminPublisherDepositsPage() {
                             watermark_position: e.target.value,
                           }))
                         }
-                        className="w-full text-xs p-2 rounded-xl border border-border bg-background text-foreground"
+                        className="w-full text-xs p-2 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-navy"
                       >
                         <option value="bottom-right">Bas Droite</option>
                         <option value="center">Centre Diagonal</option>
@@ -1009,7 +1057,7 @@ export default function AdminPublisherDepositsPage() {
                             watermark_opacity: parseInt(e.target.value, 10),
                           }))
                         }
-                        className="w-full accent-gold mt-1.5"
+                        className="w-full accent-gold mt-1.5 cursor-pointer"
                       />
                     </div>
                   </div>
@@ -1017,7 +1065,15 @@ export default function AdminPublisherDepositsPage() {
               </div>
 
               {/* 2. Protection DRM LCP */}
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-background-secondary border border-border">
+              <div
+                onClick={() =>
+                  setProtectionConfig((prev) => ({
+                    ...prev,
+                    lcp_drm_enabled: !prev.lcp_drm_enabled,
+                  }))
+                }
+                className="flex items-center justify-between p-4 rounded-2xl bg-background-secondary border border-border cursor-pointer hover:border-gold/40 transition-colors"
+              >
                 <div className="flex items-center gap-2 pr-3">
                   <Lock className="w-4 h-4 text-gold shrink-0" />
                   <div>
@@ -1030,18 +1086,28 @@ export default function AdminPublisherDepositsPage() {
                 <input
                   type="checkbox"
                   checked={protectionConfig.lcp_drm_enabled}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    e.stopPropagation();
                     setProtectionConfig((prev) => ({
                       ...prev,
                       lcp_drm_enabled: e.target.checked,
-                    }))
-                  }
+                    }));
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   className="w-4 h-4 accent-navy cursor-pointer shrink-0"
                 />
               </div>
 
               {/* 3. Bloquer copier-coller */}
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-background-secondary border border-border">
+              <div
+                onClick={() =>
+                  setProtectionConfig((prev) => ({
+                    ...prev,
+                    disable_copy_paste: !prev.disable_copy_paste,
+                  }))
+                }
+                className="flex items-center justify-between p-4 rounded-2xl bg-background-secondary border border-border cursor-pointer hover:border-gold/40 transition-colors"
+              >
                 <div className="flex items-center gap-2 pr-3">
                   <Copy className="w-4 h-4 text-gold shrink-0" />
                   <div>
@@ -1054,18 +1120,28 @@ export default function AdminPublisherDepositsPage() {
                 <input
                   type="checkbox"
                   checked={protectionConfig.disable_copy_paste}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    e.stopPropagation();
                     setProtectionConfig((prev) => ({
                       ...prev,
                       disable_copy_paste: e.target.checked,
-                    }))
-                  }
+                    }));
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   className="w-4 h-4 accent-navy cursor-pointer shrink-0"
                 />
               </div>
 
               {/* 4. Bloquer impression */}
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-background-secondary border border-border">
+              <div
+                onClick={() =>
+                  setProtectionConfig((prev) => ({
+                    ...prev,
+                    disable_print: !prev.disable_print,
+                  }))
+                }
+                className="flex items-center justify-between p-4 rounded-2xl bg-background-secondary border border-border cursor-pointer hover:border-gold/40 transition-colors"
+              >
                 <div className="flex items-center gap-2 pr-3">
                   <Printer className="w-4 h-4 text-gold shrink-0" />
                   <div>
@@ -1078,12 +1154,14 @@ export default function AdminPublisherDepositsPage() {
                 <input
                   type="checkbox"
                   checked={protectionConfig.disable_print}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    e.stopPropagation();
                     setProtectionConfig((prev) => ({
                       ...prev,
                       disable_print: e.target.checked,
-                    }))
-                  }
+                    }));
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   className="w-4 h-4 accent-navy cursor-pointer shrink-0"
                 />
               </div>
@@ -1092,7 +1170,7 @@ export default function AdminPublisherDepositsPage() {
               <div className="pt-3 border-t border-border flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsProtectionModalOpen(false)}
+                  onClick={closeModal}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-foreground-muted hover:bg-background-secondary cursor-pointer"
                 >
                   Annuler
@@ -1116,7 +1194,7 @@ export default function AdminPublisherDepositsPage() {
                   )}
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
       </Modal>
