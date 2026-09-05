@@ -12,6 +12,10 @@ import {
   Download,
   FileText,
   Eye,
+  ShieldCheck,
+  Lock,
+  Copy,
+  Printer,
 } from "lucide-react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -25,6 +29,11 @@ import {
   publishPublisherDeposit,
   type PublisherDepositForReview,
 } from "@/lib/services/publisher";
+import {
+  getDepositProtectionConfig,
+  updateDepositProtectionConfig,
+  type DepositProtectionConfig,
+} from "@/lib/services/admin";
 import { toast } from "sonner";
 
 function StatusChip({ value }: { value: string }) {
@@ -53,6 +62,20 @@ export default function AdminPublisherDepositsPage() {
   const [rightsComment, setRightsComment] = useState("");
   const [activeModal, setActiveModal] = useState<"editorial" | "rights" | "publish" | "details" | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // État de la modale de sécurisation & protection DRM
+  const [protectionDeposit, setProtectionDeposit] = useState<PublisherDepositForReview | null>(null);
+  const [protectionConfig, setProtectionConfig] = useState<DepositProtectionConfig>({
+    watermark_enabled: true,
+    watermark_position: "bottom-right",
+    watermark_opacity: 30,
+    lcp_drm_enabled: true,
+    disable_copy_paste: true,
+    disable_print: false,
+  });
+  const [loadingProtection, setLoadingProtection] = useState(false);
+  const [submittingProtection, setSubmittingProtection] = useState(false);
+  const [isProtectionModalOpen, setIsProtectionModalOpen] = useState(false);
 
   const load = async () => {
     try {
@@ -91,6 +114,47 @@ export default function AdminPublisherDepositsPage() {
   const closeModal = () => {
     setSelected(null);
     setActiveModal(null);
+  };
+
+  const openProtectionModal = async (deposit: PublisherDepositForReview) => {
+    setProtectionDeposit(deposit);
+    setIsProtectionModalOpen(true);
+    setLoadingProtection(true);
+    try {
+      const cfg = await getDepositProtectionConfig(deposit.id);
+      if (cfg) {
+        setProtectionConfig({
+          watermark_enabled: cfg.watermark_enabled ?? true,
+          watermark_position: cfg.watermark_position || "bottom-right",
+          watermark_opacity: typeof cfg.watermark_opacity === "number" ? cfg.watermark_opacity : 30,
+          lcp_drm_enabled: cfg.lcp_drm_enabled ?? true,
+          disable_copy_paste: cfg.disable_copy_paste ?? true,
+          disable_print: cfg.disable_print ?? false,
+        });
+      }
+    } catch {
+      toast.error("Impossible de récupérer la configuration de protection.");
+    } finally {
+      setLoadingProtection(false);
+    }
+  };
+
+  const handleSaveProtection = async () => {
+    if (!protectionDeposit) return;
+    setSubmittingProtection(true);
+    try {
+      const ok = await updateDepositProtectionConfig(protectionDeposit.id, protectionConfig);
+      if (ok) {
+        toast.success("Configuration de sécurité mise à jour avec succès.");
+        setIsProtectionModalOpen(false);
+      } else {
+        toast.error("Erreur lors de la mise à jour de la sécurité.");
+      }
+    } catch {
+      toast.error("Erreur de communication avec le serveur.");
+    } finally {
+      setSubmittingProtection(false);
+    }
   };
 
   const handleEditorial = async () => {
@@ -224,6 +288,13 @@ export default function AdminPublisherDepositsPage() {
           >
             Droits
           </button>
+          <button
+            type="button"
+            onClick={() => openProtectionModal(row)}
+            className="px-2.5 py-1.5 rounded-xl bg-background border border-border text-navy text-xs font-semibold hover:border-gold cursor-pointer transition-colors"
+          >
+            Sécuriser
+          </button>
           {row.editorial_status === "approved" && row.rights_status === "approved" && row.status !== "published" && (
             <button
               type="button"
@@ -348,6 +419,17 @@ export default function AdminPublisherDepositsPage() {
           >
             <FileCheck2 className="w-3.5 h-3.5 text-gold shrink-0" />
             <span>Droits</span>
+          </button>
+
+          {/* Bouton Sécuriser */}
+          <button
+            type="button"
+            onClick={() => openProtectionModal(row)}
+            className="px-2.5 py-1.5 rounded-xl bg-background border border-border hover:border-gold hover:text-navy text-navy text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
+            title="Sécuriser (Filigrane & DRM LCP)"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-gold shrink-0" />
+            <span>Sécuriser</span>
           </button>
 
           {/* Bouton Publier (si doublement validé) */}
@@ -833,6 +915,210 @@ export default function AdminPublisherDepositsPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Modale — Sécurisation & Protection DRM */}
+      <Modal
+        open={isProtectionModalOpen}
+        onClose={() => setIsProtectionModalOpen(false)}
+        title="Sécurisation & Protection DRM"
+      >
+        <div className="p-6 space-y-5">
+          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-gold/10 border border-gold/20">
+            <ShieldCheck className="w-5 h-5 text-gold shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-navy">
+                Paramètres de protection anti-piratage &amp; DRM
+              </p>
+              <p className="text-[11px] text-foreground font-semibold">
+                {protectionDeposit?.title}
+              </p>
+              <p className="text-[10px] text-foreground-muted">
+                Éditeur : {protectionDeposit?.publisher_name}
+              </p>
+            </div>
+          </div>
+
+          {loadingProtection ? (
+            <div className="p-8 text-center">
+              <InlineLoader size={24} />
+            </div>
+          ) : (
+            <div className="space-y-4 text-xs">
+              {/* 1. Filigrane Visible */}
+              <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-gold" />
+                    <div>
+                      <p className="font-bold text-navy">Filigrane Visuel Personnalisé</p>
+                      <p className="text-[11px] text-foreground-muted">
+                        Incruste un tatouage dynamique sur chaque page visualisée.
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={protectionConfig.watermark_enabled}
+                    onChange={(e) =>
+                      setProtectionConfig((prev) => ({
+                        ...prev,
+                        watermark_enabled: e.target.checked,
+                      }))
+                    }
+                    className="w-4 h-4 accent-navy cursor-pointer shrink-0"
+                  />
+                </div>
+
+                {protectionConfig.watermark_enabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/60">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-navy block mb-1">
+                        Position du filigrane
+                      </label>
+                      <select
+                        value={protectionConfig.watermark_position}
+                        onChange={(e) =>
+                          setProtectionConfig((prev) => ({
+                            ...prev,
+                            watermark_position: e.target.value,
+                          }))
+                        }
+                        className="w-full text-xs p-2 rounded-xl border border-border bg-background text-foreground"
+                      >
+                        <option value="bottom-right">Bas Droite</option>
+                        <option value="center">Centre Diagonal</option>
+                        <option value="top-right">Haut Droite</option>
+                        <option value="bottom-left">Bas Gauche</option>
+                        <option value="top-left">Haut Gauche</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-navy block mb-1">
+                        Opacité ({protectionConfig.watermark_opacity}%)
+                      </label>
+                      <input
+                        type="range"
+                        min="5"
+                        max="100"
+                        step="5"
+                        value={protectionConfig.watermark_opacity}
+                        onChange={(e) =>
+                          setProtectionConfig((prev) => ({
+                            ...prev,
+                            watermark_opacity: parseInt(e.target.value, 10),
+                          }))
+                        }
+                        className="w-full accent-gold mt-1.5"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Protection DRM LCP */}
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-background-secondary border border-border">
+                <div className="flex items-center gap-2 pr-3">
+                  <Lock className="w-4 h-4 text-gold shrink-0" />
+                  <div>
+                    <p className="font-bold text-navy">Protection DRM LCP (Readium)</p>
+                    <p className="text-[11px] text-foreground-muted">
+                      Chiffre le contenu et limite l&apos;accès aux liseuses agréées.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={protectionConfig.lcp_drm_enabled}
+                  onChange={(e) =>
+                    setProtectionConfig((prev) => ({
+                      ...prev,
+                      lcp_drm_enabled: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 accent-navy cursor-pointer shrink-0"
+                />
+              </div>
+
+              {/* 3. Bloquer copier-coller */}
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-background-secondary border border-border">
+                <div className="flex items-center gap-2 pr-3">
+                  <Copy className="w-4 h-4 text-gold shrink-0" />
+                  <div>
+                    <p className="font-bold text-navy">Bloquer le Copier-Coller</p>
+                    <p className="text-[11px] text-foreground-muted">
+                      Désactive la sélection et la copie de texte dans le lecteur web.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={protectionConfig.disable_copy_paste}
+                  onChange={(e) =>
+                    setProtectionConfig((prev) => ({
+                      ...prev,
+                      disable_copy_paste: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 accent-navy cursor-pointer shrink-0"
+                />
+              </div>
+
+              {/* 4. Bloquer impression */}
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-background-secondary border border-border">
+                <div className="flex items-center gap-2 pr-3">
+                  <Printer className="w-4 h-4 text-gold shrink-0" />
+                  <div>
+                    <p className="font-bold text-navy">Bloquer l&apos;Impression</p>
+                    <p className="text-[11px] text-foreground-muted">
+                      Interdit l&apos;impression papier et l&apos;export virtuel via le navigateur.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={protectionConfig.disable_print}
+                  onChange={(e) =>
+                    setProtectionConfig((prev) => ({
+                      ...prev,
+                      disable_print: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 accent-navy cursor-pointer shrink-0"
+                />
+              </div>
+
+              {/* Actions Footer */}
+              <div className="pt-3 border-t border-border flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsProtectionModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-foreground-muted hover:bg-background-secondary cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={submittingProtection}
+                  onClick={handleSaveProtection}
+                  className="px-5 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                >
+                  {submittingProtection ? (
+                    <>
+                      <InlineLoader size={14} />
+                      <span>Enregistrement...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-gold" />
+                      <span>Enregistrer</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );

@@ -24,6 +24,7 @@ from .models import (
     PublisherAuditLog,
 )
 from .permissions import HasValidPublisherApiKey
+from apps.accounts.permissions import IsAdminOrSuperAdmin
 
 
 def get_or_create_publisher_profile(user) -> PublisherProfile:
@@ -1209,6 +1210,55 @@ def _notify_publisher_of_review(deposit, volet, decision, comment):
             )
     except Exception:
         pass
+
+
+class AdminDepositProtectionView(APIView):
+    """PATCH /api/v1/publishers/admin/deposits/<id>/protection/ - Configuration DRM par l'Admin,
+    quel que soit le propriétaire du dépôt."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request, id):
+        try:
+            deposit = PublisherBookDeposit.objects.get(id=id)
+        except PublisherBookDeposit.DoesNotExist:
+            return Response({"success": False, "error": "Dépôt introuvable."}, status=404)
+
+        return Response({
+            "success": True,
+            "data": {
+                "watermark_enabled": deposit.watermark_enabled,
+                "watermark_position": deposit.watermark_position,
+                "watermark_opacity": deposit.watermark_opacity,
+                "lcp_drm_enabled": deposit.lcp_drm_enabled,
+                "disable_copy_paste": deposit.disable_copy_paste,
+                "disable_print": deposit.disable_print,
+            }
+        })
+
+    def patch(self, request, id):
+        try:
+            deposit = PublisherBookDeposit.objects.get(id=id)
+        except PublisherBookDeposit.DoesNotExist:
+            return Response({"success": False, "error": "Dépôt introuvable."}, status=404)
+
+        config = request.data.get("protection_config", {})
+
+        if "watermark_enabled" in config:
+            deposit.watermark_enabled = config["watermark_enabled"]
+        if "watermark_position" in config:
+            deposit.watermark_position = config["watermark_position"]
+        if "watermark_opacity" in config:
+            deposit.watermark_opacity = int(config["watermark_opacity"])
+        if "lcp_drm_enabled" in config:
+            deposit.lcp_drm_enabled = config["lcp_drm_enabled"]
+        if "disable_copy_paste" in config:
+            deposit.disable_copy_paste = config["disable_copy_paste"]
+        if "disable_print" in config:
+            deposit.disable_print = config["disable_print"]
+
+        deposit.save()
+
+        return Response({"success": True, "message": "Configuration de sécurité mise à jour."})
 
 
 

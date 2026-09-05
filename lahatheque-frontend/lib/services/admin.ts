@@ -1002,4 +1002,40 @@ export async function updateManuscriptLeadStatus(id: string, status: string): Pr
   return res.ok;
 }
 
+// =========================================================================
+// PROTECTION ET DRM DES DÉPÔTS ÉDITEURS TIERS (ADMIN)
+// =========================================================================
+
+export interface DepositProtectionConfig {
+  watermark_enabled: boolean;
+  watermark_position: string;
+  watermark_opacity: number;
+  lcp_drm_enabled: boolean;
+  disable_copy_paste: boolean;
+  disable_print: boolean;
+}
+
+export async function getDepositProtectionConfig(depositId: string): Promise<DepositProtectionConfig | null> {
+  const res = await fetch(`/api/bff/publishers/admin/deposits/${depositId}/protection/`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.data;
+}
+
+export async function updateDepositProtectionConfig(
+  depositId: string,
+  config: Partial<DepositProtectionConfig>
+): Promise<boolean> {
+  const res = await fetch(`/api/bff/publishers/admin/deposits/${depositId}/protection/`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ protection_config: config }),
+  });
+  return res.ok;
+}
+
 

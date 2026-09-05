@@ -21,6 +21,7 @@ from .publisher_views import (
     PublisherDepositEditorialDecisionView,
     PublisherDepositRightsDecisionView,
     PublisherDepositPublishView,
+    AdminDepositProtectionView,
 )
 
 app_name = 'publishers_portal'
@@ -40,6 +41,7 @@ urlpatterns = [
     path('admin/deposits/', PublisherDepositReviewListView.as_view(), name='publisher-deposit-review-list'),
     path('admin/deposits/<str:id>/editorial-decision/', PublisherDepositEditorialDecisionView.as_view(), name='publisher-deposit-editorial-decision'),
     path('admin/deposits/<str:id>/rights-decision/', PublisherDepositRightsDecisionView.as_view(), name='publisher-deposit-rights-decision'),
+    path('admin/deposits/<str:id>/protection/', AdminDepositProtectionView.as_view(), name='admin-deposit-protection'),
     path('admin/deposits/<str:id>/publish/', PublisherDepositPublishView.as_view(), name='publisher-deposit-publish'),
     path('external/deposits/', PublisherExternalDepositView.as_view(), name='publisher-external-deposit'),
     path('external/deposits/<str:pk>/', PublisherExternalDepositStatusView.as_view(), name='publisher-external-deposit-status'),
