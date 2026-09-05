@@ -332,13 +332,13 @@ export function BouquetPieDistribution({
         </div>
       </div>
 
-      {/* ─── TABLEAU DE CALCUL OFFICIEL (SECTION 11.2 DU CAHIER DES CHARGES) ─── */}
+      {/* ─── TABLEAU DE CALCUL CONSOLIDÉ ─── */}
       <div className="space-y-3 pt-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="font-serif font-bold text-base text-navy flex items-center gap-2">
               <Layers className="w-4 h-4 text-gold" />
-              R&eacute;partition des redevances &ndash; Exemple bouquet {total_ca.toLocaleString("fr-FR")} {currency}
+              R&eacute;partition des redevances &ndash; Enveloppe {total_ca.toLocaleString("fr-FR")} {currency}
             </h3>
             <p className="text-[11px] text-foreground-muted">
               Prorata calcul&eacute; sur {total_books} ouvrages et {total_consultations.toLocaleString("fr-FR")} consultations totales
