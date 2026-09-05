@@ -20,7 +20,9 @@ interface CartItem {
   format_type: "digital" | "paper";
 }
 
-const SHIPPING_FEE = 2500; // XOF — frais de livraison forfaitaires livre papier
+// Les frais de livraison sont définis par le Gestionnaire selon le service choisi,
+// communiqués après traitement de la commande — jamais un montant inventé côté client.
+const SHIPPING_FEE = 0;
 
 // ─── Searchable Book Combobox Component ────────────────────────────────────────
 
@@ -277,8 +279,9 @@ export default function OrderCreateForm({
     () => cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0),
     [cart]
   );
-  const shippingTotal = hasPaperItem ? SHIPPING_FEE : 0;
+  const shippingTotal = 0;
   const total = subtotal + shippingTotal;
+  const shippingFeeUnknown = hasPaperItem;
 
   function handleAddToCart() {
     const book = books.find((b) => b.id === selectedBookId);
@@ -544,8 +547,16 @@ export default function OrderCreateForm({
             </p>
             {hasPaperItem && (
               <p className="text-xs text-foreground-muted">
-                Frais d&apos;expédition forfaitaires (livres papier) :{" "}
-                <span className="font-mono font-semibold text-navy">{shippingTotal.toLocaleString("fr-FR")} XOF</span>
+                {shippingFeeUnknown ? (
+                  <span className="text-[11px] text-foreground-muted italic">
+                    Frais de livraison à confirmer — communiqués après traitement de votre commande par notre équipe logistique.
+                  </span>
+                ) : (
+                  <>
+                    Frais d&apos;expédition forfaitaires (livres papier) :{" "}
+                    <span className="font-mono font-semibold text-navy">{shippingTotal.toLocaleString("fr-FR")} XOF</span>
+                  </>
+                )}
               </p>
             )}
             <p className="font-serif font-bold text-navy text-base sm:text-lg pt-1">
