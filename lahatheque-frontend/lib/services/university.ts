@@ -238,17 +238,45 @@ export async function exportBouquetCatalogWord(bouquet: UniversityBouquet): Prom
   }
 
   // Fallback client haute fidélité
+  let items = (bouquet.sample_books || []).map((b) => ({
+    title: b.title,
+    author: b.author || "Auteur Universitaire",
+    discipline: bouquet.discipline || "Général",
+    isbn: (b as any).isbn || (b as any).isbn_digital || "—",
+    year: (b as any).year || new Date().getFullYear().toString(),
+  }));
+
+  // Si sample_books est vide, charger les ouvrages réels du catalogue correspondant au bouquet
+  if (items.length === 0) {
+    try {
+      const catalog = await getUniversityCatalog();
+      const matchingBooks = catalog.filter((book) => {
+        if (bouquet.discipline && book.discipline?.toLowerCase().includes(bouquet.discipline.toLowerCase())) return true;
+        if (bouquet.faculty_code && (book.faculty_code === bouquet.faculty_code || book.faculty_name?.toLowerCase().includes(bouquet.faculty_code.toLowerCase()))) return true;
+        return false;
+      });
+
+      const selectedBooks = matchingBooks.length > 0 ? matchingBooks : catalog.slice(0, Math.max(bouquet.books_count || 3, 2));
+
+      items = selectedBooks.map((b) => ({
+        title: b.title,
+        author: Array.isArray(b.authors) ? b.authors.join(", ") : (b.authors || "Auteur Universitaire"),
+        discipline: b.discipline || bouquet.discipline || "Général",
+        isbn: b.isbn_digital || b.isbn_print || "—",
+        year: new Date().getFullYear().toString(),
+      }));
+    } catch (e) {
+      console.error("Erreur enrichissement export bouquet Word:", e);
+    }
+  }
+
   const { generateWordDocument } = await import("@/lib/services/export-service");
   generateWordDocument({
     title: bouquet.title,
-    subtitle: bouquet.description,
-    institutionName: "Université Partenaire",
+    subtitle: bouquet.description || "Catalogue officiel et bibliographie des manuels universitaires",
+    institutionName: "Université Partenaire LAHAThèque",
     facultyName: bouquet.faculty_code || bouquet.discipline,
-    items: (bouquet.sample_books || []).map((b) => ({
-      title: b.title,
-      author: b.author || "Auteur Universitaire",
-      discipline: bouquet.discipline,
-    })),
+    items,
     filename: `Bouquet_${bouquet.title.replace(/\s+/g, "_").slice(0, 50)}.doc`,
   });
 }

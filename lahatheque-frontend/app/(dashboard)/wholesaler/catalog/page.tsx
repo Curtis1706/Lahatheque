@@ -173,31 +173,49 @@ export default function WholesalerCatalogPage() {
     },
     {
       key: "digital_wholesale_price",
-      header: "Licence Numérique (-25%)",
+      header: "Licence Numérique (Gros)",
       className: "min-w-[160px]",
       cell: (row) => (
         <div className="space-y-0.5">
-          <div className="font-mono font-bold text-xs text-navy">
-            {row.digital_wholesale_price.toLocaleString("fr-FR")} XOF
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-mono font-bold text-xs text-navy">
+              {row.digital_wholesale_price.toLocaleString("fr-FR")} XOF
+            </span>
+            {row.digital_discount_pct && (
+              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1 py-0.5 rounded">
+                -{row.digital_discount_pct}%
+              </span>
+            )}
           </div>
-          <div className="text-[10px] text-foreground-muted line-through font-mono">
-            Public : {(row.public_price || Math.round(row.digital_wholesale_price / 0.75)).toLocaleString("fr-FR")} XOF
-          </div>
+          {row.public_price ? (
+            <div className="text-[10px] text-foreground-muted line-through font-mono">
+              Public : {row.public_price.toLocaleString("fr-FR")} XOF
+            </div>
+          ) : null}
         </div>
       ),
     },
     {
       key: "print_wholesale_price",
-      header: "Exemplaire Papier (-32%)",
+      header: "Exemplaire Papier (Gros)",
       className: "min-w-[160px]",
       cell: (row) => (
         <div className="space-y-0.5">
-          <div className="font-mono font-bold text-xs text-navy">
-            {row.print_wholesale_price.toLocaleString("fr-FR")} XOF
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-mono font-bold text-xs text-navy">
+              {row.print_wholesale_price.toLocaleString("fr-FR")} XOF
+            </span>
+            {row.paper_discount_pct && (
+              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1 py-0.5 rounded">
+                -{row.paper_discount_pct}%
+              </span>
+            )}
           </div>
-          <div className="text-[10px] text-foreground-muted line-through font-mono">
-            Public : {(row.public_price || Math.round(row.print_wholesale_price / 0.68)).toLocaleString("fr-FR")} XOF
-          </div>
+          {row.public_price ? (
+            <div className="text-[10px] text-foreground-muted line-through font-mono">
+              Public : {row.public_price.toLocaleString("fr-FR")} XOF
+            </div>
+          ) : null}
         </div>
       ),
     },

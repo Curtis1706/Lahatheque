@@ -45,15 +45,15 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
     }
   };
 
-  const handleExportWord = () => {
+  const handleExportWord = async () => {
     setExporting(true);
     try {
-      exportBouquetCatalogWord(bouquet);
+      await exportBouquetCatalogWord(bouquet);
       toast.success("Document Word (.doc) généré et téléchargé.");
     } catch {
       toast.error("Erreur lors de la génération du document.");
     } finally {
-      setTimeout(() => setExporting(false), 500);
+      setExporting(false);
     }
   };
 

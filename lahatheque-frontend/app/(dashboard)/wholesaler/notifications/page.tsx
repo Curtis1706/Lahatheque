@@ -22,11 +22,13 @@ import type { WholesaleTrendBook, WholesalerBookItem } from "@/lib/types/wholesa
 import { WholesaleOrderModal } from "@/components/features/wholesaler/wholesale-order-modal";
 import { BookPreviewModal } from "@/components/features/wholesaler/book-preview-modal";
 import { PageLoader } from "@/components/ui/page-loader";
+import { useDisciplines } from "@/lib/hooks/use-disciplines";
 
 export default function WholesalerNotificationsPage() {
   const [newReleases, setNewReleases] = useState<WholesaleTrendBook[]>([]);
   const [bestSellers, setBestSellers] = useState<WholesaleTrendBook[]>([]);
   const [loading, setLoading] = useState(true);
+  const { disciplineNames } = useDisciplines();
 
   const [activeTab, setActiveTab] = useState<"all" | "new" | "bestsellers">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,13 +54,7 @@ export default function WholesalerNotificationsPage() {
     loadData();
   }, []);
 
-  // Liste unique des disciplines
-  const disciplines = useMemo(() => {
-    const set = new Set<string>();
-    newReleases.forEach((b) => b.discipline && set.add(b.discipline));
-    bestSellers.forEach((b) => b.discipline && set.add(b.discipline));
-    return Array.from(set);
-  }, [newReleases, bestSellers]);
+  const disciplines = disciplineNames;
 
   // Filtrage
   const filterBooks = (books: WholesaleTrendBook[]) => {
@@ -100,6 +96,20 @@ export default function WholesalerNotificationsPage() {
     summary: b.summary,
   });
 
+  const digitalDiscountRate = useMemo(() => {
+    const all = [...newReleases, ...bestSellers];
+    if (all.length === 0) return 25;
+    const rates = all.map((b) => b.digital_discount_percent).filter(Boolean);
+    return rates.length > 0 ? Math.round(rates.reduce((a, b) => a + b, 0) / rates.length) : 25;
+  }, [newReleases, bestSellers]);
+
+  const paperDiscountRate = useMemo(() => {
+    const all = [...newReleases, ...bestSellers];
+    if (all.length === 0) return 30;
+    const rates = all.map((b) => b.print_discount_percent).filter(Boolean);
+    return rates.length > 0 ? Math.round(rates.reduce((a, b) => a + b, 0) / rates.length) : 30;
+  }, [newReleases, bestSellers]);
+
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto animate-in fade-in duration-300">
       {/* Breadcrumb */}
@@ -117,9 +127,9 @@ export default function WholesalerNotificationsPage() {
             className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline mb-2 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            Retour à la vue d&apos;ensemble
+            <span>Retour à la vue d&apos;ensemble</span>
           </Link>
-          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
+          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1.5">
             <Sparkles className="w-4 h-4 text-gold" />
             Tendances Commerciales &amp; Nouvelles Parutions
           </div>
@@ -137,7 +147,9 @@ export default function WholesalerNotificationsPage() {
             <Percent className="w-4 h-4 text-gold" />
             <div>
               <span className="block text-[10px] uppercase font-bold text-navy">Tarifs Grossiste</span>
-              <span className="text-xs font-bold text-gold font-mono">-25% Num. / -30% Papier</span>
+              <span className="text-xs font-bold text-gold font-mono">
+                -{digitalDiscountRate}% Num. / -{paperDiscountRate}% Papier
+              </span>
             </div>
           </div>
           <div className="px-4 py-2.5 rounded-2xl bg-background-secondary border border-border flex items-center gap-2.5">

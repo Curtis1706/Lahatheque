@@ -8,6 +8,7 @@ import { createOrder, type OrderItemPayload } from "@/lib/services/commerce-orde
 import type { BookAPI } from "@/lib/services/student";
 import { Loader } from "@/components/ui/loader";
 import { BookCover } from "@/components/features/student/book-cover";
+import { useDisciplines } from "@/lib/hooks/use-disciplines";
 
 interface CartItem {
   ouvrage_id: string;
@@ -236,8 +237,9 @@ export default function OrderCreateForm({
   onSuccess: () => void;
   onCancel: () => void;
 }) {
+  const { disciplines: dbDisciplines } = useDisciplines();
   const [books, setBooks] = useState<BookAPI[]>([]);
-  const [disciplines, setDisciplines] = useState<{ id: string; name: string }[]>([]);
+  const [disciplines, setDisciplines] = useState<{ id: string | number; name: string }[]>([]);
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [selectedBookId, setSelectedBookId] = useState("");
   const [selectedFormat, setSelectedFormat] = useState<"digital" | "paper">("paper");
@@ -432,8 +434,8 @@ export default function OrderCreateForm({
             aria-label="Filtrer par matière"
           >
             <option value="all">Toutes disciplines</option>
-            {disciplines.map((d) => (
-              <option key={d.id} value={d.id}>
+            {(dbDisciplines && dbDisciplines.length > 0 ? dbDisciplines : disciplines).map((d) => (
+              <option key={d.id} value={String(d.id)}>
                 {d.name}
               </option>
             ))}
@@ -709,3 +711,5 @@ export default function OrderCreateForm({
     </form>
   );
 }
+
+export { OrderCreateForm };
