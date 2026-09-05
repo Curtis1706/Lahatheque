@@ -21,8 +21,6 @@ import {
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
 import { FacultyStatsChart } from "@/components/features/university/faculty-stats-chart";
 import { BouquetCard } from "@/components/features/university/bouquet-card";
-import { BouquetPieDistribution } from "@/components/features/bouquets/bouquet-pie-distribution";
-import { computeBouquetDistribution } from "@/lib/services/bouquet-distribution";
 import {
   getUniversityKpis,
   getUniversityBouquets,
@@ -204,41 +202,7 @@ export default function UniversityOverviewPage() {
       />
       */}
 
-      {/* ─── BLOC UNIQUE CDC 11.1 & 11.2 : RÉPARTITION DES REDEVANCES — BOUQUETS DOCUMENTAIRES ─── */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-border">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-0.5">
-              <Building2 className="w-4 h-4 text-gold" />
-              Section 11 &bull; Modèle Officiel de Répartition
-            </div>
-            <h2 className="font-serif text-xl sm:text-2xl font-bold text-navy">
-              Répartition des Redevances &ndash; Bouquets Documentaires
-            </h2>
-            <p className="text-xs text-foreground-muted mt-1 max-w-3xl">
-              Les revenus issus des bouquets documentaires sont répartis selon l&apos;utilisation réelle des contenus, en tenant compte des consultations, pages lues, téléchargements, temps de lecture et écoutes audio.
-            </p>
-          </div>
-          <Link
-            href="/university/royalties"
-            className="text-xs font-bold text-navy hover:text-gold inline-flex items-center gap-1.5 transition-colors shrink-0"
-          >
-            <span>Détail des redevances</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
 
-        <BouquetPieDistribution
-          distribution={computeBouquetDistribution({
-            bouquet_id: "bouquet-reference-cdc",
-            bouquet_title: "Bouquets Documentaires Multi-Universités",
-            total_ca: 10000,
-            currency: "€",
-          })}
-          highlightUniversityName="Université d'Abomey-Calavi"
-          showTitle={false}
-        />
-      </div>
 
       {/* Bouquets Documentaires en Vedette (Offres Campus) */}
       <div className="space-y-4">
