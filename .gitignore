@@ -8,6 +8,9 @@ lahatheque-frontend/.next/
 out/
 lahatheque-frontend/out/
 *.tsbuildinfo
+**/*.tsbuildinfo
+tsconfig.tsbuildinfo
+lahatheque-frontend/tsconfig.tsbuildinfo
 
 # Python / Django
 __pycache__/
