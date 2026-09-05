@@ -272,7 +272,7 @@ export default function ChiefLayoutDepositPage() {
         bookFile,
         coverFile,
         {
-          pre_edition_dossier_id: selectedPreEdition.id,
+          pre_edition_dossier_id: selectedPreEdition?.id,
         }
       );
       toast.success("Brouillon sauvegardé avec succès.");
@@ -289,11 +289,6 @@ export default function ChiefLayoutDepositPage() {
     if (!bookFile) {
       toast.error("Veuillez sélectionner le fichier PDF de l'ouvrage.");
       setCurrentStep(1);
-      return;
-    }
-    if (!selectedPreEdition) {
-      toast.error("Le rattachement à un dossier de pré-édition Juriste est obligatoire.");
-      setCurrentStep(2);
       return;
     }
     if (!title) {
@@ -339,7 +334,7 @@ export default function ChiefLayoutDepositPage() {
         bookFile,
         coverFile,
         {
-          pre_edition_dossier_id: selectedPreEdition.id,
+          pre_edition_dossier_id: selectedPreEdition?.id,
         }
       );
       toast.success(`L'ouvrage « ${title} » a été déposé, validé et publié immédiatement sur le catalogue officiel !`);
@@ -526,7 +521,7 @@ export default function ChiefLayoutDepositPage() {
               <div className="flex items-center justify-between gap-1.5 mb-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-gold" />
-                  Dossier de pré-édition Juriste *
+                  Dossier de pré-édition Juriste (Optionnel)
                 </label>
                 {allPreEditions.length > 0 && (
                   <span className="text-[11px] font-semibold text-gold">
@@ -562,6 +557,13 @@ export default function ChiefLayoutDepositPage() {
                     >
                       Changer
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPreEdition(null)}
+                      className="px-2.5 py-1.5 text-[11px] font-bold text-foreground-muted hover:text-error bg-background hover:bg-background-secondary rounded-xl transition-colors cursor-pointer"
+                    >
+                      Détacher
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -574,7 +576,7 @@ export default function ChiefLayoutDepositPage() {
                   >
                     <span className="flex items-center gap-2 text-foreground-muted truncate">
                       <Search className="w-4 h-4 text-foreground-muted shrink-0" />
-                      {loadingPreEditions ? "Chargement des dossiers pré-enregistrés..." : "Sélectionner le dossier de pré-édition obligatoire..."}
+                      {loadingPreEditions ? "Chargement des dossiers pré-enregistrés..." : "Sélectionner un dossier de pré-édition si applicable..."}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0 text-foreground-muted">
                       {loadingPreEditions && <InlineLoader size={12} />}
