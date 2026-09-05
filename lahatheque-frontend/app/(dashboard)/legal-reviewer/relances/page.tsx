@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -13,20 +13,41 @@ import {
   Send,
   ShieldCheck,
   PlusCircle,
+  Calendar,
+  Layers,
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { DebtReminderConfigModal } from "@/components/features/legal/debt-reminder-config-modal";
 import { CreateDebtForm } from "@/components/features/legal/create-debt-form";
+import { SendAuthorStatementModal } from "@/components/features/legal/send-author-statement-modal";
+import { SendDebtReminderModal } from "@/components/features/legal/send-debt-reminder-modal";
 import {
   getAuthorEmailReports,
   getClientDebts,
-  remindClientDebt,
-  sendAuthorRoyaltyReport,
   getDebtReminderConfig,
   updateDebtReminderConfig,
+  sendBatchAuthorStatements,
 } from "@/lib/services/legal";
-import type { AuthorEmailReport, ClientDebt, DebtReminderConfig } from "@/lib/types/legal";
+import type {
+  AuthorEmailReport,
+  ClientDebt,
+  DebtReminderConfig,
+  PeriodType,
+} from "@/lib/types/legal";
 import { toast } from "sonner";
+import { InlineLoader } from "@/components/ui/page-loader";
+
+const MONTH_NAMES = [
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+];
+
+const QUARTER_NAMES = [
+  { value: 1, label: "T1 (Janvier - Mars)" },
+  { value: 2, label: "T2 (Avril - Juin)" },
+  { value: 3, label: "T3 (Juillet - Septembre)" },
+  { value: 4, label: "T4 (Octobre - Décembre)" },
+];
 
 export default function LegalRelancesPage() {
   const searchParams = useSearchParams();
@@ -40,61 +61,100 @@ export default function LegalRelancesPage() {
   const [reminderConfig, setReminderConfig] = useState<DebtReminderConfig | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Filtres de périodicité pour les relevés d'auteurs
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  const currentQuarter = Math.ceil(currentMonth / 3);
+
+  const [periodType, setPeriodType] = useState<PeriodType>("monthly");
+  const [periodYear, setPeriodYear] = useState<number>(currentYear);
+  const [periodMonth, setPeriodMonth] = useState<number>(currentMonth);
+  const [periodQuarter, setPeriodQuarter] = useState<number>(currentQuarter);
+
+  // Modales
   const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [remindingId, setRemindingId] = useState<string | null>(null);
-  const [sendingAuthorId, setSendingAuthorId] = useState<string | null>(null);
+  const [selectedAuthorForStatement, setSelectedAuthorForStatement] = useState<AuthorEmailReport | null>(null);
+  const [isAuthorStatementModalOpen, setIsAuthorStatementModalOpen] = useState(false);
+  const [selectedDebtForReminder, setSelectedDebtForReminder] = useState<ClientDebt | null>(null);
+  const [isDebtReminderModalOpen, setIsDebtReminderModalOpen] = useState(false);
+
+  // Envoi groupé
+  const [isBatchSending, setIsBatchSending] = useState(false);
+
+  const loadAuthorData = useCallback(async () => {
+    try {
+      const rData = await getAuthorEmailReports({
+        period_type: periodType,
+        year: periodYear,
+        month: periodType === "monthly" ? periodMonth : undefined,
+        quarter: periodType === "quarterly" ? periodQuarter : undefined,
+      });
+      setAuthorReports(rData);
+    } catch {
+      toast.error("Impossible d'actualiser les données des auteurs.");
+    }
+  }, [periodType, periodYear, periodMonth, periodQuarter]);
+
+  const loadAllData = useCallback(async () => {
+    setLoading(true);
+    const [rData, dData, cData] = await Promise.all([
+      getAuthorEmailReports({
+        period_type: periodType,
+        year: periodYear,
+        month: periodType === "monthly" ? periodMonth : undefined,
+        quarter: periodType === "quarterly" ? periodQuarter : undefined,
+      }),
+      getClientDebts(),
+      getDebtReminderConfig(),
+    ]);
+    setAuthorReports(rData);
+    setDebts(dData);
+    setReminderConfig(cData);
+    setLoading(false);
+  }, [periodType, periodYear, periodMonth, periodQuarter]);
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      const [rData, dData, cData] = await Promise.all([
-        getAuthorEmailReports(),
-        getClientDebts(),
-        getDebtReminderConfig(),
-      ]);
-      setAuthorReports(rData);
-      setDebts(dData);
-      setReminderConfig(cData);
-      setLoading(false);
-    }
-    loadData();
-  }, []);
+    loadAllData();
+  }, [loadAllData]);
 
-  const handleRemindDebt = async (debtId: string, clientName?: string) => {
-    setRemindingId(debtId);
-    try {
-      const success = await remindClientDebt(debtId, clientName);
-      if (success) {
-        setDebts((prev) =>
-          prev.map((d) => (d.id === debtId ? { ...d, status: "reminded", reminder_count: d.reminder_count + 1 } : d))
-        );
-        toast.success("E-mail de relance automatique envoyé avec succès au client !");
-      } else {
-        toast.error("Échec de l'envoi de la relance.");
-      }
-    } catch {
-      toast.error("Erreur lors de l'envoi de la relance.");
-    } finally {
-      setRemindingId(null);
-    }
+  const handleOpenAuthorModal = (author: AuthorEmailReport) => {
+    setSelectedAuthorForStatement(author);
+    setIsAuthorStatementModalOpen(true);
   };
 
-  const handleSendAuthorReport = async (authorId?: string) => {
-    if (!authorId) return;
-    setSendingAuthorId(authorId);
+  const handleOpenDebtModal = (debt: ClientDebt) => {
+    setSelectedDebtForReminder(debt);
+    setIsDebtReminderModalOpen(true);
+  };
+
+  const handleSendBatchAuthorStatements = async () => {
+    const periodLabel = periodType === "monthly"
+      ? `${MONTH_NAMES[periodMonth - 1]} ${periodYear}`
+      : `T${periodQuarter} ${periodYear}`;
+
+    const confirmMsg = `Confirmez-vous l'expédition des bordereaux officiels signés à tous les auteurs éligibles pour la période : ${periodLabel} ?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsBatchSending(true);
     try {
-      const success = await sendAuthorRoyaltyReport(authorId);
-      if (success) {
-        toast.success("Relevé de redevances transmis avec succès à l'auteur !");
-        const refreshed = await getAuthorEmailReports();
-        setAuthorReports(refreshed);
+      const res = await sendBatchAuthorStatements({
+        period_type: periodType,
+        year: periodYear,
+        month: periodType === "monthly" ? periodMonth : undefined,
+        quarter: periodType === "quarterly" ? periodQuarter : undefined,
+        include_pdf: true,
+      });
+
+      if (res.success) {
+        toast.success(res.message || `Expédition groupée terminée : ${res.sent_count || 0} bordereau(x) envoyé(s).`);
+        await loadAuthorData();
       } else {
-        toast.error("Échec de l'envoi du relevé.");
+        toast.error(res.error || "Échec de l'expédition groupée des bordereaux.");
       }
     } catch {
-      toast.error("Erreur lors de l'envoi du relevé.");
+      toast.error("Erreur réseau lors de l'expédition groupée.");
     } finally {
-      setSendingAuthorId(null);
+      setIsBatchSending(false);
     }
   };
 
@@ -114,19 +174,23 @@ export default function LegalRelancesPage() {
       header: "Auteur Destinataire",
       cell: (row) => (
         <div>
-          <p className="font-bold text-xs text-navy">{row.name || "Auteur Inconnu"}</p>
-          <p className="text-[10px] text-foreground-muted font-mono">{row.email || "—"}</p>
+          <p className="font-bold text-xs text-navy">{row.name || row.author_name || "Auteur Inconnu"}</p>
+          <p className="text-[10px] text-foreground-muted font-mono">{row.email || row.author_email || "—"}</p>
         </div>
       ),
     },
     {
       key: "total_sales_count",
-      header: "Volume Ventes",
-      cell: (row) => <span className="font-mono font-bold text-xs text-navy">{row.total_sales_count || 0} exemplaires</span>,
+      header: "Volume Ventes (Période)",
+      cell: (row) => (
+        <span className="font-mono font-bold text-xs text-navy">
+          {row.total_sales_count || 0} exemplaires
+        </span>
+      ),
     },
     {
       key: "total_royalties_paid",
-      header: "Redevances Versées",
+      header: "Droits Calculés (Période)",
       cell: (row) => (
         <span className="font-mono font-bold text-gold text-xs">
           {(row.total_royalties_paid || 0).toLocaleString("fr-FR")} {row.currency || "XOF"}
@@ -135,7 +199,7 @@ export default function LegalRelancesPage() {
     },
     {
       key: "last_report_date",
-      header: "Dernier Relevé",
+      header: "Dernier Relevé Expédié",
       cell: (row) => (
         <span className="font-mono text-xs text-foreground-muted">
           {row.last_report_date
@@ -150,13 +214,12 @@ export default function LegalRelancesPage() {
       cell: (row) => (
         <button
           type="button"
-          disabled={sendingAuthorId === row.author_id}
-          onClick={() => handleSendAuthorReport(row.author_id)}
-          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1 disabled:opacity-50 cursor-pointer"
-          title="Transmettre le relevé de ventes et redevances par e-mail"
+          onClick={() => handleOpenAuthorModal(row)}
+          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+          title="Transmettre le relevé de ventes et redevances par e-mail officiel"
         >
           <Mail className="w-3.5 h-3.5 text-gold" />
-          {sendingAuthorId === row.author_id ? "Envoi..." : "Envoyer Relevé"}
+          Envoyer Relevé
         </button>
       ),
     },
@@ -217,12 +280,11 @@ export default function LegalRelancesPage() {
       cell: (row) => (
         <button
           type="button"
-          disabled={remindingId === row.id}
-          onClick={() => handleRemindDebt(row.id, row.client_name)}
-          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+          onClick={() => handleOpenDebtModal(row)}
+          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
         >
           <Send className="w-3.5 h-3.5 text-gold" />
-          {remindingId === row.id ? "Envoi..." : "Déclencher Relance"}
+          Déclencher Relance
         </button>
       ),
     },
@@ -246,13 +308,13 @@ export default function LegalRelancesPage() {
           </Link>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
             <BellRing className="w-4 h-4 text-gold" />
-            Communications Automatiques
+            Communications Officielles &amp; Droits d&apos;Auteur
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Relances Automatiques &amp; Rapports Auteurs
+            Relances d&apos;Impayés &amp; Bordereaux de Droits
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Envoi automatique des rapports de ventes aux auteurs et gestion des relances pour factures impayées.
+            Expédition certifiée des relevés de droits d&apos;auteur (mensuels ou trimestriels) et procédures de relance de créances via le mail pro officiel.
           </p>
         </div>
 
@@ -320,13 +382,98 @@ export default function LegalRelancesPage() {
 
       {/* Tab 1: Auteurs */}
       {activeTab === "authors" && (
-        <DataTable
-          data={authorReports}
-          columns={authorColumns}
-          rowKey="author_id"
-          loading={loading}
-          emptyMessage="Aucun rapport auteur programmé."
-        />
+        <div className="space-y-4">
+          {/* Barre de filtrage par période & Déclenchement groupé */}
+          <div className="p-4 rounded-2xl bg-background-secondary border border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-navy">
+                <Calendar className="w-4 h-4 text-gold" />
+                <span>Période :</span>
+              </div>
+
+              <div className="inline-flex rounded-xl border border-border bg-background p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setPeriodType("monthly")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[36px] ${
+                    periodType === "monthly"
+                      ? "bg-navy text-white font-bold"
+                      : "text-foreground-muted hover:text-navy"
+                  }`}
+                >
+                  Mensuelle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriodType("quarterly")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[36px] ${
+                    periodType === "quarterly"
+                      ? "bg-navy text-white font-bold"
+                      : "text-foreground-muted hover:text-navy"
+                  }`}
+                >
+                  Trimestrielle
+                </button>
+              </div>
+
+              <select
+                value={periodYear}
+                onChange={(e) => setPeriodYear(parseInt(e.target.value))}
+                className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-border bg-background text-navy focus:outline-none focus:border-gold min-h-[36px]"
+              >
+                {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+
+              {periodType === "monthly" ? (
+                <select
+                  value={periodMonth}
+                  onChange={(e) => setPeriodMonth(parseInt(e.target.value))}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-border bg-background text-navy focus:outline-none focus:border-gold min-h-[36px]"
+                >
+                  {MONTH_NAMES.map((name, idx) => (
+                    <option key={name} value={idx + 1}>{name}</option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={periodQuarter}
+                  onChange={(e) => setPeriodQuarter(parseInt(e.target.value))}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-border bg-background text-navy focus:outline-none focus:border-gold min-h-[36px]"
+                >
+                  {QUARTER_NAMES.map((q) => (
+                    <option key={q.value} value={q.value}>{q.label}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={isBatchSending || authorReports.length === 0}
+              onClick={handleSendBatchAuthorStatements}
+              className="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-xs min-h-[44px] cursor-pointer disabled:opacity-50"
+            >
+              {isBatchSending ? (
+                <InlineLoader size={16} />
+              ) : (
+                <>
+                  <Layers className="w-4 h-4 text-gold" />
+                  Expédier les Relevés de la Période ({authorReports.length})
+                </>
+              )}
+            </button>
+          </div>
+
+          <DataTable
+            data={authorReports}
+            columns={authorColumns}
+            rowKey="author_id"
+            loading={loading}
+            emptyMessage="Aucun auteur avec des ventes sur cette période."
+          />
+        </div>
       )}
 
       {/* Tab 2: Dettes Clients */}
@@ -383,7 +530,36 @@ export default function LegalRelancesPage() {
         />
       )}
 
-      {/* Modale 21st.dev de configuration des règles de relance */}
+      {/* Modale d'expédition de relevé de droits d'auteur */}
+      <SendAuthorStatementModal
+        isOpen={isAuthorStatementModalOpen}
+        onClose={() => {
+          setIsAuthorStatementModalOpen(false);
+          setSelectedAuthorForStatement(null);
+        }}
+        onSuccess={loadAuthorData}
+        author={selectedAuthorForStatement}
+        defaultPeriodType={periodType}
+        defaultYear={periodYear}
+        defaultMonth={periodMonth}
+        defaultQuarter={periodQuarter}
+      />
+
+      {/* Modale d'expédition de relance de dette client */}
+      <SendDebtReminderModal
+        isOpen={isDebtReminderModalOpen}
+        onClose={() => {
+          setIsDebtReminderModalOpen(false);
+          setSelectedDebtForReminder(null);
+        }}
+        onSuccess={async () => {
+          const refreshed = await getClientDebts();
+          setDebts(refreshed);
+        }}
+        debt={selectedDebtForReminder}
+      />
+
+      {/* Modale de configuration des règles de relance automatique */}
       {reminderConfig && (
         <DebtReminderConfigModal
           currentConfig={reminderConfig}

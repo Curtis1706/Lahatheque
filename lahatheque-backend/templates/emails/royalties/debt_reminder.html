@@ -1,0 +1,71 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Notification d'Impayé • LAHAThèque{% endblock %}
+{% block badge_header %}Service Juridique & Recouvrement{% endblock %}
+
+{% block email_title %}{{ subject_title|default:"Rappel d'échéance de paiement" }}{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #1E293B;">
+    Bonjour {{ recipient_name|default:"Madame, Monsieur" }},
+</p>
+
+<div style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.65; color: #334155; white-space: pre-line;">
+    {{ message_body }}
+</div>
+
+<!-- Synthèse Créance -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #E2E8F0;">
+    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1B2A4E; letter-spacing: 0.8px; margin-bottom: 12px;">
+        Détail de la créance en attente
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="left" style="padding: 6px 0; font-size: 13px; color: #64748B;">Référence :</td>
+            <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #1E293B;">{{ reference|default:"Impayé en cours" }}</td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 6px 0; font-size: 13px; color: #64748B;">Date d'échéance :</td>
+            <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #DC2626;">{{ due_date|default:"Échue" }}</td>
+        </tr>
+        {% if days_overdue %}
+        <tr>
+            <td align="left" style="padding: 6px 0; font-size: 13px; color: #64748B;">Retard constaté :</td>
+            <td align="right" style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #DC2626;">+{{ days_overdue }} jour(s)</td>
+        </tr>
+        {% endif %}
+        <tr>
+            <td align="left" style="padding-top: 12px; border-top: 1px solid #E2E8F0; font-size: 14px; font-weight: 700; color: #1B2A4E;">
+                Montant total dû :
+            </td>
+            <td align="right" style="padding-top: 12px; border-top: 1px solid #E2E8F0; font-size: 16px; font-weight: 700; color: #B08D42;">
+                {{ amount_formatted }} {{ currency|default:"FCFA" }}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- Instructions de règlement -->
+<div style="background-color: #FAF5FF; border-left: 3px solid #B08D42; padding: 14px 16px; margin-bottom: 24px; border-radius: 4px;">
+    <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 600; color: #1B2A4E;">
+        Modalités de règlement :
+    </p>
+    <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #475569;">
+        Vous pouvez régler cette créance par virement bancaire ou Mobile Money certifié à l'ordre de <strong>LAHA Éditions S.A.</strong> en précisant la référence de votre dossier.
+    </p>
+</div>
+
+<div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #E2E8F0;">
+    <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #1B2A4E;">
+        {{ sender_name|default:"Service Juridique & Recouvrement" }}
+    </p>
+    <p style="margin: 0 0 2px 0; font-size: 12px; color: #64748B;">
+        LAHA Éditions S.A. • Direction Financière & Juridique
+    </p>
+    {% if sender_email %}
+    <p style="margin: 0; font-size: 12px; color: #B08D42;">
+        {{ sender_email }}
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

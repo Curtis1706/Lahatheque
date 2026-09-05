@@ -1,16 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { useState, useMemo, useId } from "react";
+import { useState, useMemo, useId, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp,
-  TrendingDown,
   ArrowRight,
-  CircleDollarSign,
-  Calendar,
+  Clock,
+  ChevronDown,
+  X,
   Layers,
-  Sparkles,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,24 @@ export interface SalesChannel {
   change: string;
   isPositive: boolean;
 }
+
+export interface TimeSlotFilter {
+  id?: string;
+  label: string;
+  startHour: number; // 0 à 23
+  endHour: number;   // 0 à 23
+}
+
+export const TIME_SLOT_PRESETS: TimeSlotFilter[] = [
+  { id: "all", label: "Journée entière (00h - 24h)", startHour: 0, endHour: 23 },
+  { id: "morning", label: "Matinée (06h - 12h)", startHour: 6, endHour: 12 },
+  { id: "lunch", label: "Midi & Déjeuner (12h - 14h)", startHour: 12, endHour: 14 },
+  { id: "afternoon", label: "Après-midi (14h - 18h)", startHour: 14, endHour: 18 },
+  { id: "evening", label: "Soirée (18h - 22h)", startHour: 18, endHour: 22 },
+  { id: "night", label: "Nuit (22h - 06h)", startHour: 22, endHour: 6 },
+];
+
+export type Period = "1d" | "1w" | "1m" | "3m" | "1y";
 
 export interface TotalSalesChartProps {
   title?: string;
@@ -32,9 +50,13 @@ export interface TotalSalesChartProps {
   className?: string;
   onReportClick?: () => void;
   unit?: string;
+  // Support des plages horaires
+  showTimeSlotPicker?: boolean;
+  timeSlotFilter?: TimeSlotFilter | null;
+  onTimeSlotChange?: (filter: TimeSlotFilter | null) => void;
+  period?: Period;
+  onPeriodChange?: (period: Period) => void;
 }
-
-type Period = "1d" | "1w" | "1m" | "3m" | "1y";
 
 interface PointData {
   label: string;
@@ -55,15 +77,41 @@ function formatCompactXof(num: number): string {
 
 function getPeriodDataset(
   period: Period,
+  timeSlot: TimeSlotFilter | null,
   timelineData?: { label: string; value: number }[],
   curvePoints?: number[],
   baseTotal: number = 138500
 ): PointData[] {
   // Si timelineData réelle fournie et non vide
   if (timelineData && timelineData.length >= 2) {
-    if (period === "1m" || period === "3m" || period === "1y") {
-      return timelineData;
+    return timelineData;
+  }
+
+  // Si une plage horaire spécifique est sélectionnée
+  if (timeSlot && timeSlot.id !== "all") {
+    const { startHour, endHour } = timeSlot;
+    const hours: number[] = [];
+    if (startHour <= endHour) {
+      for (let h = startHour; h <= endHour; h++) {
+        hours.push(h);
+      }
+    } else {
+      // Cas traversant minuit (ex: 22h -> 06h)
+      for (let h = startHour; h <= 23; h++) hours.push(h);
+      for (let h = 0; h <= endHour; h++) hours.push(h);
     }
+
+    const factor = baseTotal > 0 ? baseTotal : 138500;
+    const count = hours.length;
+
+    return hours.map((h, idx) => {
+      const progress = (idx + 1) / count;
+      const val = Math.round(factor * (0.15 + 0.85 * Math.pow(progress, 1.2)));
+      return {
+        label: `${String(h).padStart(2, "0")}h`,
+        value: val,
+      };
+    });
   }
 
   // Si curvePoints fournis
@@ -75,7 +123,7 @@ function getPeriodDataset(
     }));
   }
 
-  // Datasets réalistes et calibrés sur la valeur de référence de la plateforme
+  // Datasets réalistes par défaut
   const factor = baseTotal > 0 ? baseTotal : 138500;
 
   switch (period) {
@@ -144,21 +192,109 @@ export function TotalSalesChart({
   className,
   onReportClick,
   unit = "FCFA",
+  showTimeSlotPicker = true,
+  timeSlotFilter,
+  onTimeSlotChange,
+  period,
+  onPeriodChange,
 }: TotalSalesChartProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState<Period>("1m");
+  const [internalPeriod, setInternalPeriod] = useState<Period>("1m");
+  const selectedPeriod = period || internalPeriod;
+
+  // Gestion de la plage horaire interne / contrôlée
+  const [internalTimeSlot, setInternalTimeSlot] = useState<TimeSlotFilter | null>(null);
+  const activeTimeSlot = timeSlotFilter !== undefined ? timeSlotFilter : internalTimeSlot;
+
+  // Menu déroulant Plage Horaire
+  const [isTimeSlotOpen, setIsTimeSlotOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Valeurs personnalisées de début et fin
+  const [customStartHour, setCustomStartHour] = useState<number>(8);
+  const [customEndHour, setCustomEndHour] = useState<number>(18);
+
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const chartId = useId();
 
-  // Extraction du montant de base numérique depuis totalAmountText
+  // Fermeture du popover au clic extérieur
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setIsTimeSlotOpen(false);
+      }
+    }
+    if (isTimeSlotOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isTimeSlotOpen]);
+
+  // Fermeture du popover avec Escape
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && isTimeSlotOpen) {
+        setIsTimeSlotOpen(false);
+      }
+    }
+    if (isTimeSlotOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [isTimeSlotOpen]);
+
+  const handlePeriodSelect = (p: Period) => {
+    if (onPeriodChange) {
+      onPeriodChange(p);
+    } else {
+      setInternalPeriod(p);
+    }
+    setHoveredIndex(null);
+  };
+
+  const handleSelectTimeSlot = (slot: TimeSlotFilter) => {
+    if (slot.id === "all") {
+      if (onTimeSlotChange) onTimeSlotChange(null);
+      else setInternalTimeSlot(null);
+    } else {
+      if (onTimeSlotChange) onTimeSlotChange(slot);
+      else setInternalTimeSlot(slot);
+    }
+    setIsTimeSlotOpen(false);
+    setHoveredIndex(null);
+  };
+
+  const handleApplyCustomSlot = () => {
+    const label = `${String(customStartHour).padStart(2, "0")}h00 - ${String(customEndHour).padStart(2, "0")}h00`;
+    const slot: TimeSlotFilter = {
+      id: "custom",
+      label,
+      startHour: customStartHour,
+      endHour: customEndHour,
+    };
+    if (onTimeSlotChange) onTimeSlotChange(slot);
+    else setInternalTimeSlot(slot);
+    setIsTimeSlotOpen(false);
+    setHoveredIndex(null);
+  };
+
+  const handleClearTimeSlot = () => {
+    if (onTimeSlotChange) onTimeSlotChange(null);
+    else setInternalTimeSlot(null);
+    setHoveredIndex(null);
+  };
+
+  const isCustomSlotActive = activeTimeSlot && activeTimeSlot.id !== "all";
+
+  // Extraction du montant numérique de base depuis totalAmountText
   const numericBaseTotal = useMemo(() => {
     const cleanStr = (totalAmountText || "").replace(/[^0-9]/g, "");
     return parseInt(cleanStr, 10) || 138500;
   }, [totalAmountText]);
 
-  // Points de données calculés pour la période choisie
+  // Points de données calculés pour la période et la plage horaire choisies
   const dataset = useMemo(() => {
-    return getPeriodDataset(selectedPeriod, timelineData, curvePoints, numericBaseTotal);
-  }, [selectedPeriod, timelineData, curvePoints, numericBaseTotal]);
+    return getPeriodDataset(selectedPeriod, activeTimeSlot, timelineData, curvePoints, numericBaseTotal);
+  }, [selectedPeriod, activeTimeSlot, timelineData, curvePoints, numericBaseTotal]);
 
   // Dimensions géométriques du graphique vectoriel SVG
   const svgWidth = 800;
@@ -173,7 +309,6 @@ export function TotalSalesChart({
   // Calcul du plafond Y propre et arrondi
   const maxVal = useMemo(() => {
     const rawMax = Math.max(...dataset.map((d) => d.value), 1000);
-    // Arrondi à l'échelon supérieur lisible
     if (rawMax <= 10000) return Math.ceil(rawMax / 2000) * 2000 || 10000;
     if (rawMax <= 50000) return Math.ceil(rawMax / 10000) * 10000 || 50000;
     if (rawMax <= 200000) return Math.ceil(rawMax / 25000) * 25000 || 200000;
@@ -186,7 +321,7 @@ export function TotalSalesChart({
     if (dataset.length === 0) return [];
     const count = dataset.length;
     return dataset.map((d, i) => {
-      const x = padLeft + (i / (count - 1)) * chartWidth;
+      const x = padLeft + (i / Math.max(count - 1, 1)) * chartWidth;
       const ratio = Math.min(Math.max(d.value / maxVal, 0), 1);
       const y = padTop + (1 - ratio) * chartHeight;
       return { x, y, value: d.value, label: d.label };
@@ -215,7 +350,7 @@ export function TotalSalesChart({
     return `${splinePath} L ${last.x} ${bottomY} L ${first.x} ${bottomY} Z`;
   }, [splinePath, pointsCoords, padTop, chartHeight]);
 
-  // Lignes de grille horizontales (4 paliers réguliers)
+  // Lignes de grille horizontales
   const gridLines = useMemo(() => {
     const steps = [1, 0.66, 0.33, 0];
     return steps.map((ratio) => {
@@ -244,39 +379,36 @@ export function TotalSalesChart({
   return (
     <div
       className={cn(
-        "p-5 sm:p-6 rounded-3xl bg-background-secondary border border-border flex flex-col gap-6 shadow-xs relative overflow-hidden",
+        "p-5 sm:p-6 rounded-3xl bg-background-secondary border border-border flex flex-col gap-6 shadow-xs relative overflow-visible",
         className
       )}
     >
-      {/* En-tête : Titre & Sélecteurs de Période */}
+      {/* En-tête : Titre & Sélecteurs de Période & Plages Horaires */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-base sm:text-lg font-bold font-serif text-navy">
               {title}
             </h3>
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-success/10 text-success border border-success/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Direct
             </span>
           </div>
           <p className="text-xs text-foreground-muted mt-0.5">{subtitle}</p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Sélecteur de période stylisé */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Sélecteur de période stylisé : 1J, 1S, 1M, 3M, 1A */}
           <div className="inline-flex items-center rounded-xl bg-background border border-border p-1 gap-1 shadow-2xs">
             {periods.map((p) => {
               const isActive = selectedPeriod === p.value;
               return (
                 <button
                   key={p.value}
-                  onClick={() => {
-                    setSelectedPeriod(p.value);
-                    setHoveredIndex(null);
-                  }}
+                  onClick={() => handlePeriodSelect(p.value)}
                   className={cn(
-                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all text-center cursor-pointer min-w-[38px]",
+                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all text-center cursor-pointer min-w-[38px] min-h-[36px]",
                     isActive
                       ? "bg-navy text-white shadow-xs font-bold"
                       : "text-foreground-muted hover:text-navy hover:bg-background-secondary"
@@ -288,10 +420,162 @@ export function TotalSalesChart({
             })}
           </div>
 
+          {/* Bouton Popover Plages Horaires */}
+          {showTimeSlotPicker && (
+            <div className="relative" ref={popoverRef}>
+              <button
+                type="button"
+                onClick={() => setIsTimeSlotOpen(!isTimeSlotOpen)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all flex items-center gap-1.5 min-h-[44px] cursor-pointer shadow-2xs",
+                  isCustomSlotActive
+                    ? "bg-navy text-white border-navy font-bold ring-2 ring-gold/40"
+                    : "bg-background border-border text-foreground-muted hover:text-navy hover:bg-background-secondary"
+                )}
+                title="Choisir une plage horaire"
+              >
+                <Clock className="w-4 h-4 text-gold shrink-0" />
+                <span className="hidden sm:inline font-sans">
+                  {isCustomSlotActive ? activeTimeSlot.label : "Plage Horaire"}
+                </span>
+                <span className="sm:hidden font-sans">
+                  {isCustomSlotActive ? activeTimeSlot.label : "Heures"}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "w-3 h-3 text-gold transition-transform shrink-0",
+                    isTimeSlotOpen && "rotate-180"
+                  )}
+                />
+              </button>
+
+              {/* Menu Popover Flottant */}
+              <AnimatePresence>
+                {isTimeSlotOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 rounded-2xl bg-background border border-border shadow-2xl p-4 space-y-4"
+                  >
+                    {/* Header Popover */}
+                    <div className="flex items-center justify-between border-b border-border pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-gold/10 text-gold border border-gold/20">
+                          <Clock className="w-4 h-4 text-gold" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-navy">Sélection de Plage Horaire</p>
+                          <p className="text-[11px] text-foreground-muted">Filtrer les volumes par créneau</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsTimeSlotOpen(false)}
+                        className="p-1.5 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-navy transition-colors"
+                        aria-label="Fermer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Créneaux Prédéfinis */}
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-bold text-navy uppercase tracking-wider">
+                        Créneaux Prédéfinis
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {TIME_SLOT_PRESETS.map((preset) => {
+                          const isSelected =
+                            (preset.id === "all" && !isCustomSlotActive) ||
+                            (activeTimeSlot?.id === preset.id);
+
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => handleSelectTimeSlot(preset)}
+                              className={cn(
+                                "text-left p-2 rounded-xl border text-xs font-semibold transition-all flex items-center justify-between min-h-[40px] cursor-pointer",
+                                isSelected
+                                  ? "bg-navy text-white border-navy font-bold shadow-2xs"
+                                  : "bg-background-secondary border-border text-foreground-muted hover:text-navy hover:bg-background-secondary/80"
+                              )}
+                            >
+                              <span className="truncate text-[11px]">{preset.label}</span>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-gold shrink-0 ml-1" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Créneau Personnalisé */}
+                    <div className="space-y-2 pt-2 border-t border-border">
+                      <label className="block text-[11px] font-bold text-navy uppercase tracking-wider">
+                        Créneau Personnalisé (Heure début / fin)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[10px] text-foreground-muted block mb-1">De :</span>
+                          <select
+                            value={customStartHour}
+                            onChange={(e) => setCustomStartHour(parseInt(e.target.value))}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-border bg-background-secondary text-navy focus:outline-none focus:border-gold min-h-[38px]"
+                          >
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <option key={i} value={i}>
+                                {String(i).padStart(2, "0")}h00
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-foreground-muted block mb-1">À :</span>
+                          <select
+                            value={customEndHour}
+                            onChange={(e) => setCustomEndHour(parseInt(e.target.value))}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-border bg-background-secondary text-navy focus:outline-none focus:border-gold min-h-[38px]"
+                          >
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <option key={i} value={i}>
+                                {String(i).padStart(2, "0")}h00
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleApplyCustomSlot}
+                          className="flex-1 px-3 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[40px] cursor-pointer"
+                        >
+                          Appliquer ce créneau
+                        </button>
+                        {isCustomSlotActive && (
+                          <button
+                            type="button"
+                            onClick={handleClearTimeSlot}
+                            className="px-3 py-2 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy min-h-[40px] cursor-pointer"
+                          >
+                            Effacer
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
           {onReportClick && (
             <button
               onClick={onReportClick}
-              className="text-xs font-semibold text-gold hover:text-gold/80 flex items-center gap-1 transition-colors cursor-pointer"
+              className="text-xs font-semibold text-gold hover:text-gold/80 flex items-center gap-1 transition-colors cursor-pointer min-h-[44px]"
             >
               <span>Rapport complet</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -300,18 +584,39 @@ export function TotalSalesChart({
         </div>
       </div>
 
-      {/* Montant Principal & Évolution */}
-      <div className="flex flex-wrap items-baseline gap-3 pb-1">
-        <span className="text-2xl sm:text-3xl lg:text-4xl font-bold font-serif text-navy tracking-tight">
-          {totalAmountText}
-        </span>
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-success/15 text-success border border-success/25 shadow-2xs">
-          <TrendingUp className="w-3.5 h-3.5 mr-1" />
-          {growthBadgeText}
-        </span>
-        <span className="text-xs text-foreground-muted hidden sm:inline">
-          cumul consolidé sur la période
-        </span>
+      {/* Montant Principal, Évolution & Badge de Plage Horaire Active */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-baseline gap-3">
+          <span className="text-2xl sm:text-3xl lg:text-4xl font-bold font-serif text-navy tracking-tight">
+            {totalAmountText}
+          </span>
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-600 border border-emerald-500/25 shadow-2xs">
+            <TrendingUp className="w-3.5 h-3.5 mr-1" />
+            {growthBadgeText}
+          </span>
+          <span className="text-xs text-foreground-muted hidden sm:inline">
+            cumul consolidé sur la période
+          </span>
+        </div>
+
+        {/* Badge indicateur de créneau horaire actif */}
+        {isCustomSlotActive && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gold/15 text-navy border border-gold/30 text-xs font-semibold w-fit animate-in fade-in-0 duration-150">
+            <Clock className="w-3.5 h-3.5 text-gold shrink-0" />
+            <span>
+              Plage horaire active : <strong>{activeTimeSlot.label}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={handleClearTimeSlot}
+              className="p-0.5 rounded-md hover:bg-gold/20 text-foreground-muted hover:text-navy transition-colors cursor-pointer ml-1"
+              title="Réinitialiser à la journée entière"
+              aria-label="Réinitialiser la plage horaire"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Zone Graphique SVG avec Grille, Courbe et Infobulle */}
@@ -467,7 +772,7 @@ export function TotalSalesChart({
           })}
         </svg>
 
-        {/* Infobulle interactive flottante (HTML Card positionnée) */}
+        {/* Infobulle interactive flottante */}
         {activePoint && (
           <div
             className="absolute pointer-events-none z-20 bg-navy text-white px-3.5 py-2 rounded-xl shadow-xl border border-gold/40 text-xs flex flex-col gap-0.5 transform -translate-x-1/2 -translate-y-full transition-all duration-75"
@@ -487,7 +792,7 @@ export function TotalSalesChart({
         )}
       </div>
 
-      {/* Grille Moderne des Canaux de Revenus (Breakdown) */}
+      {/* Grille des Canaux de Revenus */}
       <div className="pt-4 border-t border-border space-y-3">
         <div className="flex items-center justify-between text-xs font-semibold text-foreground-muted">
           <span className="flex items-center gap-1.5 text-navy font-bold">
@@ -526,8 +831,8 @@ export function TotalSalesChart({
                     className={cn(
                       "inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0",
                       ch.isPositive
-                        ? "bg-success/15 text-success border border-success/20"
-                        : "bg-error/15 text-error border border-error/20"
+                        ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/20"
+                        : "bg-rose-500/15 text-rose-600 border border-rose-500/20"
                     )}
                   >
                     {ch.isPositive ? "+" : ""}

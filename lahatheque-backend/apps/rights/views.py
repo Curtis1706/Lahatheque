@@ -1863,6 +1863,52 @@ class LegalPreEditionDetailView(APIView):
         return Response({"success": True, "message": "Dossier de pré-édition supprimé avec succès."})
 
 
+def get_period_date_range(period_type: str, year: int, month: int = None, quarter: int = None):
+    from datetime import date
+    import calendar
+    if period_type == "monthly" and month and year:
+        start_date = date(year, month, 1)
+        last_day = calendar.monthrange(year, month)[1]
+        end_date = date(year, month, last_day)
+        month_names = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+        label = f"{month_names[month - 1]} {year}"
+    elif period_type == "quarterly" and quarter and year:
+        start_month = (quarter - 1) * 3 + 1
+        end_month = start_month + 2
+        start_date = date(year, start_month, 1)
+        last_day = calendar.monthrange(year, end_month)[1]
+        end_date = date(year, end_month, last_day)
+        label = f"{quarter}e Trimestre {year}"
+    else:
+        start_date = None
+        end_date = None
+        label = "Toutes périodes confondues"
+    return start_date, end_date, label
+
+
+def resolve_applied_rate(ouvrage, entity_type: str, institution=None, publisher=None) -> float:
+    """
+    Résout le taux réellement applicable à un livre, en respectant la même priorité que
+    task_calculate_monthly_royalties : taux spécifique au livre en premier, repli sur le
+    taux général du compte sinon.
+    """
+    from apps.rights.models import RoyaltyRate
+
+    book_rate = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
+
+    if entity_type == "university":
+        if book_rate and book_rate.university_share_percent is not None:
+            return float(book_rate.university_share_percent)
+        return float(getattr(institution, 'royalty_rate', 15.0)) if institution else 15.0
+
+    elif entity_type == "publisher":
+        if book_rate and book_rate.publisher_share_percent is not None:
+            return float(book_rate.publisher_share_percent)
+        return float(getattr(publisher, 'contractual_royalty_rate', 0.0)) if publisher else 0.0
+
+    return 0.0
+
+
 class LegalRelancesListView(APIView):
     """GET/POST /api/v1/rights/legal/relances/ - Rapports auteurs & relances impayés RÉELS."""
     permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
@@ -1873,6 +1919,13 @@ class LegalRelancesListView(APIView):
         from datetime import timedelta
 
         now = timezone.now()
+
+        # Filtrage par période optionnel (mensuel ou trimestriel)
+        period_type = request.query_params.get('period_type', 'all')
+        year = int(request.query_params.get('year', 0) or 0)
+        month = int(request.query_params.get('month', 0) or 0)
+        quarter = int(request.query_params.get('quarter', 0) or 0)
+        start_date, end_date, period_label = get_period_date_range(period_type, year, month, quarter)
 
         # 1. Rapports & Paiements Auteurs — auteurs réellement liés à un compte
         linked_authors = User.objects.filter(
@@ -1893,6 +1946,9 @@ class LegalRelancesListView(APIView):
             lignes = LigneCommande.objects.filter(
                 ouvrage__in=ouvrages_qs, commande__statut_paiement='paid'
             )
+            if start_date and end_date:
+                lignes = lignes.filter(commande__created_at__date__gte=start_date, commande__created_at__date__lte=end_date)
+
             total_sales = lignes.aggregate(total=Sum('quantity'))['total'] or 0
             total_revenue = float(
                 lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0
@@ -1902,6 +1958,9 @@ class LegalRelancesListView(APIView):
             w_items = WholesaleOrderItem.objects.filter(
                 book__in=ouvrages_qs
             ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+            if start_date and end_date:
+                w_items = w_items.filter(order__created_at__date__gte=start_date, order__created_at__date__lte=end_date)
+
             w_sales = w_items.aggregate(t=Sum(F('digital_licenses_qty') + F('print_copies_qty')))['t'] or 0
             w_rev = float(
                 w_items.aggregate(
@@ -1911,7 +1970,25 @@ class LegalRelancesListView(APIView):
             total_sales += w_sales
             total_revenue += w_rev
 
+            # Calcul des redevances estimées pour la période
+            from apps.rights.models import AuthorRight
+            author_rights = AuthorRight.objects.filter(user=author_user, book__in=ouvrages_qs)
+            rights_by_book = {ar.book_id: float(ar.percentage) / 100.0 for ar in author_rights}
+
+            total_royalties_estimated = 0.0
+            for ligne_item in lignes.values('ouvrage').annotate(st=Sum(F('unit_price') * F('quantity'))):
+                b_id = ligne_item['ouvrage']
+                b_rate = rights_by_book.get(b_id, 0.15)
+                total_royalties_estimated += float(ligne_item['st'] or 0) * b_rate
+
+            for w_row in w_items.values('book').annotate(st=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))):
+                b_id = w_row['book']
+                b_rate = rights_by_book.get(b_id, 0.15)
+                total_royalties_estimated += float(w_row['st'] or 0) * b_rate
+
             payout_lines = RoyaltyPayoutLine.objects.filter(author_right__user=author_user)
+            if start_date and end_date:
+                payout_lines = payout_lines.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             paid_amount = float(payout_lines.filter(is_settled=True).aggregate(s=Sum('payout_amount'))['s'] or 0.0)
 
             last_relance = RelanceEmailJournal.objects.filter(
@@ -1924,9 +2001,11 @@ class LegalRelancesListView(APIView):
                 "email": author_user.email,
                 "total_sales_count": total_sales,
                 "total_revenue_reported": total_revenue,
-                "total_royalties_paid": paid_amount,
+                "total_royalties_paid": paid_amount if (paid_amount > 0 or not (start_date and end_date)) else round(total_royalties_estimated, 2),
+                "total_royalties_estimated": round(total_royalties_estimated, 2),
                 "last_report_date": last_relance.date_envoi.date().isoformat() if last_relance else None,
                 "currency": "XOF",
+                "period_label": period_label,
             })
 
         # 2. Relances Dettes Clients & Achats à Crédit Auteurs
@@ -2028,16 +2107,29 @@ class LegalRelancesListView(APIView):
                 "reports": author_reports,
                 "debts": debts,
                 "history": history,
+                "current_period": {
+                    "period_type": period_type,
+                    "period_label": period_label,
+                    "year": year,
+                    "month": month,
+                    "quarter": quarter,
+                }
             }
         })
 
     def post(self, request):
         from apps.accounts.models import User
-        from apps.reporting.tasks import send_email_task
+        from apps.communications.services.email_service import send_transactional_email
+        from apps.communications.services.pdf_attachment_service import PdfAttachmentService
+        from django.utils import timezone
 
-        if request.data.get("action") == "create_debt":
+        action = request.data.get("action")
+
+        # A. Création unitaire d'une dette
+        if action == "create_debt":
             from apps.commerce.models import Currency, Order
             from django.utils.dateparse import parse_date
+            from datetime import timedelta
 
             client_name = request.data.get("client_name", "").strip()
             client_email = request.data.get("client_email", "").strip().lower()
@@ -2101,12 +2193,10 @@ class LegalRelancesListView(APIView):
             if send_immediate:
                 subject = f"Notification d'impayé / Relance #{initial_level} — LAHAThèque"
                 body = (
-                    f"Bonjour {user.get_full_name() or user.email},<br><br>"
-                    f"Nous vous informons qu'une créance d'un montant de <strong>{amount:,.0f} {currency_code}</strong> "
-                    f"(Réf : {reference_doc or 'Impayé'}) est enregistrée au titre de vos engagements auprès de LAHA Éditions.<br>"
-                    f"Date limite de règlement : <strong>{due_date.strftime('%d/%m/%Y')}</strong>.<br><br>"
-                    f"Merci de régulariser ce montant dans les meilleurs délais.<br><br>"
-                    f"Service Juridique & Recouvrement,<br>LAHA Éditions"
+                    f"Nous vous informons qu'une créance d'un montant de {amount:,.0f} {currency_code} "
+                    f"(Réf : {reference_doc or 'Impayé'}) est enregistrée au titre de vos engagements auprès de LAHA Éditions.\n"
+                    f"Date limite de règlement : {due_date.strftime('%d/%m/%Y')}.\n\n"
+                    f"Merci de régulariser ce montant dans les meilleurs délais."
                 )
                 RelanceEmailJournal.objects.create(
                     type_relance='facture_impayee_client',
@@ -2115,11 +2205,29 @@ class LegalRelancesListView(APIView):
                     sujet=subject,
                     corps_message=body,
                     niveau_relance=initial_level,
+                    montant_du=amount,
                 )
-                try:
-                    send_email_task.delay([user.email], subject, body)
-                except Exception:
-                    pass
+                send_transactional_email(
+                    email_type="client_debt_reminder",
+                    to_email=user.email,
+                    subject=subject,
+                    template_name="emails/royalties/debt_reminder.html",
+                    context={
+                        "recipient_name": user.get_full_name() or user.email,
+                        "subject_title": "Notification d'échéance de paiement",
+                        "message_body": body,
+                        "reference": reference_doc or f"REC-{timezone.now().year}-{str(user.id)[:6].upper()}",
+                        "due_date": due_date.strftime("%d/%m/%Y"),
+                        "days_overdue": 0,
+                        "amount_formatted": f"{amount:,.0f}".replace(",", " "),
+                        "currency": currency_code,
+                        "sender_name": request.user.get_full_name() or "Service Juridique & Recouvrement",
+                        "sender_email": request.user.email,
+                    },
+                    recipient_name=user.get_full_name() or user.email,
+                    reply_to=request.user.email,
+                    async_send=True,
+                )
                 reminder_count = 1
 
             days_overdue = max(0, (timezone.now().date() - due_date).days)
@@ -2153,6 +2261,279 @@ class LegalRelancesListView(APIView):
                 "data": new_debt,
             }, status=201)
 
+        # B. Expédition du relevé de droits d'auteur pour un auteur (Périodicité Mensuelle / Trimestrielle)
+        if action == "send_author_statement":
+            author_id = request.data.get("author_id")
+            period_type = request.data.get("period_type", "monthly")
+            year = int(request.data.get("year", timezone.now().year) or timezone.now().year)
+            month = int(request.data.get("month", timezone.now().month) or timezone.now().month)
+            quarter = int(request.data.get("quarter", 1) or 1)
+            custom_message = request.data.get("custom_message", "").strip()
+            attach_pdf = bool(request.data.get("attach_pdf", True))
+
+            try:
+                author_user = User.objects.get(id=author_id)
+            except (User.DoesNotExist, ValueError):
+                return Response({"success": False, "error": "Auteur destinataire introuvable."}, status=404)
+
+            start_date, end_date, period_label = get_period_date_range(period_type, year, month, quarter)
+
+            ouvrages_qs = Ouvrage.objects.filter(
+                Q(authors__user=author_user) | Q(author_rights__user=author_user),
+                status='published'
+            ).distinct()
+
+            lignes = LigneCommande.objects.filter(
+                ouvrage__in=ouvrages_qs, commande__statut_paiement='paid'
+            )
+            if start_date and end_date:
+                lignes = lignes.filter(commande__created_at__date__gte=start_date, commande__created_at__date__lte=end_date)
+
+            total_sales_count = lignes.aggregate(total=Sum('quantity'))['total'] or 0
+            gross_sales = float(lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0)
+
+            # Redevances par ouvrage pour cet auteur
+            from apps.rights.models import AuthorRight
+            sales_breakdown = []
+            total_net_royalties = 0.0
+
+            for b in ouvrages_qs:
+                b_lignes = lignes.filter(ouvrage=b)
+                b_gross = float(b_lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0)
+                ar = AuthorRight.objects.filter(user=author_user, book=b).first()
+                rate_val = float(ar.percentage) if ar else 15.0
+                net_val = (b_gross * rate_val) / 100.0
+                total_net_royalties += net_val
+                sales_breakdown.append({
+                    "title": b.title,
+                    "gross": b_gross,
+                    "rate": rate_val,
+                    "net": net_val,
+                })
+
+            ref = f"BRD-{year}-{str(author_user.id)[:6].upper()}"
+            royalty_data = {
+                "reference": ref,
+                "beneficiary_name": author_user.get_full_name() or author_user.email,
+                "beneficiary_role": "Auteur • LAHA Éditions",
+                "period": period_label,
+                "date": timezone.now().strftime("%d/%m/%Y"),
+                "gross_sales": gross_sales,
+                "royalty_rate": 15.0 if not sales_breakdown else sales_breakdown[0]["rate"],
+                "net_amount": total_net_royalties,
+                "currency": "FCFA",
+                "sales_breakdown": sales_breakdown,
+            }
+
+            sender = request.user
+            sender_name = f"{sender.first_name} {sender.last_name}".strip() or sender.email
+
+            send_transactional_email(
+                email_type="author_royalty_statement",
+                to_email=author_user.email,
+                subject=f"Votre Bordereau de Droits d'Auteur — {period_label} • LAHAThèque",
+                template_name="emails/royalties/author_statement.html",
+                context={
+                    "recipient_name": author_user.get_full_name() or author_user.email,
+                    "period": period_label,
+                    "reference": ref,
+                    "royalty_rate": f"{royalty_data['royalty_rate']:.1f}",
+                    "net_amount": f"{total_net_royalties:,.0f}".replace(",", " "),
+                    "currency": "FCFA",
+                    "custom_message": custom_message,
+                    "sender_name": sender_name,
+                },
+                recipient_name=author_user.get_full_name() or author_user.email,
+                reply_to=sender.email,
+                pdf_royalty_data=royalty_data if attach_pdf else None,
+                async_send=True,
+            )
+
+            RelanceEmailJournal.objects.create(
+                type_relance="rapport_droits_auteur",
+                destinataire=author_user,
+                destinataire_email=author_user.email,
+                sujet=f"Bordereau de Droits d'Auteur — {period_label}",
+                corps_message=f"Bordereau {ref} ({period_label}) expédié à {author_user.email}. Montant net: {total_net_royalties:,.0f} FCFA.",
+                niveau_relance=1,
+                montant_du=total_net_royalties,
+            )
+
+            return Response({
+                "success": True,
+                "message": f"Bordereau officiel ({period_label}) expédié avec succès à {author_user.get_full_name() or author_user.email}."
+            })
+
+        # C. Expédition groupée de tous les relevés d'auteurs pour la période
+        if action == "send_batch_author_statements":
+            period_type = request.data.get("period_type", "monthly")
+            year = int(request.data.get("year", timezone.now().year) or timezone.now().year)
+            month = int(request.data.get("month", timezone.now().month) or timezone.now().month)
+            quarter = int(request.data.get("quarter", 1) or 1)
+            start_date, end_date, period_label = get_period_date_range(period_type, year, month, quarter)
+
+            linked_authors = User.objects.filter(role='author', is_active=True).distinct()
+            dispatched = 0
+
+            for a_user in linked_authors:
+                ouvrages_qs = Ouvrage.objects.filter(
+                    Q(authors__user=a_user) | Q(author_rights__user=a_user),
+                    status='published'
+                ).distinct()
+                lignes = LigneCommande.objects.filter(ouvrage__in=ouvrages_qs, commande__statut_paiement='paid')
+                if start_date and end_date:
+                    lignes = lignes.filter(commande__created_at__date__gte=start_date, commande__created_at__date__lte=end_date)
+                gross = float(lignes.aggregate(s=Sum(F('unit_price') * F('quantity')))['s'] or 0.0)
+
+                # Envoyer uniquement si ventes > 0
+                if gross > 0:
+                    from apps.rights.models import AuthorRight
+                    sales_breakdown = []
+                    total_net = 0.0
+                    for b in ouvrages_qs:
+                        b_gross = float(lignes.filter(ouvrage=b).aggregate(s=Sum(F('unit_price') * F('quantity')))['s'] or 0.0)
+                        ar = AuthorRight.objects.filter(user=a_user, book=b).first()
+                        rate_val = float(ar.percentage) if ar else 15.0
+                        b_net = (b_gross * rate_val) / 100.0
+                        total_net += b_net
+                        sales_breakdown.append({"title": b.title, "gross": b_gross, "rate": rate_val, "net": b_net})
+
+                    ref = f"BRD-{year}-{str(a_user.id)[:6].upper()}"
+                    royalty_data = {
+                        "reference": ref,
+                        "beneficiary_name": a_user.get_full_name() or a_user.email,
+                        "beneficiary_role": "Auteur • LAHA Éditions",
+                        "period": period_label,
+                        "date": timezone.now().strftime("%d/%m/%Y"),
+                        "gross_sales": gross,
+                        "royalty_rate": 15.0 if not sales_breakdown else sales_breakdown[0]["rate"],
+                        "net_amount": total_net,
+                        "currency": "FCFA",
+                        "sales_breakdown": sales_breakdown,
+                    }
+                    send_transactional_email(
+                        email_type="author_royalty_statement",
+                        to_email=a_user.email,
+                        subject=f"Votre Bordereau de Droits d'Auteur — {period_label} • LAHAThèque",
+                        template_name="emails/royalties/author_statement.html",
+                        context={
+                            "recipient_name": a_user.get_full_name() or a_user.email,
+                            "period": period_label,
+                            "reference": ref,
+                            "royalty_rate": f"{royalty_data['royalty_rate']:.1f}",
+                            "net_amount": f"{total_net:,.0f}".replace(",", " "),
+                            "currency": "FCFA",
+                        },
+                        recipient_name=a_user.get_full_name() or a_user.email,
+                        reply_to=request.user.email,
+                        pdf_royalty_data=royalty_data,
+                        async_send=True,
+                    )
+                    RelanceEmailJournal.objects.create(
+                        type_relance="rapport_droits_auteur",
+                        destinataire=a_user,
+                        destinataire_email=a_user.email,
+                        sujet=f"Bordereau de Droits d'Auteur — {period_label}",
+                        corps_message=f"Bordereau {ref} groupé ({period_label}) transmis à {a_user.email}.",
+                        niveau_relance=1,
+                        montant_du=total_net,
+                    )
+                    dispatched += 1
+
+            return Response({
+                "success": True,
+                "dispatched_count": dispatched,
+                "message": f"{dispatched} bordereau(x) de droits d'auteur expédié(s) pour la période {period_label}."
+            })
+
+        # D. Expédition d'une relance d'impayé graduée (Niveau 1, 2, 3)
+        if action == "send_debt_reminder":
+            debt_id = request.data.get("debt_id")
+            client_id = request.data.get("client_id")
+            reminder_level = int(request.data.get("reminder_level", 1))
+            custom_message = request.data.get("custom_message", "").strip()
+
+            target_user = None
+            if client_id:
+                target_user = User.objects.filter(id=client_id).first()
+            if not target_user and debt_id:
+                target_user = User.objects.filter(id=debt_id).first()
+
+            if not target_user:
+                return Response({"success": False, "error": "Débiteur introuvable."}, status=404)
+
+            # Montant dû
+            orders = Order.objects.filter(user=target_user, statut_paiement='pending')
+            total_due = float(orders.aggregate(s=Sum('total_amount'))['s'] or 0.0)
+            if total_due == 0:
+                from apps.commerce.models import WholesaleOrder
+                wo = WholesaleOrder.objects.filter(id=debt_id).first()
+                if wo:
+                    total_due = float(wo.total_amount)
+
+            due_date_str = timezone.now().strftime("%d/%m/%Y")
+            if orders.exists():
+                oldest = orders.order_by('created_at').first()
+                if oldest.credit_due_date:
+                    due_date_str = oldest.credit_due_date.strftime("%d/%m/%Y")
+
+            days_overdue = int(request.data.get("days_overdue", 0))
+
+            level_titles = {
+                1: "Rappel d'échéance de règlement (Rappel amiable)",
+                2: "Deuxième relance ferme — Facture en attente de règlement",
+                3: "Mise en demeure formelle avant procédure contentieuse",
+            }
+            subject = f"[{level_titles.get(reminder_level, 'Rappel d’impayé')}] • LAHA Éditions"
+
+            default_messages = {
+                1: f"Nous vous rappelons avec bienveillance que votre facture d'un montant de {total_due:,.0f} FCFA est arrivée à échéance. Merci de bien vouloir procéder à son règlement.",
+                2: f"Malgré notre première relance, nous constatons que la somme de {total_due:,.0f} FCFA demeure impayée. Sans régularisation sous 7 jours ouvrés, nous serons contraints de suspendre vos services.",
+                3: f"PAR LA PRÉSENTE, NOUS VOUS METTONS FORMELLEMENT EN DEMEURE de régler sous 48 heures la somme principale de {total_due:,.0f} FCFA. À défaut, le dossier sera transmis à notre avocat pour poursuite judiciaire.",
+            }
+            body = custom_message or default_messages.get(reminder_level, default_messages[1])
+
+            sender = request.user
+            sender_name = f"{sender.first_name} {sender.last_name}".strip() or "Service Juridique & Recouvrement"
+
+            send_transactional_email(
+                email_type="client_debt_reminder",
+                to_email=target_user.email,
+                subject=subject,
+                template_name="emails/royalties/debt_reminder.html",
+                context={
+                    "recipient_name": target_user.get_full_name() or target_user.email,
+                    "subject_title": level_titles.get(reminder_level, "Relance d'impayé"),
+                    "message_body": body,
+                    "reference": f"REC-{timezone.now().year}-{str(target_user.id)[:6].upper()}",
+                    "due_date": due_date_str,
+                    "days_overdue": days_overdue,
+                    "amount_formatted": f"{total_due:,.0f}".replace(",", " "),
+                    "currency": "FCFA",
+                    "sender_name": sender_name,
+                    "sender_email": sender.email,
+                },
+                recipient_name=target_user.get_full_name() or target_user.email,
+                reply_to=sender.email,
+                async_send=True,
+            )
+
+            RelanceEmailJournal.objects.create(
+                type_relance="facture_impayee_client",
+                destinataire=target_user,
+                destinataire_email=target_user.email,
+                sujet=subject,
+                corps_message=body,
+                niveau_relance=reminder_level,
+                montant_du=total_due,
+            )
+
+            return Response({
+                "success": True,
+                "message": f"Relance #{reminder_level} expédiée avec succès à {target_user.get_full_name() or target_user.email}."
+            })
+
+        # Repli standard historique
         recipient_id = request.data.get("recipient_id") or request.data.get("debt_id")
         relance_type = request.data.get("type", "facture_impayee_client")
         custom_message = request.data.get("message", "")
@@ -2165,18 +2546,20 @@ class LegalRelancesListView(APIView):
         if relance_type == "rapport_droits_auteur":
             subject = "Votre Relevé Périodique de Redevances — LAHAThèque"
             body = custom_message or (
-                f"Bonjour {recipient.get_full_name() or recipient.email},<br><br>"
-                "Veuillez trouver ci-joint le relevé de vos ventes et redevances pour la période en cours.<br><br>"
-                "Cordialement,<br>LAHA Éditions"
+                f"Bonjour {recipient.get_full_name() or recipient.email},\n\n"
+                "Veuillez trouver ci-joint le relevé de vos ventes et redevances pour la période en cours.\n\n"
+                "Cordialement,\nLAHA Éditions"
             )
+            template_to_use = "emails/royalties/author_statement.html"
         else:
             subject = "Relance : Facture en attente de règlement — LAHAThèque"
             body = custom_message or (
-                f"Bonjour {recipient.get_full_name() or recipient.email},<br><br>"
+                f"Bonjour {recipient.get_full_name() or recipient.email},\n\n"
                 "Nous vous rappelons qu'une ou plusieurs commandes restent en attente de règlement. "
-                "Merci de régulariser votre situation dans les meilleurs délais.<br><br>"
-                "Cordialement,<br>LAHA Éditions"
+                "Merci de régulariser votre situation dans les meilleurs délais.\n\n"
+                "Cordialement,\nLAHA Éditions"
             )
+            template_to_use = "emails/royalties/debt_reminder.html"
 
         journal_entry = RelanceEmailJournal.objects.create(
             type_relance=relance_type,
@@ -2187,16 +2570,172 @@ class LegalRelancesListView(APIView):
             niveau_relance=int(request.data.get("niveau", 1)),
         )
 
-        try:
-            send_email_task.delay([recipient.email], subject, body)
-        except Exception:
-            pass
+        send_transactional_email(
+            email_type="relance_notification",
+            to_email=recipient.email,
+            subject=subject,
+            template_name=template_to_use,
+            context={
+                "recipient_name": recipient.get_full_name() or recipient.email,
+                "message_body": body,
+                "sender_name": request.user.get_full_name() or "Service Juridique",
+                "sender_email": request.user.email,
+            },
+            recipient_name=recipient.get_full_name() or recipient.email,
+            reply_to=request.user.email,
+            async_send=True,
+        )
 
         return Response({
             "success": True,
             "message": f"Relance envoyée avec succès à {recipient.get_full_name() or recipient.email}.",
             "data": {"id": str(journal_entry.id)}
         })
+
+
+class LegalRedevancesStatementView(APIView):
+    """
+    POST /api/v1/rights/legal/redevances/send-statement/
+    Expédie le relevé officiel de redevances à une Université ou à un Éditeur Tiers,
+    avec bordereau PDF certifié calculé livre par livre selon la priorité stricte resolve_applied_rate.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
+
+    def post(self, request):
+        from apps.communications.services.email_service import send_transactional_email
+        from apps.communications.services.pdf_attachment_service import PdfAttachmentService
+        from apps.catalog.models import Ouvrage
+        from apps.commerce.models import LigneCommande
+        from apps.partners.models import Institution
+        from apps.publishers_portal.models import PublisherProfile
+        from django.utils import timezone
+
+        entity_type = request.data.get("entity_type")  # "university" ou "publisher"
+        entity_id = request.data.get("entity_id")
+        period_type = request.data.get("period_type", "monthly")
+        year = int(request.data.get("year", timezone.now().year) or timezone.now().year)
+        month = int(request.data.get("month", timezone.now().month) or timezone.now().month)
+        quarter = int(request.data.get("quarter", 1) or 1)
+        custom_message = request.data.get("custom_message", "").strip()
+        attach_pdf = bool(request.data.get("attach_pdf", True))
+
+        start_date, end_date, period_label = get_period_date_range(period_type, year, month, quarter)
+
+        recipient_email = None
+        entity_name = None
+        institution = None
+        publisher = None
+
+        if entity_type == "university":
+            try:
+                institution = Institution.objects.get(id=entity_id)
+                entity_name = institution.name
+                recipient_email = getattr(institution, 'contact_email', None) or (institution.user.email if hasattr(institution, 'user') and institution.user else None)
+            except (Institution.DoesNotExist, ValueError):
+                return Response({"success": False, "error": "Université / Établissement introuvable."}, status=404)
+            ouvrages = Ouvrage.objects.filter(institution=institution)
+
+        elif entity_type == "publisher":
+            try:
+                publisher = PublisherProfile.objects.get(id=entity_id)
+                entity_name = publisher.company_name or publisher.name
+                recipient_email = getattr(publisher, 'contact_email', None) or (publisher.user.email if hasattr(publisher, 'user') and publisher.user else None)
+            except (PublisherProfile.DoesNotExist, ValueError):
+                return Response({"success": False, "error": "Éditeur tiers introuvable."}, status=404)
+            ouvrages = Ouvrage.objects.filter(publisher=publisher)
+
+        else:
+            return Response({"success": False, "error": "Type d'entité invalide (doit être 'university' ou 'publisher')."}, status=400)
+
+        if not recipient_email:
+            return Response({"success": False, "error": f"Aucune adresse e-mail valide configurée pour {entity_name}."}, status=400)
+
+        # Calcul des ventes et redevances livre par livre avec resolve_applied_rate (Correction Critique)
+        total_gross = 0.0
+        total_net = 0.0
+        sales_breakdown = []
+
+        for book in ouvrages:
+            lignes = LigneCommande.objects.filter(ouvrage=book, commande__statut_paiement='paid')
+            if start_date and end_date:
+                lignes = lignes.filter(commande__created_at__date__gte=start_date, commande__created_at__date__lte=end_date)
+
+            book_gross = float(lignes.aggregate(s=Sum(F('unit_price') * F('quantity')))['s'] or 0.0)
+            applied_rate = resolve_applied_rate(book, entity_type=entity_type, institution=institution, publisher=publisher)
+            book_net = (book_gross * applied_rate) / 100.0
+
+            total_gross += book_gross
+            total_net += book_net
+
+            sales_breakdown.append({
+                "title": book.title,
+                "gross": book_gross,
+                "rate": applied_rate,
+                "net": book_net,
+            })
+
+        ref = f"RED-{year}-{str(entity_id)[:6].upper()}"
+        royalty_data = {
+            "reference": ref,
+            "beneficiary_name": entity_name,
+            "beneficiary_role": "Partenaire Institutionnel • LAHAThèque" if entity_type == "university" else "Éditeur Tiers Partenaire",
+            "period": period_label,
+            "date": timezone.now().strftime("%d/%m/%Y"),
+            "gross_sales": total_gross,
+            "royalty_rate": 15.0 if entity_type == "university" else (sales_breakdown[0]["rate"] if sales_breakdown else 0.0),
+            "net_amount": total_net,
+            "currency": "FCFA",
+            "sales_breakdown": sales_breakdown,
+        }
+
+        sender = request.user
+        sender_name = f"{sender.first_name} {sender.last_name}".strip() or "Direction Juridique & Partenariats"
+
+        default_body = (
+            f"Veuillez trouver ci-joint le relevé officiel des redevances dues au titre de la période : {period_label}.\n"
+            f"Le montant net s'élève à {total_net:,.0f} FCFA conformément aux barèmes contractuels en vigueur."
+        )
+
+        send_transactional_email(
+            email_type="institution_royalty_statement",
+            to_email=recipient_email,
+            subject=f"Relevé Officiel de Redevances — {period_label} • LAHAThèque x {entity_name}",
+            template_name="emails/royalties/institution_statement.html",
+            context={
+                "recipient_name": entity_name,
+                "entity_name": entity_name,
+                "period_label": period_label,
+                "message_body": custom_message or default_body,
+                "total_sales_formatted": f"{total_gross:,.0f}".replace(",", " "),
+                "amount_formatted": f"{total_net:,.0f}".replace(",", " "),
+                "currency": "FCFA",
+                "sender_name": sender_name,
+                "sender_email": sender.email,
+            },
+            recipient_name=entity_name,
+            reply_to=sender.email,
+            pdf_royalty_data=royalty_data if attach_pdf else None,
+            async_send=True,
+        )
+
+        # Journaliser dans RelanceEmailJournal
+        target_user_record = getattr(institution, 'user', None) if institution else getattr(publisher, 'user', None)
+        if target_user_record:
+            RelanceEmailJournal.objects.create(
+                type_relance="rapport_droits_auteur",
+                destinataire=target_user_record,
+                destinataire_email=recipient_email,
+                sujet=f"Relevé de Redevances — {period_label} ({entity_name})",
+                corps_message=f"Bordereau {ref} ({period_label}) expédié à {recipient_email}. Montant net: {total_net:,.0f} FCFA.",
+                niveau_relance=1,
+                montant_du=total_net,
+            )
+
+        return Response({
+            "success": True,
+            "message": f"Relevé officiel de redevances ({period_label}) expédié avec succès à {entity_name} ({recipient_email})."
+        })
+
 
 
 class DebtReminderConfigView(APIView):

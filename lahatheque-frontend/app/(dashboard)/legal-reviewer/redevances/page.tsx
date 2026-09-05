@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { DollarSign, ArrowLeft, Building2, Edit2, ShieldCheck, CheckCircle2, Lock } from "lucide-react";
+import { DollarSign, ArrowLeft, Building2, Edit2, ShieldCheck, Mail, Lock } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "sonner";
@@ -13,6 +13,10 @@ import {
   updateThirdPartyPublisherRate,
 } from "@/lib/services/legal";
 import type { UniversityRoyalty, ThirdPartyPublisherRoyalty } from "@/lib/types/legal";
+import {
+  SendInstitutionStatementModal,
+  StatementEntity,
+} from "@/components/features/legal/send-institution-statement-modal";
 
 export default function LegalRedevancesPage() {
   const [univRoyalties, setUnivRoyalties] = useState<UniversityRoyalty[]>([]);
@@ -23,6 +27,10 @@ export default function LegalRedevancesPage() {
   const [selectedPub, setSelectedPub] = useState<ThirdPartyPublisherRoyalty | null>(null);
   const [newRate, setNewRate] = useState(20);
   const [updating, setUpdating] = useState(false);
+
+  // Envoi de bordereau institutionnel
+  const [selectedEntityForStatement, setSelectedEntityForStatement] = useState<StatementEntity | null>(null);
+  const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -65,6 +73,34 @@ export default function LegalRedevancesPage() {
     }
   };
 
+  const handleOpenUnivStatement = (row: UniversityRoyalty) => {
+    setSelectedEntityForStatement({
+      id: row.university_id,
+      name: row.name,
+      type: "university",
+      country: row.country,
+      rate: row.fixed_rate_percentage,
+      amount_due: row.amount_due,
+      currency: row.currency,
+      contract_reference: row.contract_reference,
+    });
+    setIsStatementModalOpen(true);
+  };
+
+  const handleOpenPubStatement = (row: ThirdPartyPublisherRoyalty) => {
+    setSelectedEntityForStatement({
+      id: row.publisher_id,
+      name: row.name,
+      type: "publisher",
+      country: row.country,
+      rate: row.contractual_rate,
+      amount_due: row.amount_due,
+      currency: row.currency,
+      contract_reference: row.contract_reference,
+    });
+    setIsStatementModalOpen(true);
+  };
+
   const univColumns: DataTableColumn<UniversityRoyalty>[] = [
     {
       key: "name",
@@ -81,7 +117,7 @@ export default function LegalRedevancesPage() {
       header: "Taux Fixe Institutionnel",
       cell: (row) => (
         <div className="flex items-center gap-1.5">
-          <span className="font-mono font-bold text-navy text-xs px-2.5 py-1 rounded-xl bg-navy-light border border-navy/20">
+          <span className="font-mono font-bold text-navy text-xs px-2.5 py-1 rounded-xl bg-navy/10 border border-navy/20">
             {row.fixed_rate_percentage}%
           </span>
           <span className="text-[10px] text-foreground-muted flex items-center gap-0.5" title="Taux fixe conventionné (Non modifiable)">
@@ -107,6 +143,21 @@ export default function LegalRedevancesPage() {
         <span className="font-mono font-bold text-gold text-xs">
           {row.amount_due.toLocaleString("fr-FR")} {row.currency}
         </span>
+      ),
+    },
+    {
+      key: "actions" as keyof UniversityRoyalty,
+      header: "Action",
+      cell: (row) => (
+        <button
+          type="button"
+          onClick={() => handleOpenUnivStatement(row)}
+          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+          title="Expédier le bordereau officiel de redevances par e-mail"
+        >
+          <Mail className="w-3.5 h-3.5 text-gold" />
+          Envoyer Relevé
+        </button>
       ),
     },
   ];
@@ -142,19 +193,30 @@ export default function LegalRedevancesPage() {
     },
     {
       key: "actions" as keyof ThirdPartyPublisherRoyalty,
-      header: "",
+      header: "Actions",
       cell: (row) => (
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedPub(row);
-            setNewRate(row.contractual_rate);
-          }}
-          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1"
-        >
-          <Edit2 className="w-3.5 h-3.5 text-gold" />
-          Modifier le taux
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleOpenPubStatement(row)}
+            className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Expédier le bordereau contractuel officiel par e-mail"
+          >
+            <Mail className="w-3.5 h-3.5 text-gold" />
+            Envoyer Relevé
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedPub(row);
+              setNewRate(row.contractual_rate);
+            }}
+            className="px-3 py-1.5 rounded-xl border border-border bg-background text-navy text-[10px] font-bold hover:bg-background-secondary transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1 cursor-pointer"
+          >
+            <Edit2 className="w-3.5 h-3.5 text-gold" />
+            Modifier le taux
+          </button>
+        </div>
       ),
     },
   ];
@@ -183,7 +245,7 @@ export default function LegalRedevancesPage() {
             Redevances Universités &amp; Éditeurs Tiers
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Barème officiel conventionné : 15% fixe institutionnel pour les universités et taux contractuels négociés pour les éditeurs tiers.
+            Barème officiel conventionné : 15% fixe institutionnel pour les universités, taux contractuels négociés pour les éditeurs tiers, et expédition des bordereaux officiels.
           </p>
         </div>
       </div>
@@ -195,7 +257,7 @@ export default function LegalRedevancesPage() {
             <Building2 className="w-5 h-5 text-gold" />
             1. Redevances Universités (Taux fixe 15%)
           </h2>
-          <span className="text-[10px] font-bold text-success flex items-center gap-1">
+          <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5" />
             Conforme Cahier v3.2
           </span>
@@ -218,7 +280,7 @@ export default function LegalRedevancesPage() {
             2. Redevances Éditeurs Tiers (Taux Négocié)
           </h2>
           <span className="text-[10px] font-mono text-foreground-muted">
-            Le Juriste peut ajuster directement le taux contractuel
+            Le Juriste peut ajuster directement le taux contractuel et expédier les bordereaux
           </span>
         </div>
 
@@ -283,6 +345,16 @@ export default function LegalRedevancesPage() {
           </form>
         </Modal>
       )}
+
+      {/* Modale d'expédition du bordereau institutionnel */}
+      <SendInstitutionStatementModal
+        isOpen={isStatementModalOpen}
+        onClose={() => {
+          setIsStatementModalOpen(false);
+          setSelectedEntityForStatement(null);
+        }}
+        entity={selectedEntityForStatement}
+      />
     </div>
   );
 }

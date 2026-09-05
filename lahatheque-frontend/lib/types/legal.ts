@@ -316,3 +316,42 @@ export interface LegalKpis {
   activePreEditions: number;
   timeline?: { date: string; value: number }[];
 }
+
+export type PeriodType = "monthly" | "quarterly";
+
+export interface SendAuthorStatementPayload {
+  author_id: string;
+  period_type: PeriodType;
+  year: number;
+  month?: number;
+  quarter?: number;
+  include_pdf?: boolean;
+  custom_note?: string;
+}
+
+export interface SendBatchAuthorStatementsPayload {
+  period_type: PeriodType;
+  year: number;
+  month?: number;
+  quarter?: number;
+  include_pdf?: boolean;
+}
+
+export interface SendDebtReminderPayload {
+  debt_id: string;
+  reminder_level: 1 | 2 | 3;
+  custom_note?: string;
+  cc_accountant?: boolean;
+}
+
+export interface SendInstitutionStatementPayload {
+  entity_type: "university" | "publisher";
+  entity_id: string;
+  period_type: PeriodType;
+  year: number;
+  month?: number;
+  quarter?: number;
+  include_pdf?: boolean;
+  custom_note?: string;
+}
+

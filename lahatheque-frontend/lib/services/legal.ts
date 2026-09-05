@@ -11,6 +11,11 @@ import type {
   CreateClientDebtPayload,
   DebtReminderConfig,
   LegalKpis,
+  PeriodType,
+  SendAuthorStatementPayload,
+  SendBatchAuthorStatementsPayload,
+  SendDebtReminderPayload,
+  SendInstitutionStatementPayload,
 } from "../types/legal";
 
 const API_BASE = "/api/bff/rights/legal";
@@ -448,8 +453,20 @@ export async function updateThirdPartyPublisherRate(
 
 // ─── Relances & Communications ────────────────────────────────────────────────
 
-export async function getAuthorEmailReports(): Promise<AuthorEmailReport[]> {
-  const res = await fetch(`${API_BASE}/relances/`, {
+export async function getAuthorEmailReports(params?: {
+  period_type?: PeriodType;
+  year?: number;
+  month?: number;
+  quarter?: number;
+}): Promise<AuthorEmailReport[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.period_type) queryParams.set("period_type", params.period_type);
+  if (params?.year) queryParams.set("year", String(params.year));
+  if (params?.month) queryParams.set("month", String(params.month));
+  if (params?.quarter) queryParams.set("quarter", String(params.quarter));
+
+  const qs = queryParams.toString() ? `?${queryParams.toString()}` : "";
+  const res = await fetch(`${API_BASE}/relances/${qs}`, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -602,3 +619,93 @@ export async function updateDebtReminderConfig(
   });
   return res.ok;
 }
+
+export async function sendAuthorRoyaltyStatementDetailed(
+  payload: SendAuthorStatementPayload
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/relances/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "send_author_statement",
+        ...payload,
+      }),
+      credentials: "include",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data.error || `Erreur ${res.status}` };
+    }
+    return { success: true, message: data.message };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur réseau" };
+  }
+}
+
+export async function sendBatchAuthorStatements(
+  payload: SendBatchAuthorStatementsPayload
+): Promise<{ success: boolean; sent_count?: number; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/relances/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "send_batch_author_statements",
+        ...payload,
+      }),
+      credentials: "include",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data.error || `Erreur ${res.status}` };
+    }
+    return { success: true, sent_count: data.sent_count, message: data.message };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur réseau" };
+  }
+}
+
+export async function sendDetailedDebtReminder(
+  payload: SendDebtReminderPayload
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/relances/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "send_debt_reminder",
+        ...payload,
+      }),
+      credentials: "include",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data.error || `Erreur ${res.status}` };
+    }
+    return { success: true, message: data.message };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur réseau" };
+  }
+}
+
+export async function sendInstitutionRoyaltyStatement(
+  payload: SendInstitutionStatementPayload
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/redevances/send-statement/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      credentials: "include",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data.error || `Erreur ${res.status}` };
+    }
+    return { success: true, message: data.message };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur réseau" };
+  }
+}
+
