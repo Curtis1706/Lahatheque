@@ -125,36 +125,8 @@ export default function AuthorOverviewPage() {
         </Link>
       </div>
 
-      {/* 6 KPI Cards Connectées au Backend incluant Stock Restant et Stock Initial */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Stock Restant */}
-        <Link href="/author/books" className="block">
-          <ProgressMetricCard
-            title="Stock Restant (Papier)"
-            total={`${(kpis?.stockRemaining ?? 0).toLocaleString("fr-FR")} ex.`}
-            percent="En rayon"
-            trend="up"
-            accent="gold"
-            delta="Disponible"
-            deltaLabel="en entrepôts LAHA"
-            data={kpis?.timelines?.stock || getRollingTimeline(kpis?.stockRemaining ?? 0)}
-          />
-        </Link>
-
-        {/* Stock Initial */}
-        <Link href="/author/books" className="block">
-          <ProgressMetricCard
-            title="Stock Initial (Tirage)"
-            total={`${(kpis?.stockInitial ?? 0).toLocaleString("fr-FR")} ex.`}
-            percent="Tirage"
-            trend="up"
-            accent="neutral"
-            delta="Tirage initial"
-            deltaLabel="mis en distribution"
-            data={getRollingTimeline(kpis?.stockInitial ?? 0)}
-          />
-        </Link>
-
+      {/* 3 KPI Cards Principaux Connectés au Backend */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Ventes Réalisées */}
         <Link href="/author/books" className="block">
           <ProgressMetricCard
@@ -166,20 +138,6 @@ export default function AuthorOverviewPage() {
             delta={`${kpis?.publishedBooksCount ?? 0} ouvrages`}
             deltaLabel="au catalogue"
             data={kpis?.timelines?.sales || getRollingTimeline(kpis?.totalSales ?? 0)}
-          />
-        </Link>
-
-        {/* Lectures & DRM */}
-        <Link href="/author/books" className="block">
-          <ProgressMetricCard
-            title="Lectures &amp; DRM"
-            total={`${(kpis?.totalDownloads ?? 0).toLocaleString("fr-FR")} lectures`}
-            percent="Streaming"
-            trend="up"
-            accent="neutral"
-            delta="Filigrane actif"
-            deltaLabel="sécurisé"
-            data={getRollingTimeline(kpis?.totalDownloads ?? 0)}
           />
         </Link>
 
@@ -284,7 +242,6 @@ export default function AuthorOverviewPage() {
                 {(kpis.stockInitial ?? 0).toLocaleString("fr-FR")}{" "}
                 <span className="text-xs font-sans text-foreground-muted">ex.</span>
               </p>
-              <p className="text-[10px] text-foreground-muted">Volume initial imprimé et réceptionné</p>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-background border border-border space-y-1">
@@ -295,7 +252,6 @@ export default function AuthorOverviewPage() {
                 {Math.max(0, (kpis.stockInitial ?? 0) - (kpis.stockRemaining ?? 0)).toLocaleString("fr-FR")}{" "}
                 <span className="text-xs font-sans text-foreground-muted">ex.</span>
               </p>
-              <p className="text-[10px] text-foreground-muted">Ventes directes &amp; commandes grossistes</p>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-navy-light border border-navy-hover/20 space-y-1">
@@ -306,7 +262,6 @@ export default function AuthorOverviewPage() {
                 {(kpis.stockRemaining ?? 0).toLocaleString("fr-FR")}{" "}
                 <span className="text-xs font-sans text-gold">ex.</span>
               </p>
-              <p className="text-[10px] text-navy">Actuellement disponibles en entrepôts</p>
             </div>
           </div>
         </div>

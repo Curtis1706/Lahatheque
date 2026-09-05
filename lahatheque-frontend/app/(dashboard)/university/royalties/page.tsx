@@ -649,7 +649,7 @@ export default function UniversityRoyaltiesPage() {
                           className="px-3 py-1.5 rounded-full bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs min-h-[34px]"
                         >
                           <PieChart className="w-3.5 h-3.5 text-gold" />
-                          <span>Camembert &amp; Répartition</span>
+                          <span>Répartition &amp; Redevances</span>
                         </button>
                       </div>
                     </div>
@@ -720,7 +720,7 @@ export default function UniversityRoyaltiesPage() {
         )}
       </div>
 
-      {/* Modale Répartition Multi-Universités & Camembert Statistique */}
+      {/* Modale Répartition Multi-Universités & Statistiques */}
       <BouquetDistributionModal
         open={!!selectedBouquetForDistribution}
         onClose={() => setSelectedBouquetForDistribution(null)}

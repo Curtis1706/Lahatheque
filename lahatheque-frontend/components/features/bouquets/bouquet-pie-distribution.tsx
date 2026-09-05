@@ -41,7 +41,7 @@ export function BouquetPieDistribution({
     items,
   } = distribution;
 
-  // ─── Calcul SVG pour le camembert plein (Pie Chart) ──────────────────────
+  // ─── Calcul SVG pour le diagramme circulaire vectoriel (Pie Chart) ───────
   const size = 300;
   const center = size / 2;
   const radius = 105;
@@ -75,7 +75,7 @@ export function BouquetPieDistribution({
     const labelX = center + labelRadius * Math.cos(midAngle);
     const labelY = center + labelRadius * Math.sin(midAngle);
 
-    // Coordonnées de l'extrémité sur le bord du camembert
+    // Coordonnées de l'extrémité sur le pourtour du cercle
     const edgeX = center + (radius + 4) * Math.cos(midAngle);
     const edgeY = center + (radius + 4) * Math.sin(midAngle);
 
@@ -126,9 +126,9 @@ export function BouquetPieDistribution({
         </div>
       )}
 
-      {/* ─── GRILLE 2 COLONNES : CAMEMBERT (GAUCHE) & BARRES HORIZONTALES (DROITE) ─── */}
+      {/* ─── GRILLE 2 COLONNES : DIAGRAMME CIRCULAIRE (GAUCHE) & BARRES HORIZONTALES (DROITE) ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        {/* COLONNE GAUCHE : CAMEMBERT PLEIN (PIE CHART) */}
+        {/* COLONNE GAUCHE : DIAGRAMME CIRCULAIRE PLEIN (PIE CHART) */}
         <div className="p-5 rounded-2xl bg-background-secondary border border-border space-y-4 flex flex-col items-center">
           <div className="text-center space-y-0.5">
             <h3 className="font-bold text-xs sm:text-sm text-navy">
@@ -143,7 +143,7 @@ export function BouquetPieDistribution({
             <svg
               viewBox={`0 0 ${size} ${size}`}
               className="w-full h-full overflow-visible"
-              aria-label="Camembert de répartition des consultations"
+              aria-label="Diagramme de répartition institutionnelle des consultations"
             >
               {slices.map((slice) => {
                 const isHovered = hoveredUnivId === slice.item.institution_id;
@@ -212,7 +212,7 @@ export function BouquetPieDistribution({
             </svg>
           </div>
 
-          {/* Légende interactive sous le camembert */}
+          {/* Légende interactive sous le diagramme circulaire */}
           <div className="w-full flex flex-wrap items-center justify-center gap-2.5 pt-2 border-t border-border/60">
             {items.map((item) => (
               <button

@@ -320,14 +320,6 @@ export default function AdminBouquetsPage() {
       cell: (row) => (
         <div className="flex items-center gap-2 justify-end">
           <button
-            onClick={() => setSelectedDistributionBouquet(row)}
-            className="px-2.5 py-1.5 rounded-xl bg-gold/15 text-navy text-xs font-bold hover:bg-gold/30 border border-gold/30 transition-colors inline-flex items-center gap-1.5 min-h-[36px] cursor-pointer"
-            title="Consulter le camembert et la répartition par université"
-          >
-            <PieChart className="w-3.5 h-3.5 text-gold" />
-            <span>Camembert</span>
-          </button>
-          <button
             onClick={() => openEditModal(row)}
             className="px-2.5 py-1.5 rounded-xl bg-navy-light text-navy text-xs font-bold hover:bg-navy-hover hover:text-white transition-colors inline-flex items-center gap-1 min-h-[36px]"
             title="Modifier le bouquet"
@@ -763,7 +755,7 @@ export default function AdminBouquetsPage() {
         </div>
       )}
 
-      {/* Modale Répartition Multi-Universités & Camembert Statistique */}
+      {/* Modale Répartition Multi-Universités & Statistiques */}
       <BouquetDistributionModal
         open={!!selectedDistributionBouquet}
         onClose={() => setSelectedDistributionBouquet(null)}

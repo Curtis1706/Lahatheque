@@ -15,6 +15,11 @@ import {
   getRevenueCategoryBreakdown,
 } from "@/lib/services/admin";
 import {
+  computeBouquetDistribution,
+  BouquetDistributionResult,
+} from "@/lib/services/bouquet-distribution";
+import { BouquetPieDistribution } from "@/components/features/bouquets/bouquet-pie-distribution";
+import {
   AdminKpi,
   RoleDistribution,
   AdminSale,
@@ -36,6 +41,7 @@ import {
   Sparkles,
   ChevronRight,
   FileCheck2,
+  Building2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -105,6 +111,14 @@ export default function AdminOverviewDashboard() {
   }, []);
 
   const totalUsersCount = rolesDist.reduce((acc, r) => acc + r.count, 0);
+
+  // Modèle de calcul unique et officiel de référence (CDC Section 11 & 12)
+  const bouquetDist: BouquetDistributionResult = computeBouquetDistribution({
+    bouquet_id: "bouquet-reference-cdc",
+    bouquet_title: "Bouquets Documentaires Multi-Universités",
+    total_ca: 10000,
+    currency: "€",
+  });
 
   const donutSegments: DonutChartSegment[] = rolesDist
     .filter((r) => r.count > 0)
@@ -385,6 +399,82 @@ export default function AdminOverviewDashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ─── BLOC UNIQUE CDC 11.1 & 11.2 : RÉPARTITION DES REDEVANCES — BOUQUETS DOCUMENTAIRES ─── */}
+      <div className="p-5 sm:p-7 rounded-3xl bg-background-secondary border border-border space-y-6 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-border">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/15 text-navy text-xs font-bold">
+              <Building2 className="w-3.5 h-3.5 text-gold" />
+              Section 11 &bull; Cahier des Charges Officiel
+            </div>
+            <h2 className="text-lg sm:text-2xl font-bold font-serif text-navy">
+              Répartition des Redevances &ndash; Bouquets Documentaires
+            </h2>
+            <p className="text-xs text-foreground-muted max-w-3xl leading-relaxed">
+              Les revenus issus des bouquets documentaires sont r&eacute;partis selon l&apos;utilisation r&eacute;elle des contenus, en tenant compte des consultations, pages lues, t&eacute;l&eacute;chargements, temps de lecture et &eacute;coutes audio (Taux conventionn&eacute; : <span className="font-bold text-navy">15 %</span>).
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <Link
+              href="/admin/catalog/bouquets"
+              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[40px]"
+            >
+              <Layers className="w-4 h-4 text-gold" />
+              <span>Gérer les Bouquets</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Mini Grille de 4 KPIs Spécifiques au Bouquet Sélectionné */}
+        {bouquetDist && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+              <span className="text-[11px] font-medium text-foreground-muted">Assiette Financière Bouquet</span>
+              <p className="text-base sm:text-lg font-bold font-mono text-navy">
+                {bouquetDist.total_ca.toLocaleString("fr-FR")} {bouquetDist.currency}
+              </p>
+              <span className="text-[10px] text-foreground-muted">Chiffre d&apos;affaires annuel</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+              <span className="text-[11px] font-medium text-foreground-muted">Lectures Multi-Campus</span>
+              <p className="text-base sm:text-lg font-bold font-mono text-emerald-600">
+                {bouquetDist.total_consultations.toLocaleString("fr-FR")} lectures
+              </p>
+              <span className="text-[10px] text-foreground-muted">Usage réel certifié</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+              <span className="text-[11px] font-medium text-foreground-muted">Enveloppe Redevances (15%)</span>
+              <p className="text-base sm:text-lg font-bold font-mono text-gold">
+                {bouquetDist.total_royalties.toLocaleString("fr-FR")} {bouquetDist.currency}
+              </p>
+              <span className="text-[10px] text-foreground-muted">À verser aux universités</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+              <span className="text-[11px] font-medium text-foreground-muted">Établissements Actifs</span>
+              <p className="text-base sm:text-lg font-bold font-mono text-navy">
+                {bouquetDist.items.length} Campus
+              </p>
+              <span className="text-[10px] text-foreground-muted">UAC, Parakou, UNA</span>
+            </div>
+          </div>
+        )}
+
+        {/* Intégration du composant visuel BouquetPieDistribution */}
+        {bouquetDist && (
+          <div className="w-full">
+            <BouquetPieDistribution
+              distribution={bouquetDist}
+              showTitle={false}
+            />
+          </div>
+        )}
       </div>
 
       {/* Recent Sales Transactions Preview (Plein Écran Full Width tout en bas) */}

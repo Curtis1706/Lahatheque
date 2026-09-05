@@ -87,6 +87,8 @@ export function BouquetDistributionModal({
       open={open}
       onClose={onClose}
       title={`Analyse & Répartition : ${bouquet.title}`}
+      maxWidth={1040}
+      maxHeight="min(90vh, 850px)"
     >
       <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto space-y-4">
         <BouquetPieDistribution
