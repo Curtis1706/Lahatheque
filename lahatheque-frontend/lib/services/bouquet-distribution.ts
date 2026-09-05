@@ -97,7 +97,7 @@ const DEFAULT_UNIVERSITIES_DATA = [
  */
 export function computeBouquetDistribution(params: {
   bouquet_id: string;
-  bouquet_title: string;
+  bouquet_title?: string;
   total_ca?: number;
   currency?: string;
   custom_royalty_rate?: number;
@@ -111,9 +111,9 @@ export function computeBouquetDistribution(params: {
 }): BouquetDistributionResult {
   const {
     bouquet_id,
-    bouquet_title,
+    bouquet_title = "Bouquet Documentaire Multi-Universités",
     total_ca = 10000,
-    currency = "€",
+    currency = "FCFA",
     custom_royalty_rate,
     books,
   } = params;
@@ -276,3 +276,64 @@ export function computeBouquetDistribution(params: {
     items,
   };
 }
+
+/**
+ * Récupère la répartition d'un bouquet depuis l'API Django (avec fallback automatique instantané)
+ */
+export async function fetchBouquetDistribution(
+  bouquetId: string,
+  role: "admin" | "university" = "admin"
+): Promise<BouquetDistributionResult> {
+  const url =
+    role === "university"
+      ? `/api/v1/partners/university/bouquets/${bouquetId}/distribution/`
+      : `/api/v1/admin/bouquet-offerings/${bouquetId}/distribution/`;
+
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.data) {
+        const d = json.data;
+        return {
+          bouquet_id: d.bouquet_id,
+          bouquet_title: d.bouquet_title,
+          total_books: d.total_books_count ?? d.totals?.total_books ?? 0,
+          total_consultations: d.total_consultations ?? 100,
+          total_ca: d.annual_price ?? d.totals?.total_ca ?? 0,
+          currency: d.currency || "FCFA",
+          royalty_rate: d.royalty_rate_applied ?? getBouquetRoyaltyRate(),
+          total_royalties: d.totals?.total_royalties ?? 0,
+          items: (d.distribution || []).map((it: {
+            institution_id: string;
+            institution_name: string;
+            institution_code?: string;
+            books_owned_count: number;
+            reads_count?: number;
+            usage_percentage: number;
+            ca_share: number;
+            royalty_rate: number;
+            royalty_amount: number;
+            color: string;
+          }) => ({
+            institution_id: it.institution_id,
+            institution_name: it.institution_name,
+            short_name: it.institution_code || it.institution_name,
+            books_count: it.books_owned_count,
+            consultations_count: it.reads_count ?? it.books_owned_count * 10,
+            usage_share_percent: it.usage_percentage,
+            ca_share_allocated: it.ca_share,
+            royalty_rate: it.royalty_rate,
+            royalty_amount: it.royalty_amount,
+            color: it.color,
+          })),
+        };
+      }
+    }
+  } catch {
+    // Mode offline ou API indisponible : fallback sur le moteur de calcul local
+  }
+
+  return computeBouquetDistribution({ bouquet_id: bouquetId });
+}
+
