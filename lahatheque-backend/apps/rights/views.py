@@ -2001,23 +2001,27 @@ class LegalRelancesListView(APIView):
 
             # Calcul des redevances estimées pour la période
             from apps.rights.models import AuthorRight
-            author_rights = AuthorRight.objects.filter(user=author_user, book__in=ouvrages_qs)
-            rights_by_book = {ar.book_id: float(ar.percentage) / 100.0 for ar in author_rights}
+            author_rights = AuthorRight.objects.filter(user=author_user, ouvrage__in=ouvrages_qs)
+            rights_by_book = {}
+            for ar in author_rights:
+                rate = float(ar.pool_share_percent) / 100.0
+                rights_by_book[ar.ouvrage_id] = rate
+                rights_by_book[str(ar.ouvrage_id)] = rate
 
             total_royalties_estimated = 0.0
             for ligne_item in lignes.values('ouvrage').annotate(st=Sum(F('unit_price') * F('quantity'))):
                 b_id = ligne_item['ouvrage']
-                b_rate = rights_by_book.get(b_id, 0.15)
+                b_rate = rights_by_book.get(b_id, rights_by_book.get(str(b_id), 0.15))
                 total_royalties_estimated += float(ligne_item['st'] or 0) * b_rate
 
             for w_row in w_items.values('book').annotate(st=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))):
                 b_id = w_row['book']
-                b_rate = rights_by_book.get(b_id, 0.15)
+                b_rate = rights_by_book.get(b_id, rights_by_book.get(str(b_id), 0.15))
                 total_royalties_estimated += float(w_row['st'] or 0) * b_rate
 
             payout_lines = RoyaltyPayoutLine.objects.filter(author_right__user=author_user)
             if start_date and end_date:
-                payout_lines = payout_lines.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+                payout_lines = payout_lines.filter(calculation__period_month__gte=start_date, calculation__period_month__lte=end_date)
             paid_amount = float(payout_lines.filter(is_settled=True).aggregate(s=Sum('payout_amount'))['s'] or 0.0)
 
             last_relance = RelanceEmailJournal.objects.filter(
@@ -2329,8 +2333,8 @@ class LegalRelancesListView(APIView):
             for b in ouvrages_qs:
                 b_lignes = lignes.filter(ouvrage=b)
                 b_gross = float(b_lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0)
-                ar = AuthorRight.objects.filter(user=author_user, book=b).first()
-                rate_val = float(ar.percentage) if ar else 15.0
+                ar = AuthorRight.objects.filter(user=author_user, ouvrage=b).first()
+                rate_val = float(ar.pool_share_percent) if ar else 15.0
                 net_val = (b_gross * rate_val) / 100.0
                 total_net_royalties += net_val
                 sales_breakdown.append({
@@ -2421,8 +2425,8 @@ class LegalRelancesListView(APIView):
                     total_net = 0.0
                     for b in ouvrages_qs:
                         b_gross = float(lignes.filter(ouvrage=b).aggregate(s=Sum(F('unit_price') * F('quantity')))['s'] or 0.0)
-                        ar = AuthorRight.objects.filter(user=a_user, book=b).first()
-                        rate_val = float(ar.percentage) if ar else 15.0
+                        ar = AuthorRight.objects.filter(user=a_user, ouvrage=b).first()
+                        rate_val = float(ar.pool_share_percent) if ar else 15.0
                         b_net = (b_gross * rate_val) / 100.0
                         total_net += b_net
                         sales_breakdown.append({"title": b.title, "gross": b_gross, "rate": rate_val, "net": b_net})

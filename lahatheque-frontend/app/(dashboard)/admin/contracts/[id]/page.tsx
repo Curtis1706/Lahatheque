@@ -263,7 +263,7 @@ export default function AdminContractDetailPage() {
                 <tr className="border-b border-border text-foreground-muted font-bold">
                   <th className="pb-2">Bénéficiaire</th>
                   <th className="pb-2">Rôle Contractuel</th>
-                  <th className="pb-2 text-center">Quote-part (%)</th>
+                  <th className="pb-2 text-center">Part Globale (%)</th>
                   <th className="pb-2 text-center">Taux Papier</th>
                   <th className="pb-2 text-center">Taux Numérique</th>
                   <th className="pb-2 text-center">Taux Livre Audio</th>

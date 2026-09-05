@@ -410,7 +410,7 @@ function NewLegalContractContent() {
 
     if (isAuthorType) {
       if (!isPercentageValid) {
-        toast.error(`La somme des quotes-parts doit être de 100.00% (Actuel : ${totalPercentage.toFixed(2)}%).`);
+        toast.error(`La somme des parts globales doit être de 100.00% (Actuel : ${totalPercentage.toFixed(2)}%).`);
         return;
       }
       if (bookHasPaper && !isTauxPapierValid) {
@@ -821,7 +821,7 @@ function NewLegalContractContent() {
 
             {/* Synthèse et jauges de conformité 100% par format */}
             <div className="space-y-2">
-              {/* Quote-part générale */}
+              {/* Part Globale */}
               <div
                 className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium ${
                   isPercentageValid
@@ -837,8 +837,8 @@ function NewLegalContractContent() {
                   )}
                   <span>
                     {isPercentageValid
-                      ? "Quote-part générale : 100.00% validée et conforme."
-                      : `Quote-part générale : la somme doit être exactement de 100.00% (Actuel : ${totalPercentage.toFixed(2)}%)`}
+                      ? "Part Globale : 100.00% validée et conforme."
+                      : `Part Globale : la somme doit être exactement de 100.00% (Actuel : ${totalPercentage.toFixed(2)}%)`}
                   </span>
                 </div>
                 <span className="font-mono font-bold text-xs sm:text-sm self-end sm:self-auto">
@@ -999,7 +999,7 @@ function NewLegalContractContent() {
                     <div>
                       <label className="block text-2xs font-bold text-navy uppercase mb-1 flex items-center gap-1">
                         <Percent className="w-3 h-3 text-gold" />
-                        Quote-part (%) *
+                        Part Globale (%) *
                       </label>
                       <input
                         type="number"
