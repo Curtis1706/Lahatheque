@@ -890,6 +890,33 @@ class LegalContractsListView(APIView):
                     "error": f"La somme des quotes-parts de droits d'auteur doit être exactement de 100.00% (actuel: {total_percent:.2f}%)."
                 }, status=400)
 
+            ouvrage_for_validation = ouvrage if ouvrage else (Ouvrage.objects.filter(id=ouvrage_id).first() if ouvrage_id else None)
+            book_has_paper = bool(ouvrage_for_validation and ouvrage_for_validation.is_paper_available)
+            book_has_audio = bool(ouvrage_for_validation and ouvrage_for_validation.audio_tracks.exists())
+
+            if book_has_paper:
+                total_taux_papier = sum(float(r.get("taux_papier", 0) or 0) for r in repartitions_data)
+                if abs(total_taux_papier - 100.0) > 0.01:
+                    return Response({
+                        "success": False,
+                        "error": f"La somme des Taux Papier doit être exactement de 100.00% entre co-auteurs (actuel: {total_taux_papier:.2f}%)."
+                    }, status=400)
+
+            total_taux_numerique = sum(float(r.get("taux_numerique", 0) or 0) for r in repartitions_data)
+            if abs(total_taux_numerique - 100.0) > 0.01:
+                return Response({
+                    "success": False,
+                    "error": f"La somme des Taux Numérique doit être exactement de 100.00% entre co-auteurs (actuel: {total_taux_numerique:.2f}%)."
+                }, status=400)
+
+            if book_has_audio:
+                total_taux_audio = sum(float(r.get("taux_audio_tts", 0) or 0) for r in repartitions_data)
+                if abs(total_taux_audio - 100.0) > 0.01:
+                    return Response({
+                        "success": False,
+                        "error": f"La somme des Taux Livre Audio doit être exactement de 100.00% entre co-auteurs (actuel: {total_taux_audio:.2f}%)."
+                    }, status=400)
+
         data = request.data
         num_contrat = f"CTR-JUR-2026-{uuid.uuid4().hex[:4].upper()}"
         contrat = ContratLegal.objects.create(
@@ -1015,7 +1042,7 @@ class LegalContractsFormOptionsView(APIView):
         from .models import PreEditionDossier
 
         # 1. Ouvrages réels du catalogue
-        ouvrages_qs = Ouvrage.objects.all().prefetch_related('authors')
+        ouvrages_qs = Ouvrage.objects.all().prefetch_related('authors', 'audio_tracks')
         ouvrages = []
         for b in ouvrages_qs:
             authors_names = [
@@ -1032,7 +1059,9 @@ class LegalContractsFormOptionsView(APIView):
                 "status": b.status,
                 "cover_url": cover_url,
                 "authors": authors_names or ["Auteur Principal"],
-                "author_user_ids": [str(a.user_id) for a in b.authors.all() if a.user_id]
+                "author_user_ids": [str(a.user_id) for a in b.authors.all() if a.user_id],
+                "is_paper_available": bool(b.is_paper_available),
+                "has_audio_tracks": b.audio_tracks.exists(),
             })
 
         # 2. Auteurs réels (User role='author')

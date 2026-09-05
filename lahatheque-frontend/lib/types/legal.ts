@@ -19,6 +19,8 @@ export interface EligibleContractBook {
   cover_url: string;
   authors: string[];
   author_user_ids: string[];
+  is_paper_available?: boolean;
+  has_audio_tracks?: boolean;
 }
 
 export interface EligibleContractAuthor {

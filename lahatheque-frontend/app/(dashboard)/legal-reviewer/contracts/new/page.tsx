@@ -340,9 +340,27 @@ function NewLegalContractContent() {
     }
   };
 
-  // Gestion de la clé de répartition
+  // Gestion de la clé de répartition et validation conditionnelle des taux par format
+  const selectedBook = useMemo(() => {
+    if (!selectedBookId || !options?.ouvrages) return null;
+    return options.ouvrages.find((b) => b.id === selectedBookId) || null;
+  }, [selectedBookId, options]);
+
   const totalPercentage = splits.reduce((acc, curr) => acc + (Number(curr.pourcentage) || 0), 0);
   const isPercentageValid = Math.abs(totalPercentage - 100.0) < 0.01;
+
+  const bookHasPaper = selectedBook?.is_paper_available ?? false;
+  const bookHasAudio = selectedBook?.has_audio_tracks ?? false;
+
+  const totalTauxPapier = splits.reduce((acc, curr) => acc + (Number(curr.taux_papier) || 0), 0);
+  const totalTauxNumerique = splits.reduce((acc, curr) => acc + (Number(curr.taux_numerique) || 0), 0);
+  const totalTauxAudio = splits.reduce((acc, curr) => acc + (Number(curr.taux_audio_tts) || 0), 0);
+
+  const isTauxPapierValid = !bookHasPaper || Math.abs(totalTauxPapier - 100.0) < 0.01;
+  const isTauxNumeriqueValid = Math.abs(totalTauxNumerique - 100.0) < 0.01;
+  const isTauxAudioValid = !bookHasAudio || Math.abs(totalTauxAudio - 100.0) < 0.01;
+
+  const areAllRatesValid = isPercentageValid && isTauxPapierValid && isTauxNumeriqueValid && isTauxAudioValid;
 
   const addCoAuthorSplit = () => {
     if (!options?.authors || options.authors.length === 0) return;
@@ -390,9 +408,23 @@ function NewLegalContractContent() {
 
     const isAuthorType = contractType === "author_contract" || contractType === "pre_edition";
 
-    if (isAuthorType && !isPercentageValid) {
-      toast.error(`La somme de la clé de répartition doit être de 100.00% (Somme actuelle : ${totalPercentage.toFixed(2)}%).`);
-      return;
+    if (isAuthorType) {
+      if (!isPercentageValid) {
+        toast.error(`La somme des quotes-parts doit être de 100.00% (Actuel : ${totalPercentage.toFixed(2)}%).`);
+        return;
+      }
+      if (bookHasPaper && !isTauxPapierValid) {
+        toast.error(`La somme des Taux Papier doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxPapier.toFixed(2)}%).`);
+        return;
+      }
+      if (!isTauxNumeriqueValid) {
+        toast.error(`La somme des Taux Numérique doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxNumerique.toFixed(2)}%).`);
+        return;
+      }
+      if (bookHasAudio && !isTauxAudioValid) {
+        toast.error(`La somme des Taux Livre Audio doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxAudio.toFixed(2)}%).`);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -787,27 +819,123 @@ function NewLegalContractContent() {
               </button>
             </div>
 
-            {/* Jauge de conformité 100% */}
-            <div
-              className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs font-bold ${
-                isPercentageValid
-                  ? "bg-success/10 border-success/30 text-success"
-                  : "bg-error/10 border-error/30 text-error"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {isPercentageValid ? (
-                  <CheckCircle2 className="w-4 h-4 text-success" />
-                ) : (
-                  <AlertTriangle className="w-4 h-4 text-error" />
-                )}
-                <span>
-                  {isPercentageValid
-                    ? "Clé de répartition 100.00% validée et conforme."
-                    : `Attention : La somme des quotes-parts doit égaler 100.00% (Actuel : ${totalPercentage.toFixed(2)}%)`}
+            {/* Synthèse et jauges de conformité 100% par format */}
+            <div className="space-y-2">
+              {/* Quote-part générale */}
+              <div
+                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium ${
+                  isPercentageValid
+                    ? "bg-success/10 border-success/30 text-success"
+                    : "bg-error/10 border-error/30 text-error"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {isPercentageValid ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-error" />
+                  )}
+                  <span>
+                    {isPercentageValid
+                      ? "Quote-part générale : 100.00% validée et conforme."
+                      : `Quote-part générale : la somme doit être exactement de 100.00% (Actuel : ${totalPercentage.toFixed(2)}%)`}
+                  </span>
+                </div>
+                <span className="font-mono font-bold text-xs sm:text-sm self-end sm:self-auto">
+                  {totalPercentage.toFixed(2)}% / 100%
                 </span>
               </div>
-              <span className="font-mono text-sm">{totalPercentage.toFixed(2)}%</span>
+
+              {/* Taux Numérique (Toujours requis) */}
+              <div
+                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium ${
+                  isTauxNumeriqueValid
+                    ? "bg-success/10 border-success/30 text-success"
+                    : "bg-error/10 border-error/30 text-error"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {isTauxNumeriqueValid ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-error" />
+                  )}
+                  <span>
+                    {isTauxNumeriqueValid
+                      ? "Taux Numérique : 100.00% validé entre co-auteurs (format standard)."
+                      : `Taux Numérique : la somme doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxNumerique.toFixed(2)}%)`}
+                  </span>
+                </div>
+                <span className="font-mono font-bold text-xs sm:text-sm self-end sm:self-auto">
+                  {totalTauxNumerique.toFixed(2)}% / 100%
+                </span>
+              </div>
+
+              {/* Taux Papier (Conditionné à bookHasPaper) */}
+              <div
+                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium ${
+                  !bookHasPaper
+                    ? "bg-background-secondary/60 border-border text-foreground-muted opacity-75"
+                    : isTauxPapierValid
+                    ? "bg-success/10 border-success/30 text-success"
+                    : "bg-error/10 border-error/30 text-error"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {!bookHasPaper ? (
+                    <span className="w-4 h-4 rounded-full border border-border flex items-center justify-center text-2xs text-foreground-muted shrink-0 font-bold">
+                      -
+                    </span>
+                  ) : isTauxPapierValid ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-error" />
+                  )}
+                  <span>
+                    {!bookHasPaper
+                      ? "Taux Papier : Format papier non activé pour cet ouvrage (validation non requise)."
+                      : isTauxPapierValid
+                      ? "Taux Papier : 100.00% validé entre co-auteurs (format papier disponible)."
+                      : `Taux Papier : la somme doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxPapier.toFixed(2)}%)`}
+                  </span>
+                </div>
+                <span className="font-mono font-bold text-xs sm:text-sm self-end sm:self-auto">
+                  {bookHasPaper ? `${totalTauxPapier.toFixed(2)}% / 100%` : "Non requis"}
+                </span>
+              </div>
+
+              {/* Taux Livre Audio (Conditionné à bookHasAudio) */}
+              <div
+                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium ${
+                  !bookHasAudio
+                    ? "bg-background-secondary/60 border-border text-foreground-muted opacity-75"
+                    : isTauxAudioValid
+                    ? "bg-success/10 border-success/30 text-success"
+                    : "bg-error/10 border-error/30 text-error"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {!bookHasAudio ? (
+                    <span className="w-4 h-4 rounded-full border border-border flex items-center justify-center text-2xs text-foreground-muted shrink-0 font-bold">
+                      -
+                    </span>
+                  ) : isTauxAudioValid ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-error" />
+                  )}
+                  <span>
+                    {!bookHasAudio
+                      ? "Taux Livre Audio : Aucune piste audio enregistrée sur cet ouvrage (validation non requise)."
+                      : isTauxAudioValid
+                      ? "Taux Livre Audio : 100.00% validé entre co-auteurs (pistes audio existantes)."
+                      : `Taux Livre Audio : la somme doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxAudio.toFixed(2)}%)`}
+                  </span>
+                </div>
+                <span className="font-mono font-bold text-xs sm:text-sm self-end sm:self-auto">
+                  {bookHasAudio ? `${totalTauxAudio.toFixed(2)}% / 100%` : "Non requis"}
+                </span>
+              </div>
             </div>
 
             {/* Liste des ayants droit avec SearchableSelect */}
@@ -886,18 +1014,48 @@ function NewLegalContractContent() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/50 text-2xs text-foreground-muted">
+                  <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/50">
                     <div>
-                      <span className="block font-semibold text-navy">Taux Papier :</span>
-                      <span>{split.taux_papier || 10}%</span>
+                      <label className="block text-2xs font-bold text-navy uppercase mb-1">
+                        Taux Papier (%)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        value={split.taux_papier}
+                        onChange={(e) => updateSplit(index, "taux_papier", parseFloat(e.target.value) || 0)}
+                        className="w-full px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:border-gold text-navy font-semibold min-h-[38px]"
+                      />
                     </div>
                     <div>
-                      <span className="block font-semibold text-navy">Taux Numérique :</span>
-                      <span>{split.taux_numerique || 15}%</span>
+                      <label className="block text-2xs font-bold text-navy uppercase mb-1">
+                        Taux Numérique (%)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        value={split.taux_numerique}
+                        onChange={(e) => updateSplit(index, "taux_numerique", parseFloat(e.target.value) || 0)}
+                        className="w-full px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:border-gold text-navy font-semibold min-h-[38px]"
+                      />
                     </div>
                     <div>
-                      <span className="block font-semibold text-navy">Taux Audio TTS :</span>
-                      <span>{split.taux_audio_tts || 8}%</span>
+                      <label className="block text-2xs font-bold text-navy uppercase mb-1">
+                        Taux Livre Audio (%)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        value={split.taux_audio_tts}
+                        onChange={(e) => updateSplit(index, "taux_audio_tts", parseFloat(e.target.value) || 0)}
+                        className="w-full px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:border-gold text-navy font-semibold min-h-[38px]"
+                      />
                     </div>
                   </div>
                 </div>
@@ -917,7 +1075,7 @@ function NewLegalContractContent() {
 
           <button
             type="submit"
-            disabled={submitting || (isAuthorContract && !isPercentageValid)}
+            disabled={submitting || (isAuthorContract && !areAllRatesValid)}
             className="px-6 py-2.5 rounded-xl bg-navy text-gold text-xs font-bold hover:bg-navy-dark transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] border border-gold/30 shadow-xs cursor-pointer"
           >
             {submitting ? (

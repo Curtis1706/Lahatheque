@@ -272,7 +272,7 @@ export default function ContractDetailPage() {
                     <div className="flex items-center justify-between text-2xs text-foreground-muted pt-1 border-t border-border/50">
                       <span>Papier: {rep.taux_papier || 10}%</span>
                       <span>Numérique: {rep.taux_numerique || 15}%</span>
-                      <span>Audio TTS: {rep.taux_audio_tts || 8}%</span>
+                      <span>Livre Audio: {rep.taux_audio_tts || 8}%</span>
                     </div>
                   </div>
                 ))}
