@@ -7,13 +7,13 @@ import {
   Search,
   BookOpen,
   ArrowLeft,
-  Filter,
   ShoppingBag,
   Eye,
   Globe,
   CheckCircle2,
   Truck,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -27,6 +27,7 @@ import { BookCover } from "@/components/features/student/book-cover";
 import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle, type ViewMode } from "@/components/features/student/view-toggle";
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 
 // ─── Skeletons ────────────────────────────────────────────────────────────────
 
@@ -396,15 +397,32 @@ export default function StudentCatalogPage() {
   const { disciplines: dbDisciplines } = useDisciplines();
   const allBooks = catalogData?.books || [];
   const disciplines = dbDisciplines && dbDisciplines.length > 0 ? dbDisciplines : (catalogData?.disciplines || []);
+  const disciplineNames = useMemo(() => disciplines.map((d) => d.name), [disciplines]);
 
-  // Pagination calculée
-  const totalBooks = allBooks.length;
+  // Filtrage local immédiat et robuste en complément de l'API
+  const filteredBooks = useMemo(() => {
+    if (!allBooks) return [];
+    if (selectedDiscipline === "all" || !selectedDiscipline) return allBooks;
+    const target = selectedDiscipline.toLowerCase();
+    return allBooks.filter((b) => {
+      const name = (b.discipline_name || "").toLowerCase();
+      const disc = ((b as any).discipline || "").toLowerCase();
+      return (
+        name.includes(target) ||
+        disc.includes(target) ||
+        String((b as any).discipline_id) === selectedDiscipline
+      );
+    });
+  }, [allBooks, selectedDiscipline]);
+
+  // Pagination calculée sur les ouvrages filtrés
+  const totalBooks = filteredBooks.length;
   const totalPages = Math.ceil(totalBooks / pageSize) || 1;
 
   const paginatedBooks = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return allBooks.slice(start, start + pageSize);
-  }, [allBooks, currentPage, pageSize]);
+    return filteredBooks.slice(start, start + pageSize);
+  }, [filteredBooks, currentPage, pageSize]);
 
   const handleDisciplineSelect = (disciplineId: string, disciplineName: string) => {
     setSelectedDiscipline(disciplineId);
@@ -475,57 +493,57 @@ export default function StudentCatalogPage() {
         </div>
       )}
 
-      {/* ── Barre de Recherche & Filtres Disciplines ───────────────────── */}
-      <div className="p-5 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
-        {/* Recherche */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-4 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher un ouvrage, auteur, matière, ISBN..."
-            className="w-full pl-11 pr-4 py-3 text-xs sm:text-sm bg-background-secondary border border-border rounded-2xl text-navy placeholder:text-foreground-muted focus:outline-none focus:border-gold min-h-[48px] transition-colors"
-          />
-        </div>
-
-        {/* Disciplines : Barre défilante ergonomique */}
-        <div className="pt-2 border-t border-border flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          <div className="flex items-center gap-1.5 shrink-0 pr-1">
-            <Filter className="w-3.5 h-3.5 text-foreground-muted" />
-            <span className="text-[10px] font-bold uppercase text-foreground-muted tracking-wider">
-              Discipline :
-            </span>
+      {/* ── Barre de Recherche & Combobox Discipline Ergonomique ─────────────── */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-background border border-border shadow-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Recherche */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher un ouvrage, auteur, matière, ISBN..."
+              className="w-full pl-10 pr-9 py-2.5 text-xs sm:text-sm bg-background-secondary border border-border rounded-2xl text-navy placeholder:text-foreground-muted focus:outline-none focus:border-gold min-h-[44px] transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-navy cursor-pointer p-1"
+                title="Effacer la recherche"
+                aria-label="Effacer la recherche"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1 w-full flex-wrap sm:flex-nowrap">
+          {/* Combobox Discipline Ergonomique (Compacte sur Mobile) */}
+          <div className="w-full sm:w-72 sm:shrink-0">
+            <DisciplineCombobox
+              value={selectedDiscipline === "all" ? "" : selectedDiscipline}
+              onChange={(val) => handleDisciplineSelect(val || "all", val || "Toutes les disciplines")}
+              disciplines={disciplineNames}
+              includeAllOption={true}
+              allOptionLabel={`Toutes disciplines (${disciplineNames.length})`}
+              placeholder="Toutes les disciplines..."
+              searchPlaceholder="Rechercher une discipline..."
+            />
+          </div>
+
+          {/* Bouton Réinitialiser si filtre actif */}
+          {(searchQuery || selectedDiscipline !== "all") && (
             <button
               type="button"
-              onClick={() => handleDisciplineSelect("all", "Toutes")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors border shrink-0 min-h-[40px] cursor-pointer ${
-                selectedDiscipline === "all"
-                  ? "bg-navy text-white border-navy shadow-xs"
-                  : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
-              }`}
+              onClick={handleResetFilters}
+              className="px-3 py-2 text-xs font-semibold text-gold hover:text-gold-dark flex items-center justify-center gap-1.5 transition-colors shrink-0 min-h-[44px] cursor-pointer"
+              title="Réinitialiser les filtres"
             >
-              Toutes
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Réinitialiser</span>
             </button>
-
-            {disciplines.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => handleDisciplineSelect(String(d.id), d.name)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors border shrink-0 min-h-[40px] cursor-pointer ${
-                  selectedDiscipline === String(d.id)
-                    ? "bg-navy text-white border-navy shadow-xs"
-                    : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
-                }`}
-              >
-                {d.name}
-              </button>
-            ))}
-          </div>
+          )}
         </div>
       </div>
 
