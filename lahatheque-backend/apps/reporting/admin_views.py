@@ -1122,6 +1122,13 @@ class AdminContractViewSet(viewsets.ViewSet):
         if c.fichier_contrat_path:
             file_url = f"/api/bff/rights/legal/contracts/{c.id}/download/"
 
+        juriste_name = "Non assigné"
+        if c.juriste_responsable:
+            juriste_name = (
+                f"{c.juriste_responsable.first_name} {c.juriste_responsable.last_name}".strip()
+                or c.juriste_responsable.username
+            )
+
         return {
             "id": str(c.id),
             "contract_number": c.numero_contrat,
@@ -1134,7 +1141,7 @@ class AdminContractViewSet(viewsets.ViewSet):
             "status": c.status,
             "royalty_rate": royalty_rate,
             "is_derogatory": is_derogatory,
-            "reviewed_by_juriste": "Cabinet Juridique LAHA",
+            "reviewed_by_juriste": juriste_name,
             "date_signature": c.date_signature.isoformat() if c.date_signature else None,
             "date_expiration": c.date_expiration.isoformat() if c.date_expiration else None,
             "file_url": file_url,
@@ -1157,7 +1164,7 @@ class AdminContractViewSet(viewsets.ViewSet):
         try:
             from apps.rights.models import ContratLegal
             contracts = ContratLegal.objects.all().select_related(
-                'ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition'
+                'ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition', 'juriste_responsable'
             ).order_by('-created_at')[:50]
             results = [self._serialize_contract(c) for c in contracts]
             return Response({"success": True, "data": results, "error": None})
@@ -1172,7 +1179,7 @@ class AdminContractViewSet(viewsets.ViewSet):
         try:
             from apps.rights.models import ContratLegal
             c = ContratLegal.objects.select_related(
-                'ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition'
+                'ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition', 'juriste_responsable'
             ).get(id=pk)
             return Response({"success": True, "data": self._serialize_contract(c), "error": None})
         except ContratLegal.DoesNotExist:

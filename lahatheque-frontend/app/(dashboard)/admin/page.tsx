@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
 import { DonutChart, DonutChartSegment } from "@/components/ui/donut-chart";
@@ -13,6 +13,7 @@ import {
   getAdminSales,
   getAdminReminders,
   getRevenueCategoryBreakdown,
+  getAdminContracts,
 } from "@/lib/services/admin";
 import {
   computeBouquetDistribution,
@@ -25,6 +26,7 @@ import {
   AdminSale,
   AdminReminder,
   RevenueCategoryBreakdown,
+  AdminContract,
 } from "@/lib/types/admin";
 import {
   DollarSign,
@@ -42,6 +44,9 @@ import {
   ChevronRight,
   FileCheck2,
   Building2,
+  Scale,
+  UserCheck,
+  User,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -83,24 +88,28 @@ export default function AdminOverviewDashboard() {
   const [revenueBreakdown, setRevenueBreakdown] = useState<RevenueCategoryBreakdown[]>([]);
   const [recentSales, setRecentSales] = useState<AdminSale[]>([]);
   const [reminders, setReminders] = useState<AdminReminder[]>([]);
+  const [contracts, setContracts] = useState<AdminContract[]>([]);
+  const [activeBottomTab, setActiveBottomTab] = useState<"sales" | "contracts">("sales");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [kpiData, rolesData, salesData, remindersData, revenueBreakdownData] = await Promise.all([
+        const [kpiData, rolesData, salesData, remindersData, revenueBreakdownData, contractsData] = await Promise.all([
           getAdminKpis(),
           getRoleDistribution(),
           getAdminSales(),
           getAdminReminders(),
           getRevenueCategoryBreakdown(),
+          getAdminContracts().catch(() => []),
         ]);
         setKpis(kpiData);
         setRolesDist(rolesData);
         setRecentSales(salesData);
         setReminders(remindersData);
         setRevenueBreakdown(revenueBreakdownData);
+        setContracts(contractsData || []);
       } catch (err) {
         console.error("Erreur de chargement du dashboard admin", err);
       } finally {
@@ -131,6 +140,12 @@ export default function AdminOverviewDashboard() {
         percentage: r.percentage,
       };
     });
+
+  // Filtre officiel sur les contrats en attente de signature
+  const pendingContracts = useMemo(
+    () => contracts.filter((c) => c.status === "pending_signature"),
+    [contracts]
+  );
 
   const salesColumns: DataTableColumn<AdminSale>[] = [
     {
@@ -176,6 +191,124 @@ export default function AdminOverviewDashboard() {
       key: "payment_status",
       header: "Statut",
       cell: (row) => <StatusBadge status={row.payment_status} />,
+    },
+  ];
+
+  const contractColumns: DataTableColumn<AdminContract>[] = [
+    {
+      key: "contract_number",
+      header: "N° & Objet du Contrat",
+      cell: (row) => (
+        <div className="space-y-0.5 max-w-[280px]">
+          <Link
+            href={`/admin/contracts/${row.id}`}
+            className="font-mono font-bold text-xs text-gold hover:underline block truncate"
+          >
+            {row.contract_number}
+          </Link>
+          <p className="font-bold text-xs text-navy line-clamp-1" title={row.title}>
+            {row.title}
+          </p>
+          <span className="text-[10px] text-foreground-muted block">
+            {row.created_at ? `Créé le ${new Date(row.created_at).toLocaleDateString("fr-FR")}` : "Date non renseignée"}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "partner_name",
+      header: "Partenaire / Signataire",
+      cell: (row) => (
+        <div className="space-y-0.5 max-w-[220px]">
+          <div className="flex items-center gap-1.5 font-semibold text-xs text-navy">
+            {row.partner_type === "publisher" ? (
+              <Building2 className="w-3.5 h-3.5 text-gold shrink-0" />
+            ) : row.partner_type === "university" ? (
+              <Scale className="w-3.5 h-3.5 text-navy shrink-0" />
+            ) : (
+              <User className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+            )}
+            <span className="truncate">{row.partner_name}</span>
+          </div>
+          <p className="text-[11px] text-foreground-muted truncate">{row.partner_email || "Email non renseigné"}</p>
+        </div>
+      ),
+    },
+    {
+      key: "ouvrage",
+      header: "Ouvrage Lié",
+      cell: (row) => (
+        <div className="space-y-0.5 max-w-[200px]">
+          <p className="font-medium text-xs text-foreground truncate" title={row.ouvrage?.title || "Accord Cadre / Global"}>
+            {row.ouvrage?.title || "Accord Cadre / Global"}
+          </p>
+          {row.ouvrage?.isbn ? (
+            <span className="font-mono text-[10px] text-foreground-muted block">
+              ISBN {row.ouvrage.isbn}
+            </span>
+          ) : (
+            <span className="text-[10px] text-foreground-muted block">
+              Tous formats inclus
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "royalty_rate",
+      header: "Taux Redevance",
+      cell: (row) => (
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-xs font-bold text-navy">
+              {row.royalty_rate ? `${row.royalty_rate}%` : "15%"}
+            </span>
+            {row.is_derogatory && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gold/15 text-navy font-bold border border-gold/30">
+                Dérogatoire
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] text-foreground-muted">
+            {row.partner_type === "author"
+              ? "Part Auteur"
+              : row.partner_type === "publisher"
+              ? "Part Éditeur"
+              : "Part Académique"}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "reviewed_by_juriste",
+      header: "Juriste Responsable",
+      cell: (row) => (
+        <div className="space-y-0.5 text-[11px]">
+          <div className="flex items-center gap-1 text-navy font-medium">
+            <UserCheck className="w-3.5 h-3.5 text-gold shrink-0" />
+            <span className="truncate">{row.reviewed_by_juriste || "Non assigné"}</span>
+          </div>
+          <p className="text-[10px] text-foreground-muted">Instruction juridique</p>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Statut",
+      cell: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: "actions",
+      header: "Action",
+      cell: (row) => (
+        <Link
+          href={`/admin/contracts/${row.id}`}
+          className="px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors inline-flex items-center gap-1.5 shadow-xs shrink-0"
+        >
+          <span>Examiner & Signer</span>
+          <ArrowRight className="w-3 h-3 text-gold" />
+        </Link>
+      ),
     },
   ];
 
@@ -268,6 +401,32 @@ export default function AdminOverviewDashboard() {
             data={getRollingTimeline(kpis?.pendingSubmissions ?? 0)}
           />
         </Link>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setActiveBottomTab("contracts");
+            document.getElementById("admin-bottom-table-section")?.scrollIntoView({ behavior: "smooth" });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              setActiveBottomTab("contracts");
+              document.getElementById("admin-bottom-table-section")?.scrollIntoView({ behavior: "smooth" });
+            }
+          }}
+          className="block cursor-pointer transition-transform hover:scale-[1.01] focus:outline-none"
+        >
+          <ProgressMetricCard
+            title="Contrats en Attente"
+            total={`${pendingContracts.length} dossier${pendingContracts.length > 1 ? "s" : ""}`}
+            percent={pendingContracts.length > 0 ? "À signer" : "À jour"}
+            trend={pendingContracts.length > 0 ? "down" : "up"}
+            accent="gold"
+            delta="En attente"
+            deltaLabel="signature juridique"
+            data={getRollingTimeline(pendingContracts.length)}
+          />
+        </div>
         <Link href="/admin/reminders" className="block">
           <ProgressMetricCard
             title="Factures & Impayés en Retard"
@@ -446,6 +605,7 @@ export default function AdminOverviewDashboard() {
               {[
                 { label: "Gérer les Utilisateurs", icon: Users, href: "/admin/users", desc: "9 rôles d'accès système" },
                 { label: "Dépôts Éditeurs Tiers", icon: FileCheck2, href: "/admin/publisher-deposits", desc: "Validation éditoriale & droits" },
+                { label: "Contrats & Droits d'Auteur", icon: Scale, href: "/admin/contracts", desc: `${pendingContracts.length} en attente de signature` },
                 { label: "Catalogue & Tarifs", icon: BookOpen, href: "/admin/catalog", desc: "Prix & Protections DRM" },
                 { label: "Ventes & Commandes", icon: ShoppingBag, href: "/admin/sales", desc: "Suivi B2C / B2B" },
                 { label: "Gestion Redevances", icon: DollarSign, href: "/admin/royalties", desc: "Droits d'auteurs & éditeurs" },
@@ -477,21 +637,95 @@ export default function AdminOverviewDashboard() {
         </div>
       </div>
 
-      {/* Recent Sales Transactions Preview (Plein Écran Full Width tout en bas) */}
-      <div className="space-y-4 w-full">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">Dernières Ventes & Souscriptions</h2>
-          <Link href="/admin/sales" className="text-xs font-medium text-gold hover:text-gold-dark flex items-center gap-1">
-            Voir toutes les ventes <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+      {/* Tableaux Inférieurs à Onglets (Ventes Récentes vs Contrats en Attente) */}
+      <div id="admin-bottom-table-section" className="space-y-4 w-full scroll-mt-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border">
+          {/* Onglets Interactifs */}
+          <div className="flex items-center gap-2 p-1 rounded-xl bg-background-secondary border border-border">
+            <button
+              type="button"
+              onClick={() => setActiveBottomTab("sales")}
+              className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 min-h-[40px] ${
+                activeBottomTab === "sales"
+                  ? "bg-navy text-white shadow-xs"
+                  : "text-foreground-muted hover:text-navy hover:bg-background"
+              }`}
+            >
+              <ShoppingBag className="w-4 h-4 text-gold" />
+              <span>Dernières Ventes &amp; Souscriptions</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                  activeBottomTab === "sales"
+                    ? "bg-gold/20 text-gold"
+                    : "bg-border text-foreground-muted"
+                }`}
+              >
+                {recentSales.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveBottomTab("contracts")}
+              className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 min-h-[40px] ${
+                activeBottomTab === "contracts"
+                  ? "bg-navy text-white shadow-xs"
+                  : "text-foreground-muted hover:text-navy hover:bg-background"
+              }`}
+            >
+              <Scale className="w-4 h-4 text-gold" />
+              <span>Contrats en Attente de Signature</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                  pendingContracts.length > 0
+                    ? "bg-gold text-navy"
+                    : activeBottomTab === "contracts"
+                    ? "bg-gold/20 text-gold"
+                    : "bg-border text-foreground-muted"
+                }`}
+              >
+                {pendingContracts.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Lien droit contextuel */}
+          {activeBottomTab === "sales" ? (
+            <Link
+              href="/admin/sales"
+              className="text-xs font-semibold text-gold hover:text-gold-dark flex items-center gap-1 shrink-0"
+            >
+              <span>Voir toutes les ventes</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          ) : (
+            <Link
+              href="/admin/contracts"
+              className="text-xs font-semibold text-gold hover:text-gold-dark flex items-center gap-1 shrink-0"
+            >
+              <span>Voir tous les contrats</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
         </div>
-        <DataTable
-          data={recentSales}
-          columns={salesColumns}
-          rowKey="id"
-          loading={loading}
-          emptyMessage="Aucune transaction récente à afficher."
-        />
+
+        {activeBottomTab === "sales" ? (
+          <DataTable
+            data={recentSales}
+            columns={salesColumns}
+            rowKey="id"
+            loading={loading}
+            emptyMessage="Aucune transaction récente à afficher."
+          />
+        ) : (
+          <DataTable
+            data={pendingContracts}
+            columns={contractColumns}
+            rowKey="id"
+            loading={loading}
+            emptyMessage="Aucun contrat juridique en attente de signature."
+          />
+        )}
       </div>
     </div>
   );
