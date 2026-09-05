@@ -42,9 +42,11 @@ export function BouquetPieDistribution({
   } = distribution;
 
   // ─── Calcul SVG pour le diagramme circulaire vectoriel (Pie Chart) ───────
-  const size = 300;
+  const size = 320;
   const center = size / 2;
-  const radius = 105;
+  const radius = 90; // Rayon optimisé pour préserver la marge des étiquettes sur écran mobile
+
+  const isFcfa = currency === "FCFA" || currency === "XOF";
 
   let cumulativeAngle = -Math.PI / 2; // Démarrage à 12h
 
@@ -94,8 +96,9 @@ export function BouquetPieDistribution({
 
   // ─── Bar Chart Horizontal des Redevances ─────────────────────────────────
   const maxRoyalty = Math.max(...items.map((it) => it.royalty_amount), 1);
-  // Générateur d'échelle pour l'axe horizontal (0, 200, 400...)
-  const scaleStep = Math.ceil(maxRoyalty / 4 / 50) * 50 || 100;
+  // Générateur d'échelle pour l'axe horizontal (adapté au FCFA ou devise standard)
+  const stepUnit = isFcfa ? (maxRoyalty > 500000 ? 100000 : 25000) : 50;
+  const scaleStep = Math.ceil(maxRoyalty / 4 / stepUnit) * stepUnit || (isFcfa ? 100000 : 100);
   const scaleTicks = [0, scaleStep, scaleStep * 2, scaleStep * 3, scaleStep * 4];
 
   // Inverser l'ordre des barres pour afficher du plus petit en haut au plus grand en bas (comme dans la capture UNA -> Parakou -> UAC)
@@ -290,8 +293,8 @@ export function BouquetPieDistribution({
 
                     <span className="font-mono text-xs font-bold text-navy shrink-0">
                       {item.royalty_amount.toLocaleString("fr-FR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
+                        minimumFractionDigits: isFcfa ? 0 : 2,
+                        maximumFractionDigits: isFcfa ? 0 : 2,
                       })}{" "}
                       {currency}
                     </span>
@@ -320,9 +323,15 @@ export function BouquetPieDistribution({
 
           {/* Axe horizontal de graduation (échelle en bas) */}
           <div className="pt-3 border-t border-border/70 space-y-1">
-            <div className="flex justify-between text-[10px] font-mono text-foreground-muted px-1">
+            <div className="flex justify-between text-[10px] font-mono text-foreground-muted px-1 overflow-x-auto">
               {scaleTicks.map((tick) => (
-                <span key={tick}>{tick}</span>
+                <span key={tick}>
+                  {tick >= 1000000
+                    ? `${(tick / 1000000).toFixed(1).replace(".0", "")}M`
+                    : tick >= 1000
+                    ? `${Math.round(tick / 1000)}k`
+                    : tick}
+                </span>
               ))}
             </div>
             <p className="text-center text-[10px] text-foreground-muted font-medium">
@@ -351,16 +360,16 @@ export function BouquetPieDistribution({
           </span>
         </div>
 
-        {/* Tableau Responsive */}
-        <div className="overflow-x-auto rounded-2xl border border-border shadow-xs">
-          <table className="w-full text-xs text-left border-collapse">
+        {/* Tableau Responsive Scrollable Mobile */}
+        <div className="overflow-x-auto rounded-2xl border border-border shadow-xs -mx-1 sm:mx-0">
+          <table className="w-full min-w-[580px] text-xs text-left border-collapse">
             <thead>
               <tr className="bg-background-secondary border-b border-border text-navy font-bold">
-                <th className="py-3 px-4">Universit&eacute;</th>
-                <th className="py-3 px-4 text-center">Livres Poss&eacute;d&eacute;s</th>
-                <th className="py-3 px-4 text-center">Part Utilisation (%)</th>
-                <th className="py-3 px-4 text-right">Part du CA ({currency})</th>
-                <th className="py-3 px-4 text-right">Redevance Revers&eacute;e ({royalty_rate} %)</th>
+                <th className="py-3 px-3 sm:px-4">Universit&eacute;</th>
+                <th className="py-3 px-2 sm:px-4 text-center">Livres Poss&eacute;d&eacute;s</th>
+                <th className="py-3 px-2 sm:px-4 text-center">Part Utilisation (%)</th>
+                <th className="py-3 px-3 sm:px-4 text-right">Part du CA ({currency})</th>
+                <th className="py-3 px-3 sm:px-4 text-right">Redevance Revers&eacute;e ({royalty_rate} %)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/70 bg-background">
@@ -381,7 +390,7 @@ export function BouquetPieDistribution({
                     onMouseEnter={() => setHoveredUnivId(item.institution_id)}
                     onMouseLeave={() => setHoveredUnivId(null)}
                   >
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-3 sm:px-4">
                       <div className="flex items-center gap-2.5">
                         <span
                           className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -400,25 +409,25 @@ export function BouquetPieDistribution({
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-center font-mono font-bold text-navy">
+                    <td className="py-3 px-2 sm:px-4 text-center font-mono font-bold text-navy">
                       <span className="inline-block px-2 py-0.5 rounded-md bg-navy/5">
                         {item.books_count} {item.books_count > 1 ? "livres" : "livre"}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-center font-mono font-bold text-navy">
+                    <td className="py-3 px-2 sm:px-4 text-center font-mono font-bold text-navy">
                       {item.usage_share_percent}%
                     </td>
-                    <td className="py-3 px-4 text-right font-mono font-semibold text-foreground">
+                    <td className="py-3 px-3 sm:px-4 text-right font-mono font-semibold text-foreground">
                       {item.ca_share_allocated.toLocaleString("fr-FR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
+                        minimumFractionDigits: isFcfa ? 0 : 2,
+                        maximumFractionDigits: isFcfa ? 0 : 2,
                       })}{" "}
                       {currency}
                     </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-navy">
+                    <td className="py-3 px-3 sm:px-4 text-right font-mono font-bold text-navy">
                       {item.royalty_amount.toLocaleString("fr-FR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
+                        minimumFractionDigits: isFcfa ? 0 : 2,
+                        maximumFractionDigits: isFcfa ? 0 : 2,
                       })}{" "}
                       {currency}
                     </td>
@@ -429,20 +438,20 @@ export function BouquetPieDistribution({
             {/* Ligne des Totaux */}
             <tfoot>
               <tr className="bg-navy-light/60 border-t-2 border-navy/20 font-bold text-navy text-xs">
-                <td className="py-3 px-4 uppercase tracking-wider">Total Consolid&eacute;</td>
-                <td className="py-3 px-4 text-center font-mono">{total_books} livres</td>
-                <td className="py-3 px-4 text-center font-mono">100.00 %</td>
-                <td className="py-3 px-4 text-right font-mono">
+                <td className="py-3 px-3 sm:px-4 uppercase tracking-wider">Total Consolid&eacute;</td>
+                <td className="py-3 px-2 sm:px-4 text-center font-mono">{total_books} livres</td>
+                <td className="py-3 px-2 sm:px-4 text-center font-mono">100.00 %</td>
+                <td className="py-3 px-3 sm:px-4 text-right font-mono">
                   {total_ca.toLocaleString("fr-FR", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
+                    minimumFractionDigits: isFcfa ? 0 : 2,
+                    maximumFractionDigits: isFcfa ? 0 : 2,
                   })}{" "}
                   {currency}
                 </td>
-                <td className="py-3 px-4 text-right font-mono text-sm text-gold">
+                <td className="py-3 px-3 sm:px-4 text-right font-mono text-sm text-gold">
                   {total_royalties.toLocaleString("fr-FR", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
+                    minimumFractionDigits: isFcfa ? 0 : 2,
+                    maximumFractionDigits: isFcfa ? 0 : 2,
                   })}{" "}
                   {currency}
                 </td>

@@ -112,12 +112,12 @@ export default function AdminOverviewDashboard() {
 
   const totalUsersCount = rolesDist.reduce((acc, r) => acc + r.count, 0);
 
-  // Modèle de calcul unique et officiel de référence (CDC Section 11 & 12)
+  // Modèle de calcul unique et officiel de référence
   const bouquetDist: BouquetDistributionResult = computeBouquetDistribution({
     bouquet_id: "bouquet-reference-cdc",
     bouquet_title: "Bouquets Documentaires Multi-Universités",
-    total_ca: 10000,
-    currency: "€",
+    total_ca: 10000000,
+    currency: "FCFA",
   });
 
   const donutSegments: DonutChartSegment[] = rolesDist
@@ -291,28 +291,28 @@ export default function AdminOverviewDashboard() {
               Ressources Documentaires Multi-Universités
             </div>
             <h2 className="text-lg sm:text-2xl font-bold font-serif text-navy">
-              Répartition des Redevances &ndash; Bouquets Documentaires
+              R&eacute;partition des Redevances &ndash; Bouquets Documentaires
             </h2>
-            <p className="text-xs text-foreground-muted max-w-3xl leading-relaxed">
-              Les revenus issus des bouquets documentaires sont r&eacute;partis selon l&apos;utilisation r&eacute;elle des contenus, en tenant compte des consultations, pages lues, t&eacute;l&eacute;chargements, temps de lecture et &eacute;coutes audio (Taux conventionn&eacute; : <span className="font-bold text-navy">15 %</span>).
+            <p className="text-xs text-foreground-muted">
+              Consolidation multi-campus et r&eacute;partition proportionnelle &bull; Taux conventionn&eacute; : <span className="font-bold text-navy">15 %</span>
             </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             <Link
               href="/admin/catalog/bouquets"
-              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[40px]"
+              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
             >
               <Layers className="w-4 h-4 text-gold" />
-              <span>Gérer les Bouquets</span>
+              <span>G&eacute;rer les Bouquets</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
 
-        {/* Mini Grille de 4 KPIs */}
+        {/* Mini Grille de 4 KPIs Responsive Mobile */}
         {bouquetDist && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
               <span className="text-[11px] font-medium text-foreground-muted">Assiette Financière Bouquet</span>
               <p className="text-base sm:text-lg font-bold font-mono text-navy">

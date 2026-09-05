@@ -112,11 +112,13 @@ export function computeBouquetDistribution(params: {
   const {
     bouquet_id,
     bouquet_title = "Bouquet Documentaire Multi-Universités",
-    total_ca = 10000,
+    total_ca = 10000000,
     currency = "FCFA",
     custom_royalty_rate,
     books,
   } = params;
+
+  const isFcfa = currency === "FCFA" || currency === "XOF";
 
   const royalty_rate =
     typeof custom_royalty_rate === "number" && !isNaN(custom_royalty_rate)
@@ -138,43 +140,22 @@ export function computeBouquetDistribution(params: {
 
     books.forEach((book, idx) => {
       const name =
-        book.institution_name ||
         book.university_name ||
-        (idx % 3 === 0
-          ? "Université d'Abomey-Calavi"
-          : idx % 3 === 1
-          ? "Université de Parakou"
-          : "Université Nationale d'Agriculture");
-
-      const id =
-        book.institution_id ||
-        (name.toLowerCase().includes("abomey")
-          ? "univ-uac"
-          : name.toLowerCase().includes("parakou")
-          ? "univ-up"
-          : "univ-una");
-
-      const shortName = name.toLowerCase().includes("abomey")
-        ? "UAC"
-        : name.toLowerCase().includes("parakou")
-        ? "Univ. Parakou"
-        : name.toLowerCase().includes("agriculture")
-        ? "UNA"
-        : name.split(" ").slice(0, 2).join(" ");
+        book.institution_name ||
+        `Établissement ${idx + 1}`;
+      const id = book.institution_id || `inst-${idx + 1}`;
 
       if (!groups[id]) {
         groups[id] = {
           institution_id: id,
           institution_name: name,
-          short_name: shortName,
+          short_name: name.slice(0, 14),
           books_count: 0,
           consultations_count: 0,
         };
       }
-
       groups[id].books_count += 1;
-      const consults = book.consultations_count || Math.max(10, Math.round(500 * (1 + (idx % 5))));
-      groups[id].consultations_count += consults;
+      groups[id].consultations_count += book.consultations_count || 1;
     });
 
     const groupList = Object.values(groups);
@@ -190,12 +171,14 @@ export function computeBouquetDistribution(params: {
         const usage_share_percent = Number(
           ((g.consultations_count / total_consultations) * 100).toFixed(2)
         );
-        const ca_share_allocated = Number(
-          (total_ca * (usage_share_percent / 100)).toFixed(2)
-        );
-        const royalty_amount = Number(
-          (ca_share_allocated * (royalty_rate / 100)).toFixed(2)
-        );
+        const rawCaShare = total_ca * (usage_share_percent / 100);
+        const ca_share_allocated = isFcfa
+          ? Math.round(rawCaShare)
+          : Number(rawCaShare.toFixed(2));
+        const rawRoyalty = ca_share_allocated * (royalty_rate / 100);
+        const royalty_amount = isFcfa
+          ? Math.round(rawRoyalty)
+          : Number(rawRoyalty.toFixed(2));
 
         return {
           institution_id: g.institution_id,
@@ -211,9 +194,11 @@ export function computeBouquetDistribution(params: {
         };
       });
 
-    const total_royalties = Number(
-      items.reduce((acc, it) => acc + it.royalty_amount, 0).toFixed(2)
-    );
+    const total_royalties = isFcfa
+      ? Math.round(items.reduce((acc, it) => acc + it.royalty_amount, 0))
+      : Number(
+          items.reduce((acc, it) => acc + it.royalty_amount, 0).toFixed(2)
+        );
 
     return {
       bouquet_id,
@@ -228,7 +213,7 @@ export function computeBouquetDistribution(params: {
     };
   }
 
-  // Modèle de référence fidèle à la Section 11.2 du Cahier des Charges
+  // Modèle de référence officiel pour les bouquets documentaires
   const total_consultations = DEFAULT_UNIVERSITIES_DATA.reduce(
     (acc, u) => acc + u.base_consultations,
     0
@@ -239,12 +224,15 @@ export function computeBouquetDistribution(params: {
     const usage_share_percent = Number(
       ((u.base_consultations / total_consultations) * 100).toFixed(2)
     );
-    const ca_share_allocated = Number(
-      (total_ca * (usage_share_percent / 100)).toFixed(2)
-    );
-    const royalty_amount = Number(
-      (ca_share_allocated * (royalty_rate / 100)).toFixed(2)
-    );
+    const rawCaShare = total_ca * (usage_share_percent / 100);
+    const ca_share_allocated = isFcfa
+      ? Math.round(rawCaShare)
+      : Number(rawCaShare.toFixed(2));
+
+    const rawRoyalty = ca_share_allocated * (royalty_rate / 100);
+    const royalty_amount = isFcfa
+      ? Math.round(rawRoyalty)
+      : Number(rawRoyalty.toFixed(2));
 
     return {
       institution_id: u.institution_id,
@@ -260,9 +248,9 @@ export function computeBouquetDistribution(params: {
     };
   });
 
-  const total_royalties = Number(
-    items.reduce((acc, it) => acc + it.royalty_amount, 0).toFixed(2)
-  );
+  const total_royalties = isFcfa
+    ? Math.round(items.reduce((acc, it) => acc + it.royalty_amount, 0))
+    : Number(items.reduce((acc, it) => acc + it.royalty_amount, 0).toFixed(2));
 
   return {
     bouquet_id,
