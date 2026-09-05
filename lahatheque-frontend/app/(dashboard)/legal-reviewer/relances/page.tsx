@@ -3,9 +3,20 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { BellRing, Mail, ArrowLeft, AlertTriangle, Settings, CheckCircle2, Send, ShieldCheck } from "lucide-react";
+import {
+  BellRing,
+  Mail,
+  ArrowLeft,
+  AlertTriangle,
+  Settings,
+  CheckCircle2,
+  Send,
+  ShieldCheck,
+  PlusCircle,
+} from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { DebtReminderConfigModal } from "@/components/features/legal/debt-reminder-config-modal";
+import { CreateDebtForm } from "@/components/features/legal/create-debt-form";
 import {
   getAuthorEmailReports,
   getClientDebts,
@@ -19,8 +30,10 @@ import { toast } from "sonner";
 
 export default function LegalRelancesPage() {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "debts" ? "debts" : "authors";
-  const [activeTab, setActiveTab] = useState<"authors" | "debts">(initialTab);
+  const tabParam = searchParams.get("tab");
+  const initialTab: "authors" | "debts" | "create_debt" =
+    tabParam === "create_debt" ? "create_debt" : (tabParam === "debts" ? "debts" : "authors");
+  const [activeTab, setActiveTab] = useState<"authors" | "debts" | "create_debt">(initialTab);
 
   const [authorReports, setAuthorReports] = useState<AuthorEmailReport[]>([]);
   const [debts, setDebts] = useState<ClientDebt[]>([]);
@@ -155,8 +168,19 @@ export default function LegalRelancesPage() {
       header: "Client en Impayé",
       cell: (row) => (
         <div>
-          <p className="font-bold text-xs text-navy">{row.client_name}</p>
-          <p className="text-[10px] text-foreground-muted font-mono">{row.client_email}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-bold text-xs text-navy">{row.client_name}</p>
+            {row.source === "wholesale_credit" ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-navy/10 text-navy border border-navy/20">
+                Grossiste
+              </span>
+            ) : row.source === "author_credit" ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-gold/15 text-gold border border-gold/30">
+                Auteur
+              </span>
+            ) : null}
+          </div>
+          <p className="text-[10px] text-foreground-muted font-mono">{row.client_email || "—"}</p>
         </div>
       ),
     },
@@ -232,24 +256,34 @@ export default function LegalRelancesPage() {
           </p>
         </div>
 
-        {reminderConfig && (
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
           <button
             type="button"
-            onClick={() => setIsConfigOpen(true)}
-            className="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-xs min-h-[44px]"
+            onClick={() => setActiveTab("create_debt")}
+            className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-gold-hover text-navy text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-xs min-h-[44px] cursor-pointer"
           >
-            <Settings className="w-4 h-4 text-gold" />
-            Configurer Règles d&apos;Impayés
+            <PlusCircle className="w-4 h-4 text-navy" />
+            Ajouter une Dette
           </button>
-        )}
+          {reminderConfig && (
+            <button
+              type="button"
+              onClick={() => setIsConfigOpen(true)}
+              className="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-xs min-h-[44px] cursor-pointer"
+            >
+              <Settings className="w-4 h-4 text-gold" />
+              Configurer Règles d&apos;Impayés
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Onglets Auteurs vs Dettes Clients */}
-      <div className="flex items-center gap-2 border-b border-border">
+      {/* Onglets Auteurs vs Dettes Clients vs Ajouter une Dette */}
+      <div className="flex items-center gap-2 border-b border-border overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab("authors")}
-          className={`pb-3 px-4 text-xs font-bold transition-colors border-b-2 flex items-center gap-1.5 ${
+          className={`pb-3 px-4 text-xs font-bold transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
             activeTab === "authors"
               ? "border-gold text-navy font-serif text-sm"
               : "border-transparent text-foreground-muted hover:text-navy"
@@ -261,7 +295,7 @@ export default function LegalRelancesPage() {
         <button
           type="button"
           onClick={() => setActiveTab("debts")}
-          className={`pb-3 px-4 text-xs font-bold transition-colors border-b-2 flex items-center gap-1.5 ${
+          className={`pb-3 px-4 text-xs font-bold transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
             activeTab === "debts"
               ? "border-gold text-navy font-serif text-sm"
               : "border-transparent text-foreground-muted hover:text-navy"
@@ -269,6 +303,18 @@ export default function LegalRelancesPage() {
         >
           <AlertTriangle className="w-4 h-4 text-rose-500" />
           Relances Dettes Clients ({debts.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("create_debt")}
+          className={`pb-3 px-4 text-xs font-bold transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeTab === "create_debt"
+              ? "border-gold text-navy font-serif text-sm"
+              : "border-transparent text-foreground-muted hover:text-navy"
+          }`}
+        >
+          <PlusCircle className="w-4 h-4 text-gold" />
+          Ajouter une Dette
         </button>
       </div>
 
@@ -294,13 +340,24 @@ export default function LegalRelancesPage() {
                   Seuil min : <strong className="text-navy">{(reminderConfig.min_amount_threshold || 5000).toLocaleString("fr-FR")} FCFA</strong> • Première relance après <strong className="text-navy">{reminderConfig.days_before_first_reminder || 7} jours</strong> • Max : <strong className="text-navy">{reminderConfig.max_reminders_count || 3} relances</strong>
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsConfigOpen(true)}
-                className="text-xs font-bold text-gold hover:underline text-left sm:text-right shrink-0"
-              >
-                Modifier les règles
-              </button>
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("create_debt")}
+                  className="text-xs font-bold text-navy hover:text-navy-hover flex items-center gap-1 cursor-pointer"
+                >
+                  <PlusCircle className="w-3.5 h-3.5 text-gold" />
+                  Déclarer un impayé
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={() => setIsConfigOpen(true)}
+                  className="text-xs font-bold text-gold hover:underline cursor-pointer"
+                >
+                  Modifier les règles
+                </button>
+              </div>
             </div>
           )}
 
@@ -312,6 +369,18 @@ export default function LegalRelancesPage() {
             emptyMessage="Aucune dette ou impayé en cours."
           />
         </div>
+      )}
+
+      {/* Tab 3: Ajouter une Dette */}
+      {activeTab === "create_debt" && (
+        <CreateDebtForm
+          reminderConfig={reminderConfig}
+          onCancel={() => setActiveTab("debts")}
+          onSuccess={(newDebt) => {
+            setDebts((prev) => [newDebt, ...prev]);
+            setActiveTab("debts");
+          }}
+        />
       )}
 
       {/* Modale 21st.dev de configuration des règles de relance */}

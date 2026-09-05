@@ -1909,6 +1909,13 @@ class LegalRelancesListView(APIView):
             )
         ).select_related('user')
 
+        from apps.commerce.models import WholesaleOrder
+
+        overdue_wholesale_credits = WholesaleOrder.objects.filter(
+            is_credit_purchase=True,
+            credit_due_date__lt=now.date(),
+        ).exclude(status='cancelled').select_related('user')
+
         debts_by_user = {}
         for order in unpaid_orders:
             if not order.user:
@@ -1939,12 +1946,36 @@ class LegalRelancesListView(APIView):
                 "client_name": d["client_name"],
                 "client_email": d["client_email"],
                 "unpaid_amount": d["unpaid_amount"],
+                "amount": d["unpaid_amount"],
+                "currency": "XOF",
                 "due_date": d["oldest_due_date"].date().isoformat(),
                 "days_overdue": days_overdue,
                 "reminder_count": reminder_count,
                 "is_credit": d.get("is_credit", False),
                 "credit_due_date": d.get("credit_due_date"),
                 "status": f"relance_niveau_{min(reminder_count + 1, 3)}",
+                "source": "author_credit" if d.get("is_credit") else "unpaid_order",
+            })
+
+        for wo in overdue_wholesale_credits:
+            days_overdue = (now.date() - wo.credit_due_date).days
+            reminder_count = RelanceEmailJournal.objects.filter(
+                destinataire_id=wo.user_id, type_relance='facture_impayee_client'
+            ).count() if wo.user_id else 0
+            debts.append({
+                "id": str(wo.id),
+                "client_name": wo.company_name,
+                "client_email": wo.user.email if wo.user else "",
+                "amount": float(wo.total_amount),
+                "unpaid_amount": float(wo.total_amount),
+                "currency": wo.currency or "XOF",
+                "due_date": wo.credit_due_date.isoformat(),
+                "days_overdue": days_overdue,
+                "reminder_count": reminder_count,
+                "is_credit": True,
+                "credit_due_date": wo.credit_due_date.isoformat(),
+                "status": f"relance_niveau_{min(reminder_count + 1, 3)}",
+                "source": "wholesale_credit",
             })
 
         # 3. Historique des relances déjà envoyées (les 20 dernières)
@@ -1971,6 +2002,124 @@ class LegalRelancesListView(APIView):
     def post(self, request):
         from apps.accounts.models import User
         from apps.reporting.tasks import send_email_task
+
+        if request.data.get("action") == "create_debt":
+            from apps.commerce.models import Currency, Order
+            from django.utils.dateparse import parse_date
+
+            client_name = request.data.get("client_name", "").strip()
+            client_email = request.data.get("client_email", "").strip().lower()
+            try:
+                amount = float(request.data.get("amount", 0.0))
+            except (ValueError, TypeError):
+                amount = 0.0
+            due_date_str = request.data.get("due_date")
+            currency_code = request.data.get("currency", "XOF")
+            notes = request.data.get("notes", "")
+            reference_doc = request.data.get("reference_document", "")
+            client_phone = request.data.get("client_phone", "")
+            client_type = request.data.get("client_type", "bookstore")
+            send_immediate = bool(request.data.get("send_immediate_reminder", False))
+            initial_level = int(request.data.get("initial_reminder_level", 1))
+
+            if not client_email:
+                return Response({"success": False, "error": "L'adresse email du client est requise."}, status=400)
+            if amount <= 0:
+                return Response({"success": False, "error": "Le montant de la dette doit être supérieur à zéro."}, status=400)
+
+            user = User.objects.filter(email=client_email).first()
+            if not user:
+                name_parts = client_name.split(" ", 1)
+                first_name = name_parts[0] if name_parts else "Client"
+                last_name = name_parts[1] if len(name_parts) > 1 else ""
+                user = User.objects.create(
+                    username=client_email,
+                    email=client_email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    phone=client_phone,
+                    role='student',
+                    is_active=True,
+                )
+                user.set_unusable_password()
+                user.save()
+            elif client_name and not user.first_name and not user.last_name:
+                name_parts = client_name.split(" ", 1)
+                user.first_name = name_parts[0]
+                if len(name_parts) > 1:
+                    user.last_name = name_parts[1]
+                user.save()
+
+            currency_obj, _ = Currency.objects.get_or_create(code=currency_code, defaults={"is_pegged": True})
+            due_date = parse_date(due_date_str) if due_date_str else (timezone.now().date() + timedelta(days=14))
+
+            order = Order.objects.create(
+                user=user,
+                total_amount=amount,
+                currency=currency_obj,
+                statut_paiement='pending',
+                statut_commande='completed',
+                is_credit_purchase=True,
+                credit_due_date=due_date,
+                credit_granted_by=request.user if request.user.is_authenticated else None,
+                return_reason=f"Créance enregistrée: {reference_doc} - {notes}" if reference_doc or notes else "Créance enregistrée par le service juridique",
+            )
+
+            reminder_count = 0
+            if send_immediate:
+                subject = f"Notification d'impayé / Relance #{initial_level} — LAHAThèque"
+                body = (
+                    f"Bonjour {user.get_full_name() or user.email},<br><br>"
+                    f"Nous vous informons qu'une créance d'un montant de <strong>{amount:,.0f} {currency_code}</strong> "
+                    f"(Réf : {reference_doc or 'Impayé'}) est enregistrée au titre de vos engagements auprès de LAHA Éditions.<br>"
+                    f"Date limite de règlement : <strong>{due_date.strftime('%d/%m/%Y')}</strong>.<br><br>"
+                    f"Merci de régulariser ce montant dans les meilleurs délais.<br><br>"
+                    f"Service Juridique & Recouvrement,<br>LAHA Éditions"
+                )
+                RelanceEmailJournal.objects.create(
+                    type_relance='facture_impayee_client',
+                    destinataire=user,
+                    destinataire_email=user.email,
+                    sujet=subject,
+                    corps_message=body,
+                    niveau_relance=initial_level,
+                )
+                try:
+                    send_email_task.delay([user.email], subject, body)
+                except Exception:
+                    pass
+                reminder_count = 1
+
+            days_overdue = max(0, (timezone.now().date() - due_date).days)
+            new_debt = {
+                "id": str(user.id),
+                "client_id": str(user.id),
+                "client_name": user.get_full_name() or client_name or user.email,
+                "client_email": user.email,
+                "client_type": client_type,
+                "client_phone": client_phone or getattr(user, 'phone', '') or "+229 00 00 00 00",
+                "country": "Bénin",
+                "amount": amount,
+                "total_debt_amount": amount,
+                "unpaid_amount": amount,
+                "unpaid_invoices_count": 1,
+                "currency": currency_code,
+                "due_date": due_date.isoformat(),
+                "days_overdue": days_overdue,
+                "reminder_count": reminder_count,
+                "is_credit": True,
+                "credit_due_date": due_date.isoformat(),
+                "status": f"relance_niveau_{min(reminder_count + 1, 3)}" if reminder_count > 0 else "pending",
+                "reference_document": reference_doc,
+                "notes": notes,
+                "source": "unpaid_order",
+            }
+
+            return Response({
+                "success": True,
+                "message": f"Dette de {user.get_full_name() or user.email} enregistrée avec succès.",
+                "data": new_debt,
+            }, status=201)
 
         recipient_id = request.data.get("recipient_id") or request.data.get("debt_id")
         relance_type = request.data.get("type", "facture_impayee_client")

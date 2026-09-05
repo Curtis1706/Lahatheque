@@ -259,7 +259,33 @@ export interface ClientDebt {
   days_overdue: number;
   reminder_count: number;
   last_reminder_at?: string;
-  status: "pending" | "reminded" | "final_notice" | "formal_notice" | "relance_niveau_1" | "relance_niveau_2";
+  status: "pending" | "reminded" | "final_notice" | "formal_notice" | "relance_niveau_1" | "relance_niveau_2" | "relance_niveau_3" | string;
+  source?: "wholesale_credit" | "author_credit" | "unpaid_order" | string;
+  reference_document?: string;
+  motive?: string;
+  notes?: string;
+  auto_remind_enabled?: boolean;
+  is_credit?: boolean;
+}
+
+export interface CreateClientDebtPayload {
+  client_name: string;
+  client_email: string;
+  client_type: "bookstore" | "wholesaler" | "institution" | "author" | "individual" | "other";
+  client_phone?: string;
+  country?: string;
+  amount: number;
+  currency?: string;
+  due_date: string;
+  issue_date?: string;
+  motive?: string;
+  reference_document?: string;
+  auto_remind_enabled?: boolean;
+  initial_reminder_level?: 1 | 2 | 3;
+  send_immediate_reminder?: boolean;
+  cc_accountant?: boolean;
+  notes?: string;
+  file_name?: string;
 }
 
 export interface DebtReminderConfig {
