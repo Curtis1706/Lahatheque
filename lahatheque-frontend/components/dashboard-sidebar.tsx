@@ -333,6 +333,7 @@ export function DashboardSidebar() {
                   { label: "Entrepôts Régionaux", href: "/admin/stock/warehouses", icon: <Building2 className="size-3.5" /> },
                 ],
               },
+              { label: "Commandes Manuelles", href: "/admin/orders", icon: <PackageCheck className="size-4" /> },
               { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="size-4" /> },
               { label: "Finances Globales", href: "/admin/finance", icon: <Landmark className="size-4" /> },
               { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="size-4" /> },

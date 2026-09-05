@@ -33,3 +33,15 @@ class IsLegalReviewerRole(IsRoleUser):
 class IsWholesaler(IsRoleUser):
     required_role = 'wholesaler'
 
+class IsManagerOrAdmin(BasePermission):
+    """Autorise uniquement les Gestionnaires, Admins et Super Admins."""
+    def has_permission(self, request, view):
+        active = request.user.active_roles if isinstance(getattr(request.user, 'active_roles', None), list) else []
+        return bool(
+            request.user and request.user.is_authenticated
+            and (request.user.role in ('manager', 'admin', 'super_admin')
+                 or 'manager' in active
+                 or 'admin' in active
+                 or 'super_admin' in active)
+        )
+

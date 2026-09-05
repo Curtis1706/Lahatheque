@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+from apps.accounts.permissions import IsAdminOrSuperAdmin
 from django.db import transaction
 
 from .models import Currency, Order, LigneCommande, PhysicalDelivery, PaymentTransaction, SubscriptionPlan, Subscription
@@ -252,6 +253,40 @@ class CreateOrderView(APIView):
             'total_amount': str(total_amount),
             'order': OrderSerializer(commande).data
         }, status=status.HTTP_201_CREATED)
+
+
+class AdminCreateOrderView(CreateOrderView):
+    """
+    POST /api/v1/commerce/admin/orders/create-for-client/
+    Permet à un Admin de créer une commande au nom de n'importe quel client — réutilise
+    entièrement la logique de CreateOrderView, avec le client cible désigné explicitement.
+    """
+    permission_classes = [IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def post(self, request):
+        target_user_id = request.data.get("client_id")
+        if not target_user_id:
+            return Response({"error": "Le client cible (client_id) est requis."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from apps.accounts.models import User
+        try:
+            target_user = User.objects.get(id=target_user_id, is_active=True)
+        except (User.DoesNotExist, ValueError):
+            return Response({"error": "Client introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        original_user = request.user
+        request.user = target_user
+        try:
+            response = super().post(request)
+            if response.status_code == 201:
+                order_id = response.data.get('order_id') or (response.data.get('data') and response.data.get('data').get('id'))
+                if order_id and request.data.get('is_credit_purchase'):
+                    Order.objects.filter(id=order_id).update(credit_granted_by=original_user)
+        finally:
+            request.user = original_user
+
+        return response
+
 
 class OrderListView(APIView):
     permission_classes = [IsAuthenticated]

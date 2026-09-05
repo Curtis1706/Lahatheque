@@ -5,6 +5,7 @@ import { Plus, Trash2, X, ShoppingCart, Search, Check, ChevronDown } from "lucid
 import { toast } from "sonner";
 import { getStudentCatalog } from "@/lib/services/student";
 import { createOrder, type OrderItemPayload } from "@/lib/services/commerce-orders";
+import { adminCreateOrderForClient } from "@/lib/services/admin";
 import type { BookAPI } from "@/lib/services/student";
 import { Loader } from "@/components/ui/loader";
 import { BookCover } from "@/components/features/student/book-cover";
@@ -230,15 +231,19 @@ function BookCombobox({
   );
 }
 
-// ─── Main Order Create Form ───────────────────────────────────────────────────
+export interface OrderCreateFormProps {
+  onSuccess: () => void;
+  onCancel: () => void;
+  targetClientId?: string;
+  targetClientName?: string;
+}
 
 export default function OrderCreateForm({
   onSuccess,
   onCancel,
-}: {
-  onSuccess: () => void;
-  onCancel: () => void;
-}) {
+  targetClientId,
+  targetClientName,
+}: OrderCreateFormProps) {
   const { disciplines: dbDisciplines } = useDisciplines();
   const [books, setBooks] = useState<BookAPI[]>([]);
   const [disciplines, setDisciplines] = useState<{ id: string | number; name: string }[]>([]);
@@ -352,6 +357,22 @@ export default function OrderCreateForm({
         quantity: i.quantity,
       }));
 
+      if (targetClientId) {
+        await adminCreateOrderForClient({
+          client_id: targetClientId,
+          items,
+          type_commande: typeCommande,
+          mode_paiement: modePaiement,
+          shipping_address: shippingAddress || undefined,
+          date_livraison_souhaitee: dateLivraison || undefined,
+          plage_horaire_debut: heureDebut || undefined,
+          plage_horaire_fin: heureFin || undefined,
+        });
+        toast.success(`Commande créée avec succès pour ${targetClientName || "le client"}.`);
+        onSuccess();
+        return;
+      }
+
       const result = await createOrder({
         items,
         type_commande: typeCommande,
@@ -388,10 +409,12 @@ export default function OrderCreateForm({
         <div className="space-y-0.5">
           <h2 className="font-serif text-xl sm:text-2xl font-bold text-navy flex items-center gap-2">
             <ShoppingCart className="w-5 h-5 text-gold" aria-hidden="true" />
-            <span>Nouvelle Commande d&apos;Ouvrages</span>
+            <span>{targetClientId ? `Nouvelle Commande pour ${targetClientName || "le client"}` : "Nouvelle Commande d'Ouvrages"}</span>
           </h2>
           <p className="text-xs text-foreground-muted">
-            Sélectionnez les livres avec aperçu visuel et choisissez vos modalités de paiement.
+            {targetClientId
+              ? `Commande administrative enregistrée au nom de ${targetClientName || "ce client"}.`
+              : "Sélectionnez les livres avec aperçu visuel et choisissez vos modalités de paiement."}
           </p>
         </div>
         <button

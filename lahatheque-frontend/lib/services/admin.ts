@@ -1038,4 +1038,42 @@ export async function updateDepositProtectionConfig(
   return res.ok;
 }
 
+// =========================================================================
+// CRÉATION MANUELLE DE COMMANDES POUR UN CLIENT (ADMIN)
+// =========================================================================
+
+export async function searchClients(query: string, role?: string) {
+  const roleParam = role && role !== "all" ? `&role=${encodeURIComponent(role)}` : "";
+  const res = await fetch(`/api/bff/accounts/admin/users/?search=${encodeURIComponent(query)}${roleParam}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data || json.results || (Array.isArray(json) ? json : []);
+}
+
+export async function adminCreateOrderForClient(payload: {
+  client_id: string;
+  items: Array<{ ouvrage_id: string; format_type: string; quantity: number }>;
+  shipping_address?: string;
+  mode_paiement?: string;
+  type_commande?: string;
+  date_livraison_souhaitee?: string;
+  plage_horaire_debut?: string;
+  plage_horaire_fin?: string;
+}) {
+  const res = await fetch("/api/bff/commerce/admin/orders/create-for-client/", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || (typeof data === "object" ? JSON.stringify(data) : "Erreur lors de la création de la commande"));
+  }
+  return data;
+}
+
 

@@ -13,6 +13,7 @@ from django.db.models import Sum, Q, F
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from apps.accounts.permissions import IsManagerOrAdmin
 from rest_framework import status
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ def _is_manager_or_admin(user) -> bool:
 
 
 class ManagerKpisView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         if not _is_manager_or_admin(request.user):
@@ -88,7 +89,7 @@ class ManagerKpisView(APIView):
 
 
 class StockListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         if not _is_manager_or_admin(request.user):
@@ -143,7 +144,7 @@ class StockListView(APIView):
 
 
 class StockDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request, pk):
         if not _is_manager_or_admin(request.user):
@@ -217,7 +218,7 @@ class StockDetailView(APIView):
 
 
 class StockRestockView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     @transaction.atomic
     def post(self, request):
@@ -307,7 +308,7 @@ class StockRestockView(APIView):
 
 
 class StockManualExitView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     @transaction.atomic
     def post(self, request):
@@ -366,7 +367,7 @@ class StockManualExitView(APIView):
 
 
 class StockMovementsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         if not _is_manager_or_admin(request.user):
@@ -411,7 +412,7 @@ class StockMovementsView(APIView):
 
 
 class StockAlertsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         if not _is_manager_or_admin(request.user):
@@ -457,7 +458,7 @@ class StockAlertsView(APIView):
 
 
 class DeliveriesListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         if not _is_manager_or_admin(request.user):
@@ -612,7 +613,7 @@ class DeliveriesListView(APIView):
 
 
 class DeliveryDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request, pk):
         if not _is_manager_or_admin(request.user):
@@ -912,7 +913,7 @@ class DeliveryDetailView(APIView):
 
 
 class EntrepotsListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         if not _is_manager_or_admin(request.user):
@@ -937,7 +938,7 @@ class EntrepotsListView(APIView):
 
 class StockEscalateView(APIView):
     """Escalade et consultation des alertes de rupture vers l'administrateur."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         if not _is_manager_or_admin(request.user):
@@ -1050,7 +1051,7 @@ class ManagerReportExportView(APIView):
     GET /api/v1/commerce/manager/reports/export/?type=<report_id>&format=csv&period=<period>
     Génère un export CSV réel des rapports stock/livraison du Gestionnaire (sans données financières).
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def perform_content_negotiation(self, request, force=False):
         from rest_framework import renderers
@@ -1150,7 +1151,7 @@ class AvailableBooksForStockView(APIView):
     Si un ouvrage n'a pas de StockOuvrage, il est marqué comme "nouveau" (stock 0).
     Permet au gestionnaire de réassortir n'importe quel livre publié.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         if not _is_manager_or_admin(request.user):
@@ -1209,7 +1210,7 @@ class InstitutionalDeliveriesView(APIView):
     Vue fusionnée : commandes papier universités + grossistes en attente de traitement,
     invisibles autrement dans le flux de livraison standard (Order/PhysicalDelivery).
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         if not _is_manager_or_admin(request.user):
@@ -1329,7 +1330,7 @@ class InstitutionalDeliveriesView(APIView):
 
 class ManualPaymentConfirmView(APIView):
     """POST /api/v1/commerce/manager/orders/<order_id>/confirm-payment/"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def post(self, request, order_id):
         if not _is_manager_or_admin(request.user):
@@ -1363,7 +1364,7 @@ class ManualPaymentConfirmView(APIView):
 
 class ManagerFinanceReportView(APIView):
     """GET /api/v1/commerce/manager/finance/report/ - Rapport financier du Gestionnaire."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
         if not _is_manager_or_admin(request.user):
