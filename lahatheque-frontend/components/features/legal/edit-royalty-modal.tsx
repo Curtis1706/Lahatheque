@@ -10,7 +10,7 @@ interface EditRoyaltyModalProps {
   royalty: BookRoyalty;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (newRate: number, applyRetroactively: boolean) => Promise<void>;
+  onConfirm: (newRate: number, applyRetroactively: boolean, universityRate?: number | null) => Promise<void>;
 }
 
 export function EditRoyaltyModal({
@@ -20,18 +20,29 @@ export function EditRoyaltyModal({
   onConfirm,
 }: EditRoyaltyModalProps) {
   const [rate, setRate] = useState(royalty.current_rate);
+  const [universityRate, setUniversityRate] = useState<string>(
+    royalty.university_share_percent !== undefined && royalty.university_share_percent !== null
+      ? String(royalty.university_share_percent)
+      : ""
+  );
   const [applyRetroactively, setApplyRetroactively] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setRate(royalty.current_rate);
+    setUniversityRate(
+      royalty.university_share_percent !== undefined && royalty.university_share_percent !== null
+        ? String(royalty.university_share_percent)
+        : ""
+    );
   }, [royalty]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await onConfirm(rate, applyRetroactively);
+      const uRate = universityRate.trim() !== "" ? parseFloat(universityRate) : null;
+      await onConfirm(rate, applyRetroactively, uRate);
       onClose();
     } finally {
       setLoading(false);
@@ -97,6 +108,28 @@ export function EditRoyaltyModal({
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono font-bold text-gold">%</span>
               </div>
             </div>
+
+            {/* Champ conditionnel Taux Université si rattaché à une institution */}
+            {royalty.institution && (
+              <div>
+                <label className="text-[11px] font-bold text-navy uppercase tracking-wider block mb-1">
+                  Taux Université pour ce livre (optionnel)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.5"
+                  value={universityRate}
+                  onChange={(e) => setUniversityRate(e.target.value)}
+                  placeholder={`Par défaut : ${royalty.institution.royalty_rate}% (taux général de l'établissement)`}
+                  className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-background-secondary text-navy focus:outline-none focus:border-gold min-h-[40px]"
+                />
+                <p className="text-[10px] text-foreground-muted mt-1">
+                  Laissez vide pour utiliser le taux général de {royalty.institution.name} ({royalty.institution.royalty_rate}%).
+                </p>
+              </div>
+            )}
 
             {/* Case à cocher Rétroactivité (Validation Client LAHA) */}
             <div className="p-3.5 rounded-2xl bg-gold/5 border border-gold/20 space-y-2">

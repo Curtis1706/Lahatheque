@@ -123,8 +123,9 @@ export interface UniversityUnitSaleRoyalty {
   quantity: number;
   unit_price: number;
   gross_amount: number;
-  royalty_rate: number; // Pourcentage contractuel (ex: 15%)
-  royalty_amount: number; // Montant net de la redevance (ex: gross_amount * 0.15)
+  royalty_rate: number; // Pourcentage contractuel général (ex: 15%)
+  applied_rate?: number; // Taux spécifique appliqué à ce livre/contrat
+  royalty_amount: number; // Montant net de la redevance (ex: gross_amount * applied_rate / 100)
   currency: string;
   buyer_type: "etudiant" | "particulier" | "institution" | "grossiste";
   date: string;
@@ -142,6 +143,7 @@ export interface UniversityBouquetUsageRoyalty {
   consultation_share_percent: number; // Pourcentage comparé aux consultations globales (ex: 34.8%)
   bouquet_revenue_allocated: number; // Assiette de CA répartie au prorata d'usage (XOF)
   royalty_rate: number; // Taux de redevance conventionné (ex: 15%)
+  applied_rate?: number;
   net_royalty_amount: number; // Redevance nette reversée à l'établissement (XOF)
   currency: string;
 }
@@ -150,6 +152,11 @@ export interface UniversityRoyaltiesDetailData {
   available_balance: number;
   total_paid: number;
   contractual_rate: number;
+  institution?: {
+    id: string;
+    name: string;
+    royalty_rate: number;
+  };
   currency: string;
   min_withdrawal_threshold: number;
   totals_summary: {

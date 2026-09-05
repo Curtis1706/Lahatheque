@@ -197,6 +197,8 @@ export async function getBookRoyalties(): Promise<BookRoyalty[]> {
     isbn: r.isbn || "",
     authors: Array.isArray(r.authors) ? r.authors : [r.author_name || "Auteur"],
     current_rate: r.author_share_percent !== undefined && r.author_share_percent !== null ? Number(r.author_share_percent) : 15,
+    institution: r.institution || null,
+    university_share_percent: r.university_share_percent !== undefined && r.university_share_percent !== null ? Number(r.university_share_percent) : null,
     source: "manual_override",
     last_updated: r.effective_date || new Date().toISOString(),
     history: [],
@@ -209,19 +211,28 @@ export async function getBookRoyalties(): Promise<BookRoyalty[]> {
 export async function updateBookRoyaltyRate(
   bookId: string,
   newRate: number,
-  applyRetroactively: boolean
+  applyRetroactively: boolean,
+  universityRate?: number | string | null
 ): Promise<boolean> {
+  const payload: any = {
+    book_id: bookId,
+    rate: newRate,
+    apply_retroactively: applyRetroactively,
+    beneficiaires: [
+      { pourcentage: newRate, role: "Auteur Principal", apply_retroactively: applyRetroactively }
+    ],
+  };
+
+  if (universityRate !== undefined && universityRate !== null && String(universityRate).trim() !== "") {
+    payload.university_share_percent = Number(universityRate);
+  } else if (universityRate === null || universityRate === "") {
+    payload.university_share_percent = null;
+  }
+
   const res = await fetch(`${API_BASE}/royalties/batch/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      book_id: bookId,
-      rate: newRate,
-      apply_retroactively: applyRetroactively,
-      beneficiaires: [
-        { pourcentage: newRate, role: "Auteur Principal", apply_retroactively: applyRetroactively }
-      ]
-    }),
+    body: JSON.stringify(payload),
     credentials: "include",
   });
   if (!res.ok) {

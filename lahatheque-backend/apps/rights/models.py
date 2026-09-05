@@ -21,6 +21,10 @@ class RoyaltyRate(models.Model):
     author_share_percent = models.DecimalField(max_digits=5, decimal_places=2)
     publisher_share_percent = models.DecimalField(max_digits=5, decimal_places=2)
     platform_share_percent = models.DecimalField(max_digits=5, decimal_places=2)
+    university_share_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Taux de redevance université spécifique à ce livre/contrat — si vide, repli sur le taux général de l'institution."
+    )
 
 class RoyaltyCalculation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

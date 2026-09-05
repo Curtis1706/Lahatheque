@@ -17,7 +17,8 @@ export const mockUniversityUnitSales: UniversityUnitSaleRoyalty[] = [
     unit_price: 7500,
     gross_amount: 112500,
     royalty_rate: 15,
-    royalty_amount: 16875,
+    applied_rate: 10, // Taux spécifique différencié par livre/contrat (10% au lieu de 15%)
+    royalty_amount: 11250,
     currency: "XOF",
     buyer_type: "institution",
     date: "2026-03-02",
@@ -34,6 +35,7 @@ export const mockUniversityUnitSales: UniversityUnitSaleRoyalty[] = [
     unit_price: 5000,
     gross_amount: 140000,
     royalty_rate: 15,
+    applied_rate: 15,
     royalty_amount: 21000,
     currency: "XOF",
     buyer_type: "etudiant",
@@ -51,6 +53,7 @@ export const mockUniversityUnitSales: UniversityUnitSaleRoyalty[] = [
     unit_price: 7500,
     gross_amount: 300000,
     royalty_rate: 15,
+    applied_rate: 15,
     royalty_amount: 45000,
     currency: "XOF",
     buyer_type: "grossiste",
@@ -68,7 +71,8 @@ export const mockUniversityUnitSales: UniversityUnitSaleRoyalty[] = [
     unit_price: 5000,
     gross_amount: 175000,
     royalty_rate: 15,
-    royalty_amount: 26250,
+    applied_rate: 10, // Même livre, taux spécifique 10%
+    royalty_amount: 17500,
     currency: "XOF",
     buyer_type: "etudiant",
     date: "2026-02-25",
@@ -85,6 +89,7 @@ export const mockUniversityUnitSales: UniversityUnitSaleRoyalty[] = [
     unit_price: 9000,
     gross_amount: 225000,
     royalty_rate: 15,
+    applied_rate: 15,
     royalty_amount: 33750,
     currency: "XOF",
     buyer_type: "particulier",
@@ -102,6 +107,7 @@ export const mockUniversityUnitSales: UniversityUnitSaleRoyalty[] = [
     unit_price: 4500,
     gross_amount: 202500,
     royalty_rate: 15,
+    applied_rate: 15,
     royalty_amount: 30375,
     currency: "XOF",
     buyer_type: "etudiant",
@@ -119,6 +125,7 @@ export const mockUniversityUnitSales: UniversityUnitSaleRoyalty[] = [
     unit_price: 7500,
     gross_amount: 150000,
     royalty_rate: 15,
+    applied_rate: 15,
     royalty_amount: 22500,
     currency: "XOF",
     buyer_type: "institution",
@@ -139,6 +146,7 @@ export const mockUniversityBouquetUsage: UniversityBouquetUsageRoyalty[] = [
     consultation_share_percent: 34.96, // 34.96% de part d'audience
     bouquet_revenue_allocated: 2850000, // Quote-part d'assiette financière du bouquet
     royalty_rate: 15,
+    applied_rate: 15,
     net_royalty_amount: 427500, // 2 850 000 * 15%
     currency: "XOF",
   },
@@ -154,6 +162,7 @@ export const mockUniversityBouquetUsage: UniversityBouquetUsageRoyalty[] = [
     consultation_share_percent: 40.0, // 40% de part d'usage sur le bouquet
     bouquet_revenue_allocated: 3600000,
     royalty_rate: 15,
+    applied_rate: 15,
     net_royalty_amount: 540000, // 3 600 000 * 15%
     currency: "XOF",
   },
@@ -169,6 +178,7 @@ export const mockUniversityBouquetUsage: UniversityBouquetUsageRoyalty[] = [
     consultation_share_percent: 28.0, // 28% d'usage
     bouquet_revenue_allocated: 1450000,
     royalty_rate: 15,
+    applied_rate: 15,
     net_royalty_amount: 217500, // 1 450 000 * 15%
     currency: "XOF",
   },
@@ -183,11 +193,17 @@ export function buildUniversityRoyaltiesDetailData(
 
   const paperGross = paperSales.reduce((acc, s) => acc + s.gross_amount, 0);
   const paperCopies = paperSales.reduce((acc, s) => acc + s.quantity, 0);
-  const paperRoyalties = Math.round(paperGross * (contractualRate / 100));
+  const paperRoyalties = paperSales.reduce((acc, s) => {
+    const rate = s.applied_rate !== undefined ? s.applied_rate : contractualRate;
+    return acc + Math.round(s.gross_amount * (rate / 100));
+  }, 0);
 
   const digitalGross = digitalSales.reduce((acc, s) => acc + s.gross_amount, 0);
   const digitalLicenses = digitalSales.reduce((acc, s) => acc + s.quantity, 0);
-  const digitalRoyalties = Math.round(digitalGross * (contractualRate / 100));
+  const digitalRoyalties = digitalSales.reduce((acc, s) => {
+    const rate = s.applied_rate !== undefined ? s.applied_rate : contractualRate;
+    return acc + Math.round(s.gross_amount * (rate / 100));
+  }, 0);
 
   const bouquetConsultations = mockUniversityBouquetUsage.reduce(
     (acc, b) => acc + b.university_consultations,
@@ -207,6 +223,11 @@ export function buildUniversityRoyaltiesDetailData(
     available_balance: availableBalance,
     total_paid: totalPaid,
     contractual_rate: contractualRate,
+    institution: {
+      id: "inst-uac-01",
+      name: "Université d'Abomey-Calavi (UAC)",
+      royalty_rate: contractualRate,
+    },
     currency,
     min_withdrawal_threshold: 100000,
     totals_summary: {
@@ -220,14 +241,19 @@ export function buildUniversityRoyaltiesDetailData(
       bouquet_gross_allocated: bouquetGrossAllocated,
       bouquet_royalties_total: bouquetRoyalties,
     },
-    unit_sales: mockUniversityUnitSales.map((s) => ({
-      ...s,
-      royalty_rate: contractualRate,
-      royalty_amount: Math.round(s.gross_amount * (contractualRate / 100)),
-    })),
+    unit_sales: mockUniversityUnitSales.map((s) => {
+      const appliedRate = s.applied_rate !== undefined ? s.applied_rate : contractualRate;
+      return {
+        ...s,
+        royalty_rate: contractualRate,
+        applied_rate: appliedRate,
+        royalty_amount: Math.round(s.gross_amount * (appliedRate / 100)),
+      };
+    }),
     bouquet_royalties: mockUniversityBouquetUsage.map((b) => ({
       ...b,
       royalty_rate: contractualRate,
+      applied_rate: b.applied_rate ?? contractualRate,
       net_royalty_amount: Math.round(b.bouquet_revenue_allocated * (contractualRate / 100)),
     })),
   };

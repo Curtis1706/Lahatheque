@@ -354,20 +354,29 @@ def task_calculate_monthly_royalties():
 
         total_sales = Decimal(str(ligne['total_sales'] or 0))
 
+        from apps.rights.models import RoyaltyRate
+
         university_payout = Decimal("0.00")
         if ouvrage.institution:
-            univ_rate = Decimal(str(getattr(ouvrage.institution, 'royalty_rate', 15))) / Decimal("100")
+            book_rate = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
+
+            if book_rate and book_rate.university_share_percent is not None:
+                univ_rate = Decimal(str(book_rate.university_share_percent)) / Decimal("100")
+            else:
+                univ_rate = Decimal(str(getattr(ouvrage.institution, 'royalty_rate', 15))) / Decimal("100")
+
             university_payout = (total_sales * univ_rate).quantize(Decimal("0.01"))
 
             if university_payout > 0:
                 ref = f"REP-DIRECT-{period_label}-{str(ouvrage.id)[:8]}"
+                applied_rate_val = (univ_rate * Decimal("100")).quantize(Decimal("0.01"))
                 UniversityRoyaltyStatement.objects.get_or_create(
                     institution=ouvrage.institution,
                     reference=ref,
                     defaults={
                         "period": f"{period_label}-direct-{str(ouvrage.id)[:8]}",
                         "total_sales_catalog": total_sales,
-                        "royalty_rate": getattr(ouvrage.institution, 'royalty_rate', Decimal("15.00")),
+                        "royalty_rate": applied_rate_val,
                         "net_royalty_amount": university_payout,
                         "status": "available",
                     }

@@ -1391,6 +1391,16 @@ class LegalRoyaltiesListView(APIView):
             else:
                 current_rate = 15.0
 
+            inst_data = None
+            if b.institution:
+                inst_data = {
+                    "id": str(b.institution.id),
+                    "name": b.institution.name,
+                    "royalty_rate": float(b.institution.royalty_rate or 15.0),
+                }
+
+            univ_share = float(rate_obj.university_share_percent) if (rate_obj and rate_obj.university_share_percent is not None) else None
+
             repartitions.append({
                 "id": str(b.id),
                 "book_id": str(b.id),
@@ -1399,6 +1409,8 @@ class LegalRoyaltiesListView(APIView):
                 "author_name": authors_list[0] if authors_list else "Auteur Principal",
                 "author_role": "Auteur Principal",
                 "author_share_percent": current_rate,
+                "institution": inst_data,
+                "university_share_percent": univ_share,
                 "co_authors": [
                     {
                         "author_id": str(r.beneficiaire_id),
@@ -1435,10 +1447,11 @@ class LegalRoyaltiesBatchView(APIView):
         beneficiaires = request.data.get("beneficiaires", [])
         raw_rate = request.data.get("rate") if "rate" in request.data else (request.data.get("new_rate") if "new_rate" in request.data else request.data.get("author_share_percent"))
         apply_retroactively = bool(request.data.get("apply_retroactively", False))
+        university_rate = request.data.get("university_share_percent")
 
         # Cas 1 : Ajustement d'un taux simple (ex: modale Juriste "Ajuster le taux")
-        if raw_rate is not None or (len(beneficiaires) == 1):
-            rate = float(raw_rate if raw_rate is not None else beneficiaires[0].get("pourcentage", 15.0))
+        if raw_rate is not None or (len(beneficiaires) == 1) or university_rate is not None:
+            rate = float(raw_rate if raw_rate is not None else (beneficiaires[0].get("pourcentage", 15.0) if beneficiaires else 15.0))
             if rate < 0 or rate > 100:
                 return Response({"success": False, "error": "Le pourcentage doit être compris entre 0% et 100%."}, status=400)
 
@@ -1455,14 +1468,32 @@ class LegalRoyaltiesBatchView(APIView):
                     ouvrage = Ouvrage.objects.filter(title__iexact=str(book_id).strip()).first()
 
             if ouvrage:
-                RoyaltyRate.objects.update_or_create(
+                defaults = {
+                    "author_share_percent": rate,
+                    "publisher_share_percent": max(0.0, 100.0 - rate),
+                    "platform_share_percent": 0.0
+                }
+                if university_rate is not None and str(university_rate).strip() != "":
+                    try:
+                        defaults["university_share_percent"] = float(university_rate)
+                    except (ValueError, TypeError):
+                        pass
+
+                royalty_rate_obj, _ = RoyaltyRate.objects.update_or_create(
                     ouvrage=ouvrage,
-                    defaults={
-                        "author_share_percent": rate,
-                        "publisher_share_percent": max(0.0, 100.0 - rate),
-                        "platform_share_percent": 0.0
-                    }
+                    defaults=defaults
                 )
+
+                if university_rate is not None:
+                    if str(university_rate).strip() == "" or university_rate is None:
+                        royalty_rate_obj.university_share_percent = None
+                    else:
+                        try:
+                            royalty_rate_obj.university_share_percent = float(university_rate)
+                        except (ValueError, TypeError):
+                            royalty_rate_obj.university_share_percent = None
+                    royalty_rate_obj.save(update_fields=["university_share_percent"])
+
                 author_right, _ = AuthorRight.objects.get_or_create(
                     ouvrage=ouvrage,
                     role="auteur_principal",
@@ -1479,6 +1510,7 @@ class LegalRoyaltiesBatchView(APIView):
                     "data": {
                         "book_id": str(ouvrage.id),
                         "current_rate": rate,
+                        "university_share_percent": float(royalty_rate_obj.university_share_percent) if royalty_rate_obj.university_share_percent is not None else None,
                         "apply_retroactively": apply_retroactively
                     }
                 }, status=200)

@@ -45,14 +45,14 @@ function LegalRoyaltiesPageContent() {
     loadData();
   }, []);
 
-  const handleUpdateRoyalty = async (newRate: number, applyRetroactively: boolean) => {
+  const handleUpdateRoyalty = async (newRate: number, applyRetroactively: boolean, universityRate?: number | null) => {
     if (!selectedRoyalty) return;
-    const success = await updateBookRoyaltyRate(selectedRoyalty.book_id, newRate, applyRetroactively);
+    const success = await updateBookRoyaltyRate(selectedRoyalty.book_id, newRate, applyRetroactively, universityRate);
     if (success) {
       setRoyalties((prev) =>
         prev.map((r) =>
           r.book_id === selectedRoyalty.book_id
-            ? { ...r, current_rate: newRate, source: "manual_override" }
+            ? { ...r, current_rate: newRate, university_share_percent: universityRate, source: "manual_override" }
             : r
         )
       );
@@ -86,6 +86,12 @@ function LegalRoyaltiesPageContent() {
           <p className="text-[10px] text-foreground-muted font-mono">
             {row.isbn ? `ISBN : ${row.isbn}` : "ISBN : Non assigné"}
           </p>
+          {row.institution && (
+            <p className="text-[10px] text-gold font-medium mt-0.5">
+              {row.institution.name} &bull; Taux univ : {row.university_share_percent ?? row.institution.royalty_rate}%
+              {row.university_share_percent !== undefined && row.university_share_percent !== null && row.university_share_percent !== row.institution.royalty_rate && " (spécifique)"}
+            </p>
+          )}
         </div>
       ),
     },

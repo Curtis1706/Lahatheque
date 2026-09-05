@@ -282,11 +282,22 @@ export default function UniversityRoyaltiesPage() {
       key: "royalty_rate",
       header: "Taux",
       hideOnMobile: true,
-      cell: (row) => (
-        <span className="font-bold text-xs text-navy bg-navy-light px-2 py-0.5 rounded-md">
-          {row.royalty_rate}%
-        </span>
-      ),
+      cell: (row) => {
+        const instRate = data?.institution?.royalty_rate ?? data?.contractual_rate ?? 15;
+        const appliedRate = row.applied_rate ?? row.royalty_rate;
+        return (
+          <div className="flex flex-col gap-1">
+            <span className="font-bold text-xs text-navy bg-navy-light px-2 py-0.5 rounded-md inline-block w-fit">
+              {appliedRate}%
+            </span>
+            {appliedRate !== instRate && (
+              <span className="text-[10px] text-gold font-semibold">
+                Taux spécifique à ce contrat : {appliedRate}% (au lieu du taux général {instRate}%)
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "royalty_amount",

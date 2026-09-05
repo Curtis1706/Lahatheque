@@ -150,6 +150,12 @@ export interface BookRoyalty {
   title: string;
   authors: string[];
   current_rate: number; // Pourcentage ex: 15 (15%)
+  institution?: {
+    id: string;
+    name: string;
+    royalty_rate: number;
+  } | null;
+  university_share_percent?: number | null;
   source: ClassificationSource;
   isbn?: string;
   last_updated: string;

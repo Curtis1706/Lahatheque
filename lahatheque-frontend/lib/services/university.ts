@@ -191,6 +191,7 @@ export async function getUniversityRoyalties(): Promise<UniversityRoyaltiesDetai
         available_balance: res.summary?.total_available ?? res.available_balance ?? fallback.available_balance,
         total_paid: res.summary?.total_paid ?? res.total_paid ?? fallback.total_paid,
         contractual_rate: contractualRate,
+        institution: res.institution || fallback.institution,
         currency,
         min_withdrawal_threshold: Number(res.min_withdrawal_threshold ?? 100000),
         totals_summary: res.totals_summary ?? fallback.totals_summary,

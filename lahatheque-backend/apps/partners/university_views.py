@@ -557,7 +557,7 @@ class UniversityPaperOrdersView(APIView):
 
 
 class UniversityRoyaltiesView(APIView):
-    """GET /api/v1/partners/university/royalties/ - Suivi des redevances 15% et versements."""
+    """GET /api/v1/partners/university/royalties/ - Suivi des redevances et versements."""
     permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
 
     def get(self, request):
@@ -569,6 +569,11 @@ class UniversityRoyaltiesView(APIView):
                     "available_balance": 0.0,
                     "total_paid": 0.0,
                     "contractual_rate": 15.00,
+                    "institution": {
+                        "id": "",
+                        "name": "Université Partenaire",
+                        "royalty_rate": 15.00
+                    },
                     "currency": "XOF",
                     "min_withdrawal_threshold": 100000,
                     "statements": []
@@ -576,15 +581,19 @@ class UniversityRoyaltiesView(APIView):
                 "error": None
             })
 
+        rate = float(inst.royalty_rate) if inst and inst.royalty_rate else 15.00
+
         qs = UniversityRoyaltyStatement.objects.filter(institution=inst)
         statements = []
         for r in qs:
+            st_rate = float(r.royalty_rate)
             statements.append({
                 "id": str(r.id),
                 "reference": r.reference,
                 "period": r.period,
                 "total_sales_catalog": float(r.total_sales_catalog),
-                "royalty_rate": float(r.royalty_rate),
+                "royalty_rate": st_rate,
+                "applied_rate": st_rate,
                 "net_royalty_amount": float(r.net_royalty_amount),
                 "currency": r.currency,
                 "status": r.status,
@@ -593,18 +602,72 @@ class UniversityRoyaltiesView(APIView):
             })
         avail_bal = float(qs.filter(status='available').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
         total_paid = float(qs.filter(status='paid').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
-        rate = float(inst.royalty_rate) if inst and inst.royalty_rate else 15.00
+
+        # Extraction des ventes unitaires réelles des ouvrages de l'institution
+        from apps.commerce.models import LigneCommande
+        from apps.rights.models import RoyaltyRate
+
+        lignes = LigneCommande.objects.filter(
+            ouvrage__institution=inst,
+            commande__statut_paiement='paid'
+        ).select_related('ouvrage', 'commande').prefetch_related('ouvrage__authors').order_by('-commande__created_at')[:50]
+
+        unit_sales = []
+        for l in lignes:
+            book_rate = RoyaltyRate.objects.filter(ouvrage=l.ouvrage).first()
+            if book_rate and book_rate.university_share_percent is not None:
+                applied_rate = float(book_rate.university_share_percent)
+            else:
+                applied_rate = rate
+
+            unit_p = float(l.unit_price)
+            gross = unit_p * l.quantity
+            r_amount = gross * (applied_rate / 100.0)
+            authors = [
+                a.user.get_full_name() if (a.user and a.user.get_full_name()) else f"{a.first_name} {a.last_name}".strip()
+                for a in l.ouvrage.authors.all()
+            ] if hasattr(l.ouvrage, 'authors') else []
+            if not authors:
+                authors = ["Auteur Universitaire"]
+
+            unit_sales.append({
+                "id": str(l.id),
+                "transaction_ref": f"TX-UNIV-{str(l.commande_id)[:8].upper()}",
+                "book_id": str(l.ouvrage_id),
+                "book_title": l.ouvrage.title,
+                "authors": authors,
+                "discipline": l.ouvrage.discipline.name if l.ouvrage.discipline else "Général",
+                "format": "paper" if l.format_type == "paper" else "digital",
+                "quantity": l.quantity,
+                "unit_price": unit_p,
+                "gross_amount": gross,
+                "royalty_rate": rate,
+                "applied_rate": applied_rate,
+                "royalty_amount": r_amount,
+                "currency": "XOF",
+                "buyer_type": "etudiant" if getattr(l.commande.user, 'role', '') == 'student' else "particulier",
+                "date": l.commande.created_at.strftime("%Y-%m-%d") if l.commande.created_at else str(timezone.now().date()),
+            })
+
+        resp_data = {
+            "available_balance": avail_bal,
+            "total_paid": total_paid,
+            "contractual_rate": rate,
+            "institution": {
+                "id": str(inst.id),
+                "name": inst.name,
+                "royalty_rate": rate,
+            },
+            "currency": "XOF",
+            "min_withdrawal_threshold": 100000,
+            "statements": statements
+        }
+        if unit_sales:
+            resp_data["unit_sales"] = unit_sales
 
         return Response({
             "success": True,
-            "data": {
-                "available_balance": avail_bal,
-                "total_paid": total_paid,
-                "contractual_rate": rate,
-                "currency": "XOF",
-                "min_withdrawal_threshold": 100000,
-                "statements": statements
-            },
+            "data": resp_data,
             "error": None
         })
 
