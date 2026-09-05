@@ -1417,6 +1417,357 @@ class AdminStockViewSet(viewsets.ViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['get'], url_path='holders')
+    def holders(self, request):
+        """
+        GET /api/v1/admin/stock/holders/
+        Liste consolidée des détenteurs de stock physique et valorisation :
+        - Grossistes distributeurs & Librairies partenaires (WholesaleOrder)
+        - Auteurs dépositaires / Dépôts-ventes / Commandes physiques (Order)
+        - Entrepôts régionaux de la plateforme (Entrepot)
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            from apps.commerce.models import WholesaleOrder, WholesaleOrderStatus, Order, LigneCommande, Entrepot, StockOuvrage
+            from apps.accounts.models import User
+            from django.db.models import Sum, F, ExpressionWrapper, DecimalField
+
+            holders = []
+
+            # 1. Grossistes & Librairies partenaires (WholesaleOrder ayant des exemplaires papier)
+            w_orders = (
+                WholesaleOrder.objects
+                .exclude(status=WholesaleOrderStatus.CANCELLED)
+                .filter(total_print_copies__gt=0)
+                .select_related('user', 'profile')
+                .order_by('-created_at')
+            )
+            grossiste_map = {}
+            for wo in w_orders:
+                key = str(wo.user_id) if wo.user else wo.company_name
+                if key not in grossiste_map:
+                    grossiste_map[key] = {
+                        "id": f"wholesaler-{key}",
+                        "holder_id": str(wo.user_id) if wo.user else str(wo.id),
+                        "name": wo.company_name,
+                        "type": "grossiste",
+                        "type_label": "Grossiste & Librairie Partenaire",
+                        "contact_name": (wo.user.get_full_name() if wo.user else "") or wo.company_name,
+                        "email": wo.user.email if wo.user else "",
+                        "phone": wo.contact_phone or (wo.profile.contact_phone if wo.profile else ""),
+                        "city": wo.profile.city if wo.profile else "Cotonou",
+                        "country": wo.profile.country if wo.profile else "BJ",
+                        "address": wo.delivery_address or (wo.profile.warehouse_address if wo.profile else ""),
+                        "total_copies": 0,
+                        "total_value_xof": 0.0,
+                        "total_paid_xof": 0.0,
+                        "remaining_balance_xof": 0.0,
+                        "orders_count": 0,
+                        "is_credit": False,
+                        "last_order_date": None,
+                    }
+                g = grossiste_map[key]
+                g["total_copies"] += wo.total_print_copies
+                val = float(wo.total_amount)
+                g["total_value_xof"] += val
+                g["orders_count"] += 1
+                if wo.is_credit_purchase:
+                    g["is_credit"] = True
+                if wo.status == WholesaleOrderStatus.DELIVERED and not wo.is_credit_purchase:
+                    g["total_paid_xof"] += val
+                else:
+                    g["remaining_balance_xof"] += val
+                if not g["last_order_date"] and wo.created_at:
+                    g["last_order_date"] = wo.created_at.isoformat()
+
+            for g in grossiste_map.values():
+                status_payment = "paid" if g["remaining_balance_xof"] <= 0 else ("partial" if g["total_paid_xof"] > 0 else "pending")
+                g["payment_status"] = status_payment
+                holders.append(g)
+
+            # 2. Commandes Auteurs en Dépôt-Vente / Établissements / Particuliers à Crédit (Order avec livres papier)
+            paper_orders = (
+                Order.objects
+                .filter(lignes__format_type='paper')
+                .select_related('user')
+                .distinct()
+                .order_by('-created_at')[:100]
+            )
+            client_map = {}
+            for ord_obj in paper_orders:
+                u = ord_obj.user
+                key = str(u.id) if u else str(ord_obj.id)
+                role = getattr(u, 'role', 'client')
+                type_label = "Auteur en Dépôt" if role == 'author' else ("Université / Campus" if role == 'university' else "Client Dépositaire")
+                holder_type = "auteur_partenaire" if role == 'author' else ("universite" if role == 'university' else "client_depot")
+
+                paper_qty = ord_obj.lignes.filter(format_type='paper').aggregate(q=Sum('quantity'))['q'] or 0
+                if paper_qty <= 0:
+                    continue
+
+                if key not in client_map:
+                    client_map[key] = {
+                        "id": f"order-client-{key}",
+                        "holder_id": str(u.id) if u else str(ord_obj.id),
+                        "name": (u.get_full_name() if u else "") or (u.email if u else "Client LAHA"),
+                        "type": holder_type,
+                        "type_label": type_label,
+                        "contact_name": (u.get_full_name() if u else "") or "Contact",
+                        "email": u.email if u else "",
+                        "phone": getattr(u, 'phone', '') or "",
+                        "city": getattr(u, 'city', 'Cotonou') or "Cotonou",
+                        "country": getattr(u, 'country', 'BJ') or "BJ",
+                        "address": getattr(u, 'address', '') or "",
+                        "total_copies": 0,
+                        "total_value_xof": 0.0,
+                        "total_paid_xof": 0.0,
+                        "remaining_balance_xof": 0.0,
+                        "orders_count": 0,
+                        "is_credit": False,
+                        "last_order_date": None,
+                    }
+                c_item = client_map[key]
+                c_item["total_copies"] += paper_qty
+                amt = float(ord_obj.total_amount)
+                c_item["total_value_xof"] += amt
+                c_item["orders_count"] += 1
+                if ord_obj.is_credit_purchase:
+                    c_item["is_credit"] = True
+                if ord_obj.statut_paiement == 'paid':
+                    c_item["total_paid_xof"] += amt
+                else:
+                    c_item["remaining_balance_xof"] += amt
+                if not c_item["last_order_date"] and ord_obj.created_at:
+                    c_item["last_order_date"] = ord_obj.created_at.isoformat()
+
+            for c_item in client_map.values():
+                status_payment = "paid" if c_item["remaining_balance_xof"] <= 0 else ("partial" if c_item["total_paid_xof"] > 0 else "pending")
+                c_item["payment_status"] = status_payment
+                holders.append(c_item)
+
+            # 3. Entrepôts & Hubs logistiques régionaux
+            warehouses = Entrepot.objects.filter(is_active=True).annotate(
+                total_items=Sum('stocks_ouvrages__quantite_reelle'),
+                stock_val=Sum(ExpressionWrapper(F('stocks_ouvrages__quantite_reelle') * F('stocks_ouvrages__ouvrage__price_paper'), output_field=DecimalField()))
+            )
+            for wh in warehouses:
+                qty = wh.total_items or 0
+                val = float(wh.stock_val or 0.0)
+                holders.append({
+                    "id": f"warehouse-{wh.id}",
+                    "holder_id": str(wh.id),
+                    "name": f"{wh.nom} (Hub Régional)",
+                    "type": "entrepot_hub",
+                    "type_label": "Hub Logistique Régional",
+                    "contact_name": wh.responsable_nom or "Chef d'entrepôt",
+                    "email": "logistique@lahatheque.com",
+                    "phone": wh.telephone or "+229 01 02 03 04",
+                    "city": wh.ville,
+                    "country": wh.pays,
+                    "address": wh.adresse or wh.ville,
+                    "total_copies": qty,
+                    "total_value_xof": val,
+                    "total_paid_xof": val,
+                    "remaining_balance_xof": 0.0,
+                    "orders_count": 1,
+                    "is_credit": False,
+                    "payment_status": "en_stock",
+                    "last_order_date": wh.updated_at.isoformat() if wh.updated_at else None,
+                })
+
+            # Tri : d'abord ceux qui ont un solde restant élevé
+            holders.sort(key=lambda x: (x["remaining_balance_xof"], x["total_value_xof"]), reverse=True)
+
+            return Response({"success": True, "data": holders, "error": None})
+        except Exception as e:
+            logger.error(f"[AdminStockViewSet.holders] Erreur : {e}", exc_info=True)
+            return Response({"success": False, "data": [], "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'], url_path='transactions')
+    def transactions(self, request):
+        """
+        GET /api/v1/admin/stock/transactions/
+        Historique unifié des transactions et règlements (espèces, virement, dépôts).
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            from apps.reporting.models import JournalAuditAdmin
+            from apps.commerce.models import Order, WholesaleOrder
+            from django.utils import timezone
+
+            transactions = []
+
+            # 1. Règlements manuels enregistrés dans le journal d'audit
+            manual_logs = JournalAuditAdmin.objects.filter(
+                action__in=["RECORD_MANUAL_CASH_PAYMENT", "RECORD_MANUAL_STOCK_PAYMENT"]
+            ).order_by('-created_at')[:100]
+
+            for log in manual_logs:
+                d = log.details or {}
+                admin_name = log.administrateur.get_full_name() if log.administrateur else "Administrateur"
+                method = d.get("payment_method", "especes")
+                method_label = "Espèces (Caisse)" if method == "especes" else ("Virement Bancaire" if method == "virement" else ("Chèque" if method == "cheque" else "Mobile Money"))
+                transactions.append({
+                    "id": str(log.id),
+                    "reference": d.get("reference_receipt", f"REC-{str(log.id)[:8].upper()}"),
+                    "holder_name": d.get("holder_name", "Partenaire"),
+                    "holder_type": d.get("holder_type", "grossiste"),
+                    "transaction_type": "payment_manual",
+                    "transaction_label": f"Règlement {method_label}",
+                    "payment_method": method,
+                    "amount": float(d.get("amount", 0.0)),
+                    "currency": "XOF",
+                    "date": log.created_at.isoformat() if log.created_at else timezone.now().isoformat(),
+                    "recorded_by": admin_name,
+                    "notes": d.get("notes", "Paiement en espèces enregistré à la caisse."),
+                    "status": "completed",
+                })
+
+            # 2. Commandes payées en espèces ou virement (Order)
+            orders = (
+                Order.objects
+                .filter(statut_paiement='paid')
+                .select_related('user')
+                .order_by('-created_at')[:50]
+            )
+            for o in orders:
+                u = o.user
+                buyer_name = (u.get_full_name() if u else "") or (u.email if u else "Client")
+                method_display = dict(Order.PAYMENT_METHOD_CHOICES).get(o.mode_paiement, o.mode_paiement or "Espèces")
+                transactions.append({
+                    "id": f"ord-{o.id}",
+                    "reference": getattr(o, 'reference', f"CMD-{str(o.id)[:8].upper()}"),
+                    "holder_name": buyer_name,
+                    "holder_type": getattr(u, 'role', 'client'),
+                    "transaction_type": "payment_order",
+                    "transaction_label": f"Règlement Commande ({method_display})",
+                    "payment_method": o.mode_paiement or "mobile_money",
+                    "amount": float(o.total_amount),
+                    "currency": "XOF",
+                    "date": o.created_at.isoformat() if o.created_at else timezone.now().isoformat(),
+                    "recorded_by": "Passerelle / Caisse",
+                    "notes": f"Commande papier n° {str(o.id)[:8].upper()}",
+                    "status": "completed",
+                })
+
+            # 3. Commandes Grossistes B2B
+            w_orders = (
+                WholesaleOrder.objects
+                .exclude(status='cancelled')
+                .select_related('user')
+                .order_by('-created_at')[:50]
+            )
+            for wo in w_orders:
+                transactions.append({
+                    "id": f"wo-{wo.id}",
+                    "reference": wo.reference or f"B2B-{str(wo.id)[:8].upper()}",
+                    "holder_name": wo.company_name,
+                    "holder_type": "grossiste",
+                    "transaction_type": "delivery_wholesale",
+                    "transaction_label": f"Livraison Dépôt ({wo.total_print_copies} ex. papier)",
+                    "payment_method": "virement",
+                    "amount": float(wo.total_amount),
+                    "currency": "XOF",
+                    "date": wo.created_at.isoformat() if wo.created_at else timezone.now().isoformat(),
+                    "recorded_by": "Direction Commerciale",
+                    "notes": f"Bordereau {wo.reference} - {wo.company_name}",
+                    "status": "completed" if wo.status == 'delivered' else "pending",
+                })
+
+            transactions.sort(key=lambda x: x["date"], reverse=True)
+            return Response({"success": True, "data": transactions[:100], "error": None})
+        except Exception as e:
+            logger.error(f"[AdminStockViewSet.transactions] Erreur : {e}", exc_info=True)
+            return Response({"success": False, "data": [], "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='record-payment')
+    def record_payment(self, request):
+        """
+        POST /api/v1/admin/stock/record-payment/
+        Enregistrement d'un paiement manuel (espèces, virement, chèque).
+        """
+        import logging
+        from decimal import Decimal
+        from django.utils import timezone
+        logger = logging.getLogger(__name__)
+
+        try:
+            from apps.reporting.models import JournalAuditAdmin
+            from apps.commerce.models import Order, WholesaleOrder
+
+            data = request.data
+            holder_name = data.get('holder_name', '').strip()
+            holder_id = data.get('holder_id', '').strip()
+            amount_raw = data.get('amount')
+            payment_method = data.get('payment_method', 'especes').strip()
+            reference_receipt = data.get('reference_receipt', '').strip()
+            notes = data.get('notes', '').strip()
+            order_id = data.get('order_id', '').strip()
+
+            if not holder_name or not amount_raw:
+                return Response({
+                    "success": False,
+                    "error": "Le nom du détenteur et le montant réglé sont obligatoires."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                amount = Decimal(str(amount_raw))
+                if amount <= 0:
+                    raise ValueError()
+            except Exception:
+                return Response({
+                    "success": False,
+                    "error": "Le montant doit être un nombre positif valide."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if not reference_receipt:
+                now_str = timezone.now().strftime("%Y%m%d%H%M")
+                reference_receipt = f"REC-ESP-{now_str}"
+
+            if order_id:
+                try:
+                    ord_obj = Order.objects.get(id=order_id)
+                    ord_obj.statut_paiement = 'paid'
+                    ord_obj.mode_paiement = payment_method
+                    ord_obj.save(update_fields=['statut_paiement', 'mode_paiement'])
+                except Exception:
+                    pass
+
+            log = JournalAuditAdmin.objects.create(
+                administrateur=request.user if request.user.is_authenticated else None,
+                action="RECORD_MANUAL_CASH_PAYMENT",
+                ressource_type="StockPaymentReceipt",
+                ressource_id=reference_receipt,
+                details={
+                    "holder_name": holder_name,
+                    "holder_id": holder_id,
+                    "amount": float(amount),
+                    "currency": "XOF",
+                    "payment_method": payment_method,
+                    "reference_receipt": reference_receipt,
+                    "notes": notes,
+                    "recorded_at": timezone.now().isoformat(),
+                }
+            )
+
+            return Response({
+                "success": True,
+                "message": f"Paiement de {float(amount):,.0f} FCFA en {payment_method} enregistré avec succès pour {holder_name}.",
+                "data": {
+                    "id": str(log.id),
+                    "reference": reference_receipt,
+                    "holder_name": holder_name,
+                    "amount": float(amount),
+                    "payment_method": payment_method,
+                    "recorded_at": timezone.now().isoformat(),
+                }
+            })
+        except Exception as e:
+            logger.error(f"[AdminStockViewSet.record_payment] Erreur : {e}", exc_info=True)
+            return Response({"success": False, "error": f"Erreur lors de l'enregistrement du paiement : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class AdminReportExportAPIView(APIView):
     """

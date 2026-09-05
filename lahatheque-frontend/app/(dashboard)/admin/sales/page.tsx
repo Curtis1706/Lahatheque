@@ -169,6 +169,10 @@ export default function AdminSalesPage() {
           isPositive: c.percentage >= 0,
         }))}
         curvePoints={(kpis?.salesCurve ?? []).map((p) => p.total)}
+        timelineData={(kpis?.salesCurve ?? []).map((p) => ({
+          label: p.month,
+          value: p.total,
+        }))}
       />
 
       {/* Sales Table */}

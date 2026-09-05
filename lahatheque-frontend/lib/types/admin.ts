@@ -416,3 +416,42 @@ export interface AdminSubscriptionItem {
   status: "active" | "expiring_soon" | "expired";
 }
 
+export interface StockHolder {
+  id: string;
+  holder_id: string;
+  name: string;
+  type: "grossiste" | "auteur_partenaire" | "universite" | "client_depot" | "entrepot_hub";
+  type_label: string;
+  contact_name: string;
+  email: string;
+  phone: string;
+  city: string;
+  country: string;
+  address: string;
+  total_copies: number;
+  total_value_xof: number;
+  total_paid_xof: number;
+  remaining_balance_xof: number;
+  orders_count: number;
+  is_credit: boolean;
+  payment_status: "paid" | "partial" | "pending" | "en_stock";
+  last_order_date?: string | null;
+}
+
+export interface StockTransaction {
+  id: string;
+  reference: string;
+  holder_name: string;
+  holder_type: string;
+  transaction_type: string;
+  transaction_label: string;
+  payment_method: string;
+  amount: number;
+  currency: string;
+  date: string;
+  recorded_by: string;
+  notes: string;
+  status: string;
+}
+
+

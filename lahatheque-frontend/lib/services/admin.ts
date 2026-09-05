@@ -18,6 +18,8 @@ import {
   AdminStockMovement,
   CountrySales,
   AdminSubscriptionItem,
+  StockHolder,
+  StockTransaction,
 } from "@/lib/types/admin";
 
 // =========================================================================
@@ -719,6 +721,41 @@ export async function createAdminWarehouse(data: {
     return { success: true, message: json.message || `L'entrepôt "${data.name}" a été créé avec succès.` };
   }
   return { success: false, error: json.error || 'Erreur lors de la création de l\'entrepôt.' };
+}
+
+export async function getAdminStockHolders(): Promise<StockHolder[]> {
+  const res = await fetch('/api/bff/admin/stock/holders/', { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Erreur détenteurs de stock: ${res.status}`);
+  const json = await res.json();
+  return json.data || json.results || [];
+}
+
+export async function getAdminStockTransactions(): Promise<StockTransaction[]> {
+  const res = await fetch('/api/bff/admin/stock/transactions/', { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Erreur transactions stock: ${res.status}`);
+  const json = await res.json();
+  return json.data || json.results || [];
+}
+
+export async function recordAdminManualPayment(payload: {
+  holder_name: string;
+  holder_id?: string;
+  amount: number;
+  payment_method: string;
+  reference_receipt?: string;
+  notes?: string;
+  order_id?: string;
+}): Promise<{ success: boolean; message?: string; error?: string; data?: any }> {
+  const res = await fetch('/api/bff/admin/stock/record-payment/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (res.ok && json.success !== false) {
+    return { success: true, message: json.message, data: json.data };
+  }
+  return { success: false, error: json.error || 'Erreur lors de l\'enregistrement du paiement manuel.' };
 }
 
 export interface PlatformGlobalSettings {

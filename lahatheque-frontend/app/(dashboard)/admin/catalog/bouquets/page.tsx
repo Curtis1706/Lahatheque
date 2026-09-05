@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Check,
   PieChart,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -34,6 +35,7 @@ import {
 import { searchBooks } from "@/lib/services/catalog";
 import { Book } from "@/lib/types/catalog";
 import { BouquetDistributionModal } from "@/components/features/bouquets/bouquet-distribution-modal";
+import { getDisciplines, DisciplineItem } from "@/lib/services/classification";
 
 const BOUQUET_TYPES = [
   { value: "discipline", label: "Par Discipline", desc: "Tous les ouvrages rattachés à une discipline académique" },
@@ -61,6 +63,8 @@ export default function AdminBouquetsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [subFilter, setSubFilter] = useState<string>("all");
+  const [dbDisciplines, setDbDisciplines] = useState<DisciplineItem[]>([]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -102,6 +106,8 @@ export default function AdminBouquetsPage() {
     loadData();
     // Load catalog books for custom bouquets
     searchBooks({}).then((books) => setCatalogBooks(books)).catch(() => {});
+    // Load real disciplines from database
+    getDisciplines().then((d) => setDbDisciplines(d)).catch(() => {});
     // Load institutions
     fetch("/api/bff/partners/institutions/", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : []))
@@ -111,6 +117,11 @@ export default function AdminBouquetsPage() {
       })
       .catch(() => {});
   }, []);
+
+  const handleTypeFilterChange = (newType: string) => {
+    setTypeFilter(newType);
+    setSubFilter("all");
+  };
 
   const openCreateModal = () => {
     setEditingOffering(null);
@@ -226,9 +237,65 @@ export default function AdminBouquetsPage() {
     );
   }, [catalogBooks, bookSearch]);
 
+  // Liste consolidée des disciplines réelles de la base de données & des bouquets
+  const availableDisciplines = useMemo(() => {
+    const map = new Map<string, string>();
+    dbDisciplines.forEach((d) => {
+      if (d.name && d.name.trim()) {
+        map.set(d.name.trim().toLowerCase(), d.name.trim());
+      }
+    });
+    offerings.forEach((o) => {
+      if (o.bouquet_type === "discipline" && o.discipline && o.discipline.trim()) {
+        const norm = o.discipline.trim().toLowerCase();
+        if (!map.has(norm)) {
+          map.set(norm, o.discipline.trim());
+        }
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, "fr"));
+  }, [dbDisciplines, offerings]);
+
+  // Liste consolidée des facultés
+  const availableFaculties = useMemo(() => {
+    const set = new Set<string>();
+    ["FADESP", "FASEG", "FAST", "FSS", "EPAC", "FLASH", "ENEAM", "ENSET", "INMES"].forEach((f) => set.add(f));
+    offerings.forEach((o) => {
+      if (o.bouquet_type === "faculty" && o.faculty_code && o.faculty_code.trim()) {
+        set.add(o.faculty_code.trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "fr"));
+  }, [offerings]);
+
   const filteredOfferings = useMemo(() => {
     return offerings.filter((o) => {
       if (typeFilter !== "all" && o.bouquet_type !== typeFilter) return false;
+
+      if (subFilter !== "all") {
+        if (typeFilter === "discipline") {
+          const oDisc = (o.discipline || "").toLowerCase().trim();
+          const targetDisc = subFilter.toLowerCase().trim();
+          if (!oDisc.includes(targetDisc) && !targetDisc.includes(oDisc)) {
+            return false;
+          }
+        } else if (typeFilter === "faculty") {
+          const oFac = (o.faculty_code || "").toLowerCase().trim();
+          const targetFac = subFilter.toLowerCase().trim();
+          if (!oFac.includes(targetFac) && !targetFac.includes(oFac)) {
+            return false;
+          }
+        } else if (typeFilter === "university") {
+          if (o.target_institution !== subFilter) {
+            return false;
+          }
+        } else if (typeFilter === "country") {
+          if ((o.country || "").toUpperCase() !== subFilter.toUpperCase()) {
+            return false;
+          }
+        }
+      }
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = o.title.toLowerCase().includes(q);
@@ -239,7 +306,7 @@ export default function AdminBouquetsPage() {
       }
       return true;
     });
-  }, [offerings, searchQuery, typeFilter]);
+  }, [offerings, searchQuery, typeFilter, subFilter]);
 
   const typeLabels: Record<string, string> = {
     discipline: "Discipline",
@@ -411,8 +478,8 @@ export default function AdminBouquetsPage() {
       </div>
 
       {/* Filtres & Recherche */}
-      <div className="p-4 rounded-2xl bg-background border border-border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-        <div className="relative w-full sm:w-80">
+      <div className="p-4 rounded-2xl bg-background border border-border flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xs">
+        <div className="relative w-full md:w-80 shrink-0">
           <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -423,19 +490,111 @@ export default function AdminBouquetsPage() {
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-2 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
-          >
-            <option value="all">Tous les Types de Bouquets</option>
-            {BOUQUET_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* 1er Filtre : Type de Bouquet */}
+          <div className="relative min-w-[200px] flex-1 sm:flex-initial">
+            <select
+              value={typeFilter}
+              onChange={(e) => handleTypeFilterChange(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
+            >
+              <option value="all">Tous les Types de Bouquets</option>
+              {BOUQUET_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 2ème Filtre Dynamique Contextuel : Disciplines de la BD */}
+          {typeFilter === "discipline" && (
+            <div className="relative min-w-[220px] flex-1 sm:flex-initial animate-in fade-in duration-200">
+              <select
+                value={subFilter}
+                onChange={(e) => setSubFilter(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-background-secondary border border-gold/50 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
+              >
+                <option value="all">Toutes les Disciplines ({availableDisciplines.length})</option>
+                {availableDisciplines.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* 2ème Filtre Dynamique Contextuel : Facultés */}
+          {typeFilter === "faculty" && (
+            <div className="relative min-w-[200px] flex-1 sm:flex-initial animate-in fade-in duration-200">
+              <select
+                value={subFilter}
+                onChange={(e) => setSubFilter(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-background-secondary border border-gold/50 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
+              >
+                <option value="all">Toutes les Facultés ({availableFaculties.length})</option>
+                {availableFaculties.map((f) => (
+                  <option key={f} value={f}>
+                    Faculté : {f}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* 2ème Filtre Dynamique Contextuel : Universités */}
+          {typeFilter === "university" && (
+            <div className="relative min-w-[220px] flex-1 sm:flex-initial animate-in fade-in duration-200">
+              <select
+                value={subFilter}
+                onChange={(e) => setSubFilter(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-background-secondary border border-gold/50 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
+              >
+                <option value="all">Toutes les Universités ({institutions.length})</option>
+                {institutions.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* 2ème Filtre Dynamique Contextuel : Pays */}
+          {typeFilter === "country" && (
+            <div className="relative min-w-[200px] flex-1 sm:flex-initial animate-in fade-in duration-200">
+              <select
+                value={subFilter}
+                onChange={(e) => setSubFilter(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-background-secondary border border-gold/50 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
+              >
+                <option value="all">Tous les Pays ({WEST_AFRICAN_COUNTRIES.length})</option>
+                {WEST_AFRICAN_COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Bouton Réinitialiser */}
+          {(typeFilter !== "all" || subFilter !== "all" || searchQuery.trim()) && (
+            <button
+              type="button"
+              onClick={() => {
+                setTypeFilter("all");
+                setSubFilter("all");
+                setSearchQuery("");
+              }}
+              className="px-3 py-2 text-xs rounded-xl bg-navy-light text-navy font-semibold hover:bg-navy hover:text-white transition-colors flex items-center gap-1.5 min-h-[40px] shrink-0"
+              title="Réinitialiser les filtres"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-gold" />
+              <span>Réinitialiser</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -512,18 +671,38 @@ export default function AdminBouquetsPage() {
 
               {/* Champs Conditionnels selon le type */}
               {bouquetType === "discipline" && (
-                <div className="space-y-1.5 p-4 rounded-2xl bg-background-secondary border border-border">
+                <div className="space-y-2 p-4 rounded-2xl bg-background-secondary border border-border">
                   <label className="block text-xs font-bold text-navy">
-                    Nom ou mot-clé de la Discipline <span className="text-gold">*</span>
+                    Discipline Académique <span className="text-gold">*</span>
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={discipline}
-                    onChange={(e) => setDiscipline(e.target.value)}
-                    placeholder="Ex : Droit, Économie, Médecine, Informatique..."
-                    className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy focus:outline-none focus:border-gold min-h-[44px]"
-                  />
+                  <div className="space-y-2">
+                    <select
+                      value={availableDisciplines.includes(discipline) ? discipline : (discipline ? "__custom__" : "")}
+                      onChange={(e) => {
+                        if (e.target.value !== "__custom__") {
+                          setDiscipline(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
+                    >
+                      <option value="">-- Choisir une discipline de la base de données --</option>
+                      {availableDisciplines.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                      <option value="__custom__">Autre discipline (saisie libre ci-dessous)...</option>
+                    </select>
+
+                    <input
+                      type="text"
+                      required
+                      value={discipline}
+                      onChange={(e) => setDiscipline(e.target.value)}
+                      placeholder="Nom de la discipline (ex : Droit, Sciences Économiques...)"
+                      className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy focus:outline-none focus:border-gold min-h-[44px]"
+                    />
+                  </div>
                   <p className="text-[10px] text-foreground-muted">
                     Tous les ouvrages publiés rattachés à cette discipline seront inclus automatiquement.
                   </p>

@@ -1,9 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
+  CircleDollarSign,
+  Calendar,
+  Layers,
+  Sparkles,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface SalesChannel {
@@ -15,10 +23,12 @@ export interface SalesChannel {
 
 export interface TotalSalesChartProps {
   title?: string;
+  subtitle?: string;
   totalAmountText?: string;
   growthBadgeText?: string;
   channels?: SalesChannel[];
   curvePoints?: number[];
+  timelineData?: { label: string; value: number }[];
   className?: string;
   onReportClick?: () => void;
   unit?: string;
@@ -26,41 +36,102 @@ export interface TotalSalesChartProps {
 
 type Period = "1d" | "1w" | "1m" | "3m" | "1y";
 
-function generatePoints(period: Period, customPoints?: number[]): number[] {
-  if (customPoints && customPoints.length >= 2) {
-    const max = Math.max(...customPoints, 1);
-    return customPoints.map((v) => Math.round((v / max) * 100));
-  }
-  const seeds: Record<Period, number[]> = {
-    "1d": [35, 42, 38, 55, 62, 58, 70, 75, 82, 80, 95, 88],
-    "1w": [45, 52, 60, 58, 72, 85, 92],
-    "1m": [30, 38, 42, 50, 48, 62, 70, 68, 80, 85, 82, 94],
-    "3m": [25, 35, 45, 40, 55, 65, 60, 75, 80, 88, 92, 98],
-    "1y": [20, 30, 40, 50, 60, 55, 70, 80, 85, 90, 94, 100],
-  };
-  return seeds[period];
+interface PointData {
+  label: string;
+  value: number;
 }
 
-function generateSmoothPath(points: number[], width: number, height: number): string {
-  if (!points || points.length < 2) return `M 0 ${height}`;
-  const xStep = width / (points.length - 1);
-  const coords = points.map((p, i) => [
-    i * xStep,
-    height - (p / 100) * (height * 0.75) - height * 0.1,
-  ]);
-  let path = `M ${coords[0][0]} ${coords[0][1]}`;
-  for (let i = 0; i < coords.length - 1; i++) {
-    const [x1, y1] = coords[i];
-    const [x2, y2] = coords[i + 1];
-    const midX = (x1 + x2) / 2;
-    path += ` C ${midX},${y1} ${midX},${y2} ${x2},${y2}`;
+function formatCompactXof(num: number): string {
+  if (num >= 1_000_000) {
+    const val = (num / 1_000_000).toFixed(1).replace(".0", "");
+    return `${val}M`;
   }
-  return path;
+  if (num >= 1_000) {
+    const val = (num / 1_000).toFixed(0);
+    return `${val}k`;
+  }
+  return num.toString();
+}
+
+function getPeriodDataset(
+  period: Period,
+  timelineData?: { label: string; value: number }[],
+  curvePoints?: number[],
+  baseTotal: number = 138500
+): PointData[] {
+  // Si timelineData réelle fournie et non vide
+  if (timelineData && timelineData.length >= 2) {
+    if (period === "1m" || period === "3m" || period === "1y") {
+      return timelineData;
+    }
+  }
+
+  // Si curvePoints fournis
+  if (curvePoints && curvePoints.length >= 2) {
+    const defaultLabels = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
+    return curvePoints.map((v, i) => ({
+      label: defaultLabels[i % defaultLabels.length] || `P${i + 1}`,
+      value: v,
+    }));
+  }
+
+  // Datasets réalistes et calibrés sur la valeur de référence de la plateforme
+  const factor = baseTotal > 0 ? baseTotal : 138500;
+
+  switch (period) {
+    case "1d":
+      return [
+        { label: "00h", value: Math.round(factor * 0.04) },
+        { label: "04h", value: Math.round(factor * 0.06) },
+        { label: "08h", value: Math.round(factor * 0.15) },
+        { label: "11h", value: Math.round(factor * 0.32) },
+        { label: "14h", value: Math.round(factor * 0.55) },
+        { label: "17h", value: Math.round(factor * 0.78) },
+        { label: "20h", value: Math.round(factor * 0.92) },
+        { label: "23h", value: factor },
+      ];
+    case "1w":
+      return [
+        { label: "Lun", value: Math.round(factor * 0.35) },
+        { label: "Mar", value: Math.round(factor * 0.48) },
+        { label: "Mer", value: Math.round(factor * 0.56) },
+        { label: "Jeu", value: Math.round(factor * 0.68) },
+        { label: "Ven", value: Math.round(factor * 0.82) },
+        { label: "Sam", value: Math.round(factor * 0.94) },
+        { label: "Dim", value: factor },
+      ];
+    case "1m":
+      return [
+        { label: "Sem 1", value: Math.round(factor * 0.22) },
+        { label: "Sem 2", value: Math.round(factor * 0.45) },
+        { label: "Sem 3", value: Math.round(factor * 0.68) },
+        { label: "Sem 4", value: Math.round(factor * 0.88) },
+        { label: "Clôture", value: factor },
+      ];
+    case "3m":
+      return [
+        { label: "Mois -2", value: Math.round(factor * 0.5) },
+        { label: "Mi-Trim.", value: Math.round(factor * 0.75) },
+        { label: "Mois -1", value: Math.round(factor * 0.88) },
+        { label: "En cours", value: factor },
+      ];
+    case "1y":
+      return [
+        { label: "Mars", value: Math.round(factor * 0.15) },
+        { label: "Avril", value: Math.round(factor * 0.28) },
+        { label: "Mai", value: Math.round(factor * 0.42) },
+        { label: "Juin", value: Math.round(factor * 0.58) },
+        { label: "Juillet", value: Math.round(factor * 0.76) },
+        { label: "Août", value: Math.round(factor * 0.89) },
+        { label: "Sept", value: factor },
+      ];
+  }
 }
 
 export function TotalSalesChart({
   title = "Progression des Ventes & Revenus",
-  totalAmountText = "28.450.000 FCFA",
+  subtitle = "Pilotage chronologique du chiffre d'affaires et ventilation par canal de vente",
+  totalAmountText = "138 500 FCFA",
   growthBadgeText = "+14.5%",
   channels = [
     { name: "Ventes numériques unitaires", amount: 12400000, change: "+18.2%", isPositive: true },
@@ -69,22 +140,96 @@ export function TotalSalesChart({
     { name: "Livres physiques (papier)", amount: 2000000, change: "-3.1%", isPositive: false },
   ],
   curvePoints,
+  timelineData,
   className,
   onReportClick,
   unit = "FCFA",
 }: TotalSalesChartProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<Period>("1m");
-  const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const chartId = useId();
 
-  const points = useMemo(() => generatePoints(selectedPeriod, curvePoints), [selectedPeriod, curvePoints]);
-  const width = 360;
-  const height = 140;
+  // Extraction du montant de base numérique depuis totalAmountText
+  const numericBaseTotal = useMemo(() => {
+    const cleanStr = (totalAmountText || "").replace(/[^0-9]/g, "");
+    return parseInt(cleanStr, 10) || 138500;
+  }, [totalAmountText]);
 
-  const svgPath = useMemo(() => generateSmoothPath(points, width, height), [points]);
+  // Points de données calculés pour la période choisie
+  const dataset = useMemo(() => {
+    return getPeriodDataset(selectedPeriod, timelineData, curvePoints, numericBaseTotal);
+  }, [selectedPeriod, timelineData, curvePoints, numericBaseTotal]);
+
+  // Dimensions géométriques du graphique vectoriel SVG
+  const svgWidth = 800;
+  const svgHeight = 250;
+  const padLeft = 60;
+  const padRight = 30;
+  const padTop = 25;
+  const padBottom = 40;
+  const chartWidth = svgWidth - padLeft - padRight;
+  const chartHeight = svgHeight - padTop - padBottom;
+
+  // Calcul du plafond Y propre et arrondi
+  const maxVal = useMemo(() => {
+    const rawMax = Math.max(...dataset.map((d) => d.value), 1000);
+    // Arrondi à l'échelon supérieur lisible
+    if (rawMax <= 10000) return Math.ceil(rawMax / 2000) * 2000 || 10000;
+    if (rawMax <= 50000) return Math.ceil(rawMax / 10000) * 10000 || 50000;
+    if (rawMax <= 200000) return Math.ceil(rawMax / 25000) * 25000 || 200000;
+    if (rawMax <= 1000000) return Math.ceil(rawMax / 100000) * 100000 || 1000000;
+    return Math.ceil(rawMax / 500000) * 500000;
+  }, [dataset]);
+
+  // Coordonnées absolues dans le SVG
+  const pointsCoords = useMemo(() => {
+    if (dataset.length === 0) return [];
+    const count = dataset.length;
+    return dataset.map((d, i) => {
+      const x = padLeft + (i / (count - 1)) * chartWidth;
+      const ratio = Math.min(Math.max(d.value / maxVal, 0), 1);
+      const y = padTop + (1 - ratio) * chartHeight;
+      return { x, y, value: d.value, label: d.label };
+    });
+  }, [dataset, maxVal, chartWidth, chartHeight, padLeft, padTop]);
+
+  // Tracé de la courbe lissée Bézier (Spline)
+  const splinePath = useMemo(() => {
+    if (pointsCoords.length < 2) return "";
+    let path = `M ${pointsCoords[0].x} ${pointsCoords[0].y}`;
+    for (let i = 0; i < pointsCoords.length - 1; i++) {
+      const p1 = pointsCoords[i];
+      const p2 = pointsCoords[i + 1];
+      const midX = (p1.x + p2.x) / 2;
+      path += ` C ${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`;
+    }
+    return path;
+  }, [pointsCoords]);
+
+  // Tracé de la zone sous la courbe (Area gradient)
   const areaPath = useMemo(() => {
-    if (!svgPath) return "";
-    return `${svgPath} L ${width} ${height} L 0 ${height} Z`;
-  }, [svgPath]);
+    if (!splinePath || pointsCoords.length < 2) return "";
+    const first = pointsCoords[0];
+    const last = pointsCoords[pointsCoords.length - 1];
+    const bottomY = padTop + chartHeight;
+    return `${splinePath} L ${last.x} ${bottomY} L ${first.x} ${bottomY} Z`;
+  }, [splinePath, pointsCoords, padTop, chartHeight]);
+
+  // Lignes de grille horizontales (4 paliers réguliers)
+  const gridLines = useMemo(() => {
+    const steps = [1, 0.66, 0.33, 0];
+    return steps.map((ratio) => {
+      const y = padTop + (1 - ratio) * chartHeight;
+      const val = Math.round(maxVal * ratio);
+      return { y, val };
+    });
+  }, [maxVal, padTop, chartHeight]);
+
+  // Total cumulé des canaux pour barres de proportion
+  const totalChannelsSum = useMemo(() => {
+    const sum = channels.reduce((acc, c) => acc + c.amount, 0);
+    return sum > 0 ? sum : numericBaseTotal;
+  }, [channels, numericBaseTotal]);
 
   const periods: { label: string; value: Period }[] = [
     { label: "1J", value: "1d" },
@@ -94,111 +239,319 @@ export function TotalSalesChart({
     { label: "1A", value: "1y" },
   ];
 
-  return (
-    <div className={cn("p-5 rounded-2xl bg-background-secondary border border-border flex flex-col gap-4 shadow-sm", className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {onReportClick && (
-          <button
-            onClick={onReportClick}
-            className="text-xs font-medium text-gold hover:text-gold-dark flex items-center gap-1 transition-colors"
-          >
-            Rapport complet <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
+  const activePoint = hoveredIndex !== null ? pointsCoords[hoveredIndex] : null;
 
-      {/* Main Value & Trend */}
-      <div className="flex items-baseline justify-between">
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{totalAmountText}</span>
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-success/15 text-success">
-            <TrendingUp className="w-3 h-3 mr-1" />
-            {growthBadgeText}
-          </span>
+  return (
+    <div
+      className={cn(
+        "p-5 sm:p-6 rounded-3xl bg-background-secondary border border-border flex flex-col gap-6 shadow-xs relative overflow-hidden",
+        className
+      )}
+    >
+      {/* En-tête : Titre & Sélecteurs de Période */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base sm:text-lg font-bold font-serif text-navy">
+              {title}
+            </h3>
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-success/10 text-success border border-success/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+              Direct
+            </span>
+          </div>
+          <p className="text-xs text-foreground-muted mt-0.5">{subtitle}</p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Sélecteur de période stylisé */}
+          <div className="inline-flex items-center rounded-xl bg-background border border-border p-1 gap-1 shadow-2xs">
+            {periods.map((p) => {
+              const isActive = selectedPeriod === p.value;
+              return (
+                <button
+                  key={p.value}
+                  onClick={() => {
+                    setSelectedPeriod(p.value);
+                    setHoveredIndex(null);
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all text-center cursor-pointer min-w-[38px]",
+                    isActive
+                      ? "bg-navy text-white shadow-xs font-bold"
+                      : "text-foreground-muted hover:text-navy hover:bg-background-secondary"
+                  )}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {onReportClick && (
+            <button
+              onClick={onReportClick}
+              className="text-xs font-semibold text-gold hover:text-gold/80 flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <span>Rapport complet</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Period Selector Toggle */}
-      <div className="flex w-full rounded-xl bg-background border border-border p-1 gap-1">
-        {periods.map((p) => {
-          const isActive = selectedPeriod === p.value;
-          return (
-            <button
-              key={p.value}
-              onClick={() => setSelectedPeriod(p.value)}
-              className={cn(
-                "flex-1 py-1 text-xs font-medium rounded-lg transition-all text-center",
-                isActive
-                  ? "bg-navy text-white shadow-xs font-semibold"
-                  : "text-foreground-muted hover:text-foreground hover:bg-background-secondary"
-              )}
-            >
-              {p.label}
-            </button>
-          );
-        })}
+      {/* Montant Principal & Évolution */}
+      <div className="flex flex-wrap items-baseline gap-3 pb-1">
+        <span className="text-2xl sm:text-3xl lg:text-4xl font-bold font-serif text-navy tracking-tight">
+          {totalAmountText}
+        </span>
+        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-success/15 text-success border border-success/25 shadow-2xs">
+          <TrendingUp className="w-3.5 h-3.5 mr-1" />
+          {growthBadgeText}
+        </span>
+        <span className="text-xs text-foreground-muted hidden sm:inline">
+          cumul consolidé sur la période
+        </span>
       </div>
 
-      {/* Sparkline Interactive Curve */}
-      <div className="relative w-full h-[140px] pt-2">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-          <motion.path
-            d={svgPath}
-            fill="none"
-            stroke="var(--gold)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          />
+      {/* Zone Graphique SVG avec Grille, Courbe et Infobulle */}
+      <div className="relative w-full h-[230px] sm:h-[260px] select-none">
+        <svg
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          className="w-full h-full overflow-visible"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            {/* Dégradé de la surface sous la courbe */}
+            <linearGradient id={`areaGrad-${chartId}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--gold)" stopOpacity="0.32" />
+              <stop offset="50%" stopColor="var(--gold)" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="var(--gold)" stopOpacity="0.0" />
+            </linearGradient>
 
-          {/* Points interactivity */}
-          {points.map((p, i) => {
-            const xStep = width / (points.length - 1);
-            const cx = i * xStep;
-            const cy = height - (p / 100) * (height * 0.75) - height * 0.1;
-            const isHovered = hoveredPointIndex === i;
+            {/* Dégradé du trait doré */}
+            <linearGradient id={`strokeGrad-${chartId}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="var(--gold)" />
+              <stop offset="100%" stopColor="var(--gold)" />
+            </linearGradient>
 
+            {/* Filtre d'ombre douce sous la courbe */}
+            <filter id={`glow-${chartId}`} x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="var(--gold)" floodOpacity="0.25" />
+            </filter>
+          </defs>
+
+          {/* Lignes de repère horizontales et graduations d'ordonnées */}
+          {gridLines.map((line, idx) => (
+            <g key={idx}>
+              <line
+                x1={padLeft}
+                y1={line.y}
+                x2={svgWidth - padRight}
+                y2={line.y}
+                stroke="var(--border)"
+                strokeDasharray="4 4"
+                strokeWidth="1"
+                strokeOpacity="0.8"
+              />
+              <text
+                x={padLeft - 10}
+                y={line.y + 3.5}
+                textAnchor="end"
+                className="text-[10px] font-mono fill-foreground-muted"
+              >
+                {formatCompactXof(line.val)} {idx === 0 ? "F" : ""}
+              </text>
+            </g>
+          ))}
+
+          {/* Remplissage de surface sous la courbe */}
+          {areaPath && (
+            <motion.path
+              d={areaPath}
+              fill={`url(#areaGrad-${chartId})`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6 }}
+            />
+          )}
+
+          {/* Trait principal de la courbe */}
+          {splinePath && (
+            <motion.path
+              d={splinePath}
+              fill="none"
+              stroke={`url(#strokeGrad-${chartId})`}
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              filter={`url(#glow-${chartId})`}
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            />
+          )}
+
+          {/* Ligne verticale interactive de survol */}
+          {activePoint && (
+            <line
+              x1={activePoint.x}
+              y1={padTop}
+              x2={activePoint.x}
+              y2={padTop + chartHeight}
+              stroke="var(--gold)"
+              strokeDasharray="3 3"
+              strokeWidth="1.5"
+              strokeOpacity="0.8"
+            />
+          )}
+
+          {/* Points de données interactifs et zones tactiles */}
+          {pointsCoords.map((pt, i) => {
+            const isHovered = hoveredIndex === i;
             return (
-              <g key={i} onMouseEnter={() => setHoveredPointIndex(i)} onMouseLeave={() => setHoveredPointIndex(null)}>
+              <g
+                key={i}
+                className="cursor-pointer"
+                onMouseEnter={() => setHoveredIndex(i)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              >
+                {/* Zone de contact tactile élargie invisible */}
+                <rect
+                  x={pt.x - 20}
+                  y={padTop}
+                  width="40"
+                  height={chartHeight + padBottom}
+                  fill="transparent"
+                />
+
+                {/* Halo pulsant si survolé */}
+                {isHovered && (
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r="10"
+                    fill="var(--gold)"
+                    fillOpacity="0.25"
+                    className="animate-ping"
+                  />
+                )}
+
+                {/* Cercle du point */}
                 <circle
-                  cx={cx}
-                  cy={cy}
-                  r={isHovered ? 6 : 4}
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={isHovered ? 6.5 : 4}
                   fill="var(--background)"
                   stroke="var(--gold)"
                   strokeWidth={isHovered ? 3 : 2}
-                  className="cursor-pointer transition-all"
+                  className="transition-all duration-150"
                 />
+
+                {/* Libellé d'axe X sous le point */}
+                <text
+                  x={pt.x}
+                  y={padTop + chartHeight + 20}
+                  textAnchor="middle"
+                  className={cn(
+                    "text-[10px] sm:text-[11px] font-sans transition-colors",
+                    isHovered
+                      ? "fill-navy font-bold"
+                      : "fill-foreground-muted font-medium"
+                  )}
+                >
+                  {pt.label}
+                </text>
               </g>
             );
           })}
         </svg>
+
+        {/* Infobulle interactive flottante (HTML Card positionnée) */}
+        {activePoint && (
+          <div
+            className="absolute pointer-events-none z-20 bg-navy text-white px-3.5 py-2 rounded-xl shadow-xl border border-gold/40 text-xs flex flex-col gap-0.5 transform -translate-x-1/2 -translate-y-full transition-all duration-75"
+            style={{
+              left: `${(activePoint.x / svgWidth) * 100}%`,
+              top: `${(activePoint.y / svgHeight) * 100 - 4}%`,
+            }}
+          >
+            <div className="flex items-center justify-between gap-3 text-[10px] text-white/70">
+              <span className="font-semibold">{activePoint.label}</span>
+              <span className="text-gold font-medium">Revenu</span>
+            </div>
+            <p className="font-mono font-bold text-gold text-sm">
+              {activePoint.value.toLocaleString("fr-FR")} {unit}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Channels Breakdown */}
-      <div className="pt-2 border-t border-border flex flex-col gap-2.5">
-        {channels.map((ch, idx) => (
-          <div key={idx} className="flex items-center justify-between text-xs">
-            <span className="text-foreground-muted font-medium truncate max-w-[200px]">{ch.name}</span>
-            <div className="flex items-center gap-2 font-mono">
-              <span className="font-semibold text-foreground">
-                {ch.amount.toLocaleString("fr-FR")} {unit}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center font-medium px-1.5 py-0.5 rounded-xs",
-                  ch.isPositive ? "bg-success/15 text-success" : "bg-error/15 text-error"
-                )}
+      {/* Grille Moderne des Canaux de Revenus (Breakdown) */}
+      <div className="pt-4 border-t border-border space-y-3">
+        <div className="flex items-center justify-between text-xs font-semibold text-foreground-muted">
+          <span className="flex items-center gap-1.5 text-navy font-bold">
+            <Layers className="w-3.5 h-3.5 text-gold" />
+            Ventilation des Revenus par Canal
+          </span>
+          <span className="text-[11px]">Part du total commercialisé</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {channels.map((ch, idx) => {
+            const share =
+              totalChannelsSum > 0
+                ? Math.round((ch.amount / totalChannelsSum) * 100)
+                : 0;
+
+            return (
+              <div
+                key={idx}
+                className="p-3.5 rounded-2xl bg-background border border-border flex flex-col justify-between gap-2.5 hover:border-gold/50 transition-all shadow-2xs"
               >
-                {ch.isPositive ? "+" : ""}{ch.change}
-              </span>
-            </div>
-          </div>
-        ))}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-semibold text-foreground line-clamp-1">
+                      {ch.name}
+                    </span>
+                    <p className="font-mono font-bold text-navy text-sm sm:text-base">
+                      {ch.amount.toLocaleString("fr-FR")}{" "}
+                      <span className="text-[11px] font-sans font-normal text-gold">
+                        {unit}
+                      </span>
+                    </p>
+                  </div>
+
+                  <span
+                    className={cn(
+                      "inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0",
+                      ch.isPositive
+                        ? "bg-success/15 text-success border border-success/20"
+                        : "bg-error/15 text-error border border-error/20"
+                    )}
+                  >
+                    {ch.isPositive ? "+" : ""}
+                    {ch.change}
+                  </span>
+                </div>
+
+                {/* Barre de progression proportionnelle */}
+                <div className="space-y-1">
+                  <div className="w-full h-1.5 rounded-full bg-border overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gold transition-all duration-500"
+                      style={{ width: `${Math.min(Math.max(share, 5), 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-foreground-muted font-mono">
+                    <span>Part</span>
+                    <span className="font-semibold text-navy">{share}%</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
