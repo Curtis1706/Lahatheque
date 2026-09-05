@@ -34,6 +34,14 @@ class PartnerApp(models.Model):
         related_name='partner_apps',
         help_text="Établissement/Institution académique rattaché à cette application partenaire"
     )
+    restricted_bouquet = models.ForeignKey(
+        'partners.BouquetOffering',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='partner_apps_restricted',
+        help_text="Si défini, cette clé API n'a accès qu'aux livres de ce bouquet précis."
+    )
     allowed_return_origins = models.JSONField(
         default=list,
         help_text="Liste des domaines/origines autorisés pour la redirection return_url (anti-open-redirect)"

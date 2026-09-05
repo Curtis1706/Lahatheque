@@ -287,6 +287,10 @@ export interface PartnerApiKey {
   allowByod: boolean;
   allowedDocumentSources: string[];
   maxFileSizeMb: number;
+
+  // Restriction Bouquet
+  restricted_bouquet_id?: string | null;
+  restrictedBouquetName?: string | null;
 }
 
 export interface AdminValidationProof {

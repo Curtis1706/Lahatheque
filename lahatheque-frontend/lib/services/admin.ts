@@ -938,6 +938,22 @@ export async function getBouquetOfferings(): Promise<BouquetOfferingAdmin[]> {
   return DEFAULT_MOCK_BOUQUET_OFFERINGS;
 }
 
+export async function getAvailableBouquets(): Promise<Array<{ id: string; title: string }>> {
+  try {
+    const res = await fetch('/api/bff/admin/bouquet-offerings/', { credentials: 'include', cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      const list = json.data || json.results || (Array.isArray(json) ? json : []);
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map((b: any) => ({ id: String(b.id), title: b.title }));
+      }
+    }
+  } catch {
+    // Mode offline ou API indisponible
+  }
+  return DEFAULT_MOCK_BOUQUET_OFFERINGS.map((b) => ({ id: b.id, title: b.title }));
+}
+
 export async function createBouquetOffering(data: Partial<BouquetOfferingAdmin>): Promise<boolean> {
   const res = await fetch("/api/bff/admin/bouquet-offerings/", {
     method: "POST", credentials: "include",

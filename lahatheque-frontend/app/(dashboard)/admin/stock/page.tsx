@@ -547,7 +547,7 @@ export default function AdminStockOverviewPage() {
 
                           {/* Action */}
                           <td className="py-3.5 px-4 text-center">
-                            {!isHub && (
+                            {!isHub && holder.remaining_balance_xof > 0 ? (
                               <button
                                 onClick={() => handleOpenPaymentModal(holder)}
                                 className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-navy text-white text-[11px] font-semibold hover:bg-navy/90 transition-colors cursor-pointer min-h-[34px]"
@@ -555,7 +555,9 @@ export default function AdminStockOverviewPage() {
                                 <Banknote className="w-3.5 h-3.5 text-gold" />
                                 <span>Encaisser</span>
                               </button>
-                            )}
+                            ) : !isHub ? (
+                              <span className="text-[10px] text-foreground-muted italic">Rien à recouvrer</span>
+                            ) : null}
                           </td>
                         </tr>
                       );

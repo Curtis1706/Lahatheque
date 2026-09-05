@@ -1486,10 +1486,12 @@ class AdminStockViewSet(viewsets.ViewSet):
                 g["payment_status"] = status_payment
                 holders.append(g)
 
-            # 2. Commandes Auteurs en Dépôt-Vente / Établissements / Particuliers à Crédit (Order avec livres papier)
+            # 2. Détenteurs à crédit uniquement (Auteurs, Universités, ou tout rôle ayant pris
+            # des livres papier à crédit) — un client ayant payé comptant n'est PAS un
+            # détenteur de stock, quel que soit son rôle.
             paper_orders = (
                 Order.objects
-                .filter(lignes__format_type='paper')
+                .filter(lignes__format_type='paper', is_credit_purchase=True)
                 .select_related('user')
                 .distinct()
                 .order_by('-created_at')[:100]

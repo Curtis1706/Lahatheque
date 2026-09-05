@@ -906,7 +906,16 @@ class PartnerCatalogListView(APIView):
         from apps.catalog.models import Ouvrage
         from apps.student.serializers import OuvrageBasicSerializer
 
-        qs = Ouvrage.objects.filter(status='published').select_related('discipline', 'institution').prefetch_related('authors')
+        partner = getattr(request, 'partner', None)
+        restricted_bouquet = getattr(partner, 'restricted_bouquet', None) if partner else None
+
+        if restricted_bouquet:
+            institution = getattr(partner, 'linked_institution', None)
+            qs = restricted_bouquet.get_books_queryset(requesting_institution=institution).select_related(
+                'discipline', 'institution'
+            ).prefetch_related('authors')
+        else:
+            qs = Ouvrage.objects.filter(status='published').select_related('discipline', 'institution').prefetch_related('authors')
 
         q = request.query_params.get('q', '').strip()
         if q:
@@ -932,10 +941,19 @@ class PartnerCatalogDetailView(APIView):
         from apps.catalog.models import Ouvrage
         from apps.student.serializers import OuvrageBasicSerializer
 
+        partner = getattr(request, 'partner', None)
+        restricted_bouquet = getattr(partner, 'restricted_bouquet', None) if partner else None
+
         try:
             ouvrage = Ouvrage.objects.get(id=id, status='published')
         except (Ouvrage.DoesNotExist, Exception):
-            return Response({"success": False, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
+
+        if restricted_bouquet:
+            institution = getattr(partner, 'linked_institution', None)
+            allowed_ids = restricted_bouquet.get_books_queryset(requesting_institution=institution).values_list('id', flat=True)
+            if ouvrage.id not in allowed_ids:
+                return Response({"success": False, "error": "Cet ouvrage n'appartient pas au bouquet autorisé pour cette clé."}, status=403)
 
         serializer = OuvrageBasicSerializer(ouvrage, context={'request': request})
         return Response({"success": True, "data": serializer.data})

@@ -364,7 +364,7 @@ export default function AdminOrdersPage() {
             <span>Administration Commerciale</span>
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Commandes Manuelles &amp; Gestion
+            Gestion des commandes
           </h1>
           <p className="text-xs text-foreground-muted">
             Passez commande directement pour n&apos;importe quel client et supervisez les expéditions de la plateforme.

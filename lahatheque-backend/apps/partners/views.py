@@ -244,7 +244,7 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
     def list(self, request: Request) -> Response:
         """GET /api/v1/partners/apps/ - Liste toutes les applications partenaires."""
         try:
-            apps = PartnerApp.objects.all().order_by("-created_at")
+            apps = PartnerApp.objects.all().select_related("restricted_bouquet").order_by("-created_at")
             results: List[Dict[str, Any]] = []
 
             for app in apps:
@@ -326,6 +326,8 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                     "allowByod": allow_byod,
                     "allowedDocumentSources": quotas.get("allowed_document_sources", []),
                     "maxFileSizeMb": quotas.get("max_file_size_mb", 200),
+                    "restricted_bouquet_id": str(app.restricted_bouquet_id) if app.restricted_bouquet_id else None,
+                    "restrictedBouquetName": app.restricted_bouquet.title if app.restricted_bouquet else None,
                 })
 
             return standard_response(data=results)
@@ -381,6 +383,12 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
             if not cleaned_origins:
                 cleaned_origins = ["*"]
 
+            restricted_bouquet_id = data.get("restricted_bouquet_id") or data.get("restrictedBouquetId")
+            restricted_bouquet = None
+            if restricted_bouquet_id:
+                from apps.partners.models import BouquetOffering
+                restricted_bouquet = BouquetOffering.objects.filter(id=restricted_bouquet_id).first()
+
             app = PartnerApp.objects.create(
                 name=name,
                 client_id=client_id_gen,
@@ -390,6 +398,7 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                 webhook_url=data.get("webhookUrl", ""),
                 webhook_secret=webhook_signing_secret,
                 quotas=quotas,
+                restricted_bouquet=restricted_bouquet,
                 is_active=True
             )
 
@@ -416,6 +425,8 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                 "allowByod": allow_byod,
                 "allowedDocumentSources": quotas["allowed_document_sources"],
                 "maxFileSizeMb": quotas["max_file_size_mb"],
+                "restricted_bouquet_id": str(app.restricted_bouquet_id) if app.restricted_bouquet_id else None,
+                "restrictedBouquetName": app.restricted_bouquet.title if app.restricted_bouquet else None,
             }
 
             return standard_response(data=result, status_code=status.HTTP_201_CREATED)
@@ -486,6 +497,14 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
             if "maxFileSizeMb" in data:
                 quotas["max_file_size_mb"] = data["maxFileSizeMb"]
 
+            if "restricted_bouquet_id" in data or "restrictedBouquetId" in data:
+                r_id = data.get("restricted_bouquet_id") or data.get("restrictedBouquetId")
+                if r_id:
+                    from apps.partners.models import BouquetOffering
+                    app.restricted_bouquet = BouquetOffering.objects.filter(id=r_id).first()
+                else:
+                    app.restricted_bouquet = None
+
             app.quotas = quotas
             app.save()
 
@@ -503,6 +522,8 @@ class PartnerAppAdminViewSet(viewsets.ViewSet):
                 "allowByod": quotas.get("allow_byod", True),
                 "allowedDocumentSources": quotas.get("allowed_document_sources", ["*"]),
                 "maxFileSizeMb": quotas.get("max_file_size_mb", 200),
+                "restricted_bouquet_id": str(app.restricted_bouquet_id) if app.restricted_bouquet_id else None,
+                "restrictedBouquetName": app.restricted_bouquet.title if app.restricted_bouquet else None,
             })
         except PartnerApp.DoesNotExist:
             return standard_response(error="Application introuvable.", status_code=status.HTTP_404_NOT_FOUND)
