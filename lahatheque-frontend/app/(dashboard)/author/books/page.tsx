@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, ArrowLeft, Eye, Download, DollarSign, ChevronRight, BarChart3 } from "lucide-react";
+import { BookOpen, ArrowLeft, Eye, Download, DollarSign, ChevronRight, BarChart3, ShoppingBag, ArrowRight } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getAuthorPublishedBooks } from "@/lib/services/author";
@@ -50,11 +50,37 @@ export default function AuthorBooksPage() {
       ),
     },
     {
+      key: "stock_remaining" as keyof AuthorPublishedBook,
+      header: "Stock Restant",
+      cell: (row) => (
+        <div>
+          <span className="font-mono font-bold text-xs text-navy">
+            {(row.stock_remaining ?? 0).toLocaleString("fr-FR")} ex.
+          </span>
+          <p className="text-[10px] text-foreground-muted">disponibles</p>
+        </div>
+      ),
+    },
+    {
+      key: "stock_initial" as keyof AuthorPublishedBook,
+      header: "Stock Initial",
+      hideOnMobile: true,
+      cell: (row) => (
+        <div>
+          <span className="font-mono font-bold text-xs text-foreground-muted">
+            {(row.stock_initial ?? 0).toLocaleString("fr-FR")} ex.
+          </span>
+          <p className="text-[10px] text-foreground-muted">tirage total</p>
+        </div>
+      ),
+    },
+    {
       key: "downloads_count",
-      header: "Téléchargements (DRM)",
+      header: "Lectures Sécurisées",
+      hideOnMobile: true,
       cell: (row) => (
         <span className="font-mono font-bold text-xs text-navy">
-          {row.downloads_count.toLocaleString("fr-FR")} fois
+          {row.downloads_count.toLocaleString("fr-FR")} lectures
         </span>
       ),
     },
@@ -80,13 +106,23 @@ export default function AuthorBooksPage() {
       key: "id",
       header: "",
       cell: (row) => (
-        <Link
-          href={`/author/books/${row.id}`}
-          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1 min-h-[36px]"
-        >
-          <BarChart3 className="w-3.5 h-3.5 text-gold" />
-          Détail
-        </Link>
+        <div className="flex items-center gap-1.5 justify-end">
+          <Link
+            href={`/author/catalog`}
+            className="px-2.5 py-1.5 rounded-xl bg-gold/15 text-navy border border-gold/30 hover:bg-gold/25 text-[10px] font-bold transition-colors inline-flex items-center gap-1 min-h-[36px]"
+            title="Commander cet ouvrage avec votre remise auteur (-40% papier)"
+          >
+            <ShoppingBag className="w-3.5 h-3.5 text-gold" />
+            <span>Commander (-40%)</span>
+          </Link>
+          <Link
+            href={`/author/books/${row.id}`}
+            className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1 min-h-[36px]"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-gold" />
+            Détail
+          </Link>
+        </div>
       ),
     },
   ];
@@ -115,9 +151,33 @@ export default function AuthorBooksPage() {
             Mes Livres Publiés
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Suivi des ventes, des téléchargements et des revenus générés pour chacun de vos ouvrages actuellement au catalogue.
+            Suivi des ventes, des lectures en streaming sécurisé et des revenus générés pour chacun de vos ouvrages actuellement au catalogue.
           </p>
         </div>
+      </div>
+
+      {/* Bannière Remise Auteur */}
+      <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-gold text-navy">
+            <ShoppingBag className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="font-bold text-xs text-navy">
+              Tarif Préférentiel Auteur : -40% sur vos exemplaires papier &amp; -25% en numérique
+            </p>
+            <p className="text-[11px] text-foreground-muted">
+              Commandez des tirages personnels pour vos dédicaces, conférences ou pour votre entourage.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/author/catalog"
+          className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1.5 shrink-0 shadow-xs min-h-[40px]"
+        >
+          <span>Commander mes livres (-40%)</span>
+          <ArrowRight className="w-3.5 h-3.5 text-gold" />
+        </Link>
       </div>
 
       {/* Note d'explication de la règle de séparation avec "Mes Dépôts" */}

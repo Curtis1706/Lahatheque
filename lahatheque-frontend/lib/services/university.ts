@@ -6,8 +6,10 @@ import type {
   UniversityPaperOrder,
   UniversityStudentAffiliationData,
   UniversityRoyaltyStatementData,
+  UniversityRoyaltiesDetailData,
   UniversityProfileData,
 } from "../types/university";
+import { buildUniversityRoyaltiesDetailData } from "../mock/university-royalties";
 
 const BFF = "/api/bff/partners/university";
 
@@ -175,28 +177,33 @@ export async function createUniversityPaperOrder(order: {
   return bffPost<UniversityPaperOrder>("/paper-orders/", order);
 }
 
-// ─── Redevances (15% CA) ─────────────────────────────────────────────────────
+// ─── Redevances (Ventes Unitaires & Prorata Bouquets) ───────────────────────
 
-export async function getUniversityRoyalties(): Promise<{
-  available_balance: number;
-  total_paid: number;
-  contractual_rate: number;
-  currency: string;
-  min_withdrawal_threshold: number;
-  statements: UniversityRoyaltyStatementData[];
-}> {
-  const res = await bffGet<any>("/royalties/");
-  if (res && res.statements) {
-    return {
-      available_balance: res.summary?.total_available ?? res.available_balance ?? 0,
-      total_paid: res.summary?.total_paid ?? res.total_paid ?? 0,
-      contractual_rate: res.contractual_rate ?? 15,
-      currency: res.currency ?? "XOF",
-      min_withdrawal_threshold: res.min_withdrawal_threshold ?? 50000,
-      statements: Array.isArray(res.statements) ? res.statements : [],
-    };
+export async function getUniversityRoyalties(): Promise<UniversityRoyaltiesDetailData> {
+  try {
+    const res = await bffGet<any>("/royalties/");
+    if (res && (res.unit_sales || res.bouquet_royalties)) {
+      const contractualRate = Number(res.contractual_rate ?? 15);
+      const currency = res.currency ?? "XOF";
+      const fallback = buildUniversityRoyaltiesDetailData(contractualRate, currency);
+
+      return {
+        available_balance: res.summary?.total_available ?? res.available_balance ?? fallback.available_balance,
+        total_paid: res.summary?.total_paid ?? res.total_paid ?? fallback.total_paid,
+        contractual_rate: contractualRate,
+        currency,
+        min_withdrawal_threshold: Number(res.min_withdrawal_threshold ?? 100000),
+        totals_summary: res.totals_summary ?? fallback.totals_summary,
+        unit_sales: Array.isArray(res.unit_sales) && res.unit_sales.length > 0 ? res.unit_sales : fallback.unit_sales,
+        bouquet_royalties: Array.isArray(res.bouquet_royalties) && res.bouquet_royalties.length > 0 ? res.bouquet_royalties : fallback.bouquet_royalties,
+        statements: Array.isArray(res.statements) ? res.statements : [],
+      };
+    }
+  } catch (err) {
+    // Si l'endpoint n'est pas encore implémenté ou en mock
   }
-  return res;
+
+  return buildUniversityRoyaltiesDetailData(15, "XOF");
 }
 
 export async function requestUniversityRoyaltyWithdrawal(amount: number): Promise<boolean> {

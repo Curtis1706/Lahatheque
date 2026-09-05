@@ -34,7 +34,8 @@ import {
   Activity,
   Layers,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  FileCheck2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -241,15 +242,15 @@ export default function AdminOverviewDashboard() {
           deltaLabel="actifs"
           data={getRollingTimeline(kpis?.activeUsers ?? 0)}
         />
-        <Link href="/admin/reminders" className="block">
+        <Link href="/admin/publisher-deposits" className="block">
           <ProgressMetricCard
-            title="Dépôts & Maquettes en Attente"
+            title="Dépôts Éditeurs & Maquettes"
             total={`${kpis?.pendingSubmissions ?? 0} dossiers`}
-            percent="Action"
+            percent="À traiter"
             trend="down"
             accent="rose"
             delta="À valider"
-            deltaLabel="par chefs"
+            deltaLabel="éditorial & droits"
             data={getRollingTimeline(kpis?.pendingSubmissions ?? 0)}
           />
         </Link>
@@ -354,6 +355,7 @@ export default function AdminOverviewDashboard() {
             <div className="flex flex-col gap-2.5">
               {[
                 { label: "Gérer les Utilisateurs", icon: Users, href: "/admin/users", desc: "9 rôles d'accès système" },
+                { label: "Dépôts Éditeurs Tiers", icon: FileCheck2, href: "/admin/publisher-deposits", desc: "Validation éditoriale & droits" },
                 { label: "Catalogue & Tarifs", icon: BookOpen, href: "/admin/catalog", desc: "Prix & Protections DRM" },
                 { label: "Ventes & Commandes", icon: ShoppingBag, href: "/admin/sales", desc: "Suivi B2C / B2B" },
                 { label: "Gestion Redevances", icon: DollarSign, href: "/admin/royalties", desc: "Droits d'auteurs & éditeurs" },

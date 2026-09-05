@@ -154,6 +154,10 @@ export interface PublisherRoyaltyPayment {
   amount: number;
   currency: string;
   period: string;
+  quarter?: 1 | 2 | 3 | 4;
+  year?: number;
+  start_date?: string;
+  end_date?: string;
   status: "paid" | "processing" | "pending" | "failed";
   payment_date?: string;
   paid_at?: string;

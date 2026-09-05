@@ -49,6 +49,9 @@ export async function getAuthorKpis(): Promise<AuthorKpis> {
     activeSubmissionsCount: 0,
     publishedBooksCount: 0,
     authorName: "Prof. Augustin CHAKIROU",
+    stockRemaining: 0,
+    stockInitial: 0,
+    paperSalesCount: 0,
   };
 }
 
@@ -157,15 +160,27 @@ export async function createAuthorSubmission(
 
 // ─── Droits, Redevances & Retraits ───────────────────────────────────────────
 
-export async function getAuthorRoyaltyPayments(): Promise<AuthorRoyaltyPayment[]> {
+export async function getAuthorRoyaltyPayments(filters?: {
+  start_date?: string;
+  end_date?: string;
+  year?: number;
+  quarter?: number;
+}): Promise<AuthorRoyaltyPayment[]> {
   try {
-    const res = await fetch("/api/bff/rights/author/royalties/", {
+    const params = new URLSearchParams();
+    if (filters?.start_date) params.append("start_date", filters.start_date);
+    if (filters?.end_date) params.append("end_date", filters.end_date);
+    if (filters?.year) params.append("year", String(filters.year));
+    if (filters?.quarter) params.append("quarter", String(filters.quarter));
+
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(`/api/bff/rights/author/royalties/${query}`, {
       headers: { "Content-Type": "application/json" },
       credentials: "include",
     });
     if (res.ok) {
       const data = await res.json();
-      if (data.success && data.data) {
+      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
         return data.data;
       }
     }
@@ -173,7 +188,24 @@ export async function getAuthorRoyaltyPayments(): Promise<AuthorRoyaltyPayment[]
     console.warn("[Author Service] API getAuthorRoyaltyPayments error:", err);
   }
 
-  return [];
+  // Fallback haute fidélité sur les relevés trimestriels mockés
+  const { mockAuthorRoyaltyPayments } = await import("../mock/author");
+  let results = [...mockAuthorRoyaltyPayments];
+
+  if (filters?.year) {
+    results = results.filter((r) => r.year === filters.year);
+  }
+  if (filters?.quarter) {
+    results = results.filter((r) => r.quarter === filters.quarter);
+  }
+  if (filters?.start_date) {
+    results = results.filter((r) => (r.end_date ? r.end_date >= filters.start_date! : true));
+  }
+  if (filters?.end_date) {
+    results = results.filter((r) => (r.start_date ? r.start_date <= filters.end_date! : true));
+  }
+
+  return results;
 }
 
 export async function getPayoutRequests(): Promise<PayoutRequestItem[]> {

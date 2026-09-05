@@ -71,15 +71,58 @@ export default function RoyaltyStatementDetailPage() {
             <span className="text-xs font-bold text-gold uppercase tracking-wider">LAHA Éditions • Relevé de Redevances (Part Propre Auteur)</span>
             <h2 className="font-serif font-bold text-navy text-xl">{payment.period}</h2>
           </div>
-          <a
-            href={payment.receipt_url}
-            target="_blank"
-            rel="noreferrer"
-            className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors inline-flex items-center gap-2"
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const { generateOfficialPdf } = await import("@/lib/services/export-service");
+                await generateOfficialPdf({
+                  docType: "BORDEREAU_REDEVANCES",
+                  docNumber: `REL-AUTEUR-${payment.id.slice(0, 8).toUpperCase()}`,
+                  date: payment.payment_date || new Date().toLocaleDateString("fr-FR"),
+                  period: payment.period,
+                  recipient: {
+                    name: "Auteur / Créateur d'Ouvrage",
+                    roleOrTitle: "Titulaire de Droits d'Auteur LAHAThèque",
+                    addressOrCampus: "Compte Auteur Agréé",
+                    emailOrPhone: "auteur@lahatheque.bj",
+                  },
+                  summaryCards: [
+                    { label: "Trimestre / Période", value: payment.period },
+                    { label: "Ventes Trimestrielles", value: `${payment.total_sales_count.toLocaleString("fr-FR")} exemplaires` },
+                    { label: "Taux de Rétribution", value: `${payment.author_percentage_rate} % (Droits)` },
+                    { label: "Statut Règlement", value: payment.status === "paid" ? "Payé" : "En cours" },
+                  ],
+                  tableHeaders: [
+                    "Période Trimestrielle",
+                    "Volume Ventes",
+                    "Revenus Bruts (HT)",
+                    "Quote-part Auteur (15%)",
+                    "Statut",
+                  ],
+                  tableRows: [
+                    [
+                      payment.period,
+                      `${payment.total_sales_count.toLocaleString("fr-FR")} ex.`,
+                      `${payment.gross_revenue.toLocaleString("fr-FR")} XOF`,
+                      `${payment.author_earned_amount.toLocaleString("fr-FR")} XOF`,
+                      payment.status === "paid" ? "Versé" : "En attente",
+                    ],
+                  ],
+                  totalAmount: `${payment.author_earned_amount.toLocaleString("fr-FR")} XOF`,
+                  totalNotes:
+                    "Relevé officiel certifié par LAHAThèque Éditions & Numérique S.A.",
+                  filename: `releve_droits_${payment.period.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
+                });
+              } catch {
+                // Ignore
+              }
+            }}
+            className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 cursor-pointer"
           >
             <Download className="w-4 h-4 text-gold" />
             Télécharger le relevé PDF
-          </a>
+          </button>
         </div>
 
         {/* Détail du Calcul des Droits (Section 3.4.1) */}

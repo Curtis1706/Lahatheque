@@ -17,7 +17,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Key,
-  Clock,
+  FileBarChart,
   RefreshCw,
 } from "lucide-react";
 
@@ -111,7 +111,7 @@ export default function PublisherOverviewPage() {
           <ProgressMetricCard
             title="Consultations & Lecteurs"
             total={`${(kpis?.totalConsultations ?? 0).toLocaleString("fr-FR")} lectures`}
-            percent={`${kpis?.totalDownloads ?? 0} téléch.`}
+            percent="Streaming sécurisé"
             trend="up"
             accent="navy"
             delta="Lectures"
@@ -178,10 +178,10 @@ export default function PublisherOverviewPage() {
               href: "/publisher/catalog/batch",
             },
             {
-              label: "Suivi des Dépôts",
-              desc: "Circuit de validation éditoriale en 5 étapes",
-              icon: Clock,
-              href: "/publisher/submissions",
+              label: "Catalogue d'Ouvrages",
+              desc: "Gérer vos titres et statuts de parution",
+              icon: BookOpen,
+              href: "/publisher/catalog",
             },
             {
               label: "Protections Anti-Piratage",
@@ -197,8 +197,8 @@ export default function PublisherOverviewPage() {
             },
             {
               label: "Statistiques & Lectorat",
-              desc: "Consultations et téléchargements détaillés",
-              icon: BookOpen,
+              desc: "Consultations en streaming et ventes",
+              icon: FileBarChart,
               href: "/publisher/stats",
             },
           ].map((item) => (

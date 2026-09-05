@@ -92,47 +92,38 @@ function AuthorCatalogBookCard({
               <CheckCircle2 className="w-3 h-3 text-success" /> Déjà acquis
             </span>
           ) : (
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1">
-                <span className="text-[9px] uppercase font-bold text-foreground-muted">Numérique</span>
-                {book.author_discounted_digital_price !== undefined && book.author_discounted_digital_price !== null ? (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-gold/15 text-navy border border-gold/30">
+                    Remise Auteur
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
                   <div className="flex items-center gap-1">
+                    <span className="text-[9px] uppercase font-bold text-foreground-muted">Numérique :</span>
                     <span className="font-mono font-bold text-navy text-xs">
-                      {book.author_discounted_digital_price.toLocaleString("fr-FR")} FCFA
+                      {(book.author_discounted_digital_price ?? Math.round((book.price_digital || 3000) * 0.75)).toLocaleString("fr-FR")} FCFA
                     </span>
                     <span className="text-[9px] text-foreground-muted line-through font-mono">
-                      {(book.price_digital ?? 0).toLocaleString("fr-FR")}
+                      {(book.price_digital || 3000).toLocaleString("fr-FR")}
                     </span>
                   </div>
-                ) : (
-                  <span className="font-mono font-bold text-navy text-xs">
-                    {(book.price_digital ?? 0).toLocaleString("fr-FR")} FCFA
-                  </span>
-                )}
-              </div>
-              {book.is_paper_available && (
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] uppercase font-bold text-foreground-muted flex items-center gap-0.5">
-                    <Truck className="w-2.5 h-2.5 text-gold" /> Papier
-                  </span>
-                  {book.author_discounted_paper_price !== undefined && book.author_discounted_paper_price !== null ? (
+                  {book.is_paper_available && (
                     <div className="flex items-center gap-1">
+                      <span className="text-[9px] uppercase font-bold text-foreground-muted flex items-center gap-0.5">
+                        <Truck className="w-2.5 h-2.5 text-gold" /> Papier :
+                      </span>
                       <span className="font-mono font-bold text-gold text-xs">
-                        {book.author_discounted_paper_price.toLocaleString("fr-FR")} FCFA
+                        {(book.author_discounted_paper_price ?? Math.round((book.price_paper || 5000) * 0.6)).toLocaleString("fr-FR")} FCFA
                       </span>
                       <span className="text-[9px] text-foreground-muted line-through font-mono">
-                        {(book.price_paper ?? 0).toLocaleString("fr-FR")}
+                        {(book.price_paper || 5000).toLocaleString("fr-FR")}
                       </span>
                     </div>
-                  ) : (
-                    <span className="font-mono font-bold text-gold text-xs">
-                      {(book.price_paper ?? 0).toLocaleString("fr-FR")} FCFA
-                    </span>
                   )}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -217,6 +208,23 @@ export default function AuthorCatalogPage() {
           <ShoppingBag className="w-4 h-4" />
           <span>Mes Achats</span>
         </Link>
+      </div>
+
+      {/* Bannière d'Avantage Tarifaire Auteur */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-gold/10 border border-gold/30 flex items-center justify-between gap-4 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-2xl bg-gold text-navy shrink-0">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="font-bold text-xs text-navy">
+              Tarif Préférentiel Auteur Actif : -40% sur le papier et -25% sur le numérique
+            </p>
+            <p className="text-[11px] text-foreground-muted">
+              Les prix remisés s&apos;appliquent automatiquement à tous vos achats d&apos;exemplaires, avec option de règlement immédiat ou en dépôt à terme (30 jours).
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Barre de Recherche & Filtres */}

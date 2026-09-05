@@ -6,7 +6,6 @@ import {
   FileBarChart,
   ArrowLeft,
   Eye,
-  Download,
   DollarSign,
   TrendingUp,
   BookOpen,
@@ -47,11 +46,11 @@ export default function PublisherStatsPage() {
     return books.reduce((acc, b) => acc + (b.consultations_count || 0), 0);
   }, [kpis, books]);
 
-  const totalDownloads = useMemo(() => {
-    if (kpis?.totalDownloads !== undefined && kpis.totalDownloads > 0) {
-      return kpis.totalDownloads;
+  const publishedBooksCount = useMemo(() => {
+    if (kpis?.publishedBooks !== undefined && kpis.publishedBooks > 0) {
+      return kpis.publishedBooks;
     }
-    return books.reduce((acc, b) => acc + (b.downloads_count || 0), 0);
+    return books.filter((b) => b.status === "published").length;
   }, [kpis, books]);
 
   const totalRevenue = useMemo(() => {
@@ -116,21 +115,11 @@ export default function PublisherStatsPage() {
     },
     {
       key: "consultations_count",
-      header: "Consultations",
+      header: "Consultations Streaming",
       cell: (row) => (
         <div className="flex items-center gap-1.5 font-mono font-bold text-xs text-navy">
           <Eye className="w-3.5 h-3.5 text-info shrink-0" />
-          <span>{(row.consultations_count || 0).toLocaleString("fr-FR")} vues</span>
-        </div>
-      ),
-    },
-    {
-      key: "downloads_count",
-      header: "Téléchargements",
-      cell: (row) => (
-        <div className="flex items-center gap-1.5 font-mono font-bold text-xs text-navy">
-          <Download className="w-3.5 h-3.5 text-gold shrink-0" />
-          <span>{(row.downloads_count || 0).toLocaleString("fr-FR")} fois</span>
+          <span>{(row.consultations_count || 0).toLocaleString("fr-FR")} lectures</span>
         </div>
       ),
     },
@@ -192,21 +181,15 @@ export default function PublisherStatsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-background-secondary/60 text-xs border border-border">
+      <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-background-secondary/60 text-xs border border-border">
         <div>
-          <span className="text-[10px] text-foreground-muted block font-semibold">Vues</span>
+          <span className="text-[10px] text-foreground-muted block font-semibold">Consultations</span>
           <span className="font-mono font-bold text-navy">
-            {(row.consultations_count || 0).toLocaleString("fr-FR")}
+            {(row.consultations_count || 0).toLocaleString("fr-FR")} lectures
           </span>
         </div>
         <div>
-          <span className="text-[10px] text-foreground-muted block font-semibold">Téléch.</span>
-          <span className="font-mono font-bold text-navy">
-            {(row.downloads_count || 0).toLocaleString("fr-FR")}
-          </span>
-        </div>
-        <div>
-          <span className="text-[10px] text-foreground-muted block font-semibold">Revenus</span>
+          <span className="text-[10px] text-foreground-muted block font-semibold">Revenus Générés</span>
           <span className="font-mono font-bold text-gold">
             {(row.revenue_generated || 0).toLocaleString("fr-FR")} XOF
           </span>
@@ -254,7 +237,7 @@ export default function PublisherStatsPage() {
             Statistiques &amp; Performances
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Consultations, téléchargements et chiffre d&apos;affaires généré par votre catalogue exclusif.
+            Consultations en streaming sécurisé et chiffre d&apos;affaires généré par votre catalogue exclusif.
           </p>
         </div>
 
@@ -283,22 +266,22 @@ export default function PublisherStatsPage() {
           <p className="font-bold text-2xl text-navy font-mono">
             {totalConsultations.toLocaleString("fr-FR")}
           </p>
-          <p className="text-[11px] text-foreground-muted">Lectures uniques sur la plateforme</p>
+          <p className="text-[11px] text-foreground-muted">Lectures uniques en streaming sécurisé</p>
         </div>
 
         <div className="p-5 rounded-3xl bg-background border border-border space-y-2 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-navy uppercase tracking-wider">
-              Total Téléchargements
+              Ouvrages Diffusés
             </span>
             <div className="p-2 rounded-xl bg-gold/15 text-gold">
-              <Download className="w-4 h-4" />
+              <BookOpen className="w-4 h-4" />
             </div>
           </div>
           <p className="font-bold text-2xl text-navy font-mono">
-            {totalDownloads.toLocaleString("fr-FR")}
+            {publishedBooksCount} <span className="text-sm font-normal text-foreground-muted font-sans">/ {books.length} titres</span>
           </p>
-          <p className="text-[11px] text-foreground-muted">Ouvertures autorisées en LCP DRM</p>
+          <p className="text-[11px] text-foreground-muted">Titres actifs au catalogue</p>
         </div>
 
         <div className="p-5 rounded-3xl bg-background border border-border space-y-2 shadow-xs">

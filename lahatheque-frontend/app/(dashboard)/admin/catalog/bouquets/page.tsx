@@ -19,6 +19,7 @@ import {
   X,
   AlertCircle,
   Check,
+  PieChart,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -32,6 +33,7 @@ import {
 } from "@/lib/services/admin";
 import { searchBooks } from "@/lib/services/catalog";
 import { Book } from "@/lib/types/catalog";
+import { BouquetDistributionModal } from "@/components/features/bouquets/bouquet-distribution-modal";
 
 const BOUQUET_TYPES = [
   { value: "discipline", label: "Par Discipline", desc: "Tous les ouvrages rattachés à une discipline académique" },
@@ -63,6 +65,7 @@ export default function AdminBouquetsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOffering, setEditingOffering] = useState<BouquetOfferingAdmin | null>(null);
+  const [selectedDistributionBouquet, setSelectedDistributionBouquet] = useState<BouquetOfferingAdmin | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Form State
@@ -316,6 +319,14 @@ export default function AdminBouquetsPage() {
       header: "",
       cell: (row) => (
         <div className="flex items-center gap-2 justify-end">
+          <button
+            onClick={() => setSelectedDistributionBouquet(row)}
+            className="px-2.5 py-1.5 rounded-xl bg-gold/15 text-navy text-xs font-bold hover:bg-gold/30 border border-gold/30 transition-colors inline-flex items-center gap-1.5 min-h-[36px] cursor-pointer"
+            title="Consulter le camembert et la répartition par université"
+          >
+            <PieChart className="w-3.5 h-3.5 text-gold" />
+            <span>Camembert</span>
+          </button>
           <button
             onClick={() => openEditModal(row)}
             className="px-2.5 py-1.5 rounded-xl bg-navy-light text-navy text-xs font-bold hover:bg-navy-hover hover:text-white transition-colors inline-flex items-center gap-1 min-h-[36px]"
@@ -751,6 +762,13 @@ export default function AdminBouquetsPage() {
           </div>
         </div>
       )}
+
+      {/* Modale Répartition Multi-Universités & Camembert Statistique */}
+      <BouquetDistributionModal
+        open={!!selectedDistributionBouquet}
+        onClose={() => setSelectedDistributionBouquet(null)}
+        bouquet={selectedDistributionBouquet}
+      />
     </div>
   );
 }

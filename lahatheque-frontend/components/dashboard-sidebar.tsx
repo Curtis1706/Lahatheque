@@ -210,7 +210,6 @@ export function DashboardSidebar() {
                   { label: "Dépôt en Lot ONIX 3.0", href: "/publisher/catalog/batch", icon: <UploadCloud className="size-3.5" /> },
                 ],
               },
-              { label: "Suivi des Dépôts", href: "/publisher/submissions", icon: <Clock className="size-4" /> },
               { label: "Statistiques & Lectorat", href: "/publisher/stats", icon: <FileBarChart className="size-4" /> },
               { label: "Redevances & Ventes", href: "/publisher/royalties", icon: <DollarSign className="size-4" /> },
               { label: "Profil & Mandat", href: "/publisher/profile", icon: <Building2 className="size-4" /> },

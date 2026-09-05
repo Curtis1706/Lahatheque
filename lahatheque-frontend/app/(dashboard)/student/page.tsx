@@ -22,7 +22,6 @@ import {
   Sparkles,
   Building2,
   Play,
-  BookMarked,
   History,
 } from "lucide-react";
 
@@ -213,7 +212,7 @@ export default function StudentOverviewPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 sm:p-7 rounded-3xl bg-navy border border-navy-hover text-white shadow-md">
         <div className="space-y-1.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/20 text-gold text-xs font-bold uppercase tracking-wider">
-            <BookMarked className="w-3.5 h-3.5" />
+            <BookOpen className="w-3.5 h-3.5" />
             <span>Mon Espace Lecteur</span>
           </div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold font-serif tracking-tight">
@@ -385,26 +384,6 @@ export default function StudentOverviewPage() {
                   </p>
                   <p className="text-[10px] text-foreground-muted">
                     Rechercher par discipline ou université
-                  </p>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-navy transition-colors" />
-            </Link>
-
-            <Link
-              href="/student/annotations"
-              className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-navy/10 text-navy group-hover:bg-gold/20 transition-colors">
-                  <BookMarked className="w-4 h-4 text-gold" />
-                </div>
-                <div>
-                {/*   <p className="font-serif font-bold text-navy text-xs">
-                    Mes Surlignages &amp; Notes
-                  </p> */}
-                  <p className="text-[10px] text-foreground-muted">
-                    Citations et fiches enregistrées
                   </p>
                 </div>
               </div>

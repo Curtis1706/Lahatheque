@@ -214,6 +214,8 @@ class UniversityBouquetsView(APIView):
         if inst:
             subs = UniversityBouquetSubscription.objects.filter(institution=inst)
             for b in subs:
+                offering = BouquetOffering.objects.filter(id=b.offering_id).first() if b.offering_id else None
+                my_cnt = offering.get_books_queryset(requesting_institution=inst).filter(institution=inst).count() if (offering and inst) else 0
                 subscribed_data.append({
                     "id": str(b.id),
                     "offering_id": str(b.offering_id) if b.offering_id else None,
@@ -222,6 +224,7 @@ class UniversityBouquetsView(APIView):
                     "faculty_code": b.faculty_code,
                     "discipline": b.discipline,
                     "books_count": b.books_count,
+                    "my_books_count": my_cnt,
                     "annual_price": float(b.annual_price),
                     "currency": b.currency,
                     "status": b.status,
@@ -234,6 +237,7 @@ class UniversityBouquetsView(APIView):
 
         available_data = []
         for o in BouquetOffering.objects.filter(is_active=True).exclude(id__in=subscribed_offering_ids):
+            b_qs = o.get_books_queryset(requesting_institution=inst)
             available_data.append({
                 "id": str(o.id),
                 "offering_id": str(o.id),
@@ -242,7 +246,8 @@ class UniversityBouquetsView(APIView):
                 "faculty_code": o.faculty_code,
                 "discipline": o.discipline,
                 "country": o.country,
-                "books_count": o.get_books_queryset(requesting_institution=inst).count(),
+                "books_count": b_qs.count(),
+                "my_books_count": b_qs.filter(institution=inst).count() if inst else 0,
                 "annual_price": float(o.annual_price),
                 "currency": o.currency,
                 "description": o.description,
@@ -251,6 +256,30 @@ class UniversityBouquetsView(APIView):
             })
 
         return Response({"success": True, "data": available_data + subscribed_data, "error": None})
+
+
+class UniversityBouquetDistributionView(APIView):
+    """GET /api/v1/partners/university/bouquets/<pk>/distribution/ - Camembert et stats de répartition multi-universités."""
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
+
+    def get(self, request, pk):
+        from .models import BouquetOffering
+        inst = get_user_institution(request.user)
+
+        offering = BouquetOffering.objects.filter(id=pk).first()
+        sub = None
+        if not offering:
+            sub = UniversityBouquetSubscription.objects.filter(id=pk).first()
+            if sub and sub.offering_id:
+                offering = BouquetOffering.objects.filter(id=sub.offering_id).first()
+
+        if not offering and not sub:
+            return Response({"success": False, "error": "Bouquet introuvable.", "data": None}, status=404)
+
+        target = offering if offering else sub
+        from apps.reporting.admin_views import compute_bouquet_distribution_payload
+        data = compute_bouquet_distribution_payload(target, requesting_institution_id=str(inst.id) if inst else None)
+        return Response({"success": True, "data": data, "error": None})
 
 
 class UniversityBouquetSubscribeView(APIView):

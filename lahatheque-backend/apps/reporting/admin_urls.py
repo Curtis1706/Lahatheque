@@ -24,6 +24,7 @@ from apps.reporting.admin_views import (
     AdminStockViewSet,
     AdminBouquetOfferingsView,
     AdminBouquetOfferingDetailView,
+    AdminBouquetDistributionView,
 )
 from apps.accounts.admin_views import AdminUserManagementViewSet
 
@@ -49,5 +50,6 @@ urlpatterns = [
     path('catalog/pricing/role-discounts/', AdminRoleDiscountsView.as_view(), name='admin-pricing-role-discounts'),
     path('bouquet-offerings/', AdminBouquetOfferingsView.as_view(), name='admin-bouquet-offerings'),
     path('bouquet-offerings/<str:pk>/', AdminBouquetOfferingDetailView.as_view(), name='admin-bouquet-offering-detail'),
+    path('bouquet-offerings/<str:pk>/distribution/', AdminBouquetDistributionView.as_view(), name='admin-bouquet-distribution'),
     path('', include(router.urls)),
 ]

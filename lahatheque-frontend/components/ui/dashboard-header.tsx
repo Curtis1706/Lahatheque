@@ -92,7 +92,6 @@ export function DashboardHeader() {
     if (path === "/author") return { section: "Espace Auteur", title: "Vue d'ensemble Auteur" };
 
     if (path.startsWith("/publisher/catalog")) return { section: "Espace Éditeur", title: "Mon Catalogue Éditeur" };
-    if (path.startsWith("/publisher/submissions")) return { section: "Espace Éditeur", title: "Suivi des Dépôts & Validation" };
     if (path.startsWith("/publisher/stats")) return { section: "Espace Éditeur", title: "Statistiques & Lectorat" };
     if (path.startsWith("/publisher/royalties")) return { section: "Espace Éditeur", title: "Redevances & Ventes" };
     if (path.startsWith("/publisher/profile")) return { section: "Espace Éditeur", title: "Profil & Mandat d'Édition" };
