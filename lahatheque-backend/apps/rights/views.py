@@ -714,7 +714,7 @@ class LegalContractsListView(APIView):
             qs = qs.annotate(rank=SearchRank(vector, query)).filter(rank__gte=0.01).order_by('-rank')
 
         contracts = []
-        for c in qs.select_related('ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition'):
+        for c in qs.select_related('ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition', 'juriste_responsable'):
             mapped = map_db_type_to_frontend(c.type_contrat)
             file_url = get_contract_file_url(c.fichier_contrat_path)
 
@@ -727,6 +727,12 @@ class LegalContractsListView(APIView):
                 "reference": c.numero_contrat,
                 "title": c.titre,
                 "contracting_party": c.contracting_party or (c.signataire_user.get_full_name() if c.signataire_user else "Partie Contractante"),
+                "contracting_party_email": c.contracting_party_email,
+                "contracting_party_phone": c.contracting_party_phone,
+                "juriste_responsable": {
+                    "id": str(c.juriste_responsable.id),
+                    "name": f"{c.juriste_responsable.first_name} {c.juriste_responsable.last_name}".strip() or c.juriste_responsable.username,
+                } if c.juriste_responsable else None,
                 "party_type": mapped["party_type"],
                 "type": mapped["type"],
                 "signed_at": str(c.date_signature) if c.date_signature else str(c.created_at.date()),
@@ -884,12 +890,16 @@ class LegalContractsListView(APIView):
                     "error": f"La somme des quotes-parts de droits d'auteur doit être exactement de 100.00% (actuel: {total_percent:.2f}%)."
                 }, status=400)
 
+        data = request.data
         num_contrat = f"CTR-JUR-2026-{uuid.uuid4().hex[:4].upper()}"
         contrat = ContratLegal.objects.create(
             numero_contrat=num_contrat,
             type_contrat=db_type,
             titre=title,
             contracting_party=contracting_party,
+            contracting_party_email=data.get("contracting_party_email", "").strip(),
+            contracting_party_phone=data.get("contracting_party_phone", "").strip(),
+            juriste_responsable_id=data.get("juriste_responsable_id") or request.user.id,
             parties_prenantes=[contracting_party, "LAHA Éditions"],
             ouvrage=ouvrage,
             signataire_user=signataire,
@@ -1062,6 +1072,16 @@ class LegalContractsFormOptionsView(APIView):
             "author_email": d.auteur_email
         } for d in pre_editions_qs]
 
+        # 6. Juristes disponibles
+        from apps.accounts.models import User
+        juristes = list(
+            User.objects.filter(role__in=["legal_reviewer", "admin", "super_admin"], is_active=True)
+            .values("id", "first_name", "last_name")
+        )
+        for j in juristes:
+            j["id"] = str(j["id"])
+            j["name"] = f"{j.get('first_name', '')} {j.get('last_name', '')}".strip() or "Juriste"
+
         return Response({
             "success": True,
             "data": {
@@ -1070,6 +1090,7 @@ class LegalContractsFormOptionsView(APIView):
                 "publishers": publishers,
                 "institutions": institutions,
                 "pre_editions": pre_editions,
+                "juristes_disponibles": juristes,
             }
         })
 
@@ -1083,7 +1104,7 @@ class LegalContractDetailView(APIView):
         from django.db.models import Sum, F
 
         try:
-            c = ContratLegal.objects.select_related('ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition').get(id=id)
+            c = ContratLegal.objects.select_related('ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition', 'juriste_responsable').get(id=id)
             file_url = get_contract_file_url(c.fichier_contrat_path)
             mapped = map_db_type_to_frontend(c.type_contrat)
 
@@ -1160,6 +1181,12 @@ class LegalContractDetailView(APIView):
                 "reference": c.numero_contrat,
                 "title": c.titre,
                 "contracting_party": c.contracting_party or (c.signataire_user.get_full_name() if c.signataire_user else "Partie Contractante"),
+                "contracting_party_email": c.contracting_party_email,
+                "contracting_party_phone": c.contracting_party_phone,
+                "juriste_responsable": {
+                    "id": str(c.juriste_responsable.id),
+                    "name": f"{c.juriste_responsable.first_name} {c.juriste_responsable.last_name}".strip() or c.juriste_responsable.username,
+                } if c.juriste_responsable else None,
                 "party_type": mapped["party_type"],
                 "type": mapped["type"],
                 "signed_at": str(c.date_signature) if c.date_signature else None,
@@ -1188,10 +1215,16 @@ class LegalContractDetailView(APIView):
                 c.status = request.data["status"]
             if "notes" in request.data:
                 c.notes = request.data["notes"]
+            if "contracting_party_email" in request.data:
+                c.contracting_party_email = request.data["contracting_party_email"]
+            if "contracting_party_phone" in request.data:
+                c.contracting_party_phone = request.data["contracting_party_phone"]
+            if "juriste_responsable_id" in request.data:
+                c.juriste_responsable_id = request.data["juriste_responsable_id"] or None
             if "title" in request.data:
                 c.titre = request.data["title"].strip()
             if "contracting_party" in request.data:
-                c.partie_contractante = request.data["contracting_party"].strip()
+                c.contracting_party = request.data["contracting_party"].strip()
             if "party_type" in request.data:
                 c.type_partie = request.data["party_type"]
             if "type" in request.data:

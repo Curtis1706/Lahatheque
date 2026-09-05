@@ -50,12 +50,20 @@ export interface EligibleContractPreEdition {
   author_email: string;
 }
 
+export interface EligibleContractJuriste {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  name: string;
+}
+
 export interface ContractFormOptions {
   ouvrages: EligibleContractBook[];
   authors: EligibleContractAuthor[];
   publishers: EligibleContractPublisher[];
   institutions: EligibleContractInstitution[];
   pre_editions: EligibleContractPreEdition[];
+  juristes_disponibles?: EligibleContractJuriste[];
 }
 
 export interface ContractRoyaltySplit {
@@ -75,6 +83,12 @@ export interface LegalContract {
   reference: string;
   title: string;
   contracting_party: string;
+  contracting_party_email?: string;
+  contracting_party_phone?: string;
+  juriste_responsable?: {
+    id: string;
+    name: string;
+  } | null;
   party_type: "author" | "university" | "publisher" | "other";
   type: ContractType;
   signed_at: string;

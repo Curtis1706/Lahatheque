@@ -96,6 +96,12 @@ class ContratLegal(models.Model):
     type_contrat = models.CharField(max_length=32, choices=TYPE_CHOICES, default="edition_auteur", db_index=True)
     titre = models.CharField(max_length=255, db_index=True)
     contracting_party = models.CharField(max_length=255, default="", db_index=True)
+    contracting_party_email = models.EmailField(blank=True, default="")
+    contracting_party_phone = models.CharField(max_length=30, blank=True, default="")
+    juriste_responsable = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="dossiers_geres", limit_choices_to={"role__in": ["legal_reviewer", "admin", "super_admin"]}
+    )
     parties_prenantes = models.JSONField(default=list)
 
     # Liaisons directes avec les entités réelles de la base

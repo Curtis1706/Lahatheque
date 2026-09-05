@@ -7,28 +7,52 @@ import {
   ArrowLeft,
   ShieldCheck,
   FileText,
-  ExternalLink,
   Clock,
-  Tag,
   Percent,
   CheckCircle2,
   BookOpen,
-  Users,
   Scale,
-  DollarSign,
-  Building2,
-  Smartphone,
-  Headphones,
+  Maximize2,
+  Minimize2,
+  Mail,
+  Phone,
 } from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ContractPdfViewer } from "@/components/features/legal/contract-pdf-viewer";
-import { getContractDetail } from "@/lib/services/legal";
+import { getContractDetail, updateContract } from "@/lib/services/legal";
 import type { LegalContract } from "@/lib/types/legal";
 
 export default function ContractDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const [contract, setContract] = useState<LegalContract | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGrandEcran, setIsGrandEcran] = useState(false);
+
+  // Édition des notes
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  async function handleSaveNotes() {
+    if (!contract) return;
+    try {
+      setSavingNotes(true);
+      const ok = await updateContract(contract.id, { notes: notesDraft });
+      if (ok) {
+        setContract((prev) => (prev ? { ...prev, notes: notesDraft } : null));
+        setIsEditingNotes(false);
+        toast.success("Note enregistrée avec succès.");
+      } else {
+        toast.error("Impossible d'enregistrer la note.");
+      }
+    } catch {
+      toast.error("Impossible d'enregistrer la note.");
+    } finally {
+      setSavingNotes(false);
+    }
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -125,19 +149,43 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
           <p className="text-xs sm:text-sm text-foreground-muted mt-1">
             Partie contractante : <span className="font-bold text-navy">{contract.contracting_party}</span>
           </p>
+
+          {(contract.contracting_party_email || contract.contracting_party_phone) && (
+            <div className="text-[11px] text-foreground-muted space-y-0.5 mt-1">
+              {contract.contracting_party_email && (
+                <p className="flex items-center gap-1.5">
+                  <Mail className="w-3 h-3 text-gold shrink-0" />
+                  <span>{contract.contracting_party_email}</span>
+                </p>
+              )}
+              {contract.contracting_party_phone && (
+                <p className="flex items-center gap-1.5">
+                  <Phone className="w-3 h-3 text-gold shrink-0" />
+                  <span>{contract.contracting_party_phone}</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {contract.juriste_responsable && (
+            <div className="text-[11px] text-foreground-muted mt-1">
+              <span className="font-bold text-navy">Juriste responsable : </span>
+              {contract.juriste_responsable.name}
+            </div>
+          )}
         </div>
 
-        {/* Liens rapides & Actions de lecture */}
+        {/* Liens rapides & Actions Grand Écran */}
         <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <Link
-            href={`/catalog/reader/lesson_pdf?contract_id=${contract.id}&file=${encodeURIComponent(contract.file_url || "")}&title=${encodeURIComponent(contract.title)}`}
-            target="_blank"
+          <button
+            type="button"
+            onClick={() => setIsGrandEcran(true)}
             className="px-4 py-2.5 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all inline-flex items-center gap-2 shadow-xs min-h-[44px] cursor-pointer"
-            title="Ouvrir dans la liseuse officielle LAHAThèque (Modes FlipBook 3D et Défilement continu)"
+            title="Lire le document contractuel en grand écran immersif"
           >
-            <BookOpen className="w-4 h-4" />
-            Ouvrir dans la Liseuse
-          </Link>
+            <Maximize2 className="w-4 h-4" />
+            Lire en Grand Écran
+          </button>
 
           <Link
             href="/legal-reviewer/royalties"
@@ -235,14 +283,31 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      {/* Disposition en 2 colonnes */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Colonne Gauche: Visionneuse PDF / DOCX */}
-        <div className="lg:col-span-8 space-y-4">
-          <h3 className="font-serif font-bold text-sm text-navy uppercase tracking-wider flex items-center gap-2">
-            <FileText className="w-4 h-4 text-gold" /> Liseuse &amp; Aperçu Documentaire
-          </h3>
+      {/* Disposition : Lecture Directe du Contrat en Pleine Largeur */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="space-y-0.5">
+            <h2 className="font-serif font-bold text-base sm:text-lg text-navy uppercase tracking-wider flex items-center gap-2">
+              <FileText className="w-4 h-4 text-gold" /> Lecture Directe du Contrat
+            </h2>
+            <p className="text-xs text-foreground-muted">
+              Document officiel affiché en haute définition avec recherche, zoom et défilement continu.
+            </p>
+          </div>
 
+          <button
+            type="button"
+            onClick={() => setIsGrandEcran(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all shadow-xs cursor-pointer"
+            title="Ouvrir le lecteur en plein écran immersif"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span>Mode Grand Écran</span>
+          </button>
+        </div>
+
+        {/* Visionneuse Documentaire en Pleine Largeur */}
+        <div className="w-full">
           <ContractPdfViewer
             contractId={contract.id}
             streamUrl={(contract as any).stream_url}
@@ -252,11 +317,13 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
             title={contract.title}
             reference={contract.reference}
             extractedText={(contract as any).extracted_text || (contract as any).extracted_text_preview || contract.notes}
+            isGrandEcran={isGrandEcran}
+            onToggleGrandEcran={() => setIsGrandEcran((prev) => !prev)}
           />
         </div>
 
-        {/* Colonne Droite: Fiche Métadonnées & Registre Avenants */}
-        <div className="lg:col-span-4 space-y-6">
+        {/* Métadonnées & Registre Avenants (agencés sous le document pour ne pas le comprimer) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
           {/* Fiche Métadonnées */}
           <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
             <h3 className="font-serif font-bold text-xs text-navy uppercase tracking-wider flex items-center gap-2 border-b border-border pb-3">
@@ -308,12 +375,51 @@ export default function ContractDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               )}
 
-              {contract.notes && (
-                <div className="p-3 rounded-xl bg-background border border-border text-[11px] text-foreground-muted space-y-1">
-                  <span className="font-bold text-navy block">Notes du Juriste :</span>
-                  <p>{contract.notes}</p>
-                </div>
-              )}
+              <div className="p-3 rounded-xl bg-background border border-border text-[11px] text-foreground-muted space-y-2">
+                <span className="font-bold text-navy block">Notes du Juriste :</span>
+                {isEditingNotes ? (
+                  <>
+                    <textarea
+                      value={notesDraft}
+                      onChange={(e) => setNotesDraft(e.target.value)}
+                      rows={3}
+                      className="w-full px-2 py-1.5 text-[11px] rounded-lg border border-border bg-background-secondary outline-none focus:border-gold resize-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveNotes}
+                        disabled={savingNotes}
+                        className="px-3 py-1 rounded-lg bg-navy text-white text-[10px] font-bold cursor-pointer hover:bg-navy-dark transition-colors disabled:opacity-50"
+                      >
+                        {savingNotes ? "Enregistrement..." : "Enregistrer"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingNotes(false)}
+                        disabled={savingNotes}
+                        className="px-3 py-1 rounded-lg bg-background-secondary border border-border text-[10px] font-bold cursor-pointer hover:bg-background transition-colors"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p>{contract.notes || "Aucune note enregistrée pour ce contrat."}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotesDraft(contract.notes || "");
+                        setIsEditingNotes(true);
+                      }}
+                      className="text-[10px] font-bold text-gold underline cursor-pointer"
+                    >
+                      Modifier
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 

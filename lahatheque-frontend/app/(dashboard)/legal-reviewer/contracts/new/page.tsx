@@ -18,7 +18,10 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileSpreadsheet,
+  Mail,
+  Phone,
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -34,6 +37,7 @@ import { toast } from "sonner";
 function NewLegalContractContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user: currentUser } = useAuth();
   const preEditionParamId = searchParams.get("pre_edition_id");
   const titleParam = searchParams.get("title");
   const authorNameParam = searchParams.get("author_name");
@@ -47,6 +51,17 @@ function NewLegalContractContent() {
   const [title, setTitle] = useState(titleParam ? `Contrat d'Édition — ${titleParam}` : "");
   const [contractType, setContractType] = useState<ContractType>("author_contract");
   const [partyType, setPartyType] = useState<"author" | "university" | "publisher">("author");
+
+  // Coordonnées & Juriste responsable
+  const [contractingPartyEmail, setContractingPartyEmail] = useState("");
+  const [contractingPartyPhone, setContractingPartyPhone] = useState("");
+  const [juristeResponsableId, setJuristeResponsableId] = useState<string>(currentUser?.id ? String(currentUser.id) : "");
+
+  useEffect(() => {
+    if (currentUser?.id && !juristeResponsableId) {
+      setJuristeResponsableId(String(currentUser.id));
+    }
+  }, [currentUser?.id, juristeResponsableId]);
 
   // Entités sélectionnées
   const [selectedBookId, setSelectedBookId] = useState<string>("");
@@ -183,6 +198,15 @@ function NewLegalContractContent() {
         if (data.institutions && data.institutions.length > 0) {
           setSelectedInstitutionId(data.institutions[0].id);
         }
+        if (data.juristes_disponibles && data.juristes_disponibles.length > 0) {
+          setJuristeResponsableId((prev) => {
+            if (prev) return prev;
+            const currentMatch = currentUser?.id
+              ? data.juristes_disponibles?.find((j) => String(j.id) === String(currentUser.id))
+              : null;
+            return currentMatch ? String(currentMatch.id) : String(data.juristes_disponibles![0].id);
+          });
+        }
       } catch (err) {
         toast.error("Impossible de charger les données du catalogue.");
       } finally {
@@ -273,6 +297,8 @@ function NewLegalContractContent() {
     setSelectedAuthorId(authorId);
     const author = options?.authors.find((a) => a.id === authorId);
     if (author) {
+      if (author.email) setContractingPartyEmail(author.email);
+      if (author.phone) setContractingPartyPhone(author.phone);
       setSplits((prev) => {
         if (prev.length === 0) {
           return [
@@ -307,7 +333,10 @@ function NewLegalContractContent() {
     } else if (newType === "publisher_partnership") {
       setPartyType("publisher");
       const pub = options?.publishers.find((p) => p.id === selectedPublisherId);
-      if (pub) setTitle(`Contrat de Distribution — ${pub.name}`);
+      if (pub) {
+        setTitle(`Contrat de Distribution — ${pub.name}`);
+        if (pub.email) setContractingPartyEmail(pub.email);
+      }
     }
   };
 
@@ -384,6 +413,9 @@ function NewLegalContractContent() {
         {
           title,
           contracting_party: contractingPartyName || "Partie Contractante",
+          contracting_party_email: contractingPartyEmail.trim(),
+          contracting_party_phone: contractingPartyPhone.trim(),
+          juriste_responsable_id: juristeResponsableId || (currentUser?.id ? String(currentUser.id) : undefined),
           party_type: partyType,
           type: contractType,
           signed_at: signedAt,
@@ -626,6 +658,63 @@ function NewLegalContractContent() {
                 />
               </div>
             )}
+
+            {/* Coordonnées de la partie contractante */}
+            <div>
+              <label htmlFor="contracting-party-email" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Mail className="w-3.5 h-3.5 text-gold" />
+                Email de la Partie Contractante
+              </label>
+              <input
+                id="contracting-party-email"
+                type="email"
+                value={contractingPartyEmail}
+                onChange={(e) => setContractingPartyEmail(e.target.value)}
+                placeholder="contact@auteur-ou-partenaire.bj"
+                className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="contracting-party-phone" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Phone className="w-3.5 h-3.5 text-gold" />
+                Téléphone de la Partie Contractante
+              </label>
+              <input
+                id="contracting-party-phone"
+                type="tel"
+                value={contractingPartyPhone}
+                onChange={(e) => setContractingPartyPhone(e.target.value)}
+                placeholder="+229 97 00 00 00"
+                className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
+              />
+            </div>
+
+            {/* Sélecteur du Juriste responsable du dossier */}
+            <div className="sm:col-span-2">
+              <label htmlFor="juriste-responsable-select" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Scale className="w-3.5 h-3.5 text-gold" />
+                Juriste Responsable du Dossier *
+              </label>
+              <select
+                id="juriste-responsable-select"
+                value={juristeResponsableId}
+                onChange={(e) => setJuristeResponsableId(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px] cursor-pointer"
+              >
+                {options?.juristes_disponibles && options.juristes_disponibles.length > 0 ? (
+                  options.juristes_disponibles.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.name || `${j.first_name || ""} ${j.last_name || ""}`.trim() || "Juriste"}
+                    </option>
+                  ))
+                ) : (
+                  <option value={currentUser?.id || ""}>
+                    {currentUser ? `${currentUser.first_name || ""} ${currentUser.last_name || ""}`.trim() || currentUser.email : "Moi-même (Juriste connecté)"}
+                  </option>
+                )}
+              </select>
+            </div>
 
             {/* Dates avec DatePicker chic */}
             <div>

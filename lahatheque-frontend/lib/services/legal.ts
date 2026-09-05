@@ -73,6 +73,9 @@ export async function getContractDetail(id: string): Promise<LegalContract | nul
 
 export async function createLegalContract(
   data: Partial<LegalContract> & {
+    contracting_party_email?: string;
+    contracting_party_phone?: string;
+    juriste_responsable_id?: string;
     ouvrage_id?: string;
     signataire_user_id?: string;
     institution_id?: string;
@@ -89,6 +92,9 @@ export async function createLegalContract(
     const formData = new FormData();
     formData.append("title", data.title || "");
     formData.append("contracting_party", data.contracting_party || "");
+    if (data.contracting_party_email) formData.append("contracting_party_email", data.contracting_party_email);
+    if (data.contracting_party_phone) formData.append("contracting_party_phone", data.contracting_party_phone);
+    if (data.juriste_responsable_id) formData.append("juriste_responsable_id", data.juriste_responsable_id);
     formData.append("party_type", data.party_type || "author");
     formData.append("type", data.type || "author_contract");
     formData.append("notes", data.notes || "");
@@ -133,6 +139,9 @@ export async function updateLegalContract(
   data: {
     title?: string;
     contracting_party?: string;
+    contracting_party_email?: string;
+    contracting_party_phone?: string;
+    juriste_responsable_id?: string;
     party_type?: string;
     type?: string;
     signed_at?: string;
@@ -156,6 +165,8 @@ export async function updateLegalContract(
   const json = await res.json();
   return !!json.success;
 }
+
+export const updateContract = updateLegalContract;
 
 export async function deleteLegalContract(id: string): Promise<boolean> {
   const res = await fetch(`${API_BASE}/contracts/${id}/`, {

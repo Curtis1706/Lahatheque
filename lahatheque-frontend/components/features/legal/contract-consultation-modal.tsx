@@ -15,7 +15,7 @@ import {
   ExternalLink,
   ArrowRight,
   CheckCircle2,
-  BookOpen,
+  Maximize2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -58,12 +58,12 @@ export function ContractConsultationModal({
 
           <div className="flex items-center gap-2 shrink-0">
             <Link
-              href={`/catalog/reader/lesson_pdf?contract_id=${contract.id}&file=${encodeURIComponent(contract.file_url || "")}&title=${encodeURIComponent(contract.title)}`}
-              target="_blank"
+              href={`/legal-reviewer/contracts/${contract.id}`}
+              onClick={onClose}
               className="px-3.5 py-2 rounded-xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
-              title="Ouvrir dans la liseuse officielle LAHAThèque avec FlipBook et défilement continu"
+              title="Ouvrir la page de lecture grand écran"
             >
-              <BookOpen className="w-3.5 h-3.5" /> Ouvrir dans la Liseuse
+              <Maximize2 className="w-3.5 h-3.5" /> Lire en Grand Écran
             </Link>
           </div>
         </div>
@@ -74,7 +74,7 @@ export function ContractConsultationModal({
           {/* Colonne Gauche: Visionneuse PDF et DOCX */}
           <div className="lg:col-span-7 space-y-4">
             <h3 className="font-serif font-bold text-xs text-navy uppercase tracking-wider flex items-center gap-2">
-              <FileText className="w-4 h-4 text-gold" /> Liseuse &amp; Aperçu de l&apos;Acte Contractuel
+              <FileText className="w-4 h-4 text-gold" /> Document de l&apos;Acte Contractuel
             </h3>
 
             <ContractPdfViewer
