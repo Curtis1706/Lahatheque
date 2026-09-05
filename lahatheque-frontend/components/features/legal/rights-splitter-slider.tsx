@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, Users, Check } from "lucide-react";
+import { Sparkles, Users, Check, AlertTriangle } from "lucide-react";
 import type { CoAuthorSplit } from "@/lib/types/legal";
 
 interface RightsSplitterSliderProps {
@@ -65,9 +65,15 @@ export function RightsSplitterSlider({
             Répartition Graphique des Droits (Total : {totalPercentage}%)
           </h4>
         </div>
-        <span className="text-[10px] font-bold text-success flex items-center gap-1">
-          <Check className="w-3 h-3" /> Équilibre garanti (100%)
-        </span>
+        {Math.abs(totalPercentage - 100) < 0.01 ? (
+          <span className="text-[10px] font-bold text-success flex items-center gap-1">
+            <Check className="w-3 h-3" /> Équilibre garanti (100%)
+          </span>
+        ) : (
+          <span className="text-[10px] font-bold text-error flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" /> Déséquilibré ({totalPercentage}% au lieu de 100%)
+          </span>
+        )}
       </div>
 
       <div className="space-y-4">

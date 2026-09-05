@@ -271,34 +271,56 @@ export async function getAIRoyaltySuggestions(): Promise<AIRoyaltySuggestion[]> 
   if (!res.ok) throw new Error(`Erreur suggestions IA: ${res.status}`);
   const data = await res.json();
   const list = data.data || data.results || [];
-  return list.map((s: any) => ({
-    id: s.id,
-    book_id: s.contract_id || s.id,
-    title: s.book_title || s.contract_title,
-    authors: [s.beneficiary_name],
-    proposed_splits: [
-      { author_name: s.beneficiary_name, percentage: s.suggested_rate || 50 }
-    ],
-    is_validated: s.is_validated,
-    ai_confidence: Math.round((s.confidence_score || 0.95) * 100),
-    extracted_clause: s.extracted_clause,
-    suggested_rate: s.suggested_rate,
-  }));
+  return list.map((s: any) => {
+    const authors = Array.isArray(s.authors) && s.authors.length > 0
+      ? s.authors
+      : [s.beneficiary_name || "Auteur"];
+
+    const proposedSplits = Array.isArray(s.proposed_splits) && s.proposed_splits.length > 0
+      ? s.proposed_splits
+      : (authors.length > 1
+          ? authors.map((a: string, idx: number) => {
+              const defaultPercent = Math.floor(100 / authors.length);
+              return {
+                author_name: a,
+                percentage: idx === 0 ? 100 - defaultPercent * (authors.length - 1) : defaultPercent,
+              };
+            })
+          : [{ author_name: authors[0], percentage: 100 }]);
+
+    return {
+      id: s.id,
+      book_id: s.contract_id || s.id,
+      title: s.book_title || s.contract_title,
+      authors,
+      proposed_splits: proposedSplits,
+      is_validated: s.is_validated,
+      ai_confidence: Math.round((s.confidence_score || 0.95) * 100),
+      extracted_clause: s.extracted_clause,
+      suggested_rate: s.suggested_rate,
+    };
+  });
 }
 
 export async function validateAISuggestion(
   suggestionId: string,
   adjustedSplits?: { author_name: string; percentage: number }[]
-): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/ai-suggestions/${suggestionId}/decide/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ decision: "approve", splits: adjustedSplits }),
-    credentials: "include",
-  });
-  if (!res.ok) return false;
-  const data = await res.json();
-  return !!data.success;
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/ai-suggestions/${suggestionId}/decide/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: "approve", splits: adjustedSplits }),
+      credentials: "include",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data.error || `Erreur de validation (${res.status})` };
+    }
+    return { success: !!data.success, message: data.message, error: data.error };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erreur réseau" };
+  }
 }
 
 // ─── Pré-éditions ─────────────────────────────────────────────────────────────

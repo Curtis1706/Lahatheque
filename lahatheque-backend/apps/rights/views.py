@@ -4,7 +4,7 @@ import uuid
 from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Sum, Count, Q, F
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -1571,7 +1571,7 @@ class LegalAiSuggestionsListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def get(self, request):
-        qs = AIRoyaltySuggestion.objects.filter(is_validated=False).select_related('contrat', 'ouvrage').order_by('-created_at')
+        qs = AIRoyaltySuggestion.objects.filter(is_validated=False).select_related('contrat', 'ouvrage').prefetch_related('ouvrage__authors').order_by('-created_at')
         suggestions = []
         for s in qs:
             contract_title = s.contrat.titre if s.contrat else "Contrat d'Édition"
@@ -1580,12 +1580,41 @@ class LegalAiSuggestionsListView(APIView):
             clause = s.clause_extraite or ""
             pct = float(s.pourcentage_suggere) if s.pourcentage_suggere else 100.0
 
+            # Récupérer les auteurs réels de l'ouvrage s'il existe
+            book_authors = []
+            if s.ouvrage:
+                book_authors = [
+                    f"{a.first_name} {a.last_name}".strip()
+                    for a in s.ouvrage.authors.all()
+                    if f"{a.first_name} {a.last_name}".strip()
+                ]
+
+            if not book_authors and beneficiary:
+                book_authors = [beneficiary]
+
+            # Si l'ouvrage a plusieurs co-auteurs, préparer des splits initiaux équitables totalisant 100%
+            if len(book_authors) > 1:
+                default_pct = 100 // len(book_authors)
+                initial_splits = [
+                    {
+                        "author_name": a_name,
+                        "percentage": 100 - default_pct * (len(book_authors) - 1) if idx == 0 else default_pct
+                    }
+                    for idx, a_name in enumerate(book_authors)
+                ]
+            else:
+                initial_splits = [
+                    {"author_name": book_authors[0] if book_authors else beneficiary, "percentage": 100.0}
+                ]
+
             suggestions.append({
                 "id": str(s.id),
                 "contract_id": str(s.contrat_id) if s.contrat_id else "",
                 "contract_title": contract_title,
                 "book_title": book_title,
                 "beneficiary_name": beneficiary,
+                "authors": book_authors,
+                "proposed_splits": initial_splits,
                 "suggested_rate": pct,
                 "extracted_clause": clause,
                 "confidence_score": float(s.confiance_score) if s.confiance_score else 0.95,
@@ -1601,21 +1630,118 @@ class LegalAiSuggestionDecisionView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
 
     def post(self, request, id):
-        decision = request.data.get("decision", "approve")  # approve | reject
-        try:
-            sug = AIRoyaltySuggestion.objects.filter(id=id).first()
-            if sug:
-                if decision == "approve":
-                    sug.is_validated = True
-                    sug.save()
-                    return Response({"success": True, "message": "Suggestion IA appliquée avec succès."})
-                else:
-                    sug.delete()
-                    return Response({"success": True, "message": "Suggestion IA rejetée."})
-        except Exception as e:
-            logger.warning(f"Erreur décision suggestion IA {id}: {e}")
+        decision = request.data.get("decision", "approve")
 
-        return Response({"success": True, "message": "Opération enregistrée."})
+        sug = AIRoyaltySuggestion.objects.filter(id=id).first()
+        if not sug:
+            return Response({"success": False, "error": "Suggestion introuvable."}, status=404)
+
+        if decision != "approve":
+            sug.delete()
+            return Response({"success": True, "message": "Suggestion IA rejetée."})
+
+        splits = request.data.get("splits")
+        if not splits:
+            splits = [{"author_name": sug.beneficiaire_nom, "percentage": float(sug.pourcentage_suggere)}]
+
+        total = sum(float(s.get("percentage", 0)) for s in splits)
+        if abs(total - 100.0) > 0.01:
+            return Response({
+                "success": False,
+                "error": f"La répartition doit sommer à exactement 100% avant validation (actuel : {total:.2f}%)."
+            }, status=400)
+
+        if not sug.ouvrage:
+            return Response({
+                "success": False,
+                "error": "Cette suggestion n'est rattachée à aucun ouvrage précis — impossible de créer les droits."
+            }, status=400)
+
+        from apps.catalog.models import BookAuthor
+
+        created_rights = []
+        unmatched_names = []
+        matched_splits = []
+
+        # Récupération des auteurs déjà rattachés à l'ouvrage
+        book_authors = list(sug.ouvrage.authors.select_related('user').all())
+
+        for s in splits:
+            name = s.get("author_name", "").strip()
+            pct = float(s.get("percentage", 0))
+            if pct <= 0:
+                continue
+
+            book_author = None
+            clean_name = name.lower()
+
+            # 1. Correspondance exacte sur prénom + nom ou nom + prénom
+            for ba in book_authors:
+                full1 = f"{ba.first_name} {ba.last_name}".strip().lower()
+                full2 = f"{ba.last_name} {ba.first_name}".strip().lower()
+                if clean_name == full1 or clean_name == full2:
+                    book_author = ba
+                    break
+
+            # 2. Correspondance souple si non trouvé (nom partiel ou premier mot)
+            if not book_author:
+                for ba in book_authors:
+                    full = f"{ba.first_name} {ba.last_name}".strip().lower()
+                    if clean_name in full or full in clean_name:
+                        book_author = ba
+                        break
+
+            if not book_author and name:
+                first_part = name.split()[0].lower()
+                for ba in book_authors:
+                    if first_part in ba.first_name.lower() or first_part in ba.last_name.lower():
+                        book_author = ba
+                        break
+
+            # 3. Si book_author n'a pas encore de compte user mais possède un email enregistré
+            if book_author and not book_author.user and book_author.email:
+                from apps.accounts.models import User
+                matched_user = User.objects.filter(email__iexact=book_author.email).first()
+                if matched_user:
+                    book_author.user = matched_user
+                    book_author.save(update_fields=['user'])
+
+            if not book_author or not book_author.user:
+                unmatched_names.append(name)
+            else:
+                matched_splits.append((book_author, pct))
+
+        if unmatched_names:
+            return Response({
+                "success": False,
+                "error": f"Impossible de valider : les bénéficiaires suivants ne sont pas rattachés à un compte auteur sur cet ouvrage : {', '.join(unmatched_names)}. Rattachez-les d'abord au livre."
+            }, status=400)
+
+        with transaction.atomic():
+            for book_author, pct in matched_splits:
+                author_right, _ = AuthorRight.objects.update_or_create(
+                    ouvrage=sug.ouvrage,
+                    user=book_author.user,
+                    defaults={"pool_share_percent": pct, "author": book_author}
+                )
+                created_rights.append(str(author_right.id))
+
+                # Mettre à jour ou créer la RepartitionDroits associée pour cohérence juridique
+                RepartitionDroits.objects.update_or_create(
+                    ouvrage=sug.ouvrage,
+                    beneficiaire=book_author.user,
+                    defaults={"pourcentage": pct, "role_libelle": "Auteur / Co-auteur"}
+                )
+
+            sug.is_validated = True
+            sug.validated_by = request.user
+            sug.save(update_fields=["is_validated", "validated_by"])
+
+        return Response({
+            "success": True,
+            "message": f"Répartition validée — {len(created_rights)} droit(s) d'auteur créé(s)/mis à jour.",
+            "data": {"author_rights_created": created_rights}
+        })
 
 
 class LegalUniversityRoyaltiesListView(APIView):

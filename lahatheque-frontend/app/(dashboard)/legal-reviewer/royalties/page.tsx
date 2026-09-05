@@ -69,10 +69,12 @@ function LegalRoyaltiesPageContent() {
   };
 
   const handleValidateSuggestion = async (suggestionId: string, adjustedSplits?: CoAuthorSplit[]) => {
-    const success = await validateAISuggestion(suggestionId, adjustedSplits);
-    if (success) {
+    const res = await validateAISuggestion(suggestionId, adjustedSplits);
+    if (res.success) {
       setAiSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
-      toast.success("La suggestion IA de partage de droits a été validée et enregistrée avec succès !");
+      toast.success(res.message || "La suggestion IA de partage de droits a été validée et enregistrée avec succès !");
+    } else {
+      toast.error(res.error || "Impossible de valider la suggestion.");
     }
   };
 
@@ -244,7 +246,13 @@ function LegalRoyaltiesPageContent() {
                 <RightsSplitterSlider
                   authors={sug.authors}
                   initialSplits={sug.proposed_splits}
-                  onChange={(newSplits) => { sug.proposed_splits = newSplits; }}
+                  onChange={(newSplits) => {
+                    setAiSuggestions((prev) =>
+                      prev.map((item) =>
+                        item.id === sug.id ? { ...item, proposed_splits: newSplits } : item
+                      )
+                    );
+                  }}
                 />
               </div>
             ))
