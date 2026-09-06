@@ -130,6 +130,41 @@ export function LahathequeAudioPlayerCard({
     }
   };
 
+  // Raccourcis clavier (Espace = Play/Pause, Flèche gauche = -10s, Flèche droite = +10s)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ne pas intercepter si l'utilisateur saisit dans un champ de texte
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        seekRelative(-10);
+      } else if (e.code === "ArrowRight") {
+        e.preventDefault();
+        seekRelative(10);
+      } else if (e.code === "ArrowUp") {
+        e.preventDefault();
+        setVolume(Math.min(100, state.volume + 5));
+      } else if (e.code === "ArrowDown") {
+        e.preventDefault();
+        setVolume(Math.max(0, state.volume - 5));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [togglePlay, seekRelative, setVolume, state.volume]);
+
   const rates = [0.75, 1.0, 1.25, 1.5, 2.0];
 
   return (
@@ -360,18 +395,19 @@ export function LahathequeAudioPlayerCard({
 
             <button
               type="button"
-              onClick={() => seekRelative(-15)}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer"
-              title="Reculer de 15 secondes"
+              onClick={() => seekRelative(-10)}
+              className="relative w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer"
+              title="Reculer de 10 secondes (Flèche Gauche)"
             >
               <RotateCcw className="w-4 h-4" />
+              <span className="absolute -bottom-1 text-[8px] font-bold text-gold/80">10</span>
             </button>
 
             <button
               type="button"
               onClick={togglePlay}
               className="w-12 h-12 rounded-full bg-gold text-navy-dark flex items-center justify-center shadow-lg hover:bg-gold-hover hover:scale-105 active:scale-95 transition-all cursor-pointer"
-              title={state.isPlaying ? "Mettre en pause" : "Lancer la lecture"}
+              title={state.isPlaying ? "Mettre en pause (Espace)" : "Lancer la lecture (Espace)"}
             >
               {state.isPlaying ? (
                 <Pause className="w-6 h-6 fill-current" />
@@ -382,11 +418,12 @@ export function LahathequeAudioPlayerCard({
 
             <button
               type="button"
-              onClick={() => seekRelative(15)}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer"
-              title="Avancer de 15 secondes"
+              onClick={() => seekRelative(10)}
+              className="relative w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer"
+              title="Avancer de 10 secondes (Flèche Droite)"
             >
               <RotateCw className="w-4 h-4" />
+              <span className="absolute -bottom-1 text-[8px] font-bold text-gold/80">10</span>
             </button>
 
             <button

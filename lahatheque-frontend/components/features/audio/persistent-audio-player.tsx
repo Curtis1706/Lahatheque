@@ -137,11 +137,12 @@ export function PersistentAudioPlayer() {
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => seekRelative(-15)}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer"
-            title="Reculer de 15 secondes"
+            onClick={() => seekRelative(-10)}
+            className="relative w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer"
+            title="Reculer de 10 secondes"
           >
             <RotateCcw className="w-4 h-4" />
+            <span className="absolute -bottom-1 text-[8px] font-bold text-gold/80">10</span>
           </button>
 
           <button
@@ -160,11 +161,12 @@ export function PersistentAudioPlayer() {
 
           <button
             type="button"
-            onClick={() => seekRelative(15)}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer"
-            title="Avancer de 15 secondes"
+            onClick={() => seekRelative(10)}
+            className="relative w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer"
+            title="Avancer de 10 secondes"
           >
             <RotateCw className="w-4 h-4" />
+            <span className="absolute -bottom-1 text-[8px] font-bold text-gold/80">10</span>
           </button>
 
           {/* Volume (desktop) */}
