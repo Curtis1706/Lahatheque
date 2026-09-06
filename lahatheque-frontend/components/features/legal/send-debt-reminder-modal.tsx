@@ -228,7 +228,7 @@ export function SendDebtReminderModal({
                     Copie conforme comptabilité
                   </span>
                   <p className="text-[11px] text-foreground-muted">
-                    Mettre en copie le pôle financier (comptabilite@lahatheque.bj)
+                    Mettre en copie le pôle financier (contact@mail.lahalex.com)
                   </p>
                 </div>
                 <input

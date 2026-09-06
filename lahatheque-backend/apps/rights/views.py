@@ -2635,7 +2635,7 @@ class LegalRelancesListView(APIView):
                 or ""
             ).strip()
             cc_accountant = bool(request.data.get("cc_accountant", False))
-            accountant_email = "comptabilite@lahatheque.bj"
+            accountant_email = "contact@mail.lahalex.com"
 
             try:
                 def _find_user(val):

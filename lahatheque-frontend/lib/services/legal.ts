@@ -625,7 +625,7 @@ export async function getDebtReminderConfig(): Promise<DebtReminderConfig> {
     formal_notice_days: 21,
     auto_suspend_after_days: 30,
     cc_accountant: true,
-    accountant_email: "comptabilite@lahatheque.bj",
+    accountant_email: "contact@mail.lahalex.com",
   };
   const data = await res.json();
   return data.data || data;
