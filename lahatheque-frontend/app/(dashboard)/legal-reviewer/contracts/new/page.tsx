@@ -41,6 +41,7 @@ function NewLegalContractContent() {
   const preEditionParamId = searchParams.get("pre_edition_id");
   const titleParam = searchParams.get("title");
   const authorNameParam = searchParams.get("author_name");
+  const bookIdParam = searchParams.get("book_id");
 
   // Chargement des données réelles
   const [options, setOptions] = useState<ContractFormOptions | null>(null);
@@ -170,6 +171,79 @@ function NewLegalContractContent() {
               setSelectedBookId(data.ouvrages[0].id);
             }
           }
+        } else if (bookIdParam && data.ouvrages) {
+          const matchedBook = data.ouvrages.find((b) => b.id === bookIdParam);
+
+          if (matchedBook) {
+            setSelectedBookId(matchedBook.id);
+            setContractType("author_contract");
+            setPartyType("author");
+            setTitle(`Contrat d'Édition — ${matchedBook.title}`);
+
+            const authorIds = matchedBook.author_user_ids || [];
+            const authorNames = matchedBook.authors || [];
+
+            if (authorIds.length > 0) {
+              const equalShare = parseFloat((100 / authorIds.length).toFixed(2));
+              const newSplits = authorIds.map((uid, idx) => ({
+                user_id: uid,
+                name: authorNames[idx] || "Auteur",
+                role_libelle: idx === 0 ? "Auteur Principal" : "Co-Auteur",
+                pourcentage: idx === authorIds.length - 1
+                  ? parseFloat((100 - equalShare * (authorIds.length - 1)).toFixed(2))
+                  : equalShare,
+                taux_papier: matchedBook.is_paper_available ? equalShare : 0,
+                taux_numerique: equalShare,
+                taux_audio_tts: matchedBook.has_audio_tracks ? equalShare : 0,
+              }));
+              setSelectedAuthorId(authorIds[0]);
+              setSplits(newSplits);
+
+              const mainAuthor = data.authors?.find((a) => a.id === authorIds[0]);
+              if (mainAuthor) {
+                if (mainAuthor.email) setContractingPartyEmail(mainAuthor.email);
+                if (mainAuthor.phone) setContractingPartyPhone(mainAuthor.phone);
+              }
+            } else if (authorNames.length > 0) {
+              const matchedAuthor = data.authors?.find(
+                (a) =>
+                  authorNames.some(
+                    (name) =>
+                      a.name.toLowerCase().includes(name.toLowerCase()) ||
+                      name.toLowerCase().includes(a.name.toLowerCase())
+                  )
+              );
+              if (matchedAuthor) {
+                setSelectedAuthorId(matchedAuthor.id);
+                if (matchedAuthor.email) setContractingPartyEmail(matchedAuthor.email);
+                if (matchedAuthor.phone) setContractingPartyPhone(matchedAuthor.phone);
+                setSplits([
+                  {
+                    user_id: matchedAuthor.id,
+                    name: matchedAuthor.name,
+                    role_libelle: "Auteur Principal",
+                    pourcentage: 100.0,
+                    taux_papier: matchedBook.is_paper_available ? 10.0 : 0,
+                    taux_numerique: 15.0,
+                    taux_audio_tts: matchedBook.has_audio_tracks ? 8.0 : 0,
+                  },
+                ]);
+              } else {
+                const customVal = `custom:${authorNames[0]}`;
+                setSelectedAuthorId(customVal);
+                setSplits([
+                  {
+                    name: authorNames[0],
+                    role_libelle: "Auteur Principal",
+                    pourcentage: 100.0,
+                    taux_papier: matchedBook.is_paper_available ? 10.0 : 0,
+                    taux_numerique: 15.0,
+                    taux_audio_tts: matchedBook.has_audio_tracks ? 8.0 : 0,
+                  },
+                ]);
+              }
+            }
+          }
         } else {
           // Auto-sélection par défaut si disponibles
           if (data.ouvrages && data.ouvrages.length > 0) {
@@ -214,7 +288,7 @@ function NewLegalContractContent() {
       }
     }
     loadOptions();
-  }, [preEditionParamId, titleParam, authorNameParam]);
+  }, [preEditionParamId, titleParam, authorNameParam, bookIdParam]);
 
   // Formatage des listes pour les SearchableSelect
   const bookOptions = useMemo(() => {
@@ -244,8 +318,18 @@ function NewLegalContractContent() {
       });
     }
 
+    if (selectedAuthorId && selectedAuthorId.startsWith("custom:") && !list.some((a) => a.value === selectedAuthorId)) {
+      const customName = selectedAuthorId.replace("custom:", "");
+      list.unshift({
+        value: selectedAuthorId,
+        label: `${customName} (Auteur de l'ouvrage)`,
+        subtitle: "Compte à rattacher ou externe",
+        badge: "Ouvrage",
+      });
+    }
+
     return list;
-  }, [options, authorNameParam]);
+  }, [options, authorNameParam, selectedAuthorId]);
 
   const institutionOptions = useMemo(() => {
     if (!options?.institutions) return [];
@@ -290,6 +374,57 @@ function NewLegalContractContent() {
     const book = options?.ouvrages.find((b) => b.id === bookId);
     if (book) {
       setTitle(`Contrat d'Édition — ${book.title}`);
+
+      const authorIds = book.author_user_ids || [];
+      const authorNames = book.authors || [];
+
+      if (authorIds.length > 0) {
+        const equalShare = parseFloat((100 / authorIds.length).toFixed(2));
+        const newSplits = authorIds.map((uid, idx) => ({
+          user_id: uid,
+          name: authorNames[idx] || "Auteur",
+          role_libelle: idx === 0 ? "Auteur Principal" : "Co-Auteur",
+          pourcentage: idx === authorIds.length - 1
+            ? parseFloat((100 - equalShare * (authorIds.length - 1)).toFixed(2))
+            : equalShare,
+          taux_papier: book.is_paper_available ? equalShare : 0,
+          taux_numerique: equalShare,
+          taux_audio_tts: book.has_audio_tracks ? equalShare : 0,
+        }));
+        setSelectedAuthorId(authorIds[0]);
+        setSplits(newSplits);
+
+        const mainAuthor = options?.authors?.find((a) => a.id === authorIds[0]);
+        if (mainAuthor) {
+          if (mainAuthor.email) setContractingPartyEmail(mainAuthor.email);
+          if (mainAuthor.phone) setContractingPartyPhone(mainAuthor.phone);
+        }
+      } else if (authorNames.length > 0) {
+        const matchedAuthor = options?.authors?.find(
+          (a) =>
+            authorNames.some(
+              (name) =>
+                a.name.toLowerCase().includes(name.toLowerCase()) ||
+                name.toLowerCase().includes(a.name.toLowerCase())
+            )
+        );
+        if (matchedAuthor) {
+          setSelectedAuthorId(matchedAuthor.id);
+          if (matchedAuthor.email) setContractingPartyEmail(matchedAuthor.email);
+          if (matchedAuthor.phone) setContractingPartyPhone(matchedAuthor.phone);
+          setSplits([
+            {
+              user_id: matchedAuthor.id,
+              name: matchedAuthor.name,
+              role_libelle: "Auteur Principal",
+              pourcentage: 100.0,
+              taux_papier: book.is_paper_available ? 10.0 : 0,
+              taux_numerique: 15.0,
+              taux_audio_tts: book.has_audio_tracks ? 8.0 : 0,
+            },
+          ]);
+        }
+      }
     }
   };
 
