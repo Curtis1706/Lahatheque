@@ -74,8 +74,13 @@ export function SendDebtReminderModal({
     try {
       const res = await sendDetailedDebtReminder({
         debt_id: debt.id,
+        client_id: debt.client_id || debt.id,
+        client_email: debt.client_email,
+        amount: debt.amount || debt.total_debt_amount,
+        days_overdue: debt.days_overdue,
         reminder_level: level,
         custom_note: customNote.trim() ? customNote.trim() : undefined,
+        custom_message: customNote.trim() ? customNote.trim() : undefined,
         cc_accountant: ccAccountant,
       });
 

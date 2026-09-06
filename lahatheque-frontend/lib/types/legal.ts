@@ -343,7 +343,12 @@ export interface SendDebtReminderPayload {
   debt_id: string;
   reminder_level: 1 | 2 | 3;
   custom_note?: string;
+  custom_message?: string;
   cc_accountant?: boolean;
+  client_id?: string;
+  client_email?: string;
+  amount?: number;
+  days_overdue?: number;
 }
 
 export interface SendInstitutionStatementPayload {

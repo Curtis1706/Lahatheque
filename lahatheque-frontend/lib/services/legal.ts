@@ -693,12 +693,15 @@ export async function sendDetailedDebtReminder(
   payload: SendDebtReminderPayload
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
+    const customText = payload.custom_note || payload.custom_message;
     const res = await fetch(`${API_BASE}/relances/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "send_debt_reminder",
         ...payload,
+        custom_note: customText,
+        custom_message: customText,
       }),
       credentials: "include",
     });

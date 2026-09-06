@@ -2623,91 +2623,156 @@ class LegalRelancesListView(APIView):
 
         # D. Expédition d'une relance d'impayé graduée (Niveau 1, 2, 3)
         if action == "send_debt_reminder":
+            import uuid
+            from decimal import Decimal
+
             debt_id = request.data.get("debt_id")
             client_id = request.data.get("client_id")
             reminder_level = int(request.data.get("reminder_level") or 1)
-            custom_message = request.data.get("custom_message", "").strip()
+            custom_message = (
+                request.data.get("custom_message")
+                or request.data.get("custom_note")
+                or ""
+            ).strip()
+            cc_accountant = bool(request.data.get("cc_accountant", False))
+            accountant_email = "comptabilite@lahatheque.bj"
 
-            target_user = None
-            if client_id:
-                target_user = User.objects.filter(id=client_id).first()
-            if not target_user and debt_id:
-                target_user = User.objects.filter(id=debt_id).first()
+            try:
+                def _find_user(val):
+                    if not val:
+                        return None
+                    try:
+                        u_uuid = uuid.UUID(str(val))
+                        return User.objects.filter(id=u_uuid).first()
+                    except Exception:
+                        return None
 
-            if not target_user:
-                return Response({"success": False, "error": "Débiteur introuvable."}, status=404)
+                target_user = _find_user(client_id) or _find_user(debt_id)
 
-            # Montant dû
-            orders = Order.objects.filter(user=target_user, statut_paiement='pending')
-            total_due = float(orders.aggregate(s=Sum('total_amount'))['s'] or 0.0)
-            if total_due == 0:
-                from apps.commerce.models import WholesaleOrder
-                wo = WholesaleOrder.objects.filter(id=debt_id).first()
-                if wo:
-                    total_due = float(wo.total_amount)
+                if not target_user and debt_id:
+                    try:
+                        from apps.commerce.models import WholesaleOrder
+                        wo = WholesaleOrder.objects.filter(id=uuid.UUID(str(debt_id))).select_related("user").first()
+                        if wo and wo.user:
+                            target_user = wo.user
+                    except Exception:
+                        pass
 
-            due_date_str = timezone.now().strftime("%d/%m/%Y")
-            if orders.exists():
-                oldest = orders.order_by('created_at').first()
-                if oldest.credit_due_date:
-                    due_date_str = oldest.credit_due_date.strftime("%d/%m/%Y")
+                if not target_user:
+                    email_lookup = (request.data.get("client_email") or "").strip().lower()
+                    if email_lookup:
+                        target_user = User.objects.filter(email=email_lookup).first()
 
-            days_overdue = int(request.data.get("days_overdue", 0))
+                if not target_user:
+                    return Response({"success": False, "error": "Débiteur introuvable."}, status=404)
 
-            level_titles = {
-                1: "Rappel d'échéance de règlement (Rappel amiable)",
-                2: "Deuxième relance ferme — Facture en attente de règlement",
-                3: "Mise en demeure formelle avant procédure contentieuse",
-            }
-            _level_title = level_titles.get(reminder_level, "Rappel d'impayé")
-            subject = "[" + _level_title + "] \u2022 LAHA \u00c9ditions"
+                # Montant exigible / dû
+                orders = Order.objects.filter(user=target_user, statut_paiement="pending")
+                total_due = float(orders.aggregate(s=Sum("total_amount"))["s"] or 0.0)
+                if total_due == 0 and debt_id:
+                    try:
+                        from apps.commerce.models import WholesaleOrder
+                        wo = WholesaleOrder.objects.filter(id=uuid.UUID(str(debt_id))).first()
+                        if wo:
+                            total_due = float(wo.total_amount)
+                    except Exception:
+                        pass
 
-            default_messages = {
-                1: f"Nous vous rappelons avec bienveillance que votre facture d'un montant de {total_due:,.0f} FCFA est arrivée à échéance. Merci de bien vouloir procéder à son règlement.",
-                2: f"Malgré notre première relance, nous constatons que la somme de {total_due:,.0f} FCFA demeure impayée. Sans régularisation sous 7 jours ouvrés, nous serons contraints de suspendre vos services.",
-                3: f"PAR LA PRÉSENTE, NOUS VOUS METTONS FORMELLEMENT EN DEMEURE de régler sous 48 heures la somme principale de {total_due:,.0f} FCFA. À défaut, le dossier sera transmis à notre avocat pour poursuite judiciaire.",
-            }
-            body = custom_message or default_messages.get(reminder_level, default_messages[1])
+                if total_due == 0:
+                    try:
+                        total_due = float(request.data.get("amount") or request.data.get("unpaid_amount") or 0.0)
+                    except (ValueError, TypeError):
+                        total_due = 0.0
 
-            sender = request.user
-            sender_name = f"{sender.first_name} {sender.last_name}".strip() or "Service Juridique & Recouvrement"
+                due_date_str = timezone.now().strftime("%d/%m/%Y")
+                if orders.exists():
+                    oldest = orders.order_by("created_at").first()
+                    if oldest.credit_due_date:
+                        due_date_str = oldest.credit_due_date.strftime("%d/%m/%Y")
 
-            send_transactional_email(
-                email_type="client_debt_reminder",
-                to_email=target_user.email,
-                subject=subject,
-                template_name="emails/royalties/debt_reminder.html",
-                context={
-                    "recipient_name": target_user.get_full_name() or target_user.email,
-                    "subject_title": level_titles.get(reminder_level, "Relance d'impayé"),
-                    "message_body": body,
-                    "reference": f"REC-{timezone.now().year}-{str(target_user.id)[:6].upper()}",
-                    "due_date": due_date_str,
-                    "days_overdue": days_overdue,
-                    "amount_formatted": f"{total_due:,.0f}".replace(",", " "),
-                    "currency": "FCFA",
-                    "sender_name": sender_name,
-                    "sender_email": sender.email,
-                },
-                recipient_name=target_user.get_full_name() or target_user.email,
-                reply_to=sender.email,
-                async_send=True,
-            )
+                try:
+                    days_overdue = int(request.data.get("days_overdue") or 0)
+                except (ValueError, TypeError):
+                    days_overdue = 0
 
-            RelanceEmailJournal.objects.create(
-                type_relance="facture_impayee_client",
-                destinataire=target_user,
-                destinataire_email=target_user.email,
-                sujet=subject,
-                corps_message=body,
-                niveau_relance=reminder_level,
-                montant_du=total_due,
-            )
+                level_titles = {
+                    1: "Rappel d'échéance de règlement (Rappel amiable)",
+                    2: "Deuxième relance ferme — Facture en attente de règlement",
+                    3: "Mise en demeure formelle avant procédure contentieuse",
+                }
+                _level_title = level_titles.get(reminder_level, "Rappel d'impayé")
+                subject = "[" + _level_title + "] \u2022 LAHA \u00c9ditions"
 
-            return Response({
-                "success": True,
-                "message": f"Relance #{reminder_level} expédiée avec succès à {target_user.get_full_name() or target_user.email}."
-            })
+                default_messages = {
+                    1: f"Nous vous rappelons avec bienveillance que votre facture d'un montant de {total_due:,.0f} FCFA est arrivée à échéance. Merci de bien vouloir procéder à son règlement.",
+                    2: f"Malgré notre première relance, nous constatons que la somme de {total_due:,.0f} FCFA demeure impayée. Sans régularisation sous 7 jours ouvrés, nous serons contraints de suspendre vos services.",
+                    3: f"PAR LA PRÉSENTE, NOUS VOUS METTONS FORMELLEMENT EN DEMEURE de régler sous 48 heures la somme principale de {total_due:,.0f} FCFA. À défaut, le dossier sera transmis à notre avocat pour poursuite judiciaire.",
+                }
+                body = custom_message or default_messages.get(reminder_level, default_messages[1])
+
+                sender = request.user
+                sender_name = f"{sender.first_name} {sender.last_name}".strip() if sender.is_authenticated else ""
+                if not sender_name:
+                    sender_name = "Service Juridique & Recouvrement"
+                sender_email = sender.email if (sender.is_authenticated and sender.email) else "contact@mail.lahalex.com"
+
+                # Destinataires de l'email (client + copie comptabilité optionnelle)
+                recipients = [target_user.email]
+                if cc_accountant and accountant_email not in recipients:
+                    recipients.append(accountant_email)
+
+                send_transactional_email(
+                    email_type="client_debt_reminder",
+                    to_email=recipients,
+                    subject=subject,
+                    template_name="emails/royalties/debt_reminder.html",
+                    context={
+                        "recipient_name": target_user.get_full_name() or target_user.email,
+                        "subject_title": level_titles.get(reminder_level, "Relance d'impayé"),
+                        "message_body": body,
+                        "reference": f"REC-{timezone.now().year}-{str(target_user.id)[:6].upper()}",
+                        "due_date": due_date_str,
+                        "days_overdue": days_overdue,
+                        "amount_formatted": f"{total_due:,.0f}".replace(",", " "),
+                        "currency": "FCFA",
+                        "sender_name": sender_name,
+                        "sender_email": sender_email,
+                        "cc_accountant": cc_accountant,
+                        "accountant_email": accountant_email if cc_accountant else None,
+                    },
+                    recipient_name=target_user.get_full_name() or target_user.email,
+                    reply_to=sender_email,
+                    async_send=True,
+                )
+
+                body_audit = body
+                if cc_accountant:
+                    body_audit = f"{body}\n\n[Copie conforme transmise au pôle financier: {accountant_email}]"
+
+                RelanceEmailJournal.objects.create(
+                    type_relance="facture_impayee_client",
+                    destinataire=target_user,
+                    destinataire_email=target_user.email,
+                    sujet=subject,
+                    corps_message=body_audit,
+                    niveau_relance=reminder_level,
+                    montant_du=Decimal(str(round(total_due, 2))),
+                )
+
+                success_msg = f"Relance #{reminder_level} expédiée avec succès à {target_user.get_full_name() or target_user.email}."
+                if cc_accountant:
+                    success_msg += f" (Copie conforme adressée à {accountant_email})"
+
+                return Response({
+                    "success": True,
+                    "message": success_msg,
+                })
+            except Exception as e:
+                logger.error(f"Erreur lors de l'expédition de la relance: {e}", exc_info=True)
+                return Response(
+                    {"success": False, "error": f"Erreur lors du traitement de la relance: {str(e)}"},
+                    status=500
+                )
 
         # Repli standard historique
         recipient_id = request.data.get("recipient_id") or request.data.get("debt_id")
