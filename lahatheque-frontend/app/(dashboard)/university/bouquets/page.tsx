@@ -132,7 +132,7 @@ export default function UniversityBouquetsPage() {
         <ProgressMetricCard
           title="Vos Ouvrages Référencés"
           total={`${bouquets.reduce(
-            (acc, b) => acc + (b.my_books_count ?? Math.max(1, Math.round(b.books_count * 0.35))),
+            (acc, b) => acc + (b.my_books_count ?? 0),
             0
           )} Ouvrages`}
           percent="Catalogue Partagé"
@@ -143,7 +143,7 @@ export default function UniversityBouquetsPage() {
           defaultView="bar"
           data={getRollingTimeline(
             bouquets.reduce(
-              (acc, b) => acc + (b.my_books_count ?? Math.max(1, Math.round(b.books_count * 0.35))),
+              (acc, b) => acc + (b.my_books_count ?? 0),
               0
             )
           )}

@@ -1092,4 +1092,15 @@ export async function adminCreateOrderForClient(payload: {
   return data;
 }
 
+// =========================================================================
+// RÉPARTITION RÉELLE DES BOUQUETS DOCUMENTAIRES (ADMIN)
+// =========================================================================
+
+export async function getAdminBouquetsDistribution() {
+  const res = await fetch('/api/bff/admin/bouquets/distribution/', { credentials: 'include' });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data || [];
+}
+
 

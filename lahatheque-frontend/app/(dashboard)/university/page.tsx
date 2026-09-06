@@ -152,7 +152,7 @@ export default function UniversityOverviewPage() {
         <ProgressMetricCard
           title="Vos Ouvrages en Bouquets"
           total={`${bouquets.reduce(
-            (acc, b) => acc + (b.my_books_count ?? Math.max(1, Math.round(b.books_count * 0.35))),
+            (acc, b) => acc + (b.my_books_count ?? 0),
             0
           )} Ouvrages`}
           percent="Inclus"
@@ -163,7 +163,7 @@ export default function UniversityOverviewPage() {
           defaultView="bar"
           data={getRollingTimeline(
             bouquets.reduce(
-              (acc, b) => acc + (b.my_books_count ?? Math.max(1, Math.round(b.books_count * 0.35))),
+              (acc, b) => acc + (b.my_books_count ?? 0),
               0
             )
           )}

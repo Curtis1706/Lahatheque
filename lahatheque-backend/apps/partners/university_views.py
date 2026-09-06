@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.utils import timezone
-from apps.accounts.permissions import IsUniversityStaff
+from apps.accounts.permissions import IsUniversityStaff, IsAdminOrSuperAdmin
 from .models import (
     Institution,
     Faculty,
@@ -937,4 +937,38 @@ class ExportBouquetWordView(APIView):
         response['Content-Disposition'] = f'attachment; filename="Bouquet_{safe_title}.docx"'
         doc.save(response)
         return response
+
+
+class AdminBouquetsDistributionListView(APIView):
+    """GET /api/v1/admin/bouquets/distribution/ - Répartition réelle des bouquets par université."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from apps.partners.models import BouquetOffering
+
+        bouquets = BouquetOffering.objects.filter(is_active=True)
+        data = []
+
+        for b in bouquets:
+            books_qs = b.get_books_queryset()
+            books_data = [
+                {
+                    "id": str(book.id),
+                    "institution_id": str(book.institution_id) if book.institution_id else None,
+                    "institution_name": book.institution.name if book.institution else "Sans université",
+                }
+                for book in books_qs.select_related('institution')
+            ]
+
+            data.append({
+                "id": str(b.id),
+                "title": b.title,
+                "bouquet_type": b.bouquet_type,
+                "annual_price": float(b.annual_price),
+                "currency": b.currency,
+                "books_count": len(books_data),
+                "books": books_data,
+            })
+
+        return Response({"success": True, "data": data})
 

@@ -26,6 +26,7 @@ from apps.reporting.admin_views import (
     AdminBouquetOfferingDetailView,
     AdminBouquetDistributionView,
 )
+from apps.partners.university_views import AdminBouquetsDistributionListView
 from apps.accounts.admin_views import AdminUserManagementViewSet
 
 router = DefaultRouter()
@@ -51,5 +52,6 @@ urlpatterns = [
     path('bouquet-offerings/', AdminBouquetOfferingsView.as_view(), name='admin-bouquet-offerings'),
     path('bouquet-offerings/<str:pk>/', AdminBouquetOfferingDetailView.as_view(), name='admin-bouquet-offering-detail'),
     path('bouquet-offerings/<str:pk>/distribution/', AdminBouquetDistributionView.as_view(), name='admin-bouquet-distribution'),
+    path('bouquets/distribution/', AdminBouquetsDistributionListView.as_view(), name='admin-bouquets-distribution'),
     path('', include(router.urls)),
 ]

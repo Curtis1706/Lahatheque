@@ -7,13 +7,16 @@ import {
   Building2,
   CheckCircle2,
   DollarSign,
+  PieChart,
   X,
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
+import { BouquetDistributionModal } from "@/components/features/bouquets/bouquet-distribution-modal";
 import {
   getAdminRoyalties,
+  getAdminBouquetsDistribution,
   processRoyaltyPayout,
 } from "@/lib/services/admin";
 import { AdminRoyalty } from "@/lib/types/admin";
@@ -22,6 +25,11 @@ import { toast } from "sonner";
 export default function AdminUniversityRoyaltiesPage() {
   const [data, setData] = useState<AdminRoyalty[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // État des bouquets pour la répartition
+  const [bouquets, setBouquets] = useState<any[]>([]);
+  const [loadingBouquets, setLoadingBouquets] = useState(false);
+  const [selectedBouquetForDistribution, setSelectedBouquetForDistribution] = useState<any | null>(null);
 
   // Modale de traitement reversement université
   const [payoutToProcess, setPayoutToProcess] = useState<AdminRoyalty | null>(null);
@@ -33,12 +41,18 @@ export default function AdminUniversityRoyaltiesPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const items = await getAdminRoyalties("university");
+      setLoadingBouquets(true);
+      const [items, bouquetsData] = await Promise.all([
+        getAdminRoyalties("university"),
+        getAdminBouquetsDistribution(),
+      ]);
       setData(items);
+      setBouquets(bouquetsData);
     } catch {
       toast.error("Erreur de chargement des redevances universités.");
     } finally {
       setLoading(false);
+      setLoadingBouquets(false);
     }
   };
 
@@ -223,6 +237,62 @@ export default function AdminUniversityRoyaltiesPage() {
         emptyMessage="Aucune redevance universitaire enregistrée."
       />
 
+      {/* Section Répartition des Bouquets Documentaires */}
+      <div className="space-y-4 pt-6 border-t border-border">
+        <div>
+          <h2 className="text-base font-bold text-navy font-serif">
+            Répartition des Bouquets par Université Partenaire
+          </h2>
+          <p className="text-xs text-foreground-muted">
+            Pondération et répartition des livres contributifs par établissement dans chaque bouquet actif.
+          </p>
+        </div>
+
+        {loadingBouquets ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="h-32 bg-background-secondary rounded-2xl border border-border" />
+            ))}
+          </div>
+        ) : bouquets.length === 0 ? (
+          <div className="p-6 text-center rounded-2xl bg-background-secondary border border-border">
+            <p className="text-xs text-foreground-muted">Aucun bouquet documentaire actif trouvé.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {bouquets.map((b) => (
+              <div
+                key={b.id}
+                className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3 flex flex-col justify-between shadow-xs"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="font-serif font-bold text-sm text-navy line-clamp-1">
+                      {b.title}
+                    </h3>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-navy-light text-navy font-semibold shrink-0">
+                      {b.books_count} {b.books_count > 1 ? "livres" : "livre"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground-muted font-mono">
+                    {Number(b.annual_price).toLocaleString("fr-FR")} {b.currency || "XOF"} / an
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedBouquetForDistribution(b)}
+                  className="w-full px-3 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer min-h-[40px]"
+                >
+                  <PieChart className="w-3.5 h-3.5 text-gold" />
+                  <span>Répartition & Statistiques</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Modale de Traitement */}
       {payoutToProcess && (
         <Modal
@@ -298,6 +368,23 @@ export default function AdminUniversityRoyaltiesPage() {
           </form>
         </Modal>
       )}
+
+      {/* Modale de Répartition Bouquet */}
+      <BouquetDistributionModal
+        open={!!selectedBouquetForDistribution}
+        onClose={() => setSelectedBouquetForDistribution(null)}
+        bouquet={
+          selectedBouquetForDistribution
+            ? {
+                id: selectedBouquetForDistribution.id,
+                title: selectedBouquetForDistribution.title,
+                annual_price: selectedBouquetForDistribution.annual_price,
+                currency: selectedBouquetForDistribution.currency,
+                books: selectedBouquetForDistribution.books,
+              }
+            : null
+        }
+      />
     </div>
   );
 }
