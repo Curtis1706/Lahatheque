@@ -2625,7 +2625,7 @@ class LegalRelancesListView(APIView):
         if action == "send_debt_reminder":
             debt_id = request.data.get("debt_id")
             client_id = request.data.get("client_id")
-            reminder_level = int(request.data.get("reminder_level", 1))
+            reminder_level = int(request.data.get("reminder_level") or 1)
             custom_message = request.data.get("custom_message", "").strip()
 
             target_user = None
@@ -2659,7 +2659,7 @@ class LegalRelancesListView(APIView):
                 2: "Deuxième relance ferme — Facture en attente de règlement",
                 3: "Mise en demeure formelle avant procédure contentieuse",
             }
-            subject = f"[{level_titles.get(reminder_level, 'Rappel d’impayé')}] • LAHA Éditions"
+            subject = f"[{level_titles.get(reminder_level, 'Rappel d\'impayé')}] • LAHA Éditions"
 
             default_messages = {
                 1: f"Nous vous rappelons avec bienveillance que votre facture d'un montant de {total_due:,.0f} FCFA est arrivée à échéance. Merci de bien vouloir procéder à son règlement.",
