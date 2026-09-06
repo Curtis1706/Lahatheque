@@ -238,21 +238,25 @@ export function SendDebtReminderModal({
                   className="w-4 h-4 rounded border-border accent-navy cursor-pointer"
                 />
               </div>
-
-              {/* Messages de statut */}
-              {errorMsg && (
-                <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-xs text-error flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-              {successMsg && (
-                <div className="p-3 rounded-xl bg-success/10 border border-success/20 text-xs text-success flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                  <span>{successMsg}</span>
-                </div>
-              )}
             </div>
+
+            {/* Messages de statut — toujours visibles, hors de la zone défilante */}
+            {(errorMsg || successMsg) && (
+              <div className="px-4 sm:px-6 pt-3 shrink-0">
+                {errorMsg && (
+                  <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-xs text-error flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+                {successMsg && (
+                  <div className="p-3 rounded-xl bg-success/10 border border-success/20 text-xs text-success flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                    <span>{successMsg}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Actions / Pied de modale fixe */}
             <div className="p-4 sm:p-6 border-t border-border bg-background-secondary/30 shrink-0 flex items-center gap-3">
