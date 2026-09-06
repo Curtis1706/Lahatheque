@@ -104,7 +104,7 @@ export function SendInstitutionStatementModal({
   return (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 overflow-hidden"
         onClick={onClose}
         role="dialog"
         aria-modal="true"
@@ -114,11 +114,11 @@ export function SendInstitutionStatementModal({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.2 }}
-          className="bg-background border border-border rounded-3xl shadow-xl w-full max-w-lg p-6 space-y-5"
+          className="bg-background border border-border rounded-3xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[min(90dvh,780px)]"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* En-tête */}
-          <div className="flex items-center justify-between">
+          {/* En-tête fixe */}
+          <div className="flex items-center justify-between p-5 sm:p-6 pb-4 border-b border-border/50 shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-2xl bg-gold/10 text-gold border border-gold/20">
                 {entity.type === "university" ? (
@@ -139,188 +139,192 @@ export function SendInstitutionStatementModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl hover:bg-background-secondary transition-colors text-foreground-muted min-h-[44px] min-w-[44px] flex items-center justify-center"
+              className="p-2 rounded-xl hover:bg-background-secondary transition-colors text-foreground-muted min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
               aria-label="Fermer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Fiche Établissement & Canal Pro */}
-          <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-foreground-muted">Partenaire :</span>
-              <span className="font-bold text-navy">{entity.name}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-foreground-muted">Statut conventionnel :</span>
-              <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold border uppercase tracking-wider bg-navy/10 text-navy border-navy/20">
-                {entity.type === "university" ? "Université Partenaire" : "Éditeur Tiers Partenaire"}
-              </span>
-            </div>
-            {formattedAmount !== null && (
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-foreground-muted">Redevance en attente :</span>
-                <span className="font-mono font-bold text-navy">{formattedAmount} {entity.currency || "FCFA"}</span>
+          {/* Formulaire avec corps scrollable et pied d'actions fixe */}
+          <form onSubmit={handleSend} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            {/* Corps scrollable */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4">
+              {/* Fiche Établissement & Canal Pro */}
+              <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-foreground-muted">Partenaire :</span>
+                  <span className="font-bold text-navy">{entity.name}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-foreground-muted">Statut conventionnel :</span>
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold border uppercase tracking-wider bg-navy/10 text-navy border-navy/20">
+                    {entity.type === "university" ? "Université Partenaire" : "Éditeur Tiers Partenaire"}
+                  </span>
+                </div>
+                {formattedAmount !== null && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-foreground-muted">Redevance en attente :</span>
+                    <span className="font-mono font-bold text-navy">{formattedAmount} {entity.currency || "FCFA"}</span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-border flex items-center gap-2 text-xs text-foreground-muted">
+                  <ShieldCheck className="w-3.5 h-3.5 text-gold flex-shrink-0" />
+                  <span>Canal officiel <strong className="text-navy">contact@mail.lahalex.com</strong></span>
+                </div>
               </div>
-            )}
-            <div className="pt-2 border-t border-border flex items-center gap-2 text-xs text-foreground-muted">
-              <ShieldCheck className="w-3.5 h-3.5 text-gold flex-shrink-0" />
-              <span>Canal officiel <strong className="text-navy">contact@mail.lahalex.com</strong></span>
-            </div>
-          </div>
 
-          <form onSubmit={handleSend} className="space-y-4">
-            {/* Choix de la périodicité : Mensuel vs Trimestriel */}
-            <div>
-              <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-2">
-                Période de reddition des comptes *
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPeriodType("monthly")}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-colors min-h-[44px] ${
-                    periodType === "monthly"
-                      ? "bg-navy text-white border-navy font-bold"
-                      : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
-                  }`}
-                >
-                  Mensuelle
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPeriodType("quarterly")}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-colors min-h-[44px] ${
-                    periodType === "quarterly"
-                      ? "bg-navy text-white border-navy font-bold"
-                      : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
-                  }`}
-                >
-                  Trimestrielle
-                </button>
-              </div>
-            </div>
-
-            {/* Sélecteurs Année et Mois/Trimestre */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Choix de la périodicité : Mensuel vs Trimestriel */}
               <div>
-                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                  Année *
+                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-2">
+                  Période de reddition des comptes *
                 </label>
-                <select
-                  value={year}
-                  onChange={(e) => setYear(parseInt(e.target.value))}
-                  className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
-                >
-                  {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPeriodType("monthly")}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-colors min-h-[44px] cursor-pointer ${
+                      periodType === "monthly"
+                        ? "bg-navy text-white border-navy font-bold"
+                        : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
+                    }`}
+                  >
+                    Mensuelle
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPeriodType("quarterly")}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-colors min-h-[44px] cursor-pointer ${
+                      periodType === "quarterly"
+                        ? "bg-navy text-white border-navy font-bold"
+                        : "bg-background-secondary text-foreground-muted border-border hover:text-navy"
+                    }`}
+                  >
+                    Trimestrielle
+                  </button>
+                </div>
               </div>
 
-              {periodType === "monthly" ? (
+              {/* Sélecteurs Année et Mois/Trimestre */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                    Mois *
+                    Année *
                   </label>
                   <select
-                    value={month}
-                    onChange={(e) => setMonth(parseInt(e.target.value))}
+                    value={year}
+                    onChange={(e) => setYear(parseInt(e.target.value))}
                     className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
                   >
-                    {MONTH_NAMES.map((name, idx) => (
-                      <option key={name} value={idx + 1}>{name}</option>
+                    {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+                      <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
                 </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                    Trimestre *
-                  </label>
-                  <select
-                    value={quarter}
-                    onChange={(e) => setQuarter(parseInt(e.target.value))}
-                    className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
-                  >
-                    {QUARTER_NAMES.map((q) => (
-                      <option key={q.value} value={q.value}>{q.label}</option>
-                    ))}
-                  </select>
+
+                {periodType === "monthly" ? (
+                  <div>
+                    <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                      Mois *
+                    </label>
+                    <select
+                      value={month}
+                      onChange={(e) => setMonth(parseInt(e.target.value))}
+                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
+                    >
+                      {MONTH_NAMES.map((name, idx) => (
+                        <option key={name} value={idx + 1}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                      Trimestre *
+                    </label>
+                    <select
+                      value={quarter}
+                      onChange={(e) => setQuarter(parseInt(e.target.value))}
+                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
+                    >
+                      {QUARTER_NAMES.map((q) => (
+                        <option key={q.value} value={q.value}>{q.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Option PDF */}
+              <div className="p-3 rounded-xl bg-background-secondary border border-border flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-gold" />
+                    Bordereau PDF annexé
+                  </span>
+                  <p className="text-[11px] text-foreground-muted">
+                    Générer le décompte contractuel certifié livre par livre
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={includePdf}
+                  onChange={(e) => setIncludePdf(e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-navy cursor-pointer"
+                />
+              </div>
+
+              {/* Note d'accompagnement */}
+              <div>
+                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                  Note d&apos;accompagnement institutionnelle (optionnel)
+                </label>
+                <textarea
+                  value={customNote}
+                  onChange={(e) => setCustomNote(e.target.value)}
+                  placeholder="Ex : Bordereau de redevances établi conformément à l'accord-cadre interuniversitaire..."
+                  rows={2}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy placeholder:text-foreground-muted"
+                />
+              </div>
+
+              {/* Récapitulatif Période */}
+              <div className="p-3 rounded-xl bg-gold/10 border border-gold/20 flex items-center gap-2 text-xs text-navy">
+                <Calendar className="w-4 h-4 text-gold flex-shrink-0" />
+                <span>
+                  Période couverte : <strong>{periodLabel}</strong>
+                </span>
+              </div>
+
+              {/* Messages de statut */}
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-xs text-error flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+              {successMsg && (
+                <div className="p-3 rounded-xl bg-success/10 border border-success/20 text-xs text-success flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  <span>{successMsg}</span>
                 </div>
               )}
             </div>
 
-            {/* Option PDF */}
-            <div className="p-3 rounded-xl bg-background-secondary border border-border flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-xs font-bold text-navy flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-gold" />
-                  Bordereau PDF annexé
-                </span>
-                <p className="text-[11px] text-foreground-muted">
-                  Générer le décompte contractuel certifié livre par livre
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={includePdf}
-                onChange={(e) => setIncludePdf(e.target.checked)}
-                className="w-4 h-4 rounded border-border accent-navy cursor-pointer"
-              />
-            </div>
-
-            {/* Note d'accompagnement */}
-            <div>
-              <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                Note d&apos;accompagnement institutionnelle (optionnel)
-              </label>
-              <textarea
-                value={customNote}
-                onChange={(e) => setCustomNote(e.target.value)}
-                placeholder="Ex : Bordereau de redevances établi conformément à l'accord-cadre interuniversitaire..."
-                rows={2}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy"
-              />
-            </div>
-
-            {/* Récapitulatif Période */}
-            <div className="p-3 rounded-xl bg-gold/10 border border-gold/20 flex items-center gap-2 text-xs text-navy">
-              <Calendar className="w-4 h-4 text-gold flex-shrink-0" />
-              <span>
-                Période couverte : <strong>{periodLabel}</strong>
-              </span>
-            </div>
-
-            {/* Messages de statut */}
-            {errorMsg && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-600 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-            {successMsg && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                <span>{successMsg}</span>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 pt-2">
+            {/* Actions / Pied de modale fixe */}
+            <div className="p-4 sm:p-6 border-t border-border bg-background-secondary/30 shrink-0 flex items-center gap-3">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy min-h-[44px]"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy min-h-[44px] cursor-pointer transition-colors"
               >
                 Annuler
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] shadow-xs"
+                className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] shadow-xs cursor-pointer"
               >
                 {loading ? (
                   <InlineLoader size={16} />

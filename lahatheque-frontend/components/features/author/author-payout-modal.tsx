@@ -67,10 +67,10 @@ export function AuthorPayoutModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-      <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-4">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+      <div className="bg-background border border-border rounded-3xl max-w-md w-full shadow-2xl overflow-hidden flex flex-col max-h-[min(90dvh,720px)] animate-in fade-in zoom-in-95 duration-200">
+        {/* Header fixe */}
+        <div className="flex items-center justify-between p-5 sm:p-6 pb-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-gold/20 text-gold">
               <CreditCard className="w-5 h-5" />
@@ -82,84 +82,89 @@ export function AuthorPayoutModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-navy cursor-pointer transition-colors"
+            className="p-1.5 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-navy cursor-pointer transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Fermer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Formulaire */}
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          <div>
-            <label className="block font-bold text-navy mb-1.5">
-              Montant à verser (XOF) *
-            </label>
-            <div className="relative">
+        {/* Formulaire avec corps scrollable et footer fixe */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          {/* Corps scrollable */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4 text-xs">
+            <div>
+              <label className="block font-bold text-navy mb-1.5">
+                Montant à verser (XOF) *
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder={`Max: ${maxAmount.toLocaleString("fr-FR")} XOF`}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-mono focus:ring-2 focus:ring-navy min-h-[44px]"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setAmount(String(maxAmount))}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gold hover:underline cursor-pointer"
+                >
+                  Tout verser
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-bold text-navy mb-1.5">
+                Canal de Paiement
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "momo", label: "MTN MoMo", icon: Smartphone },
+                  { id: "moov", label: "Moov Money", icon: Smartphone },
+                  { id: "orange", label: "Orange / Wave", icon: Smartphone },
+                  { id: "bank", label: "Virement Bancaire", icon: Building2 },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setPaymentMethod(m.id)}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer min-h-[44px] ${
+                      paymentMethod === m.id
+                        ? "border-gold bg-gold/10 font-bold text-navy shadow-2xs"
+                        : "border-border bg-background text-foreground hover:bg-background-secondary"
+                    }`}
+                  >
+                    <m.icon className="w-3.5 h-3.5 text-gold shrink-0" />
+                    <span className="truncate">{m.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-bold text-navy mb-1.5">
+                {paymentMethod === "bank" ? "Numéro IBAN / RIB National UEMOA" : "Numéro de Téléphone Bénéficiaire"}
+              </label>
               <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={`Max: ${maxAmount.toLocaleString("fr-FR")} XOF`}
+                type="text"
+                value={accountDetails}
+                onChange={(e) => setAccountDetails(e.target.value)}
+                placeholder={paymentMethod === "bank" ? "BJ061 01001 001234567890 12" : "+229 97 00 00 00"}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-mono focus:ring-2 focus:ring-navy min-h-[44px]"
                 required
               />
-              <button
-                type="button"
-                onClick={() => setAmount(String(maxAmount))}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gold hover:underline cursor-pointer"
-              >
-                Tout verser
-              </button>
             </div>
           </div>
 
-          <div>
-            <label className="block font-bold text-navy mb-1.5">
-              Canal de Paiement
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: "momo", label: "MTN MoMo", icon: Smartphone },
-                { id: "moov", label: "Moov Money", icon: Smartphone },
-                { id: "orange", label: "Orange / Wave", icon: Smartphone },
-                { id: "bank", label: "Virement Bancaire", icon: Building2 },
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setPaymentMethod(m.id)}
-                  className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
-                    paymentMethod === m.id
-                      ? "border-gold bg-gold/10 font-bold text-navy shadow-2xs"
-                      : "border-border bg-background text-foreground hover:bg-background-secondary"
-                  }`}
-                >
-                  <m.icon className="w-3.5 h-3.5 text-gold shrink-0" />
-                  <span className="truncate">{m.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-bold text-navy mb-1.5">
-              {paymentMethod === "bank" ? "Numéro IBAN / RIB National UEMOA" : "Numéro de Téléphone Bénéficiaire"}
-            </label>
-            <input
-              type="text"
-              value={accountDetails}
-              onChange={(e) => setAccountDetails(e.target.value)}
-              placeholder={paymentMethod === "bank" ? "BJ061 01001 001234567890 12" : "+229 97 00 00 00"}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-mono focus:ring-2 focus:ring-navy min-h-[44px]"
-              required
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-border">
+          {/* Footer fixe */}
+          <div className="p-4 sm:p-6 border-t border-border bg-background-secondary/30 shrink-0 flex justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-border text-foreground hover:bg-background-secondary min-h-[44px] cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border border-border text-foreground hover:bg-background-secondary min-h-[44px] cursor-pointer transition-colors"
             >
               Annuler
             </button>

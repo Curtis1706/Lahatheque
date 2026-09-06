@@ -33,11 +33,11 @@ export function SubscriptionCancelModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-dark/70 animate-in fade-in duration-200">
-      <div className="bg-background border border-border w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-navy-dark/70 animate-in fade-in duration-200 overflow-hidden">
+      <div className="bg-background border border-border w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[min(90dvh,620px)]">
         
-        {/* Header */}
-        <div className="p-6 border-b border-border bg-background-secondary flex items-center justify-between">
+        {/* Header fixe */}
+        <div className="p-5 sm:p-6 border-b border-border bg-background-secondary flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-error/10 text-error rounded-xl border border-error/20">
               <AlertTriangle className="w-5 h-5" />
@@ -49,15 +49,15 @@ export function SubscriptionCancelModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-foreground-muted hover:text-navy hover:bg-background rounded-full transition-colors"
+            className="p-1.5 text-foreground-muted hover:text-navy hover:bg-background rounded-full transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Fermer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-6 space-y-4 text-xs text-foreground/90">
+        {/* Body scrollable */}
+        <div className="p-5 sm:p-6 space-y-4 text-xs text-foreground/90 flex-1 min-h-0 overflow-y-auto overscroll-contain">
           <p className="font-semibold text-navy leading-relaxed">
             Êtes-vous sûr de vouloir désactiver le renouvellement automatique pour <span className="text-navy font-bold">{subscriptionName}</span> ?
           </p>
@@ -80,19 +80,19 @@ export function SubscriptionCancelModal({
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-border bg-background-secondary flex items-center justify-end gap-3">
+        {/* Footer Actions fixe */}
+        <div className="p-4 border-t border-border bg-background-secondary flex items-center justify-end gap-3 shrink-0">
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2.5 rounded-xl border border-border hover:bg-background text-navy font-bold text-xs transition-colors"
+            className="px-4 py-2.5 rounded-xl border border-border hover:bg-background text-navy font-bold text-xs transition-colors min-h-[44px]"
           >
             Conserver mon abonnement
           </button>
           <button
             onClick={onConfirmCancel}
             disabled={isSubmitting}
-            className="px-4 py-2.5 rounded-xl bg-error hover:bg-error/90 text-white font-bold text-xs transition-colors flex items-center gap-2 shadow"
+            className="px-4 py-2.5 rounded-xl bg-error hover:bg-error/90 text-white font-bold text-xs transition-colors flex items-center gap-2 shadow min-h-[44px]"
           >
             {isSubmitting ? "Traitement..." : "Confirmer la désactivation"}
           </button>

@@ -41,7 +41,7 @@ export function EscalateModal({ alert, isOpen, onClose, onConfirm }: EscalateMod
   return (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 overflow-hidden"
         onClick={onClose}
         onKeyDown={handleKeyDown}
         role="dialog"
@@ -53,11 +53,11 @@ export function EscalateModal({ alert, isOpen, onClose, onConfirm }: EscalateMod
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.2 }}
-          className="bg-background border border-border rounded-2xl shadow-lg w-full max-w-md p-6 space-y-5"
+          className="bg-background border border-border rounded-2xl shadow-lg w-full max-w-md overflow-hidden flex flex-col max-h-[min(90dvh,640px)]"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between">
+          {/* Header fixe */}
+          <div className="flex items-center justify-between p-5 sm:p-6 pb-4 border-b border-border/50 shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-error/10">
                 <ArrowUpCircle className="w-5 h-5 text-error" />
@@ -69,59 +69,62 @@ export function EscalateModal({ alert, isOpen, onClose, onConfirm }: EscalateMod
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-background-secondary transition-colors"
+              className="p-2 rounded-lg hover:bg-background-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
               title="Fermer"
             >
               <X className="w-4 h-4 text-foreground-muted" />
             </button>
           </div>
 
-          {/* Ouvrage concerné */}
-          <div className="bg-background-secondary p-3 rounded-xl border border-border text-xs space-y-1">
-            <p className="font-semibold text-navy">{alert.book_title}</p>
-            <p className="text-foreground-muted">ISBN : <span className="font-mono text-foreground">{alert.isbn}</span></p>
-            <p className="text-foreground-muted">Entrepôt : <span className="text-foreground">{alert.warehouse}</span></p>
-            <p className="text-foreground-muted">Quantité : <span className="font-bold text-error">{alert.quantity} exemplaire{alert.quantity !== 1 ? "s" : ""}</span></p>
+          {/* Corps scrollable */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4 text-xs">
+            {/* Ouvrage concerné */}
+            <div className="bg-background-secondary p-3.5 rounded-xl border border-border text-xs space-y-1">
+              <p className="font-semibold text-navy">{alert.book_title}</p>
+              <p className="text-foreground-muted">ISBN : <span className="font-mono text-foreground">{alert.isbn}</span></p>
+              <p className="text-foreground-muted">Entrepôt : <span className="text-foreground">{alert.warehouse}</span></p>
+              <p className="text-foreground-muted">Quantité : <span className="font-bold text-error">{alert.quantity} exemplaire{alert.quantity !== 1 ? "s" : ""}</span></p>
+            </div>
+
+            {/* Description de l'impact */}
+            <div>
+              <label htmlFor="impact-description" className="block text-xs font-semibold text-navy mb-1">
+                Impact sur la vitrine *
+              </label>
+              <textarea
+                id="impact-description"
+                value={description}
+                onChange={(e) => { setDescription(e.target.value); setError(null); }}
+                placeholder="Ex: Ouvrage indisponible pour la rentrée universitaire FSS, forte demande prévue..."
+                rows={3}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${error ? "border-error" : "border-border"} bg-background focus:outline-none focus:border-gold text-foreground placeholder:text-foreground-muted resize-none`}
+                autoFocus
+              />
+              {error && <p className="text-[10px] text-error mt-0.5">{error}</p>}
+            </div>
+
+            {/* Info */}
+            <div className="bg-gold/5 border border-gold/20 rounded-xl p-3 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+              <p className="text-[11px] text-foreground">
+                L&apos;administrateur recevra une notification et pourra désactiver l&apos;ouvrage de la vitrine publique si nécessaire. 
+                Vous ne pouvez pas retirer un ouvrage vous-même.
+              </p>
+            </div>
           </div>
 
-          {/* Description de l'impact */}
-          <div>
-            <label htmlFor="impact-description" className="block text-xs font-semibold text-navy mb-1">
-              Impact sur la vitrine *
-            </label>
-            <textarea
-              id="impact-description"
-              value={description}
-              onChange={(e) => { setDescription(e.target.value); setError(null); }}
-              placeholder="Ex: Ouvrage indisponible pour la rentrée universitaire FSS, forte demande prévue..."
-              rows={3}
-              className={`w-full px-3 py-2 text-xs rounded-xl border ${error ? "border-error" : "border-border"} bg-background focus:outline-none focus:border-gold text-foreground placeholder:text-foreground-muted resize-none`}
-              autoFocus
-            />
-            {error && <p className="text-[10px] text-error mt-0.5">{error}</p>}
-          </div>
-
-          {/* Info */}
-          <div className="bg-gold/5 border border-gold/20 rounded-xl p-3 flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-            <p className="text-[11px] text-foreground">
-              L&apos;administrateur recevra une notification et pourra désactiver l&apos;ouvrage de la vitrine publique si nécessaire. 
-              Vous ne pouvez pas retirer un ouvrage vous-même.
-            </p>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-3 pt-2">
+          {/* Actions / Footer fixe */}
+          <div className="p-4 sm:p-6 border-t border-border bg-background-secondary/30 shrink-0 flex items-center gap-3">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy hover:border-navy transition-colors min-h-[44px]"
+              className="flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy hover:border-navy transition-colors min-h-[44px] cursor-pointer"
             >
               Annuler
             </button>
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex-1 px-4 py-2.5 rounded-xl bg-error text-white text-xs font-bold hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px]"
+              className="flex-1 px-4 py-2.5 rounded-xl bg-error text-white text-xs font-bold hover:opacity-90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] cursor-pointer shadow-xs"
             >
               {loading ? (
                 <InlineLoader size={16} />

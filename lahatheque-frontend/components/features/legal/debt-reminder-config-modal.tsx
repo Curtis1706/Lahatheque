@@ -46,7 +46,7 @@ export function DebtReminderConfigModal({
   return (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 overflow-hidden"
         onClick={onClose}
         role="dialog"
         aria-modal="true"
@@ -56,11 +56,11 @@ export function DebtReminderConfigModal({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.2 }}
-          className="bg-background border border-border rounded-3xl shadow-xl w-full max-w-lg p-6 space-y-5"
+          className="bg-background border border-border rounded-3xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[min(90dvh,720px)]"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between">
+          {/* En-tête fixe */}
+          <div className="flex items-center justify-between p-5 sm:p-6 pb-4 border-b border-border/50 shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-2xl bg-gold/10 text-gold border border-gold/20">
                 <BellRing className="w-5 h-5 text-gold" />
@@ -73,98 +73,103 @@ export function DebtReminderConfigModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl hover:bg-background-secondary transition-colors text-foreground-muted"
+              className="p-2 rounded-xl hover:bg-background-secondary transition-colors text-foreground-muted min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+              aria-label="Fermer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                  Seuil minimum de dette (FCFA) *
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="5000"
-                  value={minAmountThreshold}
-                  onChange={(e) => setMinAmountThreshold(parseInt(e.target.value) || 0)}
-                  className="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
-                  required
-                />
+          {/* Formulaire avec corps scrollable et pied d'actions fixe */}
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            {/* Corps scrollable */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                    Seuil minimum de dette (FCFA) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="5000"
+                    value={minAmountThreshold}
+                    onChange={(e) => setMinAmountThreshold(parseInt(e.target.value) || 0)}
+                    className="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                    Délai avant 1ère relance (jours) *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={daysBeforeFirst}
+                    onChange={(e) => setDaysBeforeFirst(parseInt(e.target.value) || 1)}
+                    className="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                    Nombre max de relances *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={maxReminders}
+                    onChange={(e) => setMaxReminders(parseInt(e.target.value) || 1)}
+                    className="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                    Intervalle entre relances (jours) *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={frequencyDays}
+                    onChange={(e) => setFrequencyDays(parseInt(e.target.value) || 1)}
+                    className="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
+                    required
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                  Délai avant 1ère relance (jours) *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={daysBeforeFirst}
-                  onChange={(e) => setDaysBeforeFirst(parseInt(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                  Nombre max de relances *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={maxReminders}
-                  onChange={(e) => setMaxReminders(parseInt(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                  Intervalle entre relances (jours) *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={frequencyDays}
-                  onChange={(e) => setFrequencyDays(parseInt(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"
-                  required
-                />
+              <div className="p-3.5 rounded-2xl bg-navy/5 border border-navy/20 text-xs text-foreground-muted space-y-1">
+                <p className="font-bold text-navy flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-gold" />
+                  Déclenchement 100% automatique
+                </p>
+                <p>
+                  Les relances seront envoyées automatiquement par e-mail aux clients dont le solde débiteur dépasse le seuil configuré.
+                </p>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-navy/5 border border-navy/20 text-xs text-foreground-muted space-y-1">
-              <p className="font-bold text-navy flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-gold" />
-                Déclenchement 100% automatique
-              </p>
-              <p>
-                Les relances seront envoyées automatiquement par e-mail aux clients dont le solde débiteur dépasse le seuil configuré.
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 pt-2">
+            {/* Actions / Pied de modale fixe */}
+            <div className="p-4 sm:p-6 border-t border-border bg-background-secondary/30 shrink-0 flex items-center gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy min-h-[44px]"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground-muted hover:text-navy min-h-[44px] cursor-pointer transition-colors"
               >
                 Annuler
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] shadow-xs"
+                className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] shadow-xs cursor-pointer"
               >
                 {loading ? (
                   <InlineLoader size={16} />

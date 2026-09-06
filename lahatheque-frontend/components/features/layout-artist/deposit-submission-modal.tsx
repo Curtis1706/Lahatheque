@@ -104,7 +104,7 @@ export function DepositSubmissionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 animate-in fade-in duration-200 overflow-y-auto">
       {/* Top Global Animated Progress Bar */}
       <div className="fixed top-0 left-0 right-0 h-1.5 bg-background-secondary z-50 overflow-hidden">
         <div
@@ -114,7 +114,7 @@ export function DepositSubmissionModal({
       </div>
 
       {/* Modal Box */}
-      <div className="relative w-full max-w-lg bg-background border border-border rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6 animate-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-lg bg-background border border-border rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6 animate-in zoom-in-95 duration-200 max-h-[min(90dvh,720px)] overflow-y-auto my-auto">
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gold/15 text-gold mb-1">
