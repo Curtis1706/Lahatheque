@@ -11,13 +11,17 @@ import {
   Trash2,
   Download,
   RotateCw,
+  Cpu,
+  CheckCircle2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ContractSearchBar } from "@/components/features/legal/contract-search-bar";
 import { EditContractModal } from "@/components/features/legal/edit-contract-modal";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
-import { getLegalContracts, deleteLegalContract } from "@/lib/services/legal";
+import { getLegalContracts, deleteLegalContract, reindexLegalContract, reindexAllLegalContracts } from "@/lib/services/legal";
 import type { LegalContract } from "@/lib/types/legal";
 import { toast } from "sonner";
 
@@ -27,11 +31,14 @@ export default function LegalContractsListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [partyTypeFilter, setPartyTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [indexingFilter, setIndexingFilter] = useState("all");
 
-  // Modales CRUD
+  // Modales CRUD & Reindex
   const [contractToEdit, setContractToEdit] = useState<LegalContract | null>(null);
   const [contractToDelete, setContractToDelete] = useState<LegalContract | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [reindexingId, setReindexingId] = useState<string | null>(null);
+  const [reindexingAll, setReindexingAll] = useState(false);
 
   const fetchContracts = useCallback(async () => {
     setLoading(true);
@@ -40,6 +47,7 @@ export default function LegalContractsListPage() {
         search: searchQuery.trim() || undefined,
         partyType: partyTypeFilter !== "all" ? partyTypeFilter : undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
+        indexingStatus: indexingFilter !== "all" ? indexingFilter : undefined,
       });
       setContracts(data);
     } catch (err) {
@@ -48,15 +56,50 @@ export default function LegalContractsListPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, partyTypeFilter, statusFilter]);
+  }, [searchQuery, partyTypeFilter, statusFilter, indexingFilter]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchContracts();
-    }, 250);
-
-    return () => clearTimeout(timer);
+    fetchContracts();
   }, [fetchContracts]);
+
+  const handleReindex = async (contractId: string) => {
+    try {
+      setReindexingId(contractId);
+      const res = await reindexLegalContract(contractId);
+      if (res.success) {
+        toast.success(res.message || "Analyse OCR et réindexation lancées en tâche de fond.");
+        // Mise à jour optimiste du statut
+        setContracts((prev) =>
+          prev.map((c) =>
+            c.id === contractId ? { ...c, indexing_status: "processing" } : c
+          )
+        );
+      } else {
+        toast.error(res.error || "Échec de la réindexation.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erreur de réindexation.");
+    } finally {
+      setReindexingId(null);
+    }
+  };
+
+  const handleReindexAll = async () => {
+    try {
+      setReindexingAll(true);
+      const res = await reindexAllLegalContracts(false);
+      if (res.success) {
+        toast.success(res.message || "Réindexation globale lancée en tâche de fond.");
+        fetchContracts();
+      } else {
+        toast.error(res.error || "Échec du lancement de la réindexation.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erreur réseau.");
+    } finally {
+      setReindexingAll(false);
+    }
+  };
 
   const handleDeleteConfirm = async () => {
     if (!contractToDelete) return;
@@ -83,21 +126,67 @@ export default function LegalContractsListPage() {
       key: "reference",
       header: "Référence & Intitulé",
       cell: (row) => (
-        <Link
-          href={`/legal-reviewer/contracts/${row.id}`}
-          className="text-left hover:text-navy transition-colors group block space-y-0.5"
-        >
-          <p className="font-mono font-bold text-[11px] text-gold">{row.reference}</p>
-          <p className="font-bold text-xs text-navy group-hover:text-gold transition-colors truncate max-w-[280px]">
-            {row.title}
-          </p>
+        <div className="space-y-1.5 max-w-[380px]">
+          <Link
+            href={`/legal-reviewer/contracts/${row.id}`}
+            className="text-left hover:text-navy transition-colors group block space-y-0.5"
+          >
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-mono font-bold text-[11px] text-gold">{row.reference}</span>
+
+              {/* Badges d'état d'indexation OCR */}
+              {row.indexing_status === "processing" && (
+                <span className="inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full bg-warning/10 text-warning border border-warning/30 font-medium animate-pulse">
+                  <Loader2 className="w-2.5 h-2.5 animate-spin shrink-0" />
+                  OCR en cours
+                </span>
+              )}
+
+              {row.indexing_status === "failed" && (
+                <span className="inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/30 font-medium">
+                  <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                  Échec OCR
+                </span>
+              )}
+
+              {row.indexing_status === "indexed" && (
+                <span className="inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full bg-navy/5 text-foreground-muted border border-border font-medium">
+                  <CheckCircle2 className="w-2.5 h-2.5 text-gold shrink-0" />
+                  {row.ocr_engine_used === "tesseract_ocr"
+                    ? "Indexé (OCR)"
+                    : row.ocr_engine_used === "python_docx"
+                    ? "Indexé (Word)"
+                    : "Indexé (Natif)"}
+                </span>
+              )}
+            </div>
+
+            <p className="font-bold text-xs text-navy group-hover:text-gold transition-colors line-clamp-1">
+              {row.title}
+            </p>
+          </Link>
+
+          {/* Snippet contextuel en surbrillance (T011) */}
+          {row.snippet_highlight && (
+            <div className="p-2 rounded-xl bg-background-secondary border border-border text-[11px] text-foreground leading-relaxed font-sans shadow-2xs">
+              <span className="text-[10px] font-bold text-gold uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                <FileText className="w-3 h-3 text-gold" />
+                Clause détectée dans le document :
+              </span>
+              <div
+                dangerouslySetInnerHTML={{ __html: row.snippet_highlight }}
+                className="line-clamp-2 [&>strong]:text-gold [&>strong]:bg-gold/10 [&>strong]:px-1 [&>strong]:rounded"
+              />
+            </div>
+          )}
+
           {row.ouvrage_title && (
             <span className="inline-flex items-center gap-1 text-[10px] text-foreground-muted bg-background-secondary px-2 py-0.5 rounded border border-border">
               <span className="w-1.5 h-1.5 rounded-full bg-gold shrink-0" />
               Livre : {row.ouvrage_title}
             </span>
           )}
-        </Link>
+        </div>
       ),
     },
     {
@@ -141,6 +230,17 @@ export default function LegalContractsListPage() {
             <FileText className="w-3.5 h-3.5 text-gold" />
             <span className="hidden sm:inline">Consulter</span>
           </Link>
+
+          {/* Réindexer / OCR de secours */}
+          <button
+            type="button"
+            title="Relancer l'extraction et l'indexation OCR"
+            disabled={reindexingId === row.id || row.indexing_status === "processing"}
+            onClick={() => handleReindex(row.id)}
+            className="p-2 rounded-xl bg-background hover:bg-background-secondary text-navy font-bold text-xs transition-colors border border-border cursor-pointer inline-flex items-center justify-center min-h-[38px] min-w-[38px] disabled:opacity-40"
+          >
+            <Cpu className={`w-3.5 h-3.5 ${reindexingId === row.id ? "animate-spin text-gold" : "text-navy"}`} />
+          </button>
 
           {/* Modifier */}
           <button
@@ -204,11 +304,21 @@ export default function LegalContractsListPage() {
             Contrats &amp; Conventions Stockés
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Moteur de recherche documentaire full-text et gestion complète (CRUD) des contrats signés.
+            Moteur de recherche documentaire full-text haute performance et reconnaissance optique (OCR).
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleReindexAll}
+            disabled={reindexingAll || loading}
+            className="p-2.5 px-3.5 rounded-xl bg-background hover:bg-background-secondary border border-border text-navy font-bold text-xs transition-colors min-h-[44px] inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+            title="Lancer l'analyse OCR sur tous les contrats non indexés"
+          >
+            <Cpu className={`w-4 h-4 text-gold ${reindexingAll ? "animate-spin" : ""}`} />
+            <span className="hidden md:inline">Réindexer l&apos;existant</span>
+          </button>
           <button
             type="button"
             onClick={fetchContracts}
@@ -236,6 +346,8 @@ export default function LegalContractsListPage() {
         onPartyTypeChange={setPartyTypeFilter}
         statusFilter={statusFilter}
         onStatusChange={setStatusFilter}
+        indexingFilter={indexingFilter}
+        onIndexingFilterChange={setIndexingFilter}
       />
 
       {/* Table des contrats */}
@@ -275,4 +387,3 @@ export default function LegalContractsListPage() {
     </div>
   );
 }
-

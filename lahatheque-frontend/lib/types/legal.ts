@@ -103,6 +103,11 @@ export interface LegalContract {
   notes?: string;
   extracted_text?: string;
   extracted_text_preview?: string;
+  indexing_status?: "pending" | "processing" | "indexed" | "failed";
+  ocr_engine_used?: string;
+  ocr_confidence_score?: number;
+  snippet_highlight?: string;
+  relevance_rank?: number;
   
   // Liaisons directes avec les entités réelles
   ouvrage_id?: string;

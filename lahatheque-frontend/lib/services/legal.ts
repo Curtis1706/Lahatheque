@@ -51,11 +51,13 @@ export async function getLegalContracts(filters?: {
   search?: string;
   partyType?: string;
   status?: string;
+  indexingStatus?: string;
 }): Promise<LegalContract[]> {
   const params = new URLSearchParams();
   if (filters?.search) params.append("search", filters.search);
   if (filters?.partyType && filters.partyType !== "all") params.append("party_type", filters.partyType);
   if (filters?.status && filters.status !== "all") params.append("status", filters.status);
+  if (filters?.indexingStatus && filters.indexingStatus !== "all") params.append("indexing_status", filters.indexingStatus);
 
   const res = await fetch(`${API_BASE}/contracts/?${params.toString()}`, {
     method: "GET",
@@ -65,6 +67,49 @@ export async function getLegalContracts(filters?: {
   if (!res.ok) throw new Error(`Erreur contrats juriste: ${res.status}`);
   const data = await res.json();
   return data.data || data.results || [];
+}
+
+export async function reindexLegalContract(
+  contractId: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/contracts/${contractId}/reindex/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data.error || `Erreur réindexation (${res.status})` };
+    }
+    return { success: true, message: data.message || "Réindexation OCR lancée." };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur réseau" };
+  }
+}
+
+export async function reindexAllLegalContracts(
+  force: boolean = false
+): Promise<{ success: boolean; queued_count?: number; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/contracts/reindex-all/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force }),
+      credentials: "include",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data.error || `Erreur réindexation globale (${res.status})` };
+    }
+    return {
+      success: true,
+      queued_count: data.data?.queued_count,
+      message: data.data?.message || "Réindexation globale lancée en tâche de fond.",
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur réseau" };
+  }
 }
 
 export async function getContractDetail(id: string): Promise<LegalContract | null> {

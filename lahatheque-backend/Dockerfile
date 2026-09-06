@@ -42,6 +42,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2 \
     libxslt1.1 \
     curl \
+    tesseract-ocr \
+    tesseract-ocr-fra \
+    tesseract-ocr-eng \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

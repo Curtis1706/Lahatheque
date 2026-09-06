@@ -710,24 +710,18 @@ class LegalContractsListView(APIView):
         search_query = request.query_params.get("search", "").strip()
         party_type = request.query_params.get("party_type", "").strip()
         status_filter = request.query_params.get("status", "").strip()
+        indexing_status = request.query_params.get("indexing_status", "").strip()
 
-        from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
+        from apps.rights.services.search_service import search_legal_contracts, generate_snippet_highlight
 
         qs = ContratLegal.objects.all()
-        if party_type and party_type != "all":
-            qs = qs.filter(type_contrat=party_type)
-        if status_filter and status_filter != "all":
-            qs = qs.filter(status=status_filter)
-
-        if search_query:
-            vector = (
-                SearchVector('titre', weight='A') +
-                SearchVector('contracting_party', weight='A') +
-                SearchVector('numero_contrat', weight='B') +
-                SearchVector('texte_integral_index', weight='C')
-            )
-            query = SearchQuery(search_query, config='french')
-            qs = qs.annotate(rank=SearchRank(vector, query)).filter(rank__gte=0.01).order_by('-rank')
+        qs = search_legal_contracts(
+            queryset=qs,
+            search_query=search_query,
+            party_type=party_type,
+            status_filter=status_filter,
+            indexing_status=indexing_status,
+        )
 
         contracts = []
         for c in qs.select_related('ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition', 'juriste_responsable'):
@@ -737,6 +731,9 @@ class LegalContractsListView(APIView):
             cover_url = ""
             if c.ouvrage and c.ouvrage.cover_image:
                 cover_url = c.ouvrage.cover_image.url if hasattr(c.ouvrage.cover_image, 'url') else str(c.ouvrage.cover_image)
+
+            snippet = generate_snippet_highlight(c.texte_integral_index, search_query) if search_query else ""
+            rank_val = round(float(getattr(c, "rank", 0.0)), 3) if hasattr(c, "rank") else None
 
             contracts.append({
                 "id": str(c.id),
@@ -758,6 +755,12 @@ class LegalContractsListView(APIView):
                 "file_size": c.file_size or 2450000,
                 "tags": c.tags or ["contrat", "édition"],
                 "status": c.status,
+                "indexing_status": getattr(c, "indexing_status", "indexed"),
+                "ocr_engine_used": getattr(c, "ocr_engine_used", "pymupdf_native"),
+                "ocr_confidence_score": float(getattr(c, "ocr_confidence_score", 1.0) or 1.0),
+                "indexed_at": str(c.indexed_at) if getattr(c, "indexed_at", None) else None,
+                "snippet_highlight": snippet,
+                "relevance_rank": rank_val,
                 "notes": c.notes,
                 "extracted_text_preview": c.texte_integral_index[:300] if c.texte_integral_index else "",
                 "ouvrage_id": str(c.ouvrage_id) if c.ouvrage_id else None,
@@ -849,11 +852,18 @@ class LegalContractsListView(APIView):
             contracting_party = "Partie Contractante"
 
         # Traitement du fichier PDF/DOCX
+        from apps.rights.services.ocr_service import extract_text_from_document, MIN_NATIVE_CHARS_THRESHOLD
+        from apps.rights.tasks.ocr_tasks import trigger_contract_ocr
+
         uploaded_file = request.FILES.get("file")
         saved_path = ""
         file_name = request.data.get("file_name", "")
         file_size = int(request.data.get("file_size", 0))
         extracted_text = str(request.data.get("extracted_text", "")) if hasattr(request.data, "get") else ""
+        indexing_status = "indexed"
+        ocr_engine_used = "direct_input"
+        ocr_confidence_score = 1.0
+        needs_async_ocr = False
 
         if uploaded_file:
             file_name = uploaded_file.name
@@ -871,20 +881,29 @@ class LegalContractsListView(APIView):
                     "error": "Échec de l'enregistrement du fichier. Réessayez ou contactez le support."
                 }, status=500)
 
+            # Analyse rapide de premier niveau (PyMuPDF / docx natif)
             try:
-                lower_name = file_name.lower()
-                if lower_name.endswith('.pdf'):
-                    import fitz
-                    with fitz.open(stream=file_bytes, filetype="pdf") as doc:
-                        extracted_text = "\n".join(page.get_text() for page in doc)
-                elif lower_name.endswith('.docx'):
-                    import io
-                    from docx import Document as DocxDocument
-                    doc = DocxDocument(io.BytesIO(file_bytes))
-                    extracted_text = "\n".join(p.text for p in doc.paragraphs)
+                fast_result = extract_text_from_document(
+                    file_bytes=file_bytes,
+                    file_name=file_name,
+                    max_pages=50,
+                    enable_ocr_fallback=False,
+                )
+                extracted_text = fast_result.get("text", "").strip()
+                ocr_engine_used = fast_result.get("engine", "unknown")
+                ocr_confidence_score = fast_result.get("confidence", 1.0)
+
+                if fast_result.get("is_scanned") or len(extracted_text) < MIN_NATIVE_CHARS_THRESHOLD:
+                    # Document scanné : mise en file asynchrone non-bloquante
+                    indexing_status = "processing"
+                    ocr_engine_used = "pending_ocr"
+                    needs_async_ocr = True
+                else:
+                    indexing_status = "indexed"
             except Exception as extract_err:
-                logger.warning(f"[Contrats] Extraction de texte impossible pour {file_name}: {extract_err}")
-                extracted_text = ""
+                logger.warning(f"[Contrats] Extraction rapide impossible pour {file_name}: {extract_err}")
+                indexing_status = "processing"
+                needs_async_ocr = True
 
         # Gestion et validation stricte de la clé de répartition des redevances
         raw_repartitions = request.data.get("repartitions")
@@ -955,9 +974,17 @@ class LegalContractsListView(APIView):
             texte_integral_index=extracted_text[:50000],
             date_signature=timezone.now().date(),
             status="active",
+            indexing_status=indexing_status,
+            ocr_engine_used=ocr_engine_used,
+            ocr_confidence_score=ocr_confidence_score,
+            indexed_at=timezone.now() if indexing_status == "indexed" else None,
             notes=notes,
             tags=["contrat", db_type]
         )
+
+        # Déclenchement de l'analyse OCR non-bloquante si le document est scanné
+        if needs_async_ocr and saved_path:
+            trigger_contract_ocr(contrat.id)
 
         # Génération réelle d'une suggestion IA pour le contrat téléversé / indexé
         try:
@@ -1242,6 +1269,10 @@ class LegalContractDetailView(APIView):
                 "file_size": c.file_size,
                 "tags": c.tags,
                 "status": c.status,
+                "indexing_status": getattr(c, "indexing_status", "indexed"),
+                "ocr_engine_used": getattr(c, "ocr_engine_used", "pymupdf_native"),
+                "ocr_confidence_score": float(getattr(c, "ocr_confidence_score", 1.0) or 1.0),
+                "indexed_at": str(c.indexed_at) if getattr(c, "indexed_at", None) else None,
                 "notes": c.notes,
                 "extracted_text": c.texte_integral_index,
                 "ouvrage": ouvrage_data,
@@ -1403,6 +1434,79 @@ class LegalContractStreamView(APIView):
         response["Accept-Ranges"] = "bytes"
         response["Cache-Control"] = "no-cache, no-store, must-revalidate"
         return response
+
+
+class ContractReindexView(APIView):
+    """
+    POST /api/v1/rights/legal/contracts/<uuid:id>/reindex/
+    Déclenche manuellement la réindexation et l'analyse OCR d'un contrat en tâche de fond.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+
+    def post(self, request, id):
+        try:
+            contrat = ContratLegal.objects.get(id=id)
+        except ContratLegal.DoesNotExist:
+            return Response({
+                "success": False,
+                "error": "Contrat introuvable."
+            }, status=404)
+
+        from apps.rights.tasks.ocr_tasks import trigger_contract_ocr
+
+        contrat.indexing_status = "processing"
+        contrat.save(update_fields=["indexing_status"])
+
+        trigger_contract_ocr(contrat.id)
+
+        return Response({
+            "success": True,
+            "data": {
+                "id": str(contrat.id),
+                "reference": contrat.numero_contrat,
+                "indexing_status": "processing",
+                "message": "Réindexation OCR démarrée avec succès en tâche de fond."
+            }
+        })
+
+
+class ContractReindexAllView(APIView):
+    """
+    POST /api/v1/rights/legal/contracts/reindex-all/
+    Lance la réindexation OCR en tâche de fond pour tous les contrats existants
+    ayant un fichier mais dont le texte est incomplet (< 50 car.) ou en statut failed.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+
+    def post(self, request):
+        from apps.rights.tasks.ocr_tasks import trigger_contract_ocr
+        from apps.rights.services.ocr_service import MIN_NATIVE_CHARS_THRESHOLD
+
+        force = bool(request.data.get("force", False))
+
+        qs = ContratLegal.objects.exclude(fichier_contrat_path="").exclude(fichier_contrat_path__isnull=True)
+        if not force:
+            target_ids = [
+                c.id for c in qs.only("id", "texte_integral_index", "indexing_status")
+                if len((c.texte_integral_index or "").strip()) < MIN_NATIVE_CHARS_THRESHOLD or c.indexing_status == "failed"
+            ]
+            contracts_to_reindex = ContratLegal.objects.filter(id__in=target_ids)
+        else:
+            contracts_to_reindex = qs
+
+        count = contracts_to_reindex.count()
+        for c in contracts_to_reindex:
+            c.indexing_status = "processing"
+            c.save(update_fields=["indexing_status"])
+            trigger_contract_ocr(c.id)
+
+        return Response({
+            "success": True,
+            "data": {
+                "queued_count": count,
+                "message": f"{count} contrat(s) envoye(s) a la file d'analyse OCR en tache de fond."
+            }
+        })
 
 
 class LegalRoyaltiesListView(APIView):

@@ -140,6 +140,20 @@ class ContratLegal(models.Model):
         ("terminated", "Résilié"),
     ]
     status = models.CharField(max_length=24, choices=STATUS_CHOICES, default="active", db_index=True)
+
+    INDEXING_STATUS_CHOICES = [
+        ("pending", "En attente d'indexation"),
+        ("processing", "Analyse OCR en cours"),
+        ("indexed", "Indexé avec succès"),
+        ("failed", "Échec d'indexation optique"),
+    ]
+    indexing_status = models.CharField(
+        max_length=24, choices=INDEXING_STATUS_CHOICES, default="indexed", db_index=True
+    )
+    ocr_engine_used = models.CharField(max_length=32, blank=True, default="pymupdf_native")
+    ocr_confidence_score = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    indexed_at = models.DateTimeField(null=True, blank=True)
+
     notes = models.TextField(blank=True)
     tags = models.JSONField(default=list)
     
@@ -148,6 +162,9 @@ class ContratLegal(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["indexing_status"], name="idx_contrat_idx_status"),
+        ]
 
     def __str__(self) -> str:
         return f"Contrat {self.numero_contrat} - {self.titre}"
