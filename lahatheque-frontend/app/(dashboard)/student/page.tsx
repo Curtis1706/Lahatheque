@@ -330,7 +330,7 @@ export default function StudentOverviewPage() {
               Lectures Récentes
             </h2>
             <Link
-              href="/student/library"
+              href="/student/books"
               className="text-xs font-semibold text-navy hover:text-gold transition-colors inline-flex items-center gap-1"
             >
               Ma Bibliothèque ({kpis?.stats?.total_books_read ?? kpis?.totalBooksInLibrary ?? recentBooks.length})

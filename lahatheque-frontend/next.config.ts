@@ -30,6 +30,20 @@ const nextConfig: NextConfig = {
       canvas: "./lib/canvas-stub.ts",
     },
   },
+  async redirects() {
+    return [
+      {
+        source: "/library",
+        destination: "/student/books",
+        permanent: true,
+      },
+      {
+        source: "/student/library",
+        destination: "/student/books",
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api').replace(/\/+$/, '');
     const djangoBaseUrl = rawApiUrl.replace(/\/api$/, '').replace('localhost:8000', '127.0.0.1:8000');
