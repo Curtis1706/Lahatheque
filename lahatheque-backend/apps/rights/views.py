@@ -1066,14 +1066,14 @@ class LegalContractsListView(APIView):
                 global_author_rate = 15.0
 
             existing_rate_obj = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
-            platform_rate = max(0.0, 100.0 - global_author_rate - (
-                float(existing_rate_obj.publisher_share_percent) if (existing_rate_obj and existing_rate_obj.publisher_share_percent) else 0.0
-            ))
+            existing_pub_pct = float(existing_rate_obj.publisher_share_percent) if (existing_rate_obj and existing_rate_obj.publisher_share_percent) else 0.0
+            platform_rate = max(0.0, 100.0 - global_author_rate - existing_pub_pct)
 
             RoyaltyRate.objects.update_or_create(
                 ouvrage=ouvrage,
                 defaults={
                     "author_share_percent": global_author_rate,
+                    "publisher_share_percent": existing_pub_pct,
                     "platform_share_percent": platform_rate,
                 }
             )
@@ -1599,9 +1599,11 @@ class LegalRoyaltiesListView(APIView):
                     }
                     for r in b.repartitions_droits.all()
                 ],
-                "paper_rate": float(repart_obj.taux_papier) if (repart_obj and repart_obj.taux_papier) else 10.0,
-                "digital_rate": float(repart_obj.taux_numerique) if (repart_obj and repart_obj.taux_numerique) else current_rate,
-                "audio_tts_rate": float(repart_obj.taux_audio_tts) if (repart_obj and repart_obj.taux_audio_tts) else 8.0,
+                "paper_rate": float(repart_obj.taux_papier) if (repart_obj and repart_obj.taux_papier is not None) else None,
+                "digital_rate": float(repart_obj.taux_numerique) if (repart_obj and repart_obj.taux_numerique is not None) else None,
+                "audio_tts_rate": float(repart_obj.taux_audio_tts) if (repart_obj and repart_obj.taux_audio_tts is not None) else None,
+                "has_paper_version": bool(getattr(b, 'is_paper_available', False)),
+                "has_audio_version": bool(getattr(b, 'has_audio_version', False)),
                 "effective_date": repart_obj.date_effet.isoformat() if (repart_obj and hasattr(repart_obj, 'date_effet')) else "2026-08-01",
                 "status": "validated",
                 "isbn": b.isbn or "",
@@ -1651,6 +1653,7 @@ class LegalRoyaltiesBatchView(APIView):
                 existing_publisher_pct = float(existing_rate_obj.publisher_share_percent) if (existing_rate_obj and existing_rate_obj.publisher_share_percent) else 0.0
                 defaults = {
                     "author_share_percent": rate,
+                    "publisher_share_percent": existing_publisher_pct,
                     "platform_share_percent": max(0.0, 100.0 - rate - existing_publisher_pct)
                 }
                 if university_rate is not None and str(university_rate).strip() != "":
@@ -1675,6 +1678,7 @@ class LegalRoyaltiesBatchView(APIView):
                     royalty_rate_obj.save(update_fields=["university_share_percent"])
 
                 existing_author_rights_count = AuthorRight.objects.filter(ouvrage=ouvrage).count()
+                author_right = None
                 if existing_author_rights_count == 0:
                     author_right, _ = AuthorRight.objects.get_or_create(
                         ouvrage=ouvrage,
@@ -1684,8 +1688,37 @@ class LegalRoyaltiesBatchView(APIView):
                     if ouvrage.authors.exists() and ouvrage.authors.first().user:
                         author_right.user = ouvrage.authors.first().user
                         author_right.save()
-                elif existing_author_rights_count == 1:
+                else:
                     author_right = AuthorRight.objects.filter(ouvrage=ouvrage).first()
+
+                paper_rate = request.data.get("paper_rate")
+                digital_rate = request.data.get("digital_rate")
+                audio_rate = request.data.get("audio_tts_rate")
+
+                if any(v is not None and str(v).strip() != "" for v in [paper_rate, digital_rate, audio_rate]):
+                    from apps.rights.models import RepartitionDroits
+
+                    repart_defaults = {}
+                    if paper_rate is not None and str(paper_rate).strip() != "":
+                        repart_defaults["taux_papier"] = float(paper_rate)
+                    if digital_rate is not None and str(digital_rate).strip() != "":
+                        repart_defaults["taux_numerique"] = float(digital_rate)
+                    if audio_rate is not None and str(audio_rate).strip() != "":
+                        repart_defaults["taux_audio_tts"] = float(audio_rate)
+
+                    beneficiary_user = (author_right.user if author_right and author_right.user else None) or (
+                        ouvrage.authors.first().user if (ouvrage.authors.exists() and ouvrage.authors.first().user) else None
+                    )
+                    if beneficiary_user:
+                        RepartitionDroits.objects.update_or_create(
+                            ouvrage=ouvrage,
+                            beneficiaire=beneficiary_user,
+                            defaults={
+                                "role_libelle": "Auteur Principal",
+                                "pourcentage": rate,
+                                **repart_defaults,
+                            }
+                        )
 
                 return Response({
                     "success": True,
@@ -1890,6 +1923,26 @@ class LegalAiSuggestionDecisionView(APIView):
             sug.is_validated = True
             sug.validated_by = request.user
             sug.save(update_fields=["is_validated", "validated_by"])
+
+            from apps.rights.models import RoyaltyRate
+
+            global_rate_from_ai = request.data.get("global_author_rate")
+            if global_rate_from_ai is None:
+                global_rate_from_ai = float(sug.pourcentage_suggere)
+            else:
+                global_rate_from_ai = float(global_rate_from_ai)
+
+            existing_rate_obj = RoyaltyRate.objects.filter(ouvrage=sug.ouvrage).first()
+            existing_publisher_pct = float(existing_rate_obj.publisher_share_percent) if (existing_rate_obj and existing_rate_obj.publisher_share_percent) else 0.0
+
+            RoyaltyRate.objects.update_or_create(
+                ouvrage=sug.ouvrage,
+                defaults={
+                    "author_share_percent": global_rate_from_ai,
+                    "publisher_share_percent": existing_publisher_pct,
+                    "platform_share_percent": max(0.0, 100.0 - global_rate_from_ai - existing_publisher_pct),
+                }
+            )
 
         return Response({
             "success": True,

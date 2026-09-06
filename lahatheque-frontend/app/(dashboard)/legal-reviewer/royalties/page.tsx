@@ -30,6 +30,7 @@ function LegalRoyaltiesPageContent() {
 
   // State pour modale d'édition
   const [selectedRoyalty, setSelectedRoyalty] = useState<BookRoyalty | null>(null);
+  const [globalRateBySuggestion, setGlobalRateBySuggestion] = useState<Record<string, number>>({});
 
   useEffect(() => {
     async function loadData() {
@@ -45,14 +46,37 @@ function LegalRoyaltiesPageContent() {
     loadData();
   }, []);
 
-  const handleUpdateRoyalty = async (newRate: number, applyRetroactively: boolean, universityRate?: number | null) => {
+  const handleUpdateRoyalty = async (
+    newRate: number,
+    applyRetroactively: boolean,
+    universityRate?: number | null,
+    paperRate?: number | null,
+    digitalRate?: number | null,
+    audioRate?: number | null
+  ) => {
     if (!selectedRoyalty) return;
-    const success = await updateBookRoyaltyRate(selectedRoyalty.book_id, newRate, applyRetroactively, universityRate);
+    const success = await updateBookRoyaltyRate(
+      selectedRoyalty.book_id,
+      newRate,
+      applyRetroactively,
+      universityRate,
+      paperRate,
+      digitalRate,
+      audioRate
+    );
     if (success) {
       setRoyalties((prev) =>
         prev.map((r) =>
           r.book_id === selectedRoyalty.book_id
-            ? { ...r, current_rate: newRate, university_share_percent: universityRate, source: "manual_override" }
+            ? {
+                ...r,
+                current_rate: newRate,
+                university_share_percent: universityRate,
+                paper_rate: paperRate ?? r.paper_rate,
+                digital_rate: digitalRate ?? r.digital_rate,
+                audio_tts_rate: audioRate ?? r.audio_tts_rate,
+                source: "manual_override"
+              }
             : r
         )
       );
@@ -69,7 +93,8 @@ function LegalRoyaltiesPageContent() {
   };
 
   const handleValidateSuggestion = async (suggestionId: string, adjustedSplits?: CoAuthorSplit[]) => {
-    const res = await validateAISuggestion(suggestionId, adjustedSplits);
+    const globalRate = globalRateBySuggestion[suggestionId];
+    const res = await validateAISuggestion(suggestionId, adjustedSplits, globalRate);
     if (res.success) {
       setAiSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
       toast.success(res.message || "La suggestion IA de partage de droits a été validée et enregistrée avec succès !");
@@ -245,6 +270,28 @@ function LegalRoyaltiesPageContent() {
                     <Check className="w-4 h-4 text-gold" />
                     Valider ce Partage de Droits
                   </button>
+                </div>
+
+                <div className="mb-4 p-3 rounded-xl bg-gold/5 border border-gold/20">
+                  <label htmlFor={`global-rate-input-${sug.id}`} className="block text-[11px] font-bold text-navy uppercase tracking-wider mb-1">
+                    Taux Global de Droits d&apos;Auteur Détecté (%)
+                  </label>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <input
+                      id={`global-rate-input-${sug.id}`}
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.5"
+                      value={globalRateBySuggestion[sug.id] ?? (sug.pourcentage_suggere ?? sug.suggested_rate ?? 15)}
+                      onChange={(e) => setGlobalRateBySuggestion(prev => ({ ...prev, [sug.id]: parseFloat(e.target.value) || 0 }))}
+                      className="w-24 px-2.5 py-1.5 text-sm font-semibold border border-border rounded-lg bg-background-secondary text-navy"
+                    />
+                    <span className="text-[11px] text-foreground-muted">
+                      Détecté depuis le texte du contrat — les auteurs se partagent ce pourcentage de la vente
+                      selon la répartition ci-dessous. LAHA conserve le reste.
+                    </span>
+                  </div>
                 </div>
 
                 {/* Slider dual-range 21st.dev pour ajuster si besoin */}

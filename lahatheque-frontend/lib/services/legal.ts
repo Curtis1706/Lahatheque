@@ -272,9 +272,11 @@ export async function getBookRoyalties(): Promise<BookRoyalty[]> {
     source: "manual_override",
     last_updated: r.effective_date || new Date().toISOString(),
     history: [],
-    paper_rate: r.paper_rate,
-    digital_rate: r.digital_rate,
-    audio_tts_rate: r.audio_tts_rate,
+    paper_rate: r.paper_rate !== undefined && r.paper_rate !== null ? Number(r.paper_rate) : undefined,
+    digital_rate: r.digital_rate !== undefined && r.digital_rate !== null ? Number(r.digital_rate) : undefined,
+    audio_tts_rate: r.audio_tts_rate !== undefined && r.audio_tts_rate !== null ? Number(r.audio_tts_rate) : undefined,
+    has_paper_version: r.has_paper_version !== undefined ? Boolean(r.has_paper_version) : undefined,
+    has_audio_version: r.has_audio_version !== undefined ? Boolean(r.has_audio_version) : undefined,
   }));
 }
 
@@ -282,7 +284,10 @@ export async function updateBookRoyaltyRate(
   bookId: string,
   newRate: number,
   applyRetroactively: boolean,
-  universityRate?: number | string | null
+  universityRate?: number | string | null,
+  paperRate?: number | null,
+  digitalRate?: number | null,
+  audioRate?: number | null
 ): Promise<boolean> {
   const payload: any = {
     book_id: bookId,
@@ -297,6 +302,16 @@ export async function updateBookRoyaltyRate(
     payload.university_share_percent = Number(universityRate);
   } else if (universityRate === null || universityRate === "") {
     payload.university_share_percent = null;
+  }
+
+  if (paperRate !== undefined && paperRate !== null) {
+    payload.paper_rate = Number(paperRate);
+  }
+  if (digitalRate !== undefined && digitalRate !== null) {
+    payload.digital_rate = Number(digitalRate);
+  }
+  if (audioRate !== undefined && audioRate !== null) {
+    payload.audio_tts_rate = Number(audioRate);
   }
 
   const res = await fetch(`${API_BASE}/royalties/batch/`, {
@@ -363,19 +378,25 @@ export async function getAIRoyaltySuggestions(): Promise<AIRoyaltySuggestion[]> 
       ai_confidence: Math.round((s.confidence_score || 0.95) * 100),
       extracted_clause: s.extracted_clause,
       suggested_rate: s.suggested_rate,
+      pourcentage_suggere: s.suggested_rate ?? 15,
     };
   });
 }
 
 export async function validateAISuggestion(
   suggestionId: string,
-  adjustedSplits?: { author_name: string; percentage: number }[]
+  adjustedSplits?: { author_name: string; percentage: number }[],
+  globalAuthorRate?: number
 ): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
+    const payload: any = { decision: "approve", splits: adjustedSplits };
+    if (globalAuthorRate !== undefined && globalAuthorRate !== null) {
+      payload.global_author_rate = globalAuthorRate;
+    }
     const res = await fetch(`${API_BASE}/ai-suggestions/${suggestionId}/decide/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision: "approve", splits: adjustedSplits }),
+      body: JSON.stringify(payload),
       credentials: "include",
     });
     const data = await res.json().catch(() => ({}));
