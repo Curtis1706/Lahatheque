@@ -93,7 +93,6 @@ class CreateOrderView(APIView):
             # Vérification anti-doublon pour l'achat audio — vérifie spécifiquement un achat
             # du format audio, pas l'accès général.
             if format_type == 'audio':
-                from apps.commerce.models import LigneCommande
                 already_owns_audio = LigneCommande.objects.filter(
                     commande__user=request.user,
                     commande__statut_paiement='paid',

@@ -88,7 +88,7 @@ def _notify_order_finalized(commande, context_label):
                     "title": l.ouvrage.title if l.ouvrage else "Ouvrage LAHAThèque",
                     "quantity": l.quantity,
                     "unit_price": float(l.unit_price or 0.0),
-                    "total": float(l.total_price or (l.quantity * (l.unit_price or 0))),
+                    "total": float(getattr(l, 'total_price', None) or (l.quantity * (l.unit_price or 0))),
                 })
 
             order_num = str(getattr(commande, 'numero_commande', '') or str(commande.id)[:8])
