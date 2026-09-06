@@ -771,6 +771,10 @@ class LegalContractsListView(APIView):
                 "signataire_name": c.signataire_user.get_full_name() if c.signataire_user else None,
             })
 
+        logger.info(
+            f"[LegalContracts API] GET: {len(contracts)} contrat(s) renvoye(s) a l'utilisateur {request.user.email} "
+            f"(search='{search_query}', party='{party_type}', status='{status_filter}', idx='{indexing_status}')."
+        )
         return Response({"success": True, "data": contracts})
 
     def post(self, request):
@@ -985,6 +989,11 @@ class LegalContractsListView(APIView):
         # Déclenchement de l'analyse OCR non-bloquante si le document est scanné
         if needs_async_ocr and saved_path:
             trigger_contract_ocr(contrat.id)
+
+        logger.info(
+            f"[LegalContracts API] POST contrat cree: ref='{contrat.numero_contrat}', titre='{contrat.titre}', "
+            f"fichier='{contrat.file_name}', statut_indexation='{indexing_status}', moteur='{ocr_engine_used}', async_ocr={needs_async_ocr}."
+        )
 
         # Génération réelle d'une suggestion IA pour le contrat téléversé / indexé
         try:

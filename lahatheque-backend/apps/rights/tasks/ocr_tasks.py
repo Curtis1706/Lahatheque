@@ -18,16 +18,21 @@ def process_contract_ocr_task(self, contrat_id: str):
     Télécharge le fichier en mémoire, extrait le texte via Tesseract/PyMuPDF
     et met à jour l'index plein texte sans bloquer le serveur web.
     """
+    import time
+    task_t0 = time.perf_counter()
+
     from apps.rights.models import ContratLegal
     from apps.rights.services.ocr_service import extract_text_from_document
 
     try:
         contrat = ContratLegal.objects.get(id=contrat_id)
     except ContratLegal.DoesNotExist:
-        logger.warning(f"[OCR Task] Contrat {contrat_id} introuvable.")
+        logger.error(f"[OCR Task ERREUR] Contrat introuvable en base pour id='{contrat_id}'.")
         return
 
-    logger.info(f"[OCR Task] Début de l'analyse OCR pour le contrat {contrat.numero_contrat} ({contrat_id}).")
+    ref = contrat.numero_contrat or contrat_id[:8]
+    logger.info(f"[OCR Task ETAPE 1/4] Debut de l'analyse pour le contrat '{ref}' (titre: '{contrat.titre}').")
+
     contrat.indexing_status = "processing"
     contrat.save(update_fields=["indexing_status"])
 
@@ -35,17 +40,21 @@ def process_contract_ocr_task(self, contrat_id: str):
         file_bytes = b""
         if contrat.fichier_contrat_path:
             try:
+                logger.info(f"[OCR Task ETAPE 2/4] Telechargement du fichier depuis le storage: '{contrat.fichier_contrat_path}'...")
                 with default_storage.open(contrat.fichier_contrat_path, "rb") as f:
                     file_bytes = f.read()
+                logger.info(f"[OCR Task] Fichier lu avec succes: {len(file_bytes) / 1024:.1f} Ko.")
             except Exception as read_err:
-                logger.error(f"[OCR Task] Impossible de lire le fichier {contrat.fichier_contrat_path}: {read_err}")
+                logger.error(f"[OCR Task ERREUR] Impossible de lire le fichier '{contrat.fichier_contrat_path}': {read_err}")
 
         if not file_bytes:
             contrat.indexing_status = "failed"
             contrat.ocr_engine_used = "file_not_found"
             contrat.save(update_fields=["indexing_status", "ocr_engine_used"])
+            logger.error(f"[OCR Task ECHEC] Fichier vide ou introuvable pour '{ref}'. Statut passe a 'failed'.")
             return
 
+        logger.info(f"[OCR Task ETAPE 3/4] Lancement de l'extraction de texte et fallback OCR sur '{contrat.file_name}'...")
         result = extract_text_from_document(
             file_bytes=file_bytes,
             file_name=contrat.file_name or "contrat.pdf",
@@ -54,6 +63,8 @@ def process_contract_ocr_task(self, contrat_id: str):
         )
 
         extracted_text = result.get("text", "").strip()
+        elapsed = time.perf_counter() - task_t0
+
         if extracted_text:
             contrat.texte_integral_index = extracted_text[:50000]
             contrat.indexing_status = "indexed"
@@ -67,15 +78,19 @@ def process_contract_ocr_task(self, contrat_id: str):
                 "ocr_confidence_score",
                 "indexed_at",
             ])
-            logger.info(f"[OCR Task] Contrat {contrat.numero_contrat} indexé avec succès via {result.get('engine')}.")
+            logger.info(
+                f"[OCR Task ETAPE 4/4 SUCCES] Contrat '{ref}' indexe avec succes en {elapsed:.2f}s ! "
+                f"Moteur: {result.get('engine')}, Caracteres: {len(extracted_text)}, Confiance: {result.get('confidence', 0.85)}."
+            )
         else:
             contrat.indexing_status = "failed"
             contrat.ocr_engine_used = "no_text_extracted"
             contrat.save(update_fields=["indexing_status", "ocr_engine_used"])
-            logger.warning(f"[OCR Task] Aucun texte extrait pour le contrat {contrat.numero_contrat}.")
+            logger.warning(f"[OCR Task ATTENTION] Aucun texte extrait pour le contrat '{ref}' apres {elapsed:.2f}s. Statut passe a 'failed'.")
 
     except Exception as exc:
-        logger.error(f"[OCR Task] Erreur OCR sur le contrat {contrat_id}: {exc}", exc_info=True)
+        elapsed = time.perf_counter() - task_t0
+        logger.error(f"[OCR Task ERREUR CRITIQUE] Exception OCR sur le contrat '{ref}' apres {elapsed:.2f}s: {exc}", exc_info=True)
         contrat.indexing_status = "failed"
         contrat.ocr_engine_used = f"error: {str(exc)[:50]}"
         contrat.save(update_fields=["indexing_status", "ocr_engine_used"])
@@ -91,9 +106,9 @@ def trigger_contract_ocr(contrat_id: str):
     cid = contrat_id
     try:
         process_contract_ocr_task.delay(cid)
-        logger.info(f"[OCR Trigger] Tâche Celery planifiée pour {cid}.")
+        logger.info(f"[OCR Trigger] Tache Celery planifiee avec succes pour le contrat '{cid}'.")
     except Exception as celery_err:
-        logger.info(f"[OCR Trigger] Broker Celery non joint ({celery_err}). Lancement via Threading daemon.")
+        logger.info(f"[OCR Trigger] Broker Celery indisponible ({celery_err}). Repli immediat sur un thread daemon d'arriere-plan.")
         thread = threading.Thread(
             target=process_contract_ocr_task,
             args=(cid,),
@@ -101,3 +116,5 @@ def trigger_contract_ocr(contrat_id: str):
             name=f"ocr-contract-{cid[:8]}"
         )
         thread.start()
+        logger.info(f"[OCR Trigger] Thread daemon '{thread.name}' demarre avec succes en arriere-plan.")
+

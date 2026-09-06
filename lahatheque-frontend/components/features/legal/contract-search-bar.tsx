@@ -44,11 +44,13 @@ export function ContractSearchBar({
     }
 
     debounceTimerRef.current = setTimeout(() => {
+      console.log(`[Barre Recherche Contrats] Saisie filtree (anti-rebond 300ms) : '${val}'`);
       onSearchChange(val);
     }, 300);
   };
 
   const handleClear = () => {
+    console.log("[Barre Recherche Contrats] Reinitialisation du terme de recherche");
     setInternalValue("");
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);

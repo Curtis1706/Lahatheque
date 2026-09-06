@@ -38,7 +38,10 @@ def search_legal_contracts(
 
     search_query = (search_query or "").strip()
     if not search_query:
+        logger.info(f"[SearchService] Listing contrats sans mot-cle (filtres: party={party_type}, status={status_filter}, idx={indexing_status}).")
         return qs.order_by("-created_at")
+
+    logger.info(f"[SearchService] Recherche lancee pour query='{search_query}' (party={party_type}, status={status_filter}, idx={indexing_status}).")
 
     # Cache 60s des résultats pour requêtes fréquentes
     from django.core.cache import cache
@@ -47,6 +50,7 @@ def search_legal_contracts(
     cache_key = f"fts_contracts_{hashlib.md5(f'{search_query.lower()}:{party_type}:{status_filter}:{indexing_status}'.encode()).hexdigest()}"
     cached_ids = cache.get(cache_key)
     if cached_ids is not None and isinstance(cached_ids, list):
+        logger.info(f"[SearchService CACHE HIT] {len(cached_ids)} contrats retournes depuis le cache (cle={cache_key[:16]}...).")
         # Préservation de l'ordre de pertinence du cache
         from django.db.models import Case, When
         order_preserved = Case(*[When(id=pk, then=pos) for pos, pk in enumerate(cached_ids)])
@@ -77,13 +81,14 @@ def search_legal_contracts(
         try:
             ids_list = list(fts_matches.values_list("id", flat=True)[:100])
             cache.set(cache_key, ids_list, timeout=60)
+            logger.info(f"[SearchService PG FTS] Requete hybride executee avec succes : {len(ids_list)} contrats indexes trouves.")
         except Exception:
             pass
 
         return fts_matches
 
     except Exception as pg_err:
-        logger.warning(f"[SearchService] Fallback FTS standard activé: {pg_err}")
+        logger.warning(f"[SearchService ATTENTION] Repli sur fallback FTS standard : {pg_err}")
         # Fallback pour SQLite ou si PostgreSQL FTS n'est pas disponible
         fallback_matches = qs.filter(
             Q(texte_integral_index__icontains=search_query)
@@ -96,6 +101,7 @@ def search_legal_contracts(
         try:
             ids_list = list(fallback_matches.values_list("id", flat=True)[:100])
             cache.set(cache_key, ids_list, timeout=60)
+            logger.info(f"[SearchService FALLBACK] {len(ids_list)} contrats trouves via correspondance textuelle.")
         except Exception:
             pass
 

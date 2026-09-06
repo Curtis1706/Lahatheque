@@ -59,20 +59,28 @@ export async function getLegalContracts(filters?: {
   if (filters?.status && filters.status !== "all") params.append("status", filters.status);
   if (filters?.indexingStatus && filters.indexingStatus !== "all") params.append("indexing_status", filters.indexingStatus);
 
+  console.log(`[Legal Service] Chargement des contrats (filtres: search='${filters?.search || ""}', party='${filters?.partyType || "all"}', status='${filters?.status || "all"}', idx='${filters?.indexingStatus || "all"}')`);
+
   const res = await fetch(`${API_BASE}/contracts/?${params.toString()}`, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
   });
-  if (!res.ok) throw new Error(`Erreur contrats juriste: ${res.status}`);
+  if (!res.ok) {
+    console.error(`[Legal Service ERREUR] Requete contrats echouee (HTTP ${res.status})`);
+    throw new Error(`Erreur contrats juriste: ${res.status}`);
+  }
   const data = await res.json();
-  return data.data || data.results || [];
+  const list = data.data || data.results || [];
+  console.log(`[Legal Service] ${list.length} contrat(s) recu(s) avec succes.`);
+  return list;
 }
 
 export async function reindexLegalContract(
   contractId: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
+    console.log(`[Legal Service] Lancement reindexation OCR pour le contrat ${contractId}...`);
     const res = await fetch(`${API_BASE}/contracts/${contractId}/reindex/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -80,10 +88,13 @@ export async function reindexLegalContract(
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      console.error(`[Legal Service ERREUR] Echec reindexation unitaire (HTTP ${res.status}):`, data);
       return { success: false, error: data.error || `Erreur réindexation (${res.status})` };
     }
+    console.log(`[Legal Service] Reindexation unitaire confirmee par l'API:`, data.data);
     return { success: true, message: data.message || "Réindexation OCR lancée." };
   } catch (err: any) {
+    console.error(`[Legal Service EXCEPTION] Reindexation unitaire impossible:`, err);
     return { success: false, error: err?.message || "Erreur réseau" };
   }
 }
@@ -92,6 +103,7 @@ export async function reindexAllLegalContracts(
   force: boolean = false
 ): Promise<{ success: boolean; queued_count?: number; message?: string; error?: string }> {
   try {
+    console.log(`[Legal Service] Lancement reindexation globale (force=${force})...`);
     const res = await fetch(`${API_BASE}/contracts/reindex-all/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -100,14 +112,17 @@ export async function reindexAllLegalContracts(
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      console.error(`[Legal Service ERREUR] Echec reindexation globale (HTTP ${res.status}):`, data);
       return { success: false, error: data.error || `Erreur réindexation globale (${res.status})` };
     }
+    console.log(`[Legal Service] Reindexation globale acceptee: ${data.data?.queued_count} contrat(s) en file.`);
     return {
       success: true,
       queued_count: data.data?.queued_count,
       message: data.data?.message || "Réindexation globale lancée en tâche de fond.",
     };
   } catch (err: any) {
+    console.error(`[Legal Service EXCEPTION] Reindexation globale impossible:`, err);
     return { success: false, error: err?.message || "Erreur réseau" };
   }
 }

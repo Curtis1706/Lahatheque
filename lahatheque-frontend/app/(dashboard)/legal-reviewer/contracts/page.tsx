@@ -42,6 +42,12 @@ export default function LegalContractsListPage() {
 
   const fetchContracts = useCallback(async () => {
     setLoading(true);
+    console.log("[Contrats Page] Rafraichissement de la liste...", {
+      search: searchQuery.trim(),
+      partyType: partyTypeFilter,
+      status: statusFilter,
+      indexingStatus: indexingFilter,
+    });
     try {
       const data = await getLegalContracts({
         search: searchQuery.trim() || undefined,
@@ -49,9 +55,10 @@ export default function LegalContractsListPage() {
         status: statusFilter !== "all" ? statusFilter : undefined,
         indexingStatus: indexingFilter !== "all" ? indexingFilter : undefined,
       });
+      console.log(`[Contrats Page] ${data.length} contrat(s) charge(s) dans le tableau.`);
       setContracts(data);
     } catch (err) {
-      console.error("Erreur chargement contrats:", err);
+      console.error("[Contrats Page ERREUR] Impossible de charger les contrats:", err);
       toast.error("Impossible de charger les contrats.");
     } finally {
       setLoading(false);
@@ -63,10 +70,12 @@ export default function LegalContractsListPage() {
   }, [fetchContracts]);
 
   const handleReindex = async (contractId: string) => {
+    console.log(`[Contrats Page] Declenchement reindexation OCR pour contrat id='${contractId}'`);
     try {
       setReindexingId(contractId);
       const res = await reindexLegalContract(contractId);
       if (res.success) {
+        console.log(`[Contrats Page SUCCES] Reindexation initiee pour '${contractId}':`, res.message);
         toast.success(res.message || "Analyse OCR et réindexation lancées en tâche de fond.");
         // Mise à jour optimiste du statut
         setContracts((prev) =>
@@ -75,9 +84,11 @@ export default function LegalContractsListPage() {
           )
         );
       } else {
+        console.warn(`[Contrats Page AVERTISSEMENT] Reindexation echouee pour '${contractId}':`, res.error);
         toast.error(res.error || "Échec de la réindexation.");
       }
     } catch (err: any) {
+      console.error(`[Contrats Page ERREUR CRITIQUE] Exception reindexation '${contractId}':`, err);
       toast.error(err.message || "Erreur de réindexation.");
     } finally {
       setReindexingId(null);
@@ -85,16 +96,20 @@ export default function LegalContractsListPage() {
   };
 
   const handleReindexAll = async () => {
+    console.log("[Contrats Page] Declenchement reindexation globale de masse...");
     try {
       setReindexingAll(true);
       const res = await reindexAllLegalContracts(false);
       if (res.success) {
+        console.log("[Contrats Page SUCCES] Reindexation globale acceptee:", res);
         toast.success(res.message || "Réindexation globale lancée en tâche de fond.");
         fetchContracts();
       } else {
+        console.warn("[Contrats Page AVERTISSEMENT] Reindexation globale rejetee:", res.error);
         toast.error(res.error || "Échec du lancement de la réindexation.");
       }
     } catch (err: any) {
+      console.error("[Contrats Page ERREUR CRITIQUE] Exception reindexation globale:", err);
       toast.error(err.message || "Erreur réseau.");
     } finally {
       setReindexingAll(false);
