@@ -838,7 +838,7 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
 
         ouvrage.is_paper_available = bool(request.data.get('is_paper_available', False))
 
-        ouvrage.status = 'published'
+        ouvrage.status = 'pending_legal_approval'
         ouvrage.save()
 
         try:
@@ -893,7 +893,7 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
                     user=ouvrage.created_by,
                     notification_type=Notification.NotificationType.SYSTEM,
                     title="Dépôt validé par le Chef Maquettiste",
-                    message=f"Félicitations ! Votre maquette pour « {ouvrage.title} » a été validée par le Chef Maquettiste et transmise à la Direction pour Bon à Tirer.",
+                    message=f"Félicitations ! Votre maquette pour « {ouvrage.title} » a été validée par le Chef Maquettiste et transmise au Juriste pour vérification contractuelle.",
                     action_url=f"/layout-artist/deposits/{ouvrage.id}",
                     resource_id=str(ouvrage.id),
                 )
@@ -905,20 +905,21 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
                     user=adm,
                     notification_type=Notification.NotificationType.SYSTEM,
                     title="Nouvelle épreuve validée par le Chef Maquettiste",
-                    message=f"Le Chef Maquettiste {request.user.get_full_name() or request.user.email} a validé l'épreuve de « {ouvrage.title} ». Le Bon à Tirer est prêt pour contrôle.",
+                    message=f"Le Chef Maquettiste {request.user.get_full_name() or request.user.email} a validé l'épreuve de « {ouvrage.title} ». L'ouvrage est transmis au Juriste pour vérification du contrat.",
                     action_url=f"/admin/validation/{ouvrage.id}",
                     resource_id=str(ouvrage.id),
                 )
 
-            # Notification aux Juristes pour attribution/vérification du cadre contractuel et des redevances
-            juristes = User.objects.filter(role='legal_reviewer', is_active=True)
-            for jur in juristes:
+            # Notification aux Juristes pour attribution/vérification du cadre contractuel et publication
+            from apps.accounts.models import User as UserModel
+            juristes = UserModel.objects.filter(role__in=['legal_reviewer', 'admin', 'super_admin'], is_active=True)
+            for juriste in juristes:
                 notify_user(
-                    user=jur,
-                    notification_type=Notification.NotificationType.SYSTEM,
-                    title="Nouvelle maquette validée — Vérification contractuelle",
-                    message=f"L'ouvrage « {ouvrage.title} » a été validé par la maquette. Veuillez vérifier la grille de répartition des droits d'auteur.",
-                    action_url="/legal-reviewer/royalties",
+                    user=juriste,
+                    notification_type=Notification.NotificationType.GENERAL,
+                    title="Ouvrage en attente de validation juridique",
+                    message=f"« {ouvrage.title} » a été validé par le Chef Maquettiste et attend votre vérification du contrat avant publication.",
+                    action_url=f"/legal-reviewer/publication-en-attente/{ouvrage.id}",
                     resource_id=str(ouvrage.id),
                 )
         except Exception as notif_err:
@@ -926,7 +927,7 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Response({
             "success": True,
-            "message": f"L'ouvrage « {ouvrage.title} » a été validé par le Chef Maquettiste.",
+            "message": f"L'ouvrage « {ouvrage.title} » a été validé par le Chef Maquettiste et transmis au Juriste pour validation légale.",
             "data": OuvrageReadSerializer(ouvrage).data
         })
 

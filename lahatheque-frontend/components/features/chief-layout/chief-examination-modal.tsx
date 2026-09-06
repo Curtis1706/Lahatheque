@@ -360,8 +360,13 @@ export function ChiefExaminationModal({
                 <StatusBadge status="approved" leftLabel="Filigrane &amp; DRM Actifs" />
               </div>
 
+              {/* Note d'information sur le flux */}
+              <p className="text-[11px] text-foreground-muted text-center pt-1">
+                La validation transmettra l'ouvrage au Juriste pour vérification du contrat d'édition avant mise en ligne.
+              </p>
+
               {/* Actions de Décision */}
-              <div className="pt-4 border-t border-border flex flex-col sm:flex-row items-center gap-3">
+              <div className="pt-2 border-t border-border flex flex-col sm:flex-row items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setMode("reject")}
@@ -382,7 +387,7 @@ export function ChiefExaminationModal({
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
-                      Valider &amp; Publier sur la Vitrine
+                      Valider &amp; Envoyer au Juriste
                     </>
                   )}
                 </button>

@@ -239,6 +239,7 @@ export function DashboardSidebar() {
             groupLabel: "Espace Juridique",
             items: [
               { label: "Vue d'ensemble", href: "/legal-reviewer", icon: <LayoutDashboard className="size-4" /> },
+              { label: "Publication en Attente", href: "/legal-reviewer/publication-en-attente", icon: <BookOpenCheck className="size-4" /> },
               { label: "Contrats Légaux", href: "/legal-reviewer/contracts", icon: <ShieldCheck className="size-4" /> },
               { label: "Droits d'Auteur", href: "/legal-reviewer/royalties", icon: <Percent className="size-4" /> },
               { label: "Pré-éditions", href: "/legal-reviewer/pre-editions", icon: <PenTool className="size-4" /> },

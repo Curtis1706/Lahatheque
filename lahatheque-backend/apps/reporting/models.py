@@ -15,6 +15,7 @@ class Notification(models.Model):
     objects = models.Manager()
     class NotificationType(models.TextChoices):
         SYSTEM = 'system', 'Système'
+        GENERAL = 'general', 'Général'
         MESSAGE = 'message', 'Message'
         BOOKING_CONFIRMED = 'booking_confirmed', 'Réservation Confirmée'
         BOOKING_REMINDER = 'booking_reminder', 'Rappel Réservation'

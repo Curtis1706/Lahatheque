@@ -357,3 +357,14 @@ export interface SendInstitutionStatementPayload {
   custom_note?: string;
 }
 
+export interface PendingPublicationBook {
+  id: string;
+  title: string;
+  authors: string[];
+  discipline: string;
+  has_active_contract: boolean;
+  cover_url?: string | null;
+  created_at?: string | null;
+}
+
+

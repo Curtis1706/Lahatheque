@@ -30,6 +30,8 @@ from .views import (
     AdminManuscriptLeadsListView,
     AdminManuscriptLeadDecisionView,
     PublicManuscriptPresignedUrlView,
+    LegalPendingPublicationListView,
+    LegalPublishOuvrageView,
 )
 
 app_name = 'rights'
@@ -71,5 +73,7 @@ urlpatterns = [
     path('legal/pre-editions/<uuid:pk>/', LegalPreEditionDetailView.as_view(), name='legal-pre-edition-detail'),
     path('legal/relances/config/', DebtReminderConfigView.as_view(), name='legal-relances-config'),
     path('legal/relances/', LegalRelancesListView.as_view(), name='legal-relances-list'),
+    path('legal/pending-publication/', LegalPendingPublicationListView.as_view(), name='legal-pending-publication-list'),
+    path('legal/pending-publication/<str:id>/publish/', LegalPublishOuvrageView.as_view(), name='legal-publish-ouvrage'),
 ]
 

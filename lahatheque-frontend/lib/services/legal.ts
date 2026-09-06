@@ -16,6 +16,7 @@ import type {
   SendBatchAuthorStatementsPayload,
   SendDebtReminderPayload,
   SendInstitutionStatementPayload,
+  PendingPublicationBook,
 } from "../types/legal";
 
 const API_BASE = "/api/bff/rights/legal";
@@ -730,4 +731,47 @@ export async function sendInstitutionRoyaltyStatement(
     return { success: false, error: err?.message || "Erreur réseau" };
   }
 }
+
+// ─── Publications en Attente (Double Contrôle Juriste) ───────────────────────
+
+export async function getPendingPublicationBooks(): Promise<PendingPublicationBook[]> {
+  try {
+    const res = await fetch(`${API_BASE}/pending-publication/`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error(`Erreur récupération ouvrages en attente: ${res.status}`);
+    const data = await res.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function publishPendingOuvrage(
+  id: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/pending-publication/${id}/publish/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        success: false,
+        error: data.error || `Impossible de publier cet ouvrage (${res.status}).`,
+      };
+    }
+    return {
+      success: true,
+      message: data.message || "Ouvrage publié avec succès sur la vitrine.",
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur réseau lors de la publication." };
+  }
+}
+
 

@@ -3361,5 +3361,75 @@ class PublicManuscriptPresignedUrlView(APIView):
             return Response({"success": False, "error": f"Impossible de générer l'URL de téléversement : {e}"}, status=500)
 
 
+class LegalPendingPublicationListView(APIView):
+    """GET /api/v1/rights/legal/pending-publication/ - Ouvrages internes en attente de publication."""
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from apps.catalog.models import Ouvrage
+        from apps.rights.models import ContratLegal
+
+        ouvrages = Ouvrage.objects.filter(status='pending_legal_approval').select_related('discipline').prefetch_related('authors')
+
+        data = []
+        for o in ouvrages:
+            has_contract = ContratLegal.objects.filter(ouvrage=o, status='active').exists()
+            data.append({
+                "id": str(o.id),
+                "title": o.title,
+                "authors": [f"{a.first_name} {a.last_name}".strip() for a in o.authors.all()],
+                "discipline": o.discipline.name if o.discipline else "",
+                "has_active_contract": has_contract,
+                "cover_url": o.cover_image.url if getattr(o, 'cover_image', None) else None,
+                "created_at": o.created_at.isoformat() if hasattr(o, 'created_at') and o.created_at else None,
+            })
+
+        return Response({"success": True, "data": data})
+
+
+class LegalPublishOuvrageView(APIView):
+    """POST /api/v1/rights/legal/pending-publication/<id>/publish/ - Publication finale par le Juriste."""
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
+
+    def post(self, request, id):
+        from apps.catalog.models import Ouvrage
+        from apps.rights.models import ContratLegal
+
+        try:
+            ouvrage = Ouvrage.objects.get(id=id, status='pending_legal_approval')
+        except Ouvrage.DoesNotExist:
+            return Response({"success": False, "error": "Ouvrage introuvable ou déjà traité."}, status=404)
+
+        has_contract = ContratLegal.objects.filter(ouvrage=ouvrage, status='active').exists()
+        if not has_contract:
+            return Response({
+                "success": False,
+                "error": "Aucun contrat actif n'est rattaché à cet ouvrage. Enregistrez le contrat avant de publier."
+            }, status=400)
+
+        ouvrage.status = 'published'
+        ouvrage.save(update_fields=['status'])
+
+        try:
+            from apps.reporting.services import notify_user
+            from apps.reporting.models import Notification
+
+            depositor = getattr(ouvrage, 'created_by', None) or getattr(ouvrage, 'deposited_by', None)
+            if depositor:
+                notify_user(
+                    user=depositor,
+                    notification_type=Notification.NotificationType.GENERAL,
+                    title="Ouvrage publié sur la vitrine",
+                    message=f"« {ouvrage.title} » a été validé juridiquement et est maintenant visible sur la vitrine publique.",
+                    action_url=f"/catalog/{ouvrage.id}",
+                    resource_id=str(ouvrage.id),
+                )
+        except Exception:
+            pass
+
+        return Response({"success": True, "message": f"« {ouvrage.title} » a été publié sur la vitrine."})
+
+
+
 
 
