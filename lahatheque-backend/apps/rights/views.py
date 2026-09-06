@@ -2659,7 +2659,8 @@ class LegalRelancesListView(APIView):
                 2: "Deuxième relance ferme — Facture en attente de règlement",
                 3: "Mise en demeure formelle avant procédure contentieuse",
             }
-            subject = f"[{level_titles.get(reminder_level, 'Rappel d\'impayé')}] • LAHA Éditions"
+            _level_title = level_titles.get(reminder_level, "Rappel d'impayé")
+            subject = "[" + _level_title + "] \u2022 LAHA \u00c9ditions"
 
             default_messages = {
                 1: f"Nous vous rappelons avec bienveillance que votre facture d'un montant de {total_due:,.0f} FCFA est arrivée à échéance. Merci de bien vouloir procéder à son règlement.",
