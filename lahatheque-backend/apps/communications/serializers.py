@@ -82,6 +82,7 @@ class ProfessionalContactSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     category_display = serializers.CharField(source='get_category_display', read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    is_platform_user = serializers.SerializerMethodField()
 
     class Meta:
         from .models import ProfessionalContact
@@ -90,9 +91,9 @@ class ProfessionalContactSerializer(serializers.ModelSerializer):
             'id', 'first_name', 'last_name', 'full_name', 'email', 'phone',
             'organization', 'role_or_title', 'category', 'category_display',
             'notes', 'created_by', 'created_by_name', 'last_contacted_at',
-            'emails_sent_count', 'created_at', 'updated_at'
+            'emails_sent_count', 'created_at', 'updated_at', 'is_platform_user'
         ]
-        read_only_fields = ['id', 'created_by', 'last_contacted_at', 'emails_sent_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'last_contacted_at', 'emails_sent_count', 'created_at', 'updated_at', 'is_platform_user']
 
     def get_full_name(self, obj) -> str:
         return f"{obj.first_name} {obj.last_name}".strip()
@@ -102,6 +103,11 @@ class ProfessionalContactSerializer(serializers.ModelSerializer):
             return ""
         name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
         return name or obj.created_by.email or ""
+
+    def get_is_platform_user(self, obj) -> bool:
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        return User.objects.filter(email__iexact=obj.email).exists()
 
 
 class ContactEmailDispatchSerializer(serializers.ModelSerializer):

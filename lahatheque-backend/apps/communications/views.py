@@ -504,6 +504,52 @@ class ProfessionalContactsListView(APIView):
     permission_classes = [IsAdminOrLegalReviewer]
 
     def get(self, request):
+        # 1. Synchronisation transparente des utilisateurs enregistrés ayant des rôles partenaires/institutionnels
+        try:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            target_roles = ['university', 'publisher', 'author', 'wholesaler', 'teacher']
+            partner_users = User.objects.filter(role__in=target_roles, is_suspended=False)
+            existing_emails = set(ProfessionalContact.objects.values_list('email', flat=True))
+
+            new_contacts = []
+            category_map = {
+                'university': ProfessionalContact.Category.UNIVERSITY,
+                'publisher': ProfessionalContact.Category.PUBLISHER,
+                'author': ProfessionalContact.Category.AUTHOR,
+                'wholesaler': ProfessionalContact.Category.PARTNER,
+                'teacher': ProfessionalContact.Category.UNIVERSITY,
+            }
+            role_label_map = {
+                'university': 'Université / Établissement Partenaire',
+                'publisher': 'Éditeur Tiers Partenaire',
+                'author': 'Auteur Partenaire',
+                'wholesaler': 'Grossiste / Librairie Partenaire',
+                'teacher': 'Enseignant Chercheur',
+            }
+
+            for u in partner_users:
+                if u.email and u.email.strip().lower() not in existing_emails:
+                    org_name = u.university_affiliation or (u.institution.name if getattr(u, 'institution', None) else '') or f"Partenaire {role_label_map.get(u.role, '')}"
+                    new_contacts.append(
+                        ProfessionalContact(
+                            first_name=u.first_name or u.email.split('@')[0],
+                            last_name=u.last_name or '',
+                            email=u.email.strip().lower(),
+                            phone=u.phone or '',
+                            organization=org_name,
+                            role_or_title=role_label_map.get(u.role, 'Membre Partenaire'),
+                            category=category_map.get(u.role, ProfessionalContact.Category.OTHER),
+                            notes=f"Compte plateforme inscrit sous le rôle '{u.get_role_display()}'.",
+                        )
+                    )
+                    existing_emails.add(u.email.strip().lower())
+
+            if new_contacts:
+                ProfessionalContact.objects.bulk_create(new_contacts)
+        except Exception as e:
+            logger.warning(f"Avertissement lors de la synchronisation des contacts utilisateurs: {e}")
+
         qs = ProfessionalContact.objects.all()
 
         # Recherche textuelle
