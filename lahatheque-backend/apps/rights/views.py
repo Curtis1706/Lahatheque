@@ -2738,6 +2738,7 @@ class LegalRelancesListView(APIView):
         if action == "send_debt_reminder":
             import uuid
             from decimal import Decimal
+            from apps.commerce.models import Order
 
             debt_id = request.data.get("debt_id")
             client_id = request.data.get("client_id")
@@ -2764,7 +2765,7 @@ class LegalRelancesListView(APIView):
 
                 if not target_user and debt_id:
                     try:
-                        from apps.commerce.models import WholesaleOrder
+                        from apps.commerce.models import WholesaleOrder, Order
                         wo = WholesaleOrder.objects.filter(id=uuid.UUID(str(debt_id))).select_related("user").first()
                         if wo and wo.user:
                             target_user = wo.user
@@ -2784,7 +2785,7 @@ class LegalRelancesListView(APIView):
                 total_due = float(orders.aggregate(s=Sum("total_amount"))["s"] or 0.0)
                 if total_due == 0 and debt_id:
                     try:
-                        from apps.commerce.models import WholesaleOrder
+                        from apps.commerce.models import WholesaleOrder, Order
                         wo = WholesaleOrder.objects.filter(id=uuid.UUID(str(debt_id))).first()
                         if wo:
                             total_due = float(wo.total_amount)
