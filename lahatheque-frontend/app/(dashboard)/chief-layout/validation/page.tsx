@@ -73,7 +73,7 @@ export default function ChefValidationPage() {
 
   const handleQuickValidate = async (id: string) => {
     await validateDeposit(id);
-    toast.success("Ouvrage validé avec succès ! Mis en ligne sur la vitrine publique.");
+    toast.success("Ouvrage validé avec succès ! Transmis au Juriste pour vérification contractuelle avant publication.");
     await loadData();
   };
 
@@ -212,7 +212,7 @@ export default function ChefValidationPage() {
           Dépôts en Attente de Validation
         </h1>
         <p className="text-xs text-foreground-muted mt-1">
-          Examinez les dépôts soumis par les maquettistes. En cas de refus, motivez la décision pour permettre la correction. La validation déclenche la mise en ligne automatique sur la vitrine.
+          Examinez les dépôts soumis par les maquettistes. En cas de refus, motivez la décision pour permettre la correction. La validation transmet l&apos;ouvrage au Juriste pour vérification contractuelle avant publication.
         </p>
       </div>
 

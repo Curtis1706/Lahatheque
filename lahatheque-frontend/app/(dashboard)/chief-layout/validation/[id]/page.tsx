@@ -67,7 +67,7 @@ export default function ChefValidationDetailPage() {
     );
     setValidating(false);
     if (success) {
-      toast.success(`Ouvrage validé et publié avec succès au tarif de ${priceDigital.toLocaleString("fr-FR")} FCFA !`);
+      toast.success("Ouvrage validé avec succès ! Transmis au Juriste pour vérification contractuelle avant publication.");
       router.push("/chief-layout/validation");
     }
   };
@@ -264,7 +264,7 @@ export default function ChefValidationDetailPage() {
             <div>
               <p className="text-xs font-bold text-navy">Disponible en version papier physique</p>
               <p className="text-[11px] text-foreground-muted">
-                Active le format papier sur la vitrine et l&apos;entrée en stock pour le Gestionnaire.
+                Active le format papier et l&apos;entrée en stock lors de la publication finale.
               </p>
             </div>
             <button
@@ -329,7 +329,7 @@ export default function ChefValidationDetailPage() {
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4 text-gold" />
-                  Valider et Mettre en Ligne sur la Vitrine
+                  Valider et Envoyer au Juriste
                 </>
               )}
             </button>
