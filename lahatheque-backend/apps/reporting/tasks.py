@@ -395,6 +395,21 @@ def task_calculate_monthly_royalties():
             pub_rate = Decimal(str(ouvrage.publisher.contractual_royalty_rate)) / Decimal("100")
             publisher_payout = (total_sales * pub_rate).quantize(Decimal("0.01"))
 
+        remaining_after_partners = total_sales - university_payout - publisher_payout
+        if remaining_after_partners <= 0:
+            continue
+
+        from apps.rights.models import RepartitionDroits, RoyaltyRate
+
+        book_royalty_rate_obj = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
+        if book_royalty_rate_obj and book_royalty_rate_obj.author_share_percent is not None:
+            global_author_rate = Decimal(str(book_royalty_rate_obj.author_share_percent)) / Decimal("100")
+        else:
+            global_author_rate = Decimal("0.15")
+
+        author_pool = (remaining_after_partners * global_author_rate).quantize(Decimal("0.01"))
+        platform_revenue = remaining_after_partners - author_pool
+
         calculation, _ = RoyaltyCalculation.objects.update_or_create(
             ouvrage=ouvrage,
             period_month=period_month_date,
@@ -402,15 +417,13 @@ def task_calculate_monthly_royalties():
                 'total_reads_count': ligne['units_sold'],
                 'total_revenue': total_sales,
                 'publisher_payout_amount': publisher_payout,
+                'platform_revenue_amount': platform_revenue,
             }
         )
         calculations_created += 1
 
-        author_pool = total_sales - university_payout - publisher_payout
         if author_pool <= 0:
             continue
-
-        from apps.rights.models import RepartitionDroits
 
         ventes_fmt = ventes_par_format.get(ouvrage.id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00'), 'audio': Decimal('0.00')})
 

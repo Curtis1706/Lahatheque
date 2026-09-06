@@ -132,6 +132,7 @@ export interface LegalContract {
     email: string;
     phone: string;
   };
+  author_royalty_rate?: number;
   repartitions?: ContractRoyaltySplit[];
   linked_book_id?: string;
   linked_book_title?: string;
@@ -169,6 +170,8 @@ export interface BookRoyalty {
   paper_rate?: number;
   digital_rate?: number;
   audio_tts_rate?: number; // Quote-part écoutes Audio TTS (Text-To-Speech)
+  has_paper_version?: boolean;
+  has_audio_version?: boolean;
   history: {
     date: string;
     rate: number;
@@ -193,6 +196,7 @@ export interface AIRoyaltySuggestion {
   ai_confidence: number; // ex: 92%
   extracted_clause?: string;
   suggested_rate?: number;
+  pourcentage_suggere?: number;
 }
 
 export interface PreEditionContract {

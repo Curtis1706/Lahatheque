@@ -10,7 +10,14 @@ interface EditRoyaltyModalProps {
   royalty: BookRoyalty;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (newRate: number, applyRetroactively: boolean, universityRate?: number | null) => Promise<void>;
+  onConfirm: (
+    newRate: number,
+    applyRetroactively: boolean,
+    universityRate?: number | null,
+    paperRate?: number | null,
+    digitalRate?: number | null,
+    audioRate?: number | null
+  ) => Promise<void>;
 }
 
 export function EditRoyaltyModal({
@@ -20,6 +27,9 @@ export function EditRoyaltyModal({
   onConfirm,
 }: EditRoyaltyModalProps) {
   const [rate, setRate] = useState(royalty.current_rate);
+  const [paperRate, setPaperRate] = useState(royalty.paper_rate ?? 100);
+  const [digitalRate, setDigitalRate] = useState(royalty.digital_rate ?? 100);
+  const [audioRate, setAudioRate] = useState(royalty.audio_tts_rate ?? 100);
   const [universityRate, setUniversityRate] = useState<string>(
     royalty.university_share_percent !== undefined && royalty.university_share_percent !== null
       ? String(royalty.university_share_percent)
@@ -30,6 +40,9 @@ export function EditRoyaltyModal({
 
   useEffect(() => {
     setRate(royalty.current_rate);
+    setPaperRate(royalty.paper_rate ?? 100);
+    setDigitalRate(royalty.digital_rate ?? 100);
+    setAudioRate(royalty.audio_tts_rate ?? 100);
     setUniversityRate(
       royalty.university_share_percent !== undefined && royalty.university_share_percent !== null
         ? String(royalty.university_share_percent)
@@ -42,7 +55,7 @@ export function EditRoyaltyModal({
     setLoading(true);
     try {
       const uRate = universityRate.trim() !== "" ? parseFloat(universityRate) : null;
-      await onConfirm(rate, applyRetroactively, uRate);
+      await onConfirm(rate, applyRetroactively, uRate, paperRate, digitalRate, audioRate);
       onClose();
     } finally {
       setLoading(false);
@@ -95,7 +108,7 @@ export function EditRoyaltyModal({
               {/* Taux actuel vs nouveau taux */}
               <div>
                 <label htmlFor="royalty-rate" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
-                  Nouveau pourcentage de droits d&apos;auteur (%) *
+                  Taux Global de Droits d&apos;Auteur (%) — part de la vente revenant aux auteurs *
                 </label>
                 <div className="relative">
                   <input
@@ -111,6 +124,75 @@ export function EditRoyaltyModal({
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono font-bold text-gold">%</span>
                 </div>
+
+                <div id="live-rate-preview" className="mt-2 p-2.5 rounded-lg bg-gold/5 border border-gold/20 text-[11px] text-navy flex items-center justify-between">
+                  <span>Les auteurs recevront <strong>{rate}%</strong> de chaque vente.</span>
+                  <span className="font-bold text-gold">LAHA conservera {(100 - rate).toFixed(1)}%</span>
+                </div>
+              </div>
+
+              {/* Répartition par format */}
+              <div className="pt-3 border-t border-border space-y-3">
+                <p className="text-[11px] font-bold text-navy uppercase tracking-wider">
+                  Répartition par format (bénéficiaire principal)
+                </p>
+
+                {royalty.has_paper_version !== false && (
+                  <div>
+                    <label htmlFor="paper-rate-input" className="block text-[10px] font-semibold text-foreground-muted uppercase mb-1">
+                      Taux Papier (%)
+                    </label>
+                    <input
+                      id="paper-rate-input"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.5"
+                      value={paperRate}
+                      onChange={(e) => setPaperRate(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background-secondary text-navy"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="digital-rate-input" className="block text-[10px] font-semibold text-foreground-muted uppercase mb-1">
+                    Taux Numérique (%)
+                  </label>
+                  <input
+                    id="digital-rate-input"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.5"
+                    value={digitalRate}
+                    onChange={(e) => setDigitalRate(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background-secondary text-navy"
+                  />
+                </div>
+
+                {royalty.has_audio_version && (
+                  <div>
+                    <label htmlFor="audio-rate-input" className="block text-[10px] font-semibold text-foreground-muted uppercase mb-1">
+                      Taux Livre Audio (%)
+                    </label>
+                    <input
+                      id="audio-rate-input"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.5"
+                      value={audioRate}
+                      onChange={(e) => setAudioRate(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background-secondary text-navy"
+                    />
+                  </div>
+                )}
+
+                <p className="text-[10px] text-foreground-muted italic">
+                  Pour une répartition par format entre plusieurs co-auteurs, utilisez le formulaire complet
+                  de création de contrat plutôt que ce réglage rapide.
+                </p>
               </div>
 
               {/* Champ conditionnel Taux Université si rattaché à une institution */}
