@@ -704,6 +704,33 @@ function NewLegalContractContent() {
                     icon={<BookOpen className="w-4 h-4" />}
                     disabled={loadingOptions}
                   />
+
+                  {selectedBook && (
+                    <div className="mt-2 p-3 rounded-xl bg-background border border-border flex flex-wrap gap-4">
+                      <div>
+                        <span className="text-[10px] font-bold text-foreground-muted uppercase block">Prix Numérique</span>
+                        <span className="text-sm font-semibold text-navy">
+                          {selectedBook.price_digital != null ? `${selectedBook.price_digital.toLocaleString("fr-FR")} FCFA` : "Non défini"}
+                        </span>
+                      </div>
+                      {selectedBook.is_paper_available && (
+                        <div>
+                          <span className="text-[10px] font-bold text-foreground-muted uppercase block">Prix Papier</span>
+                          <span className="text-sm font-semibold text-navy">
+                            {selectedBook.price_paper != null ? `${selectedBook.price_paper.toLocaleString("fr-FR")} FCFA` : "Non défini"}
+                          </span>
+                        </div>
+                      )}
+                      {selectedBook.has_audio_tracks && (
+                        <div>
+                          <span className="text-[10px] font-bold text-foreground-muted uppercase block">Prix Livre Audio</span>
+                          <span className="text-sm font-semibold text-navy">
+                            {selectedBook.price_audio != null ? `${selectedBook.price_audio.toLocaleString("fr-FR")} FCFA` : "Non défini"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>

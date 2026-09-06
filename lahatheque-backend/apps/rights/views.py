@@ -1135,6 +1135,9 @@ class LegalContractsFormOptionsView(APIView):
                 "author_user_ids": [str(a.user_id) for a in b.authors.all() if a.user_id],
                 "is_paper_available": bool(b.is_paper_available),
                 "has_audio_tracks": b.audio_tracks.exists(),
+                "price_digital": float(b.price_digital) if b.price_digital is not None else None,
+                "price_paper": float(b.price_paper) if (b.is_paper_available and b.price_paper is not None) else None,
+                "price_audio": float(getattr(b, 'price_audio', None)) if (getattr(b, 'has_audio_version', False) and getattr(b, 'price_audio', None) is not None) else None,
             })
 
         # 2. Auteurs réels (User role='author')

@@ -21,6 +21,9 @@ export interface EligibleContractBook {
   author_user_ids: string[];
   is_paper_available?: boolean;
   has_audio_tracks?: boolean;
+  price_digital?: number | null;
+  price_paper?: number | null;
+  price_audio?: number | null;
 }
 
 export interface EligibleContractAuthor {
