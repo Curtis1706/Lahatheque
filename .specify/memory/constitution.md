@@ -1,3 +1,15 @@
+<!--
+Sync Impact Report:
+- Version change: 1.1.0 -> 1.2.0
+- List of modified principles:
+  - IX. Code Exhaustivement Commenté et Documenté -> enrichi avec les exigences de lisibilité et de non-régression.
+- Added principles & sections:
+  - XI. Traçabilité, Observabilité et Journalisation Granulaire (NON-NÉGOCIABLE)
+  - ## Development Workflow & Quality Gates (Processus de validation, tests et déploiement Coolify)
+- Removed sections: Aucun
+- Follow-up TODOs: Aucun
+-->
+
 # LAHAThèque Constitution
 
 ## Core Principles
@@ -51,14 +63,26 @@ Tout le code source produit doit être richement commenté, avec des docstrings 
 ### X. Interdiction Absolue de Tout Émoji
 Aucun émoji n'est toléré dans le code source, les commentaires, les docstrings, les fichiers de règles, les réponses d'API, les tableaux de bord, les modales ou la documentation technique. Utiliser exclusivement les icônes vectorielles Lucide React.
 
+### XI. Traçabilité, Observabilité et Journalisation Granulaire (NON-NÉGOCIABLE)
+- Chaque traitement asynchrone (OCR, encodage audio, indexation, notifications, imports de masse) doit émettre des logs balisés étape par étape (`[NomModule ETAPE X/Y]`), permettant un diagnostic sans ambiguïté dans les logs Docker / Coolify.
+- Zéro action silencieuse côté frontend : toute interaction utilisateur asynchrone (recherche anti-rebond, réindexation, mutation) doit être tracée dans la console navigateur (`[NomComposant]`) et pourvue d'un feedback visuel immédiat (toast, loader, mise à jour optimiste).
+- En cas d'erreur ou d'échec, persister explicitement la cause de l'erreur dans l'entité de base de données correspondante et consigner l'exception avec trace complète (`exc_info=True`).
+
 ## Constraints & Security Requirements
 
-- Base de données : PostgreSQL (Neon) avec contraintes d'intégrité strictes et indexation ciblée.
-- Stockage de fichiers : Cloudflare R2 sécurisé avec URLs publiques et gestion résiliente des permissions.
-- DRM et Lecteur : Moteur de lecture 3D FlipBook et mode normal vertical avec protection anti-capture et filigrane dynamique.
+- Base de données : PostgreSQL (Neon) avec contraintes d'intégrité strictes, index GIN/FTS pour la recherche plein texte et indexation ciblée.
+- Stockage de fichiers : Cloudflare R2 sécurisé avec URLs publiques et gestion résiliente des permissions de téléversement jusqu'à 800 Mo.
+- DRM et Lecteur : Moteur de lecture 3D FlipBook et mode normal vertical avec protection anti-capture et filigrane dynamique personnalisé.
+- Environnement d'exécution : Déploiement conteneurisé Docker / Coolify sous reverse proxy Traefik avec isolation des tâches lourdes en arrière-plan (Celery / threads asynchrones).
+
+## Development Workflow & Quality Gates
+
+- Spécifications Spec Kit : Tout développement d'envergure suit la séquence Spec Kit (`specify` -> `clarify` -> `plan` -> `tasks` -> `implement` -> `analyze`).
+- Validation Mobile-First : Aucun écran ne peut être livré s'il présente un défilement horizontal indésirable ou des ruptures sous 400px de largeur.
+- Isolation réseau : Les endpoints de mutation lourde doivent répondre immédiatement (< 300 ms) en déléguant le travail intensif à des processus d'arrière-plan non bloquants.
 
 ## Governance
 
-Cette Constitution fait foi sur l'ensemble du projet LAHAThèque et prime sur toute décision locale. Tout code produit doit être audité et validé conformément à ces 10 principes.
+Cette Constitution fait foi sur l'ensemble du projet LAHAThèque et prime sur toute décision locale. Tout code produit doit être audité et validé conformément à ces 11 principes fondamentaux. Toute modification ou amendement requiert une revue de conformité et un incrément sémantique de version.
 
-**Version**: 1.1.0 | **Ratified**: 2026-08-18 | **Last Amended**: 2026-08-21
+**Version**: 1.2.0 | **Ratified**: 2026-08-18 | **Last Amended**: 2026-09-06
