@@ -388,6 +388,7 @@ export default function AdminContractDetailPage() {
                   </div>
                   <a
                     href={contract.file_url}
+                    download={contract.file_name || `${contract.contract_number}.pdf`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-xs font-bold text-gold hover:underline shrink-0"

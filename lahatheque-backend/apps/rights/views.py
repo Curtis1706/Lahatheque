@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 from rest_framework import status, permissions
 from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from apps.accounts.permissions import IsAuthor, IsLegalReviewerRole, IsAdminOrSuperAdmin
+from apps.accounts.permissions import IsAuthor, IsLegalReviewerRole, IsAdminOrSuperAdmin, IsAdminOrLegalReviewer
 
 from apps.catalog.models import Ouvrage, BookAuthor
 from apps.rights.models import (
@@ -1388,7 +1388,7 @@ class LegalContractStreamView(APIView):
     GET /api/v1/rights/legal/contracts/<uuid:id>/stream/
     Sert le document d'un contrat juridique sous forme de flux PDF sécurisé et filigrané Range HTTP 206/200.
     """
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrLegalReviewer]
     renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
 
     def get(self, request, id):
@@ -1466,6 +1466,102 @@ class LegalContractStreamView(APIView):
         response["Content-Length"] = str(len(watermarked_bytes))
         response["Accept-Ranges"] = "bytes"
         response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+
+class LegalContractDownloadView(APIView):
+    """
+    GET /api/v1/rights/legal/contracts/<uuid:id>/download/
+    Téléchargement direct du document contractuel scellé (avec filigrane juridique et Content-Disposition: attachment).
+    Accessible aux Juristes, Administrateurs et Super Administrateurs.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrLegalReviewer]
+    renderer_classes = [PassthroughStreamRenderer, JSONRenderer]
+
+    def get(self, request, id):
+        import os
+        import urllib.parse
+        import requests
+        from apps.protection.models import GlobalDrmConfig
+        from apps.protection.watermark import WatermarkEngine
+
+        try:
+            c = ContratLegal.objects.get(id=id)
+        except ContratLegal.DoesNotExist:
+            return Response({"success": False, "error": "Contrat introuvable."}, status=404)
+
+        file_bytes = None
+        if c.fichier_contrat_path:
+            # 1. default_storage (R2 ou local)
+            try:
+                from django.core.files.storage import default_storage
+                if default_storage.exists(c.fichier_contrat_path):
+                    with default_storage.open(c.fichier_contrat_path, "rb") as f:
+                        file_bytes = f.read()
+            except Exception as e:
+                logger.warning(f"Erreur default_storage.open pour download contrat {c.id}: {e}")
+
+            # 2. Téléchargement via URL publique si nécessaire
+            if not file_bytes:
+                file_url = get_contract_file_url(c.fichier_contrat_path)
+                if file_url and file_url.startswith("http"):
+                    try:
+                        resp = requests.get(file_url, timeout=20)
+                        if resp.status_code == 200:
+                            file_bytes = resp.content
+                    except Exception as e:
+                        logger.warning(f"Erreur téléchargement HTTP contrat {c.id}: {e}")
+
+        if not file_bytes:
+            return Response({
+                "success": False,
+                "error": "Le fichier de ce contrat est introuvable sur le stockage."
+            }, status=404)
+
+        file_name = c.file_name or f"{c.numero_contrat}.pdf"
+        lower_name = file_name.lower()
+
+        # Filigrane juridique si document PDF
+        if lower_name.endswith(".pdf") or file_bytes.startswith(b"%PDF"):
+            content_type = "application/pdf"
+            try:
+                global_drm = GlobalDrmConfig.get_singleton()
+                ip = request.META.get("HTTP_X_FORWARDED_FOR")
+                if ip:
+                    ip = ip.split(",")[0].strip()
+                else:
+                    ip = request.META.get("REMOTE_ADDR", "127.0.0.1")
+
+                user_info = {
+                    "nom": request.user.get_full_name() or request.user.username,
+                    "email": request.user.email,
+                    "ip": ip,
+                    "user_id": str(request.user.id),
+                    "device_fingerprint": request.headers.get("X-Device-Fingerprint", ""),
+                    "title": c.titre,
+                    "id": str(c.id),
+                    "is_partner": False,
+                }
+                file_bytes = WatermarkEngine.apply_watermark(
+                    pdf_bytes=file_bytes,
+                    user_info=user_info,
+                    config=global_drm
+                )
+            except Exception as wm_err:
+                logger.warning(f"WatermarkEngine bypass pour download contrat {c.id}: {wm_err}")
+        elif lower_name.endswith(".docx"):
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif lower_name.endswith(".doc"):
+            content_type = "application/msword"
+        else:
+            content_type = "application/octet-stream"
+
+        safe_filename = urllib.parse.quote(file_name)
+        response = Response(file_bytes, content_type=content_type)
+        response["Content-Disposition"] = f'attachment; filename="{file_name}"; filename*=UTF-8\'\'{safe_filename}'
+        response["Content-Length"] = str(len(file_bytes))
+        response["Accept-Ranges"] = "bytes"
+        response["Cache-Control"] = "private, no-cache, no-store, must-revalidate"
         return response
 
 
