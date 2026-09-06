@@ -1068,7 +1068,7 @@ class AdminContractViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def _serialize_contract(self, c):
-        from apps.rights.models import RepartitionDroits
+        from apps.rights.models import RepartitionDroits, RoyaltyRate
 
         # Détermination du type de partenaire et de l'email
         partner_type = "author"
@@ -1086,9 +1086,9 @@ class AdminContractViewSet(viewsets.ViewSet):
             partner_type = "author"
             partner_email = "auteur@lahatheque.com"
 
-        # Clé de répartition & Taux de redevance
+        # Clé de répartition entre co-auteurs (affichage détaillé) — distincte du taux
+        # global de droits d'auteur affiché juste après.
         repartition_list = []
-        royalty_rate = 15.0
         is_derogatory = False
 
         if c.ouvrage:
@@ -1107,16 +1107,23 @@ class AdminContractViewSet(viewsets.ViewSet):
                     "digital_rate": d_rate,
                     "audio_tts_rate": a_rate,
                 })
-                if d_rate > 15.0:
-                    is_derogatory = True
-            if repartition_list:
-                royalty_rate = repartition_list[0]["digital_rate"]
+
+            # Vrai taux global de droits d'auteur (% de la vente) — jamais la répartition
+            # entre co-auteurs.
+            book_rate_obj = RoyaltyRate.objects.filter(ouvrage=c.ouvrage).first()
+            if book_rate_obj and book_rate_obj.author_share_percent is not None:
+                royalty_rate = float(book_rate_obj.author_share_percent)
+            else:
+                royalty_rate = 15.0
+            is_derogatory = royalty_rate > 20.0
         elif partner_type == "university" and c.institution:
             royalty_rate = float(getattr(c.institution, 'taux_redevance_defaut', 5.0) or 5.0)
             if royalty_rate > 10.0:
                 is_derogatory = True
         elif partner_type == "publisher" and c.publisher:
             royalty_rate = float(getattr(c.publisher, 'taux_commission_standard', 70.0) or 70.0)
+        else:
+            royalty_rate = 15.0
 
         file_url = None
         if c.fichier_contrat_path:

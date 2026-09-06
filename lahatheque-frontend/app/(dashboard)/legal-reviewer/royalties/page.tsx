@@ -104,11 +104,16 @@ function LegalRoyaltiesPageContent() {
     },
     {
       key: "current_rate",
-      header: "Taux Actuel (%)",
+      header: "Taux de Droits d'Auteur Global (%)",
       cell: (row) => (
-        <span className="font-mono font-bold text-navy text-sm px-2.5 py-1 rounded-xl bg-gold/15 border border-gold/30">
-          {row.current_rate}%
-        </span>
+        <div>
+          <span className="font-mono font-bold text-navy text-sm px-2.5 py-1 rounded-xl bg-gold/15 border border-gold/30">
+            {row.current_rate}%
+          </span>
+          <span className="text-[10px] text-foreground-muted block mt-1">
+            LAHA conserve {100 - row.current_rate}%
+          </span>
+        </div>
       ),
     },
     {

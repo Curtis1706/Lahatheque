@@ -132,6 +132,7 @@ export interface LegalContract {
     email: string;
     phone: string;
   };
+  author_royalty_rate?: number;
   repartitions?: ContractRoyaltySplit[];
   linked_book_id?: string;
   linked_book_title?: string;

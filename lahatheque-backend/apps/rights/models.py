@@ -18,8 +18,15 @@ class RightTerritory(models.Model):
 
 class RoyaltyRate(models.Model):
     ouvrage = models.ForeignKey('catalog.Ouvrage', on_delete=models.CASCADE)
+    # Pourcentage de la vente (après université/éditeur tiers) qui revient aux AUTEURS
+    # COLLECTIVEMENT. Ce n'est PAS la répartition entre co-auteurs (voir AuthorRight et
+    # RepartitionDroits pour cela) — c'est le taux global négocié pour ce livre, tel que
+    # défini par le CDC.
     author_share_percent = models.DecimalField(max_digits=5, decimal_places=2)
+    # Pourcentage revenant à l'éditeur tiers (si applicable). Sans lien avec author_share_percent
+    # — un troisième acteur (LAHA elle-même) récupère toujours le reliquat non attribué.
     publisher_share_percent = models.DecimalField(max_digits=5, decimal_places=2)
+    # Pourcentage explicitement retenu par LAHA en tant qu'éditeur.
     platform_share_percent = models.DecimalField(max_digits=5, decimal_places=2)
     university_share_percent = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True,
@@ -33,6 +40,7 @@ class RoyaltyCalculation(models.Model):
     total_reads_count = models.IntegerField(default=0)
     total_revenue = models.DecimalField(max_digits=12, decimal_places=2)
     publisher_payout_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    platform_revenue_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_settled = models.BooleanField(default=False)
 
     @property

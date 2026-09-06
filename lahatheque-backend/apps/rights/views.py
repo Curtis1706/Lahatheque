@@ -300,9 +300,20 @@ class AuthorBookDetailView(APIView):
         downloads = TraceAcces.objects.filter(
             ouvrage=b, access_type='download'
         ).count()
+        from apps.rights.models import RoyaltyRate
+
         author_right = AuthorRight.objects.filter(ouvrage=b, user=user).first()
-        rate = float(author_right.pool_share_percent) if author_right else 15.0
-        share = rev * (rate / 100)
+        pool_share = float(author_right.pool_share_percent) if author_right else 100.0
+
+        book_rate_obj = RoyaltyRate.objects.filter(ouvrage=b).first()
+        global_author_rate = float(book_rate_obj.author_share_percent) if (book_rate_obj and book_rate_obj.author_share_percent is not None) else 15.0
+
+        # Taux réellement applicable à cet auteur : sa part de répartition, appliquée au
+        # taux global de droits d'auteur négocié pour ce livre — pas la part de répartition
+        # seule, qui donnerait un montant très supérieur à ce qu'il touchera réellement.
+        effective_rate = global_author_rate * (pool_share / 100)
+        share = rev * (effective_rate / 100)
+        rate = effective_rate
         format_breakdown = {
             "digital": (lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0) + w_dig_qty,
             "paper": (lignes.filter(format_type='paper').aggregate(total=Sum('quantity'))['total'] or 0) + w_prt_qty,
@@ -1046,14 +1057,24 @@ class LegalContractsListView(APIView):
                         taux_audio_tts=audio
                     )
 
-            # Mise à jour synchronisée du taux global
-            main_pct = float(repartitions_data[0].get("pourcentage", 15.0))
+            # Taux global de droits d'auteur : un champ DISTINCT de la répartition entre
+            # co-auteurs, envoyé explicitement par le frontend (Fiche BH4).
+            author_royalty_rate = request.data.get("author_royalty_rate")
+            if author_royalty_rate is not None and str(author_royalty_rate).strip() != "":
+                global_author_rate = float(author_royalty_rate)
+            else:
+                global_author_rate = 15.0
+
+            existing_rate_obj = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
+            platform_rate = max(0.0, 100.0 - global_author_rate - (
+                float(existing_rate_obj.publisher_share_percent) if (existing_rate_obj and existing_rate_obj.publisher_share_percent) else 0.0
+            ))
+
             RoyaltyRate.objects.update_or_create(
                 ouvrage=ouvrage,
                 defaults={
-                    "author_share_percent": main_pct,
-                    "publisher_share_percent": max(0.0, 100.0 - main_pct),
-                    "platform_share_percent": 0.0
+                    "author_share_percent": global_author_rate,
+                    "platform_share_percent": platform_rate,
                 }
             )
 
@@ -1626,10 +1647,11 @@ class LegalRoyaltiesBatchView(APIView):
                     ouvrage = Ouvrage.objects.filter(title__iexact=str(book_id).strip()).first()
 
             if ouvrage:
+                existing_rate_obj = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
+                existing_publisher_pct = float(existing_rate_obj.publisher_share_percent) if (existing_rate_obj and existing_rate_obj.publisher_share_percent) else 0.0
                 defaults = {
                     "author_share_percent": rate,
-                    "publisher_share_percent": max(0.0, 100.0 - rate),
-                    "platform_share_percent": 0.0
+                    "platform_share_percent": max(0.0, 100.0 - rate - existing_publisher_pct)
                 }
                 if university_rate is not None and str(university_rate).strip() != "":
                     try:
@@ -1652,15 +1674,18 @@ class LegalRoyaltiesBatchView(APIView):
                             royalty_rate_obj.university_share_percent = None
                     royalty_rate_obj.save(update_fields=["university_share_percent"])
 
-                author_right, _ = AuthorRight.objects.get_or_create(
-                    ouvrage=ouvrage,
-                    role="auteur_principal",
-                    defaults={"pool_share_percent": rate}
-                )
-                author_right.pool_share_percent = rate
-                if ouvrage.authors.exists() and ouvrage.authors.first().user:
-                    author_right.user = ouvrage.authors.first().user
-                author_right.save()
+                existing_author_rights_count = AuthorRight.objects.filter(ouvrage=ouvrage).count()
+                if existing_author_rights_count == 0:
+                    author_right, _ = AuthorRight.objects.get_or_create(
+                        ouvrage=ouvrage,
+                        role="auteur_principal",
+                        defaults={"pool_share_percent": 100.0}
+                    )
+                    if ouvrage.authors.exists() and ouvrage.authors.first().user:
+                        author_right.user = ouvrage.authors.first().user
+                        author_right.save()
+                elif existing_author_rights_count == 1:
+                    author_right = AuthorRight.objects.filter(ouvrage=ouvrage).first()
 
                 return Response({
                     "success": True,

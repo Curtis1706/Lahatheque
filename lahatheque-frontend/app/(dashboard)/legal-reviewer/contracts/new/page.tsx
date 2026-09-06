@@ -95,6 +95,7 @@ function NewLegalContractContent() {
   const [tags, setTags] = useState("contrat, édition, redevance");
 
   // Grille de répartition des droits
+  const [authorRoyaltyRate, setAuthorRoyaltyRate] = useState<number>(15);
   const [splits, setSplits] = useState<ContractRoyaltySplit[]>([
     buildDefaultSplit(),
   ]);
@@ -573,6 +574,7 @@ function NewLegalContractContent() {
           institution_id: contractType === "university_agreement" ? selectedInstitutionId : undefined,
           publisher_id: contractType === "publisher_partnership" ? selectedPublisherId : undefined,
           pre_edition_id: selectedPreEditionId || undefined,
+          author_royalty_rate: authorRoyaltyRate,
           repartitions: isAuthorType ? splits : undefined,
         },
         file
@@ -911,17 +913,40 @@ function NewLegalContractContent() {
 
         {/* Étape 3 : Grille de Répartition des Droits (Verrouillage 100%) */}
         {isAuthorContract && (
-          <div className="p-6 rounded-3xl bg-background border border-border shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
-                  <Scale className="w-4 h-4 text-gold" />
-                  3. Clé de Répartition des Redevances Auteurs (Somme stricte 100%)
-                </h3>
-                <p className="text-2xs text-foreground-muted mt-0.5">
-                  Définit la quote-part perçue par chaque ayant droit lors des ventes papier, numériques et écoutes audio.
-                </p>
-              </div>
+          <div className="space-y-6">
+            <div className="p-4 rounded-2xl border border-gold/30 bg-gold/5 space-y-2">
+              <label htmlFor="author-royalty-rate-input" className="block text-xs font-bold text-navy uppercase tracking-wider">
+                Taux de Droits d&apos;Auteur Global (%) *
+              </label>
+              <input
+                id="author-royalty-rate-input"
+                type="number"
+                min={0}
+                max={100}
+                step="0.5"
+                value={authorRoyaltyRate}
+                onChange={(e) => setAuthorRoyaltyRate(parseFloat(e.target.value) || 0)}
+                className="w-full sm:w-48 px-3 py-2 text-sm border border-border rounded-lg bg-background-secondary font-semibold text-navy"
+              />
+              <p className="text-[11px] text-foreground-muted leading-relaxed">
+                Pourcentage du prix de vente qui revient aux auteurs, collectivement — pas la répartition
+                entre co-auteurs (définie plus bas). Le reste reste à LAHA Éditions en tant qu&apos;éditeur.
+                Exemple : pour un livre à 7 000 FCFA avec un taux de 10%, les auteurs se partagent 700
+                FCFA au total.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-background border border-border shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-gold" />
+                    3. RÉPARTITION ENTRE CO-AUTEURS (SOMME STRICTE 100% DE LA PART AUTEUR CI-DESSUS)
+                  </h3>
+                  <p className="text-2xs text-foreground-muted mt-0.5">
+                    Définit la quote-part perçue par chaque ayant droit lors des ventes papier, numériques et écoutes audio.
+                  </p>
+                </div>
 
               <button
                 type="button"
@@ -1174,6 +1199,7 @@ function NewLegalContractContent() {
                   </div>
                 </div>
               ))}
+            </div>
             </div>
           </div>
         )}

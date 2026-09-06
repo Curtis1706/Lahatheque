@@ -148,6 +148,7 @@ export async function createLegalContract(
     institution_id?: string;
     publisher_id?: string;
     pre_edition_id?: string;
+    author_royalty_rate?: number;
     repartitions?: any[];
   },
   file?: File | null
@@ -175,6 +176,9 @@ export async function createLegalContract(
     if (data.institution_id) formData.append("institution_id", data.institution_id);
     if (data.publisher_id) formData.append("publisher_id", data.publisher_id);
     if (data.pre_edition_id) formData.append("pre_edition_id", data.pre_edition_id);
+    if (data.author_royalty_rate !== undefined) {
+      formData.append("author_royalty_rate", String(data.author_royalty_rate));
+    }
     if (data.repartitions && data.repartitions.length > 0) {
       formData.append("repartitions", JSON.stringify(data.repartitions));
     }
