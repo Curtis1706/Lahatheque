@@ -247,6 +247,7 @@ export interface AdminReminder {
   amount_or_count?: string;
   days_overdue?: number;
   status?: "pending" | "sent" | "resolved" | "envoye" | "echec" | "ouvert";
+  statut?: "en_attente" | "envoye" | "echec" | "ouvert" | string;
   reference_id?: string;
   created_at: string;
 }

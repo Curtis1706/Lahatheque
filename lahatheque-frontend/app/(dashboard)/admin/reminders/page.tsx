@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Sliders,
+  XCircle,
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -141,15 +142,20 @@ export default function AdminRemindersPage() {
       key: "status",
       header: "Statut",
       cell: (row) => {
-        const isSent = row.status === "sent" || row.status === "envoye";
+        const isSent = row.statut === "envoye" || row.status === "sent" || row.status === "envoye";
+        const isFailed = row.statut === "echec";
         return (
           <span
             className={`text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1 w-fit ${
-              isSent ? "bg-success/15 text-success" : "bg-warning/15 text-gold-dark"
+              isSent
+                ? "bg-success/15 text-success"
+                : isFailed
+                ? "bg-error/15 text-error"
+                : "bg-warning/15 text-gold-dark"
             }`}
           >
-            <CheckCircle2 className="w-3 h-3" />
-            {isSent ? "Envoyé avec succès" : "En file d'attente"}
+            {isFailed ? <XCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+            {isSent ? "Envoyé avec succès" : isFailed ? "Échec de l'envoi" : "En file d'attente"}
           </span>
         );
       },
