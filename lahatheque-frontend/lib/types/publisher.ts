@@ -49,6 +49,8 @@ export interface PublisherBook {
   keywords: string[];
   target_audience: "universitaire" | "professionnel" | "grand_public";
   price: number;
+  price_audio?: number;
+  has_audio_version?: boolean;
   currency: string;
   sales_model: SalesModel;
   allowed_territories: string[]; // ex: ["Bénin", "Togo", "Côte d'Ivoire", "Monde"]

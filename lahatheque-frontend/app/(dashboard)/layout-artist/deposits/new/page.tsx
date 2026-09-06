@@ -27,6 +27,8 @@ import {
   UserCheck,
   Users,
   Loader2,
+  Headphones,
+  Volume2,
 } from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
@@ -36,6 +38,7 @@ import { DepositSubmissionModal } from "@/components/features/layout-artist/depo
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { createDeposit, createDepositWithFiles, searchPreEditions, searchAuthors, type PreEditionSearchResult, type AuthorSearchResult } from "@/lib/services/layout-artist";
+import { uploadAudioTrack } from "@/lib/services/audio";
 import { extractBookMetadataWithAi, AiBookAnalysisResult } from "@/lib/services/ai";
 import type { ClassificationSource } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
@@ -100,6 +103,35 @@ export default function NewDepositPage() {
   const [priceDigital, setPriceDigital] = useState(5000);
   const [pricePaper, setPricePaper] = useState(7500);
   const [plannedPaperVersion, setPlannedPaperVersion] = useState(false);
+
+  // Audio State (BG7)
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioDurationSeconds, setAudioDurationSeconds] = useState<number>(0);
+  const [priceAudio, setPriceAudio] = useState<number>(3500);
+  const [audioUploadStatus, setAudioUploadStatus] = useState<"none" | "uploading" | "processing" | "ready" | "error">("none");
+
+  const handleAudioFileSelect = (file: File) => {
+    setAudioFile(file);
+    setAudioUploadStatus("ready");
+    try {
+      const audio = new Audio();
+      audio.src = URL.createObjectURL(file);
+      audio.onloadedmetadata = () => {
+        if (audio.duration && !isNaN(audio.duration)) {
+          setAudioDurationSeconds(Math.round(audio.duration));
+        }
+      };
+    } catch {
+      // Ignorer si audio API indisponible
+    }
+    toast.success(`Fichier audio « ${file.name} » sélectionné.`);
+  };
+
+  const handleAudioFileRemove = () => {
+    setAudioFile(null);
+    setAudioDurationSeconds(0);
+    setAudioUploadStatus("none");
+  };
 
   // Classification State
   const [realDisciplines, setRealDisciplines] = useState<DisciplineItem[]>([]);
@@ -344,7 +376,10 @@ export default function NewDepositPage() {
             cover_url: coverPreview,
           },
           status: "draft",
-          default_price: 5000,
+          default_price: priceDigital,
+          admin_price: pricePaper,
+          price_audio: audioFile ? priceAudio : undefined,
+          has_audio_version: Boolean(audioFile),
           is_paper_available: plannedPaperVersion,
         },
         bookFile,
@@ -355,7 +390,16 @@ export default function NewDepositPage() {
         }
       );
       console.log(`[Deposit Page] Brouillon enregistré avec succès. ID: ${dep.id}`);
-      toast.success("Brouillon sauvegardé avec succès.");
+      if (audioFile) {
+        try {
+          await uploadAudioTrack(dep.id, audioFile, title || "Version Audio", audioDurationSeconds);
+          toast.success("Brouillon et version audio sauvegardés avec succès.");
+        } catch {
+          toast.info("Brouillon sauvegardé. L'audio pourra être réessayé lors de la soumission.");
+        }
+      } else {
+        toast.success("Brouillon sauvegardé avec succès.");
+      }
       router.push(`/layout-artist/deposits/${dep.id}`);
     } catch (err: any) {
       console.error(`[Deposit Page ERROR] Échec de la sauvegarde du brouillon :`, err);
@@ -384,6 +428,7 @@ export default function NewDepositPage() {
       discipline: genreCategory,
       fichier: bookFile.name,
       tailleMo: (bookFile.size / (1024 * 1024)).toFixed(2),
+      audio: audioFile ? audioFile.name : "Aucun",
     });
 
     setSaving(true);
@@ -421,7 +466,10 @@ export default function NewDepositPage() {
             cover_url: coverPreview,
           },
           status: "pending_validation",
-          default_price: 5000,
+          default_price: priceDigital,
+          admin_price: pricePaper,
+          price_audio: audioFile ? priceAudio : undefined,
+          has_audio_version: Boolean(audioFile),
           is_paper_available: plannedPaperVersion,
         },
         bookFile,
@@ -442,6 +490,16 @@ export default function NewDepositPage() {
 
       const dep = await depPromise;
       console.log(`[Deposit Page] Réponse backend reçue pour le dépôt #${dep.id}.`);
+
+      // Téléversement optionnel du flux audio vers Cloudflare Stream
+      if (audioFile) {
+        try {
+          console.log(`[Deposit Page] Téléversement du flux audio pour #${dep.id}...`);
+          await uploadAudioTrack(dep.id, audioFile, title || "Version Audio", audioDurationSeconds);
+        } catch (audioErr) {
+          console.warn("[Deposit Page Audio Error]", audioErr);
+        }
+      }
 
       // 2. Enregistrement (l'étape ONIX est déjà affichée via onUploadProgress si R2 a réussi,
       // sinon on la force ici pour le chemin sans R2)
@@ -646,6 +704,36 @@ export default function NewDepositPage() {
               />
               <p className="text-[11px] text-foreground-muted">
                 Format portrait recommandé (rapport 1:1.5 ou 1:1.6, min. 1200x1800 px).
+              </p>
+            </div>
+
+            {/* Dropzone Version Livre Audio (Optionnel) */}
+            <div className="space-y-2 md:col-span-2 p-4 rounded-2xl bg-background-secondary border border-border">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                  <Headphones className="w-4 h-4 text-gold" />
+                  3. Version Livre Audio Complète (Optionnel — Streaming Sécurisé HLS)
+                </label>
+                {audioFile && (
+                  <span className="text-[11px] font-bold text-gold px-2 py-0.5 bg-gold/10 rounded-md flex items-center gap-1">
+                    <Volume2 className="w-3 h-3" />
+                    {audioDurationSeconds > 0
+                      ? `${Math.floor(audioDurationSeconds / 60)} min ${audioDurationSeconds % 60} s`
+                      : "Audio chargé"}
+                  </span>
+                )}
+              </div>
+              <FileDropzone
+                label="Sélectionner le fichier audio complet (MP3 / M4B / AAC)"
+                acceptTypes={[".mp3", ".m4b", ".aac", ".wav", ".ogg"]}
+                maxSizeMB={1200}
+                onFileSelect={handleAudioFileSelect}
+                selectedFileName={audioFile?.name}
+                selectedFileSize={audioFile?.size}
+                onFileRemove={handleAudioFileRemove}
+              />
+              <p className="text-[11px] text-foreground-muted">
+                L&apos;audio sera encodé et diffusé exclusivement en streaming HLS chiffré via des jetons sécurisés temporaires (téléchargement interdit).
               </p>
             </div>
           </div>
@@ -1085,6 +1173,40 @@ export default function NewDepositPage() {
                 />
               </div>
             </div>
+
+            {/* Version Audio (Optionnelle si fichier fourni) */}
+            {audioFile && (
+              <div className="p-4 rounded-2xl bg-gold/5 border border-gold/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Headphones className="w-4 h-4 text-gold" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-navy">
+                      Tarification Livre Audio (Streaming HLS)
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-gold px-2 py-0.5 rounded bg-gold/10">
+                    Version audio détectée
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                      Prix du Format Audio (FCFA) *
+                    </label>
+                    <input
+                      type="number"
+                      step="500"
+                      value={priceAudio}
+                      onChange={(e) => setPriceAudio(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                    />
+                  </div>
+                  <p className="text-[11px] text-foreground-muted leading-relaxed">
+                    Ce prix s&apos;applique à l&apos;achat streaming du format audio seul. Les étudiants souscrivant au bouquet complet de l&apos;université ou à un bouquet direct auront accès à l&apos;écoute selon les droits négociés.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Version papier prévue */}
             <div className="p-4 rounded-xl bg-background-secondary border border-border flex items-center justify-between gap-4">

@@ -338,8 +338,8 @@ def task_calculate_monthly_royalties():
         commande__statut_paiement='paid',
     ).values('ouvrage', 'format_type').annotate(sous_total=Sum('unit_price')):
         ouvrage_id = row['ouvrage']
-        ventes_par_format.setdefault(ouvrage_id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00')})
-        fmt = row['format_type'] if row['format_type'] in ('digital', 'paper') else 'digital'
+        ventes_par_format.setdefault(ouvrage_id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00'), 'audio': Decimal('0.00')})
+        fmt = row['format_type'] if row['format_type'] in ('digital', 'paper', 'audio') else 'digital'
         ventes_par_format[ouvrage_id][fmt] += Decimal(str(row['sous_total'] or 0))
 
     calculations_created = 0
@@ -412,15 +412,16 @@ def task_calculate_monthly_royalties():
 
         from apps.rights.models import RepartitionDroits
 
-        ventes_fmt = ventes_par_format.get(ouvrage.id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00')})
+        ventes_fmt = ventes_par_format.get(ouvrage.id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00'), 'audio': Decimal('0.00')})
 
         author_rights = AuthorRight.objects.filter(ouvrage=ouvrage, user__isnull=False)
         for right in author_rights:
             repartition = RepartitionDroits.objects.filter(ouvrage=ouvrage, beneficiaire=right.user).first()
 
-            if repartition and (repartition.taux_papier is not None or repartition.taux_numerique is not None):
+            if repartition and (repartition.taux_papier is not None or repartition.taux_numerique is not None or repartition.taux_audio_tts is not None):
                 taux_papier = Decimal(str(repartition.taux_papier)) / Decimal("100") if repartition.taux_papier is not None else Decimal("0")
                 taux_numerique = Decimal(str(repartition.taux_numerique)) / Decimal("100") if repartition.taux_numerique is not None else Decimal("0")
+                taux_audio = Decimal(str(repartition.taux_audio_tts)) / Decimal("100") if repartition.taux_audio_tts is not None else Decimal("0")
 
                 if total_sales > 0:
                     ratio_retenue = author_pool / total_sales
@@ -429,7 +430,8 @@ def task_calculate_monthly_royalties():
 
                 amount = (
                     (ventes_fmt['paper'] * ratio_retenue * taux_papier) +
-                    (ventes_fmt['digital'] * ratio_retenue * taux_numerique)
+                    (ventes_fmt['digital'] * ratio_retenue * taux_numerique) +
+                    (ventes_fmt['audio'] * ratio_retenue * taux_audio)
                 ).quantize(Decimal("0.01"))
             else:
                 share = Decimal(str(right.pool_share_percent)) / Decimal("100")

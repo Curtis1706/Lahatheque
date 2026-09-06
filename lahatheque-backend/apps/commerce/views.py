@@ -90,6 +90,21 @@ class CreateOrderView(APIView):
                         'error': f"Vous possédez déjà l'accès numérique à « {ouvrage.title} »."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
+            # Vérification anti-doublon pour l'achat audio — vérifie spécifiquement un achat
+            # du format audio, pas l'accès général.
+            if format_type == 'audio':
+                from apps.commerce.models import LigneCommande
+                already_owns_audio = LigneCommande.objects.filter(
+                    commande__user=request.user,
+                    commande__statut_paiement='paid',
+                    ouvrage=ouvrage,
+                    format_type='audio',
+                ).exists()
+                if already_owns_audio:
+                    return Response({
+                        'error': f"Vous possédez déjà la version audio de « {ouvrage.title} »."
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
             # Vérification du stock disponible pour le format papier, agrégé sur tous les entrepôts
             if format_type == 'paper':
                 has_paper = True
@@ -127,7 +142,14 @@ class CreateOrderView(APIView):
                         stock.save(update_fields=['quantite_reservee'])
                         remaining_to_reserve -= take
 
-            unit_price = ouvrage.price if format_type == 'digital' else (ouvrage.price_paper or ouvrage.price)
+            if format_type == 'digital':
+                unit_price = ouvrage.price
+            elif format_type == 'audio':
+                if not ouvrage.has_audio_version or not ouvrage.price_audio:
+                    return Response({"success": False, "error": "Ce livre n'a pas de version audio disponible à l'achat."}, status=400)
+                unit_price = ouvrage.price_audio
+            else:
+                unit_price = ouvrage.price_paper or ouvrage.price
             line_total = unit_price * quantity
             total_amount += line_total
 

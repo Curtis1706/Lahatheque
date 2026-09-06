@@ -27,6 +27,8 @@ import {
   FileText,
   UserCheck,
   Plus,
+  Headphones,
+  Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
@@ -35,6 +37,7 @@ import { SearchableSelect, type SearchableOption } from "@/components/ui/searcha
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { createPublisherBook } from "@/lib/services/publisher";
+import { uploadAudioTrack } from "@/lib/services/audio";
 import { extractBookMetadataWithAi, type AiBookAnalysisResult } from "@/lib/services/ai";
 import { searchAuthors, type AuthorSearchResult } from "@/lib/services/layout-artist";
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
@@ -225,6 +228,32 @@ export default function NewPublisherBookPage() {
   const [currency, setCurrency] = useState("XOF");
   const [salesModel, setSalesModel] = useState<SalesModel>("purchase");
   const [territories, setTerritories] = useState("Bénin, Togo, Côte d'Ivoire, Sénégal");
+
+  // Audio State (BG7)
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioDurationSeconds, setAudioDurationSeconds] = useState<number>(0);
+  const [priceAudio, setPriceAudio] = useState<number>(5000);
+
+  const handleAudioFileSelect = (file: File) => {
+    setAudioFile(file);
+    try {
+      const audio = new Audio();
+      audio.src = URL.createObjectURL(file);
+      audio.onloadedmetadata = () => {
+        if (audio.duration && !isNaN(audio.duration)) {
+          setAudioDurationSeconds(Math.round(audio.duration));
+        }
+      };
+    } catch {
+      // Ignorer si audio API indisponible
+    }
+    toast.success(`Fichier audio « ${file.name} » sélectionné.`);
+  };
+
+  const handleAudioFileRemove = () => {
+    setAudioFile(null);
+    setAudioDurationSeconds(0);
+  };
 
   // Classification Thématique (Étape 5 - 1 à 3 disciplines réelles de la BD)
   const [disciplinesList, setDisciplinesList] = useState<DisciplineItem[]>([]);
@@ -444,7 +473,7 @@ export default function NewPublisherBookPage() {
 
     setSubmitting(true);
     try {
-      await createPublisherBook(
+      const createdBook = await createPublisherBook(
         {
           title,
           subtitle: subtitle || undefined,
@@ -458,6 +487,8 @@ export default function NewPublisherBookPage() {
           keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
           target_audience: targetAudience,
           price,
+          price_audio: audioFile ? priceAudio : undefined,
+          has_audio_version: Boolean(audioFile),
           currency,
           sales_model: salesModel,
           allowed_territories: territories.split(",").map((t) => t.trim()).filter(Boolean),
@@ -481,6 +512,14 @@ export default function NewPublisherBookPage() {
         manuscriptFile,
         coverFile
       );
+
+      if (audioFile && createdBook?.id) {
+        try {
+          await uploadAudioTrack(createdBook.id, audioFile, title || "Version Audio", audioDurationSeconds);
+        } catch (audioErr) {
+          console.warn("[Publisher Deposit Audio Error]", audioErr);
+        }
+      }
 
       toast.success("L'ouvrage, son manuscrit et sa couverture ont été enregistrés avec succès dans la base de données.");
       router.push("/publisher/catalog");
@@ -733,6 +772,36 @@ export default function NewPublisherBookPage() {
                 )}
                 <p className="text-[10px] text-foreground-muted">
                   Format recommandé : rapport 1:1.5 (ex. 1600x2400 px), max 10 Mo.
+                </p>
+              </div>
+
+              {/* 3. Version Livre Audio Complète (Optionnel) */}
+              <div className="space-y-2 md:col-span-2 p-4 rounded-2xl bg-background-secondary border border-border">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                    <Headphones className="w-3.5 h-3.5 text-gold" />
+                    Version Livre Audio Complète (Optionnel — Streaming Sécurisé HLS)
+                  </label>
+                  {audioFile && (
+                    <span className="text-[11px] font-bold text-gold px-2 py-0.5 bg-gold/10 rounded-md flex items-center gap-1">
+                      <Volume2 className="w-3 h-3" />
+                      {audioDurationSeconds > 0
+                        ? `${Math.floor(audioDurationSeconds / 60)} min ${audioDurationSeconds % 60} s`
+                        : "Audio chargé"}
+                    </span>
+                  )}
+                </div>
+                <FileDropzone
+                  label="Téléverser le fichier audio complet (MP3 / M4B / AAC)"
+                  acceptTypes={[".mp3", ".m4b", ".aac", ".wav", ".ogg"]}
+                  maxSizeMB={1200}
+                  selectedFileName={audioFile?.name}
+                  selectedFileSize={audioFile?.size}
+                  onFileSelect={handleAudioFileSelect}
+                  onFileRemove={handleAudioFileRemove}
+                />
+                <p className="text-[10px] text-foreground-muted">
+                  Streaming exclusivement en HLS sécurisé signé. Téléchargement brut interdit.
                 </p>
               </div>
             </div>
@@ -1114,6 +1183,41 @@ export default function NewPublisherBookPage() {
                   searchPlaceholder="Rechercher (ex: Vente, Abonnement, Open Access)..."
                 />
               </div>
+
+              {/* Prix Livre Audio si présent */}
+              {audioFile && (
+                <div className="sm:col-span-2 p-4 rounded-2xl bg-gold/5 border border-gold/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Headphones className="w-4 h-4 text-gold" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-navy">
+                        Tarif Format Audio (Streaming HLS)
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-gold px-2 py-0.5 rounded bg-gold/10">
+                      Version audio détectée
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                        Prix Format Audio ({currency}) *
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={500}
+                        value={priceAudio}
+                        onChange={(e) => setPriceAudio(Number(e.target.value) || 0)}
+                        className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-bold min-h-[44px]"
+                      />
+                    </div>
+                    <p className="text-[11px] text-foreground-muted leading-relaxed">
+                      Prix pour l&apos;accès streaming illimité à l&apos;enregistrement audio intégral sous licence DRM sécurisée.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Territoires d'Exploitation avec Combobox et Presets */}
               <div className="space-y-2 sm:col-span-2">

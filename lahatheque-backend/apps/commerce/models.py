@@ -108,6 +108,7 @@ class LigneCommande(models.Model):
     FORMAT_CHOICES = [
         ('digital', 'Numérique (EPUB/PDF)'),
         ('paper', 'Livre Papier'),
+        ('audio', 'Livre Audio (Streaming)'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

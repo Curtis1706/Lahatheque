@@ -128,6 +128,18 @@ class AuthorDashboardKPIsView(APIView):
             timeline_royalties.append({"date": date_label, "value": val_royalty})
             timeline_stock.append({"date": date_label, "value": val_stock})
 
+        # Statistiques d'écoutes audio réelles (CDC 8.3)
+        from apps.audio.models import AudioListeningSession
+        audio_stats = AudioListeningSession.objects.filter(
+            ouvrage__in=ouvrages_qs
+        ).aggregate(
+            total_ecoutes=Count('id'),
+            temps_total_seconds=Sum('duration_listened_seconds'),
+        )
+        total_ecoutes = audio_stats['total_ecoutes'] or 0
+        temps_total_seconds = audio_stats['temps_total_seconds'] or 0
+        temps_total_ecoute_heures = round(temps_total_seconds / 3600.0, 2)
+
         author_name = f"{user.first_name} {user.last_name}".strip() if (user.first_name or user.last_name) else (user.email or "Auteur")
 
         return Response({
@@ -136,6 +148,10 @@ class AuthorDashboardKPIsView(APIView):
                 "totalSales": total_sales,
                 "totalDownloads": total_downloads,
                 "totalRevenueGenerated": total_revenue,
+                "totalEcoutes": total_ecoutes,
+                "tempsTotalEcouteHeures": temps_total_ecoute_heures,
+                "total_ecoutes": total_ecoutes,
+                "temps_total_ecoute_heures": temps_total_ecoute_heures,
                 "authorPendingRoyalties": pending_amount,
                 "authorPaidRoyalties": paid_amount,
                 "nextPaymentDate": f"05 {month_names_fr.get((now.month % 12) + 1, 'Mois')} {now.year}",

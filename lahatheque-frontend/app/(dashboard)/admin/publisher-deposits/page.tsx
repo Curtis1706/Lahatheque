@@ -16,7 +16,10 @@ import {
   Lock,
   Copy,
   Printer,
+  Headphones,
+  RefreshCw,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -76,6 +79,19 @@ export default function AdminPublisherDepositsPage() {
   const [loadingProtection, setLoadingProtection] = useState(false);
   const [submittingProtection, setSubmittingProtection] = useState(false);
 
+  // État de verrouillage streaming audio (Fiche BG8)
+  const [audioLockLoading, setAudioLockLoading] = useState(false);
+  const [reverifyingAudio, setReverifyingAudio] = useState(false);
+  const [audioLockData, setAudioLockData] = useState<{
+    has_audio: boolean;
+    is_locked: boolean;
+    message: string;
+  }>({
+    has_audio: false,
+    is_locked: false,
+    message: "",
+  });
+
   const load = async () => {
     try {
       setLoading(true);
@@ -121,6 +137,7 @@ export default function AdminPublisherDepositsPage() {
     setProtectionDeposit(deposit);
     setActiveModal("protection");
     setLoadingProtection(true);
+    setAudioLockLoading(true);
     try {
       const cfg = await getDepositProtectionConfig(deposit.id);
       if (cfg) {
@@ -137,6 +154,52 @@ export default function AdminPublisherDepositsPage() {
       toast.error("Impossible de récupérer la configuration de protection.");
     } finally {
       setLoadingProtection(false);
+    }
+
+    try {
+      const audioRes = await fetch(`/api/bff/audio/deposits/${deposit.id}/verify-lock/`);
+      if (audioRes.ok) {
+        const audioJson = await audioRes.json();
+        setAudioLockData({
+          has_audio: audioJson.has_audio ?? false,
+          is_locked: audioJson.is_locked ?? false,
+          message: audioJson.message || "",
+        });
+      }
+    } catch {
+      // Ignorer si échec réseau
+    } finally {
+      setAudioLockLoading(false);
+    }
+  };
+
+  const handleReverifyAudioLock = async () => {
+    if (!protectionDeposit) return;
+    setReverifyingAudio(true);
+    try {
+      const res = await fetch(`/api/bff/audio/deposits/${protectionDeposit.id}/verify-lock/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setAudioLockData({
+          has_audio: json.has_audio ?? false,
+          is_locked: json.is_locked ?? false,
+          message: json.message || "",
+        });
+        if (json.has_audio) {
+          toast.success("Verrouillage de streaming audio vérifié et actif.");
+        } else {
+          toast.info("Aucune version audio associée à ce dépôt.");
+        }
+      } else {
+        toast.error("Erreur lors de la vérification du verrouillage audio.");
+      }
+    } catch {
+      toast.error("Erreur de communication lors de la vérification.");
+    } finally {
+      setReverifyingAudio(false);
     }
   };
 
@@ -1164,6 +1227,65 @@ export default function AdminPublisherDepositsPage() {
                   onClick={(e) => e.stopPropagation()}
                   className="w-4 h-4 accent-navy cursor-pointer shrink-0"
                 />
+              </div>
+
+              {/* 5. Protection Audio & Streaming HLS (Fiche BG8) */}
+              <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Headphones className="w-4 h-4 text-gold shrink-0" />
+                    <div>
+                      <p className="font-bold text-navy text-xs sm:text-sm">Protection Audio &amp; Streaming HLS</p>
+                      <p className="text-[11px] text-foreground-muted">
+                        Vérification du verrouillage Cloudflare Stream (URLs signées obligatoires, téléchargement direct bloqué).
+                      </p>
+                    </div>
+                  </div>
+                  {audioLockLoading ? (
+                    <InlineLoader size={14} />
+                  ) : (
+                    <span
+                      className={cn(
+                        "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0",
+                        !audioLockData.has_audio
+                          ? "bg-foreground-muted/10 text-foreground-muted"
+                          : audioLockData.is_locked
+                          ? "bg-success/10 text-success border border-success/20"
+                          : "bg-danger/10 text-danger border border-danger/20"
+                      )}
+                    >
+                      {!audioLockData.has_audio
+                        ? "Pas d'audio"
+                        : audioLockData.is_locked
+                        ? "Verrouillé"
+                        : "Non verrouillé"}
+                    </span>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-foreground-muted truncate">
+                    {audioLockData.message || (audioLockData.has_audio ? "Pistes audio protégées par jeton éphémère." : "Aucune version audio associée.")}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={reverifyingAudio || audioLockLoading}
+                    onClick={handleReverifyAudioLock}
+                    className="px-3 py-1.5 rounded-xl bg-background border border-border text-navy text-xs font-semibold hover:border-gold cursor-pointer transition-colors shrink-0 flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {reverifyingAudio ? (
+                      <>
+                        <InlineLoader size={12} />
+                        <span>Vérification...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 text-gold" />
+                        <span>Revérifier le verrouillage</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Actions Footer */}

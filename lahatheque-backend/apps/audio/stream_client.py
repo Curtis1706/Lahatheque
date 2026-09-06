@@ -22,9 +22,37 @@ class CloudflareStreamClient:
     """
 
     def __init__(self):
-        self.api_token = settings.CLOUDFLARE_STREAM_API_TOKEN
-        self.account_id = settings.CLOUDFLARE_ACCOUNT_ID
-        self.subdomain = settings.CLOUDFLARE_STREAM_SUBDOMAIN
+        self.api_token = getattr(settings, 'CLOUDFLARE_STREAM_API_TOKEN', '')
+        self.account_id = getattr(settings, 'CLOUDFLARE_ACCOUNT_ID', '') or getattr(settings, 'CLOUDFLARE_STREAM_ACCOUNT_ID', '')
+        self.subdomain = getattr(settings, 'CLOUDFLARE_STREAM_SUBDOMAIN', '')
+
+    def enable_signed_urls(self, stream_id: str) -> dict:
+        response = requests.post(
+            self._account_url(f"/stream/{stream_id}"),
+            headers=self._headers(),
+            json={"requireSignedURLs": True},
+            timeout=15,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if not data.get("success"):
+            raise RuntimeError(f"Cloudflare Stream lock error: {data.get('errors')}")
+        return data["result"]
+
+    def generate_signed_token(self, stream_id: str, expiry_seconds: int = 3600) -> str:
+        import time
+        payload = {"exp": int(time.time()) + expiry_seconds}
+        response = requests.post(
+            self._account_url(f"/stream/{stream_id}/token"),
+            headers=self._headers(),
+            json=payload,
+            timeout=15,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if not data.get("success"):
+            raise RuntimeError(f"Cloudflare Stream token error: {data.get('errors')}")
+        return data["result"]["token"]
 
     def _headers(self) -> dict:
         """Headers d'authentification Cloudflare Stream."""

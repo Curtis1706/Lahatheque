@@ -73,6 +73,8 @@ class Ouvrage(models.Model):
     protection_type = models.CharField(max_length=30, default='lcp')
     price_digital = models.DecimalField(max_digits=10, decimal_places=2, default=5000.00)
     price_paper = models.DecimalField(max_digits=10, decimal_places=2, default=7500.00)
+    price_audio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    has_audio_version = models.BooleanField(default=False)
     is_paper_available = models.BooleanField(
         default=False,
         verbose_name="Disponible en version papier",

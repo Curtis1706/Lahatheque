@@ -88,6 +88,8 @@ function mapBackendToDeposit(b: any, fallbackUserId?: string): LayoutDeposit {
     chef_comment: b.rejection_reason || b.chef_comment || b.motif_rejet || "",
     default_price: Number(b.price_digital) || 5000,
     admin_price: Number(b.price_paper) || 7500,
+    price_audio: b.price_audio ? Number(b.price_audio) : undefined,
+    has_audio_version: Boolean(b.has_audio_version),
     is_paper_available: Boolean(b.is_paper_available),
     pre_edition_dossier: b.pre_edition_dossier || null,
   };
@@ -176,6 +178,8 @@ export async function createDeposit(data: Partial<LayoutDeposit>): Promise<Layou
   formData.append("language", data.metadata?.language || "fr");
   formData.append("format_type", (data.files?.format || "pdf").toLowerCase());
   formData.append("price_digital", String(data.default_price || 5000));
+  if (data.price_audio !== undefined) formData.append("price_audio", String(data.price_audio));
+  if (data.has_audio_version !== undefined) formData.append("has_audio_version", String(data.has_audio_version));
   formData.append("status", data.status || "draft");
 
   // Classification
@@ -371,6 +375,8 @@ export async function createDepositWithFiles(
       format_type: (data.files?.format || "pdf").toLowerCase(),
       price_digital: data.default_price || 5000,
       price_paper: data.admin_price || 7500,
+      price_audio: data.price_audio,
+      has_audio_version: data.has_audio_version ?? false,
       is_paper_available: data.is_paper_available ?? false,
       status: data.status || "draft",
       country: data.classification?.country || "BJ",
@@ -435,6 +441,12 @@ export async function createDepositWithFiles(
   formData.append("format_type", (data.files?.format || "pdf").toLowerCase());
   formData.append("price_digital", String(data.default_price || 5000));
   formData.append("price_paper", String(data.admin_price || 7500));
+  if (data.price_audio !== undefined) {
+    formData.append("price_audio", String(data.price_audio));
+  }
+  if (data.has_audio_version !== undefined) {
+    formData.append("has_audio_version", String(data.has_audio_version));
+  }
   if (data.is_paper_available !== undefined) {
     formData.append("is_paper_available", String(data.is_paper_available));
   }
@@ -530,6 +542,8 @@ export async function updateDeposit(
     }
     if (updates.default_price !== undefined) formData.append("price_digital", String(updates.default_price));
     if (updates.admin_price !== undefined) formData.append("price_paper", String(updates.admin_price));
+    if (updates.price_audio !== undefined) formData.append("price_audio", String(updates.price_audio));
+    if (updates.has_audio_version !== undefined) formData.append("has_audio_version", String(updates.has_audio_version));
     if (updates.is_paper_available !== undefined) formData.append("is_paper_available", String(updates.is_paper_available));
     if (updates.files?.format) formData.append("format_type", updates.files.format.toLowerCase());
 
@@ -572,6 +586,8 @@ export async function updateDeposit(
   }
   if (updates.default_price !== undefined) payload.price_digital = updates.default_price;
   if (updates.admin_price !== undefined) payload.price_paper = updates.admin_price;
+  if (updates.price_audio !== undefined) payload.price_audio = updates.price_audio;
+  if (updates.has_audio_version !== undefined) payload.has_audio_version = updates.has_audio_version;
   if (updates.is_paper_available !== undefined) payload.is_paper_available = updates.is_paper_available;
   if (updates.files?.format) payload.format_type = updates.files.format.toLowerCase();
 

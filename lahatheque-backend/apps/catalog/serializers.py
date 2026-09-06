@@ -133,6 +133,10 @@ class OuvrageCreateSerializer(serializers.Serializer):
     price_paper = serializers.DecimalField(
         max_digits=10, decimal_places=2, required=False, default=7500.00
     )
+    price_audio = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True, default=None
+    )
+    has_audio_version = serializers.BooleanField(required=False, default=False)
     is_paper_available = serializers.BooleanField(required=False, default=False)
 
     # Classification
@@ -290,6 +294,10 @@ class OuvrageCreateSerializer(serializers.Serializer):
             ouvrage.publication_date = validated_data.get('publication_date')
             ouvrage.price_digital = validated_data.get('price_digital', 5000.00)
             ouvrage.price_paper = validated_data.get('price_paper', 7500.00)
+            if 'price_audio' in validated_data:
+                ouvrage.price_audio = validated_data.get('price_audio')
+            if 'has_audio_version' in validated_data:
+                ouvrage.has_audio_version = validated_data.get('has_audio_version', False)
             ouvrage.is_paper_available = validated_data.get('is_paper_available', False)
             ouvrage.faculty = validated_data.get('faculty', '')
             ouvrage.department = validated_data.get('department', '')
@@ -316,6 +324,8 @@ class OuvrageCreateSerializer(serializers.Serializer):
                 publication_date=validated_data.get('publication_date'),
                 price_digital=validated_data.get('price_digital', 5000.00),
                 price_paper=validated_data.get('price_paper', 7500.00),
+                price_audio=validated_data.get('price_audio', None),
+                has_audio_version=validated_data.get('has_audio_version', False),
                 is_paper_available=validated_data.get('is_paper_available', False),
                 faculty=validated_data.get('faculty', ''),
                 department=validated_data.get('department', ''),
