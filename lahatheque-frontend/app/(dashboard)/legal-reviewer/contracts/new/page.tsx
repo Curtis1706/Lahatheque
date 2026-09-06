@@ -34,6 +34,22 @@ import type {
 } from "@/lib/types/legal";
 import { toast } from "sonner";
 
+/**
+ * Construit un split d'auteur par défaut. Pour un contrat à auteur unique (le cas le plus
+ * courant), les taux par format démarrent logiquement à 100% — il n'y a personne d'autre avec
+ * qui les partager. Les valeurs peuvent être surchargées via overrides.
+ */
+function buildDefaultSplit(overrides: Partial<ContractRoyaltySplit> = {}): ContractRoyaltySplit {
+  return {
+    role_libelle: "Auteur Principal",
+    pourcentage: 100.0,
+    taux_papier: 100.0,
+    taux_numerique: 100.0,
+    taux_audio_tts: 100.0,
+    ...overrides,
+  };
+}
+
 function NewLegalContractContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -80,13 +96,7 @@ function NewLegalContractContent() {
 
   // Grille de répartition des droits
   const [splits, setSplits] = useState<ContractRoyaltySplit[]>([
-    {
-      role_libelle: "Auteur Principal",
-      pourcentage: 100.0,
-      taux_papier: 10.0,
-      taux_numerique: 15.0,
-      taux_audio_tts: 8.0,
-    },
+    buildDefaultSplit(),
   ]);
 
   const [submitting, setSubmitting] = useState(false);
@@ -117,43 +127,28 @@ function NewLegalContractContent() {
             if (found) {
               setSelectedAuthorId(found.id);
               setSplits([
-                {
+                buildDefaultSplit({
                   user_id: found.id,
                   name: found.name,
-                  role_libelle: "Auteur Principal",
-                  pourcentage: 100.0,
-                  taux_papier: 10.0,
-                  taux_numerique: 15.0,
-                  taux_audio_tts: 8.0,
-                },
+                }),
               ]);
             } else {
               // Auteur externe ou du dossier
               const customVal = `custom:${authorNameParam}`;
               setSelectedAuthorId(customVal);
               setSplits([
-                {
+                buildDefaultSplit({
                   name: authorNameParam,
-                  role_libelle: "Auteur Principal",
-                  pourcentage: 100.0,
-                  taux_papier: 10.0,
-                  taux_numerique: 15.0,
-                  taux_audio_tts: 8.0,
-                },
+                }),
               ]);
             }
           } else if (data.authors && data.authors.length > 0) {
             setSelectedAuthorId(data.authors[0].id);
             setSplits([
-              {
+              buildDefaultSplit({
                 user_id: data.authors[0].id,
                 name: data.authors[0].name,
-                role_libelle: "Auteur Principal",
-                pourcentage: 100.0,
-                taux_papier: 10.0,
-                taux_numerique: 15.0,
-                taux_audio_tts: 8.0,
-              },
+              }),
             ]);
           }
 
@@ -218,28 +213,24 @@ function NewLegalContractContent() {
                 if (matchedAuthor.email) setContractingPartyEmail(matchedAuthor.email);
                 if (matchedAuthor.phone) setContractingPartyPhone(matchedAuthor.phone);
                 setSplits([
-                  {
+                  buildDefaultSplit({
                     user_id: matchedAuthor.id,
                     name: matchedAuthor.name,
-                    role_libelle: "Auteur Principal",
-                    pourcentage: 100.0,
-                    taux_papier: matchedBook.is_paper_available ? 10.0 : 0,
-                    taux_numerique: 15.0,
-                    taux_audio_tts: matchedBook.has_audio_tracks ? 8.0 : 0,
-                  },
+                    taux_papier: matchedBook.is_paper_available ? 100.0 : 0,
+                    taux_numerique: 100.0,
+                    taux_audio_tts: matchedBook.has_audio_tracks ? 100.0 : 0,
+                  }),
                 ]);
               } else {
                 const customVal = `custom:${authorNames[0]}`;
                 setSelectedAuthorId(customVal);
                 setSplits([
-                  {
+                  buildDefaultSplit({
                     name: authorNames[0],
-                    role_libelle: "Auteur Principal",
-                    pourcentage: 100.0,
-                    taux_papier: matchedBook.is_paper_available ? 10.0 : 0,
-                    taux_numerique: 15.0,
-                    taux_audio_tts: matchedBook.has_audio_tracks ? 8.0 : 0,
-                  },
+                    taux_papier: matchedBook.is_paper_available ? 100.0 : 0,
+                    taux_numerique: 100.0,
+                    taux_audio_tts: matchedBook.has_audio_tracks ? 100.0 : 0,
+                  }),
                 ]);
               }
             }
@@ -253,15 +244,10 @@ function NewLegalContractContent() {
           if (data.authors && data.authors.length > 0) {
             setSelectedAuthorId(data.authors[0].id);
             setSplits([
-              {
+              buildDefaultSplit({
                 user_id: data.authors[0].id,
                 name: data.authors[0].name,
-                role_libelle: "Auteur Principal",
-                pourcentage: 100.0,
-                taux_papier: 10.0,
-                taux_numerique: 15.0,
-                taux_audio_tts: 8.0,
-              },
+              }),
             ]);
           }
         }
@@ -413,15 +399,13 @@ function NewLegalContractContent() {
           if (matchedAuthor.email) setContractingPartyEmail(matchedAuthor.email);
           if (matchedAuthor.phone) setContractingPartyPhone(matchedAuthor.phone);
           setSplits([
-            {
+            buildDefaultSplit({
               user_id: matchedAuthor.id,
               name: matchedAuthor.name,
-              role_libelle: "Auteur Principal",
-              pourcentage: 100.0,
-              taux_papier: book.is_paper_available ? 10.0 : 0,
-              taux_numerique: 15.0,
-              taux_audio_tts: book.has_audio_tracks ? 8.0 : 0,
-            },
+              taux_papier: book.is_paper_available ? 100.0 : 0,
+              taux_numerique: 100.0,
+              taux_audio_tts: book.has_audio_tracks ? 100.0 : 0,
+            }),
           ]);
         }
       }
@@ -437,15 +421,10 @@ function NewLegalContractContent() {
       setSplits((prev) => {
         if (prev.length === 0) {
           return [
-            {
+            buildDefaultSplit({
               user_id: author.id,
               name: author.name,
-              role_libelle: "Auteur Principal",
-              pourcentage: 100.0,
-              taux_papier: 10.0,
-              taux_numerique: 15.0,
-              taux_audio_tts: 8.0,
-            },
+            }),
           ];
         }
         const copy = [...prev];
@@ -502,15 +481,15 @@ function NewLegalContractContent() {
     const available = options.authors.find((a) => !splits.some((s) => s.user_id === a.id)) || options.authors[0];
     setSplits([
       ...splits,
-      {
+      buildDefaultSplit({
         user_id: available.id,
         name: available.name,
         role_libelle: "Co-auteur",
         pourcentage: 0,
-        taux_papier: 10.0,
-        taux_numerique: 15.0,
-        taux_audio_tts: 8.0,
-      },
+        taux_papier: 0,
+        taux_numerique: 0,
+        taux_audio_tts: 0,
+      }),
     ]);
   };
 

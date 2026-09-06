@@ -71,8 +71,8 @@ export default function ChefValidationPage() {
     });
   }, [deposits, searchQuery, disciplineFilter]);
 
-  const handleQuickValidate = async (id: string) => {
-    await validateDeposit(id);
+  const handleQuickValidate = async (id: string, isPaperAvailable?: boolean) => {
+    await validateDeposit(id, undefined, undefined, undefined, isPaperAvailable);
     toast.success("Ouvrage validé avec succès ! Transmis au Juriste pour vérification contractuelle avant publication.");
     await loadData();
   };

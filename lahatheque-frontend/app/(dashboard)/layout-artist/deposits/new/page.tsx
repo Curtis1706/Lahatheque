@@ -99,6 +99,7 @@ export default function NewDepositPage() {
   const [isbn, setIsbn] = useState("");
   const [priceDigital, setPriceDigital] = useState(5000);
   const [pricePaper, setPricePaper] = useState(7500);
+  const [plannedPaperVersion, setPlannedPaperVersion] = useState(false);
 
   // Classification State
   const [realDisciplines, setRealDisciplines] = useState<DisciplineItem[]>([]);
@@ -344,6 +345,7 @@ export default function NewDepositPage() {
           },
           status: "draft",
           default_price: 5000,
+          is_paper_available: plannedPaperVersion,
         },
         bookFile,
         coverFile,
@@ -420,6 +422,7 @@ export default function NewDepositPage() {
           },
           status: "pending_validation",
           default_price: 5000,
+          is_paper_available: plannedPaperVersion,
         },
         bookFile,
         coverFile,
@@ -1081,6 +1084,30 @@ export default function NewDepositPage() {
                   className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 />
               </div>
+            </div>
+
+            {/* Version papier prévue */}
+            <div className="p-4 rounded-xl bg-background-secondary border border-border flex items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <label htmlFor="planned-paper-checkbox" className="text-xs font-bold uppercase tracking-wider text-navy cursor-pointer block">
+                  Une version papier est-elle prévue pour cet ouvrage ?
+                </label>
+                <p className="text-[11px] text-foreground-muted">
+                  Cette intention sera transmise au Chef Maquettiste et permettra de prévoir le taux papier lors de la rédaction du contrat d&apos;édition.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer shrink-0 min-h-[44px]">
+                <input
+                  id="planned-paper-checkbox"
+                  type="checkbox"
+                  checked={plannedPaperVersion}
+                  onChange={(e) => setPlannedPaperVersion(e.target.checked)}
+                  className="w-4 h-4 accent-gold cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-navy hidden sm:inline">
+                  {plannedPaperVersion ? "Papier prévu" : "Numérique uniquement"}
+                </span>
+              </label>
             </div>
 
             {/* Résumé */}

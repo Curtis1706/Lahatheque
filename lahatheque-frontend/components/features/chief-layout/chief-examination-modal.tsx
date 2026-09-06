@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   CheckCircle2, 
@@ -33,8 +33,8 @@ interface ChiefExaminationModalProps {
   deposit: LayoutDeposit | null;
   isOpen: boolean;
   onClose: () => void;
-  onValidate: (id: string) => Promise<void>;
-  onReject: (id: string, reason: string) => Promise<void>;
+  onValidate: (id: string, isPaperAvailable?: boolean) => Promise<void> | void;
+  onReject: (id: string, reason: string) => Promise<void> | void;
 }
 
 export function ChiefExaminationModal({
@@ -49,6 +49,13 @@ export function ChiefExaminationModal({
   const [rejectReason, setRejectReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [willHavePaper, setWillHavePaper] = useState(deposit?.is_paper_available ?? false);
+
+  useEffect(() => {
+    if (deposit) {
+      setWillHavePaper(deposit.is_paper_available ?? false);
+    }
+  }, [deposit]);
 
   const isCurrentUser = Boolean(
     user &&
@@ -65,7 +72,7 @@ export function ChiefExaminationModal({
   const handleValidate = async () => {
     setLoading(true);
     try {
-      await onValidate(deposit.id);
+      await onValidate(deposit.id, willHavePaper);
       onClose();
     } finally {
       setLoading(false);
@@ -308,15 +315,17 @@ export function ChiefExaminationModal({
                   </div>
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
                     <span className="text-foreground-muted">Version Papier :</span>
-                    <span className="font-semibold text-foreground">
-                      {deposit.is_paper_available ? (
-                        <span className="text-emerald-700 font-bold font-mono">
-                          Disponible • {Number(deposit.admin_price || 7500).toLocaleString("fr-FR")} FCFA
-                        </span>
-                      ) : (
-                        <span className="text-foreground-muted">Non disponible</span>
-                      )}
-                    </span>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={willHavePaper}
+                        onChange={(e) => setWillHavePaper(e.target.checked)}
+                        className="w-4 h-4 accent-gold cursor-pointer"
+                      />
+                      <span className="text-xs font-semibold text-navy">
+                        {willHavePaper ? "Ce livre aura une version papier" : "Numérique uniquement"}
+                      </span>
+                    </label>
                   </div>
                 </div>
               </div>

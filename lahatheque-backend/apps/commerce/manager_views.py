@@ -304,6 +304,40 @@ class StockRestockView(APIView):
             target_ouvrage.is_paper_available = True
             target_ouvrage.save(update_fields=['is_paper_available'])
 
+            try:
+                from apps.rights.models import ContratLegal, RepartitionDroits
+                from apps.accounts.models import User as UserModel
+                from apps.reporting.services import notify_user
+                from apps.reporting.models import Notification
+                from django.db import models
+
+                has_active_contract = ContratLegal.objects.filter(
+                    ouvrage=target_ouvrage, status='active'
+                ).exists()
+
+                if has_active_contract:
+                    missing_paper_rate = RepartitionDroits.objects.filter(
+                        ouvrage=target_ouvrage
+                    ).filter(
+                        models.Q(taux_papier__isnull=True) | models.Q(taux_papier=0)
+                    ).exists()
+
+                    if missing_paper_rate:
+                        juristes = UserModel.objects.filter(
+                            role__in=['legal_reviewer', 'admin', 'super_admin'], is_active=True
+                        )
+                        for juriste in juristes:
+                            notify_user(
+                                user=juriste,
+                                notification_type=Notification.NotificationType.GENERAL,
+                                title="Version papier disponible sans taux défini au contrat",
+                                message=f"« {target_ouvrage.title} » vient de recevoir du stock papier, mais son contrat signé ne définit aucun taux papier pour l'auteur. Un avenant est probablement nécessaire.",
+                                action_url=f"/legal-reviewer/contracts",
+                                resource_id=str(target_ouvrage.id),
+                            )
+            except Exception:
+                pass
+
         return Response({"success": True, "data": {"quantite_reelle": s.quantite_reelle, "statut": s.statut}, "error": None})
 
 
