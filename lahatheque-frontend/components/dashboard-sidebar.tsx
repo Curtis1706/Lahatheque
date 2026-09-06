@@ -245,7 +245,7 @@ export function DashboardSidebar() {
               { label: "Pré-éditions", href: "/legal-reviewer/pre-editions", icon: <PenTool className="size-4" /> },
               { label: "Redevances", href: "/legal-reviewer/redevances", icon: <DollarSign className="size-4" /> },
               { label: "Relances & Impayés", href: "/legal-reviewer/relances", icon: <BellRing className="size-4" /> },
-              { label: "Mes Contacts", href: "/legal-reviewer/contacts", icon: <Users className="size-4" /> },
+              { label: "Nos Contacts", href: "/legal-reviewer/contacts", icon: <Users className="size-4" /> },
             ],
           },
         ];
@@ -308,7 +308,7 @@ export function DashboardSidebar() {
                   { label: "Grossistes", href: "/admin/users/wholesalers", icon: <PackageCheck className="size-3.5" /> },
                 ],
               },
-              { label: "Mes Contacts", href: "/admin/contacts", icon: <Users className="size-4" /> },
+              { label: "Nos Contacts", href: "/admin/contacts", icon: <Users className="size-4" /> },
               {
                 label: "Catalogue & Tarifs",
                 href: "/admin/catalog",

@@ -4,6 +4,8 @@ export type ContactCategory =
   | "publisher"
   | "institution"
   | "partner"
+  | "wholesaler"
+  | "teacher"
   | "press"
   | "other";
 
@@ -39,6 +41,8 @@ export interface ProfessionalContact {
   created_at: string;
   updated_at: string;
   dispatches?: ContactEmailDispatch[];
+  is_platform_user?: boolean;
+  user_id?: string;
 }
 
 export interface ContactCreatePayload {
