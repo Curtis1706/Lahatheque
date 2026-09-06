@@ -35,6 +35,7 @@ import {
 import { searchBooks } from "@/lib/services/catalog";
 import { Book } from "@/lib/types/catalog";
 import { BouquetDistributionModal } from "@/components/features/bouquets/bouquet-distribution-modal";
+import { BookMultiCombobox } from "@/components/features/bouquets/book-multi-combobox";
 import { getDisciplines, DisciplineItem } from "@/lib/services/classification";
 
 const BOUQUET_TYPES = [
@@ -86,7 +87,6 @@ export default function AdminBouquetsPage() {
 
   // Auxiliary data for custom & institution selectors
   const [catalogBooks, setCatalogBooks] = useState<Book[]>([]);
-  const [bookSearch, setBookSearch] = useState("");
   const [institutions, setInstitutions] = useState<{ id: string; name: string }[]>([]);
 
   const loadData = async () => {
@@ -135,7 +135,6 @@ export default function AdminBouquetsPage() {
     setDescription("");
     setIsActive(true);
     setSelectedBookIds([]);
-    setBookSearch("");
     setIsModalOpen(true);
   };
 
@@ -151,7 +150,6 @@ export default function AdminBouquetsPage() {
     setDescription(offering.description || "");
     setIsActive(offering.is_active);
     setSelectedBookIds(offering.custom_book_ids || []);
-    setBookSearch("");
     setIsModalOpen(true);
   };
 
@@ -219,23 +217,6 @@ export default function AdminBouquetsPage() {
       toast.error("Erreur réseau");
     }
   };
-
-  const toggleBookSelection = (bookId: string) => {
-    setSelectedBookIds((prev) =>
-      prev.includes(bookId) ? prev.filter((id) => id !== bookId) : [...prev, bookId]
-    );
-  };
-
-  const filteredBooksForCustom = useMemo(() => {
-    if (!bookSearch.trim()) return catalogBooks;
-    const q = bookSearch.toLowerCase();
-    return catalogBooks.filter(
-      (b) =>
-        b.title.toLowerCase().includes(q) ||
-        (b.discipline_detail?.name && b.discipline_detail.name.toLowerCase().includes(q)) ||
-        (b.institution_name && b.institution_name.toLowerCase().includes(q))
-    );
-  }, [catalogBooks, bookSearch]);
 
   // Liste consolidée des disciplines réelles de la base de données & des bouquets
   const availableDisciplines = useMemo(() => {
@@ -790,76 +771,13 @@ export default function AdminBouquetsPage() {
               )}
 
               {bouquetType === "custom" && (
-                <div className="space-y-3 p-4 rounded-2xl bg-background-secondary border border-border">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-navy">
-                      Sélection des Livres du Bouquet ({selectedBookIds.length} sélectionné(s))
-                    </label>
-                    {selectedBookIds.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedBookIds([])}
-                        className="text-[11px] text-foreground-muted hover:text-navy underline"
-                      >
-                        Tout désélectionner
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={bookSearch}
-                      onChange={(e) => setBookSearch(e.target.value)}
-                      placeholder="Filtrer les ouvrages du catalogue..."
-                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[36px]"
-                    />
-                  </div>
-
-                  <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
-                    {filteredBooksForCustom.length === 0 ? (
-                      <p className="text-[11px] text-foreground-muted py-2 text-center">
-                        Aucun ouvrage trouvé dans le catalogue.
-                      </p>
-                    ) : (
-                      filteredBooksForCustom.map((b) => {
-                        const isSelected = selectedBookIds.includes(b.id);
-                        return (
-                          <div
-                            key={b.id}
-                            onClick={() => toggleBookSelection(b.id)}
-                            className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-colors text-xs ${
-                              isSelected
-                                ? "bg-gold/15 border-gold text-navy font-semibold"
-                                : "bg-background border-border text-navy hover:border-gold/50"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`w-4 h-4 rounded-md flex items-center justify-center border transition-colors ${
-                                  isSelected ? "bg-gold border-gold text-white" : "border-border bg-background"
-                                }`}
-                              >
-                                {isSelected && <Check className="w-3 h-3" />}
-                              </div>
-                              <div>
-                                <p className="leading-snug line-clamp-1">{b.title}</p>
-                                <p className="text-[10px] text-foreground-muted">
-                                  {b.authors_details && b.authors_details.length > 0
-                                    ? b.authors_details.map((a) => `${a.first_name} ${a.last_name}`.trim()).join(", ")
-                                    : "Auteur LAHA"} — {b.discipline_detail?.name || b.institution_name || "Général"}
-                                </p>
-                              </div>
-                            </div>
-                            <span className="font-mono text-[10px] text-foreground-muted shrink-0">
-                              {b.price ? `${b.price} XOF` : ""}
-                            </span>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+                  <BookMultiCombobox
+                    books={catalogBooks}
+                    selectedBookIds={selectedBookIds}
+                    onChange={setSelectedBookIds}
+                    placeholder="Rechercher et cocher des ouvrages du catalogue..."
+                  />
                 </div>
               )}
 
