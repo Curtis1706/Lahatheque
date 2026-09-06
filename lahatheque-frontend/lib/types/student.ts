@@ -44,6 +44,9 @@ export interface ClientBookAccess {
   language?: string;
   status?: string;
   audio_url?: string;
+  has_audio_version?: boolean;
+  price_audio?: number;
+  audio_duration_seconds?: number;
   narrator?: string;
   
   // Champs de compatibilité
@@ -87,7 +90,7 @@ export interface ClientOrder {
   reference: string;
   date: string;
   book_title: string;
-  format: "digital" | "paper" | "DIGITAL" | "PAPER";
+  format: "digital" | "paper" | "audio" | "DIGITAL" | "PAPER" | "AUDIO";
   copies_count: number;
   unit_price: number;
   total_price: number;
@@ -102,7 +105,7 @@ export interface ClientOrder {
     ouvrage: string;
     ouvrage_title: string;
     ouvrage_cover_url?: string;
-    format_type: "digital" | "paper";
+    format_type: "digital" | "paper" | "audio";
     format_display: string;
     unit_price: number;
     quantity: number;

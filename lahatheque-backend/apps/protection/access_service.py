@@ -47,8 +47,8 @@ class AccessService:
         if not user or not user.is_authenticated:
             return {"access_granted": False, "reason": "unauthenticated"}
 
-        # Privilèges administratifs & réviseurs légaux / éditoriaux de plateforme
-        platform_roles = ['admin', 'super_admin', 'chief_layout', 'legal_reviewer']
+        # Privilèges administratifs & réviseurs légaux / éditoriaux / maquettistes de plateforme
+        platform_roles = ['admin', 'super_admin', 'chief_layout', 'layout_artist', 'legal_reviewer']
         is_platform_admin = (
             user.is_superuser
             or user.is_staff

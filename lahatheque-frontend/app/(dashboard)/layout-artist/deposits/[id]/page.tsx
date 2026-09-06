@@ -25,7 +25,8 @@ import {
   Hash,
   Edit3,
   Eye,
-  UserCheck
+  UserCheck,
+  Headphones,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
@@ -45,6 +46,8 @@ import { getDisciplines, type DisciplineItem } from "@/lib/services/classificati
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
+import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
@@ -53,6 +56,7 @@ export default function DepositDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = params.id as string;
+  const { playBook } = useAudioPlayer();
 
   const [deposit, setDeposit] = useState<LayoutDeposit | null>(null);
   const [loading, setLoading] = useState(true);
@@ -465,6 +469,16 @@ export default function DepositDetailPage() {
                 <span>{aiLoading ? "Analyse en cours..." : "Assistant IA"}</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => playBook(deposit.id)}
+              className="px-3.5 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 border border-gold/40 text-navy text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer min-h-[40px]"
+              title="Écouter la piste audio du livre (Accès privilège maquettiste)"
+            >
+              <Headphones className="w-4 h-4 text-gold" />
+              <span>Écouter l&apos;audio</span>
+            </button>
 
             <Link
               href={`/catalog/reader/${deposit.id}`}
@@ -1189,6 +1203,16 @@ export default function DepositDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* BLOC 5 : GESTION & REMPLACEMENT DE LA PISTE AUDIO */}
+        {isEditing && (
+          <AudioReplacementDropzone
+            bookId={deposit.id}
+            bookTitle={deposit.metadata.title}
+            currentDurationSeconds={(deposit as any).audio_duration_seconds}
+            onSuccess={() => router.refresh()}
+          />
+        )}
       </div>
 
       {/* Actions de sauvegarde & resoumission (visibles en mode édition) */}

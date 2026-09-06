@@ -1,0 +1,177 @@
+openapi: 3.0.3
+info:
+  title: LAHAThèque Audio API
+  version: 1.0.0
+  description: Spécification des endpoints pour le streaming HLS signé, le téléversement/remplacement audio et la progression d'écoute.
+paths:
+  /api/v1/audio/ouvrages/{ouvrage_id}/session/:
+    get:
+      summary: Obtention du jeton d'écoute et des pistes signées HLS
+      description: Délivre les pistes Cloudflare Stream avec URLs signées temporaires. Si l'utilisateur n'a pas acheté l'audio et n'a pas de passe-droit, active le preview_mode limité à 180s.
+      parameters:
+        - name: ouvrage_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session d'écoute générée avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      ouvrage_id:
+                        type: string
+                        format: uuid
+                      title:
+                        type: string
+                      cover_url:
+                        type: string
+                      authors:
+                        type: string
+                      is_preview:
+                        type: boolean
+                        example: false
+                      preview_limit_seconds:
+                        type: integer
+                        example: 180
+                      expires_in:
+                        type: integer
+                        example: 3600
+                      tracks:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            chapter_number:
+                              type: integer
+                            title:
+                              type: string
+                            duration_seconds:
+                              type: integer
+                            signed_hls_url:
+                              type: string
+                            captions_vtt_url:
+                              type: string
+                              nullable: true
+                  error:
+                    type: string
+                    nullable: true
+
+  /api/v1/audio/tracks/upload/:
+    post:
+      summary: Téléversement ou remplacement d'un fichier audio
+      description: Réservé aux rôles maquettistes, chefs maquettistes et administrateurs.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - ouvrage_id
+                - file
+              properties:
+                ouvrage_id:
+                  type: string
+                  format: uuid
+                file:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                chapter_number:
+                  type: integer
+                  default: 1
+                duration_seconds:
+                  type: integer
+                replace:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Fichier audio téléversé, encodé et verrouillé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      stream_id:
+                        type: string
+                      title:
+                        type: string
+                      duration_seconds:
+                        type: integer
+                  error:
+                    type: string
+                    nullable: true
+
+  /api/v1/audio/tracks/{track_id}/progress/:
+    post:
+      summary: Enregistrement de la position de lecture
+      parameters:
+        - name: track_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - duration_listened_seconds
+              properties:
+                duration_listened_seconds:
+                  type: integer
+                completion_percent:
+                  type: number
+      responses:
+        '200':
+          description: Progression enregistrée
+    get:
+      summary: Récupération de la dernière position d'écoute
+      parameters:
+        - name: track_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dernière position sauvegardée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      resume_seconds:
+                        type: integer
+                      completion_percent:
+                        type: number

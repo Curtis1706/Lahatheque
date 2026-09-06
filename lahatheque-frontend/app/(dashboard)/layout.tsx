@@ -53,34 +53,41 @@ class DashboardErrorBoundary extends Component<Props, State> {
   }
 }
 
+import { AudioPlayerProvider } from "@/components/features/audio/audio-player-context";
+import { PersistentAudioPlayer } from "@/components/features/audio/persistent-audio-player";
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <DashboardErrorBoundary>
       <AuthGuard>
-        <AnimatedSidebarProvider defaultOpen={false}>
-          <div className="min-h-screen bg-background flex flex-col md:flex-row w-full relative pb-20 md:pb-0">
-            <NotificationBell />
-            <DashboardSidebar />
-            <AnimatedSidebarInset className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-background">
-              <div className="flex-1 min-w-0">
-                <React.Suspense
-                  fallback={
-                    <div className="p-6 space-y-4 animate-pulse max-w-7xl mx-auto w-full">
-                      <div className="h-8 bg-background-secondary rounded-xl w-1/4" />
-                      <div className="h-64 bg-background-secondary rounded-3xl" />
-                    </div>
-                  }
-                >
-                  {children}
-                </React.Suspense>
-              </div>
-            </AnimatedSidebarInset>
-            {/* Floating Dock Bottom Navigation for Mobile (21st.dev Floating Nav) */}
-            <MobileBottomNav />
-            {/* Modale de Contact Support globale */}
-            <ContactSupportDialog />
-          </div>
-        </AnimatedSidebarProvider>
+        <AudioPlayerProvider>
+          <AnimatedSidebarProvider defaultOpen={false}>
+            <div className="min-h-screen bg-background flex flex-col md:flex-row w-full relative pb-20 md:pb-0">
+              <NotificationBell />
+              <DashboardSidebar />
+              <AnimatedSidebarInset className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-background">
+                <div className="flex-1 min-w-0">
+                  <React.Suspense
+                    fallback={
+                      <div className="p-6 space-y-4 animate-pulse max-w-7xl mx-auto w-full">
+                        <div className="h-8 bg-background-secondary rounded-xl w-1/4" />
+                        <div className="h-64 bg-background-secondary rounded-3xl" />
+                      </div>
+                    }
+                  >
+                    {children}
+                  </React.Suspense>
+                </div>
+              </AnimatedSidebarInset>
+              {/* Mini-lecteur audio persistant flottant */}
+              <PersistentAudioPlayer />
+              {/* Floating Dock Bottom Navigation for Mobile (21st.dev Floating Nav) */}
+              <MobileBottomNav />
+              {/* Modale de Contact Support globale */}
+              <ContactSupportDialog />
+            </div>
+          </AnimatedSidebarProvider>
+        </AudioPlayerProvider>
       </AuthGuard>
     </DashboardErrorBoundary>
   );

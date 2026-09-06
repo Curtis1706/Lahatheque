@@ -83,7 +83,7 @@ def _alert_juriste_if_contract_missing_audio_rate(ouvrage):
 
 
 class AudioTrackUploadView(APIView):
-    """POST /api/v1/audio/tracks/upload/ - Dépôt réel d'un fichier audio, verrouillé dès l'envoi."""
+    """POST /api/v1/audio/tracks/upload/ - Dépôt ou remplacement d'un fichier audio, verrouillé dès l'envoi."""
     permission_classes = [permissions.IsAuthenticated, IsAudioUploader]
 
     def post(self, request):
@@ -95,6 +95,7 @@ class AudioTrackUploadView(APIView):
         chapter_number = int(request.data.get("chapter_number", 1))
         title = request.data.get("title", "").strip()
         duration_seconds = int(request.data.get("duration_seconds", 0))
+        is_replace = str(request.data.get("replace", "")).lower() in ["true", "1", "yes"]
 
         if not ouvrage_id or not audio_file:
             return Response({"success": False, "error": "ouvrage_id et file sont requis."}, status=400)
@@ -112,40 +113,86 @@ class AudioTrackUploadView(APIView):
             logger.error(f"Échec upload audio Cloudflare Stream: {e}")
             return Response({"success": False, "error": "Échec de l'envoi vers le service de streaming."}, status=502)
 
-        track = AudioTrack.objects.create(
-            ouvrage=ouvrage,
-            chapter_number=chapter_number,
-            title=title or ouvrage.title,
-            duration_seconds=duration_seconds or result.get("duration") or 0,
-            stream_id=result["stream_id"],
-            hls_manifest_url=result.get("hls_url", "") or result.get("hls_manifest_url", ""),
-        )
+        manifest_url = result.get("hls_url", "") or result.get("hls_manifest_url", "")
+        track_duration = duration_seconds or result.get("duration") or 0
+
+        if is_replace:
+            existing_track = AudioTrack.objects.filter(ouvrage=ouvrage, chapter_number=chapter_number).first()
+            if not existing_track:
+                existing_track = AudioTrack.objects.filter(ouvrage=ouvrage).first()
+            if existing_track:
+                existing_track.stream_id = result["stream_id"]
+                existing_track.hls_manifest_url = manifest_url
+                existing_track.duration_seconds = track_duration
+                if title:
+                    existing_track.title = title
+                existing_track.save()
+                track = existing_track
+            else:
+                track = AudioTrack.objects.create(
+                    ouvrage=ouvrage,
+                    chapter_number=chapter_number,
+                    title=title or ouvrage.title,
+                    duration_seconds=track_duration,
+                    stream_id=result["stream_id"],
+                    hls_manifest_url=manifest_url,
+                )
+        else:
+            track = AudioTrack.objects.create(
+                ouvrage=ouvrage,
+                chapter_number=chapter_number,
+                title=title or ouvrage.title,
+                duration_seconds=track_duration,
+                stream_id=result["stream_id"],
+                hls_manifest_url=manifest_url,
+            )
 
         was_first_audio = not ouvrage.has_audio_version
         ouvrage.has_audio_version = True
-        ouvrage.save(update_fields=["has_audio_version"])
+        price_audio_param = request.data.get("price_audio")
+        if price_audio_param is not None and str(price_audio_param).strip() != "":
+            try:
+                ouvrage.price_audio = float(price_audio_param)
+            except (ValueError, TypeError):
+                pass
+        ouvrage.save()
 
-        if was_first_audio:
+        if was_first_audio or is_replace:
             _alert_juriste_if_contract_missing_audio_rate(ouvrage)
 
         return Response({
             "success": True,
-            "data": {"id": str(track.id), "stream_id": track.stream_id}
+            "data": {"id": str(track.id), "stream_id": track.stream_id, "title": track.title, "duration_seconds": track.duration_seconds}
         })
 
 
 class AudioStreamSessionView(APIView):
-    """GET /api/v1/audio/ouvrages/<ouvrage_id>/session/ - Jeton d'écoute à courte durée."""
+    """GET /api/v1/audio/ouvrages/<ouvrage_id>/session/ - Jeton d'écoute sécurisé ou extrait gratuit (180s)."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, ouvrage_id):
         from apps.protection.access_service import AccessService
         from apps.protection.models import TraceAcces
         from apps.commerce.models import LigneCommande
+        from apps.catalog.models import Ouvrage
         from .stream_client import CloudflareStreamClient
         from django.conf import settings
 
+        try:
+            ouvrage = Ouvrage.objects.prefetch_related('authors').get(id=ouvrage_id)
+        except (Ouvrage.DoesNotExist, ValueError):
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
+
         access = AccessService.check_user_book_access(request.user, ouvrage_id)
+        user_role = getattr(request.user, 'role', '')
+
+        # Rôles bénéficiant d'un accès intégral gracieux (Supervision, Maquette, Juridique, Auteur de son oeuvre)
+        is_bypass_role = (
+            request.user.is_superuser
+            or request.user.is_staff
+            or user_role in ['admin', 'super_admin', 'chief_layout', 'layout_artist', 'legal_reviewer']
+            or access.get("reason") in ["privilege_access", "development_access", "author_own_book", "publisher_own_book"]
+        )
 
         has_audio_purchase = LigneCommande.objects.filter(
             commande__user=request.user,
@@ -163,11 +210,10 @@ class AudioStreamSessionView(APIView):
                 if bouquet_sub_obj:
                     institution_obj = user_institution
 
-        if not has_audio_purchase and not bouquet_sub_obj and access.get("reason") not in ["privilege_access", "development_access", "author_own_book"]:
-            return Response({
-                "success": False,
-                "error": "Vous devez acheter la version audio de cet ouvrage, ou y accéder via un bouquet couvrant l'audio, pour l'écouter."
-            }, status=403)
+        # Détermination du mode écoute : Accès Complet vs Extrait Gratuit (180s)
+        has_full_access = is_bypass_role or has_audio_purchase or bool(bouquet_sub_obj)
+        is_preview = not has_full_access
+        preview_limit_seconds = 180 if is_preview else 0
 
         tracks = AudioTrack.objects.filter(ouvrage_id=ouvrage_id).order_by("chapter_number")
         if not tracks.exists():
@@ -177,7 +223,7 @@ class AudioStreamSessionView(APIView):
             TraceAcces.objects.create(
                 user=request.user,
                 ouvrage_id=ouvrage_id,
-                access_type="audio_stream",
+                access_type="audio_preview" if is_preview else "audio_stream",
                 institution=institution_obj,
                 bouquet_subscription=bouquet_sub_obj,
                 ip_address=request.META.get("REMOTE_ADDR", ""),
@@ -197,6 +243,7 @@ class AudioStreamSessionView(APIView):
                 logger.error(f"Échec génération token audio: {e}")
                 token = "stream_token"
             sessions.append({
+                "id": str(track.id),
                 "chapter_number": track.chapter_number,
                 "title": track.title,
                 "duration_seconds": track.duration_seconds,
@@ -204,7 +251,25 @@ class AudioStreamSessionView(APIView):
                 "captions_vtt_url": track.captions_vtt_url,
             })
 
-        return Response({"success": True, "data": {"tracks": sessions, "expires_in": 3600}})
+        authors_list = []
+        if hasattr(ouvrage, 'authors'):
+            authors_list = [a.full_name for a in ouvrage.authors.all()]
+        if not authors_list and getattr(ouvrage, 'publisher_name', ''):
+            authors_list = [ouvrage.publisher_name]
+
+        return Response({
+            "success": True,
+            "data": {
+                "ouvrage_id": str(ouvrage.id),
+                "title": ouvrage.title,
+                "cover_url": ouvrage.cover_image.url if ouvrage.cover_image else None,
+                "authors": authors_list,
+                "is_preview": is_preview,
+                "preview_limit_seconds": preview_limit_seconds,
+                "tracks": sessions,
+                "expires_in": 3600,
+            }
+        })
 
 
 class AudioListeningProgressView(APIView):

@@ -2,13 +2,26 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, ArrowLeft, Eye, Download, DollarSign, ChevronRight, BarChart3, ShoppingBag, ArrowRight } from "lucide-react";
+import { 
+  BookOpen, 
+  ArrowLeft, 
+  Eye, 
+  Download, 
+  DollarSign, 
+  ChevronRight, 
+  BarChart3, 
+  ShoppingBag, 
+  ArrowRight,
+  Headphones,
+} from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getAuthorPublishedBooks } from "@/lib/services/author";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import type { AuthorPublishedBook } from "@/lib/types/author";
 
 export default function AuthorBooksPage() {
+  const { playBook } = useAudioPlayer();
   const [books, setBooks] = useState<AuthorPublishedBook[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -107,6 +120,16 @@ export default function AuthorBooksPage() {
       header: "",
       cell: (row) => (
         <div className="flex items-center gap-1.5 justify-end">
+          <button
+            type="button"
+            onClick={() => playBook(row.id)}
+            className="px-2.5 py-1.5 rounded-xl bg-gold/15 text-navy border border-gold/30 hover:bg-gold/25 text-[10px] font-bold transition-colors inline-flex items-center gap-1 min-h-[36px] cursor-pointer"
+            title="Écouter la version audio de votre ouvrage (Accès auteur)"
+          >
+            <Headphones className="w-3.5 h-3.5 text-gold" />
+            <span>Écouter</span>
+          </button>
+
           <Link
             href={`/author/catalog`}
             className="px-2.5 py-1.5 rounded-xl bg-gold/15 text-navy border border-gold/30 hover:bg-gold/25 text-[10px] font-bold transition-colors inline-flex items-center gap-1 min-h-[36px]"

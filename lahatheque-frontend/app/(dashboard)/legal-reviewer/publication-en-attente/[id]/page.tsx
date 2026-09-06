@@ -12,6 +12,7 @@ import {
   Send,
   Calendar,
   FileSignature,
+  Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/auth-guard";
@@ -21,11 +22,13 @@ import {
   getPendingPublicationBooks,
   publishPendingOuvrage,
 } from "@/lib/services/legal";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import type { PendingPublicationBook } from "@/lib/types/legal";
 
 export default function PendingPublicationDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { playBook } = useAudioPlayer();
   const rawId = params?.id;
   const bookId = Array.isArray(rawId) ? rawId[0] : (rawId as string);
 
@@ -196,6 +199,28 @@ export default function PendingPublicationDetailPage() {
                   </Link>
                 </div>
               )}
+            </div>
+
+            {/* Contrôle Audio & Contrat */}
+            <div className="p-4 rounded-xl bg-background border border-border space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Headphones className="w-4 h-4 text-gold" />
+                  <span className="text-xs font-bold text-navy">Épreuve Audio de l&apos;Ouvrage</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => playBook(book.id)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy font-bold text-xs border border-gold/30 transition-colors cursor-pointer"
+                  title="Écouter l'enregistrement audio (Privilège Juriste)"
+                >
+                  <Headphones className="w-3.5 h-3.5 text-gold" />
+                  <span>Écouter l&apos;audio</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-foreground-muted">
+                Contrôlez l&apos;enregistrement complet sans restriction. Vérifiez que le contrat rattaché prévoit bien le taux de redevance pour les diffusions audio.
+              </p>
             </div>
 
             {/* Actions de publication */}

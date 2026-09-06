@@ -9,6 +9,7 @@ import {
   Bookmark,
   Sparkles,
   RotateCcw,
+  Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -62,7 +63,7 @@ export default function StudentBooksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [filterTab, setFilterTab] = useState<"all" | "audio" | "favorites">("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   // Pagination
@@ -97,10 +98,19 @@ export default function StudentBooksPage() {
     }
   };
 
-  // Filtrage combiné : recherche textuelle et filtre favoris
+  // Filtrage combiné : recherche textuelle et filtre onglet (tous / audio / favoris)
   const filteredBooks = useMemo(() => {
     return books.filter((b) => {
-      if (onlyFavorites && !b.is_favorite) return false;
+      if (filterTab === "favorites" && !b.is_favorite) return false;
+      if (filterTab === "audio") {
+        const hasAudio = Boolean(
+          (b as any).has_audio_version ||
+          (b as any).price_audio ||
+          (b as any).format === "audio" ||
+          (b as any).format_type === "audio"
+        );
+        if (!hasAudio) return false;
+      }
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       return (
@@ -114,9 +124,22 @@ export default function StudentBooksPage() {
         b.discipline_name?.toLowerCase().includes(q)
       );
     });
-  }, [books, onlyFavorites, searchQuery]);
+  }, [books, filterTab, searchQuery]);
 
   const favoriteCount = useMemo(() => books.filter((b) => b.is_favorite).length, [books]);
+  const audioCount = useMemo(
+    () =>
+      books.filter(
+        (b) =>
+          Boolean(
+            (b as any).has_audio_version ||
+            (b as any).price_audio ||
+            (b as any).format === "audio" ||
+            (b as any).format_type === "audio"
+          )
+      ).length,
+    [books]
+  );
 
   // Pagination calculée sur les livres filtrés
   const totalBooks = filteredBooks.length;
@@ -139,7 +162,7 @@ export default function StudentBooksPage() {
 
   const handleResetFilters = () => {
     setSearchQuery("");
-    setOnlyFavorites(false);
+    setFilterTab("all");
     setCurrentPage(1);
     toast.info("Filtres réinitialisés");
   };
@@ -173,7 +196,7 @@ export default function StudentBooksPage() {
             Ma Bibliothèque
           </h1>
           <p className="text-xs sm:text-sm text-foreground-muted mt-1.5 max-w-2xl leading-relaxed">
-            Consultez tous vos ouvrages débloqués, reprenez vos lectures en cours et gérez votre sélection de favoris.
+            Consultez tous vos ouvrages débloqués, reprenez vos lectures en cours et vos écoutes audio.
           </p>
         </div>
 
@@ -200,17 +223,17 @@ export default function StudentBooksPage() {
           />
         </div>
 
-        {/* Onglets Filtres : Tous les ouvrages / Mes Favoris */}
+        {/* Onglets Filtres : Tous les ouvrages / Livres Audio / Mes Favoris */}
         <div className="flex items-center gap-2 pt-2 border-t border-border flex-wrap">
           <button
             type="button"
             onClick={() => {
-              setOnlyFavorites(false);
+              setFilterTab("all");
               setCurrentPage(1);
               toast.info("Tous les ouvrages");
             }}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors border min-h-[40px] cursor-pointer ${
-              !onlyFavorites
+              filterTab === "all"
                 ? "bg-navy text-white border-navy shadow-xs"
                 : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
             }`}
@@ -221,17 +244,34 @@ export default function StudentBooksPage() {
           <button
             type="button"
             onClick={() => {
-              setOnlyFavorites(true);
+              setFilterTab("audio");
               setCurrentPage(1);
-              toast.info("Mes Favoris");
+              toast.info("Livres Audio");
             }}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-2 min-h-[40px] cursor-pointer ${
-              onlyFavorites
+              filterTab === "audio"
                 ? "bg-gold text-navy border-gold shadow-xs"
                 : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
             }`}
           >
-            <Bookmark className={`w-3.5 h-3.5 ${onlyFavorites ? "fill-current text-navy" : "text-gold"}`} />
+            <Headphones className="w-3.5 h-3.5 text-navy" />
+            <span>Livres Audio ({audioCount})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFilterTab("favorites");
+              setCurrentPage(1);
+              toast.info("Mes Favoris");
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-2 min-h-[40px] cursor-pointer ${
+              filterTab === "favorites"
+                ? "bg-gold text-navy border-gold shadow-xs"
+                : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
+            }`}
+          >
+            <Bookmark className={`w-3.5 h-3.5 ${filterTab === "favorites" ? "fill-current text-navy" : "text-gold"}`} />
             <span>Mes Favoris ({favoriteCount})</span>
           </button>
         </div>
@@ -250,7 +290,11 @@ export default function StudentBooksPage() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <p className="text-xs text-foreground-muted">
               <strong className="text-navy font-bold">{totalBooks}</strong> ouvrage{totalBooks > 1 ? "s" : ""}{" "}
-              {onlyFavorites ? "dans vos favoris" : "dans votre bibliothèque"}
+              {filterTab === "favorites"
+                ? "dans vos favoris"
+                : filterTab === "audio"
+                ? "en version audio"
+                : "dans votre bibliothèque"}
               {searchQuery && (
                 <span>
                   {" "}pour « <strong className="text-navy">{searchQuery}</strong> »
@@ -283,23 +327,29 @@ export default function StudentBooksPage() {
         ) : filteredBooks.length === 0 ? (
           <div className="py-20 px-6 rounded-3xl bg-background border border-dashed border-border text-center space-y-4 shadow-xs">
             <div className="w-14 h-14 rounded-2xl bg-navy/5 flex items-center justify-center mx-auto text-foreground-muted">
-              {onlyFavorites ? (
+              {filterTab === "favorites" ? (
                 <Bookmark className="w-7 h-7 text-gold opacity-80" />
+              ) : filterTab === "audio" ? (
+                <Headphones className="w-7 h-7 text-gold opacity-80" />
               ) : (
                 <BookOpen className="w-7 h-7 opacity-60" />
               )}
             </div>
             <div className="space-y-1 max-w-sm mx-auto">
               <h3 className="font-serif font-bold text-navy text-lg">
-                {onlyFavorites
+                {filterTab === "favorites"
                   ? "Aucun favori enregistré"
+                  : filterTab === "audio"
+                  ? "Aucun livre audio disponible"
                   : books.length === 0
                   ? "Votre bibliothèque est vide"
                   : "Aucun résultat trouvé"}
               </h3>
               <p className="text-xs text-foreground-muted leading-relaxed">
-                {onlyFavorites
+                {filterTab === "favorites"
                   ? "Cliquez sur l'icône de marque-page d'un ouvrage pour l'ajouter à vos favoris."
+                  : filterTab === "audio"
+                  ? "Explorez le catalogue pour découvrir des ouvrages avec version audio intégrée."
                   : books.length === 0
                   ? "Explorez le catalogue académique pour acquérir vos premiers ouvrages ou débloquer vos bouquets campus."
                   : "Modifiez vos critères de recherche ou réinitialisez les filtres."}

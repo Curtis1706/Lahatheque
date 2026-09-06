@@ -11,6 +11,7 @@ import {
   BookOpen,
   ShoppingBag,
   Eye,
+  Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClientBookAccess } from "@/lib/types/student";
@@ -18,6 +19,7 @@ import { BookCover } from "./book-cover";
 import { BookSampleModal } from "./book-sample-modal";
 import { PaperOrderModal } from "./paper-order-modal";
 import { createOrder } from "@/lib/services/commerce-orders";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { cn } from "@/lib/utils";
 
 interface BookCardProps {
@@ -27,6 +29,7 @@ interface BookCardProps {
 }
 
 export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
+  const { playBook } = useAudioPlayer();
   const [showSample, setShowSample] = useState(false);
   const [showPaperModal, setShowPaperModal] = useState(false);
   const [isFav, setIsFav] = useState(book.is_favorite);
@@ -101,6 +104,12 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-gold px-2.5 py-0.5 rounded-md bg-navy/5 border border-gold/30 truncate max-w-[180px]">
                   {disciplineName}
                 </span>
+                {(book.has_audio_version || book.format === "audio" || book.format_type === "audio") && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gold px-2 py-0.5 rounded-md bg-gold/15 border border-gold/30">
+                    <Headphones className="w-3 h-3 text-gold" />
+                    Livre Audio
+                  </span>
+                )}
               </div>
 
               <button
@@ -197,6 +206,18 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
                 <BookOpen className="w-3.5 h-3.5 text-gold" />
                 Fiche
               </Link>
+
+              {(book.has_audio_version || book.format === "audio" || book.format_type === "audio") && (
+                <button
+                  type="button"
+                  onClick={() => playBook(book.id)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy font-bold text-xs border border-gold/40 transition-all min-h-[36px] cursor-pointer shadow-xs"
+                  title="Écouter la version audio"
+                >
+                  <Headphones className="w-3.5 h-3.5 text-gold" />
+                  <span>Écouter</span>
+                </button>
+              )}
 
               <Link
                 href={`/catalog/reader/${book.id}`}

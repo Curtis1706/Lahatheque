@@ -133,6 +133,8 @@ export interface AdminCatalogBook {
   protection_type?: string;
   price_digital: number;
   price_paper: number;
+  price_audio?: number;
+  has_audio_version?: boolean;
   price?: number;
   sales_count: number;
   consultation_count: number;

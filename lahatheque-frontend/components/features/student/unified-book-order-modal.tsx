@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, ShoppingBag, BookOpen, Truck, Eye, CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
+import { X, ShoppingBag, BookOpen, Truck, Eye, CheckCircle2, ShieldCheck, Sparkles, Headphones } from "lucide-react";
 import { toast } from "sonner";
 import { createOrder } from "@/lib/services/commerce-orders";
 import type { BookAPI } from "@/lib/services/student";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 
-type Format = "digital" | "paper";
+type Format = "digital" | "paper" | "audio";
 
 export function UnifiedBookOrderModal({
   book,
@@ -20,11 +21,16 @@ export function UnifiedBookOrderModal({
   onDigitalPurchaseSuccess?: () => void;
 }) {
   const router = useRouter();
+  const { playBook } = useAudioPlayer();
   const paperAvailable = Boolean(book.is_paper_available) && (book.price_paper ?? 0) > 0;
+  const audioAvailable = Boolean((book as any).has_audio_version || (book as any).price_audio || (book as any).format === "audio" || (book as any).format_type === "audio");
+  const audioPrice = (book as any).price_audio ?? 2500;
   const isDigitalOwned = Boolean(book.is_owned || book.has_digital_access || book.progress_percent !== undefined);
+  const isAudioOwned = Boolean((book as any).has_audio_access || (book as any).is_audio_owned);
 
-  // Si le numérique est déjà possédé, sélectionner "paper" par défaut si disponible
+  // Si le numérique est déjà possédé, sélectionner "audio" ou "paper" par défaut si disponible
   const [format, setFormat] = useState<Format>(() => {
+    if (isDigitalOwned && audioAvailable && !isAudioOwned) return "audio";
     if (isDigitalOwned && paperAvailable) return "paper";
     return "digital";
   });
@@ -38,12 +44,18 @@ export function UnifiedBookOrderModal({
   const [progressPct, setProgressPct] = useState<number>(0);
   const [success, setSuccess] = useState(false);
 
-  const unitPrice = format === "digital" ? (book.price_digital ?? 0) : (book.price_paper ?? 0);
+  const unitPrice =
+    format === "digital"
+      ? (book.price_digital ?? 0)
+      : format === "audio"
+      ? audioPrice
+      : (book.price_paper ?? 0);
+
   // Les frais de livraison sont définis par le Gestionnaire selon le service choisi,
   // communiqués après traitement — jamais un montant inventé côté client.
   const shippingFee = 0;
   const shippingFeeUnknown = format === "paper";
-  const total = unitPrice * quantity + shippingFee;
+  const total = unitPrice * (format === "paper" ? quantity : 1) + shippingFee;
 
   const authorsDisplay =
     book.authors && Array.isArray(book.authors) && book.authors.length > 0
@@ -83,6 +95,14 @@ export function UnifiedBookOrderModal({
       return;
     }
 
+    // Si déjà possédé en audio et sélectionné, lancer la lecture audio
+    if (format === "audio" && isAudioOwned) {
+      playBook(book.id);
+      router.push(`/student/audio/${book.id}`);
+      onClose();
+      return;
+    }
+
     if (format === "paper" && !shippingAddress.trim()) {
       toast.error("Veuillez renseigner votre adresse de livraison.");
       return;
@@ -94,11 +114,11 @@ export function UnifiedBookOrderModal({
     setProgressPct(0);
 
     const orderPromise = createOrder({
-      items: [{ ouvrage_id: book.id, format_type: format, quantity }],
+      items: [{ ouvrage_id: book.id, format_type: format, quantity: format === "paper" ? quantity : 1 }],
       type_commande: "personnel",
       mode_paiement: modePaiement,
       shipping_address: format === "paper" ? shippingAddress : undefined,
-      city: "Cotonou",
+      city: format === "paper" ? "Cotonou" : undefined,
       country: "BJ",
     });
 
@@ -115,7 +135,7 @@ export function UnifiedBookOrderModal({
       // Pause visuelle de confirmation à 0 XOF
       await new Promise((r) => setTimeout(r, 350));
 
-      if (format === "digital") {
+      if (format === "digital" || format === "audio") {
         setPaymentPhase("success");
         setSuccess(true);
         onDigitalPurchaseSuccess?.();
@@ -190,7 +210,9 @@ export function UnifiedBookOrderModal({
               <span>•</span>
               <span>Débit Effectué</span>
             </div>
-            <h3 className="font-serif text-2xl font-bold text-navy">Paiement effectué !</h3>
+            <h3 className="font-serif text-2xl font-bold text-navy">
+              {format === "audio" ? "Livre audio activé !" : "Paiement effectué !"}
+            </h3>
             <p className="text-xs text-foreground-muted">
               « {book.title} » est maintenant disponible dans votre bibliothèque.
             </p>
@@ -199,7 +221,9 @@ export function UnifiedBookOrderModal({
           <div className="p-3.5 rounded-2xl bg-background-secondary border border-border text-left space-y-1.5 text-xs">
             <div className="flex items-center justify-between text-navy font-bold">
               <span>Format activé</span>
-              <span className="text-gold font-mono uppercase text-[11px] font-bold">Numérique (Accès illimité)</span>
+              <span className="text-gold font-mono uppercase text-[11px] font-bold">
+                {format === "audio" ? "Livre Audio (Accès illimité)" : "Numérique (Accès illimité)"}
+              </span>
             </div>
             <div className="flex items-center justify-between text-foreground-muted text-[11px]">
               <span>Total réglé</span>
@@ -208,14 +232,29 @@ export function UnifiedBookOrderModal({
           </div>
 
           <div className="flex flex-col gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => router.push(`/catalog/reader/${book.id}`)}
-              className="w-full px-4 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
-            >
-              <BookOpen className="w-4 h-4 text-gold" />
-              Ouvrir la liseuse maintenant
-            </button>
+            {format === "audio" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  playBook(book.id);
+                  router.push(`/student/audio/${book.id}`);
+                  onClose();
+                }}
+                className="w-full px-4 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
+              >
+                <Headphones className="w-4 h-4 text-gold" />
+                Écouter le livre audio maintenant
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push(`/catalog/reader/${book.id}`)}
+                className="w-full px-4 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"
+              >
+                <BookOpen className="w-4 h-4 text-gold" />
+                Ouvrir la liseuse maintenant
+              </button>
+            )}
             <button
               type="button"
               onClick={() => router.push("/student/books")}
@@ -274,7 +313,7 @@ export function UnifiedBookOrderModal({
         )}
 
         {/* Sélection Format */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className={`grid grid-cols-1 ${audioAvailable ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
           {/* Option Numérique */}
           <button
             type="button"
@@ -283,7 +322,7 @@ export function UnifiedBookOrderModal({
                 setFormat("digital");
               }
             }}
-            className={`p-4 rounded-2xl border text-left space-y-1 transition-all relative ${
+            className={`p-3.5 rounded-2xl border text-left space-y-1 transition-all relative ${
               isDigitalOwned
                 ? "border-success/30 bg-success/5 cursor-default"
                 : format === "digital"
@@ -305,7 +344,7 @@ export function UnifiedBookOrderModal({
 
             {isDigitalOwned ? (
               <p className="text-xs font-bold text-success pt-1">
-                Déjà dans votre bibliothèque
+                Déjà acquis
               </p>
             ) : (
               <span className="block text-sm font-mono font-bold text-gold">
@@ -315,16 +354,60 @@ export function UnifiedBookOrderModal({
             <p className="text-[10px] text-foreground-muted">
               {isDigitalOwned
                 ? "Accès illimité actif."
-                : "Accès immédiat dans votre bibliothèque."}
+                : "Accès immédiat."}
             </p>
           </button>
+
+          {/* Option Audio (si disponible) */}
+          {audioAvailable && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!isAudioOwned) {
+                  setFormat("audio");
+                }
+              }}
+              className={`p-3.5 rounded-2xl border text-left space-y-1 transition-all relative ${
+                isAudioOwned
+                  ? "border-success/30 bg-success/5 cursor-default"
+                  : format === "audio"
+                  ? "border-gold bg-gold/10 cursor-pointer"
+                  : "border-border bg-background-secondary cursor-pointer"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                  <Headphones className="w-4 h-4 text-gold" />
+                  Livre Audio
+                </span>
+                {isAudioOwned && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success/15 text-success flex items-center gap-1">
+                    <CheckCircle2 className="w-2.5 h-2.5" /> Acquis
+                  </span>
+                )}
+              </div>
+
+              {isAudioOwned ? (
+                <p className="text-xs font-bold text-success pt-1">
+                  Déjà acquis
+                </p>
+              ) : (
+                <span className="block text-sm font-mono font-bold text-gold">
+                  {audioPrice.toLocaleString("fr-FR")} XOF
+                </span>
+              )}
+              <p className="text-[10px] text-foreground-muted">
+                {isAudioOwned ? "Écoute illimitée." : "Écoute intégrale."}
+              </p>
+            </button>
+          )}
 
           {/* Option Papier */}
           <button
             type="button"
             onClick={() => paperAvailable && setFormat("paper")}
             disabled={!paperAvailable}
-            className={`p-4 rounded-2xl border text-left space-y-1 transition-all relative ${
+            className={`p-3.5 rounded-2xl border text-left space-y-1 transition-all relative ${
               !paperAvailable
                 ? "border-border bg-background-secondary opacity-50 cursor-not-allowed"
                 : format === "paper"
@@ -339,7 +422,7 @@ export function UnifiedBookOrderModal({
               </span>
               {paperAvailable && isDigitalOwned && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-gold/15 text-navy">
-                  Disponible
+                  Dispo
                 </span>
               )}
             </div>
@@ -348,11 +431,11 @@ export function UnifiedBookOrderModal({
                 <span className="block text-sm font-mono font-bold text-navy">
                   {(book.price_paper ?? 0).toLocaleString("fr-FR")} XOF
                 </span>
-                <p className="text-[10px] text-foreground-muted">Livraison sous 24-48h.</p>
+                <p className="text-[10px] text-foreground-muted">Livraison 24-48h.</p>
               </>
             ) : (
               <span className="text-[10px] font-semibold text-foreground-muted block pt-1">
-                Non disponible en version papier
+                Non disponible
               </span>
             )}
           </button>
@@ -475,7 +558,7 @@ export function UnifiedBookOrderModal({
             )}
           </div>
         ) : (
-          /* Cas 3: Commande standard (numérique non possédé ou commande papier) */
+          /* Cas 3: Commande standard (numérique, audio ou papier) */
           <button
             type="button"
             onClick={handleSubmit}
@@ -484,10 +567,24 @@ export function UnifiedBookOrderModal({
           >
             {submitting ? (
               <InlineLoader size={16} />
-            ) : (
+            ) : format === "audio" ? (
+              isAudioOwned ? (
+                <Headphones className="w-4 h-4 text-gold" />
+              ) : (
+                <ShoppingBag className="w-4 h-4 text-gold" />
+              )
+            ) : format === "digital" ? (
               <ShoppingBag className="w-4 h-4 text-gold" />
+            ) : (
+              <Truck className="w-4 h-4 text-gold" />
             )}
-            {format === "digital" ? "Acheter maintenant" : "Confirmer la commande papier"}
+            {format === "audio"
+              ? isAudioOwned
+                ? "Écouter le livre audio"
+                : "Acheter la version audio"
+              : format === "digital"
+              ? "Acheter maintenant"
+              : "Confirmer la commande papier"}
           </button>
         )}
       </div>

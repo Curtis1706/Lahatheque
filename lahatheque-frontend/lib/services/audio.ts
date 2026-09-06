@@ -4,44 +4,28 @@
  * Zéro emoji, typé TypeScript.
  */
 
+import {
+  AudioStreamSession,
+  AudioTrackItem,
+  AudioListeningProgress,
+  AudioTrackUploadResult,
+} from "@/lib/types/audio";
+
 export interface AudioTrackUploadResponse {
   success: boolean;
-  data?: {
-    track_id: string;
-    stream_id: string;
-    title: string;
-    duration_seconds: number;
-    stream_playback_url: string;
-    stream_status: string;
-    hls_manifest_url?: string;
-  };
+  data?: AudioTrackUploadResult;
   error?: string;
 }
 
 export interface AudioStreamSessionResponse {
   success: boolean;
-  data?: {
-    ouvrage_id: string;
-    title: string;
-    audio_enabled: boolean;
-    stream_id: string;
-    hls_manifest_url: string;
-    signed_token: string;
-    expires_in_seconds: number;
-    duration_seconds: number;
-    current_progress_seconds: number;
-  };
+  data?: AudioStreamSession;
   error?: string;
 }
 
 export interface AudioProgressResponse {
   success: boolean;
-  data?: {
-    track_id: string;
-    duration_listened_seconds: number;
-    completion_percent: number;
-    completed: boolean;
-  };
+  data?: AudioListeningProgress;
   error?: string;
 }
 
@@ -65,13 +49,15 @@ export interface AudioLockVerificationResponse {
 }
 
 /**
- * Téléversement d'un fichier audio (MP3 / M4B) vers Cloudflare Stream sécurisé.
+ * Téléversement ou remplacement d'un fichier audio (MP3 / M4B / AAC) vers Cloudflare Stream sécurisé.
  */
 export async function uploadAudioTrack(
   ouvrageId: string,
   file: File,
   title?: string,
-  durationSeconds?: number
+  durationSeconds?: number,
+  replace: boolean = false,
+  priceAudio?: number
 ): Promise<AudioTrackUploadResponse> {
   const formData = new FormData();
   formData.append("ouvrage_id", ouvrageId);
@@ -79,6 +65,12 @@ export async function uploadAudioTrack(
   formData.append("title", title || file.name);
   if (durationSeconds) {
     formData.append("duration_seconds", String(Math.round(durationSeconds)));
+  }
+  if (replace) {
+    formData.append("replace", "true");
+  }
+  if (priceAudio !== undefined && priceAudio !== null) {
+    formData.append("price_audio", String(priceAudio));
   }
 
   const res = await fetch("/api/bff/audio/tracks/upload/", {
@@ -91,7 +83,7 @@ export async function uploadAudioTrack(
 }
 
 /**
- * Récupère la session de streaming audio HLS signée pour un ouvrage acheté ou accessible.
+ * Récupère la session de streaming audio HLS signée pour un ouvrage (accès complet ou extrait 180s).
  */
 export async function getAudioStreamSession(
   ouvrageId: string
@@ -110,13 +102,17 @@ export async function getAudioStreamSession(
  */
 export async function saveAudioListeningProgress(
   trackId: string,
-  positionSeconds: number
+  durationListenedSeconds: number,
+  completionPercent: number = 0
 ): Promise<AudioProgressResponse> {
   const res = await fetch(`/api/bff/audio/tracks/${trackId}/progress/`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ position_seconds: Math.round(positionSeconds) }),
+    body: JSON.stringify({
+      duration_listened_seconds: Math.round(durationListenedSeconds),
+      completion_percent: Math.min(100, Math.max(0, completionPercent)),
+    }),
   });
 
   return res.json();

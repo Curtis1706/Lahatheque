@@ -16,7 +16,8 @@ import {
   FileCode, 
   Check, 
   Layers,
-  GraduationCap
+  GraduationCap,
+  Headphones,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
@@ -24,6 +25,8 @@ import { VitrinePreviewCard } from "@/components/features/chief-layout/vitrine-p
 import { RevisionModal } from "@/components/features/chief-layout/revision-modal";
 import { getDepositDetail, validateDeposit, requestRevision } from "@/lib/services/layout-artist";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
+import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
@@ -31,6 +34,7 @@ export default function ChefValidationDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { playBook } = useAudioPlayer();
 
   const [deposit, setDeposit] = useState<LayoutDeposit | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,6 +164,16 @@ export default function ChefValidationDetailPage() {
             {showXmlNotice ? "Masquer notice ONIX 3.0" : "Inspecter notice ONIX 3.0"}
           </button>
 
+          <button
+            type="button"
+            onClick={() => playBook(deposit.id)}
+            className="px-4 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 border border-gold/40 text-navy text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            title="Écouter la piste audio (Privilège Chef Maquettiste)"
+          >
+            <Headphones className="w-4 h-4 text-gold" />
+            <span>Écouter l&apos;audio</span>
+          </button>
+
           <Link
             href={`/catalog/reader/${deposit.id}`}
             target="_blank"
@@ -251,6 +265,14 @@ export default function ChefValidationDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Remplacement / Contrôle Audio */}
+      <AudioReplacementDropzone
+        bookId={deposit.id}
+        bookTitle={deposit.metadata.title}
+        currentDurationSeconds={(deposit as any).audio_duration_seconds}
+        onSuccess={() => router.refresh()}
+      />
 
       {/* Actions de Décision Éditoriale */}
       {deposit.status === "pending_validation" && (

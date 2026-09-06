@@ -23,7 +23,9 @@ import {
   Building2,
   Play,
   History,
+  Headphones,
 } from "lucide-react";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
 
@@ -36,8 +38,15 @@ function SkeletonCard() {
 // ─── Carte Livre Résumée ──────────────────────────────────────────────────────
 
 function RecentBookCard({ book }: { book: BookAPI }) {
+  const { playBook } = useAudioPlayer();
   const authorName =
     book.authors?.map((a) => a.full_name).join(", ") || "Auteur inconnu";
+  const hasAudio = Boolean(
+    (book as any).has_audio_version ||
+    (book as any).price_audio ||
+    (book as any).format === "audio" ||
+    (book as any).format_type === "audio"
+  );
 
   return (
     <div className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center gap-4">
@@ -46,9 +55,17 @@ function RecentBookCard({ book }: { book: BookAPI }) {
       </Link>
 
       <div className="min-w-0 flex-1 space-y-1">
-        <p className="text-[11px] font-bold text-gold uppercase tracking-wider">
-          {book.discipline_name || "Académique"}
-        </p>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="text-[11px] font-bold text-gold uppercase tracking-wider">
+            {book.discipline_name || "Académique"}
+          </p>
+          {hasAudio && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-gold/15 text-navy border border-gold/30">
+              <Headphones className="w-2.5 h-2.5 text-gold" />
+              Audio
+            </span>
+          )}
+        </div>
         <Link href={`/catalog/reader/${book.id}`}>
           <h3 className="font-serif font-bold text-navy text-sm leading-tight truncate group-hover:text-gold transition-colors">
             {book.title}
@@ -77,13 +94,25 @@ function RecentBookCard({ book }: { book: BookAPI }) {
         )}
       </div>
 
-      <Link
-        href={`/catalog/reader/${book.id}`}
-        className="shrink-0 p-2.5 rounded-xl bg-navy/10 hover:bg-gold/20 transition-colors"
-        title="Continuer la lecture"
-      >
-        <Play className="w-4 h-4 text-navy" />
-      </Link>
+      <div className="flex items-center gap-1.5 shrink-0">
+        {hasAudio && (
+          <button
+            type="button"
+            onClick={() => playBook(book.id)}
+            className="p-2.5 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy border border-gold/40 transition-colors cursor-pointer"
+            title="Écouter la version audio"
+          >
+            <Headphones className="w-4 h-4 text-gold" />
+          </button>
+        )}
+        <Link
+          href={`/catalog/reader/${book.id}`}
+          className="p-2.5 rounded-xl bg-navy/10 hover:bg-gold/20 transition-colors"
+          title="Continuer la lecture"
+        >
+          <Play className="w-4 h-4 text-navy" />
+        </Link>
+      </div>
     </div>
   );
 }
@@ -95,7 +124,16 @@ function ReadingHeroCard({
 }: {
   currentReading: StudentOverviewKPIs["currentReading"];
 }) {
+  const { playBook } = useAudioPlayer();
+
   if (currentReading) {
+    const hasAudio = Boolean(
+      (currentReading.ouvrage as any).has_audio_version ||
+      (currentReading.ouvrage as any).price_audio ||
+      (currentReading.ouvrage as any).format === "audio" ||
+      (currentReading.ouvrage as any).format_type === "audio"
+    );
+
     return (
       <div className="book-ribbon p-7 sm:p-8 rounded-3xl bg-background border-2 border-gold/70 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="flex items-center gap-5 min-w-0">
@@ -123,13 +161,27 @@ function ReadingHeroCard({
           </div>
         </div>
 
-        <Link
-          href={`/catalog/reader/${currentReading.ouvrage.id}`}
-          className="shrink-0 px-6 py-3.5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2.5 min-h-[48px] shadow-sm cursor-pointer"
-        >
-          <Play className="w-4 h-4 text-gold fill-gold" />
-          <span>Continuer ma lecture</span>
-        </Link>
+        <div className="flex items-center gap-3 shrink-0 flex-wrap">
+          {hasAudio && (
+            <button
+              type="button"
+              onClick={() => playBook(currentReading.ouvrage.id)}
+              className="px-5 py-3.5 rounded-2xl bg-gold/20 hover:bg-gold/30 text-navy text-xs font-bold border border-gold/40 transition-colors inline-flex items-center gap-2 min-h-[48px] shadow-xs cursor-pointer"
+              title="Écouter la version audio"
+            >
+              <Headphones className="w-4 h-4 text-gold" />
+              <span>Écouter en audio</span>
+            </button>
+          )}
+
+          <Link
+            href={`/catalog/reader/${currentReading.ouvrage.id}`}
+            className="px-6 py-3.5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2.5 min-h-[48px] shadow-sm cursor-pointer"
+          >
+            <Play className="w-4 h-4 text-gold fill-gold" />
+            <span>Continuer ma lecture</span>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -404,6 +456,26 @@ export default function StudentOverviewPage() {
                   </p>
                   <p className="text-[10px] text-foreground-muted">
                     Suivi d&apos;expédition d&apos;exemplaires
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-navy transition-colors" />
+            </Link>
+
+            <Link
+              href="/student/books"
+              className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gold/15 text-navy group-hover:bg-gold/25 transition-colors">
+                  <Headphones className="w-4 h-4 text-gold" />
+                </div>
+                <div>
+                  <p className="font-serif font-bold text-navy text-xs">
+                    Livres Audio
+                  </p>
+                  <p className="text-[10px] text-foreground-muted">
+                    Lecteur immersif et reprise d&apos;écoute
                   </p>
                 </div>
               </div>

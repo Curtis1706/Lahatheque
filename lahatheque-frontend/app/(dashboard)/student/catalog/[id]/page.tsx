@@ -16,6 +16,7 @@ import {
   Calendar,
   FileText,
   Eye,
+  Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -25,6 +26,7 @@ import {
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
 import { UnifiedBookOrderModal } from "@/components/features/student/unified-book-order-modal";
 import { BookCover } from "@/components/features/student/book-cover";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -58,6 +60,14 @@ function AccessBlock({
   onOpenSample: () => void;
   onOpenOrder: () => void;
 }) {
+  const { playBook } = useAudioPlayer();
+  const hasAudio = Boolean(
+    (book as any).has_audio_version ||
+    (book as any).price_audio ||
+    (book as any).format === "audio" ||
+    (book as any).format_type === "audio"
+  );
+
   if (access.access_granted) {
     const reasonLabels: Record<string, string> = {
       individual_purchase: "Achat unitaire numérique",
@@ -88,6 +98,17 @@ function AccessBlock({
             Ouvrir la Liseuse Sécurisée
           </Link>
 
+          {hasAudio && (
+            <button
+              type="button"
+              onClick={() => playBook(book.id)}
+              className="py-3 px-5 rounded-2xl bg-gold/20 hover:bg-gold/30 text-navy text-xs font-bold border border-gold/40 transition-colors flex items-center justify-center gap-2 min-h-[44px] cursor-pointer shadow-xs"
+            >
+              <Headphones className="w-4 h-4 text-gold" />
+              Écouter le Livre Audio
+            </button>
+          )}
+
           {book.is_paper_available && book.price_paper > 0 && (
             <button
               type="button"
@@ -110,7 +131,7 @@ function AccessBlock({
         <h3 className="font-bold text-navy text-base">Modalités d&apos;Accès &amp; Achat</h3>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className={`grid grid-cols-1 ${hasAudio ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
         {/* Extrait gratuit */}
         <Link
           href={`/catalog/reader/${book.id}?mode=sample`}
@@ -130,6 +151,28 @@ function AccessBlock({
           </p>
         </Link>
 
+        {/* Extrait Audio (si disponible) */}
+        {hasAudio && (
+          <button
+            type="button"
+            onClick={() => playBook(book.id, { preview: true })}
+            className="p-4 rounded-2xl border border-border bg-background-secondary hover:border-gold text-left space-y-1 transition-all cursor-pointer block"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                <Headphones className="w-4 h-4 text-gold" />
+                Extrait Audio
+              </span>
+              <span className="text-[10px] uppercase font-bold text-navy bg-gold/20 px-2 py-0.5 rounded-md">
+                3 Min Gratuites
+              </span>
+            </div>
+            <p className="text-[11px] text-foreground-muted">
+              Écoutez le livre audio en streaming haute fidélité.
+            </p>
+          </button>
+        )}
+
         {/* Commander cet ouvrage — Unifié */}
         <button
           type="button"
@@ -146,14 +189,16 @@ function AccessBlock({
             </span>
           </div>
           <p className="text-[11px] text-foreground-muted">
-            Choisissez le format numérique (accès immédiat) ou papier (si disponible).
+            Format numérique, audio ou papier disponible.
           </p>
         </button>
 
         {/* Bouquet campus */}
         <Link
           href="/student/university"
-          className="p-4 rounded-2xl border border-navy/20 bg-navy/5 hover:bg-navy/10 text-left space-y-1 transition-all flex flex-col justify-between sm:col-span-2"
+          className={`p-4 rounded-2xl border border-navy/20 bg-navy/5 hover:bg-navy/10 text-left space-y-1 transition-all flex flex-col justify-between ${
+            hasAudio ? "sm:col-span-3" : "sm:col-span-2"
+          }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-navy flex items-center gap-1.5">

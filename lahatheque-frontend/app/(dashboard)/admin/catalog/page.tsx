@@ -6,13 +6,31 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getAdminCatalog, updateBookPricing, deleteAdminCatalogBook } from "@/lib/services/admin";
 import { AdminCatalogBook } from "@/lib/types/admin";
-import { BookOpen, Search, Tag, History, Shield, Eye, Pencil, X, Save, CheckCircle2, Trash2, PlusCircle } from "lucide-react";
+import { 
+  BookOpen, 
+  Search, 
+  Tag, 
+  History, 
+  Shield, 
+  Eye, 
+  Pencil, 
+  X, 
+  Save, 
+  CheckCircle2, 
+  Trash2, 
+  PlusCircle,
+  Headphones,
+  RefreshCw,
+} from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { ViewToggle, ViewMode } from "@/components/features/student/view-toggle";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
+import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
 
 export default function AdminCatalogPage() {
+  const { playBook } = useAudioPlayer();
   const [books, setBooks] = useState<AdminCatalogBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -24,6 +42,9 @@ export default function AdminCatalogPage() {
   const [editPricePaper, setEditPricePaper] = useState<number>(7500);
   const [editStatus, setEditStatus] = useState<AdminCatalogBook["status"]>("published");
   const [saving, setSaving] = useState(false);
+
+  // State pour la gestion audio
+  const [audioManagingBook, setAudioManagingBook] = useState<AdminCatalogBook | null>(null);
 
   // State pour la suppression
   const [deleteConfirmBook, setDeleteConfirmBook] = useState<AdminCatalogBook | null>(null);
@@ -187,6 +208,22 @@ export default function AdminCatalogPage() {
       header: "Actions",
       cell: (row) => (
         <div className="flex items-center gap-1.5 justify-end">
+          <button
+            type="button"
+            onClick={() => playBook(row.id)}
+            className="p-1.5 rounded-lg border border-gold/40 bg-gold/10 hover:bg-gold hover:text-navy text-gold transition-colors cursor-pointer"
+            title="Écouter la piste audio (Privilège Administrateur)"
+          >
+            <Headphones className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setAudioManagingBook(row)}
+            className="p-1.5 rounded-lg border border-border bg-background hover:bg-gold/15 text-foreground-muted hover:text-navy transition-colors cursor-pointer"
+            title="Gérer / Remplacer la piste audio"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-gold" />
+          </button>
           <button
             type="button"
             onClick={() => handleOpenEditModal(row)}
@@ -497,6 +534,42 @@ export default function AdminCatalogPage() {
                 Supprimer Définitivement
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Gestion et Remplacement Audio */}
+      {audioManagingBook && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-dark/80 animate-in fade-in">
+          <div className="bg-background rounded-3xl border border-border p-6 max-w-xl w-full shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-gold/10 text-gold">
+                  <Headphones className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-navy text-base">Gestion Audio — {audioManagingBook.title}</h3>
+                  <p className="text-[11px] text-foreground-muted">Remplacement ou téléversement de la piste audio Cloudflare Stream</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAudioManagingBook(null)}
+                className="p-1 text-foreground-muted hover:text-navy rounded-lg hover:bg-background-secondary transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <AudioReplacementDropzone
+              bookId={audioManagingBook.id}
+              bookTitle={audioManagingBook.title}
+              currentDurationSeconds={(audioManagingBook as any).audio_duration_seconds}
+              onSuccess={() => {
+                setAudioManagingBook(null);
+                toast.success("Piste audio actualisée !");
+              }}
+            />
           </div>
         </div>
       )}

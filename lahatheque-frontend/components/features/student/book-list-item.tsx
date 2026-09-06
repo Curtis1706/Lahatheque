@@ -10,6 +10,7 @@ import {
   BookOpen,
   Eye,
   ShoppingBag,
+  Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClientBookAccess } from "@/lib/types/student";
@@ -17,6 +18,7 @@ import { BookCover } from "./book-cover";
 import { BookSampleModal } from "./book-sample-modal";
 import { PaperOrderModal } from "./paper-order-modal";
 import { createOrder } from "@/lib/services/commerce-orders";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { cn } from "@/lib/utils";
 
 interface BookListItemProps {
@@ -26,6 +28,7 @@ interface BookListItemProps {
 }
 
 export function BookListItem({ book, onToggleFavorite, className }: BookListItemProps) {
+  const { playBook } = useAudioPlayer();
   const [showSample, setShowSample] = useState(false);
   const [showPaperModal, setShowPaperModal] = useState(false);
   const [isFav, setIsFav] = useState(book.is_favorite);
@@ -178,6 +181,18 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
             <BookOpen className="w-3.5 h-3.5 text-gold" />
             Détails
           </Link>
+
+          {(book.has_audio_version || (book as any).price_audio || (book as any).format === "audio" || (book as any).format_type === "audio") && (
+            <button
+              type="button"
+              onClick={() => playBook(book.id)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy font-bold text-xs border border-gold/40 transition-all min-h-[40px] cursor-pointer shadow-xs"
+              title="Écouter la version audio"
+            >
+              <Headphones className="w-3.5 h-3.5 text-gold" />
+              <span>Écouter</span>
+            </button>
+          )}
 
           <Link
             href={`/catalog/reader/${book.id}`}

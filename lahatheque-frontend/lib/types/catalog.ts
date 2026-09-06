@@ -24,6 +24,8 @@ export interface Book {
   publication_year?: number;
   price?: number;
   price_paper?: number;
+  price_audio?: number;
+  has_audio_version?: boolean;
   stock_disponible?: number;
   is_paper_available?: boolean;
   is_digital_available?: boolean;
