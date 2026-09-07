@@ -291,7 +291,7 @@ export function SavoirAfriqueSection() {
 
   return (
     <section className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 overflow-hidden">
-      <div className="w-full space-y-6 sm:space-y-8">
+      <div className="w-full space-y-8 sm:space-y-12">
         {/* En-tête de section */}
         <div className="text-center max-w-3xl mx-auto space-y-2.5">
           <span className="inline-block text-xs font-bold tracking-[0.2em] uppercase text-gold">
@@ -304,8 +304,8 @@ export function SavoirAfriqueSection() {
 
         {/* Scène Blueprint Interactive responsive */}
         <figure
-          className="relative w-full max-w-6xl mx-auto border border-border rounded-3xl bg-[#F5F6F8] shadow-sm overflow-hidden"
-          style={{ margin: "0 auto" }}
+          className="relative w-full max-w-6xl mx-auto border border-border rounded-3xl bg-[#F5F6F8] shadow-sm overflow-hidden mb-8 sm:mb-10"
+          style={{ margin: "0 auto 0 auto" }}
         >
           <div
             className="relative w-full"

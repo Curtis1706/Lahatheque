@@ -306,6 +306,96 @@ class AudioStreamSessionView(APIView):
         })
 
 
+class AudioPublicPreviewView(APIView):
+    """
+    GET /api/v1/audio/ouvrages/<ouvrage_id>/public-preview/
+    Extrait audio public (visiteur non connecté). Aucune authentification requise.
+    - Limite HARDCODÉE à 180 secondes côté serveur, indépendamment du client.
+    - Retourne uniquement l'URL publique R2 de la première piste (pas de token Cloudflare Stream signé).
+    - N'enregistre aucune session ni progression (visiteur anonyme).
+    """
+    permission_classes = [permissions.AllowAny]
+    PREVIEW_LIMIT_SECONDS = 180
+
+    def get(self, request, ouvrage_id):
+        from apps.catalog.models import Ouvrage
+        from django.conf import settings
+
+        try:
+            ouvrage = Ouvrage.objects.prefetch_related('authors').get(id=ouvrage_id, status='published')
+        except (Ouvrage.DoesNotExist, ValueError):
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
+
+        if not ouvrage.has_audio_version:
+            return Response({"success": False, "error": "Cet ouvrage ne dispose pas de version audio."}, status=404)
+
+        public_r2_url = (
+            getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', '')
+            or getattr(settings, 'CLOUDFLARE_R2_PUBLIC_DOMAIN', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
+        )
+
+        track = AudioTrack.objects.filter(ouvrage_id=ouvrage_id).order_by("order_index", "chapter_number", "id").first()
+        audio_url = None
+
+        if track:
+            if track.hls_manifest_url and (
+                track.hls_manifest_url.endswith('.mp3')
+                or 'r2.dev' in track.hls_manifest_url
+                or (track.hls_manifest_url.startswith('http') and '.m3u8' not in track.hls_manifest_url)
+            ):
+                audio_url = track.hls_manifest_url
+            elif track.stream_id and (track.stream_id.endswith('.mp3') or '/' in track.stream_id):
+                audio_url = f"{public_r2_url.rstrip('/')}/{track.stream_id.lstrip('/')}"
+            elif track.audio_file:
+                try:
+                    audio_url = track.audio_file.url
+                    if not audio_url.startswith("http"):
+                        audio_url = request.build_absolute_uri(audio_url)
+                except Exception:
+                    pass
+
+        if not audio_url and ouvrage.file:
+            fname = ouvrage.file.name.lower()
+            if ouvrage.format_type == 'audio' or fname.endswith(('.mp3', '.m4a', '.wav', '.aac', '.ogg')):
+                try:
+                    audio_url = ouvrage.file.url
+                    if not audio_url.startswith("http"):
+                        audio_url = request.build_absolute_uri(audio_url)
+                except Exception:
+                    pass
+
+        if not audio_url:
+            return Response(
+                {"success": False, "error": "L'extrait audio n'est pas encore disponible pour la lecture publique."},
+                status=404
+            )
+
+        authors_list = [
+            f"{a.first_name} {a.last_name}".strip()
+            for a in ouvrage.authors.all()
+            if f"{a.first_name} {a.last_name}".strip()
+        ]
+        cover_url = None
+        try:
+            cover_url = ouvrage.cover_image.url if ouvrage.cover_image else None
+        except Exception:
+            pass
+
+        return Response({
+            "success": True,
+            "data": {
+                "ouvrage_id": str(ouvrage.id),
+                "title": ouvrage.title,
+                "cover_url": cover_url,
+                "authors": authors_list,
+                "audio_url": audio_url,
+                "preview_limit_seconds": self.PREVIEW_LIMIT_SECONDS,
+                "track_title": track.title if track else ouvrage.title,
+                "track_duration_seconds": track.duration_seconds if track else None,
+            }
+        })
+
+
 class AudioListeningProgressView(APIView):
     """
     POST /api/v1/audio/tracks/<track_id>/progress/ - Enregistre la progression d'écoute.
