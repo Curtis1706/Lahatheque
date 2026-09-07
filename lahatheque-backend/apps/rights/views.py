@@ -1786,16 +1786,25 @@ class LegalRoyaltiesBatchView(APIView):
                             royalty_rate_obj.university_share_percent = None
                     royalty_rate_obj.save(update_fields=["university_share_percent"])
 
+                from apps.rights.models import RepartitionDroits
+
                 existing_author_rights_count = AuthorRight.objects.filter(ouvrage=ouvrage).count()
                 author_right = None
                 if existing_author_rights_count == 0:
+                    resolved_user = None
+                    repart_beneficiary = RepartitionDroits.objects.filter(ouvrage=ouvrage).exclude(beneficiaire__isnull=True).first()
+                    if repart_beneficiary:
+                        resolved_user = repart_beneficiary.beneficiaire
+                    elif ouvrage.authors.exists() and ouvrage.authors.first().user:
+                        resolved_user = ouvrage.authors.first().user
+
                     author_right, _ = AuthorRight.objects.get_or_create(
                         ouvrage=ouvrage,
                         role="auteur_principal",
-                        defaults={"pool_share_percent": 100.0}
+                        defaults={"pool_share_percent": 100.0, "user": resolved_user}
                     )
-                    if ouvrage.authors.exists() and ouvrage.authors.first().user:
-                        author_right.user = ouvrage.authors.first().user
+                    if not author_right.user and resolved_user:
+                        author_right.user = resolved_user
                         author_right.save()
                 else:
                     author_right = AuthorRight.objects.filter(ouvrage=ouvrage).first()
