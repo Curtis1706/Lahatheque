@@ -68,9 +68,61 @@ export interface WordDocumentOptions {
 }
 
 /**
+ * Assainit les chaînes de texte destinées à jsPDF :
+ * - Remplace les espaces insécables Unicode (\u202F, \u00A0, \u2000-\u200B, \uFEFF)
+ *   par un espace ASCII standard ' ' (0x20) pour éviter que jsPDF (police standard Helvetica WinAnsi)
+ *   ne les transforme en slash '/' ou en caractères corrompus.
+ * - Normalise les guillemets et tirets typographiques vers leurs équivalents ASCII.
+ */
+export function sanitizeForPdf(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  return String(val)
+    .replace(/[\u202F\u00A0\u2000-\u200B\uFEFF]/g, " ")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-")
+    .trim();
+}
+
+/**
+ * Formate un montant en devise pour le PDF avec espace ASCII standard (sans espace insécable étroit Unicode).
+ */
+export function formatPdfCurrency(amount: number, currency: string = "XOF"): string {
+  const rounded = Math.round(amount);
+  const formatted = rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return `${formatted} ${currency}`;
+}
+
+/**
  * 1. Générateur de PDF Officiel Haute Fidélité (Norme LAHAThèque)
  */
-export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<void> {
+export async function generateOfficialPdf(rawOptions: PdfDocumentOptions): Promise<void> {
+  // Assainissement universel préalable de toutes les données textuelles
+  const options: PdfDocumentOptions = {
+    ...rawOptions,
+    docNumber: sanitizeForPdf(rawOptions.docNumber),
+    date: sanitizeForPdf(rawOptions.date),
+    period: rawOptions.period ? sanitizeForPdf(rawOptions.period) : undefined,
+    recipient: rawOptions.recipient
+      ? {
+          name: sanitizeForPdf(rawOptions.recipient.name),
+          roleOrTitle: rawOptions.recipient.roleOrTitle ? sanitizeForPdf(rawOptions.recipient.roleOrTitle) : undefined,
+          addressOrCampus: rawOptions.recipient.addressOrCampus ? sanitizeForPdf(rawOptions.recipient.addressOrCampus) : undefined,
+          emailOrPhone: rawOptions.recipient.emailOrPhone ? sanitizeForPdf(rawOptions.recipient.emailOrPhone) : undefined,
+          taxId: rawOptions.recipient.taxId ? sanitizeForPdf(rawOptions.recipient.taxId) : undefined,
+        }
+      : undefined,
+    summaryCards: rawOptions.summaryCards?.map((c) => ({
+      label: sanitizeForPdf(c.label),
+      value: sanitizeForPdf(c.value),
+    })),
+    tableHeaders: rawOptions.tableHeaders.map((h) => sanitizeForPdf(h)),
+    tableRows: rawOptions.tableRows.map((row) => row.map((cell) => sanitizeForPdf(cell))),
+    totalLabel: rawOptions.totalLabel ? sanitizeForPdf(rawOptions.totalLabel) : undefined,
+    totalAmount: rawOptions.totalAmount ? sanitizeForPdf(rawOptions.totalAmount) : undefined,
+    totalNotes: rawOptions.totalNotes ? sanitizeForPdf(rawOptions.totalNotes) : undefined,
+  };
+
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -152,7 +204,7 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
 
   // ── 3. Cartouche du Document & Destinataire
   const boxWidth = (pageWidth - margin * 2 - 6) / 2;
-  const boxHeight = 28;
+  const boxHeight = 30;
 
   // Bloc Document (Gauche)
   doc.setFillColor(...lightBg);
@@ -172,15 +224,15 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
     RAPPORT_LOGISTIQUE: "RAPPORT D'INVENTAIRE & STOCKS",
   }[options.docType];
 
-  doc.text(docTypeLabel, margin + 4, y + 6);
+  doc.text(docTypeLabel, margin + 4, y + 6, { maxWidth: boxWidth - 8 });
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...textDark);
-  doc.text(`Réf : ${options.docNumber}`, margin + 4, y + 12);
-  doc.text(`Date d'émission : ${options.date}`, margin + 4, y + 17);
+  doc.text(`Réf : ${options.docNumber}`, margin + 4, y + 12, { maxWidth: boxWidth - 8 });
+  doc.text(`Date d'émission : ${options.date}`, margin + 4, y + 17, { maxWidth: boxWidth - 8 });
   if (options.period) {
-    doc.text(`Période : ${options.period}`, margin + 4, y + 22);
+    doc.text(`Période : ${options.period}`, margin + 4, y + 22, { maxWidth: boxWidth - 8 });
   }
 
   // Bloc Bénéficiaire / Tiers (Droite)
@@ -193,24 +245,24 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
     doc.setTextColor(...navyRgb);
-    doc.text("DESTINATAIRE / PARTENAIRE :", rightX + 4, y + 6);
+    doc.text("DESTINATAIRE / PARTENAIRE :", rightX + 4, y + 6, { maxWidth: boxWidth - 8 });
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
     doc.setTextColor(...goldRgb);
-    doc.text(options.recipient.name, rightX + 4, y + 11);
+    doc.text(options.recipient.name, rightX + 4, y + 11, { maxWidth: boxWidth - 8 });
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...textDark);
     if (options.recipient.roleOrTitle) {
-      doc.text(options.recipient.roleOrTitle, rightX + 4, y + 15.5);
+      doc.text(options.recipient.roleOrTitle, rightX + 4, y + 15.5, { maxWidth: boxWidth - 8 });
     }
     if (options.recipient.addressOrCampus) {
-      doc.text(options.recipient.addressOrCampus, rightX + 4, y + 20);
+      doc.text(options.recipient.addressOrCampus, rightX + 4, y + 20, { maxWidth: boxWidth - 8 });
     }
     if (options.recipient.emailOrPhone) {
-      doc.text(options.recipient.emailOrPhone, rightX + 4, y + 24.5);
+      doc.text(options.recipient.emailOrPhone, rightX + 4, y + 24.5, { maxWidth: boxWidth - 8 });
     }
   }
 

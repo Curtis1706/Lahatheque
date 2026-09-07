@@ -207,33 +207,37 @@ export default function AuthorRoyaltiesPage() {
             if (b.format_breakdown.audio > 0) formats.push(`${b.format_breakdown.audio} aud.`);
             const formatStr = formats.length > 0 ? formats.join(" / ") : "Numérique";
 
+            const formattedSales = Math.round(b.sales_count).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            const formattedGross = Math.round(b.gross_revenue).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            const formattedNet = Math.round(b.net_royalty).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
             return [
               b.title,
               formatStr,
-              `${b.sales_count.toLocaleString("fr-FR")} ex.`,
-              `${b.gross_revenue.toLocaleString("fr-FR")} XOF`,
+              `${formattedSales} ex.`,
+              `${formattedGross} XOF`,
               `${b.royalty_rate} %`,
-              `${b.net_royalty.toLocaleString("fr-FR")} XOF`,
+              `${formattedNet} XOF`,
             ];
           })
         : [
             [
               row.period,
-              `${row.total_sales_count.toLocaleString("fr-FR")} ex.`,
-              `${row.gross_revenue.toLocaleString("fr-FR")} XOF`,
-              `${row.author_earned_amount.toLocaleString("fr-FR")} XOF`,
+              `${Math.round(row.total_sales_count).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} ex.`,
+              `${Math.round(row.gross_revenue).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} XOF`,
+              `${Math.round(row.author_earned_amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} XOF`,
               row.status === "paid" ? "Versé" : "En attente",
             ],
           ];
 
       const columnStyles = hasDetailedBooks
         ? {
-            0: { cellWidth: 62, overflow: "linebreak" },
-            1: { cellWidth: 26, overflow: "linebreak" },
-            2: { halign: "right", cellWidth: 18 },
-            3: { halign: "right", cellWidth: 26 },
-            4: { halign: "center", cellWidth: 20 },
-            5: { halign: "right", cellWidth: 30, fontStyle: "bold" },
+            0: { cellWidth: 64, overflow: "linebreak" },
+            1: { cellWidth: 22, overflow: "linebreak" },
+            2: { halign: "right", cellWidth: 16 },
+            3: { halign: "right", cellWidth: 28 },
+            4: { halign: "center", cellWidth: 18 },
+            5: { halign: "right", cellWidth: 34, fontStyle: "bold" },
           }
         : undefined;
 
@@ -254,14 +258,14 @@ export default function AuthorRoyaltiesPage() {
         },
         summaryCards: [
           { label: "Période", value: quarterShortLabel },
-          { label: "Ventes Trimestre", value: `${row.total_sales_count.toLocaleString("fr-FR")} ex.` },
+          { label: "Ventes Trimestre", value: `${Math.round(row.total_sales_count).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} ex.` },
           { label: "Taux Appliqué", value: `${row.author_percentage_rate} %` },
           { label: "Règlement", value: row.status === "paid" ? "Payé" : "En cours" },
         ],
         tableHeaders,
         tableRows,
         columnStyles,
-        totalAmount: `${row.author_earned_amount.toLocaleString("fr-FR")} XOF`,
+        totalAmount: `${Math.round(row.author_earned_amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} XOF`,
         totalNotes:
           "Relevé trimestriel officiel de redevances certifié par LAHAThèque Éditions & Numérique S.A. Les droits sont liquidés au terme de chaque trimestre calendaire (T1: Janv-Mars, T2: Avr-Juin, T3: Juil-Sept, T4: Oct-Déc).",
         filename: `bordereau_redevances_auteur_${row.period.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
@@ -282,6 +286,10 @@ export default function AuthorRoyaltiesPage() {
             ? `Trimestre ${selectedQuarter} ${selectedYear !== "all" ? selectedYear : ""}`
             : "Relevé Périodique Consolidé";
 
+      const fmtSales = Math.round(periodTotals.totalSales).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+      const fmtGross = Math.round(periodTotals.totalGross).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+      const fmtEarned = Math.round(periodTotals.totalEarned).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
       await generateOfficialPdf({
         docType: "BORDEREAU_REDEVANCES",
         docNumber: `REL-PERIODE-${Date.now().toString().slice(-6)}`,
@@ -295,9 +303,9 @@ export default function AuthorRoyaltiesPage() {
         },
         summaryCards: [
           { label: "Période Décomptée", value: rangeLabel },
-          { label: "Ventes Cumulées", value: `${periodTotals.totalSales.toLocaleString("fr-FR")} exemplaires` },
-          { label: "Chiffre d'Affaires Brut", value: `${periodTotals.totalGross.toLocaleString("fr-FR")} XOF` },
-          { label: "Redevance Nette Auteur", value: `${periodTotals.totalEarned.toLocaleString("fr-FR")} XOF` },
+          { label: "Ventes Cumulées", value: `${fmtSales} exemplaires` },
+          { label: "Chiffre d'Affaires Brut", value: `${fmtGross} XOF` },
+          { label: "Redevance Nette Auteur", value: `${fmtEarned} XOF` },
         ],
         tableHeaders: [
           "Période Trimestrielle",
@@ -311,13 +319,13 @@ export default function AuthorRoyaltiesPage() {
         tableRows: filteredPayments.map((p) => [
           p.period,
           p.start_date && p.end_date ? `${p.start_date} au ${p.end_date}` : "-",
-          `${p.total_sales_count.toLocaleString("fr-FR")} ex.`,
-          `${p.gross_revenue.toLocaleString("fr-FR")} XOF`,
+          `${Math.round(p.total_sales_count).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} ex.`,
+          `${Math.round(p.gross_revenue).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} XOF`,
           `${p.author_percentage_rate}%`,
-          `${p.author_earned_amount.toLocaleString("fr-FR")} XOF`,
+          `${Math.round(p.author_earned_amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} XOF`,
           p.status === "paid" ? "Payé" : "En cours",
         ]),
-        totalAmount: `${periodTotals.totalEarned.toLocaleString("fr-FR")} XOF`,
+        totalAmount: `${fmtEarned} XOF`,
         totalNotes:
           "Relevé de droits d'auteur généré sur l'intervalle sélectionné par l'auteur. Certifié par LAHAThèque Éditions & Numérique S.A.",
         filename: `releve_droits_periode_${new Date().toISOString().slice(0, 10)}.pdf`,
