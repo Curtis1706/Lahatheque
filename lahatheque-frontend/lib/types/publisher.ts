@@ -150,16 +150,38 @@ export interface PublisherAuditLog {
   is_suspicious?: boolean;
 }
 
+export interface PublisherRoyaltyBookBreakdown {
+  book_id: string;
+  title: string;
+  cover_url?: string | null;
+  isbn?: string;
+  discipline?: string;
+  sales_count: number;
+  format_breakdown: {
+    digital: number;
+    paper: number;
+    audio: number;
+  };
+  gross_revenue: number;
+  royalty_rate: number;
+  net_royalty: number;
+}
+
 export interface PublisherRoyaltyPayment {
   id: string;
   reference?: string;
-  amount: number;
+  amount?: number;
   currency: string;
   period: string;
   quarter?: 1 | 2 | 3 | 4;
   year?: number;
   start_date?: string;
   end_date?: string;
+  total_sales_count?: number;
+  paper_sales_count?: number;
+  digital_sales_count?: number;
+  audio_sales_count?: number;
+  gross_revenue?: number;
   status: "paid" | "processing" | "pending" | "failed";
   payment_date?: string;
   paid_at?: string;
@@ -169,6 +191,7 @@ export interface PublisherRoyaltyPayment {
   total_sales_amount?: number;
   royalty_rate?: number;
   net_royalty_amount?: number;
+  books?: PublisherRoyaltyBookBreakdown[];
 }
 
 export interface PublisherKpis {

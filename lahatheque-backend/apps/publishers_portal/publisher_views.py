@@ -44,12 +44,92 @@ def get_or_create_publisher_profile(user) -> PublisherProfile:
     return prof
 
 
+def get_publisher_quarter_books(prof, start_date_str, end_date_str):
+    """
+    Retourne la liste détaillée des livres vendus pour une maison d'édition durant un trimestre donné.
+    Prend en compte les ventes directes (LigneCommande payées) et les commandes grossistes (WholesaleOrderItem validées).
+    """
+    from apps.catalog.models import Ouvrage
+    from apps.commerce.models import LigneCommande, WholesaleOrderItem, WholesaleOrderStatus
+
+    deposits_isbns = list(
+        PublisherBookDeposit.objects.filter(publisher=prof)
+        .exclude(isbn_digital="")
+        .values_list("isbn_digital", flat=True)
+    )
+    ouvrages_qs = Ouvrage.objects.filter(
+        Q(publisher=prof) | Q(isbn__in=deposits_isbns),
+        status='published'
+    ).select_related('discipline').distinct()
+
+    lignes = LigneCommande.objects.filter(
+        ouvrage__in=ouvrages_qs,
+        commande__statut_paiement='paid',
+        commande__created_at__date__gte=start_date_str,
+        commande__created_at__date__lte=end_date_str,
+    ).select_related('ouvrage')
+
+    w_items = WholesaleOrderItem.objects.filter(
+        book__in=ouvrages_qs,
+        order__created_at__date__gte=start_date_str,
+        order__created_at__date__lte=end_date_str,
+    ).exclude(order__status=WholesaleOrderStatus.CANCELLED).select_related('book')
+
+    rate = float(prof.contractual_royalty_rate or 22.0)
+    books = []
+
+    for o in ouvrages_qs:
+        o_lignes = [l for l in lignes if l.ouvrage_id == o.id]
+        o_w = [w for w in w_items if w.book_id == o.id]
+
+        if not o_lignes and not o_w:
+            continue
+
+        dig_qty = sum(l.quantity for l in o_lignes if l.format_type == 'digital') + sum(w.digital_licenses_qty for w in o_w)
+        pap_qty = sum(l.quantity for l in o_lignes if l.format_type == 'paper') + sum(w.print_copies_qty for w in o_w)
+        aud_qty = sum(l.quantity for l in o_lignes if l.format_type == 'audio')
+        tot_qty = dig_qty + pap_qty + aud_qty
+
+        dig_rev = sum(float(l.unit_price * l.quantity) for l in o_lignes if l.format_type == 'digital') + sum(float(w.digital_unit_price * w.digital_licenses_qty) for w in o_w)
+        pap_rev = sum(float(l.unit_price * l.quantity) for l in o_lignes if l.format_type == 'paper') + sum(float(w.print_unit_price * w.print_copies_qty) for w in o_w)
+        aud_rev = sum(float(l.unit_price * l.quantity) for l in o_lignes if l.format_type == 'audio')
+        gross_rev = dig_rev + pap_rev + aud_rev
+
+        net_royalty = (gross_rev * rate) / 100.0
+
+        cover_url = ""
+        if o.cover_image:
+            try:
+                cover_url = o.cover_image.url
+            except Exception:
+                cover_url = ""
+
+        books.append({
+            "book_id": str(o.id),
+            "title": o.title,
+            "cover_url": cover_url,
+            "isbn": o.isbn or "",
+            "discipline": o.discipline.name if o.discipline else "Discipline non spécifiée",
+            "sales_count": tot_qty,
+            "format_breakdown": {
+                "digital": dig_qty,
+                "paper": pap_qty,
+                "audio": aud_qty,
+            },
+            "gross_revenue": float(gross_rev),
+            "royalty_rate": rate,
+            "net_royalty": net_royalty,
+        })
+
+    return books
+
+
 class PublisherKpisView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         from apps.protection.models import TraceAcces
-        from apps.commerce.models import LigneCommande
+        from apps.commerce.models import LigneCommande, WholesaleOrderItem, WholesaleOrderStatus
         from apps.catalog.models import Ouvrage
         from django.db.models import F
 
@@ -61,36 +141,49 @@ class PublisherKpisView(APIView):
         pending_validations = deposits_qs.exclude(status=PublisherDepositStatus.PUBLISHED).count()
         published_books = deposits_qs.filter(status=PublisherDepositStatus.PUBLISHED).count()
 
-        totals = deposits_qs.aggregate(
-            total_consultations=Sum("consultations_count"),
-            total_downloads=Sum("downloads_count"),
-            total_revenue=Sum("revenue_generated"),
+        deposits_isbns = list(deposits_qs.exclude(isbn_digital="").values_list("isbn_digital", flat=True))
+        ouvrages_qs = Ouvrage.objects.filter(
+            Q(publisher=prof) | Q(isbn__in=deposits_isbns),
+            status='published'
+        ).distinct()
+
+        total_consultations_acc = TraceAcces.objects.filter(ouvrage__in=ouvrages_qs).count()
+
+        lignes = LigneCommande.objects.filter(
+            ouvrage__in=ouvrages_qs, commande__statut_paiement='paid'
         )
+        lignes_rev = float(lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0.0)
 
-        total_consultations_acc = 0
-        total_revenue_acc = 0.0
+        w_items = WholesaleOrderItem.objects.filter(
+            book__in=ouvrages_qs
+        ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+        w_rev = float(
+            w_items.aggregate(
+                t=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))
+            )['t'] or 0.0
+        )
+        total_revenue_acc = lignes_rev + w_rev
+        if total_revenue_acc == 0.0:
+            deposits_rev = float(
+                deposits_qs.aggregate(t=Sum("revenue_generated"))["t"] or 0.0
+            )
+            total_revenue_acc = deposits_rev
 
-        for b in deposits_qs:
-            real_c = 0
-            real_r = 0.0
-            if b.status == PublisherDepositStatus.PUBLISHED:
-                linked_ouvrage = Ouvrage.objects.filter(isbn=b.isbn_digital).first()
-                if linked_ouvrage:
-                    real_c = TraceAcces.objects.filter(ouvrage=linked_ouvrage).count()
-                    lignes = LigneCommande.objects.filter(
-                        ouvrage=linked_ouvrage, commande__statut_paiement='paid'
-                    )
-                    real_r = float(
-                        lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0
-                    )
-                else:
-                    real_c = b.consultations_count or 0
-                    real_r = float(b.revenue_generated or 0.0)
-                total_consultations_acc += real_c
-                total_revenue_acc += real_r
+        rate = float(str(prof.contractual_royalty_rate or 22.0))
+        total_earned = (total_revenue_acc * rate) / 100.0
 
-        rate = float(prof.contractual_royalty_rate)
-        pending_royalties = (total_revenue_acc * rate) / 100
+        already_withdrawn = float(
+            PublisherRoyaltyPayment.objects.filter(
+                publisher=prof, status__in=["pending", "approved", "processed", "paid"]
+            ).aggregate(t=Sum("net_royalty_amount"))["t"] or 0.0
+        )
+        available_balance = max(0.0, total_earned - already_withdrawn)
+
+        total_paid = float(
+            PublisherRoyaltyPayment.objects.filter(
+                publisher=prof, status="paid"
+            ).aggregate(t=Sum("net_royalty_amount"))["t"] or 0.0
+        )
 
         return Response({
             "success": True,
@@ -99,9 +192,11 @@ class PublisherKpisView(APIView):
                 "pendingValidations": pending_validations,
                 "publishedBooks": published_books,
                 "totalConsultations": total_consultations_acc,
-                "totalDownloads": totals["total_downloads"] or 0,
+                "totalDownloads": total_consultations_acc,
                 "totalRevenue": total_revenue_acc,
-                "pendingRoyalties": pending_royalties,
+                "pendingRoyalties": available_balance,
+                "totalWithdrawn": already_withdrawn,
+                "totalPaid": total_paid,
                 "contractualRoyaltyRate": rate,
                 "contractReference": prof.contract_reference or "CTR-PUB-2025-08",
             },
@@ -666,23 +761,68 @@ class PublisherRoyaltiesListView(APIView):
     def get(self, request):
         user = request.user
         prof = get_or_create_publisher_profile(user)
-        payments = PublisherRoyaltyPayment.objects.filter(publisher=prof)
-        data = [
-            {
-                "id": str(p.id),
-                "reference": p.reference,
-                "period": p.period,
-                "total_sales_amount": float(p.total_sales_amount),
-                "royalty_rate": float(p.royalty_rate),
-                "net_royalty_amount": float(p.net_royalty_amount),
-                "currency": p.currency,
-                "status": p.status,
-                "pdf_statement_url": p.pdf_statement_url or None,
-                "paid_at": p.paid_at.isoformat() if p.paid_at else None,
-            }
-            for p in payments
+
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+        year_str = request.query_params.get("year")
+        quarter_str = request.query_params.get("quarter")
+
+        quarter_definitions = [
+            {"quarter": 3, "year": 2026, "label": "3ème Trimestre 2026 (Juillet - Septembre)", "start": "2026-07-01", "end": "2026-09-30", "status": "pending", "pay_date": "2026-10-10"},
+            {"quarter": 2, "year": 2026, "label": "2ème Trimestre 2026 (Avril - Juin)", "start": "2026-04-01", "end": "2026-06-30", "status": "paid", "pay_date": "2026-07-10"},
+            {"quarter": 1, "year": 2026, "label": "1er Trimestre 2026 (Janvier - Mars)", "start": "2026-01-01", "end": "2026-03-31", "status": "paid", "pay_date": "2026-04-10"},
+            {"quarter": 4, "year": 2025, "label": "4ème Trimestre 2025 (Octobre - Décembre)", "start": "2025-10-01", "end": "2025-12-31", "status": "paid", "pay_date": "2026-01-10"},
         ]
-        return Response({"success": True, "data": data, "error": None})
+
+        rate = float(str(prof.contractual_royalty_rate or 22.0))
+        statements = []
+
+        for qd in quarter_definitions:
+            real_books = get_publisher_quarter_books(prof, qd["start"], qd["end"])
+
+            # Option A : Uniquement les trimestres avec ventes réelles effectives
+            if real_books:
+                tot_sales = sum(b["sales_count"] for b in real_books)
+                pap_sales = sum(b["format_breakdown"]["paper"] for b in real_books)
+                dig_sales = sum(b["format_breakdown"]["digital"] for b in real_books)
+                aud_sales = sum(b["format_breakdown"]["audio"] for b in real_books)
+                gross_rev = sum(b["gross_revenue"] for b in real_books)
+                net_earned = sum(b["net_royalty"] for b in real_books)
+
+                statements.append({
+                    "id": f"pay-pub-{qd['year']}-t{qd['quarter']}",
+                    "reference": f"REL-EDIT-{qd['year']}-T{qd['quarter']}",
+                    "period": qd["label"],
+                    "quarter": qd["quarter"],
+                    "year": qd["year"],
+                    "start_date": qd["start"],
+                    "end_date": qd["end"],
+                    "total_sales_count": tot_sales,
+                    "paper_sales_count": pap_sales,
+                    "digital_sales_count": dig_sales,
+                    "audio_sales_count": aud_sales,
+                    "gross_revenue": float(gross_rev),
+                    "total_sales_amount": float(gross_rev),
+                    "royalty_rate": rate,
+                    "net_royalty_amount": float(net_earned),
+                    "currency": "XOF",
+                    "status": qd["status"],
+                    "payment_date": qd["pay_date"],
+                    "books": real_books,
+                })
+
+        # Filtrage
+        filtered = statements
+        if year_str and year_str.isdigit():
+            filtered = [s for s in filtered if s.get("year") == int(year_str)]
+        if quarter_str and quarter_str.isdigit():
+            filtered = [s for s in filtered if s.get("quarter") == int(quarter_str)]
+        if start_date:
+            filtered = [s for s in filtered if s.get("end_date", "") >= start_date]
+        if end_date:
+            filtered = [s for s in filtered if s.get("start_date", "") <= end_date]
+
+        return Response({"success": True, "data": filtered, "error": None})
 
 
 class PublisherRoyaltiesWithdrawView(APIView):
@@ -697,37 +837,56 @@ class PublisherRoyaltiesWithdrawView(APIView):
         except (ValueError, TypeError):
             return Response({"success": False, "error": "Montant invalide."}, status=400)
 
-        if amount <= 0:
-            return Response({"success": False, "error": "Le montant doit être positif."}, status=400)
+        if amount < 50000:
+            return Response({
+                "success": False,
+                "error": "Le montant minimal de versement pour un éditeur partenaire est de 50 000 XOF."
+            }, status=400)
 
         from apps.catalog.models import Ouvrage
-        from apps.commerce.models import LigneCommande
+        from apps.commerce.models import LigneCommande, WholesaleOrderItem, WholesaleOrderStatus
         from django.db.models import F
 
-        deposits_qs = PublisherBookDeposit.objects.filter(publisher=prof)
-        total_revenue_acc = 0.0
-        for b in deposits_qs:
-            real_r = 0.0
-            if b.status == PublisherDepositStatus.PUBLISHED:
-                linked_ouvrage = Ouvrage.objects.filter(isbn=b.isbn_digital).first()
-                if linked_ouvrage:
-                    lignes = LigneCommande.objects.filter(
-                        ouvrage=linked_ouvrage, commande__statut_paiement='paid'
-                    )
-                    real_r = float(
-                        lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0
-                    )
-                else:
-                    real_r = float(b.revenue_generated or 0.0)
-                total_revenue_acc += real_r
+        deposits_isbns = list(
+            PublisherBookDeposit.objects.filter(publisher=prof)
+            .exclude(isbn_digital="")
+            .values_list("isbn_digital", flat=True)
+        )
+        ouvrages_qs = Ouvrage.objects.filter(
+            Q(publisher=prof) | Q(isbn__in=deposits_isbns),
+            status='published'
+        ).distinct()
 
-        rate = float(prof.contractual_royalty_rate)
+        lignes = LigneCommande.objects.filter(
+            ouvrage__in=ouvrages_qs, commande__statut_paiement='paid'
+        )
+        lignes_rev = float(lignes.aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0.0)
+
+        w_items = WholesaleOrderItem.objects.filter(
+            book__in=ouvrages_qs
+        ).exclude(order__status=WholesaleOrderStatus.CANCELLED)
+        w_rev = float(
+            w_items.aggregate(
+                t=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))
+            )['t'] or 0.0
+        )
+        total_revenue_acc = lignes_rev + w_rev
+        if total_revenue_acc == 0.0:
+            deposits_rev = float(
+                PublisherBookDeposit.objects.filter(publisher=prof)
+                .aggregate(t=Sum("revenue_generated"))["t"] or 0.0
+            )
+            total_revenue_acc = deposits_rev
+
+        rate = float(str(prof.contractual_royalty_rate or 22.0))
+        total_earned = (total_revenue_acc * rate) / 100.0
+
         already_withdrawn = float(
             PublisherRoyaltyPayment.objects.filter(
-                publisher=prof, status__in=["pending", "paid"]
-            ).aggregate(t=Sum("net_royalty_amount"))["t"] or 0
+                publisher=prof, status__in=["pending", "approved", "processed", "paid"]
+            ).aggregate(t=Sum("net_royalty_amount"))["t"] or 0.0
         )
-        available_balance = max(0.0, (total_revenue_acc * rate / 100) - already_withdrawn)
+        available_balance = max(0.0, total_earned - already_withdrawn)
 
         if float(amount) > available_balance:
             return Response({
@@ -735,14 +894,18 @@ class PublisherRoyaltiesWithdrawView(APIView):
                 "error": f"Montant demandé ({amount} XOF) supérieur au solde disponible ({available_balance:.2f} XOF)."
             }, status=400)
 
+        method = request.data.get("payment_method", "Virement Bancaire")
+        acc = request.data.get("account_details", "")
+        period_label = f"Virement {method} ({acc})" if acc else f"Demande de virement {timezone.now().strftime('%B %Y')}"
+
         ref = f"VIR-EDT-{timezone.now().strftime('%Y%m')}-{secrets.token_hex(3).upper()}"
         payment = PublisherRoyaltyPayment.objects.create(
             publisher=prof,
             reference=ref,
-            period=f"Demande de virement {timezone.now().strftime('%B %Y')}",
-            total_sales_amount=Decimal(str(amount)),
+            period=period_label,
+            total_sales_amount=amount,
             royalty_rate=prof.contractual_royalty_rate,
-            net_royalty_amount=Decimal(str(amount)),
+            net_royalty_amount=amount,
             currency="XOF",
             status="pending",
             pdf_statement_url=None
@@ -751,12 +914,33 @@ class PublisherRoyaltiesWithdrawView(APIView):
         return Response({
             "success": True,
             "data": {
+                "id": str(payment.id),
                 "reference": payment.reference,
                 "amount": float(payment.net_royalty_amount),
                 "status": payment.status,
+                "created_at": payment.created_at.isoformat(),
             },
             "error": None,
         })
+
+    def get(self, request):
+        user = request.user
+        prof = get_or_create_publisher_profile(user)
+        withdrawals = PublisherRoyaltyPayment.objects.filter(publisher=prof).order_by("-created_at")
+        data = [
+            {
+                "id": str(w.id),
+                "reference": w.reference,
+                "created_at": w.created_at.isoformat() if w.created_at else "",
+                "amount": float(w.net_royalty_amount),
+                "currency": w.currency,
+                "status": w.status,
+                "period": w.period,
+                "paid_at": w.paid_at.isoformat() if w.paid_at else None,
+            }
+            for w in withdrawals
+        ]
+        return Response({"success": True, "data": data, "error": None})
 
 
 class PublisherApiKeysView(APIView):

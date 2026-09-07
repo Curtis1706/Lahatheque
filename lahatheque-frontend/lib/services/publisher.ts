@@ -195,12 +195,35 @@ export async function getPublisherAuditLogs(): Promise<PublisherAuditLog[]> {
 
 // ─── Redevances & Ventes ─────────────────────────────────────────────────────
 
+export interface PublisherPayoutRequestItem {
+  id: string;
+  reference: string;
+  created_at: string;
+  amount: number;
+  currency: string;
+  status: "pending" | "approved" | "processed" | "paid" | "rejected";
+  period: string;
+  paid_at?: string | null;
+}
+
 export async function getPublisherRoyaltyPayments(): Promise<PublisherRoyaltyPayment[]> {
   return bffGet<PublisherRoyaltyPayment[]>("/royalties/");
 }
 
-export async function requestRoyaltyPayout(amount: number): Promise<boolean> {
-  await bffPost("/royalties/withdraw/", { amount });
+export async function getPublisherPayoutRequests(): Promise<PublisherPayoutRequestItem[]> {
+  return bffGet<PublisherPayoutRequestItem[]>("/royalties/withdraw/");
+}
+
+export async function requestRoyaltyPayout(
+  amount: number,
+  paymentMethod: string = "Virement Bancaire",
+  accountDetails: string = ""
+): Promise<boolean> {
+  await bffPost("/royalties/withdraw/", {
+    amount,
+    payment_method: paymentMethod,
+    account_details: accountDetails,
+  });
   return true;
 }
 

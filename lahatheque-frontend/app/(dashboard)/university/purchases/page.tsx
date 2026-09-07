@@ -19,8 +19,10 @@ import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { getUniversityPaperOrders } from "@/lib/services/university";
 import { generateOfficialPdf } from "@/lib/services/export-service";
 import type { UniversityPaperOrder } from "@/lib/types/university";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function UniversityPurchasesPage() {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<UniversityPaperOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
@@ -44,15 +46,18 @@ export default function UniversityPurchasesPage() {
     setGeneratingPdfId(order.id);
     try {
       const totalQty = order.items.reduce((sum, it) => sum + it.quantity, 0);
+      const universityBuyerName = user
+        ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "Université Partenaire (Campus)"
+        : "Université Partenaire (Campus)";
       await generateOfficialPdf({
         docType: "BON_COMMANDE",
         docNumber: order.order_number,
         date: new Date(order.created_at).toLocaleDateString("fr-FR"),
         recipient: {
-          name: "Université Partenaire (Campus)",
+          name: universityBuyerName,
           roleOrTitle: order.contact_person || "Responsable Acquisitions",
           addressOrCampus: order.delivery_campus,
-          emailOrPhone: order.contact_phone,
+          emailOrPhone: order.contact_phone || user?.email || "Campus Universitaire Agréé",
         },
         summaryCards: [
           { label: "Volumes Commandés", value: `${totalQty} exemplaires` },

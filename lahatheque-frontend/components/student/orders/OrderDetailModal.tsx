@@ -5,6 +5,7 @@ import { X, Printer, BookOpen, MapPin, ShoppingBag, ShieldCheck, Download } from
 import { toast } from "sonner";
 import { StudentOrder } from "@/lib/types/student-orders";
 import { generateOfficialPdf } from "@/lib/services/export-service";
+import { useAuth } from "@/hooks/use-auth";
 
 interface OrderDetailModalProps {
   order: StudentOrder | null;
@@ -13,6 +14,8 @@ interface OrderDetailModalProps {
 }
 
 export function OrderDetailModal({ order, isOpen, onClose }: OrderDetailModalProps) {
+  const { user } = useAuth();
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -32,15 +35,20 @@ export function OrderDetailModal({ order, isOpen, onClose }: OrderDetailModalPro
   const handleDownloadPdf = async () => {
     try {
       const orderRef = `#${order.id.slice(0, 8).toUpperCase()}`;
+      const customerName = user
+        ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "Client / Apprenant LAHAThèque"
+        : "Client / Apprenant LAHAThèque";
+      const customerEmail = user?.email || (order.livraison?.carrier_name ? `Transporteur : ${order.livraison.carrier_name}` : "contact@lahatheque.bj");
+
       await generateOfficialPdf({
         docType: "FACTURE",
         docNumber: orderRef,
         date: new Date(order.created_at).toLocaleDateString("fr-FR"),
         recipient: {
-          name: "Client / Apprenant LAHAThèque",
-          roleOrTitle: "Compte Lecteur Particulier",
+          name: customerName,
+          roleOrTitle: "Compte Lecteur Agréé LAHAThèque",
           addressOrCampus: order.livraison ? `${order.livraison.shipping_address}, ${order.livraison.city}` : "Livraison Numérique Instantanée",
-          emailOrPhone: order.livraison?.carrier_name ? `Transporteur : ${order.livraison.carrier_name}` : "contact@lahatheque.bj",
+          emailOrPhone: customerEmail,
         },
         summaryCards: [
           { label: "Articles", value: `${order.lignes?.length || 0} ouvrage(s)` },

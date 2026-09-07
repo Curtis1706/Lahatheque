@@ -23,6 +23,7 @@ import OrderCreateForm from "@/components/student/OrderCreateForm";
 import { BookCover } from "@/components/features/student/book-cover";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { generateOfficialPdf } from "@/lib/services/export-service";
+import { useAuth } from "@/hooks/use-auth";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ interface OrderTableRow extends OrderAPI {
 // ─── Page Principale ──────────────────────────────────────────────────────────
 
 export default function StudentOrdersPage() {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<OrderAPI[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -143,15 +145,20 @@ export default function StudentOrdersPage() {
     e.stopPropagation();
     try {
       const orderRef = `#${String(order.id).slice(0, 8).toUpperCase()}`;
+      const customerName = user
+        ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "Client / Apprenant LAHAThèque"
+        : "Client / Apprenant LAHAThèque";
+      const customerEmail = user?.email || (order.livraison?.carrier_name ? `Transporteur : ${order.livraison.carrier_name}` : "contact@lahatheque.bj");
+
       await generateOfficialPdf({
         docType: "FACTURE",
         docNumber: orderRef,
         date: formatDate(order.created_at),
         recipient: {
-          name: "Client / Apprenant LAHAThèque",
-          roleOrTitle: "Compte Lecteur Particulier",
+          name: customerName,
+          roleOrTitle: "Compte Lecteur Agréé LAHAThèque",
           addressOrCampus: order.livraison ? `${order.livraison.shipping_address}, ${order.livraison.city}` : "Livraison Numérique Instantanée",
-          emailOrPhone: order.livraison ? `Transporteur : ${order.livraison.carrier_name}` : "contact@lahatheque.bj",
+          emailOrPhone: customerEmail,
         },
         summaryCards: [
           { label: "Articles", value: `${order.lignes.length} ouvrage(s)` },

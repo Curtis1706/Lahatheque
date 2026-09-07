@@ -12,8 +12,10 @@ import type { WholesalerOrder } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { generateOfficialPdf } from "@/lib/services/export-service";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function WholesalerOrderDetailPage() {
+  const { user } = useAuth();
   const params = useParams();
   const orderId = (params?.id as string) || "";
   const [order, setOrder] = useState<WholesalerOrder | null>(null);
@@ -143,10 +145,10 @@ export default function WholesalerOrderDetailPage() {
                   docNumber: orderRef,
                   date: new Date(order.created_at).toLocaleDateString("fr-FR"),
                   recipient: {
-                    name: order.company_name || "Établissement Grossiste Partenaire",
+                    name: order.company_name || (user ? [user.first_name, user.last_name].filter(Boolean).join(" ") : "Établissement Grossiste Partenaire"),
                     roleOrTitle: "Grossiste Commercial Agréé",
                     addressOrCampus: order.delivery_address || "Livraison Réseau Grossiste",
-                    emailOrPhone: order.contact_phone || "grossiste@lahatheque.bj",
+                    emailOrPhone: order.contact_phone || user?.email || "Réseau Grossiste Agréé",
                   },
                   summaryCards: [
                     { label: "Volume Total", value: `${totalVol} ex. commandés` },

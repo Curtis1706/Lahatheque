@@ -273,13 +273,13 @@ class PublisherPortalFichesYTestCase(TestCase):
         self.assertEqual(item["revenue_generated"], 10000.0)
 
     def test_y5_royalties_withdraw_balance_check(self):
-        """Fiche Y5 : Le retrait de redevances vérifie le solde disponible et rejette les montants excessifs."""
+        """Fiche Y5 : Le retrait de redevances vérifie le solde disponible et le seuil minimal de 50 000 XOF."""
         PublisherBookDeposit.objects.create(
             publisher=self.publisher_profile,
             title="Livre Rentable",
             isbn_digital="978-2-PROFIT-001",
             price=Decimal("10000.00"),
-            revenue_generated=Decimal("40000.00"), # 25% de 40 000 = 10 000 XOF max disponible
+            revenue_generated=Decimal("400000.00"), # 25% de 400 000 = 100 000 XOF max disponible
             status=PublisherDepositStatus.PUBLISHED,
         )
 
@@ -289,19 +289,24 @@ class PublisherPortalFichesYTestCase(TestCase):
         res_zero = self.client.post("/api/v1/publishers/royalties/withdraw/", {"amount": 0}, format="json")
         self.assertEqual(res_zero.status_code, 400)
 
-        # 2. Montant supérieur au solde disponible (15 000 > 10 000) -> rejet 400
-        res_excess = self.client.post("/api/v1/publishers/royalties/withdraw/", {"amount": 15000}, format="json")
+        # 2. Montant inférieur au seuil minimal (30 000 < 50 000) -> rejet 400
+        res_threshold = self.client.post("/api/v1/publishers/royalties/withdraw/", {"amount": 30000}, format="json")
+        self.assertEqual(res_threshold.status_code, 400)
+        self.assertIn("minimal de versement", res_threshold.data["error"])
+
+        # 3. Montant supérieur au solde disponible (150 000 > 100 000) -> rejet 400
+        res_excess = self.client.post("/api/v1/publishers/royalties/withdraw/", {"amount": 150000}, format="json")
         self.assertEqual(res_excess.status_code, 400)
         self.assertIn("supérieur au solde disponible", res_excess.data["error"])
 
-        # 3. Montant valide (6 000 <= 10 000) -> succès
-        res_ok = self.client.post("/api/v1/publishers/royalties/withdraw/", {"amount": 6000}, format="json")
+        # 4. Montant valide (60 000 <= 100 000 et >= 50 000) -> succès
+        res_ok = self.client.post("/api/v1/publishers/royalties/withdraw/", {"amount": 60000}, format="json")
         self.assertEqual(res_ok.status_code, 200)
         self.assertTrue(res_ok.data["success"])
-        self.assertEqual(res_ok.data["data"]["amount"], 6000.0)
+        self.assertEqual(res_ok.data["data"]["amount"], 60000.0)
 
-        # 4. Deuxième retrait (5 000 > 4 000 restant) -> rejet
-        res_second = self.client.post("/api/v1/publishers/royalties/withdraw/", {"amount": 5000}, format="json")
+        # 5. Deuxième retrait (50 000 > 40 000 restant) -> rejet
+        res_second = self.client.post("/api/v1/publishers/royalties/withdraw/", {"amount": 50000}, format="json")
         self.assertEqual(res_second.status_code, 400)
 
     def test_z1_ai_metadata_extraction(self):

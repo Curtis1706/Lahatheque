@@ -35,10 +35,12 @@ import type {
 } from "@/lib/types/university";
 import { toast } from "sonner";
 import { generateOfficialPdf } from "@/lib/services/export-service";
+import { useAuth } from "@/hooks/use-auth";
 
 type TabType = "unit_sales" | "bouquets";
 
 export default function UniversityRoyaltiesPage() {
+  const { user } = useAuth();
   const [data, setData] = useState<UniversityRoyaltiesDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("unit_sales");
@@ -108,16 +110,22 @@ export default function UniversityRoyaltiesPage() {
   const handleExportUnitSalesPdf = async () => {
     if (!data) return;
     try {
+      const universityName = user
+        ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "Établissement Universitaire Partenaire"
+        : "Établissement Universitaire Partenaire";
+      const universityEmail = user?.email || "redevances@lahatheque.bj";
+      const universityPhone = user?.phone ? ` | ${user.phone}` : "";
+
       await generateOfficialPdf({
         docType: "BORDEREAU_REDEVANCES",
         docNumber: `REL-VENTES-${Date.now().toString().slice(-6)}`,
         date: new Date().toLocaleDateString("fr-FR"),
         period: "Année Académique 2025-2026",
         recipient: {
-          name: "Établissement Universitaire Partenaire",
+          name: universityName,
           roleOrTitle: "Relevé Analytique des Ventes à l'Unité",
-          addressOrCampus: "Campus Universitaire Principal",
-          emailOrPhone: "redevances@lahatheque.bj",
+          addressOrCampus: `Campus Universitaire • ID: ${user?.id ? user.id.slice(0, 8).toUpperCase() : "UNIV-AGR"}`,
+          emailOrPhone: `${universityEmail}${universityPhone}`,
         },
         summaryCards: [
           { label: "Taux Conventionné", value: `${data.contractual_rate}%` },
@@ -160,6 +168,12 @@ export default function UniversityRoyaltiesPage() {
   const handleExportBouquetsPdf = async () => {
     if (!data) return;
     try {
+      const universityName = user
+        ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "Établissement Universitaire Partenaire"
+        : "Établissement Universitaire Partenaire";
+      const universityEmail = user?.email || "redevances@lahatheque.bj";
+      const universityPhone = user?.phone ? ` | ${user.phone}` : "";
+
       const totalBouquetRoyalties = data.bouquet_royalties.reduce(
         (acc, b) => acc + b.net_royalty_amount,
         0
@@ -170,10 +184,10 @@ export default function UniversityRoyaltiesPage() {
         date: new Date().toLocaleDateString("fr-FR"),
         period: "1er Trimestre 2026",
         recipient: {
-          name: "Établissement Universitaire Partenaire",
+          name: universityName,
           roleOrTitle: "Relevé Analytique Quotes-Parts Abonnements Bouquets",
-          addressOrCampus: "Campus Universitaire Principal",
-          emailOrPhone: "redevances@lahatheque.bj",
+          addressOrCampus: `Campus Universitaire • ID: ${user?.id ? user.id.slice(0, 8).toUpperCase() : "UNIV-AGR"}`,
+          emailOrPhone: `${universityEmail}${universityPhone}`,
         },
         summaryCards: [
           { label: "Taux Conventionné", value: `${data.contractual_rate}%` },
