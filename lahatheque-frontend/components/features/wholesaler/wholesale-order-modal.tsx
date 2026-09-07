@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { createWholesalerOrder } from "@/lib/services/wholesaler";
 import type { WholesalerBookItem } from "@/lib/types/wholesaler";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 interface WholesaleOrderModalProps {
   book: WholesalerBookItem | null;
@@ -325,13 +326,12 @@ export function WholesaleOrderModal({
                   <label className="block text-[10px] text-foreground-muted font-bold mb-1">
                     Numéro de téléphone du responsable logistique :
                   </label>
-                  <input
-                    type="tel"
-                    required
+                  <PhoneInput
                     value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                    placeholder="Ex: +229 97 00 00 00"
-                    className="w-full px-3 py-2 rounded-xl bg-background border border-border text-navy text-xs focus:outline-none focus:border-gold font-medium"
+                    onChange={setContactPhone}
+                    required
+                    placeholder="97 00 00 00"
+                    className="min-h-[44px]"
                   />
                 </div>
               </div>

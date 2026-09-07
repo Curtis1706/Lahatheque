@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { ProfessionalContact, ContactCategory } from "@/lib/types/contacts";
 import { User, Mail, Phone, Building2, Briefcase, Tag, FileText, Loader2 } from "lucide-react";
 
@@ -213,16 +214,12 @@ export function AddEditContactModal({
             <label className="block text-xs font-semibold text-navy dark:text-white">
               Téléphone / WhatsApp
             </label>
-            <div className="relative">
-              <Phone className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+229 97 00 00 00"
-                className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-border bg-background focus:ring-2 focus:ring-navy focus:outline-none"
-              />
-            </div>
+            <PhoneInput
+              value={phone}
+              onChange={setPhone}
+              placeholder="97 00 00 00"
+              className="min-h-[44px]"
+            />
           </div>
         </div>
 

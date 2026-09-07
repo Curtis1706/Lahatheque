@@ -76,6 +76,10 @@ export interface BookAPI {
   price_digital: number;
   price_paper: number;
   is_paper_available?: boolean;
+  has_audio_version?: boolean;
+  price_audio?: number | null;
+  has_audio?: boolean;
+  is_audio_owned?: boolean;
   cover_url: string;
   is_owned?: boolean;
   has_digital_access?: boolean;

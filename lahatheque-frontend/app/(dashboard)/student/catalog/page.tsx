@@ -14,6 +14,7 @@ import {
   Truck,
   RotateCcw,
   X,
+  Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -150,6 +151,13 @@ function CatalogBookCard({
               Disponible en papier
             </span>
           )}
+
+          {(book.has_audio_version || book.has_audio) && (
+            <span className="text-[10px] font-bold text-navy bg-gold/15 border border-gold/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+              <Headphones className="w-3 h-3 text-gold shrink-0" />
+              <span>Audio dispo</span>
+            </span>
+          )}
         </div>
 
         {/* Barre d'actions aérée et adaptée à tous les écrans */}
@@ -278,6 +286,13 @@ function CatalogBookListItem({
           </div>
         ) : (
           <span className="text-xs font-bold text-success">Accès libre</span>
+        )}
+
+        {(book.has_audio_version || book.has_audio) && (
+          <span className="text-[10px] font-bold text-navy bg-gold/15 border border-gold/30 px-2.5 py-1 rounded-full flex items-center gap-1">
+            <Headphones className="w-3.5 h-3.5 text-gold shrink-0" />
+            <span>Audio dispo</span>
+          </span>
         )}
       </div>
 

@@ -237,23 +237,33 @@ class AudioStreamSessionView(APIView):
         sessions = []
         cf_subdomain = getattr(settings, 'CLOUDFLARE_STREAM_SUBDOMAIN', '') or 'customer-m033avyqq0x51sbg.cloudflarestream.com'
         for track in tracks:
+            token = "stream_token"
             try:
                 token = client.generate_signed_token(track.stream_id, expiry_seconds=3600)
             except Exception as e:
                 logger.error(f"Échec génération token audio: {e}")
                 token = "stream_token"
+            signed_url = f"https://{cf_subdomain}/{track.stream_id}/manifest/video.m3u8?token={token}"
+            if track.hls_manifest_url and track.hls_manifest_url.startswith("http"):
+                if token == "stream_token" or "cloudflare" not in track.hls_manifest_url:
+                    signed_url = track.hls_manifest_url
+
             sessions.append({
                 "id": str(track.id),
                 "chapter_number": track.chapter_number,
                 "title": track.title,
                 "duration_seconds": track.duration_seconds,
-                "signed_hls_url": f"https://{cf_subdomain}/{track.stream_id}/manifest/video.m3u8?token={token}",
+                "signed_hls_url": signed_url,
                 "captions_vtt_url": track.captions_vtt_url,
             })
 
         authors_list = []
         if hasattr(ouvrage, 'authors'):
-            authors_list = [a.full_name for a in ouvrage.authors.all()]
+            authors_list = [
+                f"{a.first_name} {a.last_name}".strip()
+                for a in ouvrage.authors.all()
+                if f"{a.first_name} {a.last_name}".strip()
+            ]
         if not authors_list and getattr(ouvrage, 'publisher_name', ''):
             authors_list = [ouvrage.publisher_name]
 

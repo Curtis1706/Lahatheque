@@ -1,0 +1,49 @@
+openapi: 3.0.3
+info:
+  title: API Pays et Contrat PhoneInput
+  version: 1.0.0
+  description: Spécification du contrat de données pour les pays actifs et la normalisation téléphonique.
+paths:
+  /api/v1/catalog/countries/:
+    get:
+      summary: Liste des pays configurés sur la plateforme
+      parameters:
+        - name: is_active
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filtrer par statut actif
+      responses:
+        '200':
+          description: Liste des pays actifs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Country'
+components:
+  schemas:
+    Country:
+      type: object
+      required:
+        - code
+        - name
+        - phone_code
+      properties:
+        code:
+          type: string
+          example: "BJ"
+        name:
+          type: string
+          example: "Bénin"
+        phone_code:
+          type: string
+          example: "+229"
+        currency:
+          type: string
+          example: "FCFA"
+        is_active:
+          type: boolean
+          example: true

@@ -942,7 +942,7 @@ class LegalContractsListView(APIView):
 
             ouvrage_for_validation = ouvrage if ouvrage else (Ouvrage.objects.filter(id=ouvrage_id).first() if ouvrage_id else None)
             book_has_paper = bool(ouvrage_for_validation and ouvrage_for_validation.is_paper_available)
-            book_has_audio = bool(ouvrage_for_validation and ouvrage_for_validation.audio_tracks.exists())
+            book_has_audio = bool(ouvrage_for_validation and (ouvrage_for_validation.audio_tracks.exists() or getattr(ouvrage_for_validation, 'has_audio_version', False)))
 
             if book_has_paper:
                 total_taux_papier = sum(float(r.get("taux_papier", 0) or 0) for r in repartitions_data)
@@ -1134,10 +1134,10 @@ class LegalContractsFormOptionsView(APIView):
                 "authors": authors_names or ["Auteur Principal"],
                 "author_user_ids": [str(a.user_id) for a in b.authors.all() if a.user_id],
                 "is_paper_available": bool(b.is_paper_available),
-                "has_audio_tracks": b.audio_tracks.exists(),
+                "has_audio_tracks": bool(b.audio_tracks.exists() or getattr(b, 'has_audio_version', False)),
                 "price_digital": float(b.price_digital) if b.price_digital is not None else None,
                 "price_paper": float(b.price_paper) if (b.is_paper_available and b.price_paper is not None) else None,
-                "price_audio": float(getattr(b, 'price_audio', None)) if (getattr(b, 'has_audio_version', False) and getattr(b, 'price_audio', None) is not None) else None,
+                "price_audio": float(b.price_audio) if (getattr(b, 'has_audio_version', False) and getattr(b, 'price_audio', None) is not None) else None,
             })
 
         # 2. Auteurs réels (User role='author')

@@ -28,6 +28,8 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     cover_url = serializers.SerializerMethodField()
     is_owned = serializers.SerializerMethodField()
     has_digital_access = serializers.SerializerMethodField()
+    has_audio = serializers.SerializerMethodField()
+    is_audio_owned = serializers.SerializerMethodField()
     author_discounted_digital_price = serializers.SerializerMethodField()
     author_discounted_paper_price = serializers.SerializerMethodField()
 
@@ -39,6 +41,7 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             'country', 'format_type', 'page_count', 'sample_pages_count', 'publication_date',
             'language', 'summary', 'status', 'price_digital', 'price_paper',
             'is_paper_available', 'cover_url', 'is_owned', 'has_digital_access',
+            'has_audio_version', 'price_audio', 'has_audio', 'is_audio_owned',
             'author_discounted_digital_price', 'author_discounted_paper_price',
         ]
 
@@ -75,6 +78,21 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
 
     def get_has_digital_access(self, obj) -> bool:
         return self.get_is_owned(obj)
+
+    def get_has_audio(self, obj) -> bool:
+        return bool(obj.has_audio_version or (hasattr(obj, 'audio_tracks') and obj.audio_tracks.exists()))
+
+    def get_is_audio_owned(self, obj) -> bool:
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            from apps.commerce.models import LigneCommande
+            return LigneCommande.objects.filter(
+                commande__user=request.user,
+                commande__statut_paiement='paid',
+                ouvrage=obj,
+                format_type='audio'
+            ).exists()
+        return False
 
     def get_author_discounted_digital_price(self, obj):
         request = self.context.get('request')

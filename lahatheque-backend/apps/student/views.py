@@ -653,7 +653,9 @@ class StudentCatalogView(APIView):
                 qs = qs.filter(Q(discipline__name__iexact=discipline_id) | Q(discipline__name__icontains=discipline_id))
 
         format_type = request.query_params.get('format')
-        if format_type and format_type != 'all':
+        if format_type == 'audio':
+            qs = qs.filter(Q(format_type='audio') | Q(has_audio_version=True) | Q(audio_tracks__isnull=False)).distinct()
+        elif format_type and format_type != 'all':
             qs = qs.filter(format_type=format_type)
 
         # Disciplines disponibles pour les filtres (toutes les disciplines du référentiel Admin)

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { AdminRole } from "@/lib/types/admin";
 import { createAdminUser } from "@/lib/services/admin";
 import { Shield, Mail, CheckCircle2 } from "lucide-react";
@@ -208,13 +209,14 @@ export function CreateAccountModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-foreground">Téléphone</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+229 97 00 00 00"
-                  className="w-full mt-1 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none"
-                />
+                <div className="mt-1">
+                  <PhoneInput
+                    value={formData.phone}
+                    onChange={(val) => setFormData({ ...formData, phone: val })}
+                    placeholder="97 00 00 00"
+                    className="min-h-[44px]"
+                  />
+                </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-foreground">Pays</label>

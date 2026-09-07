@@ -25,6 +25,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { DatePicker } from "@/components/ui/date-picker";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { getContractFormOptions, createLegalContract } from "@/lib/services/legal";
 import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 import type {
@@ -119,11 +120,14 @@ function NewLegalContractContent() {
 
           // Recherche de l'auteur correspondant dans la base
           if (authorNameParam) {
-            const found = data.authors?.find(
-              (a) =>
-                a.name.toLowerCase().includes(authorNameParam.toLowerCase()) ||
-                authorNameParam.toLowerCase().includes(a.name.toLowerCase())
-            );
+            const authorParamNorm = (authorNameParam || "").toLowerCase();
+            const found = data.authors?.find((a) => {
+              const aNameNorm = (a?.name || "").toLowerCase();
+              return (
+                (aNameNorm && aNameNorm.includes(authorParamNorm)) ||
+                (authorParamNorm && authorParamNorm.includes(aNameNorm))
+              );
+            });
 
             if (found) {
               setSelectedAuthorId(found.id);
@@ -156,11 +160,14 @@ function NewLegalContractContent() {
           // Recherche d'un ouvrage existant ayant un titre similaire
           if (data.ouvrages && data.ouvrages.length > 0) {
             if (titleParam) {
-              const foundBook = data.ouvrages.find(
-                (b) =>
-                  b.title.toLowerCase().includes(titleParam.toLowerCase()) ||
-                  titleParam.toLowerCase().includes(b.title.toLowerCase())
-              );
+              const titleParamNorm = (titleParam || "").toLowerCase();
+              const foundBook = data.ouvrages.find((b) => {
+                const bTitleNorm = (b?.title || "").toLowerCase();
+                return (
+                  (bTitleNorm && bTitleNorm.includes(titleParamNorm)) ||
+                  (titleParamNorm && titleParamNorm.includes(bTitleNorm))
+                );
+              });
               if (foundBook) setSelectedBookId(foundBook.id);
               else setSelectedBookId(data.ouvrages[0].id);
             } else {
@@ -201,14 +208,16 @@ function NewLegalContractContent() {
                 if (mainAuthor.phone) setContractingPartyPhone(mainAuthor.phone);
               }
             } else if (authorNames.length > 0) {
-              const matchedAuthor = data.authors?.find(
-                (a) =>
-                  authorNames.some(
-                    (name) =>
-                      a.name.toLowerCase().includes(name.toLowerCase()) ||
-                      name.toLowerCase().includes(a.name.toLowerCase())
-                  )
-              );
+              const matchedAuthor = data.authors?.find((a) => {
+                const aNameNorm = (a?.name || "").toLowerCase();
+                return authorNames.some((name) => {
+                  const nameNorm = (name || "").toLowerCase();
+                  return (
+                    (aNameNorm && aNameNorm.includes(nameNorm)) ||
+                    (nameNorm && nameNorm.includes(aNameNorm))
+                  );
+                });
+              });
               if (matchedAuthor) {
                 setSelectedAuthorId(matchedAuthor.id);
                 if (matchedAuthor.email) setContractingPartyEmail(matchedAuthor.email);
@@ -296,7 +305,11 @@ function NewLegalContractContent() {
       badge: a.phone || "Auteur",
     }));
 
-    if (authorNameParam && !list.some((a) => a.label.toLowerCase() === authorNameParam.toLowerCase())) {
+    const authorParamNorm = (authorNameParam || "").toLowerCase();
+    if (
+      authorParamNorm &&
+      !list.some((a) => (a?.label || "").toLowerCase() === authorParamNorm)
+    ) {
       list.unshift({
         value: `custom:${authorNameParam}`,
         label: `${authorNameParam} (Auteur du dossier)`,
@@ -387,14 +400,16 @@ function NewLegalContractContent() {
           if (mainAuthor.phone) setContractingPartyPhone(mainAuthor.phone);
         }
       } else if (authorNames.length > 0) {
-        const matchedAuthor = options?.authors?.find(
-          (a) =>
-            authorNames.some(
-              (name) =>
-                a.name.toLowerCase().includes(name.toLowerCase()) ||
-                name.toLowerCase().includes(a.name.toLowerCase())
-            )
-        );
+        const matchedAuthor = options?.authors?.find((a) => {
+          const aNameNorm = (a?.name || "").toLowerCase();
+          return authorNames.some((name) => {
+            const nameNorm = (name || "").toLowerCase();
+            return (
+              (aNameNorm && aNameNorm.includes(nameNorm)) ||
+              (nameNorm && nameNorm.includes(aNameNorm))
+            );
+          });
+        });
         if (matchedAuthor) {
           setSelectedAuthorId(matchedAuthor.id);
           if (matchedAuthor.email) setContractingPartyEmail(matchedAuthor.email);
@@ -691,7 +706,7 @@ function NewLegalContractContent() {
             {isAuthorContract && (
               <>
                 <div>
-                  <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <label className="text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
                     <BookOpen className="w-3.5 h-3.5 text-gold" />
                     Ouvrage Rattaché dans le Catalogue *
                   </label>
@@ -734,7 +749,7 @@ function NewLegalContractContent() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <label className="text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
                     <Users className="w-3.5 h-3.5 text-gold" />
                     Auteur Signataire Principal *
                   </label>
@@ -751,7 +766,7 @@ function NewLegalContractContent() {
 
                 {/* Sélecteur de Dossier de Pré-Édition Lié */}
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <label className="text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
                     <FileSpreadsheet className="w-3.5 h-3.5 text-gold" />
                     Dossier de Pré-Édition Lié (Optionnel)
                   </label>
@@ -791,7 +806,7 @@ function NewLegalContractContent() {
             {/* Cas 2: Convention Université -> Searchable Select Université */}
             {contractType === "university_agreement" && (
               <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
                   <Building2 className="w-3.5 h-3.5 text-gold" />
                   Université / Institution Partenaire *
                 </label>
@@ -814,7 +829,7 @@ function NewLegalContractContent() {
             {/* Cas 3: Éditeur Tiers -> Searchable Select Éditeur */}
             {contractType === "publisher_partnership" && (
               <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+                <label className="text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
                   <Building2 className="w-3.5 h-3.5 text-gold" />
                   Éditeur Tiers Enregistré *
                 </label>
@@ -836,7 +851,7 @@ function NewLegalContractContent() {
 
             {/* Coordonnées de la partie contractante */}
             <div>
-              <label htmlFor="contracting-party-email" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+              <label htmlFor="contracting-party-email" className="text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
                 <Mail className="w-3.5 h-3.5 text-gold" />
                 Email de la Partie Contractante
               </label>
@@ -851,23 +866,22 @@ function NewLegalContractContent() {
             </div>
 
             <div>
-              <label htmlFor="contracting-party-phone" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+              <label htmlFor="contracting-party-phone" className="text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
                 <Phone className="w-3.5 h-3.5 text-gold" />
                 Téléphone de la Partie Contractante
               </label>
-              <input
+              <PhoneInput
                 id="contracting-party-phone"
-                type="tel"
                 value={contractingPartyPhone}
-                onChange={(e) => setContractingPartyPhone(e.target.value)}
-                placeholder="+229 97 00 00 00"
-                className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
+                onChange={setContractingPartyPhone}
+                placeholder="97 00 00 00"
+                className="bg-background-secondary min-h-[44px]"
               />
             </div>
 
             {/* Sélecteur du Juriste responsable du dossier */}
             <div className="sm:col-span-2">
-              <label htmlFor="juriste-responsable-select" className="block text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
+              <label htmlFor="juriste-responsable-select" className="text-xs font-bold text-navy uppercase tracking-wider mb-1 flex items-center gap-1">
                 <Scale className="w-3.5 h-3.5 text-gold" />
                 Juriste Responsable du Dossier *
               </label>
