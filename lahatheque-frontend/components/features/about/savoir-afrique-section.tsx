@@ -305,7 +305,7 @@ export function SavoirAfriqueSection() {
         {/* Scène Blueprint Interactive responsive */}
         <figure
           className="relative w-full max-w-6xl mx-auto border border-border rounded-3xl bg-[#F5F6F8] shadow-sm overflow-hidden mb-8 sm:mb-10"
-          style={{ margin: "0 auto 0 auto" }}
+          style={{ marginLeft: "auto", marginRight: "auto" }}
         >
           <div
             className="relative w-full"
