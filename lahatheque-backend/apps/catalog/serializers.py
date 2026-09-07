@@ -459,9 +459,9 @@ class OuvrageCreateSerializer(serializers.Serializer):
             RoyaltyRate.objects.get_or_create(
                 ouvrage=ouvrage,
                 defaults={
-                    "author_share_percent": 70.00 if selected_author_user else 0.00,
-                    "publisher_share_percent": 30.00 if publisher_obj else 0.00,
-                    "platform_share_percent": 0.00
+                    "author_share_percent": 15.00 if selected_author_user else 0.00,
+                    "publisher_share_percent": 0.00,
+                    "platform_share_percent": 85.00 if selected_author_user else 100.00
                 }
             )
 

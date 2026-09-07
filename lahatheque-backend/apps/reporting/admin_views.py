@@ -522,6 +522,25 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             return Response({"success": False, "error": f"Erreur lors de la suppression: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def _resolve_real_royalty_rate(contract, partner_type):
+    """Résout le vrai taux depuis RoyaltyRate, jamais une valeur fabriquée."""
+    from apps.rights.models import RoyaltyRate
+
+    if not getattr(contract, 'ouvrage', None):
+        return 15.0 if partner_type == "author" else (15.0 if partner_type == "publisher" else 5.0)
+
+    rate_obj = RoyaltyRate.objects.filter(ouvrage=contract.ouvrage).first()
+    if not rate_obj:
+        return 15.0 if partner_type == "author" else (15.0 if partner_type == "publisher" else 5.0)
+
+    if partner_type == "author":
+        return float(rate_obj.author_share_percent) if rate_obj.author_share_percent is not None else 15.0
+    elif partner_type == "publisher":
+        return float(rate_obj.publisher_share_percent) if rate_obj.publisher_share_percent is not None else 15.0
+    else:
+        return float(rate_obj.university_share_percent) if rate_obj.university_share_percent is not None else 5.0
+
+
 class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
     """
     GET /api/v1/admin/royalties/payouts/
@@ -679,7 +698,7 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
                     "partner_name": c.contracting_party or c.titre,
                     "partner_type": p_type,
                     "contract_reference": c.numero_contrat,
-                    "custom_royalty_rate": 70.0 if p_type == "author" else (22.0 if p_type == "publisher" else 15.0),
+                    "custom_royalty_rate": _resolve_real_royalty_rate(c, p_type),
                     "payout_frequency": "monthly",
                     "payment_method_preferred": "bank",
                     "account_identifier": "Compte conventionné",
