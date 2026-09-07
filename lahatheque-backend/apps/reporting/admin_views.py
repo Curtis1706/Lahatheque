@@ -523,19 +523,26 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
 
 
 def _resolve_real_royalty_rate(contract, partner_type):
-    """Résout le vrai taux depuis RoyaltyRate, jamais une valeur fabriquée."""
-    from apps.rights.models import RoyaltyRate
+    """Résout le vrai taux depuis RepartitionDroits (ou RoyaltyRate), avec repli à 5% pour les auteurs."""
+    from apps.rights.models import RepartitionDroits, RoyaltyRate
 
     if not getattr(contract, 'ouvrage', None):
-        return 15.0 if partner_type == "author" else (15.0 if partner_type == "publisher" else 5.0)
+        return 5.0 if partner_type == "author" else (15.0 if partner_type == "publisher" else 5.0)
+
+    if partner_type == "author":
+        rep = RepartitionDroits.objects.filter(ouvrage=contract.ouvrage).first()
+        if rep and rep.taux_numerique is not None:
+            return float(rep.taux_numerique)
+        rate_obj = RoyaltyRate.objects.filter(ouvrage=contract.ouvrage).first()
+        if rate_obj and rate_obj.author_share_percent is not None:
+            return float(rate_obj.author_share_percent)
+        return 5.0
 
     rate_obj = RoyaltyRate.objects.filter(ouvrage=contract.ouvrage).first()
     if not rate_obj:
-        return 15.0 if partner_type == "author" else (15.0 if partner_type == "publisher" else 5.0)
+        return 15.0 if partner_type == "publisher" else 5.0
 
-    if partner_type == "author":
-        return float(rate_obj.author_share_percent) if rate_obj.author_share_percent is not None else 15.0
-    elif partner_type == "publisher":
+    if partner_type == "publisher":
         return float(rate_obj.publisher_share_percent) if rate_obj.publisher_share_percent is not None else 15.0
     else:
         return float(rate_obj.university_share_percent) if rate_obj.university_share_percent is not None else 5.0
@@ -567,8 +574,11 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
             book_title = book.title if book else "Ouvrage"
             period_str = pl.calculation.period_month.strftime("%Y-%m") if (pl.calculation and pl.calculation.period_month) else ""
 
-            rate_obj = RoyaltyRate.objects.filter(ouvrage=book).first() if book else None
-            author_rate = float(rate_obj.author_share_percent) if (rate_obj and rate_obj.author_share_percent is not None) else 15.0
+            from apps.rights.models import RepartitionDroits
+            rep = RepartitionDroits.objects.filter(ouvrage=book, beneficiaire=author).first() if (book and author) else None
+            if not rep and book:
+                rep = RepartitionDroits.objects.filter(ouvrage=book).first()
+            author_rate = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 5.0
 
             results.append({
                 "id": f"payout-line-{pl.id}",
@@ -1249,9 +1259,9 @@ class AdminContractViewSet(viewsets.ViewSet):
         if c.ouvrage:
             reps = RepartitionDroits.objects.filter(ouvrage=c.ouvrage).select_related('beneficiaire')
             for r in reps:
-                p_rate = float(r.taux_papier) if r.taux_papier is not None else 10.0
-                d_rate = float(r.taux_numerique) if r.taux_numerique is not None else 15.0
-                a_rate = float(r.taux_audio_tts) if r.taux_audio_tts is not None else 8.0
+                p_rate = float(r.taux_papier) if r.taux_papier is not None else 5.0
+                d_rate = float(r.taux_numerique) if r.taux_numerique is not None else 5.0
+                a_rate = float(r.taux_audio_tts) if r.taux_audio_tts is not None else 5.0
                 repartition_list.append({
                     "id": str(r.id),
                     "author_name": r.beneficiaire.get_full_name() or r.beneficiaire.email,
@@ -1263,13 +1273,16 @@ class AdminContractViewSet(viewsets.ViewSet):
                     "audio_tts_rate": a_rate,
                 })
 
-            # Vrai taux global de droits d'auteur (% de la vente) — jamais la répartition
-            # entre co-auteurs.
-            book_rate_obj = RoyaltyRate.objects.filter(ouvrage=c.ouvrage).first()
-            if book_rate_obj and book_rate_obj.author_share_percent is not None:
-                royalty_rate = float(book_rate_obj.author_share_percent)
+            # Taux de référence droits d'auteur (% de la vente), par défaut 5%
+            rep_first = reps.first()
+            if rep_first and rep_first.taux_numerique is not None:
+                royalty_rate = float(rep_first.taux_numerique)
             else:
-                royalty_rate = 15.0
+                book_rate_obj = RoyaltyRate.objects.filter(ouvrage=c.ouvrage).first()
+                if book_rate_obj and book_rate_obj.author_share_percent is not None:
+                    royalty_rate = float(book_rate_obj.author_share_percent)
+                else:
+                    royalty_rate = 5.0
             is_derogatory = royalty_rate > 20.0
         elif partner_type == "university" and c.institution:
             royalty_rate = float(getattr(c.institution, 'taux_redevance_defaut', 5.0) or 5.0)
@@ -1278,7 +1291,7 @@ class AdminContractViewSet(viewsets.ViewSet):
         elif partner_type == "publisher" and c.publisher:
             royalty_rate = float(getattr(c.publisher, 'taux_commission_standard', 70.0) or 70.0)
         else:
-            royalty_rate = 15.0
+            royalty_rate = 5.0
 
         file_url = None
         if c.fichier_contrat_path:
@@ -2395,18 +2408,18 @@ class AdminAuthorRoyaltiesReportView(APIView):
             total_due = float(payout_lines.aggregate(t=Sum('payout_amount'))['t'] or 0)
             total_paid = float(payout_lines.filter(is_settled=True).aggregate(t=Sum('payout_amount'))['t'] or 0)
 
-            from apps.rights.models import RoyaltyRate
+            from apps.rights.models import RepartitionDroits
 
             rights_count = rights.count()
             effective_rates = []
             for r in rights:
-                pool_share = float(r.pool_share_percent) if r.pool_share_percent is not None else 100.0
-                book_rate_obj = RoyaltyRate.objects.filter(ouvrage=r.ouvrage).first()
-                global_rate = float(book_rate_obj.author_share_percent) if (book_rate_obj and book_rate_obj.author_share_percent is not None) else 15.0
-                # Taux effectif par livre = part de répartition × taux global de droits négocié
-                effective_rates.append(global_rate * (pool_share / 100))
+                rep = RepartitionDroits.objects.filter(ouvrage=r.ouvrage, beneficiaire=author).first()
+                if not rep:
+                    rep = RepartitionDroits.objects.filter(ouvrage=r.ouvrage).first()
+                rate = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 5.0
+                effective_rates.append(rate)
 
-            avg_rate = float(sum(effective_rates) / len(effective_rates)) if effective_rates else 0
+            avg_rate = float(sum(effective_rates) / len(effective_rates)) if effective_rates else 5.0
 
             results.append({
                 "author_id": str(author.id),
@@ -2473,15 +2486,15 @@ class AdminAuthorRoyaltyDetailView(APIView):
 
         for r in rights:
             book = r.ouvrage
-            rate_obj = RoyaltyRate.objects.filter(ouvrage=book).first()
-            global_rate = float(rate_obj.author_share_percent) if (rate_obj and rate_obj.author_share_percent is not None) else 15.0
-            pool_share = float(r.pool_share_percent) if r.pool_share_percent is not None else 100.0
-            effective_rate = round(global_rate * (pool_share / 100.0), 2)
-
             repart = RepartitionDroits.objects.filter(ouvrage=book, beneficiaire=author).first()
-            taux_pap = _resolve_safe_rate(repart.taux_papier if repart else None, effective_rate)
-            taux_num = _resolve_safe_rate(repart.taux_numerique if repart else None, effective_rate)
-            taux_aud = _resolve_safe_rate(repart.taux_audio_tts if repart else None, 8.0)
+            if not repart:
+                repart = RepartitionDroits.objects.filter(ouvrage=book).first()
+
+            taux_pap = _resolve_safe_rate(repart.taux_papier if repart else None, 5.0)
+            taux_num = _resolve_safe_rate(repart.taux_numerique if repart else None, 5.0)
+            taux_aud = _resolve_safe_rate(repart.taux_audio_tts if repart else None, 5.0)
+            effective_rate = taux_num
+            pool_share = 100.0
 
             lignes = LigneCommande.objects.filter(ouvrage=book, commande__statut_paiement='paid')
 

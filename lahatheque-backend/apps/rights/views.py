@@ -234,18 +234,22 @@ class AuthorBooksListView(APIView):
             downloads = TraceAcces.objects.filter(
                 ouvrage=b, access_type='download'
             ).count()
-            author_right = AuthorRight.objects.filter(ouvrage=b, user=user).first()
+            rep = RepartitionDroits.objects.filter(ouvrage=b, beneficiaire=user).first()
+            if not rep:
+                rep = RepartitionDroits.objects.filter(ouvrage=b).first()
 
-            from apps.rights.models import RoyaltyRate
+            taux_p = float(rep.taux_papier) if (rep and rep.taux_papier is not None) else 5.0
+            taux_num = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 5.0
+            taux_aud = float(rep.taux_audio_tts) if (rep and rep.taux_audio_tts is not None) else 5.0
 
-            pool_share = float(author_right.pool_share_percent) if author_right else 100.0
-            book_rate_obj = RoyaltyRate.objects.filter(ouvrage=b).first()
-            global_author_rate = float(book_rate_obj.author_share_percent) if (book_rate_obj and book_rate_obj.author_share_percent is not None) else 15.0
+            ind_dig_rev = float(lignes.filter(format_type='digital').aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0.0)
+            ind_prt_rev = float(lignes.filter(format_type='paper').aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0.0)
+            ind_aud_rev = float(lignes.filter(format_type='audio').aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0.0)
+            w_dig_rev = float(w_items.aggregate(t=Sum(F('digital_unit_price') * F('digital_licenses_qty')))['t'] or 0.0)
+            w_prt_rev = float(w_items.aggregate(t=Sum(F('print_unit_price') * F('print_copies_qty')))['t'] or 0.0)
 
-            # Taux réellement applicable : part de répartition × taux global de droits négocié,
-            # cohérent avec AuthorBookDetailView (Fiche BH9).
-            effective_rate = global_author_rate * (pool_share / 100)
-            share = rev * (effective_rate / 100)
+            share = (ind_dig_rev + w_dig_rev) * (taux_num / 100.0) + (ind_prt_rev + w_prt_rev) * (taux_p / 100.0) + ind_aud_rev * (taux_aud / 100.0)
+            effective_rate = taux_num
             rate = effective_rate
             format_breakdown = {
                 "digital": (lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0) + w_dig_qty,
@@ -328,19 +332,22 @@ class AuthorBookDetailView(APIView):
         downloads = TraceAcces.objects.filter(
             ouvrage=b, access_type='download'
         ).count()
-        from apps.rights.models import RoyaltyRate
+        rep = RepartitionDroits.objects.filter(ouvrage=b, beneficiaire=user).first()
+        if not rep:
+            rep = RepartitionDroits.objects.filter(ouvrage=b).first()
 
-        author_right = AuthorRight.objects.filter(ouvrage=b, user=user).first()
-        pool_share = float(author_right.pool_share_percent) if author_right else 100.0
+        taux_p = float(rep.taux_papier) if (rep and rep.taux_papier is not None) else 5.0
+        taux_num = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 5.0
+        taux_aud = float(rep.taux_audio_tts) if (rep and rep.taux_audio_tts is not None) else 5.0
 
-        book_rate_obj = RoyaltyRate.objects.filter(ouvrage=b).first()
-        global_author_rate = float(book_rate_obj.author_share_percent) if (book_rate_obj and book_rate_obj.author_share_percent is not None) else 15.0
+        ind_dig_rev = float(lignes.filter(format_type='digital').aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0.0)
+        ind_prt_rev = float(lignes.filter(format_type='paper').aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0.0)
+        ind_aud_rev = float(lignes.filter(format_type='audio').aggregate(t=Sum(F('unit_price') * F('quantity')))['t'] or 0.0)
+        w_dig_rev = float(w_items.aggregate(t=Sum(F('digital_unit_price') * F('digital_licenses_qty')))['t'] or 0.0)
+        w_prt_rev = float(w_items.aggregate(t=Sum(F('print_unit_price') * F('print_copies_qty')))['t'] or 0.0)
 
-        # Taux réellement applicable à cet auteur : sa part de répartition, appliquée au
-        # taux global de droits d'auteur négocié pour ce livre — pas la part de répartition
-        # seule, qui donnerait un montant très supérieur à ce qu'il touchera réellement.
-        effective_rate = global_author_rate * (pool_share / 100)
-        share = rev * (effective_rate / 100)
+        share = (ind_dig_rev + w_dig_rev) * (taux_num / 100.0) + (ind_prt_rev + w_prt_rev) * (taux_p / 100.0) + ind_aud_rev * (taux_aud / 100.0)
+        effective_rate = taux_num
         rate = effective_rate
         format_breakdown = {
             "digital": (lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0) + w_dig_qty,
@@ -420,6 +427,11 @@ class AuthorRoyaltiesStatementsView(APIView):
                 end_m = q * 3
                 end_d = f"{calc.period_month.year}-{end_m:02d}-30" if end_m in (6, 9) else f"{calc.period_month.year}-{end_m:02d}-31"
 
+                rep = RepartitionDroits.objects.filter(ouvrage=calc.ouvrage, beneficiaire=user).first()
+                if not rep:
+                    rep = RepartitionDroits.objects.filter(ouvrage=calc.ouvrage).first()
+                actual_rate = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 5.0
+
                 statements.append({
                     "id": str(line.id),
                     "period": period_str,
@@ -431,7 +443,7 @@ class AuthorRoyaltiesStatementsView(APIView):
                     "paper_sales_count": int(calc.total_reads_count * 0.45),
                     "digital_sales_count": int(calc.total_reads_count * 0.55),
                     "gross_revenue": float(calc.total_revenue),
-                    "author_percentage_rate": float(line.author_right.pool_share_percent),
+                    "author_percentage_rate": actual_rate,
                     "author_earned_amount": float(line.payout_amount),
                     "status": "paid" if line.is_settled else "pending",
                     "payment_date": f"05/{(end_m % 12) + 1:02d}/{calc.period_month.year}",
@@ -957,52 +969,7 @@ class LegalContractsListView(APIView):
                 indexing_status = "processing"
                 needs_async_ocr = True
 
-        # Gestion et validation stricte de la clé de répartition des redevances
         raw_repartitions = request.data.get("repartitions")
-        repartitions_data = []
-        if raw_repartitions:
-            if isinstance(raw_repartitions, str):
-                try:
-                    repartitions_data = json.loads(raw_repartitions)
-                except Exception:
-                    repartitions_data = []
-            elif isinstance(raw_repartitions, list):
-                repartitions_data = raw_repartitions
-
-        if len(repartitions_data) > 0:
-            total_percent = sum(float(r.get("pourcentage", 0)) for r in repartitions_data)
-            if abs(total_percent - 100.0) > 0.01:
-                return Response({
-                    "success": False,
-                    "error": f"La somme des quotes-parts de droits d'auteur doit être exactement de 100.00% (actuel: {total_percent:.2f}%)."
-                }, status=400)
-
-            ouvrage_for_validation = ouvrage if ouvrage else (Ouvrage.objects.filter(id=ouvrage_id).first() if ouvrage_id else None)
-            book_has_paper = bool(ouvrage_for_validation and ouvrage_for_validation.is_paper_available)
-            book_has_audio = bool(ouvrage_for_validation and (ouvrage_for_validation.audio_tracks.exists() or getattr(ouvrage_for_validation, 'has_audio_version', False)))
-
-            if book_has_paper:
-                total_taux_papier = sum(float(r.get("taux_papier", 0) or 0) for r in repartitions_data)
-                if abs(total_taux_papier - 100.0) > 0.01:
-                    return Response({
-                        "success": False,
-                        "error": f"La somme des Taux Papier doit être exactement de 100.00% entre co-auteurs (actuel: {total_taux_papier:.2f}%)."
-                    }, status=400)
-
-            total_taux_numerique = sum(float(r.get("taux_numerique", 0) or 0) for r in repartitions_data)
-            if abs(total_taux_numerique - 100.0) > 0.01:
-                return Response({
-                    "success": False,
-                    "error": f"La somme des Taux Numérique doit être exactement de 100.00% entre co-auteurs (actuel: {total_taux_numerique:.2f}%)."
-                }, status=400)
-
-            if book_has_audio:
-                total_taux_audio = sum(float(r.get("taux_audio_tts", 0) or 0) for r in repartitions_data)
-                if abs(total_taux_audio - 100.0) > 0.01:
-                    return Response({
-                        "success": False,
-                        "error": f"La somme des Taux Livre Audio doit être exactement de 100.00% entre co-auteurs (actuel: {total_taux_audio:.2f}%)."
-                    }, status=400)
 
         data = request.data
         num_contrat = f"CTR-JUR-2026-{uuid.uuid4().hex[:4].upper()}"
@@ -1069,67 +1036,73 @@ class LegalContractsListView(APIView):
         except Exception as e:
             logger.warning(f"Suggestion IA non générée pour le contrat {contrat.id}: {e}")
 
-        # Si des quotes-parts d'ayants droit sont définies et qu'un ouvrage est lié, on verrouille la répartition en base
-        if ouvrage and len(repartitions_data) > 0:
-            RepartitionDroits.objects.filter(ouvrage=ouvrage).delete()
-            for r in repartitions_data:
-                ben_id = r.get("user_id") or r.get("beneficiaire_id")
-                ben_user = User.objects.filter(id=ben_id).first() if ben_id else signataire
-                if not ben_user and signataire:
-                    ben_user = signataire
+        # R2 : Un seul bénéficiaire, taux par format indépendants, défaut 5% si non renseigné
+        if ouvrage:
+            beneficiary_user_id = (
+                request.data.get("beneficiary_user_id") or
+                request.data.get("signataire_user_id") or
+                (str(signataire.id) if signataire else None)
+            )
+            if not beneficiary_user_id and raw_repartitions:
+                try:
+                    reps = json.loads(raw_repartitions) if isinstance(raw_repartitions, str) else raw_repartitions
+                    if reps and isinstance(reps, list) and len(reps) > 0:
+                        beneficiary_user_id = reps[0].get("user_id") or reps[0].get("beneficiaire_id")
+                except Exception:
+                    pass
 
-                if ben_user:
-                    pct = float(r.get("pourcentage", 100.0))
-                    paper = float(r.get("taux_papier", 10.0)) if r.get("taux_papier") else 10.0
-                    digital = float(r.get("taux_numerique", 15.0)) if r.get("taux_numerique") else 15.0
-                    audio = float(r.get("taux_audio_tts", 8.0)) if r.get("taux_audio_tts") else 8.0
+            if not beneficiary_user_id:
+                return Response({"success": False, "error": "Un bénéficiaire (auteur) est requis."}, status=400)
 
-                    RepartitionDroits.objects.create(
-                        ouvrage=ouvrage,
-                        beneficiaire=ben_user,
-                        role_libelle=r.get("role_libelle", "Auteur Principal"),
-                        pourcentage=pct,
-                        taux_papier=paper,
-                        taux_numerique=digital,
-                        taux_audio_tts=audio
-                    )
+            from apps.accounts.models import User as UserModel
+            beneficiary_user = UserModel.objects.filter(id=beneficiary_user_id).first()
+            if not beneficiary_user:
+                return Response({"success": False, "error": "Bénéficiaire introuvable."}, status=404)
 
-                    ba = ouvrage.authors.filter(
-                        models.Q(user=ben_user) |
-                        models.Q(first_name__iexact=ben_user.first_name, last_name__iexact=ben_user.last_name)
-                    ).first()
-                    if ba and not ba.user:
-                        ba.user = ben_user
-                        ba.save(update_fields=['user'])
+            def _rate_or_default(key):
+                val = request.data.get(key)
+                if val is None or str(val).strip() == "":
+                    return 5.0
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return 5.0
 
-                    AuthorRight.objects.update_or_create(
-                        ouvrage=ouvrage,
-                        user=ben_user,
-                        defaults={
-                            "author": ba,
-                            "role": r.get("role_libelle", "auteur_principal"),
-                            "pool_share_percent": pct,
-                        }
-                    )
+            taux_papier = _rate_or_default("taux_papier")
+            taux_numerique = _rate_or_default("taux_numerique")
+            taux_audio_tts = _rate_or_default("taux_audio_tts")
 
-            # Taux global de droits d'auteur : un champ DISTINCT de la répartition entre
-            # co-auteurs, envoyé explicitement par le frontend (Fiche BH4).
-            author_royalty_rate = request.data.get("author_royalty_rate")
-            if author_royalty_rate is not None and str(author_royalty_rate).strip() != "":
-                global_author_rate = float(author_royalty_rate)
-            else:
-                global_author_rate = 15.0
+            from apps.rights.models import RepartitionDroits, AuthorRight
 
-            existing_rate_obj = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
-            existing_pub_pct = float(existing_rate_obj.publisher_share_percent) if (existing_rate_obj and existing_rate_obj.publisher_share_percent) else 0.0
-            platform_rate = max(0.0, 100.0 - global_author_rate - existing_pub_pct)
+            RepartitionDroits.objects.filter(ouvrage=ouvrage).exclude(beneficiaire=beneficiary_user).delete()
+            RepartitionDroits.objects.update_or_create(
+                ouvrage=ouvrage,
+                beneficiaire=beneficiary_user,
+                defaults={
+                    "role_libelle": "Auteur Principal",
+                    "pourcentage": 100.0,
+                    "taux_papier": taux_papier,
+                    "taux_numerique": taux_numerique,
+                    "taux_audio_tts": taux_audio_tts,
+                }
+            )
 
-            RoyaltyRate.objects.update_or_create(
+            ba = ouvrage.authors.filter(
+                models.Q(user=beneficiary_user) |
+                models.Q(first_name__iexact=beneficiary_user.first_name, last_name__iexact=beneficiary_user.last_name)
+            ).first()
+            if ba and not ba.user:
+                ba.user = beneficiary_user
+                ba.save(update_fields=['user'])
+
+            AuthorRight.objects.filter(ouvrage=ouvrage).exclude(user=beneficiary_user).delete()
+            AuthorRight.objects.update_or_create(
                 ouvrage=ouvrage,
                 defaults={
-                    "author_share_percent": global_author_rate,
-                    "publisher_share_percent": existing_pub_pct,
-                    "platform_share_percent": platform_rate,
+                    "user": beneficiary_user,
+                    "author": ba,
+                    "pool_share_percent": 100.0,
+                    "role": "auteur_principal"
                 }
             )
 
@@ -1710,19 +1683,19 @@ class LegalRoyaltiesListView(APIView):
             if not authors_list:
                 authors_list = ["Auteur LAHA"]
 
-            # Trouver le taux auteur
+            # Trouver le taux auteur (taux de redevance par format ou defaut 5%)
             rate_obj = RoyaltyRate.objects.filter(ouvrage=b).first()
             author_right = AuthorRight.objects.filter(ouvrage=b).first()
             repart_obj = RepartitionDroits.objects.filter(ouvrage=b).first()
 
-            if rate_obj:
+            if repart_obj and repart_obj.taux_numerique is not None:
+                current_rate = float(repart_obj.taux_numerique)
+            elif rate_obj and rate_obj.author_share_percent is not None:
                 current_rate = float(rate_obj.author_share_percent)
-            elif author_right:
-                current_rate = float(author_right.pool_share_percent)
-            elif repart_obj:
+            elif repart_obj and repart_obj.pourcentage is not None and float(repart_obj.pourcentage) <= 50.0:
                 current_rate = float(repart_obj.pourcentage)
             else:
-                current_rate = 15.0
+                current_rate = 5.0
 
             inst_data = None
             if b.institution:
@@ -1990,98 +1963,108 @@ class LegalAiSuggestionDecisionView(APIView):
             sug.delete()
             return Response({"success": True, "message": "Suggestion IA rejetée."})
 
-        splits = request.data.get("splits")
-        if not splits:
-            splits = [{"author_name": sug.beneficiaire_nom, "percentage": float(sug.pourcentage_suggere)}]
-
-        total = sum(float(s.get("percentage", 0)) for s in splits)
-        if abs(total - 100.0) > 0.01:
-            return Response({
-                "success": False,
-                "error": f"La répartition doit sommer à exactement 100% avant validation (actuel : {total:.2f}%)."
-            }, status=400)
-
         if not sug.ouvrage:
             return Response({
                 "success": False,
                 "error": "Cette suggestion n'est rattachée à aucun ouvrage précis — impossible de créer les droits."
             }, status=400)
 
+        from apps.accounts.models import User
         from apps.catalog.models import BookAuthor
 
-        created_rights = []
-        unmatched_names = []
-        matched_splits = []
+        # Taux par format avec valeur par défaut issue de la suggestion IA ou 5%
+        default_rate = float(sug.pourcentage_suggere) if sug.pourcentage_suggere else 5.0
+        taux_papier = float(request.data.get("taux_papier") if request.data.get("taux_papier") is not None else default_rate)
+        taux_numerique = float(request.data.get("taux_numerique") if request.data.get("taux_numerique") is not None else default_rate)
+        taux_audio_tts = float(request.data.get("taux_audio_tts") if request.data.get("taux_audio_tts") is not None else default_rate)
 
-        # Récupération des auteurs déjà rattachés à l'ouvrage
-        book_authors = list(sug.ouvrage.authors.select_related('user').all())
+        # Résolution du bénéficiaire unique (un seul auteur par livre)
+        beneficiary_user = None
+        book_author = None
+        beneficiary_user_id = request.data.get("beneficiary_user_id")
 
-        for s in splits:
-            name = s.get("author_name", "").strip()
-            pct = float(s.get("percentage", 0))
-            if pct <= 0:
-                continue
+        if beneficiary_user_id:
+            beneficiary_user = User.objects.filter(id=beneficiary_user_id).first()
+            if beneficiary_user:
+                book_author = sug.ouvrage.authors.filter(user=beneficiary_user).first()
 
-            book_author = None
-            clean_name = name.lower()
+        if not beneficiary_user:
+            book_authors = list(sug.ouvrage.authors.select_related('user').all())
+            target_name = (request.data.get("author_name") or "").strip()
+            if not target_name and request.data.get("splits"):
+                target_name = (request.data.get("splits")[0].get("author_name") or "").strip()
+            if not target_name:
+                target_name = (sug.beneficiaire_nom or "").strip()
 
-            # 1. Correspondance exacte sur prénom + nom ou nom + prénom
-            for ba in book_authors:
-                full1 = f"{ba.first_name} {ba.last_name}".strip().lower()
-                full2 = f"{ba.last_name} {ba.first_name}".strip().lower()
-                if clean_name == full1 or clean_name == full2:
-                    book_author = ba
-                    break
+            clean_name = target_name.lower() if target_name else ""
 
-            # 2. Correspondance souple si non trouvé (nom partiel ou premier mot)
-            if not book_author:
+            if clean_name:
                 for ba in book_authors:
-                    full = f"{ba.first_name} {ba.last_name}".strip().lower()
-                    if clean_name in full or full in clean_name:
+                    full1 = f"{ba.first_name} {ba.last_name}".strip().lower()
+                    full2 = f"{ba.last_name} {ba.first_name}".strip().lower()
+                    if clean_name == full1 or clean_name == full2:
                         book_author = ba
                         break
 
-            if not book_author and name:
-                first_part = name.split()[0].lower()
-                for ba in book_authors:
-                    if first_part in ba.first_name.lower() or first_part in ba.last_name.lower():
-                        book_author = ba
+                if not book_author:
+                    for ba in book_authors:
+                        full = f"{ba.first_name} {ba.last_name}".strip().lower()
+                        if clean_name in full or full in clean_name:
+                            book_author = ba
+                            break
+
+                if not book_author and len(clean_name.split()) > 0:
+                    first_part = clean_name.split()[0]
+                    for ba in book_authors:
+                        if first_part in ba.first_name.lower() or first_part in ba.last_name.lower():
+                            book_author = ba
+                            break
+
+            if not book_author and book_authors:
+                book_author = book_authors[0]
+
+            if book_author:
+                if book_author.user:
+                    beneficiary_user = book_author.user
+                elif book_author.email:
+                    matched_user = User.objects.filter(email__iexact=book_author.email).first()
+                    if matched_user:
+                        book_author.user = matched_user
+                        book_author.save(update_fields=['user'])
+                        beneficiary_user = matched_user
+
+            if not beneficiary_user and target_name:
+                for u in User.objects.filter(role__in=['author', 'admin', 'superadmin']):
+                    fn = f"{u.first_name} {u.last_name}".strip().lower()
+                    if clean_name and (clean_name == fn or clean_name == u.username.lower()):
+                        beneficiary_user = u
                         break
 
-            # 3. Si book_author n'a pas encore de compte user mais possède un email enregistré
-            if book_author and not book_author.user and book_author.email:
-                from apps.accounts.models import User
-                matched_user = User.objects.filter(email__iexact=book_author.email).first()
-                if matched_user:
-                    book_author.user = matched_user
-                    book_author.save(update_fields=['user'])
-
-            if not book_author or not book_author.user:
-                unmatched_names.append(name)
-            else:
-                matched_splits.append((book_author, pct))
-
-        if unmatched_names:
+        if not beneficiary_user:
             return Response({
                 "success": False,
-                "error": f"Impossible de valider : les bénéficiaires suivants ne sont pas rattachés à un compte auteur sur cet ouvrage : {', '.join(unmatched_names)}. Rattachez-les d'abord au livre."
+                "error": "Impossible de valider : aucun compte utilisateur auteur associé à cet ouvrage n'a pu être identifié."
             }, status=400)
 
         with transaction.atomic():
-            for book_author, pct in matched_splits:
-                author_right, _ = AuthorRight.objects.update_or_create(
-                    ouvrage=sug.ouvrage,
-                    user=book_author.user,
-                    defaults={"pool_share_percent": pct, "author": book_author}
-                )
-                created_rights.append(str(author_right.id))
+            author_right, _ = AuthorRight.objects.update_or_create(
+                ouvrage=sug.ouvrage,
+                user=beneficiary_user,
+                defaults={"pool_share_percent": 100.0, "author": book_author, "role": "auteur_principal"}
+            )
 
-                # Mettre à jour ou créer la RepartitionDroits associée pour cohérence juridique
-                RepartitionDroits.objects.update_or_create(
-                    ouvrage=sug.ouvrage,
-                    beneficiaire=book_author.user,
-                    defaults={"pourcentage": pct, "role_libelle": "Auteur / Co-auteur"}
-                )
+            # Création ou mise à jour de la RepartitionDroits avec taux par format et part 100%
+            RepartitionDroits.objects.update_or_create(
+                ouvrage=sug.ouvrage,
+                beneficiaire=beneficiary_user,
+                defaults={
+                    "pourcentage": 100.0,
+                    "taux_papier": taux_papier,
+                    "taux_numerique": taux_numerique,
+                    "taux_audio_tts": taux_audio_tts,
+                    "role_libelle": "Auteur",
+                }
+            )
 
             sug.is_validated = True
             sug.validated_by = request.user
@@ -2089,28 +2072,28 @@ class LegalAiSuggestionDecisionView(APIView):
 
             from apps.rights.models import RoyaltyRate
 
-            global_rate_from_ai = request.data.get("global_author_rate")
-            if global_rate_from_ai is None:
-                global_rate_from_ai = float(sug.pourcentage_suggere)
-            else:
-                global_rate_from_ai = float(global_rate_from_ai)
-
+            ref_rate = float(taux_numerique)
             existing_rate_obj = RoyaltyRate.objects.filter(ouvrage=sug.ouvrage).first()
             existing_publisher_pct = float(existing_rate_obj.publisher_share_percent) if (existing_rate_obj and existing_rate_obj.publisher_share_percent) else 0.0
 
             RoyaltyRate.objects.update_or_create(
                 ouvrage=sug.ouvrage,
                 defaults={
-                    "author_share_percent": global_rate_from_ai,
+                    "author_share_percent": ref_rate,
                     "publisher_share_percent": existing_publisher_pct,
-                    "platform_share_percent": max(0.0, 100.0 - global_rate_from_ai - existing_publisher_pct),
+                    "platform_share_percent": max(0.0, 100.0 - ref_rate - existing_publisher_pct),
                 }
             )
 
         return Response({
             "success": True,
-            "message": f"Répartition validée — {len(created_rights)} droit(s) d'auteur créé(s)/mis à jour.",
-            "data": {"author_rights_created": created_rights}
+            "message": f"Taux validés avec succès pour {beneficiary_user.get_full_name() or beneficiary_user.username} (Papier: {taux_papier:.1f}%, Numérique: {taux_numerique:.1f}%, Audio: {taux_audio_tts:.1f}%).",
+            "data": {
+                "author_rights_created": [str(author_right.id)],
+                "taux_papier": float(taux_papier),
+                "taux_numerique": float(taux_numerique),
+                "taux_audio_tts": float(taux_audio_tts),
+            }
         })
 
 
@@ -2496,24 +2479,31 @@ class LegalRelancesListView(APIView):
             total_revenue += w_rev
 
             # Calcul des redevances estimées pour la période
-            from apps.rights.models import AuthorRight
-            author_rights = AuthorRight.objects.filter(user=author_user, ouvrage__in=ouvrages_qs)
-            rights_by_book = {}
-            for ar in author_rights:
-                rate = float(ar.pool_share_percent) / 100.0
-                rights_by_book[ar.ouvrage_id] = rate
-                rights_by_book[str(ar.ouvrage_id)] = rate
+            from apps.rights.models import RepartitionDroits
+            reparts = RepartitionDroits.objects.filter(beneficiaire=author_user, ouvrage__in=ouvrages_qs)
+            rates_by_book = {}
+            for rep in reparts:
+                taux_p = float(rep.taux_papier) if rep.taux_papier is not None else 5.0
+                taux_d = float(rep.taux_numerique) if rep.taux_numerique is not None else 5.0
+                taux_a = float(rep.taux_audio_tts) if rep.taux_audio_tts is not None else 5.0
+                rates_by_book[rep.ouvrage_id] = {"paper": taux_p / 100.0, "digital": taux_d / 100.0, "audio": taux_a / 100.0}
 
             total_royalties_estimated = 0.0
-            for ligne_item in lignes.values('ouvrage').annotate(st=Sum(F('unit_price') * F('quantity'))):
+            for ligne_item in lignes.values('ouvrage', 'format_type').annotate(st=Sum(F('unit_price') * F('quantity'))):
                 b_id = ligne_item['ouvrage']
-                b_rate = rights_by_book.get(b_id, rights_by_book.get(str(b_id), 0.15))
+                fmt = ligne_item.get('format_type', 'digital')
+                b_rates = rates_by_book.get(b_id, {"paper": 0.05, "digital": 0.05, "audio": 0.05})
+                b_rate = b_rates.get(fmt, 0.05)
                 total_royalties_estimated += float(ligne_item['st'] or 0) * b_rate
 
-            for w_row in w_items.values('book').annotate(st=Sum(F('digital_unit_price') * F('digital_licenses_qty') + F('print_unit_price') * F('print_copies_qty'))):
+            for w_row in w_items.values('book').annotate(
+                dig_st=Sum(F('digital_unit_price') * F('digital_licenses_qty')),
+                prt_st=Sum(F('print_unit_price') * F('print_copies_qty'))
+            ):
                 b_id = w_row['book']
-                b_rate = rights_by_book.get(b_id, rights_by_book.get(str(b_id), 0.15))
-                total_royalties_estimated += float(w_row['st'] or 0) * b_rate
+                b_rates = rates_by_book.get(b_id, {"paper": 0.05, "digital": 0.05, "audio": 0.05})
+                total_royalties_estimated += float(w_row['dig_st'] or 0) * b_rates.get("digital", 0.05)
+                total_royalties_estimated += float(w_row['prt_st'] or 0) * b_rates.get("paper", 0.05)
 
             payout_lines = RoyaltyPayoutLine.objects.filter(author_right__user=author_user)
             if start_date and end_date:
@@ -2822,15 +2812,17 @@ class LegalRelancesListView(APIView):
             gross_sales = float(lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0)
 
             # Redevances par ouvrage pour cet auteur
-            from apps.rights.models import AuthorRight
+            from apps.rights.models import RepartitionDroits
             sales_breakdown = []
             total_net_royalties = 0.0
 
             for b in ouvrages_qs:
                 b_lignes = lignes.filter(ouvrage=b)
                 b_gross = float(b_lignes.aggregate(total=Sum(F('unit_price') * F('quantity')))['total'] or 0.0)
-                ar = AuthorRight.objects.filter(user=author_user, ouvrage=b).first()
-                rate_val = float(ar.pool_share_percent) if ar else 15.0
+                rep = RepartitionDroits.objects.filter(beneficiaire=author_user, ouvrage=b).first()
+                if not rep:
+                    rep = RepartitionDroits.objects.filter(ouvrage=b).first()
+                rate_val = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 5.0
                 net_val = (b_gross * rate_val) / 100.0
                 total_net_royalties += net_val
                 sales_breakdown.append({
@@ -2916,13 +2908,15 @@ class LegalRelancesListView(APIView):
 
                 # Envoyer uniquement si ventes > 0
                 if gross > 0:
-                    from apps.rights.models import AuthorRight
+                    from apps.rights.models import RepartitionDroits
                     sales_breakdown = []
                     total_net = 0.0
                     for b in ouvrages_qs:
                         b_gross = float(lignes.filter(ouvrage=b).aggregate(s=Sum(F('unit_price') * F('quantity')))['s'] or 0.0)
-                        ar = AuthorRight.objects.filter(user=a_user, ouvrage=b).first()
-                        rate_val = float(ar.pool_share_percent) if ar else 15.0
+                        rep = RepartitionDroits.objects.filter(beneficiaire=a_user, ouvrage=b).first()
+                        if not rep:
+                            rep = RepartitionDroits.objects.filter(ouvrage=b).first()
+                        rate_val = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 5.0
                         b_net = (b_gross * rate_val) / 100.0
                         total_net += b_net
                         sales_breakdown.append({"title": b.title, "gross": b_gross, "rate": rate_val, "net": b_net})

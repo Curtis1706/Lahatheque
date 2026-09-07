@@ -26,10 +26,10 @@ export function EditRoyaltyModal({
   onClose,
   onConfirm,
 }: EditRoyaltyModalProps) {
-  const [rate, setRate] = useState(royalty.current_rate);
-  const [paperRate, setPaperRate] = useState(royalty.paper_rate ?? 100);
-  const [digitalRate, setDigitalRate] = useState(royalty.digital_rate ?? 100);
-  const [audioRate, setAudioRate] = useState(royalty.audio_tts_rate ?? 100);
+  const [rate, setRate] = useState(royalty.current_rate ?? 5);
+  const [paperRate, setPaperRate] = useState(royalty.paper_rate ?? 5);
+  const [digitalRate, setDigitalRate] = useState(royalty.digital_rate ?? 5);
+  const [audioRate, setAudioRate] = useState(royalty.audio_tts_rate ?? 5);
   const [universityRate, setUniversityRate] = useState<string>(
     royalty.university_share_percent !== undefined && royalty.university_share_percent !== null
       ? String(royalty.university_share_percent)
@@ -39,10 +39,10 @@ export function EditRoyaltyModal({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setRate(royalty.current_rate);
-    setPaperRate(royalty.paper_rate ?? 100);
-    setDigitalRate(royalty.digital_rate ?? 100);
-    setAudioRate(royalty.audio_tts_rate ?? 100);
+    setRate(royalty.current_rate ?? 5);
+    setPaperRate(royalty.paper_rate ?? 5);
+    setDigitalRate(royalty.digital_rate ?? 5);
+    setAudioRate(royalty.audio_tts_rate ?? 5);
     setUniversityRate(
       royalty.university_share_percent !== undefined && royalty.university_share_percent !== null
         ? String(royalty.university_share_percent)
@@ -190,8 +190,7 @@ export function EditRoyaltyModal({
                 )}
 
                 <p className="text-[10px] text-foreground-muted italic">
-                  Pour une répartition par format entre plusieurs co-auteurs, utilisez le formulaire complet
-                  de création de contrat plutôt que ce réglage rapide.
+                  Chaque taux s&apos;applique directement sur les ventes du format concerné pour l&apos;auteur unique du livre.
                 </p>
               </div>
 
