@@ -855,6 +855,20 @@ export async function getAuthorRoyaltiesReport(): Promise<AuthorRoyaltyReportLin
   return json.data || [];
 }
 
+export async function triggerRoyaltyCalculationNow(): Promise<{
+  success: boolean;
+  message?: string;
+  data?: any;
+  error?: string;
+}> {
+  const res = await fetch("/api/bff/admin/finance/royalties/trigger-now", {
+    method: "POST",
+    credentials: "include",
+  });
+  const json = await res.json();
+  return json;
+}
+
 // =========================================================================
 // CATALOGUE DES BOUQUETS DOCUMENTAIRES (ADMIN)
 // =========================================================================

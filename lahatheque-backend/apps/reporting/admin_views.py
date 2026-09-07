@@ -2198,6 +2198,30 @@ class AdminAuthorRoyaltiesReportView(APIView):
         return Response({"success": True, "data": results})
 
 
+class AdminTriggerRoyaltyCalculationView(APIView):
+    """POST /api/v1/admin/finance/royalties/trigger-now/ - Déclenchement manuel du calcul."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def post(self, request):
+        from apps.reporting.tasks import task_calculate_monthly_royalties
+
+        result = task_calculate_monthly_royalties()
+
+        JournalAuditAdmin.objects.create(
+            administrateur=request.user,
+            action="TRIGGER_MANUAL_ROYALTY_CALCULATION",
+            ressource_type="RoyaltyCalculation",
+            details=result if isinstance(result, dict) else {"result": str(result)}
+        )
+
+        return Response({
+            "success": True,
+            "message": "Calcul des redevances exécuté avec succès.",
+            "data": result,
+            "error": None
+        })
+
+
 class AdminRoleDiscountsView(APIView):
     """GET/PATCH /api/v1/admin/catalog/pricing/role-discounts/ - Remises par profil acheteur."""
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]

@@ -15,9 +15,11 @@ import {
   DollarSign,
   BookOpen,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   getAdminGlobalFinance,
   getAuthorRoyaltiesReport,
+  triggerRoyaltyCalculationNow,
   type AdminGlobalFinance,
   type AuthorRoyaltyReportLine,
 } from "@/lib/services/admin";
@@ -27,6 +29,24 @@ export default function AdminFinancePage() {
   const [authorRoyalties, setAuthorRoyalties] = useState<AuthorRoyaltyReportLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchAuthor, setSearchAuthor] = useState("");
+  const [triggeringCalc, setTriggeringCalc] = useState(false);
+
+  const handleTriggerCalculation = async () => {
+    setTriggeringCalc(true);
+    try {
+      const result = await triggerRoyaltyCalculationNow();
+      if (result.success) {
+        toast.success(result.message || "Calcul des redevances exécuté.");
+        loadData();
+      } else {
+        toast.error(result.error || "Échec du calcul des redevances.");
+      }
+    } catch {
+      toast.error("Impossible de déclencher le calcul.");
+    } finally {
+      setTriggeringCalc(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -204,15 +224,27 @@ export default function AdminFinancePage() {
             </p>
           </div>
 
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Rechercher un auteur..."
-              value={searchAuthor}
-              onChange={(e) => setSearchAuthor(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-border bg-background-secondary text-navy placeholder:text-foreground-muted focus:outline-none focus:border-gold min-h-[40px]"
-            />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <button
+              type="button"
+              onClick={handleTriggerCalculation}
+              disabled={triggeringCalc}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-navy text-white text-sm font-semibold hover:bg-navy-hover disabled:opacity-50 transition-colors min-h-[44px]"
+            >
+              <RefreshCw className={`w-4 h-4 ${triggeringCalc ? "animate-spin" : ""}`} />
+              {triggeringCalc ? "Calcul en cours..." : "Recalculer les Redevances Maintenant"}
+            </button>
+
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Rechercher un auteur..."
+                value={searchAuthor}
+                onChange={(e) => setSearchAuthor(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-border bg-background-secondary text-navy placeholder:text-foreground-muted focus:outline-none focus:border-gold min-h-[44px]"
+              />
+            </div>
           </div>
         </div>
 
