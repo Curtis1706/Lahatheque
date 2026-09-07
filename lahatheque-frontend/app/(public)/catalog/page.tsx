@@ -262,13 +262,9 @@ function CatalogSearchInner() {
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
                 <option value="">Tous les formats</option>
-                <option value="audio">Livres audio (tous)</option>
-                <option value="audio_only">Audio seul (Pure audio)</option>
-                <option value="pack_complet">Pack complet (Papier, Numérique &amp; Audio)</option>
-                <option value="digital_audio">Numérique &amp; Audio</option>
-                <option value="paper_audio">Papier &amp; Audio</option>
                 <option value="digital">Livre numérique</option>
                 <option value="paper">Livre papier</option>
+                <option value="audio">Livre audio</option>
               </select>
             </div>
           </aside>

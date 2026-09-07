@@ -95,6 +95,9 @@ export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
       if (json && Array.isArray(json.results)) {
         return json.results;
       }
+      if (json && json.data && Array.isArray(json.data.results)) {
+        return json.data.results;
+      }
     }
     return [];
   } catch (err) {
