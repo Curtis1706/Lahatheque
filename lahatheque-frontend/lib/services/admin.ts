@@ -86,8 +86,47 @@ export async function getAdminUsers(roleFilter?: AdminRole | string, search?: st
     organization: u.organization || u.institution_name,
     date_joined: u.date_joined ? u.date_joined.split('T')[0] : '2026-08-01',
     status: u.is_suspended ? 'suspended' : 'active',
+    custom_remise_papier_pct: u.custom_remise_papier_pct,
+    custom_remise_numerique_pct: u.custom_remise_numerique_pct,
+    custom_remise_audio_pct: u.custom_remise_audio_pct,
     extra_info: u.extra_info || {},
   }));
+}
+
+export async function getAdminUserDiscounts(userId: string): Promise<any> {
+  try {
+    const res = await fetch(`/api/bff/admin/users/${userId}/discounts/`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.success ? json.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateAdminUserDiscounts(
+  userId: string,
+  payload: {
+    use_global?: boolean;
+    paper_pct?: number;
+    digital_pct?: number;
+    audio_pct?: number;
+  }
+): Promise<{ success: boolean; message?: string; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/admin/users/${userId}/discounts/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error || 'Erreur lors de la mise à jour des remises.' };
+    }
+    return { success: true, message: data.message, data: data.data };
+  } catch {
+    return { success: false, error: 'Erreur réseau lors de la mise à jour des remises.' };
+  }
 }
 
 export async function createAdminUser(payload: any): Promise<{ success: boolean; data?: any; error?: string; temporary_password?: string }> {

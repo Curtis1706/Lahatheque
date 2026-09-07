@@ -81,10 +81,18 @@ export function AuthorCatalogOrderModal({
   const [progressPct, setProgressPct] = useState<number>(0);
   const [success, setSuccess] = useState(false);
 
-  // Remises Auteur : -25% Numérique, -40% Papier, -25% Audio
-  const effectiveDigitalPrice = book.author_discounted_digital_price ?? Math.round((book.price_digital ?? 3000) * 0.75);
-  const effectivePaperPrice = book.author_discounted_paper_price ?? Math.round((book.price_paper ?? 5000) * 0.6);
-  const effectiveAudioPrice = (book as any).author_discounted_audio_price ?? Math.round(((book as any).price_audio ?? 3500) * 0.75);
+  // Remises Auteur calculées dynamiquement
+  const baseDigitalPrice = book.price_digital ?? 3000;
+  const effectiveDigitalPrice = book.author_discounted_digital_price ?? Math.round(baseDigitalPrice * 0.75);
+  const digitalDiscountPct = baseDigitalPrice > 0 ? Math.max(0, Math.round((1 - effectiveDigitalPrice / baseDigitalPrice) * 100)) : 25;
+
+  const basePaperPrice = book.price_paper ?? 5000;
+  const effectivePaperPrice = book.author_discounted_paper_price ?? Math.round(basePaperPrice * 0.6);
+  const paperDiscountPct = basePaperPrice > 0 ? Math.max(0, Math.round((1 - effectivePaperPrice / basePaperPrice) * 100)) : 40;
+
+  const baseAudioPrice = (book as any).price_audio ?? 3500;
+  const effectiveAudioPrice = (book as any).author_discounted_audio_price ?? Math.round(baseAudioPrice * 0.75);
+  const audioDiscountPct = baseAudioPrice > 0 ? Math.max(0, Math.round((1 - effectiveAudioPrice / baseAudioPrice) * 100)) : 25;
 
   const unitPrice =
     format === "digital"
@@ -302,7 +310,7 @@ export function AuthorCatalogOrderModal({
                   <div className="text-xs">
                     <p className="font-bold text-navy">Formats numérique et audio déjà acquis</p>
                     <p className="text-foreground-muted text-[11px] mt-0.5">
-                      Vos accès de lecture et d&apos;écoute sont actifs. Vous pouvez commander des exemplaires papier physiques supplémentaires avec votre remise auteur de -40%.
+                      Vos accès de lecture et d&apos;écoute sont actifs. Vous pouvez commander des exemplaires papier physiques supplémentaires avec votre remise auteur de -{paperDiscountPct}%.
                     </p>
                   </div>
                 </div>
@@ -312,7 +320,7 @@ export function AuthorCatalogOrderModal({
                   <div className="text-xs">
                     <p className="font-bold text-navy">Format numérique déjà acquis</p>
                     <p className="text-foreground-muted text-[11px] mt-0.5">
-                      Votre accès liseuse est actif. Vous pouvez acquérir le livre audio (-25%) ou des exemplaires papier (-40%).
+                      Votre accès liseuse est actif. Vous pouvez acquérir le livre audio (-{audioDiscountPct}%) ou des exemplaires papier (-{paperDiscountPct}%).
                     </p>
                   </div>
                 </div>
@@ -322,7 +330,7 @@ export function AuthorCatalogOrderModal({
                   <div className="text-xs">
                     <p className="font-bold text-navy">Format audio déjà acquis</p>
                     <p className="text-foreground-muted text-[11px] mt-0.5">
-                      Votre écoute intégrale est active. Vous pouvez acquérir le format numérique (-25%) ou des exemplaires papier (-40%).
+                      Votre écoute intégrale est active. Vous pouvez acquérir le format numérique (-{digitalDiscountPct}%) ou des exemplaires papier (-{paperDiscountPct}%).
                     </p>
                   </div>
                 </div>
@@ -369,7 +377,7 @@ export function AuthorCatalogOrderModal({
                             {effectiveDigitalPrice.toLocaleString("fr-FR")} FCFA
                           </p>
                           <p className="text-[10px] text-foreground-muted line-through font-mono">
-                            {(book.price_digital ?? 3000).toLocaleString("fr-FR")} (-25%)
+                            {(book.price_digital ?? 3000).toLocaleString("fr-FR")} (-{digitalDiscountPct}%)
                           </p>
                         </>
                       )}
@@ -411,7 +419,7 @@ export function AuthorCatalogOrderModal({
                               {effectiveAudioPrice.toLocaleString("fr-FR")} FCFA
                             </p>
                             <p className="text-[10px] text-foreground-muted line-through font-mono">
-                              {((book as any).price_audio ?? 3500).toLocaleString("fr-FR")} (-25%)
+                              {((book as any).price_audio ?? 3500).toLocaleString("fr-FR")} (-{audioDiscountPct}%)
                             </p>
                           </>
                         )}
@@ -442,7 +450,7 @@ export function AuthorCatalogOrderModal({
                       </p>
                       {paperAvailable && (
                         <p className="text-[10px] text-foreground-muted line-through font-mono">
-                          {(book.price_paper ?? 5000).toLocaleString("fr-FR")} (-40%)
+                          {(book.price_paper ?? 5000).toLocaleString("fr-FR")} (-{paperDiscountPct}%)
                         </p>
                       )}
                     </div>

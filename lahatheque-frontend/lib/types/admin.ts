@@ -85,7 +85,28 @@ export interface AdminUser {
   last_login?: string;
   status?: "active" | "suspended" | "pending_activation";
   organization?: string;
+  custom_remise_papier_pct?: number | null;
+  custom_remise_numerique_pct?: number | null;
+  custom_remise_audio_pct?: number | null;
   extra_info?: Record<string, any>;
+}
+
+export interface AuthorUserDiscounts {
+  user_id: string;
+  user_name: string;
+  role: string;
+  is_custom: boolean;
+  custom_remise_papier_pct?: number | null;
+  custom_remise_numerique_pct?: number | null;
+  custom_remise_audio_pct?: number | null;
+  effective_paper_pct: number;
+  effective_digital_pct: number;
+  effective_audio_pct: number;
+  global_defaults: {
+    paper_pct: number;
+    digital_pct: number;
+    audio_pct: number;
+  };
 }
 
 export interface AdminKpi {

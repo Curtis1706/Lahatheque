@@ -19,16 +19,30 @@ def invalidate_platform_config_cache():
     cache.delete("platform_config_singleton")
 
 
-def compute_role_price(ouvrage, role: str) -> dict:
+def compute_role_price(ouvrage, role: str, user=None) -> dict:
     """
-    Calcule le prix net numérique et papier pour un ouvrage, selon le profil acheteur.
+    Calcule le prix net numérique, papier et audio pour un ouvrage, selon le profil acheteur.
     role : 'wholesaler' | 'author' | 'university' | 'public'
+    user : Utilisateur connecté optionnel (permet la prise en compte des remises personnalisées par auteur)
     """
     config = get_platform_config()
 
     public_digital = float(ouvrage.price_digital or 0)
     public_paper = float(ouvrage.price_paper or 0)
     public_audio = float(getattr(ouvrage, 'price_audio', None) or 2500.0)
+
+    # Récupération des taux pour l'auteur (avec priorité sur les remises individuelles sur-mesure)
+    author_digital_pct = float(config.remise_auteur_numerique_pct)
+    author_paper_pct = float(config.remise_auteur_papier_pct)
+    author_audio_pct = float(getattr(config, 'remise_auteur_audio_pct', 25.0))
+
+    if role == "author" and user:
+        if getattr(user, 'custom_remise_numerique_pct', None) is not None:
+            author_digital_pct = float(user.custom_remise_numerique_pct)
+        if getattr(user, 'custom_remise_papier_pct', None) is not None:
+            author_paper_pct = float(user.custom_remise_papier_pct)
+        if getattr(user, 'custom_remise_audio_pct', None) is not None:
+            author_audio_pct = float(user.custom_remise_audio_pct)
 
     rate_map = {
         "wholesaler": (
@@ -37,9 +51,9 @@ def compute_role_price(ouvrage, role: str) -> dict:
             0.0,
         ),
         "author": (
-            float(config.remise_auteur_numerique_pct),
-            float(config.remise_auteur_papier_pct),
-            float(getattr(config, 'remise_auteur_audio_pct', 25.0)),
+            author_digital_pct,
+            author_paper_pct,
+            author_audio_pct,
         ),
         "university": (
             float(config.remise_campus_numerique_pct),

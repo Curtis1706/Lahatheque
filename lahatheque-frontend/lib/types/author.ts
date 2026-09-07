@@ -103,6 +103,12 @@ export interface AuthorKpis {
   stockRemaining?: number;
   stockInitial?: number;
   paperSalesCount?: number;
+  authorDiscounts?: {
+    paper_pct: number;
+    digital_pct: number;
+    audio_pct: number;
+    is_custom: boolean;
+  };
   timelines?: {
     sales: { date: string; value: number }[];
     royalties: { date: string; value: number }[];

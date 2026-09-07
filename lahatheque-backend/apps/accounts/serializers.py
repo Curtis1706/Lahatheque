@@ -14,7 +14,8 @@ class UserSerializer(serializers.ModelSerializer):
             'country', 'role', 'active_roles', 'avatar', 'avatar_url', 
             'pen_name', 'bio', 'institution', 'institution_name',
             'is_suspended', 'suspension_reason', 'is_verified', 
-            'is_staff', 'is_superuser', 'date_joined', 'extra_info'
+            'is_staff', 'is_superuser', 'date_joined', 'extra_info',
+            'custom_remise_papier_pct', 'custom_remise_numerique_pct', 'custom_remise_audio_pct',
         ]
         read_only_fields = ['id', 'username', 'is_staff', 'is_superuser', 'date_joined', 'extra_info']
 
@@ -47,6 +48,7 @@ class UserSerializer(serializers.ModelSerializer):
             from apps.student.models import ReadingSession
             from apps.rights.models import ContratLegal
             from apps.reporting.models import RelanceAutomatiqueLog
+            from apps.reporting.pricing_service import get_platform_config
 
             role = obj.role or ""
             if role in ['layout_artist', 'maquettiste']:
@@ -77,6 +79,21 @@ class UserSerializer(serializers.ModelSerializer):
                 info['pending_royalties'] = cnt * 3500 if cnt > 0 else 0
                 last_b = author_books.order_by('-created_at').first()
                 info['last_deposit_status'] = "Validé & Publié" if (last_b and last_b.status == 'published') else ("En attente" if last_b else "Aucun dépôt")
+
+                # Remises de cet auteur
+                config = get_platform_config()
+                has_custom = bool(
+                    obj.custom_remise_papier_pct is not None or
+                    obj.custom_remise_numerique_pct is not None or
+                    obj.custom_remise_audio_pct is not None
+                )
+                info['has_custom_discount'] = has_custom
+                info['custom_remise_papier_pct'] = float(obj.custom_remise_papier_pct) if obj.custom_remise_papier_pct is not None else None
+                info['custom_remise_numerique_pct'] = float(obj.custom_remise_numerique_pct) if obj.custom_remise_numerique_pct is not None else None
+                info['custom_remise_audio_pct'] = float(obj.custom_remise_audio_pct) if obj.custom_remise_audio_pct is not None else None
+                info['effective_paper_discount'] = float(obj.custom_remise_papier_pct if obj.custom_remise_papier_pct is not None else config.remise_auteur_papier_pct)
+                info['effective_digital_discount'] = float(obj.custom_remise_numerique_pct if obj.custom_remise_numerique_pct is not None else config.remise_auteur_numerique_pct)
+                info['effective_audio_discount'] = float(obj.custom_remise_audio_pct if obj.custom_remise_audio_pct is not None else getattr(config, 'remise_auteur_audio_pct', 25.0))
             elif role == 'publisher':
                 pub_books = Ouvrage.objects.filter(created_by=obj)
                 cnt = pub_books.count()

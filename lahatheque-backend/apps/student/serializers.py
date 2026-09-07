@@ -101,21 +101,21 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and getattr(request.user, 'role', None) == 'author':
             from apps.reporting.pricing_service import compute_role_price
-            return compute_role_price(obj, "author")["digital_price"]
+            return compute_role_price(obj, "author", user=request.user)["digital_price"]
         return None
 
     def get_author_discounted_paper_price(self, obj):
         request = self.context.get('request')
         if request and getattr(request.user, 'role', None) == 'author':
             from apps.reporting.pricing_service import compute_role_price
-            return compute_role_price(obj, "author")["paper_price"]
+            return compute_role_price(obj, "author", user=request.user)["paper_price"]
         return None
 
     def get_author_discounted_audio_price(self, obj):
         request = self.context.get('request')
         if request and getattr(request.user, 'role', None) == 'author':
             from apps.reporting.pricing_service import compute_role_price
-            return compute_role_price(obj, "author")["audio_price"]
+            return compute_role_price(obj, "author", user=request.user)["audio_price"]
         return None
 
 

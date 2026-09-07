@@ -64,6 +64,11 @@ export default function AuthorOverviewPage() {
     loadData();
   }, []);
 
+  const paperDiscount = kpis?.authorDiscounts?.paper_pct ?? 40;
+  const digitalDiscount = kpis?.authorDiscounts?.digital_pct ?? 25;
+  const audioDiscount = kpis?.authorDiscounts?.audio_pct ?? 25;
+  const isCustomDiscount = Boolean(kpis?.authorDiscounts?.is_custom);
+
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 sm:space-y-8 animate-in fade-in duration-300">
       {/* Banner Header */}
@@ -92,7 +97,7 @@ export default function AuthorOverviewPage() {
         </div>
       </div>
 
-      {/* Bannière Avantage Tarif Auteur */}
+      {/* Bannière Avantage Tarif Auteur — 100% Dynamique */}
       <div className="p-5 sm:p-6 rounded-3xl bg-gold/10 border border-gold/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
         <div className="flex items-start sm:items-center gap-3.5">
           <div className="p-3 rounded-2xl bg-gold text-navy shrink-0 shadow-2xs">
@@ -103,8 +108,13 @@ export default function AuthorOverviewPage() {
               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-navy text-white uppercase tracking-wider">
                 Avantage Partenaire Auteur
               </span>
+              {isCustomDiscount && (
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-gold text-navy uppercase tracking-wider">
+                  Taux Personnalisé
+                </span>
+              )}
               <span className="text-xs font-bold text-gold font-mono">
-                -40% Papier &bull; -25% Numérique
+                -{paperDiscount}% Papier &bull; -{digitalDiscount}% Numérique &bull; -{audioDiscount}% Audio
               </span>
             </div>
             <h2 className="font-serif font-bold text-base sm:text-lg text-navy">
@@ -120,7 +130,7 @@ export default function AuthorOverviewPage() {
           href="/author/catalog"
           className="px-5 py-2.5 rounded-xl bg-navy text-white font-bold text-xs hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs shrink-0 self-start sm:self-auto min-h-[44px]"
         >
-          <span>Commander mes livres (-40%)</span>
+          <span>Commander au tarif auteur (-{paperDiscount}%)</span>
           <ArrowRight className="w-3.5 h-3.5 text-gold" />
         </Link>
       </div>
