@@ -32,6 +32,7 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     is_audio_owned = serializers.SerializerMethodField()
     author_discounted_digital_price = serializers.SerializerMethodField()
     author_discounted_paper_price = serializers.SerializerMethodField()
+    author_discounted_audio_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Ouvrage
@@ -42,7 +43,7 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             'language', 'summary', 'status', 'price_digital', 'price_paper',
             'is_paper_available', 'cover_url', 'is_owned', 'has_digital_access',
             'has_audio_version', 'price_audio', 'has_audio', 'is_audio_owned',
-            'author_discounted_digital_price', 'author_discounted_paper_price',
+            'author_discounted_digital_price', 'author_discounted_paper_price', 'author_discounted_audio_price',
         ]
 
     def get_author_name(self, obj) -> str:
@@ -86,11 +87,13 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
             from apps.commerce.models import LigneCommande
+            from django.db.models import Q
             return LigneCommande.objects.filter(
                 commande__user=request.user,
-                commande__statut_paiement='paid',
                 ouvrage=obj,
                 format_type='audio'
+            ).filter(
+                Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
             ).exists()
         return False
 
@@ -106,6 +109,13 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
         if request and getattr(request.user, 'role', None) == 'author':
             from apps.reporting.pricing_service import compute_role_price
             return compute_role_price(obj, "author")["paper_price"]
+        return None
+
+    def get_author_discounted_audio_price(self, obj):
+        request = self.context.get('request')
+        if request and getattr(request.user, 'role', None) == 'author':
+            from apps.reporting.pricing_service import compute_role_price
+            return compute_role_price(obj, "author")["audio_price"]
         return None
 
 

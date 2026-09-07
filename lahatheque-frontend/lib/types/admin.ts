@@ -202,6 +202,11 @@ export interface GlobalPricingConfig {
   prix_pass_mensuel_xof?: number;
   prix_pass_annuel_xof?: number;
   devise_defaut: string;
+
+  // Remises profil auteur configurables par l'administrateur (%)
+  remise_auteur_papier_pct?: number;
+  remise_auteur_numerique_pct?: number;
+  remise_auteur_audio_pct?: number;
   
   // Barèmes de redevances par défaut
   default_author_royalty_rate: number;

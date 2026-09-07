@@ -268,7 +268,7 @@ export async function createAdminCatalogBook(formData: FormData): Promise<{ succ
 }
 
 export interface RoleDiscounts {
-  author: { paper_pct: number; digital_pct: number };
+  author: { paper_pct: number; digital_pct: number; audio_pct?: number };
   wholesaler: { paper_pct: number; digital_pct: number };
   university: { paper_pct: number; digital_pct: number };
 }

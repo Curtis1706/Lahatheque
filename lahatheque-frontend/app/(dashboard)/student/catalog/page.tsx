@@ -127,70 +127,81 @@ function CatalogBookCard({
 
       {/* Bas : Prix, Disponibilité & Actions */}
       <div className="space-y-3.5 pt-3.5 border-t border-border min-w-0">
-        {/* Prix & Statut */}
+        {/* Prix & Statut par Format */}
         <div className="flex items-center justify-between gap-2 flex-wrap min-h-[26px]">
-          {book.is_owned || book.has_digital_access ? (
-            <span className="text-[10px] font-bold text-success bg-success/10 border border-success/30 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
-              <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
-              <span>Déjà acquis</span>
-            </span>
-          ) : book.price_digital > 0 ? (
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-[9px] uppercase font-bold text-foreground-muted tracking-wider">
-                Numérique
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {book.is_owned || book.has_digital_access ? (
+              <span className="text-[10px] font-bold text-success bg-success/10 border border-success/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                <CheckCircle2 className="w-3 h-3 text-success shrink-0" />
+                <span>Numérique acquis</span>
               </span>
-              <span className="font-mono font-bold text-gold text-xs sm:text-sm">
-                {book.price_digital.toLocaleString("fr-FR")} XOF
-              </span>
-            </div>
-          ) : (
-            <span className="text-xs font-bold text-success">Accès libre</span>
-          )}
+            ) : book.price_digital > 0 ? (
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[9px] uppercase font-bold text-foreground-muted tracking-wider">
+                  Numérique
+                </span>
+                <span className="font-mono font-bold text-gold text-xs sm:text-sm">
+                  {book.price_digital.toLocaleString("fr-FR")} XOF
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs font-bold text-success">Accès libre</span>
+            )}
+
+            {Boolean(book.has_audio_version || book.has_audio || book.price_audio || book.format_type === "audio") && (
+              book.is_audio_owned || (book as any).has_audio_access ? (
+                <span className="text-[10px] font-bold text-navy bg-gold/15 border border-gold/35 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                  <Headphones className="w-3 h-3 text-gold shrink-0" />
+                  <span>Audio acquis</span>
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold text-navy bg-gold/10 border border-gold/25 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Headphones className="w-3 h-3 text-gold shrink-0" />
+                  <span>Audio {book.price_audio ? `${book.price_audio.toLocaleString("fr-FR")} XOF` : "dispo"}</span>
+                </span>
+              )
+            )}
+          </div>
 
           {book.is_paper_available && book.price_paper > 0 && (
             <span className="text-[10px] font-medium text-navy bg-navy/5 border border-navy/10 px-2.5 py-0.5 rounded-full">
-              Disponible en papier
-            </span>
-          )}
-
-          {(book.has_audio_version || book.has_audio) && (
-            <span className="text-[10px] font-bold text-navy bg-gold/15 border border-gold/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-              <Headphones className="w-3 h-3 text-gold shrink-0" />
-              <span>Audio dispo</span>
+              Papier dispo
             </span>
           )}
         </div>
 
-        {/* Barre d'actions aérée et adaptée à tous les écrans */}
+        {/* Barre d'actions contextuelle adaptée aux formats acquis */}
         <div className="flex items-center gap-2 w-full min-w-0">
           {book.is_owned || book.has_digital_access ? (
-            <>
-              <Link
-                href={`/catalog/reader/${book.id}`}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-xs truncate cursor-pointer"
-              >
-                <BookOpen className="w-4 h-4 text-gold shrink-0" />
-                <span>Lire</span>
-              </Link>
-              {book.is_paper_available && (
-                <button
-                  type="button"
-                  onClick={() => onOpenOrderModal(book)}
-                  className="px-3.5 py-2.5 rounded-xl border border-border bg-background hover:border-gold text-navy text-xs font-bold transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-2xs cursor-pointer shrink-0"
-                  title="Commander la version papier"
-                >
-                  <Truck className="w-3.5 h-3.5 text-navy shrink-0" />
-                  <span>Papier</span>
-                </button>
-              )}
-            </>
-          ) : (
+            <Link
+              href={`/catalog/reader/${book.id}`}
+              className="flex-1 px-3.5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-xs truncate cursor-pointer"
+              title="Lire la version numérique"
+            >
+              <BookOpen className="w-4 h-4 text-gold shrink-0" />
+              <span className="truncate">Lire</span>
+            </Link>
+          ) : null}
+
+          {Boolean(book.has_audio_version || book.has_audio || book.price_audio || book.format_type === "audio") && (book.is_audio_owned || (book as any).has_audio_access) ? (
+            <Link
+              href={`/catalog/reader/${book.id}?audio=1`}
+              className="flex-1 px-3.5 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-xs truncate cursor-pointer"
+              title="Écouter le livre audio"
+            >
+              <Headphones className="w-4 h-4 text-navy shrink-0" />
+              <span className="truncate">Écouter</span>
+            </Link>
+          ) : null}
+
+          {/* Si au moins un format n'est pas possédé, offrir l'accès à l'achat ou à l'extrait */}
+          {!(book.is_owned || book.has_digital_access) && !(Boolean(book.has_audio_version || book.has_audio) && (book.is_audio_owned || (book as any).has_audio_access)) ? (
             <>
               <button
                 type="button"
                 onClick={() => onOpenSample(book)}
                 className="flex-1 px-3 py-2.5 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-gold text-xs font-bold transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-2xs cursor-pointer truncate"
-                title="Lire un extrait gratuit"
+                title="Découvrir un extrait gratuit"
               >
                 <Eye className="w-4 h-4 text-gold shrink-0" />
                 <span className="truncate">Extrait</span>
@@ -199,11 +210,27 @@ function CatalogBookCard({
                 type="button"
                 onClick={() => onOpenOrderModal(book)}
                 className="flex-1 px-3.5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-xs cursor-pointer truncate"
+                title="Acquérir un format"
               >
                 <ShoppingBag className="w-4 h-4 text-gold shrink-0" />
                 <span className="truncate">Commander</span>
               </button>
             </>
+          ) : (
+            /* L'un des formats est possédé, mais l'autre format (ex: audio ou papier) peut être commandé */
+            ((!(book.is_owned || book.has_digital_access)) ||
+             (Boolean(book.has_audio_version || book.has_audio) && !(book.is_audio_owned || (book as any).has_audio_access)) ||
+             book.is_paper_available) && (
+              <button
+                type="button"
+                onClick={() => onOpenOrderModal(book)}
+                className="px-3.5 py-2.5 rounded-xl border border-border bg-background hover:border-gold text-navy text-xs font-bold transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-2xs cursor-pointer shrink-0"
+                title="Acquérir les autres formats (audio, papier, numérique)"
+              >
+                <ShoppingBag className="w-3.5 h-3.5 text-navy shrink-0" />
+                <span>Autre format</span>
+              </button>
+            )
           )}
 
           <Link
@@ -232,6 +259,10 @@ function CatalogBookListItem({
 }) {
   const authorName =
     book.authors?.map((a) => a.full_name).join(", ") || "Auteur académique";
+
+  const hasDigital = Boolean(book.is_owned || book.has_digital_access);
+  const hasAudioFormat = Boolean(book.has_audio_version || book.has_audio || book.price_audio || book.format_type === "audio");
+  const hasAudio = Boolean(book.is_audio_owned || (book as any).has_audio_access);
 
   return (
     <div className="group p-4 sm:p-5 rounded-3xl border border-border bg-background hover:border-gold/60 transition-all duration-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6 w-full min-w-0 overflow-hidden">
@@ -269,12 +300,12 @@ function CatalogBookListItem({
         </div>
       </div>
 
-      {/* Prix & Statut */}
-      <div className="shrink-0 flex items-center gap-2 self-start md:self-center">
-        {book.is_owned || book.has_digital_access ? (
-          <span className="text-[10px] font-bold text-success bg-success/10 border border-success/30 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+      {/* Prix & Statut par Format */}
+      <div className="shrink-0 flex items-center gap-2 flex-wrap self-start md:self-center">
+        {hasDigital ? (
+          <span className="text-[10px] font-bold text-success bg-success/10 border border-success/30 px-2.5 py-1 rounded-full flex items-center gap-1 shadow-2xs">
             <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
-            <span>Déjà acquis</span>
+            <span>Numérique acquis</span>
           </span>
         ) : book.price_digital > 0 ? (
           <div className="text-left md:text-right">
@@ -289,38 +320,46 @@ function CatalogBookListItem({
           <span className="text-xs font-bold text-success">Accès libre</span>
         )}
 
-        {(book.has_audio_version || book.has_audio) && (
-          <span className="text-[10px] font-bold text-navy bg-gold/15 border border-gold/30 px-2.5 py-1 rounded-full flex items-center gap-1">
-            <Headphones className="w-3.5 h-3.5 text-gold shrink-0" />
-            <span>Audio dispo</span>
-          </span>
+        {hasAudioFormat && (
+          hasAudio ? (
+            <span className="text-[10px] font-bold text-navy bg-gold/15 border border-gold/35 px-2.5 py-1 rounded-full flex items-center gap-1 shadow-2xs">
+              <Headphones className="w-3.5 h-3.5 text-gold shrink-0" />
+              <span>Audio acquis</span>
+            </span>
+          ) : (
+            <span className="text-[10px] font-bold text-navy bg-gold/10 border border-gold/25 px-2.5 py-1 rounded-full flex items-center gap-1">
+              <Headphones className="w-3.5 h-3.5 text-gold shrink-0" />
+              <span>Audio {book.price_audio ? `${book.price_audio.toLocaleString("fr-FR")} XOF` : "dispo"}</span>
+            </span>
+          )
         )}
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-2 self-stretch md:self-center shrink-0 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0 border-border">
-        {book.is_owned || book.has_digital_access ? (
-          <>
-            <Link
-              href={`/catalog/reader/${book.id}`}
-              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-xs cursor-pointer"
-            >
-              <BookOpen className="w-4 h-4 text-gold shrink-0" />
-              <span>Lire</span>
-            </Link>
-            {book.is_paper_available && (
-              <button
-                type="button"
-                onClick={() => onOpenOrderModal(book)}
-                className="px-3.5 py-2.5 rounded-xl border border-border bg-background hover:border-gold text-navy text-xs font-bold transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-2xs cursor-pointer shrink-0"
-                title="Commander la version papier"
-              >
-                <Truck className="w-3.5 h-3.5 text-navy shrink-0" />
-                <span>Papier</span>
-              </button>
-            )}
-          </>
-        ) : (
+        {hasDigital && (
+          <Link
+            href={`/catalog/reader/${book.id}`}
+            className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-xs cursor-pointer"
+            title="Lire le livre numérique"
+          >
+            <BookOpen className="w-4 h-4 text-gold shrink-0" />
+            <span>Lire</span>
+          </Link>
+        )}
+
+        {hasAudioFormat && hasAudio && (
+          <Link
+            href={`/catalog/reader/${book.id}?audio=1`}
+            className="px-4 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-xs cursor-pointer"
+            title="Écouter le livre audio"
+          >
+            <Headphones className="w-4 h-4 text-navy shrink-0" />
+            <span>Écouter</span>
+          </Link>
+        )}
+
+        {!hasDigital && !hasAudio ? (
           <>
             <button
               type="button"
@@ -340,6 +379,18 @@ function CatalogBookListItem({
               <span>Commander</span>
             </button>
           </>
+        ) : (
+          ((!hasDigital) || (hasAudioFormat && !hasAudio) || book.is_paper_available) && (
+            <button
+              type="button"
+              onClick={() => onOpenOrderModal(book)}
+              className="px-3.5 py-2.5 rounded-xl border border-border bg-background hover:border-gold text-navy text-xs font-bold transition-colors flex items-center justify-center gap-1.5 min-h-[44px] shadow-2xs cursor-pointer shrink-0"
+              title="Acquérir les autres formats (audio, papier, numérique)"
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-navy shrink-0" />
+              <span>Autre format</span>
+            </button>
+          )
         )}
 
         <Link
@@ -416,8 +467,13 @@ export default function StudentCatalogPage() {
       ((book as any).audio_tracks && (book as any).audio_tracks.length > 0)
     );
 
-    if (hasAudio) {
+    const hasDigital = (book as any).is_digital_available !== false && (book as any).format_type !== "audio" && (book as any).format !== "audio";
+
+    if (hasAudio && hasDigital) {
       setSampleChoiceBook(book);
+    } else if (hasAudio) {
+      toast.info(`Lancement de l'extrait audio pour « ${book.title} »`);
+      router.push(`/listen/${book.id}?mode=sample`);
     } else {
       toast.info(`Ouverture de l'extrait pour « ${book.title} »`);
       router.push(`/catalog/reader/${book.id}?mode=sample`);

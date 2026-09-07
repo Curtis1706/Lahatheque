@@ -48,10 +48,12 @@ function RecentBookCard({ book }: { book: BookAPI }) {
     (book as any).format === "audio" ||
     (book as any).format_type === "audio"
   );
+  const isAudioOnly = hasAudio && (book as any).is_digital_available === false;
+  const primaryHref = isAudioOnly ? `/listen/${book.id}` : `/catalog/reader/${book.id}`;
 
   return (
     <div className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center gap-4">
-      <Link href={`/catalog/reader/${book.id}`} className="shrink-0" title={`Lire ${book.title}`}>
+      <Link href={primaryHref} className="shrink-0" title={isAudioOnly ? `Écouter ${book.title}` : `Lire ${book.title}`}>
         <BookCover book={book} size="xs" />
       </Link>
 
@@ -67,7 +69,7 @@ function RecentBookCard({ book }: { book: BookAPI }) {
             </span>
           )}
         </div>
-        <Link href={`/catalog/reader/${book.id}`}>
+        <Link href={primaryHref}>
           <h3 className="font-serif font-bold text-navy text-sm leading-tight truncate group-hover:text-gold transition-colors">
             {book.title}
           </h3>
@@ -106,13 +108,15 @@ function RecentBookCard({ book }: { book: BookAPI }) {
             <Headphones className="w-4 h-4 text-gold" />
           </button>
         )}
-        <Link
-          href={`/catalog/reader/${book.id}`}
-          className="p-2.5 rounded-xl bg-navy/10 hover:bg-gold/20 transition-colors"
-          title="Continuer la lecture"
-        >
-          <Play className="w-4 h-4 text-navy" />
-        </Link>
+        {!isAudioOnly && (
+          <Link
+            href={`/catalog/reader/${book.id}`}
+            className="p-2.5 rounded-xl bg-navy/10 hover:bg-gold/20 transition-colors"
+            title="Continuer la lecture"
+          >
+            <Play className="w-4 h-4 text-navy" />
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -134,19 +138,21 @@ function ReadingHeroCard({
       (currentReading.ouvrage as any).format === "audio" ||
       (currentReading.ouvrage as any).format_type === "audio"
     );
+    const isAudioOnly = hasAudio && (currentReading.ouvrage as any).is_digital_available === false;
+    const heroHref = isAudioOnly ? `/listen/${currentReading.ouvrage.id}` : `/catalog/reader/${currentReading.ouvrage.id}`;
 
     return (
       <div className="book-ribbon p-7 sm:p-8 rounded-3xl bg-background border-2 border-gold/70 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="flex items-center gap-5 min-w-0">
-          <Link href={`/catalog/reader/${currentReading.ouvrage.id}`} className="shrink-0" title={`Continuer ${currentReading.ouvrage.title}`}>
+          <Link href={heroHref} className="shrink-0" title={isAudioOnly ? `Continuer l'écoute de ${currentReading.ouvrage.title}` : `Continuer ${currentReading.ouvrage.title}`}>
             <BookCover book={currentReading.ouvrage} size="md" />
           </Link>
           <div className="min-w-0 space-y-2">
             <div className="section-ribbon-badge">
-              <Play className="w-3 h-3 fill-current" />
-              <span>Reprendre la lecture · {currentReading.progress_percent}%</span>
+              {isAudioOnly ? <Headphones className="w-3 h-3 text-gold" /> : <Play className="w-3 h-3 fill-current" />}
+              <span>{isAudioOnly ? "Reprendre l'écoute" : "Reprendre la lecture"} · {currentReading.progress_percent}%</span>
             </div>
-            <Link href={`/catalog/reader/${currentReading.ouvrage.id}`}>
+            <Link href={heroHref}>
               <h3 className="font-serif font-bold text-navy text-xl sm:text-2xl truncate hover:text-gold transition-colors">
                 {currentReading.ouvrage.title}
               </h3>
@@ -163,7 +169,7 @@ function ReadingHeroCard({
         </div>
 
         <div className="flex items-center gap-3 shrink-0 flex-wrap">
-          {hasAudio && (
+          {hasAudio && !isAudioOnly && (
             <button
               type="button"
               onClick={() => playBook(currentReading.ouvrage.id)}
@@ -175,13 +181,24 @@ function ReadingHeroCard({
             </button>
           )}
 
-          <Link
-            href={`/catalog/reader/${currentReading.ouvrage.id}`}
-            className="px-6 py-3.5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2.5 min-h-[48px] shadow-sm cursor-pointer"
-          >
-            <Play className="w-4 h-4 text-gold fill-gold" />
-            <span>Continuer ma lecture</span>
-          </Link>
+          {isAudioOnly ? (
+            <button
+              type="button"
+              onClick={() => playBook(currentReading.ouvrage.id)}
+              className="px-6 py-3.5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2.5 min-h-[48px] shadow-sm cursor-pointer"
+            >
+              <Headphones className="w-4 h-4 text-gold" />
+              <span>Continuer mon écoute</span>
+            </button>
+          ) : (
+            <Link
+              href={`/catalog/reader/${currentReading.ouvrage.id}`}
+              className="px-6 py-3.5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2.5 min-h-[48px] shadow-sm cursor-pointer"
+            >
+              <Play className="w-4 h-4 text-gold fill-gold" />
+              <span>Continuer ma lecture</span>
+            </Link>
+          )}
         </div>
       </div>
     );

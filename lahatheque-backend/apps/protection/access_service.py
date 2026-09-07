@@ -63,41 +63,17 @@ class AccessService:
                 "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
             }
 
-        # Auteur de cet ouvrage spécifique
-        if getattr(user, 'role', '') == 'author':
-            from apps.catalog.models import Ouvrage
-            from django.db.models import Q
-            is_own_book = Ouvrage.objects.filter(id=book_id).filter(
-                Q(authors__user=user) | Q(created_by=user)
-            ).exists()
-            if is_own_book:
-                return {
-                    "access_granted": True,
-                    "reason": "author_own_book",
-                    "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
-                }
-
-        # Éditeur de cet ouvrage spécifique
-        if getattr(user, 'role', '') == 'publisher':
-            from apps.catalog.models import Ouvrage
-            is_own_published = Ouvrage.objects.filter(id=book_id, publisher__user=user).exists()
-            if is_own_published:
-                return {
-                    "access_granted": True,
-                    "reason": "publisher_own_book",
-                    "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
-                }
-
-        # Achat individuel payé ou achat à crédit accordé
+        # Achat individuel payé ou achat à crédit accordé (Strictement restreint au format numérique)
         from django.db.models import Q
-        has_purchased = LigneCommande.objects.filter(
+        has_purchased_digital = LigneCommande.objects.filter(
             commande__user=user,
-            ouvrage_id=book_id
+            ouvrage_id=book_id,
+            format_type='digital',
         ).filter(
             Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
         ).exists()
 
-        if has_purchased:
+        if has_purchased_digital:
             return {
                 "access_granted": True,
                 "reason": "individual_purchase",

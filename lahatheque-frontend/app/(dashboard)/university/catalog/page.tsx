@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ShoppingBag,
   Eye,
+  Headphones,
 } from "lucide-react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -125,14 +126,25 @@ export default function UniversityCatalogPage() {
             <span>Détails</span>
           </button>
 
-          <Link
-            href={`/catalog/reader/${row.id}?mode=sample`}
-            className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-[11px] font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
-            title="Lire l'extrait gratuit"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-gold" />
-            <span>Lire</span>
-          </Link>
+          {((row as any).has_audio || (row as any).has_audio_version || (row as any).format_type === 'audio') && (row as any).is_digital_available === false ? (
+            <Link
+              href={`/listen/${row.id}?mode=sample`}
+              className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-[11px] font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
+              title="Écouter l'extrait audio gratuit"
+            >
+              <Headphones className="w-3.5 h-3.5 text-gold" />
+              <span>Écouter</span>
+            </Link>
+          ) : (
+            <Link
+              href={`/catalog/reader/${row.id}?mode=sample`}
+              className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-[11px] font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
+              title="Lire l'extrait gratuit"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-gold" />
+              <span>Lire</span>
+            </Link>
+          )}
 
           <Link
             href={`/university/purchases/new`}
@@ -254,14 +266,25 @@ export default function UniversityCatalogPage() {
                   <Eye className="w-3.5 h-3.5 text-navy" />
                   <span>Détails</span>
                 </button>
-                <Link
-                  href={`/catalog/reader/${row.id}?mode=sample`}
-                  className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-xs font-bold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
-                  title="Lire l'extrait gratuit"
-                >
-                  <BookOpen className="w-3.5 h-3.5 text-gold" />
-                  <span>Lire</span>
-                </Link>
+                {((row as any).has_audio || (row as any).has_audio_version || (row as any).format_type === 'audio') && (row as any).is_digital_available === false ? (
+                  <Link
+                    href={`/listen/${row.id}?mode=sample`}
+                    className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-xs font-bold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
+                    title="Écouter l'extrait audio gratuit"
+                  >
+                    <Headphones className="w-3.5 h-3.5 text-gold" />
+                    <span>Écouter</span>
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/catalog/reader/${row.id}?mode=sample`}
+                    className="px-3 py-1.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-xs font-bold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
+                    title="Lire l'extrait gratuit"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-gold" />
+                    <span>Lire</span>
+                  </Link>
+                )}
                 <Link
                   href="/university/purchases/new"
                   className="px-3 py-1.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"

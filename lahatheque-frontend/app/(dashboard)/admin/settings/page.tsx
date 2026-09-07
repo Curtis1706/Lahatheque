@@ -342,7 +342,7 @@ export default function AdminSettingsPage() {
               <div>
                 <p className="text-xs font-bold text-navy">Gestion des remises par profil acheteur</p>
                 <p className="text-[11px] text-foreground-muted">
-                  Auteurs (-40% papier, -25% numérique), Grossistes (-32%), Campus (-25% papier, -35% numérique).
+                  Auteurs (-40% papier, -25% numérique, -25% audio), Grossistes (-32%), Campus (-25% papier, -35% numérique).
                 </p>
               </div>
               <Link

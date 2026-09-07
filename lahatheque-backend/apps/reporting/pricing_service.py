@@ -28,33 +28,41 @@ def compute_role_price(ouvrage, role: str) -> dict:
 
     public_digital = float(ouvrage.price_digital or 0)
     public_paper = float(ouvrage.price_paper or 0)
+    public_audio = float(getattr(ouvrage, 'price_audio', None) or 2500.0)
 
     rate_map = {
         "wholesaler": (
             float(config.remise_grossiste_numerique_pct),
             float(config.remise_grossiste_papier_pct),
+            0.0,
         ),
         "author": (
             float(config.remise_auteur_numerique_pct),
             float(config.remise_auteur_papier_pct),
+            float(getattr(config, 'remise_auteur_audio_pct', 25.0)),
         ),
         "university": (
             float(config.remise_campus_numerique_pct),
             float(config.remise_campus_papier_pct),
+            0.0,
         ),
-        "public": (0.0, 0.0),
+        "public": (0.0, 0.0, 0.0),
     }
 
-    digital_pct, paper_pct = rate_map.get(role, (0.0, 0.0))
+    digital_pct, paper_pct, audio_pct = rate_map.get(role, (0.0, 0.0, 0.0))
 
     digital_price = round(public_digital * (1 - digital_pct / 100), 2)
     paper_price = round(public_paper * (1 - paper_pct / 100), 2)
+    audio_price = round(public_audio * (1 - audio_pct / 100), 2)
 
     return {
         "digital_price": digital_price,
         "paper_price": paper_price,
+        "audio_price": audio_price,
         "digital_discount_pct": digital_pct,
         "paper_discount_pct": paper_pct,
+        "audio_discount_pct": audio_pct,
         "public_digital_price": public_digital,
         "public_paper_price": public_paper,
+        "public_audio_price": public_audio,
     }

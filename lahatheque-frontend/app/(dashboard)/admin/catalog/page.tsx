@@ -254,14 +254,25 @@ export default function AdminCatalogPage() {
           >
             <Shield className="w-3.5 h-3.5" />
           </Link>
-          <Link
-            href={`/catalog/reader/${row.id}`}
-            target="_blank"
-            className="p-1.5 rounded-lg border border-border bg-background hover:bg-navy hover:text-white text-foreground-muted transition-colors cursor-pointer"
-            title="Aperçu dans la liseuse"
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </Link>
+          {((row as any).has_audio || (row as any).has_audio_version || (row as any).format_type === 'audio') && (row as any).is_digital_available === false ? (
+            <Link
+              href={`/listen/${row.id}`}
+              target="_blank"
+              className="p-1.5 rounded-lg border border-border bg-background hover:bg-gold hover:text-navy text-foreground-muted transition-colors cursor-pointer"
+              title="Aperçu dans le lecteur audio"
+            >
+              <Headphones className="w-3.5 h-3.5 text-gold" />
+            </Link>
+          ) : (
+            <Link
+              href={`/catalog/reader/${row.id}`}
+              target="_blank"
+              className="p-1.5 rounded-lg border border-border bg-background hover:bg-navy hover:text-white text-foreground-muted transition-colors cursor-pointer"
+              title="Aperçu dans la liseuse"
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => setDeleteConfirmBook(row)}
@@ -374,14 +385,25 @@ export default function AdminCatalogPage() {
                     <Shield className="w-3 h-3 text-gold" />
                     <span>Protection</span>
                   </Link>
-                  <Link
-                    href={`/catalog/reader/${book.id}`}
-                    target="_blank"
-                    className="p-2 rounded-xl bg-navy/10 hover:bg-navy hover:text-white text-navy transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
-                    title="Ouvrir dans le lecteur sécurisé"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                  </Link>
+                  {((book as any).has_audio || (book as any).has_audio_version || (book as any).format_type === 'audio') && (book as any).is_digital_available === false ? (
+                    <Link
+                      href={`/listen/${book.id}`}
+                      target="_blank"
+                      className="p-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+                      title="Ouvrir dans le lecteur audio sécurisé"
+                    >
+                      <Headphones className="w-3.5 h-3.5 text-gold" />
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/catalog/reader/${book.id}`}
+                      target="_blank"
+                      className="p-2 rounded-xl bg-navy/10 hover:bg-navy hover:text-white text-navy transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+                      title="Ouvrir dans le lecteur sécurisé"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => setDeleteConfirmBook(book)}

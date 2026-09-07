@@ -15,15 +15,18 @@ import {
   AlertCircle,
   X,
   Layers,
-  GraduationCap
+  GraduationCap,
+  Headphones,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getMyDeposits } from "@/lib/services/layout-artist";
 import type { LayoutDeposit, DepositFilterStatus } from "@/lib/types/layout-artist";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 
 export default function MaquettisteDepositsPage() {
+  const { playBook } = useAudioPlayer();
   const searchParams = useSearchParams();
   const initialStatus = (searchParams.get("status") as DepositFilterStatus) || "all";
 
@@ -270,15 +273,26 @@ export default function MaquettisteDepositsPage() {
 
                   {/* Ligne Basse : Barre d'Actions (Cibles tactiles >= 44px) */}
                   <div className={`grid ${canEdit ? "grid-cols-3" : "grid-cols-2"} gap-2 pt-1 border-t border-border/70`}>
-                    {/* 1. Lire dans la Liseuse */}
-                    <Link
-                      href={`/catalog/reader/${row.id}`}
-                      target="_blank"
-                      className="px-2.5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs min-h-[44px] cursor-pointer"
-                    >
-                      <BookOpen className="w-3.5 h-3.5 text-gold" />
-                      <span>Lire</span>
-                    </Link>
+                    {/* 1. Lire dans la Liseuse ou écouter */}
+                    {((row as any).is_digital_available !== false && (row as any).format_type !== "audio") ? (
+                      <Link
+                        href={`/catalog/reader/${row.id}`}
+                        target="_blank"
+                        className="px-2.5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs min-h-[44px] cursor-pointer"
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-gold" />
+                        <span>Lire</span>
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => playBook(row.id)}
+                        className="px-2.5 py-2.5 rounded-xl bg-gold/15 hover:bg-gold/25 border border-gold/40 text-navy text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs min-h-[44px] cursor-pointer"
+                      >
+                        <Headphones className="w-3.5 h-3.5 text-gold" />
+                        <span>Écouter</span>
+                      </button>
+                    )}
 
                     {/* 2. Modifier / Corriger */}
                     {canEdit && (
@@ -373,15 +387,26 @@ export default function MaquettisteDepositsPage() {
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center gap-1.5 justify-end">
-                          {/* 1. Lire dans la Liseuse */}
-                          <Link
-                            href={`/catalog/reader/${row.id}`}
-                            target="_blank"
-                            className="p-2 rounded-xl border border-border bg-background hover:bg-navy hover:text-white text-navy transition-colors inline-flex items-center justify-center min-h-[36px] min-w-[36px] cursor-pointer"
-                            title="Lire dans la Liseuse LAHAThèque"
-                          >
-                            <BookOpen className="w-3.5 h-3.5 text-gold" />
-                          </Link>
+                          {/* 1. Lire dans la Liseuse ou écouter */}
+                          {((row as any).is_digital_available !== false && (row as any).format_type !== "audio") ? (
+                            <Link
+                              href={`/catalog/reader/${row.id}`}
+                              target="_blank"
+                              className="p-2 rounded-xl border border-border bg-background hover:bg-navy hover:text-white text-navy transition-colors inline-flex items-center justify-center min-h-[36px] min-w-[36px] cursor-pointer"
+                              title="Lire dans la Liseuse LAHAThèque"
+                            >
+                              <BookOpen className="w-3.5 h-3.5 text-gold" />
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => playBook(row.id)}
+                              className="p-2 rounded-xl border border-gold/40 bg-gold/15 hover:bg-gold/25 text-navy transition-colors inline-flex items-center justify-center min-h-[36px] min-w-[36px] cursor-pointer"
+                              title="Écouter l'épreuve audio"
+                            >
+                              <Headphones className="w-3.5 h-3.5 text-gold" />
+                            </button>
+                          )}
 
                           {/* 2. Modifier / Corriger */}
                           {canEdit && (

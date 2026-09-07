@@ -24,6 +24,7 @@ import {
   ArrowUpRight,
   ShieldCheck,
   Package,
+  Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
@@ -287,10 +288,10 @@ export default function AuthorPurchasesPage() {
           </div>
           <div>
             <p className="font-bold text-xs text-navy">
-              Avantage Auteur Actif : Remise de 40% sur le papier et 25% sur le numérique
+              Avantage Auteur Actif : Remise de 40% sur le papier, 25% sur le numérique et 25% sur l&apos;audio
             </p>
             <p className="text-[11px] text-foreground-muted">
-              Vos réductions conventionnées sont appliquées automatiquement à toutes vos commandes d&apos;exemplaires, réglables immédiatement ou en dépôt (à crédit sous 30 jours).
+              Vos réductions conventionnées sont appliquées automatiquement à toutes vos commandes d&apos;exemplaires, réglables immédiatement ou en dépôt (à crédit sous 30 jours). Chaque format est acquis individuellement.
             </p>
           </div>
         </div>
@@ -670,6 +671,17 @@ export default function AuthorPurchasesPage() {
                                   <BookOpen className="w-3.5 h-3.5 text-gold" />
                                   <span>Lire</span>
                                   <ArrowUpRight className="w-3 h-3 text-white/60" />
+                                </Link>
+                              )}
+
+                              {ligne.format_type === "audio" && !isReturned && (
+                                <Link
+                                  href={`/listen/${ligne.ouvrage}`}
+                                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gold/20 text-navy text-xs font-semibold hover:bg-gold/30 border border-gold/40 transition-colors min-h-[36px]"
+                                >
+                                  <Headphones className="w-3.5 h-3.5 text-gold" />
+                                  <span>Écouter</span>
+                                  <ArrowUpRight className="w-3 h-3 text-navy/60" />
                                 </Link>
                               )}
                             </div>

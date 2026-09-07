@@ -299,18 +299,38 @@ export function UnifiedBookOrderModal({
           </button>
         )}
 
-        {/* Bannière d'information si déjà acquis */}
-        {isDigitalOwned && (
+        {/* Bannière d'information si déjà acquis selon le format */}
+        {isDigitalOwned && isAudioOwned ? (
+          <div className="p-3.5 rounded-2xl bg-success/10 border border-success/30 flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
+            <div className="text-xs">
+              <p className="font-bold text-navy">Versions numérique et audio déjà acquises</p>
+              <p className="text-foreground-muted text-[11px] mt-0.5">
+                Vos accès numériques et audio sont actifs. Vous pouvez commander des exemplaires papier physiques ci-dessous.
+              </p>
+            </div>
+          </div>
+        ) : isDigitalOwned ? (
           <div className="p-3.5 rounded-2xl bg-success/10 border border-success/30 flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
             <div className="text-xs">
               <p className="font-bold text-navy">Vous possédez déjà cet ouvrage numérique</p>
               <p className="text-foreground-muted text-[11px] mt-0.5">
-                L&apos;accès numérique est actif dans votre bibliothèque. Vous pouvez le lire directement ou commander un exemplaire papier ci-dessous.
+                L&apos;accès numérique est actif dans votre bibliothèque. Vous pouvez le lire directement, ou acquérir la version audio ou papier ci-dessous.
               </p>
             </div>
           </div>
-        )}
+        ) : isAudioOwned ? (
+          <div className="p-3.5 rounded-2xl bg-gold/15 border border-gold/40 flex items-start gap-2.5">
+            <Headphones className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+            <div className="text-xs">
+              <p className="font-bold text-navy">Vous possédez déjà cet ouvrage en version audio</p>
+              <p className="text-foreground-muted text-[11px] mt-0.5">
+                L&apos;écoute illimitée est active. Vous pouvez également acquérir la version numérique ou un exemplaire papier ci-dessous.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         {/* Sélection Format */}
         <div className={`grid grid-cols-1 ${audioAvailable ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>

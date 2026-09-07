@@ -362,14 +362,16 @@ export default function ChiefLayoutCatalogPage() {
                     <ExternalLink className="w-4 h-4" />
                   </Link>
 
-                  <Link
-                    href={`/catalog/reader/${book.id}`}
-                    target="_blank"
-                    className="p-2 rounded-xl bg-background border border-border text-navy hover:border-gold hover:text-gold transition-colors flex items-center justify-center min-h-[40px] min-w-[40px]"
-                    title="Ouvrir dans la Liseuse DRM"
-                  >
-                    <Play className="w-4 h-4 text-gold fill-gold" />
-                  </Link>
+                  {((book as any).is_digital_available !== false && (book as any).format_type !== 'audio') && (
+                    <Link
+                      href={`/catalog/reader/${book.id}`}
+                      target="_blank"
+                      className="p-2 rounded-xl bg-background border border-border text-navy hover:border-gold hover:text-gold transition-colors flex items-center justify-center min-h-[40px] min-w-[40px]"
+                      title="Ouvrir dans la Liseuse DRM"
+                    >
+                      <Play className="w-4 h-4 text-gold fill-gold" />
+                    </Link>
+                  )}
                 </div>
               </div>
             );

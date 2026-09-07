@@ -67,6 +67,7 @@ function AccessBlock({
     (book as any).format === "audio" ||
     (book as any).format_type === "audio"
   );
+  const hasDigital = (book as any).is_digital_available !== false && (book as any).format_type !== "audio" && (book as any).format !== "audio";
 
   if (access.access_granted) {
     const reasonLabels: Record<string, string> = {
@@ -90,13 +91,15 @@ function AccessBlock({
           Vous bénéficiez de la consultation intégrale en ligne sous DRM LCP et de la synthèse vocale assistée.
         </p>
         <div className="flex items-center gap-3 flex-wrap">
-          <Link
-            href={`/catalog/reader/${book.id}`}
-            className="flex-1 py-3 px-5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-xs"
-          >
-            <Play className="w-4 h-4 text-gold fill-gold" />
-            Ouvrir la Liseuse Sécurisée
-          </Link>
+          {hasDigital && (
+            <Link
+              href={`/catalog/reader/${book.id}`}
+              className="flex-1 py-3 px-5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-xs"
+            >
+              <Play className="w-4 h-4 text-gold fill-gold" />
+              Ouvrir la Liseuse Sécurisée
+            </Link>
+          )}
 
           {hasAudio && (
             <button
@@ -105,7 +108,7 @@ function AccessBlock({
               className="py-3 px-5 rounded-2xl bg-gold/20 hover:bg-gold/30 text-navy text-xs font-bold border border-gold/40 transition-colors flex items-center justify-center gap-2 min-h-[44px] cursor-pointer shadow-xs"
             >
               <Headphones className="w-4 h-4 text-gold" />
-              Écouter le Livre Audio
+              Écouter l'Audio HD
             </button>
           )}
 
@@ -131,25 +134,27 @@ function AccessBlock({
         <h3 className="font-bold text-navy text-base">Modalités d&apos;Accès &amp; Achat</h3>
       </div>
 
-      <div className={`grid grid-cols-1 ${hasAudio ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
-        {/* Extrait gratuit */}
-        <Link
-          href={`/catalog/reader/${book.id}?mode=sample`}
-          className="p-4 rounded-2xl border border-border bg-background-secondary hover:border-gold text-left space-y-1 transition-all cursor-pointer block"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-navy flex items-center gap-1.5">
-              <Eye className="w-4 h-4 text-gold" />
-              Extrait Gratuit
-            </span>
-            <span className="text-[10px] uppercase font-bold text-gold bg-gold/15 px-2 py-0.5 rounded-md">
-              {book.sample_pages_count || 10} Pages
-            </span>
-          </div>
-          <p className="text-[11px] text-foreground-muted">
-            Lecture instantanée dans la liseuse sans inscription préalable.
-          </p>
-        </Link>
+      <div className={`grid grid-cols-1 ${hasAudio && hasDigital ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
+        {/* Extrait gratuit numérique (si format numérique disponible) */}
+        {hasDigital && (
+          <Link
+            href={`/catalog/reader/${book.id}?mode=sample`}
+            className="p-4 rounded-2xl border border-border bg-background-secondary hover:border-gold text-left space-y-1 transition-all cursor-pointer block"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                <Eye className="w-4 h-4 text-gold" />
+                Extrait Gratuit
+              </span>
+              <span className="text-[10px] uppercase font-bold text-gold bg-gold/15 px-2 py-0.5 rounded-md">
+                {book.sample_pages_count || 10} Pages
+              </span>
+            </div>
+            <p className="text-[11px] text-foreground-muted">
+              Lecture instantanée dans la liseuse sans inscription préalable.
+            </p>
+          </Link>
+        )}
 
         {/* Extrait Audio (si disponible) */}
         {hasAudio && (
