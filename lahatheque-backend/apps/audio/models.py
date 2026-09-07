@@ -5,16 +5,35 @@ from django.conf import settings
 from django.utils import timezone
 
 class AudioTrack(models.Model):
+    VOICE_GENDER_CHOICES = [
+        ('male', 'Voix Homme'),
+        ('female', 'Voix Femme'),
+    ]
+    TRACK_TYPE_CHOICES = [
+        ('full', 'Livre complet'),
+        ('chapter', 'Chapitre'),
+    ]
+
     ouvrage = models.ForeignKey('catalog.Ouvrage', on_delete=models.CASCADE, related_name='audio_tracks')
-    chapter_number = models.IntegerField()
+    voice_gender = models.CharField(max_length=10, choices=VOICE_GENDER_CHOICES, default='male')
+    track_type = models.CharField(max_length=10, choices=TRACK_TYPE_CHOICES, default='chapter')
+    chapter_number = models.IntegerField(default=1)
+    order_index = models.IntegerField(default=0)
     title = models.CharField(max_length=255)
-    duration_seconds = models.IntegerField()
-    stream_id = models.CharField(max_length=255) # UID Cloudflare Stream
-    hls_manifest_url = models.URLField()
-    captions_vtt_url = models.URLField(null=True, blank=True)
+    duration_seconds = models.IntegerField(default=0)
+    file_size_bytes = models.BigIntegerField(default=0)
+    bitrate_kbps = models.IntegerField(default=128)
+    audio_file = models.FileField(upload_to='audio_tracks/', max_length=512, null=True, blank=True)
+    stream_id = models.CharField(max_length=255, blank=True, default='') # UID Cloudflare Stream ou R2
+    hls_manifest_url = models.URLField(max_length=1024, blank=True, default='')
+    captions_vtt_url = models.URLField(max_length=1024, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+
+    class Meta:
+        ordering = ['voice_gender', 'track_type', 'order_index', 'chapter_number']
 
     def __str__(self):
-        return f"{self.ouvrage.title} - Ch.{self.chapter_number}: {self.title}"
+        return f"{self.ouvrage.title} [{self.get_voice_gender_display()}] - {self.title}"
 
 
 class AudioListeningSession(models.Model):

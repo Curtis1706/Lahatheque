@@ -8,7 +8,7 @@ export interface CartItem {
   title: string;
   author: string;
   cover?: string;
-  format: "digital" | "paper";
+  format: "digital" | "paper" | "audio";
   price: number;
   quantity: number;
   maxStockPaper?: number;

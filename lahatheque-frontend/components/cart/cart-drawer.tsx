@@ -4,7 +4,7 @@ import React, { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, BookOpen } from "lucide-react";
+import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, BookOpen, Headphones } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 
 // Taux de conversion officiel XOF -> EUR (1 EUR = 655.957 FCFA)
@@ -120,7 +120,7 @@ export function CartDrawer() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-navy/10 text-navy font-bold text-[10px] font-mono">
-                          {item.format === "digital" ? "E-BOOK" : "PAPIER"}
+                          {item.format === "digital" ? "E-BOOK" : item.format === "audio" ? "AUDIO" : "PAPIER"}
                         </div>
                       )}
                     </div>
@@ -142,10 +142,19 @@ export function CartDrawer() {
                       </div>
 
                       {/* Sous-titre Catégorie / Pays / Format */}
-                      <p className="text-[11px] text-foreground-muted truncate">
-                        {item.country || "Bénin"} • {item.category || "Scolaires"} •{" "}
-                        <span className="font-semibold text-navy">
-                          {item.format === "digital" ? "Livre numérique" : "Livre broché"}
+                      <p className="text-[11px] text-foreground-muted truncate flex items-center gap-1">
+                        <span>{item.country || "Bénin"} • {item.category || "Scolaires"} •</span>
+                        <span className="font-semibold text-navy inline-flex items-center gap-1">
+                          {item.format === "audio" ? (
+                            <>
+                              <Headphones className="w-3 h-3 text-gold" />
+                              Livre audio (HD)
+                            </>
+                          ) : item.format === "digital" ? (
+                            "Livre numérique"
+                          ) : (
+                            "Livre broché"
+                          )}
                         </span>
                       </p>
 
@@ -166,9 +175,13 @@ export function CartDrawer() {
                           <button
                             type="button"
                             onClick={() => updateQuantity(item.id, 1)}
-                            disabled={item.format === "paper" && item.maxStockPaper != null && item.quantity >= item.maxStockPaper}
+                            disabled={
+                              item.format !== "paper" ||
+                              (item.maxStockPaper != null && item.quantity >= item.maxStockPaper)
+                            }
                             className="w-6 h-6 rounded flex items-center justify-center text-foreground hover:bg-background transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             aria-label="Augmenter la quantité"
+                            title={item.format !== "paper" ? "Licence numérique/audio limitée à 1 exemplaire" : undefined}
                           >
                             <Plus className="w-3 h-3" />
                           </button>

@@ -40,6 +40,8 @@ interface AudioPlayerContextType {
   setPlaybackRate: (rate: number) => void;
   nextTrack: () => void;
   previousTrack: () => void;
+  selectTrackIndex: (index: number) => void;
+  switchVoice: (gender: "male" | "female") => void;
   toggleExpand: () => void;
   setExpanded: (expanded: boolean) => void;
   closePlayer: () => void;
@@ -296,7 +298,16 @@ export function AudioPlayerProvider({
           return;
         }
 
-        const initialIndex = options?.initialTrackIndex ?? 0;
+        let initialIndex = 0;
+        if (options?.initialTrackIndex !== undefined) {
+          initialIndex = options.initialTrackIndex;
+        } else {
+          // Voix masculine par défaut si disponible, sinon première piste disponible
+          const maleIndex = data.tracks.findIndex(
+            (t: AudioTrackItem) => t.voice_gender === "male"
+          );
+          initialIndex = maleIndex !== -1 ? maleIndex : 0;
+        }
         const targetTrack = data.tracks[initialIndex] || data.tracks[0];
 
         setState((prev) => ({
@@ -421,9 +432,23 @@ export function AudioPlayerProvider({
 
   const handleNextTrack = useCallback(() => {
     if (!state.tracks.length) return;
-    const nextIndex = (state.currentTrackIndex + 1) % state.tracks.length;
-    const nextTrack = state.tracks[nextIndex];
+    const currentTrack = state.tracks[state.currentTrackIndex];
+    let nextIndex = (state.currentTrackIndex + 1) % state.tracks.length;
 
+    // Si la piste courante a un genre de voix, prioriser la piste suivante de la même voix
+    if (currentTrack?.voice_gender) {
+      const sameVoiceIndices = state.tracks
+        .map((t, idx) => (t.voice_gender === currentTrack.voice_gender ? idx : -1))
+        .filter((idx) => idx !== -1);
+
+      if (sameVoiceIndices.length > 1) {
+        const localPos = sameVoiceIndices.indexOf(state.currentTrackIndex);
+        const nextLocalPos = (localPos + 1) % sameVoiceIndices.length;
+        nextIndex = sameVoiceIndices[nextLocalPos];
+      }
+    }
+
+    const nextTrack = state.tracks[nextIndex];
     setState((prev) => ({
       ...prev,
       currentTrackIndex: nextIndex,
@@ -443,12 +468,27 @@ export function AudioPlayerProvider({
 
   const handlePreviousTrack = useCallback(() => {
     if (!state.tracks.length) return;
-    const prevIndex =
+    const currentTrack = state.tracks[state.currentTrackIndex];
+    let prevIndex =
       state.currentTrackIndex === 0
         ? state.tracks.length - 1
         : state.currentTrackIndex - 1;
-    const prevTrack = state.tracks[prevIndex];
 
+    // Si la piste courante a un genre de voix, prioriser la piste précédente de la même voix
+    if (currentTrack?.voice_gender) {
+      const sameVoiceIndices = state.tracks
+        .map((t, idx) => (t.voice_gender === currentTrack.voice_gender ? idx : -1))
+        .filter((idx) => idx !== -1);
+
+      if (sameVoiceIndices.length > 1) {
+        const localPos = sameVoiceIndices.indexOf(state.currentTrackIndex);
+        const prevLocalPos =
+          localPos <= 0 ? sameVoiceIndices.length - 1 : localPos - 1;
+        prevIndex = sameVoiceIndices[prevLocalPos];
+      }
+    }
+
+    const prevTrack = state.tracks[prevIndex];
     setState((prev) => ({
       ...prev,
       currentTrackIndex: prevIndex,
@@ -463,6 +503,92 @@ export function AudioPlayerProvider({
       }
     }
   }, [state.tracks, state.currentTrackIndex, loadSource]);
+
+  const selectTrackIndex = useCallback(
+    (index: number) => {
+      if (!state.tracks.length || index < 0 || index >= state.tracks.length) return;
+      const targetTrack = state.tracks[index];
+
+      setState((prev) => ({
+        ...prev,
+        currentTrackIndex: index,
+        currentTime: 0,
+        duration: targetTrack.duration_seconds || 0,
+      }));
+
+      if (targetTrack.signed_hls_url) {
+        loadSource(targetTrack.signed_hls_url);
+        if (audioRef.current) {
+          audioRef.current.play().catch(() => {});
+        }
+      }
+    },
+    [state.tracks, loadSource]
+  );
+
+  const switchVoice = useCallback(
+    (targetGender: "male" | "female") => {
+      if (!state.tracks.length) return;
+      const currentTrack = state.tracks[state.currentTrackIndex];
+      if (currentTrack && currentTrack.voice_gender === targetGender) return;
+
+      // 1. Chercher un chapitre équivalent avec le même chapter_number et track_type
+      let targetIndex = -1;
+      if (currentTrack) {
+        targetIndex = state.tracks.findIndex(
+          (t) =>
+            t.voice_gender === targetGender &&
+            t.chapter_number === currentTrack.chapter_number &&
+            t.track_type === currentTrack.track_type
+        );
+        // Si non trouvé avec track_type strict, chercher par chapter_number
+        if (targetIndex === -1 && currentTrack.chapter_number !== undefined) {
+          targetIndex = state.tracks.findIndex(
+            (t) =>
+              t.voice_gender === targetGender &&
+              t.chapter_number === currentTrack.chapter_number
+          );
+        }
+      }
+
+      // 2. Si pas trouvé d'équivalent exact, chercher la première piste du genre cible
+      if (targetIndex === -1) {
+        targetIndex = state.tracks.findIndex((t) => t.voice_gender === targetGender);
+      }
+
+      if (targetIndex === -1) return;
+
+      const targetTrack = state.tracks[targetIndex];
+      const resumeTime = Math.min(
+        state.currentTime,
+        targetTrack.duration_seconds || state.currentTime
+      );
+
+      setState((prev) => ({
+        ...prev,
+        currentTrackIndex: targetIndex,
+        currentTime: resumeTime,
+        duration: targetTrack.duration_seconds || 0,
+      }));
+
+      if (targetTrack.signed_hls_url) {
+        loadSource(targetTrack.signed_hls_url);
+        if (audioRef.current) {
+          audioRef.current.currentTime = resumeTime;
+          if (state.isPlaying) {
+            audioRef.current.play().catch(() => {});
+          }
+        }
+      }
+    },
+    [
+      state.tracks,
+      state.currentTrackIndex,
+      state.currentTime,
+      state.isPlaying,
+      loadSource,
+    ]
+  );
 
   const toggleExpand = useCallback(() => {
     setState((prev) => ({ ...prev, isExpanded: !prev.isExpanded }));
@@ -494,6 +620,8 @@ export function AudioPlayerProvider({
         setPlaybackRate,
         nextTrack: handleNextTrack,
         previousTrack: handlePreviousTrack,
+        selectTrackIndex,
+        switchVoice,
         toggleExpand,
         setExpanded,
         closePlayer,

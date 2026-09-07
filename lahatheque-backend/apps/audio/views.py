@@ -215,7 +215,7 @@ class AudioStreamSessionView(APIView):
         is_preview = not has_full_access
         preview_limit_seconds = 180 if is_preview else 0
 
-        tracks = AudioTrack.objects.filter(ouvrage_id=ouvrage_id).order_by("chapter_number")
+        tracks = AudioTrack.objects.filter(ouvrage_id=ouvrage_id).order_by("order_index", "chapter_number", "id")
         sessions = []
         public_r2_url = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', '') or getattr(settings, 'CLOUDFLARE_R2_PUBLIC_DOMAIN', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
 
@@ -256,12 +256,23 @@ class AudioStreamSessionView(APIView):
                         logger.error(f"Échec génération token audio: {e}")
                         signed_url = track.hls_manifest_url or ""
                 
+                if not signed_url and track.audio_file:
+                    try:
+                        signed_url = track.audio_file.url
+                        if not signed_url.startswith("http"):
+                            signed_url = request.build_absolute_uri(signed_url)
+                    except Exception as e:
+                        logger.warning(f"Impossible de récupérer l'URL de audio_file pour track {track.id}: {e}")
+
                 if not signed_url and track.hls_manifest_url:
                     signed_url = track.hls_manifest_url
 
                 sessions.append({
                     "id": str(track.id),
                     "chapter_number": track.chapter_number,
+                    "order_index": getattr(track, 'order_index', 0),
+                    "track_type": getattr(track, 'track_type', 'chapter'),
+                    "voice_gender": getattr(track, 'voice_gender', 'male'),
                     "title": track.title,
                     "duration_seconds": track.duration_seconds,
                     "signed_hls_url": signed_url,
@@ -434,3 +445,316 @@ class AudioLockVerificationView(APIView):
             "tracks_count": len(tracks),
             "message": f"{len(tracks)} piste(s) audio disponible(s) et protégée(s)."
         })
+
+
+class AudioEligibleBooksView(APIView):
+    """GET /api/v1/audio/eligible-books/ — Liste des ouvrages éligibles pour un rattachement audio."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.catalog.models import Ouvrage
+        from django.db.models import Q
+
+        q = request.query_params.get("q", "").strip()
+        qs = Ouvrage.objects.filter(status__in=['published', 'approved', 'draft']).order_by('-created_at')
+
+        if q:
+            qs = qs.filter(
+                Q(title__icontains=q) |
+                Q(isbn__icontains=q) |
+                Q(authors__first_name__icontains=q) |
+                Q(authors__last_name__icontains=q)
+            ).distinct()
+
+        books_data = []
+        for b in qs[:30]:
+            authors_str = ", ".join([f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]) if b.authors.exists() else (b.publisher_name or "Auteur LAHA")
+            books_data.append({
+                "id": str(b.id),
+                "title": b.title,
+                "isbn": b.isbn,
+                "author": authors_str,
+                "authors_display": authors_str,
+                "category": b.discipline.name if b.discipline else "Général",
+                "country": b.country or "BJ",
+                "cover_url": b.cover_url,
+                "price_xof": float(b.price_digital or 2500),
+                "has_audio_version": bool(b.has_audio_version),
+            })
+
+        return Response({"success": True, "data": books_data})
+
+
+class AudioStudioSubmitView(APIView):
+    """POST /api/v1/audio/studio/submit/ — Création ou mise à jour complète d'un livre audio."""
+    permission_classes = [permissions.IsAuthenticated, IsAudioUploader]
+
+    def post(self, request):
+        from apps.catalog.models import Ouvrage, Discipline
+        from apps.audio.models import AudioTrack
+        from decimal import Decimal
+        import json
+
+        data = request.data
+        is_attached = str(data.get("is_attached", "")).lower() in ["true", "1", "yes"]
+        attached_book_id = data.get("attached_book_id")
+
+        price_xof_val = data.get("price_xof")
+        price_eur_val = data.get("price_eur")
+        price_xof = Decimal(str(price_xof_val)) if price_xof_val else Decimal("2500.00")
+        price_eur = Decimal(str(price_eur_val)) if price_eur_val else Decimal("3.80")
+
+        ouvrage = None
+        if is_attached and attached_book_id:
+            try:
+                ouvrage = Ouvrage.objects.get(id=attached_book_id)
+                ouvrage.has_audio_version = True
+                ouvrage.price_audio = price_xof
+                ouvrage.price_audio_eur = price_eur
+                ouvrage.audio_status = "pending_layout_validation"
+                ouvrage.save(update_fields=["has_audio_version", "price_audio", "price_audio_eur", "audio_status"])
+            except Ouvrage.DoesNotExist:
+                return Response({"success": False, "error": "Ouvrage de rattachement introuvable."}, status=404)
+        else:
+            title = data.get("title", "").strip()
+            if not title:
+                return Response({"success": False, "error": "Le titre du livre audio est obligatoire."}, status=400)
+
+            ouvrage = Ouvrage.objects.create(
+                title=title,
+                summary=data.get("description", ""),
+                country=data.get("country", "BJ"),
+                format_type="audio",
+                has_audio_version=True,
+                audio_status="pending_layout_validation",
+                price_digital=price_xof,
+                price_audio=price_xof,
+                price_audio_eur=price_eur,
+                created_by=request.user,
+                status="published" if getattr(request.user, "role", "") in ["admin", "super_admin"] else "draft",
+            )
+
+            cover_file = request.FILES.get("cover_image")
+            if cover_file:
+                ouvrage.cover_image = cover_file
+                ouvrage.save(update_fields=["cover_image"])
+
+            cat_name = data.get("category", "")
+            if cat_name:
+                disc = Discipline.objects.filter(name__iexact=cat_name).first()
+                if disc:
+                    ouvrage.discipline = disc
+                    ouvrage.save(update_fields=["discipline"])
+
+        # Sauvegarde des pistes Voix Homme & Voix Femme
+        tracks_created = 0
+
+        # 1. Livre complet Voix Homme
+        male_full_file = request.FILES.get("male_full_track")
+        if male_full_file:
+            male_full_duration = int(data.get("male_full_duration", 0))
+            AudioTrack.objects.filter(ouvrage=ouvrage, voice_gender="male", track_type="full").delete()
+            AudioTrack.objects.create(
+                ouvrage=ouvrage,
+                voice_gender="male",
+                track_type="full",
+                chapter_number=0,
+                order_index=0,
+                title="Livre complet – Voix Homme",
+                audio_file=male_full_file,
+                duration_seconds=male_full_duration,
+                file_size_bytes=male_full_file.size,
+            )
+            tracks_created += 1
+
+        # 2. Livre complet Voix Femme
+        female_full_file = request.FILES.get("female_full_track")
+        if female_full_file:
+            female_full_duration = int(data.get("female_full_duration", 0))
+            AudioTrack.objects.filter(ouvrage=ouvrage, voice_gender="female", track_type="full").delete()
+            AudioTrack.objects.create(
+                ouvrage=ouvrage,
+                voice_gender="female",
+                track_type="full",
+                chapter_number=0,
+                order_index=0,
+                title="Livre complet – Voix Femme",
+                audio_file=female_full_file,
+                duration_seconds=female_full_duration,
+                file_size_bytes=female_full_file.size,
+            )
+            tracks_created += 1
+
+        # 3. Chapitres dynamiques Voix Homme
+        male_chap_count = int(data.get("male_chapters_count", 0))
+        for i in range(male_chap_count):
+            chap_file = request.FILES.get(f"male_chapter_{i}_file")
+            if chap_file:
+                chap_title = data.get(f"male_chapter_{i}_title", f"Chapitre {i + 1}").strip()
+                chap_dur = int(data.get(f"male_chapter_{i}_duration", 0))
+                AudioTrack.objects.create(
+                    ouvrage=ouvrage,
+                    voice_gender="male",
+                    track_type="chapter",
+                    chapter_number=i + 1,
+                    order_index=i + 1,
+                    title=chap_title,
+                    audio_file=chap_file,
+                    duration_seconds=chap_dur,
+                    file_size_bytes=chap_file.size,
+                )
+                tracks_created += 1
+
+        # 4. Chapitres dynamiques Voix Femme
+        female_chap_count = int(data.get("female_chapters_count", 0))
+        for i in range(female_chap_count):
+            chap_file = request.FILES.get(f"female_chapter_{i}_file")
+            if chap_file:
+                chap_title = data.get(f"female_chapter_{i}_title", f"Chapitre {i + 1}").strip()
+                chap_dur = int(data.get(f"female_chapter_{i}_duration", 0))
+                AudioTrack.objects.create(
+                    ouvrage=ouvrage,
+                    voice_gender="female",
+                    track_type="chapter",
+                    chapter_number=i + 1,
+                    order_index=i + 1,
+                    title=chap_title,
+                    audio_file=chap_file,
+                    duration_seconds=chap_dur,
+                    file_size_bytes=chap_file.size,
+                )
+                tracks_created += 1
+
+        _alert_juriste_if_contract_missing_audio_rate(ouvrage)
+
+        return Response({
+            "success": True,
+            "data": {
+                "ouvrage_id": str(ouvrage.id),
+                "title": ouvrage.title,
+                "audio_status": ouvrage.audio_status,
+                "tracks_created": tracks_created,
+                "message": "Livre audio enregistré avec succès."
+            }
+        })
+
+
+class AudioManagementListView(APIView):
+    """GET /api/v1/audio/management/<role>/ — Liste des livres audio pour la gestion multi-rôles."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, role):
+        from apps.catalog.models import Ouvrage
+        from django.db.models import Q, Sum, Count
+
+        status_filter = request.query_params.get("status")
+        qs = Ouvrage.objects.filter(
+            Q(has_audio_version=True) | Q(format_type="audio") | Q(audio_tracks__isnull=False)
+        ).distinct().order_by("-updated_at")
+
+        if status_filter and status_filter != "all":
+            qs = qs.filter(audio_status=status_filter)
+
+        results = []
+        for b in qs:
+            tracks = b.audio_tracks.all()
+            has_male = tracks.filter(voice_gender="male").exists()
+            has_female = tracks.filter(voice_gender="female").exists()
+            total_dur = sum(t.duration_seconds for t in tracks)
+            authors_str = ", ".join([f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]) if b.authors.exists() else (b.publisher_name or "Auteur LAHA")
+
+            results.append({
+                "id": str(b.id),
+                "title": b.title,
+                "authors_display": authors_str,
+                "category_name": b.discipline.name if b.discipline else "Général",
+                "country": b.country or "BJ",
+                "cover_url": b.cover_url,
+                "price_audio_xof": float(b.price_audio or b.price_digital or 2500),
+                "price_audio_eur": float(b.price_audio_eur or 3.80),
+                "audio_status": getattr(b, "audio_status", "draft") or "draft",
+                "has_male_voice": has_male,
+                "has_female_voice": has_female,
+                "total_duration_seconds": total_dur,
+                "total_tracks_count": tracks.count(),
+                "created_at": b.created_at.isoformat() if b.created_at else "",
+                "rejection_reason": getattr(b, "rejection_reason", "") or "",
+            })
+
+        return Response({"success": True, "data": results})
+
+
+class AudioWorkflowTransitionView(APIView):
+    """POST /api/v1/audio/management/<book_id>/transition/ — Transition de statut de workflow."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, book_id):
+        from apps.catalog.models import Ouvrage
+
+        action = request.data.get("action")
+        comment = request.data.get("comment", "").strip()
+
+        try:
+            ouvrage = Ouvrage.objects.get(id=book_id)
+        except Ouvrage.DoesNotExist:
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
+
+        if action == "submit_layout":
+            ouvrage.audio_status = "pending_layout_validation"
+        elif action == "approve_layout":
+            ouvrage.audio_status = "pending_legal_validation"
+        elif action == "reject_layout":
+            ouvrage.audio_status = "rejected"
+            ouvrage.rejection_reason = comment or "Modifications demandées par le Chef Maquettiste."
+        elif action == "approve_legal":
+            ouvrage.audio_status = "published"
+            ouvrage.status = "published"
+        elif action == "publish_admin":
+            ouvrage.audio_status = "published"
+            ouvrage.status = "published"
+        elif action == "unpublish_admin":
+            ouvrage.audio_status = "draft"
+        else:
+            return Response({"success": False, "error": f"Action de workflow inconnue : {action}"}, status=400)
+
+        ouvrage.save()
+        return Response({
+            "success": True,
+            "data": {
+                "id": str(ouvrage.id),
+                "audio_status": ouvrage.audio_status,
+                "message": f"Statut mis à jour avec succès : {ouvrage.audio_status}"
+            }
+        })
+
+
+class RecentAudioListeningsView(APIView):
+    """GET /api/v1/audio/recent-listenings/ — Dernières écoutes audio de l'utilisateur pour le widget Dashboard."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.audio.models import AudioListeningSession
+
+        sessions = AudioListeningSession.objects.filter(
+            user=request.user
+        ).select_related("ouvrage", "audio_track").order_by("-created_at")[:5]
+
+        seen_books = set()
+        data = []
+        for s in sessions:
+            if s.ouvrage_id in seen_books:
+                continue
+            seen_books.add(s.ouvrage_id)
+            track_title = s.audio_track.title if s.audio_track else "Lecture en cours"
+            data.append({
+                "session_id": str(s.id),
+                "ouvrage_id": str(s.ouvrage.id),
+                "title": s.ouvrage.title,
+                "cover_url": s.ouvrage.cover_url,
+                "chapter_title": track_title,
+                "duration_listened_seconds": s.duration_listened_seconds,
+                "completion_percent": float(s.completion_percent or 0),
+                "session_date": s.session_date.isoformat() if s.session_date else "",
+            })
+
+        return Response({"success": True, "data": data})

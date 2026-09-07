@@ -26,6 +26,7 @@ import {
   Headphones,
 } from "lucide-react";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
+import { RecentAudioWidget } from "@/components/features/student/recent-audio-widget";
 
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
 
@@ -313,6 +314,9 @@ export default function StudentOverviewPage() {
       ) : (
         <ReadingHeroCard currentReading={kpis?.currentReading ?? null} />
       )}
+
+      {/* ── Widget Audio : Écoutes en cours ── */}
+      <RecentAudioWidget />
 
       {/* ── Statistiques & Assiduité d'Étude (Masqué / Mis en commentaire à la demande client) ── */}
       {/*

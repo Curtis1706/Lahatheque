@@ -44,6 +44,8 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
     faculty_name = serializers.CharField(source='faculty', read_only=True)
     is_owned = serializers.SerializerMethodField()
     has_digital_access = serializers.SerializerMethodField()
+    is_digital_available = serializers.SerializerMethodField()
+    has_audio = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     created_by_id = serializers.SerializerMethodField()
 

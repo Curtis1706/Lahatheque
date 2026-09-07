@@ -94,12 +94,26 @@ export default function BookDetailPage() {
     ? book.authors_details.map((a) => `${a.first_name} ${a.last_name}`).join(", ")
     : "Auteur LAHA";
 
-  const formatsAvailableText = 
-    (book.is_paper_available !== false && book.is_digital_available !== false)
-      ? "Livre broché & Numérique"
-      : book.is_paper_available !== false
-      ? "Livre broché"
-      : "Livre numérique";
+  const hasPaper = book.is_paper_available !== false;
+  const hasDigital = book.is_digital_available !== false;
+  const hasAudio = Boolean(book.has_audio || book.has_audio_version || (book.price_audio && book.price_audio > 0) || book.audio_status === "published");
+
+  let formatsAvailableText = "Livre numérique";
+  if (hasPaper && hasDigital && hasAudio) {
+    formatsAvailableText = "Livre broché, Numérique & Audio";
+  } else if (hasPaper && hasAudio) {
+    formatsAvailableText = "Livre broché & Audio";
+  } else if (hasDigital && hasAudio) {
+    formatsAvailableText = "Numérique & Audio";
+  } else if (hasAudio && !hasPaper && !hasDigital) {
+    formatsAvailableText = "Livre audio seul";
+  } else if (hasPaper && hasDigital) {
+    formatsAvailableText = "Livre broché & Numérique";
+  } else if (hasPaper) {
+    formatsAvailableText = "Livre broché";
+  } else {
+    formatsAvailableText = "Livre numérique";
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground py-6 sm:py-10 px-4 sm:px-6 lg:px-8">
@@ -295,7 +309,7 @@ export default function BookDetailPage() {
                   className="group bg-background-secondary rounded-2xl border border-border p-4 flex flex-col justify-between hover:border-gold/50 hover:shadow-md transition-all"
                 >
                   <div className="flex flex-col items-center space-y-3 text-center">
-                    <div className="relative w-28 sm:w-32 aspect-[2/3] rounded-r-md rounded-l-xs overflow-hidden shadow-md border-l-2 border-black/30 border-border group-hover:scale-103 transition-transform">
+                    <div className="relative w-28 sm:w-32 aspect-[2/3] rounded-r-md rounded-l-xs overflow-hidden shadow-md border border-border border-l-2 border-l-black/30 group-hover:scale-103 transition-transform">
                       {item.cover_url || item.cover_image ? (
                         <img
                           src={item.cover_url || item.cover_image}

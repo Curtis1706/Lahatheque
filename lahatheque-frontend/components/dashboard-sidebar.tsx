@@ -73,6 +73,7 @@ import {
   Globe,
   HelpCircle,
   Mail,
+  Headphones,
 } from "lucide-react";
 
 interface SubLinkItem {
@@ -245,6 +246,7 @@ export function DashboardSidebar() {
               { label: "Pré-éditions", href: "/legal-reviewer/pre-editions", icon: <PenTool className="size-4" /> },
               { label: "Redevances", href: "/legal-reviewer/redevances", icon: <DollarSign className="size-4" /> },
               { label: "Relances & Impayés", href: "/legal-reviewer/relances", icon: <BellRing className="size-4" /> },
+              { label: "Validation Livres Audio", href: "/legal-reviewer/audio", icon: <Headphones className="size-4" /> },
               { label: "Nos Contacts", href: "/legal-reviewer/contacts", icon: <Users className="size-4" /> },
             ],
           },
@@ -265,6 +267,7 @@ export function DashboardSidebar() {
                   { label: "Nouveau dépôt", href: "/layout-artist/deposits/new", icon: <PlusCircle className="size-3.5" /> },
                 ],
               },
+              { label: "Livres Audio", href: "/layout-artist/audio", icon: <Headphones className="size-4" /> },
             ],
           },
         ];
@@ -279,6 +282,7 @@ export function DashboardSidebar() {
               { label: "Catalogue Ouvrages", href: "/chief-layout/catalog", icon: <BookOpen className="size-4" /> },
               { label: "Déposer un ouvrage", href: "/chief-layout/deposit", icon: <PlusCircle className="size-4" /> },
               { label: "Dépôts à valider", href: "/chief-layout/validation", icon: <CheckSquare className="size-4" /> },
+              { label: "Gestion Livres Audio", href: "/chief-layout/audio", icon: <Headphones className="size-4" /> },
               { label: "Historique validations", href: "/chief-layout/history", icon: <History className="size-4" /> },
             ],
           },
@@ -323,6 +327,7 @@ export function DashboardSidebar() {
                 ],
               },
               { label: "Validation BAT & Maquettes", href: "/admin/validation", icon: <FileCheck2 className="size-4" /> },
+              { label: "Gestion Livres Audio", href: "/admin/audio", icon: <Headphones className="size-4" /> },
               { label: "Manuscrits Reçus (Public)", href: "/admin/manuscript-leads", icon: <Mail className="size-4" /> },
               { label: "Dépôts Éditeurs Tiers", href: "/admin/publisher-deposits", icon: <BookOpen className="size-4" /> },
               { label: "Contrats & Droits d'Auteur", href: "/admin/contracts", icon: <Scale className="size-4" /> },

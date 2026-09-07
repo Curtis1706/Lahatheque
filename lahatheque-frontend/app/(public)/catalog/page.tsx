@@ -13,7 +13,9 @@ import {
   Sparkles,
   UserCheck,
   ArrowRight,
-  Calendar
+  Calendar,
+  Headphones,
+  Laptop
 } from "lucide-react";
 import { Book } from "@/lib/types/catalog";
 import { searchBooks, getInstitutions, type InstitutionOption } from "@/lib/services/catalog";
@@ -21,6 +23,7 @@ import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import { Book as Book3D } from "@/components/ui/book";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
+import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-modal";
 
 // Liste dynamique des années de publication : de l'année en cours jusqu'à 1950
 const CURRENT_YEAR = new Date().getFullYear();
@@ -45,6 +48,7 @@ function CatalogSearchInner() {
   const [selectedFormat, setSelectedFormat] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [selectedSampleBook, setSelectedSampleBook] = useState<Book | null>(null);
 
   // Chargement dynamique des universités de la base de données
   useEffect(() => {
@@ -258,6 +262,11 @@ function CatalogSearchInner() {
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
                 <option value="">Tous les formats</option>
+                <option value="audio">Livres audio (tous)</option>
+                <option value="audio_only">Audio seul (Pure audio)</option>
+                <option value="pack_complet">Pack complet (Papier, Numérique &amp; Audio)</option>
+                <option value="digital_audio">Numérique &amp; Audio</option>
+                <option value="paper_audio">Papier &amp; Audio</option>
                 <option value="digital">Livre numérique</option>
                 <option value="paper">Livre papier</option>
               </select>
@@ -313,6 +322,33 @@ function CatalogSearchInner() {
                     ? book.authors_details.map(a => `${a.first_name} ${a.last_name}`).join(", ")
                     : "Auteur certifié";
 
+                  const hasAudio = Boolean(book.has_audio_version || book.has_audio || book.format_type === "audio");
+                  const hasPaper = book.is_paper_available !== false;
+                  const hasDigital = book.is_digital_available !== false && book.format_type !== "audio";
+
+                  let formatBadgeLabel = "Livre Numérique";
+                  let formatBadgeClass = "text-foreground-muted bg-background-secondary border-border";
+
+                  if (hasPaper && hasDigital && hasAudio) {
+                    formatBadgeLabel = "Papier • Numérique • Audio";
+                    formatBadgeClass = "text-gold bg-gold/10 border-gold/40 font-bold";
+                  } else if (hasDigital && hasAudio && !hasPaper) {
+                    formatBadgeLabel = "Numérique • Audio";
+                    formatBadgeClass = "text-navy bg-navy/10 border-navy/30 font-bold";
+                  } else if (hasPaper && hasAudio && !hasDigital) {
+                    formatBadgeLabel = "Papier • Audio";
+                    formatBadgeClass = "text-navy bg-navy/10 border-navy/30 font-bold";
+                  } else if (hasAudio && !hasPaper && !hasDigital) {
+                    formatBadgeLabel = "Audio Seul";
+                    formatBadgeClass = "text-gold bg-gold/15 border-gold font-bold";
+                  } else if (hasPaper && hasDigital && !hasAudio) {
+                    formatBadgeLabel = "Papier & Numérique";
+                    formatBadgeClass = "text-foreground-muted bg-background-secondary border-border";
+                  } else if (hasPaper && !hasDigital && !hasAudio) {
+                    formatBadgeLabel = "Livre Papier";
+                    formatBadgeClass = "text-foreground-muted bg-background-secondary border-border";
+                  }
+
                   return (
                     <article
                       key={book.id}
@@ -320,6 +356,13 @@ function CatalogSearchInner() {
                     >
                       {/* Présentation du Livre : Vraie Couverture ou Fallback 3D */}
                       <div className="p-6 bg-background-secondary flex items-center justify-center min-h-[230px] border-b border-border relative">
+                        {hasAudio && (
+                          <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-navy/90 text-gold text-[10px] font-bold flex items-center gap-1 shadow-md border border-gold/30 z-10">
+                            <Headphones className="w-3 h-3 text-gold" />
+                            <span>Audio</span>
+                          </div>
+                        )}
+
                         <Link href={`/catalog/${book.id}`} className="transition-transform group-hover:scale-105 duration-300 flex items-center justify-center">
                           {book.cover_url || book.cover_image ? (
                             <div className="relative w-[130px] aspect-[2/3] rounded-r-md rounded-l-sm overflow-hidden shadow-xl border-l-4 border-black/20 border-r border-t border-b border-border/60 group-hover:shadow-2xl transition-shadow duration-300">
@@ -371,33 +414,62 @@ function CatalogSearchInner() {
                                 {book.publication_year}
                               </span>
                             )}
-                            <span className="text-[10px] font-medium text-foreground-muted bg-background-secondary px-2 py-0.5 rounded border border-border">
-                              {book.is_paper_available !== false && book.is_digital_available !== false
-                                ? "Papier & Numérique"
-                                : book.is_paper_available !== false
-                                ? "Livre Papier"
-                                : "Livre Numérique"}
+                            <span className={`text-[10px] px-2 py-0.5 rounded border flex items-center gap-1 ${formatBadgeClass}`}>
+                              {hasAudio && <Headphones className="w-3 h-3 text-gold shrink-0" />}
+                              <span>{formatBadgeLabel}</span>
                             </span>
                           </div>
                         </div>
 
-                        {/* Prix & Action Achat à l'unité */}
+                        {/* Prix & Actions (Extrait + Achat) */}
                         <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
                           <div>
                             <span className="text-xs sm:text-sm font-bold font-mono text-navy block">
                               {(book.price || 2500).toLocaleString("fr-FR")} FCFA
                             </span>
                             <span className="text-[10px] text-foreground-muted font-medium">
-                              Achat à l'unité
+                              {hasAudio && !hasDigital ? "Format audio" : "Achat à l'unité"}
                             </span>
                           </div>
-                          <Link
-                            href={`/catalog/${book.id}`}
-                            className="px-3.5 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs shrink-0"
-                          >
-                            <span>Acheter / Détails</span>
-                            <ArrowRight className="w-3.5 h-3.5 text-gold" />
-                          </Link>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Bouton Extrait intelligent */}
+                            {hasAudio && hasDigital ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSampleBook(book)}
+                                className="px-2.5 py-2 rounded-xl border border-border bg-background-secondary hover:bg-navy/5 text-navy text-xs font-semibold transition-colors cursor-pointer"
+                                title="Choisir un extrait (Lire ou Écouter)"
+                              >
+                                Extrait
+                              </button>
+                            ) : hasAudio ? (
+                              <Link
+                                href={`/listen/${book.id}?mode=sample`}
+                                className="px-2.5 py-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                                title="Écouter l'extrait audio"
+                              >
+                                <Headphones className="w-3 h-3 text-gold" />
+                                <span>Extrait</span>
+                              </Link>
+                            ) : (
+                              <Link
+                                href={`/catalog/reader/${book.id}?mode=sample`}
+                                className="px-2.5 py-2 rounded-xl border border-border bg-background-secondary hover:bg-navy/5 text-navy text-xs font-semibold transition-colors cursor-pointer"
+                                title="Feuilleter l'extrait"
+                              >
+                                Extrait
+                              </Link>
+                            )}
+
+                            <Link
+                              href={`/catalog/${book.id}`}
+                              className="px-3 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-all flex items-center gap-1 shadow-xs shrink-0"
+                            >
+                              <span>Détails</span>
+                              <ArrowRight className="w-3.5 h-3.5 text-gold" />
+                            </Link>
+                          </div>
                         </div>
                       </div>
                     </article>
@@ -407,6 +479,15 @@ function CatalogSearchInner() {
             )}
           </main>
         </div>
+
+        {/* Modale de Choix d'Extrait (Liseuse 3D ou Écoute Audio) */}
+        {selectedSampleBook && (
+          <SampleChoiceModal
+            isOpen={Boolean(selectedSampleBook)}
+            onClose={() => setSelectedSampleBook(null)}
+            book={selectedSampleBook as any}
+          />
+        )}
 
       </div>
     </div>
