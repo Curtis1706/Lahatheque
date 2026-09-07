@@ -36,7 +36,6 @@ import {
   matchGenreCategory, 
   matchLanguage, 
   matchCountry, 
-  getUniversityOptions, 
   getLanguageOptions, 
   getCountryOptions, 
   getGenreOptions 
@@ -286,9 +285,9 @@ export default function ChiefLayoutDepositPage() {
     }
   };
 
-  const handleDirectPublish = async () => {
+  const handleSubmitDeposit = async () => {
     if (!bookFile) {
-      toast.error("Veuillez sélectionner le fichier PDF de l'ouvrage.");
+      toast.error("Veuillez sélectionner le fichier PDF ou EPUB de l'ouvrage.");
       setCurrentStep(1);
       return;
     }
@@ -300,7 +299,7 @@ export default function ChiefLayoutDepositPage() {
 
     setSaving(true);
     try {
-      const dep = await createDepositWithFiles(
+      await createDepositWithFiles(
         {
           metadata: {
             title,
@@ -327,7 +326,7 @@ export default function ChiefLayoutDepositPage() {
             book_file_name: bookFile.name,
             cover_url: coverPreview,
           },
-          status: "published",
+          status: "pending_validation",
           default_price: priceDigital,
           admin_price: isPaperAvailable ? pricePaper : 0,
           is_paper_available: isPaperAvailable,
@@ -339,10 +338,12 @@ export default function ChiefLayoutDepositPage() {
         }
       );
 
-      toast.success(`L'ouvrage « ${title} » a été déposé, validé et publié immédiatement sur le catalogue officiel !`);
-      router.push("/chief-layout/history");
+      toast.success(
+        `L'ouvrage « ${title} » a été déposé avec succès et transmis au Pôle Juridique pour validation contractuelle.`
+      );
+      router.push("/chief-layout");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erreur lors de la publication directe.";
+      const msg = err instanceof Error ? err.message : "Erreur lors de la transmission du dépôt.";
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -355,7 +356,7 @@ export default function ChiefLayoutDepositPage() {
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/chief-layout" className="hover:text-navy">Espace Chef Maquettiste</Link>
         <span>/</span>
-        <span className="text-navy font-semibold">Déposer &amp; Publier un Ouvrage</span>
+        <span className="text-navy font-semibold">Déposer un Ouvrage</span>
       </div>
 
       {/* Header */}
@@ -371,11 +372,11 @@ export default function ChiefLayoutDepositPage() {
             </h1>
             <span className="px-2.5 py-0.5 rounded-md bg-gold/15 text-gold text-[11px] font-bold uppercase tracking-wider flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5" />
-              Validation Directe
+              Soumission Juridique
             </span>
           </div>
           <p className="text-xs text-foreground-muted mt-0.5">
-            En tant que Chef Maquettiste, votre dépôt est certifié et publié directement sur le catalogue officiel et dans la liseuse protégée DRM.
+            En tant que Chef Maquettiste, votre dépôt est certifié techniquement puis transmis au Pôle Juridique pour validation contractuelle avant publication officielle.
           </p>
         </div>
 
@@ -390,12 +391,12 @@ export default function ChiefLayoutDepositPage() {
           </button>
 
           <button
-            onClick={handleDirectPublish}
+            onClick={handleSubmitDeposit}
             disabled={saving || !bookFile}
             className="px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all min-h-[44px] cursor-pointer"
           >
-            <ShieldCheck className="w-4 h-4 text-navy" />
-            {saving ? "Publication en cours..." : "Déposer & Publier Directement"}
+            <Send className="w-4 h-4 text-navy" />
+            {saving ? "Transmission..." : "Soumettre au Juriste"}
           </button>
         </div>
       </div>
@@ -1053,25 +1054,25 @@ export default function ChiefLayoutDepositPage() {
               onClick={() => setCurrentStep(4)}
               className="px-6 py-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[44px] cursor-pointer"
             >
-              Étape suivante : Récapitulatif &amp; Publication →
+              Étape suivante : Récapitulatif &amp; Soumission →
             </button>
           </div>
         </div>
       )}
 
-      {/* ─── ÉTAPE 4 : RÉCAPITULATIF & PUBLICATION DIRECTE ────────────────────── */}
+      {/* ─── ÉTAPE 4 : RÉCAPITULATIF & SOUMISSION AU JURISTE ────────────────────── */}
       {currentStep === 4 && (
         <div className="bg-background border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <h3 className="font-serif font-bold text-navy text-base flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-gold" />
-              Récapitulatif &amp; Publication Directe
+              Récapitulatif &amp; Soumission au Juriste
             </h3>
             <div className="flex items-center gap-2">
               <AISuggestionBadge source={aiResult ? "ai_suggested" : "manual"} />
               <span className="px-3 py-1 rounded-full bg-gold/15 text-navy text-xs font-bold uppercase tracking-wider border border-gold/30 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-gold" />
-                Publication Immédiate
+                En attente de validation juridique
               </span>
             </div>
           </div>
@@ -1155,12 +1156,12 @@ export default function ChiefLayoutDepositPage() {
             </button>
 
             <button
-              onClick={handleDirectPublish}
+              onClick={handleSubmitDeposit}
               disabled={saving}
               className="px-6 py-3 rounded-xl bg-gold hover:bg-gold-light text-navy text-xs sm:text-sm font-bold flex items-center gap-2 shadow-md transition-all min-h-[44px] cursor-pointer"
             >
-              <ShieldCheck className="w-4 h-4 text-navy" />
-              {saving ? "Publication en cours..." : "Déposer & Publier Immédiatement sur le Catalogue"}
+              <Send className="w-4 h-4 text-navy" />
+              {saving ? "Transmission en cours..." : "Déposer & Soumettre pour Validation Juridique"}
             </button>
           </div>
         </div>

@@ -69,7 +69,7 @@ export default function ChefMaquettisteOverviewPage() {
             Bonjour, {user?.first_name || "Chef Maquettiste"}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
-            Déposez des ouvrages certifiés avec validation directe ou supervisez les épreuves soumises par les maquettistes.
+            Déposez de nouveaux ouvrages certifiés pour soumission juridique ou supervisez les épreuves soumises par les maquettistes.
           </p>
         </div>
 
