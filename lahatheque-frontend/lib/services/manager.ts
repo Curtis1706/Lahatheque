@@ -343,6 +343,7 @@ function normalizeDelivery(raw: any): ManagerOrder {
   return {
     id: String(raw.id),
     commande_id: raw.commande_id ? String(raw.commande_id) : undefined,
+    order_reference: raw.order_reference || (raw.commande_id ? String(raw.commande_id).slice(0, 8).toUpperCase() : String(raw.id).slice(0, 8).toUpperCase()),
     customer_name: raw.client_nom ?? raw.customer_name ?? "—",
     customer_email: raw.client_email ?? raw.customer_email ?? "—",
     customer_phone: raw.client_phone ?? raw.customer_phone ?? "",

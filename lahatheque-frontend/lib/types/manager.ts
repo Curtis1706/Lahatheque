@@ -117,6 +117,7 @@ export interface OrderNotification {
 export interface ManagerOrder {
   id: string;
   commande_id?: string;
+  order_reference?: string;
   customer_name: string;
   customer_email: string;
   customer_phone?: string;

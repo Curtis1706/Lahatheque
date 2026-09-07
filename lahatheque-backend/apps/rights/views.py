@@ -1094,6 +1094,24 @@ class LegalContractsListView(APIView):
                         taux_audio_tts=audio
                     )
 
+                    ba = ouvrage.authors.filter(
+                        models.Q(user=ben_user) |
+                        models.Q(first_name__iexact=ben_user.first_name, last_name__iexact=ben_user.last_name)
+                    ).first()
+                    if ba and not ba.user:
+                        ba.user = ben_user
+                        ba.save(update_fields=['user'])
+
+                    AuthorRight.objects.update_or_create(
+                        ouvrage=ouvrage,
+                        user=ben_user,
+                        defaults={
+                            "author": ba,
+                            "role": r.get("role_libelle", "auteur_principal"),
+                            "pool_share_percent": pct,
+                        }
+                    )
+
             # Taux global de droits d'auteur : un champ DISTINCT de la répartition entre
             # co-auteurs, envoyé explicitement par le frontend (Fiche BH4).
             author_royalty_rate = request.data.get("author_royalty_rate")
@@ -3956,6 +3974,73 @@ class LegalPublishOuvrageView(APIView):
 
         ouvrage.status = 'published'
         ouvrage.save(update_fields=['status'])
+
+        # Réconciliation systématique des droits d'auteur (AuthorRight) et des liaisons BookAuthor
+        try:
+            from apps.rights.models import AuthorRight, RepartitionDroits
+            from apps.catalog.models import BookAuthor
+            from apps.accounts.models import User
+
+            # 1. Depuis les répartitions existantes
+            for rep in RepartitionDroits.objects.filter(ouvrage=ouvrage):
+                if rep.beneficiaire:
+                    ba = ouvrage.authors.filter(
+                        models.Q(user=rep.beneficiaire) |
+                        models.Q(first_name__iexact=rep.beneficiaire.first_name, last_name__iexact=rep.beneficiaire.last_name)
+                    ).first()
+                    if ba and not ba.user:
+                        ba.user = rep.beneficiaire
+                        ba.save(update_fields=['user'])
+                    AuthorRight.objects.get_or_create(
+                        ouvrage=ouvrage,
+                        user=rep.beneficiaire,
+                        defaults={
+                            'author': ba,
+                            'role': rep.role_libelle or 'auteur_principal',
+                            'pool_share_percent': rep.pourcentage or 100.0,
+                        }
+                    )
+
+            # 2. Depuis les contrats actifs
+            for c in ContratLegal.objects.filter(ouvrage=ouvrage, status='active'):
+                signataire = c.signataire_user or (User.objects.filter(email__iexact=c.contracting_party_email).first() if c.contracting_party_email else None)
+                if signataire:
+                    ba = ouvrage.authors.filter(
+                        models.Q(user=signataire) |
+                        models.Q(first_name__iexact=signataire.first_name, last_name__iexact=signataire.last_name)
+                    ).first()
+                    if ba and not ba.user:
+                        ba.user = signataire
+                        ba.save(update_fields=['user'])
+                    AuthorRight.objects.get_or_create(
+                        ouvrage=ouvrage,
+                        user=signataire,
+                        defaults={
+                            'author': ba,
+                            'role': 'auteur_principal',
+                            'pool_share_percent': 100.0,
+                        }
+                    )
+
+            # 3. Depuis les auteurs de l'ouvrage
+            for ba in ouvrage.authors.all():
+                if not ba.user and (ba.first_name or ba.last_name):
+                    matched_u = User.objects.filter(role='author', first_name__iexact=ba.first_name, last_name__iexact=ba.last_name).first()
+                    if matched_u:
+                        ba.user = matched_u
+                        ba.save(update_fields=['user'])
+                if ba.user:
+                    AuthorRight.objects.get_or_create(
+                        ouvrage=ouvrage,
+                        user=ba.user,
+                        defaults={
+                            'author': ba,
+                            'role': 'auteur_principal',
+                            'pool_share_percent': 100.0,
+                        }
+                    )
+        except Exception as e:
+            logger.warning(f"Erreur réconciliation AuthorRight publication ouvrage {ouvrage.id}: {e}")
 
         try:
             from apps.reporting.services import notify_user

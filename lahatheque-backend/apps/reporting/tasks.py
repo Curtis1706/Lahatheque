@@ -440,15 +440,90 @@ def task_calculate_monthly_royalties(include_current_month=False):
             ventes_fmt = ventes_par_format.get(ouvrage.id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00'), 'audio': Decimal('0.00')})
 
             author_rights = AuthorRight.objects.filter(ouvrage=ouvrage, user__isnull=False)
+            if not author_rights.exists():
+                # Auto-réconciliation des droits d'auteur pour cet ouvrage vendu
+                from apps.rights.models import RepartitionDroits, ContratLegal
+                from apps.catalog.models import BookAuthor
+                from apps.accounts.models import User
+
+                # 1. Depuis RepartitionDroits
+                for rep in RepartitionDroits.objects.filter(ouvrage=ouvrage).select_related('beneficiaire'):
+                    if rep.beneficiaire:
+                        ba = ouvrage.authors.filter(
+                            models.Q(user=rep.beneficiaire) |
+                            models.Q(first_name__iexact=rep.beneficiaire.first_name, last_name__iexact=rep.beneficiaire.last_name)
+                        ).first()
+                        if ba and not ba.user:
+                            ba.user = rep.beneficiaire
+                            ba.save(update_fields=['user'])
+                        AuthorRight.objects.get_or_create(
+                            ouvrage=ouvrage,
+                            user=rep.beneficiaire,
+                            defaults={
+                                'author': ba,
+                                'role': rep.role_libelle or 'auteur_principal',
+                                'pool_share_percent': rep.pourcentage or 100.0,
+                            }
+                        )
+
+                # 2. Depuis ContratLegal
+                for c in ContratLegal.objects.filter(ouvrage=ouvrage).select_related('signataire_user'):
+                    author_u = c.signataire_user
+                    if not author_u and c.contracting_party_email:
+                        author_u = User.objects.filter(email__iexact=c.contracting_party_email).first()
+                    if author_u:
+                        ba = ouvrage.authors.filter(
+                            models.Q(user=author_u) |
+                            models.Q(first_name__iexact=author_u.first_name, last_name__iexact=author_u.last_name)
+                        ).first()
+                        if ba and not ba.user:
+                            ba.user = author_u
+                            ba.save(update_fields=['user'])
+                        AuthorRight.objects.get_or_create(
+                            ouvrage=ouvrage,
+                            user=author_u,
+                            defaults={
+                                'author': ba,
+                                'role': 'auteur_principal',
+                                'pool_share_percent': 100.0,
+                            }
+                        )
+
+                # 3. Depuis BookAuthor
+                for ba in ouvrage.authors.all():
+                    if not ba.user and (ba.first_name or ba.last_name):
+                        matched_u = User.objects.filter(role='author', first_name__iexact=ba.first_name, last_name__iexact=ba.last_name).first()
+                        if matched_u:
+                            ba.user = matched_u
+                            ba.save(update_fields=['user'])
+                    if ba.user:
+                        AuthorRight.objects.get_or_create(
+                            ouvrage=ouvrage,
+                            user=ba.user,
+                            defaults={
+                                'author': ba,
+                                'role': 'auteur_principal',
+                                'pool_share_percent': 100.0,
+                            }
+                        )
+
+                author_rights = AuthorRight.objects.filter(ouvrage=ouvrage, user__isnull=False)
+
             for right in author_rights:
                 repartition = RepartitionDroits.objects.filter(ouvrage=ouvrage, beneficiaire=right.user).first()
                 ratio_partenaire = (remaining_after_partners / total_sales) if total_sales > 0 else Decimal("1")
                 coauthor_share = (Decimal(str(right.pool_share_percent)) / Decimal("100")) if right.pool_share_percent is not None else Decimal("1")
 
                 if repartition and (repartition.taux_papier is not None or repartition.taux_numerique is not None or repartition.taux_audio_tts is not None):
-                    taux_papier = Decimal(str(repartition.taux_papier)) / Decimal("100") if repartition.taux_papier is not None else Decimal("0")
-                    taux_numerique = Decimal(str(repartition.taux_numerique)) / Decimal("100") if repartition.taux_numerique is not None else Decimal("0")
-                    taux_audio = Decimal(str(repartition.taux_audio_tts)) / Decimal("100") if repartition.taux_audio_tts is not None else Decimal("0")
+                    raw_pap = Decimal(str(repartition.taux_papier)) / Decimal("100") if repartition.taux_papier is not None else global_author_rate
+                    raw_num = Decimal(str(repartition.taux_numerique)) / Decimal("100") if repartition.taux_numerique is not None else global_author_rate
+                    raw_aud = Decimal(str(repartition.taux_audio_tts)) / Decimal("100") if repartition.taux_audio_tts is not None else Decimal("0.08")
+
+                    # Si le taux renseigné dépasse 50% (ex: 100.00% issu de la validation de quote-part coauteurs),
+                    # c'est la quote-part sur la redevance contractuelle, donc on applique global_author_rate
+                    taux_papier = (global_author_rate * raw_pap) if raw_pap > Decimal("0.50") else (global_author_rate if raw_pap < Decimal("0.01") else raw_pap)
+                    taux_numerique = (global_author_rate * raw_num) if raw_num > Decimal("0.50") else (global_author_rate if raw_num < Decimal("0.01") else raw_num)
+                    taux_audio = (Decimal("0.08") * raw_aud) if raw_aud > Decimal("0.50") else raw_aud
 
                     amount = (
                         (ventes_fmt['paper'] * ratio_partenaire * taux_papier * coauthor_share) +

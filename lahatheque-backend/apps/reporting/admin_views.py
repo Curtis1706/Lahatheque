@@ -2281,6 +2281,84 @@ class AdminGlobalFinanceView(APIView):
         })
 
 
+def _reconcile_author_rights_for_user(author):
+    """
+    Auto-réconciliation robuste : s'assure que tout auteur ayant des ouvrages publiés,
+    des contrats signés ou des clés de répartition bénéficie bien de ses AuthorRight en base.
+    """
+    from apps.rights.models import AuthorRight, ContratLegal, RepartitionDroits
+    from apps.catalog.models import Ouvrage, BookAuthor
+    from django.db import models
+
+    # 1. Depuis RepartitionDroits
+    reparts = RepartitionDroits.objects.filter(beneficiaire=author).select_related('ouvrage')
+    for rep in reparts:
+        if rep.ouvrage:
+            ba = rep.ouvrage.authors.filter(
+                models.Q(user=author) |
+                models.Q(first_name__iexact=author.first_name, last_name__iexact=author.last_name)
+            ).first()
+            if ba and not ba.user:
+                ba.user = author
+                ba.save(update_fields=['user'])
+            AuthorRight.objects.get_or_create(
+                ouvrage=rep.ouvrage,
+                user=author,
+                defaults={
+                    'author': ba,
+                    'role': rep.role_libelle or 'auteur_principal',
+                    'pool_share_percent': rep.pourcentage or 100.0,
+                }
+            )
+
+    # 2. Depuis ContratLegal
+    contrats = ContratLegal.objects.filter(
+        models.Q(signataire_user=author) |
+        models.Q(contracting_party_email__iexact=author.email)
+    ).select_related('ouvrage')
+    for c in contrats:
+        if c.ouvrage:
+            ba = c.ouvrage.authors.filter(
+                models.Q(user=author) |
+                models.Q(first_name__iexact=author.first_name, last_name__iexact=author.last_name)
+            ).first()
+            if ba and not ba.user:
+                ba.user = author
+                ba.save(update_fields=['user'])
+            AuthorRight.objects.get_or_create(
+                ouvrage=c.ouvrage,
+                user=author,
+                defaults={
+                    'author': ba,
+                    'role': 'auteur_principal',
+                    'pool_share_percent': 100.0,
+                }
+            )
+
+    # 3. Depuis Ouvrage (auteurs enregistrés)
+    ouvrages = Ouvrage.objects.filter(
+        models.Q(authors__user=author) |
+        (models.Q(authors__first_name__iexact=author.first_name) & models.Q(authors__last_name__iexact=author.last_name))
+    ).distinct()
+    for o in ouvrages:
+        ba = o.authors.filter(
+            models.Q(user=author) |
+            (models.Q(first_name__iexact=author.first_name) & models.Q(last_name__iexact=author.last_name))
+        ).first()
+        if ba and not ba.user:
+            ba.user = author
+            ba.save(update_fields=['user'])
+        AuthorRight.objects.get_or_create(
+            ouvrage=o,
+            user=author,
+            defaults={
+                'author': ba,
+                'role': 'auteur_principal',
+                'pool_share_percent': 100.0,
+            }
+        )
+
+
 class AdminAuthorRoyaltiesReportView(APIView):
     """GET /api/v1/admin/finance/author-royalties/ - Redevances par auteur (ventes, taux Juriste, dû/versé)."""
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
@@ -2295,6 +2373,9 @@ class AdminAuthorRoyaltiesReportView(APIView):
         results = []
 
         for author in authors:
+            # Auto-réconciliation préventive pour ne jamais omettre un auteur ayant des contrats/ouvrages
+            _reconcile_author_rights_for_user(author)
+
             rights = AuthorRight.objects.filter(user=author).select_related('ouvrage')
             if not rights.exists():
                 continue
@@ -2355,6 +2436,7 @@ class AdminAuthorRoyaltyDetailView(APIView):
         from django.shortcuts import get_object_or_404
 
         author = get_object_or_404(User, id=author_id)
+        _reconcile_author_rights_for_user(author)
         rights = AuthorRight.objects.filter(user=author).select_related('ouvrage')
 
         # Contrats légaux
@@ -2376,6 +2458,19 @@ class AdminAuthorRoyaltyDetailView(APIView):
         total_author_sales = 0
         total_author_revenue = 0.0
 
+        def _resolve_safe_rate(raw_val, fallback):
+            if raw_val is not None:
+                try:
+                    val = float(raw_val)
+                    if 1.0 <= val <= 50.0:
+                        return val
+                    elif val > 50.0:
+                        # 100% de la part co-auteurs -> taux contractuel effectif
+                        return fallback
+                except (ValueError, TypeError):
+                    pass
+            return fallback
+
         for r in rights:
             book = r.ouvrage
             rate_obj = RoyaltyRate.objects.filter(ouvrage=book).first()
@@ -2384,9 +2479,9 @@ class AdminAuthorRoyaltyDetailView(APIView):
             effective_rate = round(global_rate * (pool_share / 100.0), 2)
 
             repart = RepartitionDroits.objects.filter(ouvrage=book, beneficiaire=author).first()
-            taux_pap = float(repart.taux_papier) if (repart and repart.taux_papier is not None) else effective_rate
-            taux_num = float(repart.taux_numerique) if (repart and repart.taux_numerique is not None) else effective_rate
-            taux_aud = float(repart.taux_audio_tts) if (repart and repart.taux_audio_tts is not None) else effective_rate
+            taux_pap = _resolve_safe_rate(repart.taux_papier if repart else None, effective_rate)
+            taux_num = _resolve_safe_rate(repart.taux_numerique if repart else None, effective_rate)
+            taux_aud = _resolve_safe_rate(repart.taux_audio_tts if repart else None, 8.0)
 
             lignes = LigneCommande.objects.filter(ouvrage=book, commande__statut_paiement='paid')
 

@@ -556,6 +556,7 @@ class DeliveriesListView(APIView):
             data.append({
                 "id": str(d.id),
                 "commande_id": str(d.commande_id),
+                "order_reference": getattr(d.commande, 'reference', str(d.commande_id)[:8].upper()) if d.commande else str(d.id)[:8].upper(),
                 "client_nom": client_nom,
                 "client_email": client_user.email if client_user else "—",
                 "client_phone": getattr(client_user, 'phone', '') if client_user else "—",
@@ -619,7 +620,8 @@ class DeliveriesListView(APIView):
 
             data.append({
                 "id": str(wo.id),
-                "commande_id": wo.reference or str(wo.id),
+                "commande_id": str(wo.id),
+                "order_reference": wo.reference or str(wo.id)[:8].upper(),
                 "client_nom": client_label,
                 "client_email": wo.user.email if wo.user else "—",
                 "client_phone": wo.contact_phone or (getattr(wo.user, 'phone', '') if wo.user else "—"),

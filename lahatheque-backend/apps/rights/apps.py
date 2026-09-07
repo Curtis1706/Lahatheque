@@ -3,3 +3,6 @@ from django.apps import AppConfig
 class RightsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.rights'
+
+    def ready(self):
+        import apps.rights.signals

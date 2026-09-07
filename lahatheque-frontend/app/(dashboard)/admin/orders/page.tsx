@@ -157,7 +157,9 @@ export default function AdminOrdersPage() {
       // Filtre texte
       if (searchOrderQuery.trim()) {
         const q = searchOrderQuery.toLowerCase();
-        const idMatch = ord.id.toLowerCase().includes(q) || (ord.commande_id && ord.commande_id.toLowerCase().includes(q));
+        const idMatch = ord.id.toLowerCase().includes(q) || 
+          (ord.commande_id && ord.commande_id.toLowerCase().includes(q)) ||
+          (ord.order_reference && ord.order_reference.toLowerCase().includes(q));
         const clientMatch = ord.customer_name.toLowerCase().includes(q) || ord.customer_email.toLowerCase().includes(q);
         const bookMatch = ord.items.some((i) => i.book_title.toLowerCase().includes(q));
         if (!idMatch && !clientMatch && !bookMatch) return false;
@@ -178,7 +180,7 @@ export default function AdminOrdersPage() {
           className="font-mono font-bold text-xs text-navy hover:text-gold hover:underline text-left cursor-pointer"
           title="Consulter le détail complet"
         >
-          #{row.id.slice(0, 8)}
+          #{row.order_reference || (row.commande_id ? row.commande_id.slice(0, 8).toUpperCase() : row.id.slice(0, 8).toUpperCase())}
         </button>
       ),
     },
