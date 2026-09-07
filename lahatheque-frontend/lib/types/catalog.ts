@@ -17,7 +17,7 @@ export interface Book {
   discipline_detail: DisciplineDetail;
   publisher_name: string;
   institution_name: string;
-  format_type: "pdf" | "epub" | "audio";
+  format_type: "pdf" | "epub" | "audio" | "papier";
   language: string;
   country: string;
   summary: string;
@@ -25,7 +25,10 @@ export interface Book {
   price?: number;
   price_paper?: number;
   price_audio?: number;
+  price_audio_eur?: number;
   has_audio_version?: boolean;
+  has_audio?: boolean;
+  audio_status?: string;
   stock_disponible?: number;
   is_paper_available?: boolean;
   is_digital_available?: boolean;

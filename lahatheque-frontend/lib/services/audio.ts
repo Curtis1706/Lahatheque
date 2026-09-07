@@ -151,3 +151,104 @@ export async function verifyAudioSecurityLock(
 
   return res.json();
 }
+
+/**
+ * Récupère les ouvrages du catalogue éligibles pour un rattachement de livre audio.
+ */
+export async function getEligibleBooksForAttachment(searchQuery?: string): Promise<any[]> {
+  try {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set("q", searchQuery);
+    const res = await fetch(`/api/bff/audio/eligible-books/?${params.toString()}`, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || json.results || json || [];
+    }
+  } catch (err) {
+    console.error("Erreur récupération livres éligibles:", err);
+  }
+  return [];
+}
+
+/**
+ * Soumission complète du formulaire Studio Audio (métadonnées + fichiers audio double-voix).
+ */
+export async function submitAudioStudioForm(formData: FormData): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch("/api/bff/audio/studio/submit/", {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: "Erreur de connexion au serveur" };
+  }
+}
+
+/**
+ * Récupère la liste des livres audio selon le rôle (Maquettiste, Chef Maquettiste, Juriste, Admin).
+ */
+export async function getAudioBooksList(role: string, status?: string): Promise<any[]> {
+  try {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    const res = await fetch(`/api/bff/audio/management/${role}/?${params.toString()}`, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || json.results || json || [];
+    }
+  } catch (err) {
+    console.error(`Erreur chargement livres audio rôle ${role}:`, err);
+  }
+  return [];
+}
+
+/**
+ * Met à jour le statut dans le workflow éditorial (validation technique, juridique, publication).
+ */
+export async function updateAudioWorkflowStatus(
+  bookId: string,
+  action: "submit_layout" | "approve_layout" | "reject_layout" | "approve_legal" | "publish_admin" | "unpublish_admin",
+  comment?: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/audio/management/${bookId}/transition/`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, comment }),
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: "Erreur réseau lors de la mise à jour du statut" };
+  }
+}
+
+/**
+ * Récupère les sessions d'écoute audio récentes de l'utilisateur pour le widget Dashboard.
+ */
+export async function getRecentAudioListenings(): Promise<any[]> {
+  try {
+    const res = await fetch("/api/bff/audio/recent-listenings/", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || [];
+    }
+  } catch (err) {
+    console.error("Erreur récupération écoutes audio récentes:", err);
+  }
+  return [];
+}

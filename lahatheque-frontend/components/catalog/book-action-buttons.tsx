@@ -15,12 +15,13 @@ import {
   Globe, 
   Heart, 
   Laptop,
-  Eye,
+  Headphones,
   CheckCircle2,
   AlertCircle
 } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { formatEur } from "@/components/cart/cart-drawer";
+import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-modal";
 
 interface BookActionButtonsProps {
   book: {
@@ -34,6 +35,11 @@ interface BookActionButtonsProps {
     level?: string;
     price?: number;
     price_paper?: number;
+    price_audio?: number;
+    price_audio_eur?: number;
+    has_audio_version?: boolean;
+    has_audio?: boolean;
+    format_type?: string;
     cover_image?: string;
     cover_url?: string;
     stock_disponible?: number;
@@ -46,41 +52,87 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
   const router = useRouter();
   const { addItem } = useCart();
 
-  const isDigitalAvailable = book.is_digital_available ?? true;
-  const isPaperAvailable = book.is_paper_available ?? true;
+  const isAudioAvailable = Boolean(book.has_audio_version || book.has_audio || book.format_type === "audio");
+  const isPaperAvailable = book.is_paper_available !== false;
+  const isDigitalAvailable = book.is_digital_available !== false && book.format_type !== "audio";
   const stockPaper = book.stock_disponible ?? 15;
 
-  // Format initial par défaut selon disponibilité
-  const initialFormat = isPaperAvailable && stockPaper > 0 ? "paper" : isDigitalAvailable ? "digital" : "paper";
-  const [selectedFormat, setSelectedFormat] = useState<"digital" | "paper">(initialFormat);
+  // Sélection multiple : chaque format peut être coché indépendamment
+  const [selectedPaper, setSelectedPaper] = useState<boolean>(isPaperAvailable && stockPaper > 0);
+  const [selectedDigital, setSelectedDigital] = useState<boolean>(isDigitalAvailable && (!isPaperAvailable || stockPaper <= 0));
+  const [selectedAudio, setSelectedAudio] = useState<boolean>(isAudioAvailable && !isDigitalAvailable && !isPaperAvailable);
+
   const [quantity, setQuantity] = useState<number>(1);
   const [isWishlist, setIsWishlist] = useState<boolean>(false);
   const [addedAnimation, setAddedAnimation] = useState<boolean>(false);
+  const [showSampleModal, setShowSampleModal] = useState<boolean>(false);
 
   const priceDigital = book.price || 2500;
   const pricePaper = book.price_paper || (book.price ? Math.round(book.price * 1.3) : 3500);
+  const priceAudio = book.price_audio || 2500;
 
-  const activePrice = selectedFormat === "digital" ? priceDigital : pricePaper;
+  // Calcul du montant total cumulé
+  const totalAmount = 
+    (selectedPaper ? pricePaper * quantity : 0) +
+    (selectedDigital ? priceDigital : 0) +
+    (selectedAudio ? priceAudio : 0);
+
+  const totalSelectedCount = 
+    (selectedPaper ? 1 : 0) + 
+    (selectedDigital ? 1 : 0) + 
+    (selectedAudio ? 1 : 0);
 
   const authorName = book.author || 
     (book.authors_details ? book.authors_details.map(a => `${a.first_name} ${a.last_name}`).join(", ") : 
     (typeof book.authors === "string" ? book.authors : "Auteur LAHA"));
 
   const handleAddToCart = (autoRedirectToCheckout = false) => {
+    if (totalSelectedCount === 0) return;
+
     const coverUrl = book.cover_url || book.cover_image || (book.id ? `/api/bff/catalog/books/${book.id}/cover/` : "");
-    addItem({
+    const baseItem = {
       bookId: book.id,
       title: book.title,
       author: authorName,
       cover: coverUrl,
-      format: selectedFormat,
-      price: activePrice,
-      quantity: selectedFormat === "digital" ? 1 : quantity,
-      maxStockPaper: stockPaper,
       category: book.discipline_detail?.name || "Scolaires",
       country: book.country || "Bénin",
       level: book.level || "Tous niveaux",
-    }, !autoRedirectToCheckout);
+    };
+
+    // 1. Ajouter le format papier si coché
+    if (selectedPaper) {
+      addItem({
+        ...baseItem,
+        format: "paper",
+        price: pricePaper,
+        quantity: quantity,
+        maxStockPaper: stockPaper,
+      }, false);
+    }
+
+    // 2. Ajouter le format numérique si coché
+    if (selectedDigital) {
+      addItem({
+        ...baseItem,
+        format: "digital",
+        price: priceDigital,
+        quantity: 1,
+      }, false);
+    }
+
+    // 3. Ajouter le format audio si coché
+    if (selectedAudio) {
+      addItem({
+        ...baseItem,
+        format: "audio",
+        price: priceAudio,
+        quantity: 1,
+      }, !autoRedirectToCheckout);
+    } else if (!autoRedirectToCheckout) {
+      // Si au moins un format a été ajouté et qu'on ne redirige pas, ouvrir le tiroir
+      useCart;
+    }
 
     setAddedAnimation(true);
     setTimeout(() => setAddedAnimation(false), 2000);
@@ -92,39 +144,48 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
 
   return (
     <div className="space-y-6 pt-2">
-      {/* 1. Sélection de Format (Cartes Interactives) */}
-      <div className="space-y-2.5">
-        <label className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted block font-mono">
-          Choisir un format
-        </label>
+      {/* 1. Sélection Multi-Formats Combinable */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted block font-mono">
+            Choisir un ou plusieurs formats
+          </label>
+          <span className="text-[10px] text-gold font-semibold">
+            {totalSelectedCount} format{totalSelectedCount > 1 ? "s" : ""} sélectionné{totalSelectedCount > 1 ? "s" : ""}
+          </span>
+        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Option Format Papier */}
           {isPaperAvailable && (
             <button
               type="button"
               disabled={stockPaper <= 0}
               onClick={() => {
-                setSelectedFormat("paper");
+                // Empêcher de tout décocher si c'est le seul sélectionné
+                if (selectedPaper && totalSelectedCount === 1) return;
+                setSelectedPaper(!selectedPaper);
               }}
               className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2.5 cursor-pointer ${
-                selectedFormat === "paper"
+                selectedPaper
                   ? "border-2 border-navy bg-navy/5 shadow-xs"
                   : "border-border bg-background hover:border-gold/60"
               } ${stockPaper <= 0 ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <div className={`p-1.5 rounded-lg ${selectedFormat === "paper" ? "bg-navy text-white" : "bg-background-secondary text-navy"}`}>
+                  <div className={`p-1.5 rounded-lg ${selectedPaper ? "bg-navy text-white" : "bg-background-secondary text-navy"}`}>
                     <Book className="w-4 h-4" />
                   </div>
                   <span className="font-bold text-xs sm:text-sm text-navy">
                     Livre papier
                   </span>
                 </div>
-                {selectedFormat === "paper" && (
-                  <CheckCircle2 className="w-4 h-4 text-navy shrink-0" />
-                )}
+                <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                  selectedPaper ? "bg-navy border-navy text-white" : "border-border bg-background"
+                }`}>
+                  {selectedPaper && <Check className="w-3 h-3" />}
+                </div>
               </div>
 
               <div>
@@ -137,9 +198,9 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
               </div>
 
               <div className="text-[10px] text-foreground-muted border-t border-border/50 pt-1.5 flex items-center justify-between">
-                <span>{stockPaper > 0 ? "Livraison ou Click & Collect" : "Rupture de stock"}</span>
+                <span>{stockPaper > 0 ? "Livraison / Retrait" : "Rupture"}</span>
                 {stockPaper > 0 && stockPaper <= 5 && (
-                  <span className="text-amber-600 font-semibold font-mono">Plus que {stockPaper} ex.</span>
+                  <span className="text-amber-600 font-semibold font-mono">Reste {stockPaper}</span>
                 )}
               </div>
             </button>
@@ -150,26 +211,29 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
             <button
               type="button"
               onClick={() => {
-                setSelectedFormat("digital");
+                if (selectedDigital && totalSelectedCount === 1) return;
+                setSelectedDigital(!selectedDigital);
               }}
               className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2.5 cursor-pointer ${
-                selectedFormat === "digital"
+                selectedDigital
                   ? "border-2 border-navy bg-navy/5 shadow-xs"
                   : "border-border bg-background hover:border-gold/60"
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <div className={`p-1.5 rounded-lg ${selectedFormat === "digital" ? "bg-navy text-white" : "bg-background-secondary text-navy"}`}>
+                  <div className={`p-1.5 rounded-lg ${selectedDigital ? "bg-navy text-white" : "bg-background-secondary text-navy"}`}>
                     <Laptop className="w-4 h-4" />
                   </div>
                   <span className="font-bold text-xs sm:text-sm text-navy">
                     Livre numérique
                   </span>
                 </div>
-                {selectedFormat === "digital" && (
-                  <CheckCircle2 className="w-4 h-4 text-navy shrink-0" />
-                )}
+                <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                  selectedDigital ? "bg-navy border-navy text-white" : "border-border bg-background"
+                }`}>
+                  {selectedDigital && <Check className="w-3 h-3" />}
+                </div>
               </div>
 
               <div>
@@ -182,18 +246,86 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
               </div>
 
               <div className="text-[10px] text-foreground-muted border-t border-border/50 pt-1.5">
-                Lecture immédiate (Immersion 3D)
+                Lecture immédiate
+              </div>
+            </button>
+          )}
+
+          {/* Option Format Audio */}
+          {isAudioAvailable && (
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedAudio && totalSelectedCount === 1) return;
+                setSelectedAudio(!selectedAudio);
+              }}
+              className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2.5 cursor-pointer ${
+                selectedAudio
+                  ? "border-2 border-gold bg-gold/10 shadow-xs"
+                  : "border-border bg-background hover:border-gold/60"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className={`p-1.5 rounded-lg ${selectedAudio ? "bg-gold text-navy" : "bg-background-secondary text-navy"}`}>
+                    <Headphones className="w-4 h-4" />
+                  </div>
+                  <span className="font-bold text-xs sm:text-sm text-navy">
+                    Livre audio
+                  </span>
+                </div>
+                <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                  selectedAudio ? "bg-gold border-gold text-navy" : "border-border bg-background"
+                }`}>
+                  {selectedAudio && <Check className="w-3 h-3" />}
+                </div>
+              </div>
+
+              <div>
+                <div className="font-bold text-xs sm:text-sm font-mono text-navy">
+                  {priceAudio.toLocaleString("fr-FR")} F CFA
+                </div>
+                <div className="text-[10px] text-foreground-muted font-mono">
+                  ≈ {formatEur(priceAudio)} €
+                </div>
+              </div>
+
+              <div className="text-[10px] text-foreground-muted border-t border-border/50 pt-1.5">
+                Écoute streaming HD
               </div>
             </button>
           )}
         </div>
       </div>
 
-      {/* 2. Ligne d'Actions : Quantité + Ajouter au panier + Acheter maintenant + Favori */}
-      <div className="space-y-3">
+      {/* 2. Récapitulatif du Total & Ligne d'Actions */}
+      <div className="space-y-4">
+        {/* Affichage du prix total consolidé */}
+        <div className="p-3.5 rounded-2xl bg-background-secondary border border-border flex items-center justify-between">
+          <div className="space-y-0.5">
+            <span className="text-[11px] text-foreground-muted font-semibold">Total sélectionné :</span>
+            <div className="text-xs font-bold text-navy">
+              {[
+                selectedPaper && `Papier (x${quantity})`,
+                selectedDigital && "Numérique",
+                selectedAudio && "Audio",
+              ].filter(Boolean).join(" + ") || "Aucun format sélectionné"}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="font-mono text-base sm:text-lg font-bold text-navy">
+              {totalAmount.toLocaleString("fr-FR")} F CFA
+            </div>
+            <div className="text-[10px] text-foreground-muted font-mono">
+              ≈ {formatEur(totalAmount)} €
+            </div>
+          </div>
+        </div>
+
+        {/* Boutons d'action */}
         <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
           {/* Sélecteur de Quantité (pour livre papier uniquement) */}
-          {selectedFormat === "paper" && (
+          {selectedPaper && (
             <div className="flex items-center border border-border rounded-xl bg-background p-1 shrink-0">
               <button
                 type="button"
@@ -218,22 +350,22 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
             </div>
           )}
 
-          {/* Bouton Ajouter au Panier (Secondaire avec icône) */}
+          {/* Bouton Ajouter au Panier */}
           <button
             type="button"
             onClick={() => handleAddToCart(false)}
-            disabled={selectedFormat === "paper" && stockPaper <= 0}
+            disabled={totalSelectedCount === 0}
             className="flex-1 min-h-[44px] px-4 py-2.5 rounded-xl border-2 border-navy bg-background hover:bg-navy/5 text-navy font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
           >
             {addedAnimation ? <Check className="w-4 h-4 text-emerald-600" /> : <ShoppingBag className="w-4 h-4" />}
             <span>{addedAnimation ? "Ajouté !" : "Ajouter au panier"}</span>
           </button>
 
-          {/* Bouton Acheter Maintenant (Primaire Solide Navy) */}
+          {/* Bouton Acheter Maintenant */}
           <button
             type="button"
             onClick={() => handleAddToCart(true)}
-            disabled={selectedFormat === "paper" && stockPaper <= 0}
+            disabled={totalSelectedCount === 0}
             className="flex-1 min-h-[44px] px-4 py-2.5 rounded-xl bg-navy hover:bg-navy-dark text-white font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
           >
             <span>Acheter maintenant</span>
@@ -254,14 +386,33 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
           </button>
         </div>
 
-        {/* Bouton Extrait 3D / Consultation Directe */}
-        <Link
-          href={`/catalog/reader/${book.id}?mode=sample`}
-          className="w-full py-2.5 px-4 rounded-xl bg-background-secondary hover:bg-navy/10 text-navy font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-border cursor-pointer"
-        >
-          <BookOpen className="w-4 h-4 text-gold" />
-          <span>Feuilleter l'extrait gratuit en immersion 3D</span>
-        </Link>
+        {/* Bouton Extrait Intelligent (Liseuse vs Audio) */}
+        {isAudioAvailable && isDigitalAvailable ? (
+          <button
+            type="button"
+            onClick={() => setShowSampleModal(true)}
+            className="w-full py-2.5 px-4 rounded-xl bg-background-secondary hover:bg-navy/10 text-navy font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-border cursor-pointer"
+          >
+            <Headphones className="w-4 h-4 text-gold" />
+            <span>Découvrir l'extrait gratuit (Lecture ou Écoute audio)</span>
+          </button>
+        ) : isAudioAvailable ? (
+          <Link
+            href={`/listen/${book.id}?mode=sample`}
+            className="w-full py-2.5 px-4 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-gold/30 cursor-pointer"
+          >
+            <Headphones className="w-4 h-4 text-gold" />
+            <span>Écouter l'extrait audio gratuit (3 minutes)</span>
+          </Link>
+        ) : (
+          <Link
+            href={`/catalog/reader/${book.id}?mode=sample`}
+            className="w-full py-2.5 px-4 rounded-xl bg-background-secondary hover:bg-navy/10 text-navy font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-border cursor-pointer"
+          >
+            <BookOpen className="w-4 h-4 text-gold" />
+            <span>Feuilleter l'extrait gratuit en immersion 3D</span>
+          </Link>
+        )}
       </div>
 
       {/* 3. Avantages & Modes de Livraison */}
@@ -281,6 +432,15 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
           <span>Client en France ou Europe ? Titre également distribué par notre réseau partenaire <strong>Africa Vivre</strong>.</span>
         </div>
       </div>
+
+      {/* Modale de Choix d'Extrait */}
+      {showSampleModal && (
+        <SampleChoiceModal
+          isOpen={showSampleModal}
+          onClose={() => setShowSampleModal(false)}
+          book={book as any}
+        />
+      )}
     </div>
   );
 }

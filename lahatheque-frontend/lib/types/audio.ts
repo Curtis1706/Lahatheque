@@ -56,3 +56,70 @@ export interface AudioPlayerState {
   isExpanded: boolean;
   isLoading: boolean;
 }
+
+export type VoiceGender = "male" | "female";
+export type TrackType = "full" | "chapter";
+export type AudioWorkflowStatus = 
+  | "draft" 
+  | "pending_layout_validation" 
+  | "pending_legal_validation" 
+  | "published" 
+  | "rejected";
+
+export interface AudioChapterItem {
+  id: string;
+  title: string;
+  file: File | null;
+  file_url?: string;
+  duration_seconds: number;
+  order_index: number;
+  status: "idle" | "uploading" | "ready" | "error";
+  progress: number;
+  error_message?: string;
+}
+
+export interface VoiceTrackGroup {
+  full_track: {
+    file: File | null;
+    file_url?: string;
+    duration_seconds: number;
+    status: "idle" | "uploading" | "ready" | "error";
+    progress: number;
+  };
+  chapters: AudioChapterItem[];
+}
+
+export interface AudioStudioFormState {
+  is_attached: boolean;
+  attached_book_id: string;
+  title: string;
+  author: string;
+  country: string;
+  description: string;
+  category: string;
+  level: string;
+  price_xof: number;
+  price_eur: number;
+  cover_image: File | null;
+  cover_url: string;
+  male_tracks: VoiceTrackGroup;
+  female_tracks: VoiceTrackGroup;
+}
+
+export interface AudioBookSummary {
+  id: string;
+  title: string;
+  authors_display: string;
+  category_name: string;
+  country: string;
+  cover_url: string;
+  price_audio_xof: number;
+  price_audio_eur: number;
+  audio_status: AudioWorkflowStatus;
+  has_male_voice: boolean;
+  has_female_voice: boolean;
+  total_duration_seconds: number;
+  total_tracks_count: number;
+  created_at: string;
+  rejection_reason?: string;
+}

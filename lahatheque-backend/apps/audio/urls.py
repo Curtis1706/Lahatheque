@@ -7,6 +7,11 @@ from .views import (
     AudioStreamSessionView,
     AudioListeningProgressView,
     AudioLockVerificationView,
+    AudioEligibleBooksView,
+    AudioStudioSubmitView,
+    AudioManagementListView,
+    AudioWorkflowTransitionView,
+    RecentAudioListeningsView,
 )
 
 app_name = 'audio'
@@ -15,6 +20,11 @@ router = DefaultRouter()
 router.register(r'tracks-crud', AudioTrackViewSet, basename='audio-tracks-crud')
 
 urlpatterns = [
+    path('eligible-books/', AudioEligibleBooksView.as_view(), name='audio-eligible-books'),
+    path('studio/submit/', AudioStudioSubmitView.as_view(), name='audio-studio-submit'),
+    path('management/<str:role>/', AudioManagementListView.as_view(), name='audio-management-list'),
+    path('management/<str:book_id>/transition/', AudioWorkflowTransitionView.as_view(), name='audio-workflow-transition'),
+    path('recent-listenings/', RecentAudioListeningsView.as_view(), name='audio-recent-listenings'),
     path('tracks/upload/', AudioTrackUploadView.as_view(), name='audio-track-upload'),
     path('ouvrages/<str:ouvrage_id>/session/', AudioStreamSessionView.as_view(), name='audio-stream-session'),
     path('tracks/<str:track_id>/progress/', AudioListeningProgressView.as_view(), name='audio-listening-progress'),

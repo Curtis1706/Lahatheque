@@ -407,7 +407,7 @@ export default function CheckoutPage() {
                   <div className="min-w-0">
                     <p className="font-bold text-navy truncate">{item.title}</p>
                     <p className="text-[10px] text-foreground-muted">
-                      {item.format === "digital" ? "Numérique" : "Papier"} x {item.quantity}
+                      {item.format === "digital" ? "Livre numérique" : item.format === "audio" ? "Livre audio" : "Livre papier"} x {item.quantity}
                     </p>
                   </div>
                   <span className="font-semibold text-navy shrink-0">

@@ -60,7 +60,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class CreateOrderItemSerializer(serializers.Serializer):
     ouvrage_id = serializers.UUIDField()
-    format_type = serializers.ChoiceField(choices=['digital', 'paper'], default='digital')
+    format_type = serializers.ChoiceField(choices=['digital', 'paper', 'audio'], default='digital')
     quantity = serializers.IntegerField(default=1, min_value=1)
 
 class CreateOrderSerializer(serializers.Serializer):

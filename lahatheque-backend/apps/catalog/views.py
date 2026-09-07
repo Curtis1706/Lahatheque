@@ -48,11 +48,46 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
                 Q(authors__last_name__icontains=author)
             ).distinct()
 
-        # 3. Filtre format
+        # 3. Filtre format et combinaisons
         format_val = self.request.query_params.get('format')
         if format_val and format_val.lower() != 'all':
             f = format_val.lower()
-            if f in ('digital', 'numerique'):
+            if f in ('audio', 'audio_all', 'livres_audio'):
+                # Tout ouvrage disposant d'une version audio (rattachée ou autonome)
+                qs = qs.filter(Q(has_audio_version=True) | Q(format_type='audio') | Q(audio_tracks__isnull=False)).distinct()
+            elif f in ('audio_only', 'pure_audio', 'audio_seul'):
+                # Ouvrages exclusivement audio (sans papier et sans PDF/EPUB)
+                qs = qs.filter(
+                    (Q(format_type='audio') | Q(has_audio_version=True)) &
+                    Q(is_paper_available=False) &
+                    (Q(file__isnull=True) | Q(file='') | Q(format_type='audio'))
+                ).distinct()
+            elif f in ('pack_complet', 'all_three', 'papier_numerique_audio'):
+                # Ouvrages disposant des 3 formats : Papier, Numérique ET Audio
+                qs = qs.filter(
+                    (Q(has_audio_version=True) | Q(audio_tracks__isnull=False)) &
+                    Q(is_paper_available=True) &
+                    Q(format_type__in=['pdf', 'epub'])
+                ).distinct()
+            elif f in ('digital_audio', 'numerique_audio'):
+                # Ouvrages disposant de Numérique ET Audio
+                qs = qs.filter(
+                    (Q(has_audio_version=True) | Q(audio_tracks__isnull=False)) &
+                    Q(format_type__in=['pdf', 'epub'])
+                ).distinct()
+            elif f in ('paper_audio', 'papier_audio'):
+                # Ouvrages disposant de Papier ET Audio
+                qs = qs.filter(
+                    (Q(has_audio_version=True) | Q(audio_tracks__isnull=False)) &
+                    Q(is_paper_available=True)
+                ).distinct()
+            elif f in ('paper_digital', 'papier_numerique'):
+                # Ouvrages disposant de Papier ET Numérique
+                qs = qs.filter(
+                    Q(is_paper_available=True) &
+                    Q(format_type__in=['pdf', 'epub'])
+                ).distinct()
+            elif f in ('digital', 'numerique'):
                 qs = qs.filter(format_type__in=['pdf', 'epub'])
             elif f in ('paper', 'papier'):
                 qs = qs.filter(is_paper_available=True)
