@@ -19,9 +19,7 @@ import {
   List, 
   ChevronLeft, 
   ChevronRight, 
-  XCircle,
-  ShieldCheck,
-  FileText
+  XCircle
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { getAudioBooksList, updateAudioWorkflowStatus } from "@/lib/services/audio";
@@ -60,7 +58,8 @@ export function AudioBooksManagementView({
 }: AudioBooksManagementViewProps) {
   const [books, setBooks] = useState<AudioBookItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  // Vue par défaut : VUE EN LISTE demandée expressément par l'utilisateur
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [actionLoading, setActionLoading] = useState(false);
@@ -204,55 +203,59 @@ export function AudioBooksManagementView({
     switch (status) {
       case "published":
         return (
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap shadow-2xs">
             Publié au catalogue
           </span>
         );
       case "pending_layout_validation":
         return (
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap shadow-2xs">
             Attente Chef Maquettiste
           </span>
         );
       case "pending_legal_validation":
         return (
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap shadow-2xs">
             Attente Juriste
           </span>
         );
       case "rejected":
         return (
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap shadow-2xs">
             Rejeté / Modifications
           </span>
         );
       default:
         return (
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-background-secondary text-foreground-muted border border-border">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-background-secondary text-foreground-muted border border-border whitespace-nowrap shadow-2xs">
             Brouillon
           </span>
         );
     }
   };
 
-  // Colonnes DataTable pour le Mode Liste
+  // Colonnes DataTable hautement soignées avec largeurs et typographie rigoureuses
   const columns: DataTableColumn<AudioBookItem>[] = [
     {
       key: "title",
       header: "Ouvrage",
-      className: "min-w-[240px]",
+      className: "min-w-[300px] lg:min-w-[340px]",
       cell: (book) => (
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-16 rounded-lg bg-background-secondary border border-border overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
+        <div className="flex items-center gap-3.5 py-1">
+          <div className="w-12 h-16 rounded-xl bg-background-secondary border border-border overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
             {book.cover_url ? (
               <img src={book.cover_url} alt={book.title} className="w-full h-full object-cover" />
             ) : (
-              <Headphones className="w-5 h-5 text-gold" />
+              <Headphones className="w-6 h-6 text-gold" />
             )}
           </div>
-          <div className="min-w-0">
-            <h4 className="font-serif font-bold text-sm text-navy truncate">{book.title}</h4>
-            <p className="text-xs text-foreground-muted truncate">{book.authors_display}</p>
+          <div className="min-w-0 max-w-sm">
+            <h4 className="font-serif font-bold text-sm text-navy leading-snug line-clamp-2" title={book.title}>
+              {book.title}
+            </h4>
+            <p className="text-xs text-foreground-muted truncate mt-0.5" title={book.authors_display}>
+              {book.authors_display}
+            </p>
           </div>
         </div>
       ),
@@ -260,25 +263,30 @@ export function AudioBooksManagementView({
     {
       key: "category_name",
       header: "Discipline & Pays",
-      className: "min-w-[160px]",
+      className: "min-w-[180px] whitespace-nowrap",
       cell: (book) => (
-        <div className="space-y-0.5">
-          <span className="text-xs font-semibold text-navy block truncate">{book.category_name}</span>
-          <span className="text-[11px] font-mono text-foreground-muted block">{book.country}</span>
+        <div className="space-y-1 whitespace-nowrap">
+          <span className="text-xs font-semibold text-navy block truncate" title={book.category_name}>
+            {book.category_name}
+          </span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-background-secondary border border-border text-foreground-muted">
+            {book.country}
+          </span>
         </div>
       ),
     },
     {
       key: "total_duration_seconds",
       header: "Durée & Pistes",
+      className: "min-w-[140px] whitespace-nowrap",
       cell: (book) => (
-        <div className="space-y-0.5 font-mono text-xs text-foreground-muted">
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-gold" />
+        <div className="space-y-1 font-mono text-xs whitespace-nowrap">
+          <div className="flex items-center gap-1.5 text-navy font-semibold">
+            <Clock className="w-3.5 h-3.5 text-gold shrink-0" />
             <span>{formatAudioDuration(book.total_duration_seconds)}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Music className="w-3.5 h-3.5 text-navy" />
+          <div className="flex items-center gap-1.5 text-[11px] text-foreground-muted font-sans">
+            <Music className="w-3.5 h-3.5 text-navy/70 shrink-0" />
             <span>{book.total_tracks_count} piste{book.total_tracks_count > 1 ? "s" : ""}</span>
           </div>
         </div>
@@ -287,13 +295,18 @@ export function AudioBooksManagementView({
     {
       key: "has_male_voice",
       header: "Narrateurs",
+      className: "min-w-[130px] whitespace-nowrap",
       cell: (book) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 flex-wrap whitespace-nowrap">
           {book.has_male_voice && (
-            <span className="px-2 py-0.5 rounded bg-navy/10 text-navy font-bold text-[10px]">Homme</span>
+            <span className="px-2.5 py-0.5 rounded-md bg-navy/10 text-navy font-bold text-[10px] border border-navy/20">
+              Homme
+            </span>
           )}
           {book.has_female_voice && (
-            <span className="px-2 py-0.5 rounded bg-navy/10 text-navy font-bold text-[10px]">Femme</span>
+            <span className="px-2.5 py-0.5 rounded-md bg-gold/15 text-gold font-bold text-[10px] border border-gold/30">
+              Femme
+            </span>
           )}
           {!book.has_male_voice && !book.has_female_voice && (
             <span className="text-xs text-foreground-muted">-</span>
@@ -304,30 +317,40 @@ export function AudioBooksManagementView({
     {
       key: "price_audio_xof",
       header: "Tarif",
+      className: "min-w-[140px] whitespace-nowrap",
       cell: (book) => (
-        <div className="space-y-0.5 font-mono">
-          <span className="text-xs font-bold text-navy block">{book.price_audio_xof.toLocaleString("fr-FR")} FCFA</span>
-          <span className="text-[10px] text-foreground-muted block">({book.price_audio_eur.toFixed(2)} €)</span>
+        <div className="whitespace-nowrap font-mono space-y-0.5">
+          <span className="text-xs font-bold text-navy block whitespace-nowrap">
+            {book.price_audio_xof.toLocaleString("fr-FR")} FCFA
+          </span>
+          <span className="text-[11px] text-foreground-muted block whitespace-nowrap font-sans">
+            ({book.price_audio_eur.toFixed(2)} €)
+          </span>
         </div>
       ),
     },
     {
       key: "audio_status",
       header: "Statut",
-      cell: (book) => renderStatusBadge(book.audio_status),
+      className: "min-w-[170px] whitespace-nowrap",
+      cell: (book) => (
+        <div className="whitespace-nowrap">
+          {renderStatusBadge(book.audio_status)}
+        </div>
+      ),
     },
     {
       key: "id",
       header: "Actions",
-      className: "text-right",
+      className: "min-w-[160px] text-right whitespace-nowrap",
       cell: (book) => (
-        <div className="flex items-center justify-end gap-1.5">
+        <div className="flex items-center justify-end gap-2 whitespace-nowrap">
           <Link
             href={`/listen/${book.id}`}
-            className="p-2 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy transition-colors cursor-pointer"
-            title="Écouter le livre audio"
+            className="w-9 h-9 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy hover:text-gold transition-colors inline-flex items-center justify-center shrink-0 shadow-2xs cursor-pointer"
+            title="Écouter le flux audio"
           >
-            <ExternalLink className="w-3.5 h-3.5 text-gold" />
+            <ExternalLink className="w-4 h-4 text-gold" />
           </Link>
 
           {/* Actions Rôle Admin */}
@@ -336,9 +359,9 @@ export function AudioBooksManagementView({
               type="button"
               onClick={() => handleTogglePublish(book.id, book.audio_status)}
               disabled={actionLoading}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+              className={`h-9 px-3.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50 ${
                 book.audio_status === "published"
-                  ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                  ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 shadow-2xs"
                   : "bg-navy text-white hover:bg-navy-hover shadow-xs"
               }`}
             >
@@ -363,7 +386,7 @@ export function AudioBooksManagementView({
                 type="button"
                 onClick={() => handleApproveLayout(book.id)}
                 disabled={actionLoading}
-                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Valider</span>
@@ -373,7 +396,7 @@ export function AudioBooksManagementView({
                 type="button"
                 onClick={() => { setRejectingBookId(book.id); setRejectionReason(""); }}
                 disabled={actionLoading}
-                className="px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="h-9 px-3 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <XCircle className="w-3.5 h-3.5" />
                 <span>Rejeter</span>
@@ -387,7 +410,7 @@ export function AudioBooksManagementView({
               type="button"
               onClick={() => handleApproveLegal(book.id)}
               disabled={actionLoading}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+              className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Conformité OK</span>
@@ -441,8 +464,8 @@ export function AudioBooksManagementView({
         </div>
       )}
 
-      {/* Barre d'outils : Recherche, Filtre & Commutateur de vue Grille / Liste */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* Barre d'outils unifiée : Recherche, Filtre & Commutateur Grille / Liste */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-background border border-border p-3 sm:p-4 rounded-2xl shadow-xs">
         {/* Recherche */}
         <div className="relative w-full sm:max-w-md">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
@@ -451,14 +474,14 @@ export function AudioBooksManagementView({
             placeholder="Rechercher par titre, auteur, pays..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-navy"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-background-secondary/40 text-foreground text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-navy focus:bg-background transition-all"
           />
         </div>
 
         {/* Filtre statut & Commutateur Grille / Liste */}
         <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gold" />
+            <Filter className="w-4 h-4 text-gold shrink-0" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -477,22 +500,8 @@ export function AudioBooksManagementView({
           <div className="inline-flex items-center p-1 rounded-xl bg-background-secondary border border-border shrink-0">
             <button
               type="button"
-              onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                viewMode === "grid"
-                  ? "bg-navy text-white shadow-xs"
-                  : "text-foreground-muted hover:text-navy"
-              }`}
-              title="Affichage en Grille"
-            >
-              <LayoutGrid className="w-4 h-4" />
-              <span className="hidden md:inline">Grille</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === "list"
                   ? "bg-navy text-white shadow-xs"
                   : "text-foreground-muted hover:text-navy"
@@ -500,15 +509,29 @@ export function AudioBooksManagementView({
               title="Affichage en Liste (Tableau)"
             >
               <List className="w-4 h-4" />
-              <span className="hidden md:inline">Liste</span>
+              <span>Liste</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === "grid"
+                  ? "bg-navy text-white shadow-xs"
+                  : "text-foreground-muted hover:text-navy"
+              }`}
+              title="Affichage en Grille"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span>Grille</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Contenu : Grille ou Liste */}
+      {/* Contenu : Liste (défaut) ou Grille */}
       {loading ? (
-        <div className="p-12 text-center text-xs text-foreground-muted flex items-center justify-center gap-2">
+        <div className="p-12 text-center text-xs text-foreground-muted flex items-center justify-center gap-2 bg-background border border-border rounded-2xl">
           <Sparkles className="w-5 h-5 text-gold animate-spin" />
           Chargement des livres audio...
         </div>
@@ -530,7 +553,7 @@ export function AudioBooksManagementView({
           )}
         </div>
       ) : viewMode === "list" ? (
-        /* VUE EN LISTE (DataTable LAHAThèque avec pagination intégrée) */
+        /* VUE EN LISTE (Défaut : DataTable LAHAThèque avec pagination) */
         <DataTable
           data={filtered}
           columns={columns}
@@ -562,10 +585,10 @@ export function AudioBooksManagementView({
                     <div className="text-[10px] font-bold uppercase tracking-wider text-gold font-mono">
                       {book.category_name} • {book.country}
                     </div>
-                    <h4 className="font-serif font-bold text-sm text-navy line-clamp-2 leading-snug group-hover:text-gold transition-colors">
+                    <h4 className="font-serif font-bold text-sm text-navy line-clamp-2 leading-snug group-hover:text-gold transition-colors" title={book.title}>
                       {book.title}
                     </h4>
-                    <p className="text-xs text-foreground-muted truncate">
+                    <p className="text-xs text-foreground-muted truncate" title={book.authors_display}>
                       {book.authors_display}
                     </p>
                     <div className="pt-1">
