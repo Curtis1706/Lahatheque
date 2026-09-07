@@ -21,6 +21,8 @@ import {
   BookOpen,
   Sparkles,
   Share2,
+  ListMusic,
+  Check,
 } from "lucide-react";
 import { useAudioPlayer } from "./audio-player-context";
 import { toast } from "sonner";
@@ -44,8 +46,11 @@ export function LahathequeAudioPlayerCard({
     setPlaybackRate,
     nextTrack,
     previousTrack,
+    selectTrackIndex,
   } = useAudioPlayer();
 
+  const [showChapterList, setShowChapterList] = useState<boolean>(false);
+  const [selectedVoiceFilter, setSelectedVoiceFilter] = useState<"all" | "male" | "female">("all");
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isDraggingProgress, setIsDraggingProgress] = useState<boolean>(false);
   const [isDraggingVolume, setIsDraggingVolume] = useState<boolean>(false);
@@ -332,15 +337,107 @@ export function LahathequeAudioPlayerCard({
         )}
       </div>
 
-      {/* Informations sur la piste */}
-      <div className="px-6 text-center space-y-1 mb-4">
-        <h3 className="font-serif font-bold text-white text-base sm:text-lg truncate">
-          {state.currentBookTitle || "Sélectionnez un ouvrage"}
-        </h3>
-        <p className="text-xs text-foreground-muted font-sans truncate">
-          {state.currentAuthors || "LAHA Éditions"}
-        </p>
-      </div>
+      {/* Informations sur la piste et le chapitre en cours */}
+      {(() => {
+        const currentTrack = state.tracks[state.currentTrackIndex];
+        return (
+          <div className="px-6 text-center space-y-1 mb-4">
+            <h3 className="font-serif font-bold text-white text-base sm:text-lg truncate">
+              {state.currentBookTitle || "Sélectionnez un ouvrage"}
+            </h3>
+            <p className="text-xs text-foreground-muted font-sans truncate">
+              {state.currentAuthors || "LAHA Éditions"}
+            </p>
+
+            {currentTrack && (
+              <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                <span className="text-xs font-semibold text-gold font-sans truncate max-w-xs">
+                  {currentTrack.track_type === "full"
+                    ? (currentTrack.title || "Livre complet")
+                    : `Chapitre ${currentTrack.chapter_number} : ${currentTrack.title}`}
+                </span>
+                {currentTrack.voice_gender && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold/15 text-gold border border-gold/30">
+                    {currentTrack.voice_gender === "male" ? "Voix Homme" : "Voix Femme"}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Bouton d'ouverture du sélecteur de chapitres */}
+            {state.tracks && state.tracks.length > 0 && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowChapterList(!showChapterList)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-gold text-xs font-semibold border border-white/10 transition-all cursor-pointer"
+                >
+                  <ListMusic className="w-3.5 h-3.5 text-gold" />
+                  <span>
+                    {showChapterList ? "Masquer les chapitres" : `Chapitres & Pistes (${state.tracks.length})`}
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* Liste déroulante des Chapitres et Pistes */}
+            {showChapterList && (
+              <div className="mt-3 p-3 rounded-2xl bg-navy-dark/95 border border-border text-left max-h-56 overflow-y-auto space-y-1.5 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between px-2 pb-2 border-b border-border/50 text-[11px] text-foreground-muted font-mono">
+                  <span>SÉLECTION DU CHAPITRE</span>
+                  <span>{state.tracks.length} pistes</span>
+                </div>
+
+                {state.tracks.map((track, idx) => {
+                  const isCurrent = idx === state.currentTrackIndex;
+                  return (
+                    <button
+                      key={track.id || idx}
+                      type="button"
+                      onClick={() => {
+                        selectTrackIndex(idx);
+                        setShowChapterList(false);
+                      }}
+                      className={`w-full p-2.5 rounded-xl text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                        isCurrent
+                          ? "bg-gold/15 text-gold font-bold border border-gold/40"
+                          : "hover:bg-white/5 text-white/80 hover:text-white"
+                      }`}
+                    >
+                      <div className="min-w-0 flex items-center gap-2.5">
+                        <div
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-mono font-bold shrink-0 ${
+                            isCurrent ? "bg-gold text-navy font-bold" : "bg-white/10 text-white/70"
+                          }`}
+                        >
+                          {track.track_type === "full" ? "ALL" : track.chapter_number}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs truncate">
+                            {track.track_type === "full" ? "Livre complet" : `Chapitre ${track.chapter_number} : ${track.title}`}
+                          </p>
+                          {track.voice_gender && (
+                            <p className="text-[10px] opacity-70">
+                              {track.voice_gender === "male" ? "Voix Masculine" : "Voix Féminine"}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-mono opacity-60">
+                          {formatTime(track.duration_seconds)}
+                        </span>
+                        {isCurrent && <Check className="w-4 h-4 text-gold shrink-0" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Panneau de contrôle inférieur */}
       <div className="bg-navy/90 backdrop-blur-md p-4 sm:p-5 border-t border-border rounded-b-2xl space-y-4">

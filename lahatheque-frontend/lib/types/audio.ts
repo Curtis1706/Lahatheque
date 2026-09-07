@@ -10,6 +10,9 @@ export interface AudioTrackItem {
   duration_seconds: number;
   signed_hls_url?: string;
   captions_vtt_url?: string | null;
+  voice_gender?: "male" | "female";
+  track_type?: "full" | "chapter";
+  order_index?: number;
 }
 
 export interface AudioStreamSession {

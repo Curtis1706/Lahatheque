@@ -40,6 +40,7 @@ interface AudioPlayerContextType {
   setPlaybackRate: (rate: number) => void;
   nextTrack: () => void;
   previousTrack: () => void;
+  selectTrackIndex: (index: number) => void;
   toggleExpand: () => void;
   setExpanded: (expanded: boolean) => void;
   closePlayer: () => void;
@@ -464,6 +465,28 @@ export function AudioPlayerProvider({
     }
   }, [state.tracks, state.currentTrackIndex, loadSource]);
 
+  const selectTrackIndex = useCallback(
+    (index: number) => {
+      if (!state.tracks.length || index < 0 || index >= state.tracks.length) return;
+      const targetTrack = state.tracks[index];
+
+      setState((prev) => ({
+        ...prev,
+        currentTrackIndex: index,
+        currentTime: 0,
+        duration: targetTrack.duration_seconds || 0,
+      }));
+
+      if (targetTrack.signed_hls_url) {
+        loadSource(targetTrack.signed_hls_url);
+        if (audioRef.current) {
+          audioRef.current.play().catch(() => {});
+        }
+      }
+    },
+    [state.tracks, loadSource]
+  );
+
   const toggleExpand = useCallback(() => {
     setState((prev) => ({ ...prev, isExpanded: !prev.isExpanded }));
   }, []);
@@ -494,6 +517,7 @@ export function AudioPlayerProvider({
         setPlaybackRate,
         nextTrack: handleNextTrack,
         previousTrack: handlePreviousTrack,
+        selectTrackIndex,
         toggleExpand,
         setExpanded,
         closePlayer,

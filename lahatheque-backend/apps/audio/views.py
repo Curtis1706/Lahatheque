@@ -256,12 +256,23 @@ class AudioStreamSessionView(APIView):
                         logger.error(f"Échec génération token audio: {e}")
                         signed_url = track.hls_manifest_url or ""
                 
+                if not signed_url and track.audio_file:
+                    try:
+                        signed_url = track.audio_file.url
+                        if not signed_url.startswith("http"):
+                            signed_url = request.build_absolute_uri(signed_url)
+                    except Exception as e:
+                        logger.warning(f"Impossible de récupérer l'URL de audio_file pour track {track.id}: {e}")
+
                 if not signed_url and track.hls_manifest_url:
                     signed_url = track.hls_manifest_url
 
                 sessions.append({
                     "id": str(track.id),
                     "chapter_number": track.chapter_number,
+                    "order_index": getattr(track, 'order_index', 0),
+                    "track_type": getattr(track, 'track_type', 'chapter'),
+                    "voice_gender": getattr(track, 'voice_gender', 'male'),
                     "title": track.title,
                     "duration_seconds": track.duration_seconds,
                     "signed_hls_url": signed_url,
