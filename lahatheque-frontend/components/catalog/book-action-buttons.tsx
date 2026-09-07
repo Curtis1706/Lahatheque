@@ -387,23 +387,15 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
         </div>
 
         {/* Bouton Extrait Intelligent (Liseuse vs Audio) */}
-        {isAudioAvailable && isDigitalAvailable ? (
+        {isAudioAvailable ? (
           <button
             type="button"
             onClick={() => setShowSampleModal(true)}
-            className="w-full py-2.5 px-4 rounded-xl bg-background-secondary hover:bg-navy/10 text-navy font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-border cursor-pointer"
+            className="w-full py-2.5 px-4 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-gold/40 cursor-pointer"
           >
             <Headphones className="w-4 h-4 text-gold" />
             <span>Découvrir l'extrait gratuit (Lecture ou Écoute audio)</span>
           </button>
-        ) : isAudioAvailable ? (
-          <Link
-            href={`/listen/${book.id}?mode=sample`}
-            className="w-full py-2.5 px-4 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-gold/30 cursor-pointer"
-          >
-            <Headphones className="w-4 h-4 text-gold" />
-            <span>Écouter l'extrait audio gratuit (3 minutes)</span>
-          </Link>
         ) : (
           <Link
             href={`/catalog/reader/${book.id}?mode=sample`}

@@ -318,7 +318,14 @@ function CatalogSearchInner() {
                     ? book.authors_details.map(a => `${a.first_name} ${a.last_name}`).join(", ")
                     : "Auteur certifié";
 
-                  const hasAudio = Boolean(book.has_audio_version || book.has_audio || book.format_type === "audio");
+                  const bookSlug = book.slug || book.id;
+                  const hasAudio = Boolean(
+                    book.has_audio_version || 
+                    book.has_audio || 
+                    book.format_type === "audio" || 
+                    (book.price_audio && book.price_audio > 0) ||
+                    book.audio_status === "published"
+                  );
                   const hasPaper = book.is_paper_available !== false;
                   const hasDigital = book.is_digital_available !== false && book.format_type !== "audio";
 
@@ -359,7 +366,7 @@ function CatalogSearchInner() {
                           </div>
                         )}
 
-                        <Link href={`/catalog/${book.id}`} className="transition-transform group-hover:scale-105 duration-300 flex items-center justify-center">
+                        <Link href={`/catalog/${bookSlug}`} className="transition-transform group-hover:scale-105 duration-300 flex items-center justify-center">
                           {book.cover_url || book.cover_image ? (
                             <div className="relative w-[130px] aspect-[2/3] rounded-r-md rounded-l-sm overflow-hidden shadow-xl border-l-4 border-black/20 border-r border-t border-b border-border/60 group-hover:shadow-2xl transition-shadow duration-300">
                               <img
@@ -391,7 +398,7 @@ function CatalogSearchInner() {
                             </span>
                           )}
                           <h3 className="font-serif font-bold text-navy text-base leading-snug line-clamp-2 group-hover:text-gold transition-colors">
-                            <Link href={`/catalog/${book.id}`}>
+                            <Link href={`/catalog/${bookSlug}`}>
                               {book.title}
                             </Link>
                           </h3>
@@ -429,24 +436,25 @@ function CatalogSearchInner() {
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Bouton Extrait intelligent */}
+                            {/* Bouton Extrait intelligent : modale de choix si les 2 formats existent, sinon action directe */}
                             {hasAudio && hasDigital ? (
                               <button
                                 type="button"
                                 onClick={() => setSelectedSampleBook(book)}
-                                className="px-2.5 py-2 rounded-xl border border-border bg-background-secondary hover:bg-navy/5 text-navy text-xs font-semibold transition-colors cursor-pointer"
-                                title="Choisir un extrait (Lire ou Écouter)"
+                                className="px-2.5 py-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                                title="Choisir le format d'extrait (Lire ou Écouter)"
                               >
-                                Extrait
+                                <Headphones className="w-3.5 h-3.5 text-gold shrink-0" />
+                                <span>Extrait</span>
                               </button>
                             ) : hasAudio ? (
                               <Link
-                                href={`/listen/${book.id}?mode=sample`}
-                                className="px-2.5 py-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
-                                title="Écouter l'extrait audio"
+                                href={`/listen/${bookSlug}?mode=sample`}
+                                className="px-2.5 py-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                                title="Écouter l'extrait audio gratuit"
                               >
-                                <Headphones className="w-3 h-3 text-gold" />
-                                <span>Extrait</span>
+                                <Headphones className="w-3.5 h-3.5 text-gold shrink-0" />
+                                <span>Extrait audio</span>
                               </Link>
                             ) : (
                               <Link
@@ -459,7 +467,7 @@ function CatalogSearchInner() {
                             )}
 
                             <Link
-                              href={`/catalog/${book.id}`}
+                              href={`/catalog/${bookSlug}`}
                               className="px-3 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-all flex items-center gap-1 shadow-xs shrink-0"
                             >
                               <span>Détails</span>

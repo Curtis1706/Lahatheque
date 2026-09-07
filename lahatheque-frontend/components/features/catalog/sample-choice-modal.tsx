@@ -59,6 +59,8 @@ export function SampleChoiceModal({
     router.push(`/listen/${book.id}`);
   };
 
+  const hasDigitalFormat = (book as any).is_digital_available !== false && (book as any).format_type !== "audio";
+
   return (
     <div
       role="dialog"
@@ -98,32 +100,34 @@ export function SampleChoiceModal({
         </div>
 
         {/* Options de choix */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-          {/* Option 1 : Lire l'extrait écrit */}
-          <button
-            type="button"
-            onClick={handleReadSample}
-            className="group p-5 rounded-2xl border-2 border-border hover:border-gold/60 bg-background-secondary hover:bg-background transition-all text-left flex flex-col justify-between gap-4 cursor-pointer shadow-xs hover:shadow-md"
-          >
-            <div className="space-y-3">
-              <div className="w-12 h-12 rounded-xl bg-navy/10 group-hover:bg-gold/15 text-navy group-hover:text-gold flex items-center justify-center transition-colors">
-                <BookOpen className="w-6 h-6" />
+        <div className={`grid gap-4 pt-2 ${hasDigitalFormat ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+          {/* Option 1 : Lire l'extrait écrit (uniquement si le format numérique existe) */}
+          {hasDigitalFormat && (
+            <button
+              type="button"
+              onClick={handleReadSample}
+              className="group p-5 rounded-2xl border-2 border-border hover:border-gold/60 bg-background-secondary hover:bg-background transition-all text-left flex flex-col justify-between gap-4 cursor-pointer shadow-xs hover:shadow-md"
+            >
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-navy/10 group-hover:bg-gold/15 text-navy group-hover:text-gold flex items-center justify-center transition-colors">
+                  <BookOpen className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-serif font-bold text-base text-navy group-hover:text-gold transition-colors">
+                    Lire le livre
+                  </h4>
+                  <p className="text-xs text-foreground-muted font-sans leading-relaxed">
+                    Feuilletez les premières pages de l&apos;ouvrage.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h4 className="font-serif font-bold text-base text-navy group-hover:text-gold transition-colors">
-                  Lire le livre
-                </h4>
-                <p className="text-xs text-foreground-muted font-sans leading-relaxed">
-                  Feuilletez les premières pages de l&apos;ouvrage.
-                </p>
-              </div>
-            </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-border/60 text-xs font-semibold text-navy group-hover:text-gold">
-              <span>Ouvrir la liseuse</span>
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-            </div>
-          </button>
+              <div className="flex items-center justify-between pt-3 border-t border-border/60 text-xs font-semibold text-navy group-hover:text-gold">
+                <span>Ouvrir la liseuse</span>
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </div>
+            </button>
+          )}
 
           {/* Option 2 : Écouter l'extrait audio */}
           <button

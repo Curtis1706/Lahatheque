@@ -42,6 +42,8 @@ class Country(models.Model):
     def __str__(self):
         return f"{self.name} ({self.code})"
 
+from django.utils.text import slugify
+
 class Ouvrage(models.Model):
     FORMAT_CHOICES = [
         ('pdf', 'PDF'),
@@ -51,6 +53,7 @@ class Ouvrage(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    slug = models.SlugField(max_length=280, blank=True, default='', db_index=True)
     isbn = models.CharField(max_length=64, blank=True, default='')
     title = models.CharField(max_length=255)
     subtitle = models.CharField(max_length=255, blank=True)
@@ -164,6 +167,18 @@ class Ouvrage(models.Model):
             if hasattr(authors_qs, 'all'):
                 return ", ".join([f"{a.first_name} {a.last_name}".strip() for a in authors_qs.all()])
         return ""
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_title = self.title or f"ouvrage-{uuid.uuid4().hex[:8]}"
+            base_slug = slugify(base_title)[:250] or f"ouvrage-{uuid.uuid4().hex[:8]}"
+            candidate = base_slug
+            counter = 1
+            while Ouvrage.objects.filter(slug=candidate).exclude(pk=self.pk).exists():
+                candidate = f"{base_slug}-{counter}"
+                counter += 1
+            self.slug = candidate
+        super().save(*args, **kwargs)
 
 
 

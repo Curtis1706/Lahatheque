@@ -140,10 +140,23 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         pk = kwargs.get('pk')
-        # 1. Recherche par ID ou ISBN dans Ouvrage (y compris non-publiés pour rôles autorisés)
-        ouvrage = Ouvrage.objects.filter(Q(id=pk) | Q(isbn=pk)).select_related(
-            'publisher', 'discipline', 'institution'
-        ).prefetch_related('authors').first()
+        import uuid
+        is_uuid = False
+        try:
+            uuid.UUID(str(pk))
+            is_uuid = True
+        except (ValueError, AttributeError):
+            pass
+
+        # 1. Recherche par UUID, Slug ou ISBN dans Ouvrage (y compris non-publiés pour rôles autorisés)
+        if is_uuid:
+            ouvrage = Ouvrage.objects.filter(Q(id=pk) | Q(isbn=pk) | Q(slug=pk)).select_related(
+                'publisher', 'discipline', 'institution'
+            ).prefetch_related('authors').first()
+        else:
+            ouvrage = Ouvrage.objects.filter(Q(slug=pk) | Q(isbn=pk)).select_related(
+                'publisher', 'discipline', 'institution'
+            ).prefetch_related('authors').first()
 
         if ouvrage:
             if ouvrage.status != 'published':
