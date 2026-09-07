@@ -304,175 +304,183 @@ def run_all_automated_reminders() -> dict:
 
 
 @shared_task
-def task_calculate_monthly_royalties():
+def task_calculate_monthly_royalties(include_current_month=False):
     """
-    Calcul mensuel automatique des redevances : part université (ventes directes hors bouquet
-    partagé), part éditeur tiers, part auteur sur le reste. Exécuté le 1er de chaque mois.
+    Calcul automatique des redevances : part université (ventes directes hors bouquet
+    partagé), part éditeur tiers, part auteur sur le reste.
+    Exécuté le 1er de chaque mois via Celery Beat (mois précédent), ou manuellement
+    par l'administrateur avec include_current_month=True (mois précédent + mois en cours).
     """
     from decimal import Decimal
+    from django.db import models
     from django.db.models import Sum, Count
     from apps.catalog.models import Ouvrage
     from apps.commerce.models import LigneCommande
-    from apps.rights.models import RoyaltyCalculation, RoyaltyPayoutLine, AuthorRight
+    from apps.rights.models import RoyaltyCalculation, RoyaltyPayoutLine, AuthorRight, RoyaltyRate, RepartitionDroits
     from apps.partners.models import UniversityRoyaltyStatement
 
     now = timezone.now()
-    last_month_start = (now.replace(day=1) - timedelta(days=1)).replace(day=1)
-    last_month_end = now.replace(day=1) - timedelta(days=1)
-    period_month_date = last_month_start.date()
-    period_label = period_month_date.strftime("%Y-%m")
 
-    lignes = LigneCommande.objects.filter(
-        commande__created_at__gte=last_month_start,
-        commande__created_at__lte=last_month_end,
-        commande__statut_paiement='paid',
-    ).values('ouvrage').annotate(
-        total_sales=Sum('unit_price'),
-        units_sold=Count('id'),
-    )
+    # Construction de la liste des périodes à traiter
+    periods = []
 
-    ventes_par_format = {}
-    for row in LigneCommande.objects.filter(
-        commande__created_at__gte=last_month_start,
-        commande__created_at__lte=last_month_end,
-        commande__statut_paiement='paid',
-    ).values('ouvrage', 'format_type').annotate(sous_total=Sum('unit_price')):
-        ouvrage_id = row['ouvrage']
-        ventes_par_format.setdefault(ouvrage_id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00'), 'audio': Decimal('0.00')})
-        fmt = row['format_type'] if row['format_type'] in ('digital', 'paper', 'audio') else 'digital'
-        ventes_par_format[ouvrage_id][fmt] += Decimal(str(row['sous_total'] or 0))
+    # 1. Mois civil précédent (période standard mensuelle)
+    last_month_start = (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)).replace(day=1)
+    last_month_end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(seconds=1)
+    periods.append((last_month_start, last_month_end, last_month_start.date()))
 
-    calculations_created = 0
-    payout_lines_created = 0
-    payout_lines_corrected = 0
-    university_statements_created = 0
+    # 2. Mois civil en cours (si déclenché manuellement ou requis)
+    if include_current_month:
+        current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        current_month_end = now
+        periods.append((current_month_start, current_month_end, current_month_start.date()))
 
-    for ligne in lignes:
-        ouvrage = Ouvrage.objects.filter(id=ligne['ouvrage']).select_related('institution', 'publisher').first()
-        if not ouvrage:
-            continue
+    total_calculations_created = 0
+    total_payout_lines_created = 0
+    total_payout_lines_corrected = 0
+    total_university_statements_created = 0
+    processed_periods = []
 
-        total_sales = Decimal(str(ligne['total_sales'] or 0))
+    for start_dt, end_dt, period_month_date in periods:
+        period_label = period_month_date.strftime("%Y-%m")
+        processed_periods.append(period_label)
 
-        from apps.rights.models import RoyaltyRate
-
-        university_payout = Decimal("0.00")
-        if ouvrage.institution:
-            book_rate = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
-
-            if book_rate and book_rate.university_share_percent is not None:
-                univ_rate = Decimal(str(book_rate.university_share_percent)) / Decimal("100")
-            else:
-                univ_rate = Decimal(str(getattr(ouvrage.institution, 'royalty_rate', 15))) / Decimal("100")
-
-            university_payout = (total_sales * univ_rate).quantize(Decimal("0.01"))
-
-            if university_payout > 0:
-                ref = f"REP-DIRECT-{period_label}-{str(ouvrage.id)[:8]}"
-                applied_rate_val = (univ_rate * Decimal("100")).quantize(Decimal("0.01"))
-                UniversityRoyaltyStatement.objects.get_or_create(
-                    institution=ouvrage.institution,
-                    reference=ref,
-                    defaults={
-                        "period": f"{period_label}-direct-{str(ouvrage.id)[:8]}",
-                        "total_sales_catalog": total_sales,
-                        "royalty_rate": applied_rate_val,
-                        "net_royalty_amount": university_payout,
-                        "status": "available",
-                    }
-                )
-                university_statements_created += 1
-
-        from apps.rights.models import RoyaltyRate
-
-        publisher_payout = Decimal("0.00")
-        book_specific_rate = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
-
-        if book_specific_rate:
-            pub_rate = Decimal(str(book_specific_rate.publisher_share_percent)) / Decimal("100")
-            publisher_payout = (total_sales * pub_rate).quantize(Decimal("0.01"))
-        elif ouvrage.publisher and hasattr(ouvrage.publisher, 'contractual_royalty_rate'):
-            pub_rate = Decimal(str(ouvrage.publisher.contractual_royalty_rate)) / Decimal("100")
-            publisher_payout = (total_sales * pub_rate).quantize(Decimal("0.01"))
-
-        remaining_after_partners = total_sales - university_payout - publisher_payout
-        if remaining_after_partners <= 0:
-            continue
-
-        from apps.rights.models import RepartitionDroits, RoyaltyRate
-
-        book_royalty_rate_obj = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
-        if book_royalty_rate_obj and book_royalty_rate_obj.author_share_percent is not None:
-            global_author_rate = Decimal(str(book_royalty_rate_obj.author_share_percent)) / Decimal("100")
-        else:
-            global_author_rate = Decimal("0.15")
-
-        author_pool = (remaining_after_partners * global_author_rate).quantize(Decimal("0.01"))
-        platform_revenue = remaining_after_partners - author_pool
-
-        calculation, _ = RoyaltyCalculation.objects.update_or_create(
-            ouvrage=ouvrage,
-            period_month=period_month_date,
-            defaults={
-                'total_reads_count': ligne['units_sold'],
-                'total_revenue': total_sales,
-                'publisher_payout_amount': publisher_payout,
-                'platform_revenue_amount': platform_revenue,
-            }
+        lignes = LigneCommande.objects.filter(
+            commande__created_at__gte=start_dt,
+            commande__created_at__lte=end_dt,
+            commande__statut_paiement='paid',
+        ).values('ouvrage').annotate(
+            total_sales=Sum(models.F('unit_price') * models.F('quantity')),
+            units_sold=Sum('quantity'),
         )
-        calculations_created += 1
 
-        if author_pool <= 0:
-            continue
+        ventes_par_format = {}
+        for row in LigneCommande.objects.filter(
+            commande__created_at__gte=start_dt,
+            commande__created_at__lte=end_dt,
+            commande__statut_paiement='paid',
+        ).values('ouvrage', 'format_type').annotate(sous_total=Sum(models.F('unit_price') * models.F('quantity'))):
+            ouvrage_id = row['ouvrage']
+            ventes_par_format.setdefault(ouvrage_id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00'), 'audio': Decimal('0.00')})
+            fmt = row['format_type'] if row['format_type'] in ('digital', 'paper', 'audio') else 'digital'
+            ventes_par_format[ouvrage_id][fmt] += Decimal(str(row['sous_total'] or 0))
 
-        ventes_fmt = ventes_par_format.get(ouvrage.id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00'), 'audio': Decimal('0.00')})
-
-        author_rights = AuthorRight.objects.filter(ouvrage=ouvrage, user__isnull=False)
-        for right in author_rights:
-            repartition = RepartitionDroits.objects.filter(ouvrage=ouvrage, beneficiaire=right.user).first()
-
-            if repartition and (repartition.taux_papier is not None or repartition.taux_numerique is not None or repartition.taux_audio_tts is not None):
-                taux_papier = Decimal(str(repartition.taux_papier)) / Decimal("100") if repartition.taux_papier is not None else Decimal("0")
-                taux_numerique = Decimal(str(repartition.taux_numerique)) / Decimal("100") if repartition.taux_numerique is not None else Decimal("0")
-                taux_audio = Decimal(str(repartition.taux_audio_tts)) / Decimal("100") if repartition.taux_audio_tts is not None else Decimal("0")
-
-                if total_sales > 0:
-                    ratio_retenue = author_pool / total_sales
-                else:
-                    ratio_retenue = Decimal("1")
-
-                amount = (
-                    (ventes_fmt['paper'] * ratio_retenue * taux_papier) +
-                    (ventes_fmt['digital'] * ratio_retenue * taux_numerique) +
-                    (ventes_fmt['audio'] * ratio_retenue * taux_audio)
-                ).quantize(Decimal("0.01"))
-            else:
-                share = Decimal(str(right.pool_share_percent)) / Decimal("100")
-                amount = (author_pool * share).quantize(Decimal("0.01"))
-
-            if amount <= 0:
+        for ligne in lignes:
+            ouvrage = Ouvrage.objects.filter(id=ligne['ouvrage']).select_related('institution', 'publisher').first()
+            if not ouvrage:
                 continue
 
-            existing_line = RoyaltyPayoutLine.objects.filter(calculation=calculation, author_right=right).first()
+            total_sales = Decimal(str(ligne['total_sales'] or 0))
 
-            if existing_line:
-                if not existing_line.is_settled and existing_line.payout_amount != amount:
-                    existing_line.payout_amount = amount
-                    existing_line.save(update_fields=['payout_amount'])
-                    payout_lines_corrected += 1
+            university_payout = Decimal("0.00")
+            if ouvrage.institution:
+                book_rate = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
+
+                if book_rate and book_rate.university_share_percent is not None:
+                    univ_rate = Decimal(str(book_rate.university_share_percent)) / Decimal("100")
+                else:
+                    univ_rate = Decimal(str(getattr(ouvrage.institution, 'royalty_rate', 15))) / Decimal("100")
+
+                university_payout = (total_sales * univ_rate).quantize(Decimal("0.01"))
+
+                if university_payout > 0:
+                    ref = f"REP-DIRECT-{period_label}-{str(ouvrage.id)[:8]}"
+                    applied_rate_val = (univ_rate * Decimal("100")).quantize(Decimal("0.01"))
+                    UniversityRoyaltyStatement.objects.get_or_create(
+                        institution=ouvrage.institution,
+                        reference=ref,
+                        defaults={
+                            "period": f"{period_label}-direct-{str(ouvrage.id)[:8]}",
+                            "total_sales_catalog": total_sales,
+                            "royalty_rate": applied_rate_val,
+                            "net_royalty_amount": university_payout,
+                            "status": "available",
+                        }
+                    )
+                    total_university_statements_created += 1
+
+            publisher_payout = Decimal("0.00")
+            book_specific_rate = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
+
+            if book_specific_rate:
+                pub_rate = Decimal(str(book_specific_rate.publisher_share_percent)) / Decimal("100")
+                publisher_payout = (total_sales * pub_rate).quantize(Decimal("0.01"))
+            elif ouvrage.publisher and hasattr(ouvrage.publisher, 'contractual_royalty_rate'):
+                pub_rate = Decimal(str(ouvrage.publisher.contractual_royalty_rate)) / Decimal("100")
+                publisher_payout = (total_sales * pub_rate).quantize(Decimal("0.01"))
+
+            remaining_after_partners = total_sales - university_payout - publisher_payout
+            if remaining_after_partners <= 0:
+                continue
+
+            book_royalty_rate_obj = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
+            if book_royalty_rate_obj and book_royalty_rate_obj.author_share_percent is not None:
+                global_author_rate = Decimal(str(book_royalty_rate_obj.author_share_percent)) / Decimal("100")
             else:
-                RoyaltyPayoutLine.objects.create(
-                    calculation=calculation, author_right=right,
-                    payout_amount=amount, is_settled=False
-                )
-                payout_lines_created += 1
+                global_author_rate = Decimal("0.15")
+
+            author_pool = (remaining_after_partners * global_author_rate).quantize(Decimal("0.01"))
+            platform_revenue = remaining_after_partners - author_pool
+
+            calculation, _ = RoyaltyCalculation.objects.update_or_create(
+                ouvrage=ouvrage,
+                period_month=period_month_date,
+                defaults={
+                    'total_reads_count': ligne['units_sold'],
+                    'total_revenue': total_sales,
+                    'publisher_payout_amount': publisher_payout,
+                    'platform_revenue_amount': platform_revenue,
+                }
+            )
+            total_calculations_created += 1
+
+            if author_pool <= 0:
+                continue
+
+            ventes_fmt = ventes_par_format.get(ouvrage.id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00'), 'audio': Decimal('0.00')})
+
+            author_rights = AuthorRight.objects.filter(ouvrage=ouvrage, user__isnull=False)
+            for right in author_rights:
+                repartition = RepartitionDroits.objects.filter(ouvrage=ouvrage, beneficiaire=right.user).first()
+                ratio_partenaire = (remaining_after_partners / total_sales) if total_sales > 0 else Decimal("1")
+                coauthor_share = (Decimal(str(right.pool_share_percent)) / Decimal("100")) if right.pool_share_percent is not None else Decimal("1")
+
+                if repartition and (repartition.taux_papier is not None or repartition.taux_numerique is not None or repartition.taux_audio_tts is not None):
+                    taux_papier = Decimal(str(repartition.taux_papier)) / Decimal("100") if repartition.taux_papier is not None else Decimal("0")
+                    taux_numerique = Decimal(str(repartition.taux_numerique)) / Decimal("100") if repartition.taux_numerique is not None else Decimal("0")
+                    taux_audio = Decimal(str(repartition.taux_audio_tts)) / Decimal("100") if repartition.taux_audio_tts is not None else Decimal("0")
+
+                    amount = (
+                        (ventes_fmt['paper'] * ratio_partenaire * taux_papier * coauthor_share) +
+                        (ventes_fmt['digital'] * ratio_partenaire * taux_numerique * coauthor_share) +
+                        (ventes_fmt['audio'] * ratio_partenaire * taux_audio * coauthor_share)
+                    ).quantize(Decimal("0.01"))
+                else:
+                    amount = (author_pool * coauthor_share).quantize(Decimal("0.01"))
+
+                if amount <= 0:
+                    continue
+
+                existing_line = RoyaltyPayoutLine.objects.filter(calculation=calculation, author_right=right).first()
+
+                if existing_line:
+                    if not existing_line.is_settled and existing_line.payout_amount != amount:
+                        existing_line.payout_amount = amount
+                        existing_line.save(update_fields=['payout_amount'])
+                        total_payout_lines_corrected += 1
+                else:
+                    RoyaltyPayoutLine.objects.create(
+                        calculation=calculation, author_right=right,
+                        payout_amount=amount, is_settled=False
+                    )
+                    total_payout_lines_created += 1
 
     return {
-        "period": period_label,
-        "calculations_created": calculations_created,
-        "payout_lines_created": payout_lines_created,
-        "payout_lines_corrected": payout_lines_corrected,
-        "university_statements_created": university_statements_created,
+        "periods": processed_periods,
+        "calculations_created": total_calculations_created,
+        "payout_lines_created": total_payout_lines_created,
+        "payout_lines_corrected": total_payout_lines_corrected,
+        "university_statements_created": total_university_statements_created,
     }
 
 

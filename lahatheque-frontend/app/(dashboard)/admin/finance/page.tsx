@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   DollarSign,
   BookOpen,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -23,6 +24,7 @@ import {
   type AdminGlobalFinance,
   type AuthorRoyaltyReportLine,
 } from "@/lib/services/admin";
+import { AuthorRoyaltyDetailModal } from "@/components/features/admin/author-royalty-detail-modal";
 
 export default function AdminFinancePage() {
   const [finance, setFinance] = useState<AdminGlobalFinance | null>(null);
@@ -30,6 +32,7 @@ export default function AdminFinancePage() {
   const [loading, setLoading] = useState(true);
   const [searchAuthor, setSearchAuthor] = useState("");
   const [triggeringCalc, setTriggeringCalc] = useState(false);
+  const [selectedAuthor, setSelectedAuthor] = useState<{ id: string; name: string } | null>(null);
 
   const handleTriggerCalculation = async () => {
     setTriggeringCalc(true);
@@ -282,6 +285,17 @@ export default function AdminFinancePage() {
                 <span className="font-semibold text-foreground-muted">Solde Restant :</span>
                 <span className="font-mono font-bold text-navy">{a.total_royalties_outstanding.toLocaleString("fr-FR")} FCFA</span>
               </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedAuthor({ id: a.author_id, name: a.author_name })}
+                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-background border border-border text-navy hover:text-gold hover:border-gold/40 text-xs font-semibold transition-all min-h-[44px]"
+                >
+                  <Eye className="w-3.5 h-3.5 text-gold" />
+                  <span>Détail des redevances</span>
+                </button>
+              </div>
             </div>
           ))}
 
@@ -304,6 +318,7 @@ export default function AdminFinancePage() {
                 <th className="pb-3 font-semibold uppercase tracking-wider text-right">Total Droit Dû</th>
                 <th className="pb-3 font-semibold uppercase tracking-wider text-right">Total Déjà Versé</th>
                 <th className="pb-3 font-semibold uppercase tracking-wider text-right">Solde Restant</th>
+                <th className="pb-3 font-semibold uppercase tracking-wider text-right pr-2">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -321,12 +336,23 @@ export default function AdminFinancePage() {
                   <td className="py-3.5 font-mono font-bold text-navy text-right">{a.total_royalties_due.toLocaleString("fr-FR")} FCFA</td>
                   <td className="py-3.5 font-mono font-bold text-success text-right">{a.total_royalties_paid.toLocaleString("fr-FR")} FCFA</td>
                   <td className="py-3.5 font-mono font-bold text-navy text-right">{a.total_royalties_outstanding.toLocaleString("fr-FR")} FCFA</td>
+                  <td className="py-3.5 text-right pr-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAuthor({ id: a.author_id, name: a.author_name })}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-background text-navy hover:text-gold hover:border-gold/40 text-xs font-semibold transition-all min-h-[36px]"
+                      title="Consulter la fiche détaillée"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-gold" />
+                      <span>Détails</span>
+                    </button>
+                  </td>
                 </tr>
               ))}
 
               {filteredAuthors.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-foreground-muted">
+                  <td colSpan={8} className="py-8 text-center text-foreground-muted">
                     Aucun auteur avec redevances trouvé.
                   </td>
                 </tr>
@@ -335,6 +361,13 @@ export default function AdminFinancePage() {
           </table>
         </div>
       </div>
+
+      <AuthorRoyaltyDetailModal
+        isOpen={!!selectedAuthor}
+        onClose={() => setSelectedAuthor(null)}
+        authorId={selectedAuthor?.id || null}
+        authorName={selectedAuthor?.name}
+      />
     </div>
   );
 }

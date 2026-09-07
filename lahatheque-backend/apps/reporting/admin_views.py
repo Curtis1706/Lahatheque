@@ -2217,6 +2217,155 @@ class AdminAuthorRoyaltiesReportView(APIView):
         return Response({"success": True, "data": results})
 
 
+class AdminAuthorRoyaltyDetailView(APIView):
+    """GET /api/v1/admin/finance/author-royalties/<uuid:author_id>/ - Fiche analytique détaillée d'un auteur."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request, author_id):
+        from apps.accounts.models import User
+        from apps.rights.models import AuthorRight, RoyaltyRate, RepartitionDroits, RoyaltyPayoutLine, ContratLegal
+        from apps.commerce.models import LigneCommande
+        from django.db import models
+        from django.db.models import Sum
+        from django.shortcuts import get_object_or_404
+
+        author = get_object_or_404(User, id=author_id)
+        rights = AuthorRight.objects.filter(user=author).select_related('ouvrage')
+
+        # Contrats légaux
+        contracts_qs = ContratLegal.objects.filter(
+            models.Q(signataire_user=author) | models.Q(contracting_party_email=author.email)
+        ).order_by('-date_signature')
+        contracts = []
+        for c in contracts_qs:
+            contracts.append({
+                "id": str(c.id),
+                "contract_number": c.numero_contrat,
+                "title": c.titre,
+                "type": c.type_contrat,
+                "status": c.status,
+                "date_signature": c.date_signature.isoformat() if c.date_signature else None,
+            })
+
+        books = []
+        total_author_sales = 0
+        total_author_revenue = 0.0
+
+        for r in rights:
+            book = r.ouvrage
+            rate_obj = RoyaltyRate.objects.filter(ouvrage=book).first()
+            global_rate = float(rate_obj.author_share_percent) if (rate_obj and rate_obj.author_share_percent is not None) else 15.0
+            pool_share = float(r.pool_share_percent) if r.pool_share_percent is not None else 100.0
+            effective_rate = round(global_rate * (pool_share / 100.0), 2)
+
+            repart = RepartitionDroits.objects.filter(ouvrage=book, beneficiaire=author).first()
+            taux_pap = float(repart.taux_papier) if (repart and repart.taux_papier is not None) else effective_rate
+            taux_num = float(repart.taux_numerique) if (repart and repart.taux_numerique is not None) else effective_rate
+            taux_aud = float(repart.taux_audio_tts) if (repart and repart.taux_audio_tts is not None) else effective_rate
+
+            lignes = LigneCommande.objects.filter(ouvrage=book, commande__statut_paiement='paid')
+
+            sales_by_format = {}
+            book_units_total = 0
+            book_revenue_total = 0.0
+            book_royalties_total = 0.0
+
+            formats_meta = [
+                ('paper', 'Papier', taux_pap),
+                ('digital', 'Numérique', taux_num),
+                ('audio', 'Audio', taux_aud),
+            ]
+
+            for fmt_key, fmt_label, fmt_rate in formats_meta:
+                fmt_qs = lignes.filter(format_type=fmt_key)
+                agg = fmt_qs.aggregate(
+                    units=Sum('quantity'),
+                    rev=Sum(models.F('unit_price') * models.F('quantity'))
+                )
+                units = agg['units'] or 0
+                rev = float(agg['rev'] or 0)
+                royalty = round(rev * (fmt_rate / 100.0), 2)
+
+                book_units_total += units
+                book_revenue_total += rev
+                book_royalties_total += royalty
+
+                sales_by_format[fmt_key] = {
+                    "format_key": fmt_key,
+                    "label": fmt_label,
+                    "units_sold": units,
+                    "revenue": rev,
+                    "rate_percent": fmt_rate,
+                    "royalty_amount": royalty,
+                }
+
+            total_author_sales += book_units_total
+            total_author_revenue += book_revenue_total
+
+            cover_url = None
+            if getattr(book, 'cover_image', None):
+                try:
+                    cover_url = book.cover_image.url
+                except Exception:
+                    cover_url = None
+
+            books.append({
+                "book_id": str(book.id),
+                "title": book.title,
+                "isbn": getattr(book, 'isbn', '') or '',
+                "cover_image": cover_url,
+                "effective_rate_percent": effective_rate,
+                "pool_share_percent": pool_share,
+                "format_rates": {
+                    "paper": taux_pap,
+                    "digital": taux_num,
+                    "audio": taux_aud,
+                },
+                "sales_by_format": sales_by_format,
+                "book_units_total": book_units_total,
+                "book_revenue_total": book_revenue_total,
+                "book_royalties_total": book_royalties_total,
+            })
+
+        payout_lines_qs = RoyaltyPayoutLine.objects.filter(author_right__user=author).select_related('calculation__ouvrage').order_by('-calculation__period_month')
+        total_due = float(payout_lines_qs.aggregate(t=Sum('payout_amount'))['t'] or 0)
+        total_paid = float(payout_lines_qs.filter(is_settled=True).aggregate(t=Sum('payout_amount'))['t'] or 0)
+
+        payout_lines = []
+        for pl in payout_lines_qs:
+            payout_lines.append({
+                "id": pl.id,
+                "period": pl.calculation.period_month.strftime("%Y-%m") if (pl.calculation and pl.calculation.period_month) else "N/A",
+                "book_title": pl.calculation.ouvrage.title if (pl.calculation and pl.calculation.ouvrage) else "N/A",
+                "amount": float(pl.payout_amount),
+                "is_settled": pl.is_settled,
+            })
+
+        avg_rate = round(sum(b["effective_rate_percent"] for b in books) / len(books), 2) if books else 0.0
+
+        return Response({
+            "success": True,
+            "data": {
+                "author": {
+                    "id": str(author.id),
+                    "name": author.get_full_name() or author.email,
+                    "email": author.email,
+                    "phone": getattr(author, 'phone_number', None) or '',
+                    "books_count": len(books),
+                    "books_sold_total": total_author_sales,
+                    "total_revenue_generated": total_author_revenue,
+                    "avg_royalty_rate_percent": avg_rate,
+                    "total_royalties_due": total_due,
+                    "total_royalties_paid": total_paid,
+                    "total_royalties_outstanding": total_due - total_paid,
+                },
+                "contracts": contracts,
+                "books": books,
+                "payout_lines": payout_lines,
+            }
+        })
+
+
 class AdminTriggerRoyaltyCalculationView(APIView):
     """POST /api/v1/admin/finance/royalties/trigger-now/ - Déclenchement manuel du calcul."""
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
@@ -2224,7 +2373,7 @@ class AdminTriggerRoyaltyCalculationView(APIView):
     def post(self, request):
         from apps.reporting.tasks import task_calculate_monthly_royalties
 
-        result = task_calculate_monthly_royalties()
+        result = task_calculate_monthly_royalties(include_current_month=True)
 
         JournalAuditAdmin.objects.create(
             administrateur=request.user,

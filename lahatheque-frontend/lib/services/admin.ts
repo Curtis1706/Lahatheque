@@ -841,6 +841,73 @@ export interface AuthorRoyaltyReportLine {
   total_royalties_outstanding: number;
 }
 
+export interface FormatSalesDetail {
+  format_key: string;
+  label: string;
+  units_sold: number;
+  revenue: number;
+  rate_percent: number;
+  royalty_amount: number;
+}
+
+export interface AuthorBookRoyaltyDetail {
+  book_id: string;
+  title: string;
+  isbn: string;
+  cover_image?: string | null;
+  effective_rate_percent: number;
+  pool_share_percent: number;
+  format_rates: {
+    paper: number;
+    digital: number;
+    audio: number;
+  };
+  sales_by_format: {
+    paper: FormatSalesDetail;
+    digital: FormatSalesDetail;
+    audio: FormatSalesDetail;
+  };
+  book_units_total: number;
+  book_revenue_total: number;
+  book_royalties_total: number;
+}
+
+export interface AuthorPayoutLineDetail {
+  id: number;
+  period: string;
+  book_title: string;
+  amount: number;
+  is_settled: boolean;
+}
+
+export interface AuthorContractDetail {
+  id: string;
+  contract_number: string;
+  title: string;
+  type: string;
+  status: string;
+  date_signature?: string | null;
+}
+
+export interface AuthorRoyaltyDetail {
+  author: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    books_count: number;
+    books_sold_total: number;
+    total_revenue_generated: number;
+    avg_royalty_rate_percent: number;
+    total_royalties_due: number;
+    total_royalties_paid: number;
+    total_royalties_outstanding: number;
+  };
+  contracts: AuthorContractDetail[];
+  books: AuthorBookRoyaltyDetail[];
+  payout_lines: AuthorPayoutLineDetail[];
+}
+
 export async function getAdminGlobalFinance(): Promise<AdminGlobalFinance | null> {
   const res = await fetch("/api/bff/admin/finance/global/", { credentials: "include", cache: "no-store" });
   if (!res.ok) return null;
@@ -853,6 +920,16 @@ export async function getAuthorRoyaltiesReport(): Promise<AuthorRoyaltyReportLin
   if (!res.ok) return [];
   const json = await res.json();
   return json.data || [];
+}
+
+export async function getAuthorRoyaltyDetail(authorId: string): Promise<AuthorRoyaltyDetail | null> {
+  const res = await fetch(`/api/bff/admin/finance/author-royalties/${authorId}/`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.data || null;
 }
 
 export async function triggerRoyaltyCalculationNow(): Promise<{
