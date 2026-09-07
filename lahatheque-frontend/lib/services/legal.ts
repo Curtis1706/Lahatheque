@@ -145,6 +145,10 @@ export async function createLegalContract(
     juriste_responsable_id?: string;
     ouvrage_id?: string;
     signataire_user_id?: string;
+    beneficiary_user_id?: string;
+    taux_papier?: number;
+    taux_numerique?: number;
+    taux_audio_tts?: number;
     institution_id?: string;
     publisher_id?: string;
     pre_edition_id?: string;
@@ -173,6 +177,10 @@ export async function createLegalContract(
     if (data.expires_at) formData.append("expires_at", data.expires_at);
     if (data.ouvrage_id) formData.append("ouvrage_id", data.ouvrage_id);
     if (data.signataire_user_id) formData.append("signataire_user_id", data.signataire_user_id);
+    if (data.beneficiary_user_id) formData.append("beneficiary_user_id", data.beneficiary_user_id);
+    if (data.taux_papier !== undefined) formData.append("taux_papier", String(data.taux_papier));
+    if (data.taux_numerique !== undefined) formData.append("taux_numerique", String(data.taux_numerique));
+    if (data.taux_audio_tts !== undefined) formData.append("taux_audio_tts", String(data.taux_audio_tts));
     if (data.institution_id) formData.append("institution_id", data.institution_id);
     if (data.publisher_id) formData.append("publisher_id", data.publisher_id);
     if (data.pre_edition_id) formData.append("pre_edition_id", data.pre_edition_id);
@@ -373,12 +381,13 @@ export async function getAIRoyaltySuggestions(): Promise<AIRoyaltySuggestion[]> 
       book_id: s.contract_id || s.id,
       title: s.book_title || s.contract_title,
       authors,
+      beneficiaire_nom: s.beneficiaire_nom || (authors.length > 0 ? authors[0] : undefined),
       proposed_splits: proposedSplits,
       is_validated: s.is_validated,
       ai_confidence: Math.round((s.confidence_score || 0.95) * 100),
       extracted_clause: s.extracted_clause,
-      suggested_rate: s.suggested_rate,
-      pourcentage_suggere: s.suggested_rate ?? 15,
+      suggested_rate: s.suggested_rate ?? s.pourcentage_suggere ?? 5,
+      pourcentage_suggere: s.pourcentage_suggere ?? s.suggested_rate ?? 5,
     };
   });
 }
@@ -386,12 +395,24 @@ export async function getAIRoyaltySuggestions(): Promise<AIRoyaltySuggestion[]> 
 export async function validateAISuggestion(
   suggestionId: string,
   adjustedSplits?: { author_name: string; percentage: number }[],
-  globalAuthorRate?: number
+  globalAuthorRate?: number,
+  tauxPapier?: number,
+  tauxNumerique?: number,
+  tauxAudio?: number
 ): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
     const payload: any = { decision: "approve", splits: adjustedSplits };
     if (globalAuthorRate !== undefined && globalAuthorRate !== null) {
       payload.global_author_rate = globalAuthorRate;
+    }
+    if (tauxPapier !== undefined && tauxPapier !== null) {
+      payload.taux_papier = tauxPapier;
+    }
+    if (tauxNumerique !== undefined && tauxNumerique !== null) {
+      payload.taux_numerique = tauxNumerique;
+    }
+    if (tauxAudio !== undefined && tauxAudio !== null) {
+      payload.taux_audio_tts = tauxAudio;
     }
     const res = await fetch(`${API_BASE}/ai-suggestions/${suggestionId}/decide/`, {
       method: "POST",

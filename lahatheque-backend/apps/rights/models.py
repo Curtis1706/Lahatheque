@@ -180,8 +180,9 @@ class ContratLegal(models.Model):
 
 class RepartitionDroits(models.Model):
     """
-    Clé de répartition des pourcentages de droits d'auteur pour un ouvrage.
-    Validation stricte : somme(pourcentages) == 100.00%.
+    Taux de droits d'auteur par format pour un ouvrage — un seul bénéficiaire (auteur) par
+    livre. Chaque taux (papier/numérique/audio) représente directement le pourcentage de la
+    vente de ce format qui revient à l'auteur, indépendamment des autres formats.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ouvrage = models.ForeignKey(

@@ -194,6 +194,7 @@ export interface AIRoyaltySuggestion {
   book_id: string;
   title: string;
   authors: string[];
+  beneficiaire_nom?: string;
   proposed_splits: CoAuthorSplit[];
   is_validated: boolean;
   ai_confidence: number; // ex: 92%

@@ -508,45 +508,38 @@ def task_calculate_monthly_royalties(include_current_month=False):
 
                 author_rights = AuthorRight.objects.filter(ouvrage=ouvrage, user__isnull=False)
 
-            for right in author_rights:
-                repartition = RepartitionDroits.objects.filter(ouvrage=ouvrage, beneficiaire=right.user).first()
-                coauthor_share = (Decimal(str(right.pool_share_percent)) / Decimal("100")) if right.pool_share_percent is not None else Decimal("1")
+            from apps.rights.models import RepartitionDroits, AuthorRight
 
-                if repartition and (repartition.taux_papier is not None or repartition.taux_numerique is not None or repartition.taux_audio_tts is not None):
-                    raw_pap = Decimal(str(repartition.taux_papier)) / Decimal("100") if repartition.taux_papier is not None else global_author_rate
-                    raw_num = Decimal(str(repartition.taux_numerique)) / Decimal("100") if repartition.taux_numerique is not None else global_author_rate
-                    raw_aud = Decimal(str(repartition.taux_audio_tts)) / Decimal("100") if repartition.taux_audio_tts is not None else Decimal("0.08")
+            repartition = RepartitionDroits.objects.filter(ouvrage=ouvrage).first()
+            author_right = AuthorRight.objects.filter(ouvrage=ouvrage, user__isnull=False).first()
 
-                    # Si le taux renseigné dépasse 50% (ex: 100.00% issu de la validation de quote-part coauteurs),
-                    # c'est la quote-part sur la redevance contractuelle, donc on applique global_author_rate
-                    taux_papier = (global_author_rate * raw_pap) if raw_pap > Decimal("0.50") else (global_author_rate if raw_pap < Decimal("0.01") else raw_pap)
-                    taux_numerique = (global_author_rate * raw_num) if raw_num > Decimal("0.50") else (global_author_rate if raw_num < Decimal("0.01") else raw_num)
-                    taux_audio = (Decimal("0.08") * raw_aud) if raw_aud > Decimal("0.50") else raw_aud
+            if not author_right or not author_right.user:
+                continue
 
-                    amount = (
-                        (ventes_fmt['paper'] * taux_papier * coauthor_share) +
-                        (ventes_fmt['digital'] * taux_numerique * coauthor_share) +
-                        (ventes_fmt['audio'] * taux_audio * coauthor_share)
-                    ).quantize(Decimal("0.01"))
-                else:
-                    amount = (author_pool * coauthor_share).quantize(Decimal("0.01"))
+            taux_papier = Decimal(str(repartition.taux_papier)) / Decimal("100") if (repartition and repartition.taux_papier is not None) else Decimal("0.05")
+            taux_numerique = Decimal(str(repartition.taux_numerique)) / Decimal("100") if (repartition and repartition.taux_numerique is not None) else Decimal("0.05")
+            taux_audio = Decimal(str(repartition.taux_audio_tts)) / Decimal("100") if (repartition and repartition.taux_audio_tts is not None) else Decimal("0.05")
 
-                if amount <= 0:
-                    continue
+            ventes_fmt = ventes_par_format.get(ouvrage.id, {'digital': Decimal('0.00'), 'paper': Decimal('0.00'), 'audio': Decimal('0.00')})
 
-                existing_line = RoyaltyPayoutLine.objects.filter(calculation=calculation, author_right=right).first()
+            author_pool = (
+                (ventes_fmt['paper'] * taux_papier) +
+                (ventes_fmt['digital'] * taux_numerique) +
+                (ventes_fmt['audio'] * taux_audio)
+            ).quantize(Decimal("0.01"))
 
-                if existing_line:
-                    if not existing_line.is_settled and existing_line.payout_amount != amount:
-                        existing_line.payout_amount = amount
-                        existing_line.save(update_fields=['payout_amount'])
-                        total_payout_lines_corrected += 1
-                else:
-                    RoyaltyPayoutLine.objects.create(
-                        calculation=calculation, author_right=right,
-                        payout_amount=amount, is_settled=False
-                    )
-                    total_payout_lines_created += 1
+            if author_pool <= 0:
+                continue
+
+            payout_line, created = RoyaltyPayoutLine.objects.update_or_create(
+                calculation=calculation,
+                author_right=author_right,
+                defaults={"payout_amount": author_pool}
+            )
+            if created:
+                total_payout_lines_created += 1
+            else:
+                total_payout_lines_corrected += 1
 
     return {
         "periods": processed_periods,

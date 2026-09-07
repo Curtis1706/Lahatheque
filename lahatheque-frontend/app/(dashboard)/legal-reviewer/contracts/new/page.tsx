@@ -13,10 +13,6 @@ import {
   Building2,
   Scale,
   Percent,
-  Plus,
-  Trash2,
-  CheckCircle2,
-  AlertTriangle,
   FileSpreadsheet,
   Mail,
   Phone,
@@ -31,25 +27,8 @@ import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 import type {
   ContractType,
   ContractFormOptions,
-  ContractRoyaltySplit,
 } from "@/lib/types/legal";
 import { toast } from "sonner";
-
-/**
- * Construit un split d'auteur par défaut. Pour un contrat à auteur unique (le cas le plus
- * courant), les taux par format démarrent logiquement à 100% — il n'y a personne d'autre avec
- * qui les partager. Les valeurs peuvent être surchargées via overrides.
- */
-function buildDefaultSplit(overrides: Partial<ContractRoyaltySplit> = {}): ContractRoyaltySplit {
-  return {
-    role_libelle: "Auteur Principal",
-    pourcentage: 100.0,
-    taux_papier: 100.0,
-    taux_numerique: 100.0,
-    taux_audio_tts: 100.0,
-    ...overrides,
-  };
-}
 
 function NewLegalContractContent() {
   const router = useRouter();
@@ -95,11 +74,10 @@ function NewLegalContractContent() {
   const [notes, setNotes] = useState("");
   const [tags, setTags] = useState("contrat, édition, redevance");
 
-  // Grille de répartition des droits
-  const [authorRoyaltyRate, setAuthorRoyaltyRate] = useState<number>(15);
-  const [splits, setSplits] = useState<ContractRoyaltySplit[]>([
-    buildDefaultSplit(),
-  ]);
+  // Taux de droits d'auteur par format (Fiche R3 - Bénéficiaire unique, défaut 5%)
+  const [tauxPapier, setTauxPapier] = useState<number>(5);
+  const [tauxNumerique, setTauxNumerique] = useState<number>(5);
+  const [tauxAudio, setTauxAudio] = useState<number>(5);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -131,30 +109,11 @@ function NewLegalContractContent() {
 
             if (found) {
               setSelectedAuthorId(found.id);
-              setSplits([
-                buildDefaultSplit({
-                  user_id: found.id,
-                  name: found.name,
-                }),
-              ]);
             } else {
-              // Auteur externe ou du dossier
-              const customVal = `custom:${authorNameParam}`;
-              setSelectedAuthorId(customVal);
-              setSplits([
-                buildDefaultSplit({
-                  name: authorNameParam,
-                }),
-              ]);
+              setSelectedAuthorId(`custom:${authorNameParam}`);
             }
           } else if (data.authors && data.authors.length > 0) {
             setSelectedAuthorId(data.authors[0].id);
-            setSplits([
-              buildDefaultSplit({
-                user_id: data.authors[0].id,
-                name: data.authors[0].name,
-              }),
-            ]);
           }
 
           // Recherche d'un ouvrage existant ayant un titre similaire
@@ -187,21 +146,7 @@ function NewLegalContractContent() {
             const authorNames = matchedBook.authors || [];
 
             if (authorIds.length > 0) {
-              const equalShare = parseFloat((100 / authorIds.length).toFixed(2));
-              const newSplits = authorIds.map((uid, idx) => ({
-                user_id: uid,
-                name: authorNames[idx] || "Auteur",
-                role_libelle: idx === 0 ? "Auteur Principal" : "Co-Auteur",
-                pourcentage: idx === authorIds.length - 1
-                  ? parseFloat((100 - equalShare * (authorIds.length - 1)).toFixed(2))
-                  : equalShare,
-                taux_papier: matchedBook.is_paper_available ? equalShare : 0,
-                taux_numerique: equalShare,
-                taux_audio_tts: matchedBook.has_audio_tracks ? equalShare : 0,
-              }));
               setSelectedAuthorId(authorIds[0]);
-              setSplits(newSplits);
-
               const mainAuthor = data.authors?.find((a) => a.id === authorIds[0]);
               if (mainAuthor) {
                 if (mainAuthor.email) setContractingPartyEmail(mainAuthor.email);
@@ -222,26 +167,8 @@ function NewLegalContractContent() {
                 setSelectedAuthorId(matchedAuthor.id);
                 if (matchedAuthor.email) setContractingPartyEmail(matchedAuthor.email);
                 if (matchedAuthor.phone) setContractingPartyPhone(matchedAuthor.phone);
-                setSplits([
-                  buildDefaultSplit({
-                    user_id: matchedAuthor.id,
-                    name: matchedAuthor.name,
-                    taux_papier: matchedBook.is_paper_available ? 100.0 : 0,
-                    taux_numerique: 100.0,
-                    taux_audio_tts: matchedBook.has_audio_tracks ? 100.0 : 0,
-                  }),
-                ]);
               } else {
-                const customVal = `custom:${authorNames[0]}`;
-                setSelectedAuthorId(customVal);
-                setSplits([
-                  buildDefaultSplit({
-                    name: authorNames[0],
-                    taux_papier: matchedBook.is_paper_available ? 100.0 : 0,
-                    taux_numerique: 100.0,
-                    taux_audio_tts: matchedBook.has_audio_tracks ? 100.0 : 0,
-                  }),
-                ]);
+                setSelectedAuthorId(`custom:${authorNames[0]}`);
               }
             }
           }
@@ -253,12 +180,6 @@ function NewLegalContractContent() {
           }
           if (data.authors && data.authors.length > 0) {
             setSelectedAuthorId(data.authors[0].id);
-            setSplits([
-              buildDefaultSplit({
-                user_id: data.authors[0].id,
-                name: data.authors[0].name,
-              }),
-            ]);
           }
         }
 
@@ -392,8 +313,6 @@ function NewLegalContractContent() {
           taux_audio_tts: book.has_audio_tracks ? equalShare : 0,
         }));
         setSelectedAuthorId(authorIds[0]);
-        setSplits(newSplits);
-
         const mainAuthor = options?.authors?.find((a) => a.id === authorIds[0]);
         if (mainAuthor) {
           if (mainAuthor.email) setContractingPartyEmail(mainAuthor.email);
@@ -414,15 +333,8 @@ function NewLegalContractContent() {
           setSelectedAuthorId(matchedAuthor.id);
           if (matchedAuthor.email) setContractingPartyEmail(matchedAuthor.email);
           if (matchedAuthor.phone) setContractingPartyPhone(matchedAuthor.phone);
-          setSplits([
-            buildDefaultSplit({
-              user_id: matchedAuthor.id,
-              name: matchedAuthor.name,
-              taux_papier: book.is_paper_available ? 100.0 : 0,
-              taux_numerique: 100.0,
-              taux_audio_tts: book.has_audio_tracks ? 100.0 : 0,
-            }),
-          ]);
+        } else {
+          setSelectedAuthorId(`custom:${authorNames[0]}`);
         }
       }
     }
@@ -434,19 +346,6 @@ function NewLegalContractContent() {
     if (author) {
       if (author.email) setContractingPartyEmail(author.email);
       if (author.phone) setContractingPartyPhone(author.phone);
-      setSplits((prev) => {
-        if (prev.length === 0) {
-          return [
-            buildDefaultSplit({
-              user_id: author.id,
-              name: author.name,
-            }),
-          ];
-        }
-        const copy = [...prev];
-        copy[0] = { ...copy[0], user_id: author.id, name: author.name };
-        return copy;
-      });
     }
   };
 
@@ -476,61 +375,8 @@ function NewLegalContractContent() {
     return options.ouvrages.find((b) => b.id === selectedBookId) || null;
   }, [selectedBookId, options]);
 
-  const totalPercentage = splits.reduce((acc, curr) => acc + (Number(curr.pourcentage) || 0), 0);
-  const isPercentageValid = Math.abs(totalPercentage - 100.0) < 0.01;
-
   const bookHasPaper = selectedBook?.is_paper_available ?? false;
   const bookHasAudio = selectedBook?.has_audio_tracks ?? false;
-
-  const totalTauxPapier = splits.reduce((acc, curr) => acc + (Number(curr.taux_papier) || 0), 0);
-  const totalTauxNumerique = splits.reduce((acc, curr) => acc + (Number(curr.taux_numerique) || 0), 0);
-  const totalTauxAudio = splits.reduce((acc, curr) => acc + (Number(curr.taux_audio_tts) || 0), 0);
-
-  const isTauxPapierValid = !bookHasPaper || Math.abs(totalTauxPapier - 100.0) < 0.01;
-  const isTauxNumeriqueValid = Math.abs(totalTauxNumerique - 100.0) < 0.01;
-  const isTauxAudioValid = !bookHasAudio || Math.abs(totalTauxAudio - 100.0) < 0.01;
-
-  const areAllRatesValid = isPercentageValid && isTauxPapierValid && isTauxNumeriqueValid && isTauxAudioValid;
-
-  const addCoAuthorSplit = () => {
-    if (!options?.authors || options.authors.length === 0) return;
-    const available = options.authors.find((a) => !splits.some((s) => s.user_id === a.id)) || options.authors[0];
-    setSplits([
-      ...splits,
-      buildDefaultSplit({
-        user_id: available.id,
-        name: available.name,
-        role_libelle: "Co-auteur",
-        pourcentage: 0,
-        taux_papier: 0,
-        taux_numerique: 0,
-        taux_audio_tts: 0,
-      }),
-    ]);
-  };
-
-  const removeSplit = (index: number) => {
-    if (splits.length <= 1) return;
-    setSplits(splits.filter((_, i) => i !== index));
-  };
-
-  const updateSplit = (index: number, field: keyof ContractRoyaltySplit, value: any) => {
-    const updated = [...splits];
-    if (field === "user_id") {
-      const author = options?.authors.find((a) => a.id === value);
-      updated[index] = {
-        ...updated[index],
-        user_id: value,
-        name: author ? author.name : "",
-      };
-    } else {
-      updated[index] = {
-        ...updated[index],
-        [field]: value,
-      };
-    }
-    setSplits(updated);
-  };
 
   // Soumission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -538,23 +384,9 @@ function NewLegalContractContent() {
 
     const isAuthorType = contractType === "author_contract" || contractType === "pre_edition";
 
-    if (isAuthorType) {
-      if (!isPercentageValid) {
-        toast.error(`La somme des parts globales doit être de 100.00% (Actuel : ${totalPercentage.toFixed(2)}%).`);
-        return;
-      }
-      if (bookHasPaper && !isTauxPapierValid) {
-        toast.error(`La somme des Taux Papier doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxPapier.toFixed(2)}%).`);
-        return;
-      }
-      if (!isTauxNumeriqueValid) {
-        toast.error(`La somme des Taux Numérique doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxNumerique.toFixed(2)}%).`);
-        return;
-      }
-      if (bookHasAudio && !isTauxAudioValid) {
-        toast.error(`La somme des Taux Livre Audio doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxAudio.toFixed(2)}%).`);
-        return;
-      }
+    if (isAuthorType && !selectedAuthorId) {
+      toast.error("Veuillez sélectionner un bénéficiaire (compte auteur).");
+      return;
     }
 
     setSubmitting(true);
@@ -586,16 +418,19 @@ function NewLegalContractContent() {
           tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           ouvrage_id: isAuthorType ? selectedBookId : undefined,
           signataire_user_id: partyType === "author" ? selectedAuthorId : undefined,
+          beneficiary_user_id: partyType === "author" ? selectedAuthorId : undefined,
+          taux_papier: bookHasPaper ? tauxPapier : 0,
+          taux_numerique: tauxNumerique,
+          taux_audio_tts: bookHasAudio ? tauxAudio : 0,
+          author_royalty_rate: tauxNumerique,
           institution_id: contractType === "university_agreement" ? selectedInstitutionId : undefined,
           publisher_id: contractType === "publisher_partnership" ? selectedPublisherId : undefined,
           pre_edition_id: selectedPreEditionId || undefined,
-          author_royalty_rate: authorRoyaltyRate,
-          repartitions: isAuthorType ? splits : undefined,
         },
         file
       );
 
-      toast.success("Contrat enregistré, lié à l'ouvrage et clés de répartition verrouillées avec succès !");
+      toast.success("Contrat enregistré, lié à l'ouvrage et droits verrouillés avec succès !");
       router.push("/legal-reviewer/contracts");
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de l'enregistrement du contrat.");
@@ -952,296 +787,85 @@ function NewLegalContractContent() {
           </div>
         </div>
 
-        {/* Étape 3 : Grille de Répartition des Droits (Verrouillage 100%) */}
+        {/* Étape 3 : Bénéficiaire & Taux de Droits d'Auteur par Format (Fiche R3) */}
         {isAuthorContract && (
-          <div className="space-y-6">
-            <div className="p-4 rounded-2xl border border-gold/30 bg-gold/5 space-y-2">
-              <label htmlFor="author-royalty-rate-input" className="block text-xs font-bold text-navy uppercase tracking-wider">
-                Taux de Droits d&apos;Auteur Global (%) *
+          <div className="p-4 sm:p-6 rounded-3xl border border-border bg-background-secondary space-y-4 shadow-xs">
+            <h3 className="text-sm font-bold text-navy uppercase tracking-wider">
+              Bénéficiaire &amp; Taux de Droits d&apos;Auteur par Format
+            </h3>
+
+            <div>
+              <label className="block text-xs font-bold text-navy uppercase tracking-wider mb-1">
+                Bénéficiaire (Compte Auteur) *
               </label>
-              <input
-                id="author-royalty-rate-input"
-                type="number"
-                min={0}
-                max={100}
-                step="0.5"
-                value={authorRoyaltyRate}
-                onChange={(e) => setAuthorRoyaltyRate(parseFloat(e.target.value) || 0)}
-                className="w-full sm:w-48 px-3 py-2 text-sm border border-border rounded-lg bg-background-secondary font-semibold text-navy"
+              <SearchableSelect
+                options={authorOptions}
+                value={selectedAuthorId}
+                onChange={handleAuthorChange}
+                placeholder="Sélectionner l'auteur ayant droit unique..."
+                searchPlaceholder="Rechercher l'auteur..."
+                icon={<Users className="w-3.5 h-3.5" />}
+                disabled={loadingOptions}
+                required
               />
-              <p className="text-[11px] text-foreground-muted leading-relaxed">
-                Pourcentage du prix de vente qui revient aux auteurs, collectivement — pas la répartition
-                entre co-auteurs (définie plus bas). Le reste reste à LAHA Éditions en tant qu&apos;éditeur.
-                Exemple : pour un livre à 7 000 FCFA avec un taux de 10%, les auteurs se partagent 700
-                FCFA au total.
-              </p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-background border border-border shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {bookHasPaper && (
                 <div>
-                  <h3 className="font-serif font-bold text-navy text-sm uppercase tracking-wider flex items-center gap-2">
-                    <Scale className="w-4 h-4 text-gold" />
-                    3. RÉPARTITION ENTRE CO-AUTEURS (SOMME STRICTE 100% DE LA PART AUTEUR CI-DESSUS)
-                  </h3>
-                  <p className="text-2xs text-foreground-muted mt-0.5">
-                    Définit la quote-part perçue par chaque ayant droit lors des ventes papier, numériques et écoutes audio.
-                  </p>
+                  <label htmlFor="taux-papier-input" className="block text-[11px] font-bold text-navy uppercase mb-1">
+                    Taux Papier (%)
+                  </label>
+                  <input
+                    id="taux-papier-input"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.5"
+                    value={tauxPapier}
+                    onChange={(e) => setTauxPapier(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-navy focus:outline-none focus:border-gold min-h-[44px]"
+                  />
                 </div>
-
-              <button
-                type="button"
-                onClick={addCoAuthorSplit}
-                className="px-3.5 py-2 rounded-xl bg-navy hover:bg-navy-dark text-gold text-2xs font-bold transition-colors border border-gold/30 inline-flex items-center gap-1.5 min-h-[36px] self-start sm:self-auto cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5 text-gold" />
-                Ajouter un Co-Auteur
-              </button>
+              )}
+              <div>
+                <label htmlFor="taux-numerique-input" className="block text-[11px] font-bold text-navy uppercase mb-1">
+                  Taux Numérique (%)
+                </label>
+                <input
+                  id="taux-numerique-input"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.5"
+                  value={tauxNumerique}
+                  onChange={(e) => setTauxNumerique(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-navy focus:outline-none focus:border-gold min-h-[44px]"
+                />
+              </div>
+              {bookHasAudio && (
+                <div>
+                  <label htmlFor="taux-audio-input" className="block text-[11px] font-bold text-navy uppercase mb-1">
+                    Taux Livre Audio (%)
+                  </label>
+                  <input
+                    id="taux-audio-input"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.5"
+                    value={tauxAudio}
+                    onChange={(e) => setTauxAudio(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-navy focus:outline-none focus:border-gold min-h-[44px]"
+                  />
+                </div>
+              )}
             </div>
 
-            {/* Synthèse et jauges de conformité 100% par format */}
-            <div className="space-y-2">
-              {/* Part Globale */}
-              <div
-                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium ${
-                  isPercentageValid
-                    ? "bg-success/10 border-success/30 text-success"
-                    : "bg-error/10 border-error/30 text-error"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {isPercentageValid ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-error" />
-                  )}
-                  <span>
-                    {isPercentageValid
-                      ? "Part Globale : 100.00% validée et conforme."
-                      : `Part Globale : la somme doit être exactement de 100.00% (Actuel : ${totalPercentage.toFixed(2)}%)`}
-                  </span>
-                </div>
-                <span className="font-mono font-bold text-xs sm:text-sm self-end sm:self-auto">
-                  {totalPercentage.toFixed(2)}% / 100%
-                </span>
-              </div>
-
-              {/* Taux Numérique (Toujours requis) */}
-              <div
-                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium ${
-                  isTauxNumeriqueValid
-                    ? "bg-success/10 border-success/30 text-success"
-                    : "bg-error/10 border-error/30 text-error"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {isTauxNumeriqueValid ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-error" />
-                  )}
-                  <span>
-                    {isTauxNumeriqueValid
-                      ? "Taux Numérique : 100.00% validé entre co-auteurs (format standard)."
-                      : `Taux Numérique : la somme doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxNumerique.toFixed(2)}%)`}
-                  </span>
-                </div>
-                <span className="font-mono font-bold text-xs sm:text-sm self-end sm:self-auto">
-                  {totalTauxNumerique.toFixed(2)}% / 100%
-                </span>
-              </div>
-
-              {/* Taux Papier (Conditionné à bookHasPaper) */}
-              <div
-                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium ${
-                  !bookHasPaper
-                    ? "bg-background-secondary/60 border-border text-foreground-muted opacity-75"
-                    : isTauxPapierValid
-                    ? "bg-success/10 border-success/30 text-success"
-                    : "bg-error/10 border-error/30 text-error"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {!bookHasPaper ? (
-                    <span className="w-4 h-4 rounded-full border border-border flex items-center justify-center text-2xs text-foreground-muted shrink-0 font-bold">
-                      -
-                    </span>
-                  ) : isTauxPapierValid ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-error" />
-                  )}
-                  <span>
-                    {!bookHasPaper
-                      ? "Taux Papier : Format papier non activé pour cet ouvrage (validation non requise)."
-                      : isTauxPapierValid
-                      ? "Taux Papier : 100.00% validé entre co-auteurs (format papier disponible)."
-                      : `Taux Papier : la somme doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxPapier.toFixed(2)}%)`}
-                  </span>
-                </div>
-                <span className="font-mono font-bold text-xs sm:text-sm self-end sm:self-auto">
-                  {bookHasPaper ? `${totalTauxPapier.toFixed(2)}% / 100%` : "Non requis"}
-                </span>
-              </div>
-
-              {/* Taux Livre Audio (Conditionné à bookHasAudio) */}
-              <div
-                className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-medium ${
-                  !bookHasAudio
-                    ? "bg-background-secondary/60 border-border text-foreground-muted opacity-75"
-                    : isTauxAudioValid
-                    ? "bg-success/10 border-success/30 text-success"
-                    : "bg-error/10 border-error/30 text-error"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {!bookHasAudio ? (
-                    <span className="w-4 h-4 rounded-full border border-border flex items-center justify-center text-2xs text-foreground-muted shrink-0 font-bold">
-                      -
-                    </span>
-                  ) : isTauxAudioValid ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-error" />
-                  )}
-                  <span>
-                    {!bookHasAudio
-                      ? "Taux Livre Audio : Aucune piste audio enregistrée sur cet ouvrage (validation non requise)."
-                      : isTauxAudioValid
-                      ? "Taux Livre Audio : 100.00% validé entre co-auteurs (pistes audio existantes)."
-                      : `Taux Livre Audio : la somme doit être de 100.00% entre co-auteurs (Actuel : ${totalTauxAudio.toFixed(2)}%)`}
-                  </span>
-                </div>
-                <span className="font-mono font-bold text-xs sm:text-sm self-end sm:self-auto">
-                  {bookHasAudio ? `${totalTauxAudio.toFixed(2)}% / 100%` : "Non requis"}
-                </span>
-              </div>
-            </div>
-
-            {/* Liste des ayants droit avec SearchableSelect */}
-            <div className="space-y-3">
-              {splits.map((split, index) => (
-                <div
-                  key={index}
-                  className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-navy text-gold text-2xs font-bold flex items-center justify-center border border-gold/30">
-                        {index + 1}
-                      </span>
-                      <span className="text-xs font-bold text-navy">
-                        {split.role_libelle || "Ayant Droit"}
-                      </span>
-                    </div>
-
-                    {splits.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeSplit(index)}
-                        className="p-1.5 text-foreground-muted hover:text-error transition-colors rounded-lg cursor-pointer"
-                        title="Supprimer cet ayant droit"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div className="sm:col-span-2">
-                      <label className="block text-2xs font-bold text-navy uppercase mb-1">
-                        Bénéficiaire (Compte Auteur)
-                      </label>
-                      <SearchableSelect
-                        options={authorOptions}
-                        value={split.user_id || ""}
-                        onChange={(val) => updateSplit(index, "user_id", val)}
-                        placeholder="Choisir l'auteur..."
-                        searchPlaceholder="Rechercher l'auteur..."
-                        icon={<Users className="w-3.5 h-3.5" />}
-                        disabled={loadingOptions}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-2xs font-bold text-navy uppercase mb-1">
-                        Rôle Contractuel
-                      </label>
-                      <input
-                        type="text"
-                        value={split.role_libelle}
-                        onChange={(e) => updateSplit(index, "role_libelle", e.target.value)}
-                        placeholder="ex. Auteur, Co-auteur, Illustrateur"
-                        className="w-full px-3 py-2 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-2xs font-bold text-navy uppercase mb-1 flex items-center gap-1">
-                        <Percent className="w-3 h-3 text-gold" />
-                        Part Globale (%) *
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step="0.01"
-                        value={split.pourcentage}
-                        onChange={(e) => updateSplit(index, "pourcentage", parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 text-xs bg-background border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-bold min-h-[44px]"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/50">
-                    <div>
-                      <label className="block text-2xs font-bold text-navy uppercase mb-1">
-                        Taux Papier (%)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step="0.01"
-                        value={split.taux_papier}
-                        onChange={(e) => updateSplit(index, "taux_papier", parseFloat(e.target.value) || 0)}
-                        className="w-full px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:border-gold text-navy font-semibold min-h-[38px]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-2xs font-bold text-navy uppercase mb-1">
-                        Taux Numérique (%)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step="0.01"
-                        value={split.taux_numerique}
-                        onChange={(e) => updateSplit(index, "taux_numerique", parseFloat(e.target.value) || 0)}
-                        className="w-full px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:border-gold text-navy font-semibold min-h-[38px]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-2xs font-bold text-navy uppercase mb-1">
-                        Taux Livre Audio (%)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step="0.01"
-                        value={split.taux_audio_tts}
-                        onChange={(e) => updateSplit(index, "taux_audio_tts", parseFloat(e.target.value) || 0)}
-                        className="w-full px-2.5 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:border-gold text-navy font-semibold min-h-[38px]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            </div>
+            <p className="text-[11px] text-foreground-muted">
+              Chaque taux représente le pourcentage du prix de vente de ce format précis qui revient à
+              l&apos;auteur. Le reste reste à LAHA Éditions en tant qu&apos;éditeur. Taux par défaut : 5%.
+            </p>
           </div>
         )}
 
@@ -1256,7 +880,7 @@ function NewLegalContractContent() {
 
           <button
             type="submit"
-            disabled={submitting || (isAuthorContract && !areAllRatesValid)}
+            disabled={submitting || (isAuthorContract && !selectedAuthorId)}
             className="px-6 py-2.5 rounded-xl bg-navy text-gold text-xs font-bold hover:bg-navy-dark transition-colors flex items-center justify-center gap-2 disabled:opacity-50 min-h-[44px] border border-gold/30 shadow-xs cursor-pointer"
           >
             {submitting ? (

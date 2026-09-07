@@ -3,18 +3,17 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Percent, Sparkles, Edit2, Check, ArrowLeft, Users, ShieldCheck } from "lucide-react";
+import { Percent, Sparkles, Edit2, Check, ArrowLeft, BookOpen, Layers } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EditRoyaltyModal } from "@/components/features/legal/edit-royalty-modal";
-import { RightsSplitterSlider } from "@/components/features/legal/rights-splitter-slider";
 import {
   getBookRoyalties,
   updateBookRoyaltyRate,
   getAIRoyaltySuggestions,
   validateAISuggestion,
 } from "@/lib/services/legal";
-import type { BookRoyalty, AIRoyaltySuggestion, CoAuthorSplit } from "@/lib/types/legal";
+import type { BookRoyalty, AIRoyaltySuggestion } from "@/lib/types/legal";
 
 import { toast } from "sonner";
 import { Suspense } from "react";
@@ -30,7 +29,20 @@ function LegalRoyaltiesPageContent() {
 
   // State pour modale d'édition
   const [selectedRoyalty, setSelectedRoyalty] = useState<BookRoyalty | null>(null);
-  const [globalRateBySuggestion, setGlobalRateBySuggestion] = useState<Record<string, number>>({});
+  const [formatRatesBySuggestion, setFormatRatesBySuggestion] = useState<
+    Record<string, { paper: number; digital: number; audio: number }>
+  >({});
+
+  const getRatesForSuggestion = (sug: AIRoyaltySuggestion) => {
+    const def = sug.pourcentage_suggere ?? sug.suggested_rate ?? 5;
+    return (
+      formatRatesBySuggestion[sug.id] ?? {
+        paper: def,
+        digital: def,
+        audio: def,
+      }
+    );
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -92,12 +104,19 @@ function LegalRoyaltiesPageContent() {
     }
   };
 
-  const handleValidateSuggestion = async (suggestionId: string, adjustedSplits?: CoAuthorSplit[]) => {
-    const globalRate = globalRateBySuggestion[suggestionId];
-    const res = await validateAISuggestion(suggestionId, adjustedSplits, globalRate);
+  const handleValidateSuggestion = async (sug: AIRoyaltySuggestion) => {
+    const rates = getRatesForSuggestion(sug);
+    const res = await validateAISuggestion(
+      sug.id,
+      undefined,
+      rates.digital,
+      rates.paper,
+      rates.digital,
+      rates.audio
+    );
     if (res.success) {
-      setAiSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
-      toast.success(res.message || "La suggestion IA de partage de droits a été validée et enregistrée avec succès !");
+      setAiSuggestions((prev) => prev.filter((s) => s.id !== sug.id));
+      toast.success(res.message || "Les taux de droits d'auteur ont été validés et enregistrés avec succès !");
     } else {
       toast.error(res.error || "Impossible de valider la suggestion.");
     }
@@ -250,64 +269,121 @@ function LegalRoyaltiesPageContent() {
               <p className="text-xs text-foreground-muted">Aucun nouveau partage de droits en attente d&apos;examen.</p>
             </div>
           ) : (
-            aiSuggestions.map((sug) => (
-              <div key={sug.id} className="p-6 rounded-3xl bg-background border border-border shadow-xs space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
-                  <div>
-                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gold/15 text-gold text-[10px] font-bold uppercase tracking-wider mb-1">
-                      <Sparkles className="w-3 h-3" />
-                      Confiance IA : {sug.ai_confidence}%
+            aiSuggestions.map((sug) => {
+              const currentRates = getRatesForSuggestion(sug);
+              const authorDisplay = sug.beneficiaire_nom || (sug.authors && sug.authors.length > 0 ? sug.authors[0] : "Auteur du livre");
+              return (
+                <div key={sug.id} className="p-6 rounded-3xl bg-background border border-border shadow-xs space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+                    <div>
+                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gold/15 text-gold text-[10px] font-bold uppercase tracking-wider mb-1">
+                        <Sparkles className="w-3 h-3" />
+                        Confiance IA : {sug.ai_confidence}%
+                      </div>
+                      <h3 className="font-serif font-bold text-navy text-base leading-snug">{sug.title}</h3>
+                      <p className="text-xs text-foreground-muted">
+                        Bénéficiaire unique : <span className="font-semibold text-foreground">{authorDisplay}</span>
+                      </p>
                     </div>
-                    <h3 className="font-serif font-bold text-navy text-base leading-snug">{sug.title}</h3>
-                    <p className="text-xs text-foreground-muted">Auteurs détectés : {sug.authors.join(", ")}</p>
+
+                    <button
+                      type="button"
+                      onClick={() => handleValidateSuggestion(sug)}
+                      className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] shrink-0"
+                    >
+                      <Check className="w-4 h-4 text-gold" />
+                      Valider les Taux
+                    </button>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleValidateSuggestion(sug.id, sug.proposed_splits)}
-                    className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] shrink-0"
-                  >
-                    <Check className="w-4 h-4 text-gold" />
-                    Valider ce Partage de Droits
-                  </button>
-                </div>
+                  <div className="p-4 rounded-2xl bg-background-secondary/60 border border-border space-y-4">
+                    <div className="flex items-center gap-2 text-xs text-foreground-muted">
+                      <Layers className="w-4 h-4 text-gold shrink-0" />
+                      <span>
+                        Taux différenciés par format pour cet auteur (5% par défaut). Le solde de chaque vente revient à LAHA Éditions.
+                      </span>
+                    </div>
 
-                <div className="mb-4 p-3 rounded-xl bg-gold/5 border border-gold/20">
-                  <label htmlFor={`global-rate-input-${sug.id}`} className="block text-[11px] font-bold text-navy uppercase tracking-wider mb-1">
-                    Taux Global de Droits d&apos;Auteur Détecté (%)
-                  </label>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <input
-                      id={`global-rate-input-${sug.id}`}
-                      type="number"
-                      min={0}
-                      max={100}
-                      step="0.5"
-                      value={globalRateBySuggestion[sug.id] ?? (sug.pourcentage_suggere ?? sug.suggested_rate ?? 15)}
-                      onChange={(e) => setGlobalRateBySuggestion(prev => ({ ...prev, [sug.id]: parseFloat(e.target.value) || 0 }))}
-                      className="w-24 px-2.5 py-1.5 text-sm font-semibold border border-border rounded-lg bg-background-secondary text-navy"
-                    />
-                    <span className="text-[11px] text-foreground-muted">
-                      Détecté depuis le texte du contrat — les auteurs se partagent ce pourcentage de la vente
-                      selon la répartition ci-dessous. LAHA conserve le reste.
-                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Taux Papier */}
+                      <div className="p-3 rounded-xl bg-background border border-border">
+                        <label htmlFor={`paper-rate-${sug.id}`} className="block text-[11px] font-bold text-navy uppercase tracking-wider mb-1.5">
+                          Taux Papier (%)
+                        </label>
+                        <input
+                          id={`paper-rate-${sug.id}`}
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.5"
+                          value={currentRates.paper}
+                          onChange={(e) =>
+                            setFormatRatesBySuggestion((prev) => ({
+                              ...prev,
+                              [sug.id]: { ...currentRates, paper: parseFloat(e.target.value) || 0 },
+                            }))
+                          }
+                          className="w-full px-3 py-2 text-sm font-semibold border border-border rounded-xl bg-background-secondary text-navy focus:border-gold focus:outline-none"
+                        />
+                        <span className="text-[10px] text-foreground-muted block mt-1">
+                          Édition imprimée
+                        </span>
+                      </div>
+
+                      {/* Taux Numérique */}
+                      <div className="p-3 rounded-xl bg-background border border-border">
+                        <label htmlFor={`digital-rate-${sug.id}`} className="block text-[11px] font-bold text-navy uppercase tracking-wider mb-1.5">
+                          Taux Numérique (%)
+                        </label>
+                        <input
+                          id={`digital-rate-${sug.id}`}
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.5"
+                          value={currentRates.digital}
+                          onChange={(e) =>
+                            setFormatRatesBySuggestion((prev) => ({
+                              ...prev,
+                              [sug.id]: { ...currentRates, digital: parseFloat(e.target.value) || 0 },
+                            }))
+                          }
+                          className="w-full px-3 py-2 text-sm font-semibold border border-border rounded-xl bg-background-secondary text-navy focus:border-gold focus:outline-none"
+                        />
+                        <span className="text-[10px] text-foreground-muted block mt-1">
+                          E-book &amp; PDF interactif
+                        </span>
+                      </div>
+
+                      {/* Taux Audio */}
+                      <div className="p-3 rounded-xl bg-background border border-border">
+                        <label htmlFor={`audio-rate-${sug.id}`} className="block text-[11px] font-bold text-navy uppercase tracking-wider mb-1.5">
+                          Taux Livre Audio (%)
+                        </label>
+                        <input
+                          id={`audio-rate-${sug.id}`}
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.5"
+                          value={currentRates.audio}
+                          onChange={(e) =>
+                            setFormatRatesBySuggestion((prev) => ({
+                              ...prev,
+                              [sug.id]: { ...currentRates, audio: parseFloat(e.target.value) || 0 },
+                            }))
+                          }
+                          className="w-full px-3 py-2 text-sm font-semibold border border-border rounded-xl bg-background-secondary text-navy focus:border-gold focus:outline-none"
+                        />
+                        <span className="text-[10px] text-foreground-muted block mt-1">
+                          Audio &amp; Voix de synthèse
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                {/* Slider dual-range 21st.dev pour ajuster si besoin */}
-                <RightsSplitterSlider
-                  authors={sug.authors}
-                  initialSplits={sug.proposed_splits}
-                  onChange={(newSplits) => {
-                    setAiSuggestions((prev) =>
-                      prev.map((item) =>
-                        item.id === sug.id ? { ...item, proposed_splits: newSplits } : item
-                      )
-                    );
-                  }}
-                />
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
