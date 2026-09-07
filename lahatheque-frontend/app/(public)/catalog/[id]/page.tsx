@@ -37,6 +37,14 @@ export default function BookDetailPage() {
         if (!isMounted) return;
         setBook(fetchedBook);
 
+        // Si l'ouvrage possède un slug, mettre à jour l'URL du navigateur pour avoir une URL propre SEO
+        if (fetchedBook?.slug && typeof window !== "undefined") {
+          const expectedPath = `/catalog/${fetchedBook.slug}`;
+          if (window.location.pathname !== expectedPath) {
+            window.history.replaceState(null, "", expectedPath);
+          }
+        }
+
         if (fetchedBook) {
           const disciplineId = fetchedBook.discipline_detail?.id?.toString();
           const allBooks = await searchBooks({ discipline: disciplineId });
@@ -305,7 +313,7 @@ export default function BookDetailPage() {
               {relatedBooks.map((item) => (
                 <Link
                   key={item.id}
-                  href={`/catalog/${item.id}`}
+                  href={`/catalog/${item.slug || item.id}`}
                   className="group bg-background-secondary rounded-2xl border border-border p-4 flex flex-col justify-between hover:border-gold/50 hover:shadow-md transition-all"
                 >
                   <div className="flex flex-col items-center space-y-3 text-center">

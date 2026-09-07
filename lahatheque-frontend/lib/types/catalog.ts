@@ -10,6 +10,7 @@ export interface DisciplineDetail {
 
 export interface Book {
   id: string;
+  slug?: string;
   isbn: string;
   title: string;
   subtitle?: string;

@@ -6,6 +6,7 @@ Conforme aux spécifications DRM de LAHAThèque (docs/drm/01-architecture-cible.
 import logging
 import re
 from typing import Optional, Tuple
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -223,10 +224,19 @@ class BookSampleStreamView(APIView):
         from apps.protection.source_adapter import DocumentSourceAdapter, DocumentSourceError
         from apps.catalog.models import Ouvrage
 
+        import uuid
+        is_uuid = False
         try:
-            ouvrage = Ouvrage.objects.filter(id=book_id, status='published').first()
-            if not ouvrage:
-                ouvrage = Ouvrage.objects.filter(isbn=book_id, status='published').first()
+            uuid.UUID(str(book_id))
+            is_uuid = True
+        except (ValueError, AttributeError):
+            pass
+
+        try:
+            if is_uuid:
+                ouvrage = Ouvrage.objects.filter(Q(id=book_id) | Q(slug=book_id) | Q(isbn=book_id), status='published').first()
+            else:
+                ouvrage = Ouvrage.objects.filter(Q(slug=book_id) | Q(isbn=book_id), status='published').first()
             if not ouvrage:
                 return JsonResponse({"success": False, "error": "Ouvrage introuvable."}, status=404)
         except Exception:
@@ -302,9 +312,9 @@ class BookCoverStreamView(APIView):
         try:
             import uuid as _uuid
             valid_uuid = _uuid.UUID(str(book_id).strip())
-            ouvrage = Ouvrage.objects.filter(id=valid_uuid).first()
+            ouvrage = Ouvrage.objects.filter(Q(id=valid_uuid) | Q(slug=book_id) | Q(isbn=book_id)).first()
         except (ValueError, TypeError):
-            ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
+            ouvrage = Ouvrage.objects.filter(Q(slug=book_id) | Q(isbn=book_id)).first()
 
         if not ouvrage:
             return HttpResponse(status=404)
