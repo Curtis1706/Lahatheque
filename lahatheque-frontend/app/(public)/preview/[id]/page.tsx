@@ -10,6 +10,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Hls from "hls.js";
 import {
   Play,
   Pause,
@@ -48,6 +49,7 @@ export default function PublicPreviewPage() {
   const bookId = params?.id as string;
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [data, setData] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +82,47 @@ export default function PublicPreviewPage() {
       .catch(() => setError("Impossible de charger l'extrait audio."))
       .finally(() => setLoading(false));
   }, [bookId]);
+
+  // Initialisation du flux audio (HLS pour Cloudflare Stream ou lecture native pour Cloudflare R2 MP3)
+  useEffect(() => {
+    if (!data?.audio_url) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    if (data.audio_url.includes(".m3u8")) {
+      if (Hls.isSupported()) {
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+        });
+        hls.loadSource(data.audio_url);
+        hls.attachMedia(audio);
+        hls.on(Hls.Events.ERROR, (_event, errorData) => {
+          if (errorData.fatal) {
+            console.error("[HLS Preview] Erreur fatale:", errorData);
+            hls.destroy();
+          }
+        });
+        hlsRef.current = hls;
+      } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
+        audio.src = data.audio_url;
+      }
+    } else {
+      audio.src = data.audio_url;
+    }
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [data?.audio_url]);
 
   // Enforcement côté client de la limite 180s
   const handleTimeUpdate = useCallback(() => {
@@ -319,7 +362,6 @@ export default function PublicPreviewPage() {
                 {/* Élément audio HTML natif */}
                 <audio
                   ref={audioRef}
-                  src={data.audio_url}
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleLoadedMetadata}
                   onEnded={() => {

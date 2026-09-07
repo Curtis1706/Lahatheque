@@ -344,16 +344,44 @@ class AudioPublicPreviewView(APIView):
                 except Exception as e:
                     logger.warning(f"[PublicPreview] Impossible de récupérer l'URL de audio_file pour track {track.id}: {e}")
 
-            # 2. Clé ou URL renseignée dans hls_manifest_url ou stream_id (R2)
-            if not audio_url and track.hls_manifest_url:
+            # 2. URL directe MP3 ou domaine R2
+            if not audio_url and track.hls_manifest_url and (track.hls_manifest_url.endswith('.mp3') or 'r2.dev' in track.hls_manifest_url):
                 audio_url = track.hls_manifest_url
-            elif not audio_url and track.stream_id:
-                if track.stream_id.startswith("http"):
-                    audio_url = track.stream_id
-                else:
-                    audio_url = f"{public_r2_url.rstrip('/')}/{track.stream_id.lstrip('/')}"
 
-        # 3. Fichier audio direct attaché à l'Ouvrage (fallback R2/media)
+            # 3. Clé ou chemin de fichier MP3 sur Cloudflare R2
+            elif not audio_url and track.stream_id and (track.stream_id.endswith('.mp3') or '/' in track.stream_id):
+                audio_url = f"{public_r2_url.rstrip('/')}/{track.stream_id.lstrip('/')}"
+
+            # 4. Flux Cloudflare Stream avec signature de jeton (limité à 180s)
+            elif not audio_url and (track.stream_id or (track.hls_manifest_url and '.m3u8' in track.hls_manifest_url)):
+                from .stream_client import CloudflareStreamClient
+                client = CloudflareStreamClient()
+                cf_subdomain = getattr(settings, 'CLOUDFLARE_STREAM_SUBDOMAIN', '') or 'customer-m033avyqq0x51sbg.cloudflarestream.com'
+                stream_id = track.stream_id
+                if not stream_id and track.hls_manifest_url:
+                    parts = track.hls_manifest_url.split('/')
+                    for idx, part in enumerate(parts):
+                        if part == 'manifest' and idx > 0:
+                            stream_id = parts[idx - 1]
+                            break
+                if stream_id:
+                    try:
+                        token = client.generate_signed_token(stream_id, expiry_seconds=self.PREVIEW_LIMIT_SECONDS)
+                        domain = cf_subdomain
+                        if track.hls_manifest_url and 'cloudflarestream.com' in track.hls_manifest_url:
+                            domain = track.hls_manifest_url.split('/')[2]
+                        audio_url = f"https://{domain}/{stream_id}/manifest/video.m3u8?token={token}"
+                    except Exception as e:
+                        logger.error(f"[PublicPreview] Échec génération token Cloudflare Stream: {e}")
+                        audio_url = track.hls_manifest_url or ""
+                elif track.hls_manifest_url:
+                    audio_url = track.hls_manifest_url
+
+            # 5. Repli hls_manifest_url générique
+            elif not audio_url and track.hls_manifest_url:
+                audio_url = track.hls_manifest_url
+
+        # 6. Fichier audio direct attaché à l'Ouvrage (fallback R2/media)
         if not audio_url and ouvrage.file:
             fname = ouvrage.file.name.lower()
             if ouvrage.format_type == 'audio' or fname.endswith(('.mp3', '.m4a', '.wav', '.aac', '.ogg')):
