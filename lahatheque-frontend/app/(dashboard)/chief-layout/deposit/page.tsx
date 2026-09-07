@@ -44,6 +44,7 @@ import {
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
+import { UniversityCombobox } from "@/components/features/catalog/university-combobox";
 import { toast } from "sonner";
 
 export default function ChiefLayoutDepositPage() {
@@ -949,17 +950,11 @@ export default function ChiefLayoutDepositPage() {
                     </button>
                   )}
                 </div>
-                <select
+                <UniversityCombobox
                   value={university}
-                  onChange={(e) => setUniversity(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                >
-                  {getUniversityOptions(aiResult?.institution_suggestion, university).map((u, i) => (
-                    <option key={i} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setUniversity(val)}
+                  aiSuggestion={aiResult?.institution_suggestion}
+                />
               </div>
 
               <div className="space-y-1.5">

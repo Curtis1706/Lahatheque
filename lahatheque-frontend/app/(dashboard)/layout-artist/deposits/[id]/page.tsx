@@ -45,6 +45,7 @@ import { extractBookMetadataWithAi, type AiBookAnalysisResult } from "@/lib/serv
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
+import { UniversityCombobox } from "@/components/features/catalog/university-combobox";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
@@ -1060,13 +1061,12 @@ export default function DepositDetailPage() {
                     </button>
                   )}
                 </div>
-                <input
-                  type="text"
-                  disabled={!isEditing}
+                <UniversityCombobox
                   value={university}
-                  onChange={(e) => setUniversity(e.target.value)}
+                  onChange={(val) => setUniversity(val)}
+                  disabled={!isEditing}
+                  aiSuggestion={aiResult?.institution_suggestion}
                   placeholder="Université d'Abomey-Calavi (UAC)"
-                  className={inputClass}
                 />
               </div>
 

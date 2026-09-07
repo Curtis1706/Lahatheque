@@ -11,6 +11,7 @@ export interface CreatorOption {
   first_name?: string;
   last_name?: string;
   company_name?: string;
+  trade_name?: string;
   email?: string;
   role_label: string;
   institution?: string;

@@ -26,13 +26,13 @@ import {
   matchGenreCategory, 
   matchLanguage, 
   matchCountry, 
-  getUniversityOptions, 
   getLanguageOptions, 
   getCountryOptions, 
   getGenreOptions 
 } from "@/lib/constants/classification";
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
+import { UniversityCombobox } from "@/components/features/catalog/university-combobox";
 
 interface EditBookModalProps {
   book: LayoutDeposit;
@@ -637,17 +637,10 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">
                     Université de Rattachement
                   </label>
-                  <select
+                  <UniversityCombobox
                     value={university}
-                    onChange={(e) => setUniversity(e.target.value)}
-                    className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                  >
-                    {getUniversityOptions(null, university).map((u, i) => (
-                      <option key={i} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setUniversity(val)}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
