@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { Check, UploadCloud, FileText, Layers, Headphones } from "lucide-react";
+import { Check, UploadCloud, FileText, Layers, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface WizardStep {
@@ -33,9 +33,9 @@ export const DEPOSIT_STEPS: WizardStep[] = [
   },
   {
     id: 4,
-    title: "Version Audio & DRM",
+    title: "Protection DRM & Validation",
     description: "Protection automatique",
-    icon: Headphones,
+    icon: ShieldCheck,
   },
 ];
 
