@@ -632,12 +632,53 @@ export function AudioPlayerProvider({
   );
 }
 
+const noopAsync = async () => {};
+const noopSync = () => {};
+
+/** Fallback no-op context pour les pages publiques sans AudioPlayerProvider. */
+const fallbackContext: AudioPlayerContextType = {
+  state: {
+    isPlaying: false,
+    currentBookId: null,
+    currentBookTitle: "",
+    currentAuthors: "",
+    currentCoverUrl: "",
+    tracks: [],
+    currentTrackIndex: 0,
+    currentTime: 0,
+    duration: 0,
+    volume: 80,
+    isMuted: false,
+    playbackRate: 1.0,
+    isPreview: false,
+    previewLimitSeconds: 180,
+    isExpanded: false,
+    isLoading: false,
+  },
+  playBook: noopAsync,
+  togglePlay: noopSync,
+  pause: noopSync,
+  resume: noopSync,
+  seek: noopSync,
+  seekRelative: noopSync,
+  setVolume: noopSync,
+  toggleMute: noopSync,
+  setPlaybackRate: noopSync,
+  nextTrack: noopSync,
+  previousTrack: noopSync,
+  selectTrackIndex: noopSync,
+  switchVoice: noopSync,
+  toggleExpand: noopSync,
+  setExpanded: noopSync,
+  closePlayer: noopSync,
+};
+
 export function useAudioPlayer() {
   const context = useContext(AudioPlayerContext);
-  if (!context) {
-    throw new Error(
-      "useAudioPlayer must be used within an AudioPlayerProvider"
-    );
-  }
-  return context;
+  // Retourne un stub no-op si utilisé hors AudioPlayerProvider (ex: pages publiques)
+  return context ?? fallbackContext;
+}
+
+export function useAudioPlayerIsAvailable(): boolean {
+  return useContext(AudioPlayerContext) !== undefined;
 }

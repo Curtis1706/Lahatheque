@@ -10,7 +10,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, Headphones, X, ArrowRight } from "lucide-react";
-import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
+import { useAudioPlayer, useAudioPlayerIsAvailable } from "@/components/features/audio/audio-player-context";
 
 export interface SampleChoiceBook {
   id: string;
@@ -39,6 +39,7 @@ export function SampleChoiceModal({
 }: SampleChoiceModalProps) {
   const router = useRouter();
   const { playBook } = useAudioPlayer();
+  const hasAudioProvider = useAudioPlayerIsAvailable();
 
   if (!isOpen || !book) return null;
 
@@ -54,9 +55,14 @@ export function SampleChoiceModal({
 
   const handleListenSample = async () => {
     onClose();
-    // Lance la lecture de l'extrait audio et redirige vers la page universelle de lecture
-    await playBook(book.id, { preview: true });
-    router.push(`/listen/${book.id}`);
+    if (hasAudioProvider) {
+      // Dashboard : lance la lecture intégrée puis redirige
+      await playBook(book.id, { preview: true });
+      router.push(`/listen/${book.id}`);
+    } else {
+      // Page publique : redirige directement vers la page d'écoute
+      router.push(`/listen/${book.id}?mode=sample`);
+    }
   };
 
   const hasDigitalFormat = (book as any).is_digital_available !== false && (book as any).format_type !== "audio";
