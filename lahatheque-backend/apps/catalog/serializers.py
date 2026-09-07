@@ -105,6 +105,14 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
     def get_has_digital_access(self, obj) -> bool:
         return self.get_is_owned(obj)
 
+    def get_is_digital_available(self, obj) -> bool:
+        if obj.format_type == 'audio':
+            return False
+        return bool(obj.file or obj.format_type in ['pdf', 'epub'])
+
+    def get_has_audio(self, obj) -> bool:
+        return bool(obj.has_audio_version or obj.format_type == 'audio' or (hasattr(obj, 'audio_tracks') and obj.audio_tracks.exists()))
+
 
 # Alias pour rétrocompatibilité
 OuvrageSerializer = OuvrageReadSerializer
