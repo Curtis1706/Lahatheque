@@ -43,6 +43,7 @@ export interface PdfDocumentOptions {
   summaryCards?: Array<{ label: string; value: string }>;
   tableHeaders: string[];
   tableRows: (string | number)[][];
+  columnStyles?: Record<string | number, any>;
   totalLabel?: string;
   totalAmount?: string;
   totalNotes?: string;
@@ -264,6 +265,7 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
     alternateRowStyles: {
       fillColor: [248, 250, 252],
     },
+    columnStyles: options.columnStyles || {},
     styles: {
       lineColor: [229, 231, 235],
       lineWidth: 0.1,

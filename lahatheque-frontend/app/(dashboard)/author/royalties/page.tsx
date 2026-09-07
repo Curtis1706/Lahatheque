@@ -26,9 +26,10 @@ import { AuthorPayoutModal } from "@/components/features/author/author-payout-mo
 import {
   getAuthorRoyaltyPayments,
   getPayoutRequests,
+  getAuthorKpis,
   type PayoutRequestItem,
 } from "@/lib/services/author";
-import type { AuthorRoyaltyPayment } from "@/lib/types/author";
+import type { AuthorRoyaltyPayment, AuthorKpis } from "@/lib/types/author";
 import { toast } from "sonner";
 import { generateOfficialPdf } from "@/lib/services/export-service";
 
@@ -38,6 +39,7 @@ export default function AuthorRoyaltiesPage() {
   const [activeTab, setActiveTab] = useState<"statements" | "requests">("statements");
   const [allPayments, setAllPayments] = useState<AuthorRoyaltyPayment[]>([]);
   const [payoutRequests, setPayoutRequests] = useState<PayoutRequestItem[]>([]);
+  const [kpis, setKpis] = useState<AuthorKpis | null>(null);
   const [loading, setLoading] = useState(true);
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
 
@@ -50,12 +52,14 @@ export default function AuthorRoyaltiesPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const [stmts, reqs] = await Promise.all([
+    const [stmts, reqs, authorKpis] = await Promise.all([
       getAuthorRoyaltyPayments(),
       getPayoutRequests(),
+      getAuthorKpis(),
     ]);
     setAllPayments(stmts);
     setPayoutRequests(reqs);
+    setKpis(authorKpis);
     setLoading(false);
   };
 
@@ -131,6 +135,33 @@ export default function AuthorRoyaltiesPage() {
     return { totalPaid, totalPending, totalSales, totalGross, totalEarned };
   }, [filteredPayments]);
 
+  // Déduction rigoureuse des demandes de versement (retraits)
+  const totalCommitted = useMemo(() => {
+    return payoutRequests
+      .filter((r) => ["pending", "approved", "processed"].includes(r.status))
+      .reduce((acc, r) => acc + r.amount, 0);
+  }, [payoutRequests]);
+
+  const pendingRequestsTotal = useMemo(() => {
+    return payoutRequests
+      .filter((r) => ["pending", "approved"].includes(r.status))
+      .reduce((acc, r) => acc + r.amount, 0);
+  }, [payoutRequests]);
+
+  const processedRequestsTotal = useMemo(() => {
+    return payoutRequests
+      .filter((r) => r.status === "processed")
+      .reduce((acc, r) => acc + r.amount, 0);
+  }, [payoutRequests]);
+
+  const availableRetirableBalance = useMemo(() => {
+    if (kpis && typeof kpis.authorPendingRoyalties === "number") {
+      return kpis.authorPendingRoyalties;
+    }
+    const totalEarnedAll = allPayments.reduce((acc, p) => acc + p.author_earned_amount, 0);
+    return Math.max(0, totalEarnedAll - totalCommitted);
+  }, [kpis, allPayments, totalCommitted]);
+
   const hasActiveFilters =
     searchQuery !== "" ||
     selectedQuarter !== "all" ||
@@ -146,9 +177,66 @@ export default function AuthorRoyaltiesPage() {
     setEndDate("");
   };
 
-  // Export PDF d'un bordereau trimestriel spécifique
+  // Export PDF d'un bordereau trimestriel spécifique avec décompte par livre
   const handleExportStatementPdf = async (row: AuthorRoyaltyPayment) => {
     try {
+      const hasDetailedBooks = Boolean(row.books && row.books.length > 0);
+
+      const tableHeaders = hasDetailedBooks
+        ? [
+            "Titre de l'Ouvrage",
+            "Format(s)",
+            "Quantité",
+            "CA Brut (HT)",
+            "Taux Auteur",
+            "Redevance Nette",
+          ]
+        : [
+            "Période Trimestrielle",
+            "Volume Ventes",
+            "Revenus Bruts (HT)",
+            "Quote-part Auteur",
+            "Statut",
+          ];
+
+      const tableRows = hasDetailedBooks
+        ? row.books!.map((b) => {
+            const formats: string[] = [];
+            if (b.format_breakdown.digital > 0) formats.push(`${b.format_breakdown.digital} num.`);
+            if (b.format_breakdown.paper > 0) formats.push(`${b.format_breakdown.paper} pap.`);
+            if (b.format_breakdown.audio > 0) formats.push(`${b.format_breakdown.audio} aud.`);
+            const formatStr = formats.length > 0 ? formats.join(" / ") : "Numérique";
+
+            return [
+              b.title,
+              formatStr,
+              `${b.sales_count.toLocaleString("fr-FR")} ex.`,
+              `${b.gross_revenue.toLocaleString("fr-FR")} XOF`,
+              `${b.royalty_rate} %`,
+              `${b.net_royalty.toLocaleString("fr-FR")} XOF`,
+            ];
+          })
+        : [
+            [
+              row.period,
+              `${row.total_sales_count.toLocaleString("fr-FR")} ex.`,
+              `${row.gross_revenue.toLocaleString("fr-FR")} XOF`,
+              `${row.author_earned_amount.toLocaleString("fr-FR")} XOF`,
+              row.status === "paid" ? "Versé" : "En attente",
+            ],
+          ];
+
+      const columnStyles = hasDetailedBooks
+        ? {
+            0: { cellWidth: 65 },
+            1: { cellWidth: 32 },
+            2: { halign: "right", cellWidth: 20 },
+            3: { halign: "right", cellWidth: 28 },
+            4: { halign: "center", cellWidth: 20 },
+            5: { halign: "right", cellWidth: 28, fontStyle: "bold" },
+          }
+        : undefined;
+
       await generateOfficialPdf({
         docType: "BORDEREAU_REDEVANCES",
         docNumber: `REL-AUTEUR-${row.id.slice(0, 8).toUpperCase()}`,
@@ -166,22 +254,9 @@ export default function AuthorRoyaltiesPage() {
           { label: "Taux de Rétribution", value: `${row.author_percentage_rate} % (Droits)` },
           { label: "Statut Règlement", value: row.status === "paid" ? "Payé" : "En cours" },
         ],
-        tableHeaders: [
-          "Période Trimestrielle",
-          "Volume Ventes",
-          "Revenus Bruts (HT)",
-          "Quote-part Auteur (15%)",
-          "Statut",
-        ],
-        tableRows: [
-          [
-            row.period,
-            `${row.total_sales_count.toLocaleString("fr-FR")} ex.`,
-            `${row.gross_revenue.toLocaleString("fr-FR")} XOF`,
-            `${row.author_earned_amount.toLocaleString("fr-FR")} XOF`,
-            row.status === "paid" ? "Versé" : "En attente",
-          ],
-        ],
+        tableHeaders,
+        tableRows,
+        columnStyles,
         totalAmount: `${row.author_earned_amount.toLocaleString("fr-FR")} XOF`,
         totalNotes:
           "Relevé trimestriel officiel de redevances certifié par LAHAThèque Éditions & Numérique S.A. Les droits sont liquidés au terme de chaque trimestre calendaire (T1: Janv-Mars, T2: Avr-Juin, T3: Juil-Sept, T4: Oct-Déc).",
@@ -493,34 +568,32 @@ export default function AuthorRoyaltiesPage() {
         <div className="p-5 rounded-3xl bg-background-secondary border border-border space-y-2 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-foreground-muted uppercase tracking-wider">
-              Solde en Attente de Versement {hasActiveFilters ? "(Sélection)" : ""}
+              Solde Retirable Disponible
             </span>
             <Clock className="w-4 h-4 text-gold" />
           </div>
           <p className="font-mono text-2xl sm:text-3xl font-bold text-navy">
-            {periodTotals.totalPending.toLocaleString("fr-FR")} XOF
+            {availableRetirableBalance.toLocaleString("fr-FR")} XOF
           </p>
           <p className="text-[11px] text-foreground-muted">
-            {hasActiveFilters
-              ? `Total en attente calculé sur ${filteredPayments.length} période(s)`
-              : "Prochain règlement automatique programmé le 05 du mois"}
+            {pendingRequestsTotal > 0
+              ? `Dont ${pendingRequestsTotal.toLocaleString("fr-FR")} XOF en cours de traitement`
+              : "Net des demandes de versement émises et traitées"}
           </p>
         </div>
 
         <div className="p-5 rounded-3xl bg-background-secondary border border-border space-y-2 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-foreground-muted uppercase tracking-wider">
-              Total Rétribué à ce Jour {hasActiveFilters ? "(Sélection)" : ""}
+              Total Rétribué à ce Jour
             </span>
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <p className="font-mono text-2xl sm:text-3xl font-bold text-emerald-600">
-            {periodTotals.totalPaid.toLocaleString("fr-FR")} XOF
+            {(kpis?.authorPaidRoyalties ?? processedRequestsTotal).toLocaleString("fr-FR")} XOF
           </p>
           <p className="text-[11px] text-foreground-muted">
-            {hasActiveFilters
-              ? `Droits déjà versés sur la sélection (${periodTotals.totalSales} ventes)`
-              : "Relevés certifiés et justifiés par les ventes de la plateforme"}
+            Versements confirmés et transférés par virement ou MoMo
           </p>
         </div>
       </div>
@@ -688,6 +761,145 @@ export default function AuthorRoyaltiesPage() {
               columns={statementColumns}
               data={filteredPayments}
               loading={loading}
+              renderExpandedRow={(row) => {
+                if (!row.books || row.books.length === 0) {
+                  return (
+                    <div className="p-4 sm:p-5 text-center rounded-2xl bg-background border border-border text-foreground-muted text-xs space-y-1">
+                      <BookOpen className="w-5 h-5 mx-auto text-gold/60" />
+                      <p className="font-serif font-bold text-navy text-xs">Aucun ouvrage vendu sur ce trimestre</p>
+                      <p className="text-[11px] text-foreground-muted">
+                        Les ventes et redevances de ce trimestre apparaîtront dès confirmation des commandes.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="p-4 sm:p-5 rounded-2xl bg-background border border-border shadow-2xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-border/70">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-gold shrink-0" />
+                        <h4 className="font-serif font-bold text-navy text-xs sm:text-sm">
+                          Détail des Ouvrages Vendus sur le Trimestre ({row.books.length})
+                        </h4>
+                      </div>
+                      <span className="text-[10px] text-foreground-muted font-mono">
+                        {row.period}
+                      </span>
+                    </div>
+
+                    {/* Table Desktop & Tablet (sm+) */}
+                    <div className="hidden sm:block overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-border bg-background-secondary/60">
+                            <th className="p-2.5 font-bold uppercase tracking-wider text-navy text-[10px]">Ouvrage</th>
+                            <th className="p-2.5 font-bold uppercase tracking-wider text-navy text-[10px]">Format(s)</th>
+                            <th className="p-2.5 font-bold uppercase tracking-wider text-navy text-[10px] text-right">Quantité</th>
+                            <th className="p-2.5 font-bold uppercase tracking-wider text-navy text-[10px] text-right">CA Brut (HT)</th>
+                            <th className="p-2.5 font-bold uppercase tracking-wider text-navy text-[10px] text-center">Taux Auteur</th>
+                            <th className="p-2.5 font-bold uppercase tracking-wider text-navy text-[10px] text-right">Redevance Nette</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/40 font-mono">
+                          {row.books.map((b) => (
+                            <tr key={b.book_id} className="hover:bg-background-secondary/30 transition-colors">
+                              <td className="p-2.5 font-sans">
+                                <div className="flex items-center gap-3">
+                                  {b.cover_url ? (
+                                    <img
+                                      src={b.cover_url}
+                                      alt={b.title}
+                                      className="w-8 h-11 object-cover rounded-md border border-border shadow-2xs shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-11 rounded-md bg-navy/10 flex items-center justify-center text-navy shrink-0">
+                                      <BookOpen className="w-4 h-4 text-gold" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="font-serif font-bold text-xs text-navy truncate max-w-[220px] md:max-w-[280px]">
+                                      {b.title}
+                                    </p>
+                                    <p className="text-[10px] text-foreground-muted truncate">
+                                      {b.discipline} {b.isbn ? `• ISBN: ${b.isbn}` : ""}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-2.5 font-sans">
+                                <div className="flex flex-wrap gap-1">
+                                  {b.format_breakdown.digital > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-md bg-navy/10 text-navy font-bold text-[10px] inline-flex items-center gap-1">
+                                      <Laptop className="w-3 h-3" />
+                                      {b.format_breakdown.digital} num.
+                                    </span>
+                                  )}
+                                  {b.format_breakdown.paper > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-md bg-gold/10 text-gold font-bold text-[10px] inline-flex items-center gap-1">
+                                      <BookOpen className="w-3 h-3" />
+                                      {b.format_breakdown.paper} pap.
+                                    </span>
+                                  )}
+                                  {b.format_breakdown.audio > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-md bg-background-secondary text-foreground-muted font-bold text-[10px]">
+                                      {b.format_breakdown.audio} aud.
+                                    </span>
+                                  )}
+                                  {b.format_breakdown.digital === 0 && b.format_breakdown.paper === 0 && b.format_breakdown.audio === 0 && (
+                                    <span className="text-[10px] text-foreground-muted">-</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-2.5 text-right font-bold text-navy">
+                                {b.sales_count.toLocaleString("fr-FR")} ex.
+                              </td>
+                              <td className="p-2.5 text-right text-foreground-muted">
+                                {b.gross_revenue.toLocaleString("fr-FR")} XOF
+                              </td>
+                              <td className="p-2.5 text-center text-navy font-semibold">
+                                {b.royalty_rate} %
+                              </td>
+                              <td className="p-2.5 text-right font-bold text-gold">
+                                {b.net_royalty.toLocaleString("fr-FR")} XOF
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Cards Mobile pour la sous-table (< sm) */}
+                    <div className="sm:hidden divide-y divide-border/40 space-y-2">
+                      {row.books.map((b) => (
+                        <div key={b.book_id} className="pt-2 space-y-1.5 text-xs">
+                          <div className="flex items-start gap-2.5">
+                            {b.cover_url ? (
+                              <img
+                                src={b.cover_url}
+                                alt={b.title}
+                                className="w-9 h-12 object-cover rounded-md border border-border shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-12 rounded-md bg-navy/10 flex items-center justify-center text-navy shrink-0">
+                                <BookOpen className="w-4 h-4 text-gold" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="font-serif font-bold text-xs text-navy leading-snug">{b.title}</p>
+                              <p className="text-[10px] text-foreground-muted">{b.discipline}</p>
+                              <div className="flex items-center justify-between mt-1 text-[11px] font-mono">
+                                <span className="text-foreground-muted">{b.sales_count} ex. vendus</span>
+                                <span className="font-bold text-gold">{b.net_royalty.toLocaleString("fr-FR")} XOF</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }}
               emptyState={
                 <div className="p-12 text-center space-y-2">
                   <FileText className="w-8 h-8 text-foreground-muted mx-auto" />
@@ -737,7 +949,7 @@ export default function AuthorRoyaltiesPage() {
       <AuthorPayoutModal
         isOpen={payoutModalOpen}
         onClose={() => setPayoutModalOpen(false)}
-        maxAmount={periodTotals.totalPending}
+        maxAmount={availableRetirableBalance}
         onSuccess={loadData}
       />
     </div>

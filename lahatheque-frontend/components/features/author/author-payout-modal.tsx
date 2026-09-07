@@ -43,7 +43,7 @@ export function AuthorPayoutModal({
       return;
     }
     if (amountNum > maxAmount) {
-      toast.error(`Le montant demandé ne peut excéder votre solde en attente (${maxAmount.toLocaleString("fr-FR")} XOF).`);
+      toast.error(`Le montant demandé ne peut excéder votre solde disponible retirable (${maxAmount.toLocaleString("fr-FR")} XOF).`);
       return;
     }
     if (!accountDetails.trim()) {
@@ -108,12 +108,17 @@ export function AuthorPayoutModal({
                 />
                 <button
                   type="button"
-                  onClick={() => setAmount(String(maxAmount))}
+                  onClick={() => setAmount(String(Math.max(0, maxAmount)))}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gold hover:underline cursor-pointer"
                 >
                   Tout verser
                 </button>
               </div>
+              {maxAmount <= 0 && (
+                <p className="text-[11px] text-warning mt-1.5 font-medium">
+                  Votre solde disponible retirable est actuellement de 0 XOF (toutes vos redevances font déjà l&apos;objet d&apos;une demande en cours ou d&apos;un versement traité).
+                </p>
+              )}
             </div>
 
             <div>
@@ -170,7 +175,7 @@ export function AuthorPayoutModal({
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || maxAmount <= 0}
               className="px-5 py-2.5 rounded-xl bg-gold text-navy font-bold hover:bg-gold-light transition-colors min-h-[44px] shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
             >
               {submitting ? (

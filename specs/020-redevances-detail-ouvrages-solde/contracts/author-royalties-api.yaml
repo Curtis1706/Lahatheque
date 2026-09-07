@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: API Redevances & Droits d'Auteur LAHAThèque
+  version: 1.0.0
+  description: Endpoints de consultation des relevés trimestriels avec détail par ouvrage et gestion des demandes de versement.
+
+paths:
+  /api/v1/rights/author/royalties/:
+    get:
+      summary: Liste des relevés trimestriels de l'auteur avec détail par livre
+      parameters:
+        - name: year
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: quarter
+          in: query
+          required: false
+          schema:
+            type: integer
+            enum: [1, 2, 3, 4]
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Relevés trimestriels enrichis avec la liste des ouvrages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuthorRoyaltyPayment'
+                  error:
+                    type: string
+                    nullable: true
+
+  /api/v1/rights/author/payout-request/:
+    post:
+      summary: Soumission d'une demande de versement d'acompte / retrait
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, payment_method, account_details]
+              properties:
+                amount:
+                  type: number
+                  example: 500.00
+                payment_method:
+                  type: string
+                  enum: [momo, moov, orange, bank]
+                account_details:
+                  type: string
+                  example: "+229 97 00 00 00"
+      responses:
+        '201':
+          description: Demande enregistrée avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      amount:
+                        type: number
+                      status:
+                        type: string
+                        example: "pending"
+                  error:
+                    type: string
+                    nullable: true
+        '400':
+          description: Montant invalide ou supérieur au solde disponible retirable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "Le montant demandé excède votre solde disponible (300.00 XOF)."
+
+components:
+  schemas:
+    AuthorRoyaltyPayment:
+      type: object
+      properties:
+        id:
+          type: string
+        period:
+          type: string
+          example: "3ème Trimestre (Juillet - Septembre) 2026"
+        quarter:
+          type: integer
+          example: 3
+        year:
+          type: integer
+          example: 2026
+        start_date:
+          type: string
+          example: "2026-07-01"
+        end_date:
+          type: string
+          example: "2026-09-30"
+        total_sales_count:
+          type: integer
+          example: 4
+        paper_sales_count:
+          type: integer
+          example: 2
+        digital_sales_count:
+          type: integer
+          example: 2
+        gross_revenue:
+          type: number
+          example: 12000.0
+        author_percentage_rate:
+          type: number
+          example: 15.0
+        author_earned_amount:
+          type: number
+          example: 1550.0
+        status:
+          type: string
+          enum: [paid, pending]
+        payment_date:
+          type: string
+          example: "05/10/2026"
+        receipt_url:
+          type: string
+          example: "/invoices/REL-AUT-2026-T3.pdf"
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthorRoyaltyBookItem'
+
+    AuthorRoyaltyBookItem:
+      type: object
+      properties:
+        book_id:
+          type: string
+        title:
+          type: string
+          example: "Aplicação de Agentes Remineralizantes"
+        cover_url:
+          type: string
+          nullable: true
+        isbn:
+          type: string
+          example: "978-99919-848-7-2"
+        discipline:
+          type: string
+          example: "Odontologie & Soins dentaires"
+        sales_count:
+          type: integer
+          example: 1
+        format_breakdown:
+          type: object
+          properties:
+            digital:
+              type: integer
+              example: 1
+            paper:
+              type: integer
+              example: 0
+            audio:
+              type: integer
+              example: 0
+        gross_revenue:
+          type: number
+          example: 5000.0
+        royalty_rate:
+          type: number
+          example: 10.0
+        net_royalty:
+          type: number
+          example: 500.0

@@ -39,6 +39,23 @@ export interface AuthorSubmission {
   suggested_language?: string;
 }
 
+export interface AuthorRoyaltyBookItem {
+  book_id: string;
+  title: string;
+  cover_url?: string | null;
+  isbn?: string;
+  discipline?: string;
+  sales_count: number;
+  format_breakdown: {
+    digital: number;
+    paper: number;
+    audio: number;
+  };
+  gross_revenue: number;
+  royalty_rate: number;
+  net_royalty: number;
+}
+
 export interface AuthorRoyaltyPayment {
   id: string;
   period: string; // Ex: "1er Trimestre 2026 (Janvier - Mars)"
@@ -49,12 +66,14 @@ export interface AuthorRoyaltyPayment {
   total_sales_count: number;
   paper_sales_count?: number;
   digital_sales_count?: number;
+  audio_sales_count?: number;
   gross_revenue: number;
   author_percentage_rate: number;
   author_earned_amount: number; // Part propre rétribuée à cet auteur
   status: "paid" | "pending";
   payment_date: string;
   receipt_url?: string | null;
+  books?: AuthorRoyaltyBookItem[];
 }
 
 // Interfaces de rétrocompatibilité pour composants hérités

@@ -52,6 +52,12 @@ export interface DataTableProps<T> {
   pageSizeOptions?: number[];
   /** Afficher la pagination (défaut: true) */
   showPagination?: boolean;
+  /** Rendu custom d'une sous-ligne dépliable */
+  renderExpandedRow?: (row: T) => React.ReactNode;
+  /** Clés des lignes actuellement dépliées (mode contrôlé) */
+  expandedRowKeys?: string[];
+  /** Callback lors du changement de lignes dépliées */
+  onExpandedRowsChange?: (keys: string[]) => void;
 }
 
 // ─── DataTable ────────────────────────────────────────────────────────────────
@@ -75,11 +81,29 @@ export function DataTable<T extends Record<string, any>>({
   pageSize = 10,
   pageSizeOptions = [10, 20, 50, 100, 240],
   showPagination = true,
+  renderExpandedRow,
+  expandedRowKeys,
+  onExpandedRowsChange,
 }: DataTableProps<T>) {
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [itemsPerPage, setItemsPerPage] = React.useState(pageSize);
+  const [internalExpandedKeys, setInternalExpandedKeys] = React.useState<string[]>([]);
+
+  const activeExpandedKeys = expandedRowKeys ?? internalExpandedKeys;
+
+  const toggleRowExpand = (key: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const next = activeExpandedKeys.includes(key)
+      ? activeExpandedKeys.filter((k) => k !== key)
+      : [...activeExpandedKeys, key];
+    if (onExpandedRowsChange) {
+      onExpandedRowsChange(next);
+    } else {
+      setInternalExpandedKeys(next);
+    }
+  };
 
   // Reset page to 1 when search or filter changes
   React.useEffect(() => {
@@ -213,6 +237,9 @@ export function DataTable<T extends Record<string, any>>({
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-background-secondary border-b border-border">
+                  {renderExpandedRow && (
+                    <th className="w-10 p-4" aria-label="Déplier" />
+                  )}
                   {columns.map((col) => (
                     <th
                       key={String(col.key)}
@@ -227,69 +254,127 @@ export function DataTable<T extends Record<string, any>>({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {paginatedData.map((row) => (
-                  <tr
-                    key={String(row[rowKey])}
-                    onClick={() => onRowClick?.(row)}
-                    className={cn(
-                      "hover:bg-background-secondary/40 transition-colors",
-                      onRowClick && "cursor-pointer"
-                    )}
-                  >
-                    {columns.map((col) => (
-                      <td
-                        key={String(col.key)}
-                        className={cn("p-4 text-sm text-foreground", col.className)}
+                {paginatedData.map((row) => {
+                  const rowId = String(row[rowKey]);
+                  const isExpanded = activeExpandedKeys.includes(rowId);
+
+                  return (
+                    <React.Fragment key={rowId}>
+                      <tr
+                        onClick={() => onRowClick?.(row)}
+                        className={cn(
+                          "hover:bg-background-secondary/40 transition-colors",
+                          isExpanded && "bg-background-secondary/20",
+                          onRowClick && "cursor-pointer"
+                        )}
                       >
-                        {col.cell
-                          ? col.cell(row)
-                          : String(row[col.key as keyof T] ?? "")}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                        {renderExpandedRow && (
+                          <td className="w-10 p-4 text-center">
+                            <button
+                              type="button"
+                              onClick={(e) => toggleRowExpand(rowId, e)}
+                              className="p-1 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-navy transition-colors"
+                              aria-expanded={isExpanded}
+                              aria-label={isExpanded ? "Replier la ligne" : "Déplier la ligne"}
+                            >
+                              <ChevronRight
+                                className={cn(
+                                  "w-4 h-4 transition-transform duration-200",
+                                  isExpanded && "rotate-90 text-gold"
+                                )}
+                              />
+                            </button>
+                          </td>
+                        )}
+                        {columns.map((col) => (
+                          <td
+                            key={String(col.key)}
+                            className={cn("p-4 text-sm text-foreground", col.className)}
+                          >
+                            {col.cell
+                              ? col.cell(row)
+                              : String(row[col.key as keyof T] ?? "")}
+                          </td>
+                        ))}
+                      </tr>
+                      {renderExpandedRow && isExpanded && (
+                        <tr className="bg-background-secondary/30 border-b border-border">
+                          <td colSpan={columns.length + 1} className="p-4 sm:p-6">
+                            {renderExpandedRow(row)}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Cards Mobile (sous lg) */}
           <div className="lg:hidden divide-y divide-border/60">
-            {paginatedData.map((row) =>
-              mobileCard ? (
+            {paginatedData.map((row) => {
+              const rowId = String(row[rowKey]);
+              const isExpanded = activeExpandedKeys.includes(rowId);
+
+              return (
                 <div
-                  key={String(row[rowKey])}
+                  key={rowId}
                   onClick={() => onRowClick?.(row)}
                   className={cn(
                     "p-4 hover:bg-background-secondary/20 transition-colors",
                     onRowClick && "cursor-pointer"
                   )}
                 >
-                  {mobileCard(row)}
+                  {mobileCard ? (
+                    mobileCard(row)
+                  ) : (
+                    // Fallback : afficher les colonnes non-hideOnMobile
+                    <div className="space-y-2">
+                      {columns
+                        .filter((col) => !col.hideOnMobile)
+                        .map((col) => (
+                          <div key={String(col.key)} className="flex justify-between gap-2 text-sm">
+                            <span className="text-xs font-bold text-foreground-muted uppercase tracking-wide">
+                              {col.header}
+                            </span>
+                            <span className="text-right text-foreground">
+                              {col.cell
+                                ? col.cell(row)
+                                : String(row[col.key as keyof T] ?? "")}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* Bouton Accordéon Mobile si renderExpandedRow est présent */}
+                  {renderExpandedRow && (
+                    <div className="pt-2 mt-3 border-t border-border/60 flex flex-col">
+                      <button
+                        type="button"
+                        onClick={(e) => toggleRowExpand(rowId, e)}
+                        className="flex items-center justify-between text-xs font-semibold text-navy hover:text-gold transition-colors py-1.5 focus:outline-none"
+                        aria-expanded={isExpanded}
+                      >
+                        <span>{isExpanded ? "Masquer les détails" : "Voir les détails"}</span>
+                        <ChevronRight
+                          className={cn(
+                            "w-4 h-4 transition-transform duration-200",
+                            isExpanded && "rotate-90 text-gold"
+                          )}
+                        />
+                      </button>
+                      {isExpanded && (
+                        <div className="mt-3 pt-3 border-t border-border/40">
+                          {renderExpandedRow(row)}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                // Fallback : afficher les colonnes non-hideOnMobile
-                <div
-                  key={String(row[rowKey])}
-                  onClick={() => onRowClick?.(row)}
-                  className="p-4 space-y-2"
-                >
-                  {columns
-                    .filter((col) => !col.hideOnMobile)
-                    .map((col) => (
-                      <div key={String(col.key)} className="flex justify-between gap-2 text-sm">
-                        <span className="text-xs font-bold text-foreground-muted uppercase tracking-wide">
-                          {col.header}
-                        </span>
-                        <span className="text-right text-foreground">
-                          {col.cell
-                            ? col.cell(row)
-                            : String(row[col.key as keyof T] ?? "")}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              )
-            )}
+              );
+            })}
           </div>
 
           {/* ── Footer avec Pagination ── */}
