@@ -23,6 +23,7 @@ import {
   Share2,
   ListMusic,
   Check,
+  Mic,
 } from "lucide-react";
 import { useAudioPlayer } from "./audio-player-context";
 import { toast } from "sonner";
@@ -47,10 +48,10 @@ export function LahathequeAudioPlayerCard({
     nextTrack,
     previousTrack,
     selectTrackIndex,
+    switchVoice,
   } = useAudioPlayer();
 
   const [showChapterList, setShowChapterList] = useState<boolean>(false);
-  const [selectedVoiceFilter, setSelectedVoiceFilter] = useState<"all" | "male" | "female">("all");
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isDraggingProgress, setIsDraggingProgress] = useState<boolean>(false);
   const [isDraggingVolume, setIsDraggingVolume] = useState<boolean>(false);
@@ -337,11 +338,25 @@ export function LahathequeAudioPlayerCard({
         )}
       </div>
 
-      {/* Informations sur la piste et le chapitre en cours */}
+      {/* Informations sur la piste, choix de la voix et liste de lecture des chapitres */}
       {(() => {
         const currentTrack = state.tracks[state.currentTrackIndex];
+        const hasMale = state.tracks.some((t) => t.voice_gender === "male");
+        const hasFemale = state.tracks.some((t) => t.voice_gender === "female");
+        const hasBothVoices = hasMale && hasFemale;
+
+        // Voix active : voix de la piste en cours, sinon Homme par défaut si présent, sinon Femme
+        const activeVoice: "male" | "female" =
+          currentTrack?.voice_gender || (hasMale ? "male" : "female");
+
+        // Pistes affichées dans la liste de lecture (filtrées par voix active si distinction de voix)
+        const playlistTracks = state.tracks.filter((t) => {
+          if (!hasBothVoices && !hasMale && !hasFemale) return true;
+          return t.voice_gender === activeVoice;
+        });
+
         return (
-          <div className="px-6 text-center space-y-1 mb-4">
+          <div className="px-5 sm:px-6 text-center space-y-2 mb-4">
             <h3 className="font-serif font-bold text-white text-base sm:text-lg truncate">
               {state.currentBookTitle || "Sélectionnez un ouvrage"}
             </h3>
@@ -349,76 +364,139 @@ export function LahathequeAudioPlayerCard({
               {state.currentAuthors || "LAHA Éditions"}
             </p>
 
+            {/* Commutateur de Narration (Voix Homme / Voix Femme) */}
+            {hasBothVoices ? (
+              <div className="pt-1 flex flex-col items-center gap-1">
+                <div className="inline-flex items-center p-1 rounded-xl bg-navy border border-border">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeVoice !== "male") {
+                        switchVoice("male");
+                        toast.success("Narration : Voix Masculine activée");
+                      }
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      activeVoice === "male"
+                        ? "bg-gold text-navy font-bold shadow-xs"
+                        : "text-foreground-muted hover:text-white"
+                    }`}
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Voix Homme</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeVoice !== "female") {
+                        switchVoice("female");
+                        toast.success("Narration : Voix Féminine activée");
+                      }
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      activeVoice === "female"
+                        ? "bg-gold text-navy font-bold shadow-xs"
+                        : "text-foreground-muted hover:text-white"
+                    }`}
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Voix Femme</span>
+                  </button>
+                </div>
+              </div>
+            ) : (hasMale || hasFemale) ? (
+              <div className="pt-1 flex items-center justify-center">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy/80 border border-gold/30 text-gold text-[11px] font-medium">
+                  <Mic className="w-3 h-3 text-gold" />
+                  <span>
+                    {hasMale ? "Voix Masculine (par défaut)" : "Voix Féminine"}
+                  </span>
+                </span>
+              </div>
+            ) : null}
+
+            {/* Titre de la piste active */}
             {currentTrack && (
-              <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+              <div className="flex items-center justify-center gap-2 pt-1">
                 <span className="text-xs font-semibold text-gold font-sans truncate max-w-xs">
                   {currentTrack.track_type === "full"
                     ? (currentTrack.title || "Livre complet")
                     : `Chapitre ${currentTrack.chapter_number} : ${currentTrack.title}`}
                 </span>
-                {currentTrack.voice_gender && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold/15 text-gold border border-gold/30">
-                    {currentTrack.voice_gender === "male" ? "Voix Homme" : "Voix Femme"}
-                  </span>
-                )}
               </div>
             )}
 
-            {/* Bouton d'ouverture du sélecteur de chapitres */}
-            {state.tracks && state.tracks.length > 0 && (
+            {/* Bouton d'ouverture de la Liste de lecture des chapitres */}
+            {playlistTracks.length > 0 && (
               <div className="pt-2">
                 <button
                   type="button"
                   onClick={() => setShowChapterList(!showChapterList)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-gold text-xs font-semibold border border-white/10 transition-all cursor-pointer"
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs ${
+                    showChapterList
+                      ? "bg-gold/20 text-gold border-gold/50"
+                      : "bg-navy/80 hover:bg-navy text-white/90 hover:text-gold border-border hover:border-gold/40"
+                  }`}
                 >
-                  <ListMusic className="w-3.5 h-3.5 text-gold" />
+                  <ListMusic className="w-4 h-4 text-gold" />
                   <span>
-                    {showChapterList ? "Masquer les chapitres" : `Chapitres & Pistes (${state.tracks.length})`}
+                    {showChapterList
+                      ? "Masquer la liste de lecture"
+                      : `Liste de lecture (${playlistTracks.length} piste${playlistTracks.length > 1 ? "s" : ""})`}
                   </span>
                 </button>
               </div>
             )}
 
-            {/* Liste déroulante des Chapitres et Pistes */}
+            {/* Panneau dépliable de la Liste de lecture */}
             {showChapterList && (
-              <div className="mt-3 p-3 rounded-2xl bg-navy-dark/95 border border-border text-left max-h-56 overflow-y-auto space-y-1.5 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="mt-3 p-3 rounded-2xl bg-navy-dark/95 border border-border text-left max-h-60 overflow-y-auto space-y-1.5 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between px-2 pb-2 border-b border-border/50 text-[11px] text-foreground-muted font-mono">
-                  <span>SÉLECTION DU CHAPITRE</span>
-                  <span>{state.tracks.length} pistes</span>
+                  <span className="tracking-wider">
+                    {hasBothVoices
+                      ? `CHAPITRES · ${activeVoice === "male" ? "VOIX HOMME" : "VOIX FEMME"}`
+                      : "LISTE DE LECTURE"}
+                  </span>
+                  <span>{playlistTracks.length} chapitres</span>
                 </div>
 
-                {state.tracks.map((track, idx) => {
-                  const isCurrent = idx === state.currentTrackIndex;
+                {playlistTracks.map((track) => {
+                  const globalIdx = state.tracks.indexOf(track);
+                  const isCurrent = globalIdx === state.currentTrackIndex;
                   return (
                     <button
-                      key={track.id || idx}
+                      key={track.id || globalIdx}
                       type="button"
                       onClick={() => {
-                        selectTrackIndex(idx);
+                        selectTrackIndex(globalIdx);
                         setShowChapterList(false);
                       }}
                       className={`w-full p-2.5 rounded-xl text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${
                         isCurrent
                           ? "bg-gold/15 text-gold font-bold border border-gold/40"
-                          : "hover:bg-white/5 text-white/80 hover:text-white"
+                          : "hover:bg-white/5 text-white/80 hover:text-white border border-transparent"
                       }`}
                     >
                       <div className="min-w-0 flex items-center gap-2.5">
                         <div
                           className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-mono font-bold shrink-0 ${
-                            isCurrent ? "bg-gold text-navy font-bold" : "bg-white/10 text-white/70"
+                            isCurrent
+                              ? "bg-gold text-navy font-bold shadow-xs"
+                              : "bg-white/10 text-white/70"
                           }`}
                         >
                           {track.track_type === "full" ? "ALL" : track.chapter_number}
                         </div>
                         <div className="min-w-0">
                           <p className="text-xs truncate">
-                            {track.track_type === "full" ? "Livre complet" : `Chapitre ${track.chapter_number} : ${track.title}`}
+                            {track.track_type === "full"
+                              ? (track.title || "Livre complet")
+                              : `Chapitre ${track.chapter_number} : ${track.title}`}
                           </p>
-                          {track.voice_gender && (
-                            <p className="text-[10px] opacity-70">
-                              {track.voice_gender === "male" ? "Voix Masculine" : "Voix Féminine"}
+                          {isCurrent && (
+                            <p className="text-[10px] text-gold/90 font-sans">
+                              En cours d&apos;écoute
                             </p>
                           )}
                         </div>

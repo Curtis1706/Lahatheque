@@ -19,6 +19,9 @@ import { VoiceTrackManager } from "./voice-track-manager";
 import { AudioStudioFormState, VoiceTrackGroup } from "@/lib/types/audio";
 import { submitAudioStudioForm } from "@/lib/services/audio";
 import { formatXofToEur } from "@/lib/config/audio-constants";
+import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
+import { CountryCombobox } from "@/components/features/catalog/country-combobox";
+import { AuthorCombobox } from "@/components/features/catalog/author-combobox";
 
 interface AudioStudioFormProps {
   role: "layout-artist" | "admin";
@@ -257,33 +260,25 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
                 <label className="text-xs font-bold uppercase tracking-wider text-navy block">
                   Auteur / Éditeur
                 </label>
-                <input
-                  type="text"
-                  disabled={formState.is_attached}
+                <AuthorCombobox
                   value={formState.author}
-                  onChange={(e) => setFormState({ ...formState, author: e.target.value })}
-                  placeholder="Ex: Prof. Albert KOUASSI"
-                  className={`w-full px-4 py-2.5 rounded-xl border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-navy ${
-                    formState.is_attached ? "bg-background-secondary text-foreground-muted cursor-not-allowed" : "bg-background text-foreground"
-                  }`}
+                  onChange={(name) => setFormState((prev) => ({ ...prev, author: name }))}
+                  disabled={formState.is_attached}
+                  placeholder="Rechercher en base ou saisir un auteur..."
                 />
               </div>
 
-              {/* Catégorie & Niveau */}
+              {/* Catégorie & Pays */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-navy block">
                     Catégorie
                   </label>
-                  <input
-                    type="text"
-                    disabled={formState.is_attached}
+                  <DisciplineCombobox
                     value={formState.category}
-                    onChange={(e) => setFormState({ ...formState, category: e.target.value })}
-                    placeholder="Ex: Droit, Économie..."
-                    className={`w-full px-4 py-2.5 rounded-xl border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-navy ${
-                      formState.is_attached ? "bg-background-secondary text-foreground-muted cursor-not-allowed" : "bg-background text-foreground"
-                    }`}
+                    onChange={(val) => setFormState((prev) => ({ ...prev, category: val }))}
+                    disabled={formState.is_attached}
+                    placeholder="Sélectionner une discipline..."
                   />
                 </div>
 
@@ -291,15 +286,11 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
                   <label className="text-xs font-bold uppercase tracking-wider text-navy block">
                     Pays
                   </label>
-                  <input
-                    type="text"
-                    disabled={formState.is_attached}
+                  <CountryCombobox
                     value={formState.country}
-                    onChange={(e) => setFormState({ ...formState, country: e.target.value })}
-                    placeholder="Ex: Bénin"
-                    className={`w-full px-4 py-2.5 rounded-xl border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-navy ${
-                      formState.is_attached ? "bg-background-secondary text-foreground-muted cursor-not-allowed" : "bg-background text-foreground"
-                    }`}
+                    onChange={(name) => setFormState((prev) => ({ ...prev, country: name }))}
+                    disabled={formState.is_attached}
+                    placeholder="Sélectionner un pays..."
                   />
                 </div>
               </div>

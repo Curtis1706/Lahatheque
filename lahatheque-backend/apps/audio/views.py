@@ -215,7 +215,7 @@ class AudioStreamSessionView(APIView):
         is_preview = not has_full_access
         preview_limit_seconds = 180 if is_preview else 0
 
-        tracks = AudioTrack.objects.filter(ouvrage_id=ouvrage_id).order_by("chapter_number")
+        tracks = AudioTrack.objects.filter(ouvrage_id=ouvrage_id).order_by("order_index", "chapter_number", "id")
         sessions = []
         public_r2_url = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', '') or getattr(settings, 'CLOUDFLARE_R2_PUBLIC_DOMAIN', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
 

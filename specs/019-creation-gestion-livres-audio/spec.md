@@ -7,6 +7,14 @@
 
 ---
 
+## Clarifications
+
+### Session 2026-09-07
+
+- Q: Comment souhaitez-vous que l'achat et l'accès aux chapitres audio soient accordés à l'apprenant ? → A: Option A - Livre entier débloqué d'un coup. Un tarif unique donne accès à l'ensemble du livre et de ses chapitres dans les deux narrations (voix homme et voix femme). À l'écoute, l'utilisateur dispose d'une liste de lecture pour passer librement d'un chapitre à l'autre. Si les deux voix sont disponibles, il peut basculer entre l'une et l'autre avec la voix masculine activée par défaut. Si une seule voix existe, elle est sélectionnée automatiquement par défaut.
+
+---
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Studio Audio : Création autonome ou Rattachement à un Livre Existant (Priority: P1)
@@ -128,7 +136,7 @@ En tant que visiteur ou lecteur sur le catalogue public (`/catalog`), je souhait
 #### Commande Multi-Formats & Catalogue
 - **FR-013**: La fiche catalogue et la modale de commande d'un ouvrage DOIVENT permettre la sélection combinée et non-exclusive de 1, 2 ou 3 formats : Papier, Numérique, Audio.
 - **FR-014**: Le panier et le calcul du montant total DOIVENT agréger les prix de tous les formats cochés en temps réel.
-- **FR-015**: L'acquisition d'un format audio DOIT débloquer immédiatement l'accès au streaming audio complet sur `/listen/[id]`.
+- **FR-015**: L'acquisition d'un format audio DOIT débloquer immédiatement l'accès au streaming audio complet de l'ouvrage (livre entier débloqué avec tous ses chapitres, sans micro-paiement additionnel). Le lecteur audio (`/listen/[id]`) DOIT proposer une liste de lecture des chapitres permettant la navigation libre et un sélecteur de voix (Voix Homme par défaut, Voix Femme si disponible, ou voix unique par défaut).
 
 #### Vue d'Ensemble & Progression
 - **FR-016**: La vue d'ensemble du lecteur/étudiant (`/student`) DOIT afficher un widget dédié "Lectures & Écoutes en cours" incluant la progression des livres audio écoutés.
