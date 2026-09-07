@@ -31,7 +31,6 @@ interface PreviewData {
   cover_url: string | null;
   authors: string[];
   audio_url: string;
-  is_hls: boolean;
   preview_limit_seconds: number;
   track_title: string;
   track_duration_seconds: number | null;
@@ -59,8 +58,6 @@ export default function PublicPreviewPage() {
   const [previewEnded, setPreviewEnded] = useState(false);
   const limit = data?.preview_limit_seconds ?? PREVIEW_HARD_LIMIT;
 
-  const hlsRef = useRef<unknown>(null);
-
   // Chargement des données depuis le BFF → backend public
   useEffect(() => {
     if (!bookId) return;
@@ -83,40 +80,6 @@ export default function PublicPreviewPage() {
       .catch(() => setError("Impossible de charger l'extrait audio."))
       .finally(() => setLoading(false));
   }, [bookId]);
-
-  // Attache hls.js si le flux est HLS (Cloudflare Stream)
-  useEffect(() => {
-    if (!data?.audio_url || !data.is_hls) return;
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    // Charge hls.js dynamiquement depuis CDN — pas besoin de l'installer
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js";
-    script.async = true;
-    script.onload = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const Hls = (window as any).Hls;
-      if (Hls && Hls.isSupported()) {
-        const hls = new Hls({ maxBufferLength: 30 });
-        hls.loadSource(data.audio_url);
-        hls.attachMedia(audio);
-        hlsRef.current = hls;
-      } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
-        // Safari supporte HLS nativement
-        audio.src = data.audio_url;
-      }
-    };
-    document.head.appendChild(script);
-
-    return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hls = hlsRef.current as any;
-      if (hls) hls.destroy();
-      hlsRef.current = null;
-      if (document.head.contains(script)) document.head.removeChild(script);
-    };
-  }, [data?.audio_url, data?.is_hls]);
 
   // Enforcement côté client de la limite 180s
   const handleTimeUpdate = useCallback(() => {
