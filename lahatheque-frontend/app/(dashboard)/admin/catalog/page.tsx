@@ -40,6 +40,8 @@ export default function AdminCatalogPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editPriceDigital, setEditPriceDigital] = useState<number>(5000);
   const [editPricePaper, setEditPricePaper] = useState<number>(7500);
+  const [editPriceAudio, setEditPriceAudio] = useState<number>(3500);
+  const [editHasAudioVersion, setEditHasAudioVersion] = useState<boolean>(false);
   const [editStatus, setEditStatus] = useState<AdminCatalogBook["status"]>("published");
   const [saving, setSaving] = useState(false);
 
@@ -69,6 +71,8 @@ export default function AdminCatalogPage() {
     setEditTitle(book.title);
     setEditPriceDigital(book.price_digital);
     setEditPricePaper(book.price_paper);
+    setEditPriceAudio(book.price_audio || 3500);
+    setEditHasAudioVersion(Boolean(book.has_audio_version || book.has_audio));
     setEditStatus(book.status);
   };
 
@@ -82,6 +86,8 @@ export default function AdminCatalogPage() {
         title: editTitle,
         price_digital: editPriceDigital,
         price_paper: editPricePaper,
+        price_audio: editHasAudioVersion ? editPriceAudio : undefined,
+        has_audio_version: editHasAudioVersion,
         status: editStatus,
       });
 
@@ -94,6 +100,9 @@ export default function AdminCatalogPage() {
                 title: editTitle,
                 price_digital: editPriceDigital,
                 price_paper: editPricePaper,
+                price_audio: editHasAudioVersion ? editPriceAudio : undefined,
+                has_audio_version: editHasAudioVersion,
+                has_audio: editHasAudioVersion || b.has_audio,
                 status: editStatus,
               }
             : b
@@ -463,6 +472,37 @@ export default function AdminCatalogPage() {
                     className="w-full bg-background-secondary border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy font-mono"
                   />
                 </div>
+              </div>
+
+              {/* Option Version Livre Audio */}
+              <div className="p-3.5 rounded-2xl bg-background-secondary border border-border space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-navy flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editHasAudioVersion}
+                      onChange={(e) => setEditHasAudioVersion(e.target.checked)}
+                      className="w-4 h-4 rounded border-border text-navy focus:ring-navy cursor-pointer"
+                    />
+                    <span>Version Livre Audio Active</span>
+                  </label>
+                  <span className="text-[10px] text-gold font-bold">Cloudflare Stream</span>
+                </div>
+
+                {editHasAudioVersion && (
+                  <div className="space-y-1 pt-1">
+                    <label className="text-[11px] font-bold text-navy uppercase tracking-wider">
+                      Prix Audio Streaming (FCFA)
+                    </label>
+                    <input
+                      type="number"
+                      step="500"
+                      value={editPriceAudio}
+                      onChange={(e) => setEditPriceAudio(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground font-mono font-bold focus:ring-2 focus:ring-navy"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">

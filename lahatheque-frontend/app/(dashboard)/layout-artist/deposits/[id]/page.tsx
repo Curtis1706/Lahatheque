@@ -98,6 +98,8 @@ export default function DepositDetailPage() {
   const [priceDigital, setPriceDigital] = useState(5000);
   const [isPaperAvailable, setIsPaperAvailable] = useState(false);
   const [pricePaper, setPricePaper] = useState(7500);
+  const [hasAudioVersion, setHasAudioVersion] = useState(false);
+  const [priceAudio, setPriceAudio] = useState(3500);
 
   // Fichiers de remplacement
   const [newBookFile, setNewBookFile] = useState<File | null>(null);
@@ -148,6 +150,8 @@ export default function DepositDetailPage() {
           setPriceDigital(data.default_price || 5000);
           setIsPaperAvailable(Boolean(data.is_paper_available));
           setPricePaper(data.admin_price || 7500);
+          setHasAudioVersion(Boolean(data.has_audio_version || data.has_audio));
+          setPriceAudio(data.price_audio || 3500);
 
           if (data.pre_edition_dossier?.id) {
             setSelectedPreEditionId(String(data.pre_edition_dossier.id));
@@ -330,6 +334,8 @@ export default function DepositDetailPage() {
           },
           default_price: Number(priceDigital),
           admin_price: Number(pricePaper),
+          price_audio: hasAudioVersion ? Number(priceAudio) : undefined,
+          has_audio_version: hasAudioVersion,
           is_paper_available: isPaperAvailable,
         },
         newBookFile,
@@ -1201,18 +1207,77 @@ export default function DepositDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* Option Livre Audio */}
+            <div className="p-4 rounded-2xl bg-background border border-border space-y-3">
+              <label className={`flex items-center gap-3 select-none ${isEditing ? "cursor-pointer" : "cursor-not-allowed"}`}>
+                <input
+                  type="checkbox"
+                  disabled={!isEditing}
+                  checked={hasAudioVersion}
+                  onChange={(e) => setHasAudioVersion(e.target.checked)}
+                  className="w-4 h-4 rounded border-border text-navy focus:ring-navy cursor-pointer disabled:cursor-not-allowed"
+                />
+                <span className="font-bold text-navy text-xs flex items-center gap-1.5">
+                  <Headphones className="w-3.5 h-3.5 text-gold" />
+                  Disponible en version Livre Audio (Streaming Sécurisé HLS)
+                </span>
+              </label>
+
+              {hasAudioVersion && (
+                <div className="pt-2 pl-7">
+                  <label className="block font-semibold text-navy mb-1">Prix Version Audio (FCFA)</label>
+                  <input
+                    type="number"
+                    disabled={!isEditing}
+                    value={priceAudio}
+                    onChange={(e) => setPriceAudio(Number(e.target.value))}
+                    min={0}
+                    step={500}
+                    className={`w-full max-w-xs ${inputClass}`}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* BLOC 5 : GESTION & REMPLACEMENT DE LA PISTE AUDIO */}
-        {isEditing && (
+        {isEditing ? (
           <AudioReplacementDropzone
             bookId={deposit.id}
             bookTitle={deposit.metadata.title}
             currentDurationSeconds={(deposit as any).audio_duration_seconds}
             onSuccess={() => router.refresh()}
           />
-        )}
+        ) : (deposit.has_audio_version || deposit.has_audio || hasAudioVersion) ? (
+          <div className="p-6 rounded-3xl bg-background border border-border space-y-4 shadow-xs">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-gold/15 text-navy flex items-center justify-center border border-gold/30">
+                  <Headphones className="w-5 h-5 text-gold" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-navy text-base">
+                    Version Livre Audio Active
+                  </h3>
+                  <p className="text-xs text-foreground-muted">
+                    Piste audio encodée et protégée en streaming signé.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => playBook(deposit.id)}
+                className="px-4 py-2 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center gap-2 min-h-[40px] cursor-pointer shadow-xs"
+              >
+                <Headphones className="w-4 h-4" />
+                <span>Écouter l&apos;audio</span>
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Actions de sauvegarde & resoumission (visibles en mode édition) */}

@@ -135,6 +135,8 @@ export interface AdminCatalogBook {
   price_paper: number;
   price_audio?: number;
   has_audio_version?: boolean;
+  has_audio?: boolean;
+  audio_duration_seconds?: number;
   price?: number;
   sales_count: number;
   consultation_count: number;

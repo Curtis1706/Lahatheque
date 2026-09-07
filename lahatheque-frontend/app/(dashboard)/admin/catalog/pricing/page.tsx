@@ -45,6 +45,8 @@ export default function AdminPricingCascadePage() {
   const [editingBook, setEditingBook] = useState<AdminCatalogBook | null>(null);
   const [customDigitalPrice, setCustomDigitalPrice] = useState<number>(3000);
   const [customPaperPrice, setCustomPaperPrice] = useState<number>(5000);
+  const [customAudioPrice, setCustomAudioPrice] = useState<number>(2500);
+  const [customHasAudio, setCustomHasAudio] = useState<boolean>(false);
   const [savingBookPricing, setSavingBookPricing] = useState(false);
 
   // Paramètres Multi-Rôles / Profils Acheteurs
@@ -160,6 +162,8 @@ export default function AdminPricingCascadePage() {
     setEditingBook(book);
     setCustomDigitalPrice(book.price_digital || defaultDigitalPrice);
     setCustomPaperPrice(book.price_paper || defaultPaperPrice);
+    setCustomAudioPrice(book.price_audio || defaultAudioPrice);
+    setCustomHasAudio(Boolean(book.has_audio_version || book.has_audio));
   };
 
   const handleSaveBookPricing = async (e: React.FormEvent) => {
@@ -170,6 +174,8 @@ export default function AdminPricingCascadePage() {
       const res = await updateBookPricing(editingBook.id, {
         price_digital: customDigitalPrice,
         price_paper: customPaperPrice,
+        price_audio: customHasAudio ? customAudioPrice : undefined,
+        has_audio_version: customHasAudio,
       });
       if (res.success) {
         toast.success(`Tarifs spécifiques pour "${editingBook.title}" enregistrés.`);
@@ -180,6 +186,9 @@ export default function AdminPricingCascadePage() {
                   ...b,
                   price_digital: customDigitalPrice,
                   price_paper: customPaperPrice,
+                  price_audio: customHasAudio ? customAudioPrice : undefined,
+                  has_audio_version: customHasAudio,
+                  has_audio: customHasAudio || b.has_audio,
                 }
               : b
           )
@@ -820,10 +829,10 @@ export default function AdminPricingCascadePage() {
               <p><strong className="text-navy">ISBN :</strong> {editingBook.isbn}</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="text-xs font-semibold text-navy">
-                  Prix Public Numérique Spécifique (XOF)
+                  Prix Numérique (XOF)
                 </label>
                 <input
                   type="number"
@@ -837,7 +846,7 @@ export default function AdminPricingCascadePage() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-navy">
-                  Prix Public Papier Spécifique (XOF)
+                  Prix Papier (XOF)
                 </label>
                 <input
                   type="number"
@@ -847,6 +856,29 @@ export default function AdminPricingCascadePage() {
                   onChange={(e) => setCustomPaperPrice(Number(e.target.value))}
                   className="w-full mt-1.5 p-2.5 text-xs font-mono font-bold rounded-xl bg-background border border-border text-navy focus:border-gold focus:outline-none"
                   required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-navy flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={customHasAudio}
+                    onChange={(e) => setCustomHasAudio(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-border text-navy focus:ring-navy cursor-pointer"
+                  />
+                  <span>Prix Audio (XOF)</span>
+                </label>
+                <input
+                  type="number"
+                  min="500"
+                  step="100"
+                  disabled={!customHasAudio}
+                  value={customAudioPrice}
+                  onChange={(e) => setCustomAudioPrice(Number(e.target.value))}
+                  className={`w-full mt-1.5 p-2.5 text-xs font-mono font-bold rounded-xl bg-background border border-border text-navy focus:border-gold focus:outline-none ${
+                    !customHasAudio ? "opacity-50" : ""
+                  }`}
+                  required={customHasAudio}
                 />
               </div>
             </div>

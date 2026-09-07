@@ -425,6 +425,9 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "discipline": b.discipline.name if b.discipline else "Non classé",
                 "price_digital": price_num,
                 "price_paper": price_pap,
+                "price_audio": float(b.price_audio) if b.price_audio is not None else None,
+                "has_audio_version": bool(getattr(b, "has_audio_version", False)),
+                "has_audio": bool(getattr(b, "has_audio_version", False) or b.audio_tracks.exists()),
                 "uses_default_pricing": not has_custom,
                 "status": b.status,
             })
@@ -439,6 +442,14 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 book.price_digital = Decimal(str(data['price_digital']))
             if 'price_paper' in data and data['price_paper'] is not None:
                 book.price_paper = Decimal(str(data['price_paper']))
+            if 'price_audio' in data:
+                if data['price_audio'] is not None and str(data['price_audio']).strip() != '':
+                    book.price_audio = Decimal(str(data['price_audio']))
+                else:
+                    book.price_audio = None
+            if 'has_audio_version' in data:
+                val = str(data.get('has_audio_version')).lower()
+                book.has_audio_version = val in ('true', '1', 'yes')
             if 'title' in data and data['title']:
                 book.title = str(data['title'])
             if 'status' in data and data['status']:

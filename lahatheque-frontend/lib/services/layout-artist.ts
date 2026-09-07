@@ -90,6 +90,8 @@ function mapBackendToDeposit(b: any, fallbackUserId?: string): LayoutDeposit {
     admin_price: Number(b.price_paper) || 7500,
     price_audio: b.price_audio ? Number(b.price_audio) : undefined,
     has_audio_version: Boolean(b.has_audio_version),
+    has_audio: Boolean(b.has_audio || b.has_audio_version),
+    audio_duration_seconds: b.audio_duration_seconds ? Number(b.audio_duration_seconds) : undefined,
     is_paper_available: Boolean(b.is_paper_available),
     pre_edition_dossier: b.pre_edition_dossier || null,
   };
@@ -762,6 +764,8 @@ export async function updateCatalogBookWithFiles(
   if (data.files?.format) formData.append("format_type", data.files.format.toLowerCase());
   if (data.default_price !== undefined) formData.append("price_digital", String(data.default_price));
   if (data.admin_price !== undefined) formData.append("price_paper", String(data.admin_price));
+  if (data.price_audio !== undefined) formData.append("price_audio", String(data.price_audio));
+  if (data.has_audio_version !== undefined) formData.append("has_audio_version", String(data.has_audio_version));
   if (data.is_paper_available !== undefined) formData.append("is_paper_available", String(data.is_paper_available));
   if (data.status) formData.append("status", data.status);
 

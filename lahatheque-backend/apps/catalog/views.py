@@ -491,6 +491,19 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 pass
 
+        if 'price_audio' in request.data:
+            if request.data['price_audio'] is not None and str(request.data['price_audio']).strip() != '':
+                try:
+                    ouvrage.price_audio = float(request.data['price_audio'])
+                except (ValueError, TypeError):
+                    pass
+            else:
+                ouvrage.price_audio = None
+
+        if 'has_audio_version' in request.data:
+            val = str(request.data.get('has_audio_version')).lower()
+            ouvrage.has_audio_version = val in ('true', '1', 'yes')
+
         if 'is_paper_available' in request.data:
             val = str(request.data.get('is_paper_available')).lower()
             ouvrage.is_paper_available = val in ('true', '1', 'yes')

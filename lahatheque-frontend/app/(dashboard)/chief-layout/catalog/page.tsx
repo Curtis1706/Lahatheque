@@ -20,14 +20,17 @@ import {
   FileText,
   Clock,
   Package,
+  Headphones,
 } from "lucide-react";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { getCatalogBooks } from "@/lib/services/layout-artist";
 import { EditBookModal } from "@/components/features/chief-layout/edit-book-modal";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { toast } from "sonner";
 
 export default function ChiefLayoutCatalogPage() {
+  const { playBook } = useAudioPlayer();
   const [books, setBooks] = useState<LayoutDeposit[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -290,9 +293,11 @@ export default function ChiefLayoutCatalogPage() {
                 </div>
 
                 {/* Formats & Tarifs Box */}
-                <div className="p-3 rounded-2xl bg-background-secondary border border-border grid grid-cols-2 gap-2 text-xs">
+                <div className={`p-3 rounded-2xl bg-background-secondary border border-border grid gap-2 text-xs ${
+                  book.has_audio_version || book.has_audio || book.price_audio ? "grid-cols-3" : "grid-cols-2"
+                }`}>
                   <div>
-                    <span className="text-[10px] text-foreground-muted uppercase font-bold block">
+                    <span className="text-[10px] text-foreground-muted uppercase font-bold block truncate">
                       Numérique
                     </span>
                     <span className="font-mono font-bold text-navy text-xs">
@@ -301,17 +306,29 @@ export default function ChiefLayoutCatalogPage() {
                   </div>
 
                   <div>
-                    <span className="text-[10px] text-foreground-muted uppercase font-bold block">
-                      Version Papier
+                    <span className="text-[10px] text-foreground-muted uppercase font-bold block truncate">
+                      Papier
                     </span>
                     <span className={`font-mono text-xs font-bold ${
                       book.is_paper_available ? "text-gold" : "text-foreground-muted/60"
                     }`}>
                       {book.is_paper_available
                         ? `${(book.admin_price || 7500).toLocaleString("fr-FR")} XOF`
-                        : "Non disponible"}
+                        : "Désactivé"}
                     </span>
                   </div>
+
+                  {(book.has_audio_version || book.has_audio || book.price_audio) && (
+                    <div>
+                      <span className="text-[10px] text-gold uppercase font-bold flex items-center gap-1 truncate">
+                        <Headphones className="w-2.5 h-2.5 text-gold" />
+                        Audio
+                      </span>
+                      <span className="font-mono font-bold text-gold text-xs">
+                        {(book.price_audio || 3500).toLocaleString("fr-FR")} XOF
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bottom Actions */}
@@ -324,6 +341,17 @@ export default function ChiefLayoutCatalogPage() {
                     <Edit className="w-3.5 h-3.5 text-gold" />
                     Modifier
                   </button>
+
+                  {(book.has_audio_version || book.has_audio || book.price_audio) && (
+                    <button
+                      type="button"
+                      onClick={() => playBook(book.id)}
+                      className="p-2 rounded-xl bg-gold/15 border border-gold/40 text-navy hover:bg-gold/25 transition-colors flex items-center justify-center min-h-[40px] min-w-[40px] cursor-pointer"
+                      title="Écouter la version audio"
+                    >
+                      <Headphones className="w-4 h-4 text-gold" />
+                    </button>
+                  )}
 
                   <Link
                     href={`/student/catalog/${book.id}`}

@@ -75,6 +75,8 @@ export interface LayoutDeposit {
   admin_price?: number;
   price_audio?: number;
   has_audio_version?: boolean;
+  has_audio?: boolean;
+  audio_duration_seconds?: number;
   is_paper_available?: boolean;
   pre_edition_dossier?: any;
 }

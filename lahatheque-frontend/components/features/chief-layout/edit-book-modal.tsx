@@ -13,9 +13,12 @@ import {
   FileText,
   ShieldCheck,
   CheckCircle2,
+  Headphones,
 } from "lucide-react";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { updateCatalogBookWithFiles } from "@/lib/services/layout-artist";
+import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { toast } from "sonner";
 
 import { 
@@ -39,6 +42,7 @@ interface EditBookModalProps {
 }
 
 export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalProps) {
+  const { playBook } = useAudioPlayer();
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "pricing" | "classification">("general");
 
@@ -55,6 +59,8 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
   const [priceDigital, setPriceDigital] = useState(book.default_price || 5000);
   const [isPaperAvailable, setIsPaperAvailable] = useState(Boolean(book.is_paper_available));
   const [pricePaper, setPricePaper] = useState(book.admin_price || 7500);
+  const [hasAudioVersion, setHasAudioVersion] = useState(Boolean(book.has_audio_version || book.has_audio));
+  const [priceAudio, setPriceAudio] = useState(book.price_audio || 3500);
 
   // Classification
   const { disciplines: realDisciplines, loading: disciplinesLoading } = useDisciplines();
@@ -159,6 +165,8 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
           },
           default_price: priceDigital,
           admin_price: isPaperAvailable ? pricePaper : 0,
+          price_audio: hasAudioVersion ? priceAudio : undefined,
+          has_audio_version: hasAudioVersion,
           is_paper_available: isPaperAvailable,
         },
         coverFile,
@@ -207,13 +215,26 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {(book.has_audio_version || book.has_audio || hasAudioVersion) && (
+              <button
+                type="button"
+                onClick={() => playBook(book.id)}
+                className="px-3 py-1.5 rounded-xl bg-gold/20 hover:bg-gold/30 border border-gold/40 text-gold text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Écouter la piste audio"
+              >
+                <Headphones className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Écouter</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Tab Navigation */}
@@ -238,7 +259,7 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                 : "border-transparent text-foreground-muted hover:text-foreground"
             }`}
           >
-            2. Tarification &amp; Formats (Papier / Numérique)
+            2. Tarification &amp; Formats (Papier, Numérique, Audio)
           </button>
           <button
             type="button"
@@ -508,6 +529,71 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                       }`}
                     />
                   </button>
+                </div>
+
+                {/* Section Livre Audio */}
+                <div className="pt-4 border-t border-border space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Headphones className="w-4 h-4 text-gold" />
+                        <span className="text-xs font-bold text-navy">
+                          Activer la version Livre Audio (Streaming Sécurisé HLS)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-foreground-muted">
+                        {hasAudioVersion
+                          ? "La version audio est activée : elle apparaît sur le catalogue public avec lecteur persistant et extrait gratuit."
+                          : "Aucune version audio active pour cet ouvrage."}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setHasAudioVersion((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                        hasAudioVersion ? "bg-gold" : "bg-border"
+                      }`}
+                      role="switch"
+                      aria-checked={hasAudioVersion}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          hasAudioVersion ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {hasAudioVersion && (
+                    <div className="space-y-4 pt-1 animate-in fade-in duration-200">
+                      <div className="p-4 rounded-xl bg-background border border-border space-y-1.5">
+                        <label className="text-xs font-bold text-navy flex items-center justify-between">
+                          <span>Prix Version Audio Streaming (FCFA) *</span>
+                          <span className="text-[10px] text-gold font-bold">Cloudflare Stream</span>
+                        </label>
+                        <input
+                          type="number"
+                          step="500"
+                          required={hasAudioVersion}
+                          value={priceAudio}
+                          onChange={(e) => setPriceAudio(parseFloat(e.target.value) || 0)}
+                          className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm font-mono text-navy font-bold focus:ring-2 focus:ring-navy min-h-[44px]"
+                        />
+                        <p className="text-[11px] text-foreground-muted">
+                          Prix public d&apos;achat pour l&apos;accès streaming illimité au livre audio.
+                        </p>
+                      </div>
+
+                      {/* Dropzone de gestion & remplacement de la piste audio */}
+                      <AudioReplacementDropzone
+                        bookId={book.id}
+                        bookTitle={title}
+                        currentDurationSeconds={book.audio_duration_seconds}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
