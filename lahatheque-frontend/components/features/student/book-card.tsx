@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { ClientBookAccess } from "@/lib/types/student";
 import { BookCover } from "./book-cover";
 import { BookSampleModal } from "./book-sample-modal";
+import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-modal";
 import { PaperOrderModal } from "./paper-order-modal";
 import { createOrder } from "@/lib/services/commerce-orders";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
@@ -31,8 +32,24 @@ interface BookCardProps {
 export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
   const { playBook } = useAudioPlayer();
   const [showSample, setShowSample] = useState(false);
+  const [showSampleChoice, setShowSampleChoice] = useState(false);
   const [showPaperModal, setShowPaperModal] = useState(false);
   const [isFav, setIsFav] = useState(book.is_favorite);
+
+  const hasAudio = Boolean(
+    book.has_audio_version ||
+    book.format === "audio" ||
+    book.format_type === "audio" ||
+    (book.price_audio !== null && book.price_audio !== undefined)
+  );
+
+  const handleExtractClick = () => {
+    if (hasAudio) {
+      setShowSampleChoice(true);
+    } else {
+      setShowSample(true);
+    }
+  };
 
   const handleFavoriteClick = async () => {
     const nextFav = !isFav;
@@ -180,8 +197,8 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
           <div className="pt-3 border-t border-border flex items-center justify-between gap-2 text-xs flex-wrap">
             <button
               type="button"
-              onClick={() => setShowSample(true)}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-foreground-muted hover:text-navy transition-colors"
+              onClick={handleExtractClick}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-foreground-muted hover:text-navy transition-colors cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5 text-gold" />
               Extrait gratuit
@@ -235,6 +252,12 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
         book={book}
         isOpen={showSample}
         onClose={() => setShowSample(false)}
+      />
+
+      <SampleChoiceModal
+        book={book}
+        isOpen={showSampleChoice}
+        onClose={() => setShowSampleChoice(false)}
       />
 
       <PaperOrderModal

@@ -24,6 +24,7 @@ import {
 } from "@/lib/services/student";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
 import { UnifiedBookOrderModal } from "@/components/features/student/unified-book-order-modal";
+import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-modal";
 import { BookCover } from "@/components/features/student/book-cover";
 import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle, type ViewMode } from "@/components/features/student/view-toggle";
@@ -369,6 +370,7 @@ export default function StudentCatalogPage() {
   const [pageSize, setPageSize] = useState(9);
 
   const [sampleModalBook, setSampleModalBook] = useState<BookAPI | null>(null);
+  const [sampleChoiceBook, setSampleChoiceBook] = useState<BookAPI | null>(null);
   const [orderModalBook, setOrderModalBook] = useState<BookAPI | null>(null);
 
   // Debounce la recherche
@@ -405,8 +407,21 @@ export default function StudentCatalogPage() {
   const router = useRouter();
 
   const handleOpenSample = (book: BookAPI) => {
-    toast.info(`Ouverture de l'extrait pour « ${book.title} »`);
-    router.push(`/catalog/reader/${book.id}?mode=sample`);
+    const hasAudio = Boolean(
+      book.has_audio ||
+      book.has_audio_version ||
+      (book.price_audio !== null && book.price_audio !== undefined) ||
+      (book as any).format === "audio" ||
+      (book as any).format_type === "audio" ||
+      ((book as any).audio_tracks && (book as any).audio_tracks.length > 0)
+    );
+
+    if (hasAudio) {
+      setSampleChoiceBook(book);
+    } else {
+      toast.info(`Ouverture de l'extrait pour « ${book.title} »`);
+      router.push(`/catalog/reader/${book.id}?mode=sample`);
+    }
   };
 
   const { disciplines: dbDisciplines } = useDisciplines();
@@ -688,6 +703,13 @@ export default function StudentCatalogPage() {
           }}
         />
       )}
+
+      {/* Modale de choix d'extrait (Livre numérique ou Audio) */}
+      <SampleChoiceModal
+        book={sampleChoiceBook}
+        isOpen={Boolean(sampleChoiceBook)}
+        onClose={() => setSampleChoiceBook(null)}
+      />
     </div>
   );
 }

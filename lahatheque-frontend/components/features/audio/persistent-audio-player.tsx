@@ -21,10 +21,11 @@ import {
   RotateCw,
 } from "lucide-react";
 import { useAudioPlayer } from "./audio-player-context";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export function PersistentAudioPlayer() {
   const router = useRouter();
+  const pathname = usePathname();
   const {
     state,
     togglePlay,
@@ -38,7 +39,11 @@ export function PersistentAudioPlayer() {
     closePlayer,
   } = useAudioPlayer();
 
-  if (!state.currentBookId) {
+  // Ne pas afficher le mini-lecteur si l'utilisateur est déjà sur la page de lecture audio
+  const isListeningPage =
+    pathname?.startsWith("/listen") || pathname?.includes("/audio/");
+
+  if (!state.currentBookId || isListeningPage) {
     return null;
   }
 
@@ -61,7 +66,7 @@ export function PersistentAudioPlayer() {
   const handleOpenImmersive = () => {
     toggleExpand();
     if (state.currentBookId) {
-      router.push(`/student/audio/${state.currentBookId}`);
+      router.push(`/listen/${state.currentBookId}`);
     }
   };
 

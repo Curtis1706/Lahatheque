@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { ClientBookAccess } from "@/lib/types/student";
 import { BookCover } from "./book-cover";
 import { BookSampleModal } from "./book-sample-modal";
+import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-modal";
 import { PaperOrderModal } from "./paper-order-modal";
 import { createOrder } from "@/lib/services/commerce-orders";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
@@ -30,8 +31,24 @@ interface BookListItemProps {
 export function BookListItem({ book, onToggleFavorite, className }: BookListItemProps) {
   const { playBook } = useAudioPlayer();
   const [showSample, setShowSample] = useState(false);
+  const [showSampleChoice, setShowSampleChoice] = useState(false);
   const [showPaperModal, setShowPaperModal] = useState(false);
   const [isFav, setIsFav] = useState(book.is_favorite);
+
+  const hasAudio = Boolean(
+    book.has_audio_version ||
+    (book as any).price_audio ||
+    (book as any).format === "audio" ||
+    (book as any).format_type === "audio"
+  );
+
+  const handleExtractClick = () => {
+    if (hasAudio) {
+      setShowSampleChoice(true);
+    } else {
+      setShowSample(true);
+    }
+  };
 
   const handleFavoriteClick = async () => {
     const nextFav = !isFav;
@@ -156,9 +173,9 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
 
           <button
             type="button"
-            onClick={() => setShowSample(true)}
+            onClick={handleExtractClick}
             title="Consulter l'extrait"
-            className="p-2 rounded-xl border border-border text-foreground-muted hover:text-navy transition-colors"
+            className="p-2 rounded-xl border border-border text-foreground-muted hover:text-navy transition-colors cursor-pointer"
           >
             <Eye className="w-4 h-4 text-gold" />
           </button>
@@ -208,6 +225,12 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
         book={book}
         isOpen={showSample}
         onClose={() => setShowSample(false)}
+      />
+
+      <SampleChoiceModal
+        book={book}
+        isOpen={showSampleChoice}
+        onClose={() => setShowSampleChoice(false)}
       />
 
       <PaperOrderModal

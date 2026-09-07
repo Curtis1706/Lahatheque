@@ -98,7 +98,7 @@ export function UnifiedBookOrderModal({
     // Si déjà possédé en audio et sélectionné, lancer la lecture audio
     if (format === "audio" && isAudioOwned) {
       playBook(book.id);
-      router.push(`/student/audio/${book.id}`);
+      router.push(`/listen/${book.id}`);
       onClose();
       return;
     }
@@ -237,7 +237,7 @@ export function UnifiedBookOrderModal({
                 type="button"
                 onClick={() => {
                   playBook(book.id);
-                  router.push(`/student/audio/${book.id}`);
+                  router.push(`/listen/${book.id}`);
                   onClose();
                 }}
                 className="w-full px-4 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 min-h-[44px] shadow-sm cursor-pointer"

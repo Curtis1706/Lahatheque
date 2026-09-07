@@ -22,12 +22,13 @@ import {
   getAudioStreamSession,
   saveAudioListeningProgress,
 } from "@/lib/services/audio";
+import { useRouter } from "next/navigation";
 
 interface AudioPlayerContextType {
   state: AudioPlayerState;
   playBook: (
     bookId: string,
-    options?: { preview?: boolean; initialTrackIndex?: number }
+    options?: { preview?: boolean; initialTrackIndex?: number; skipRedirect?: boolean }
   ) => Promise<void>;
   togglePlay: () => void;
   pause: () => void;
@@ -72,12 +73,17 @@ export function AudioPlayerProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const [state, setState] = useState<AudioPlayerState>(initialState);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const progressSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialisation de l'élément audio HTML5
+  const stateRef = useRef<AudioPlayerState>(state);
+  stateRef.current = state;
+  const nextTrackRef = useRef<() => void>(() => {});
+
+  // Initialisation unique de l'élément audio HTML5 au montage
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -87,12 +93,15 @@ export function AudioPlayerProvider({
 
     const onTimeUpdate = () => {
       const current = audio.currentTime;
-      const dur = audio.duration || state.duration || 0;
+      const dur = audio.duration || stateRef.current.duration || 0;
 
-      // Limitation stricte de l'extrait gratuit à 180 secondes
-      if (state.isPreview && current >= state.previewLimitSeconds) {
+      // Limitation stricte de l'extrait gratuit à previewLimitSeconds (180s)
+      if (
+        stateRef.current.isPreview &&
+        current >= stateRef.current.previewLimitSeconds
+      ) {
         audio.pause();
-        audio.currentTime = state.previewLimitSeconds;
+        audio.currentTime = stateRef.current.previewLimitSeconds;
         setState((prev) => ({
           ...prev,
           currentTime: prev.previewLimitSeconds,
@@ -115,9 +124,16 @@ export function AudioPlayerProvider({
     const onPause = () => setState((prev) => ({ ...prev, isPlaying: false }));
     const onWaiting = () => setState((prev) => ({ ...prev, isLoading: true }));
     const onPlaying = () => setState((prev) => ({ ...prev, isLoading: false }));
+    const onLoadedMetadata = () => {
+      if (audio.duration && !isNaN(audio.duration) && audio.duration > 0) {
+        setState((prev) => ({
+          ...prev,
+          duration: audio.duration,
+        }));
+      }
+    };
     const onEnded = () => {
-      // Piste terminée : passage à la suivante ou arrêt
-      handleNextTrack();
+      nextTrackRef.current?.();
     };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
@@ -125,6 +141,7 @@ export function AudioPlayerProvider({
     audio.addEventListener("pause", onPause);
     audio.addEventListener("waiting", onWaiting);
     audio.addEventListener("playing", onPlaying);
+    audio.addEventListener("loadedmetadata", onLoadedMetadata);
     audio.addEventListener("ended", onEnded);
 
     return () => {
@@ -134,12 +151,13 @@ export function AudioPlayerProvider({
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("waiting", onWaiting);
       audio.removeEventListener("playing", onPlaying);
+      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("ended", onEnded);
       if (hlsRef.current) {
         hlsRef.current.destroy();
       }
     };
-  }, [state.isPreview, state.previewLimitSeconds]);
+  }, []); // Exécuté UNIQUEMENT au montage pour préserver la source et les écouteurs
 
   // Sauvegarde périodique de progression d'écoute toutes les 10 secondes (hors extrait)
   useEffect(() => {
@@ -183,7 +201,7 @@ export function AudioPlayerProvider({
     state.currentBookId,
   ]);
 
-  // Chargement d'une URL de flux dans l'élément audio (HLS.js ou natif)
+  // Chargement d'une URL de flux dans l'élément audio (HLS.js ou audio standard MP3/AAC)
   const loadSource = useCallback((url: string) => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -201,14 +219,44 @@ export function AudioPlayerProvider({
         });
         hls.loadSource(url);
         hls.attachMedia(audio);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          audio.play().catch((err) => {
+            console.log("Lecture audio différée :", err);
+          });
+        });
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.warn("HLS fatal network error, tentative de reprise...", data);
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.warn("HLS fatal media error, récupération...", data);
+                hls.recoverMediaError();
+                break;
+              default:
+                console.error("HLS unrecoverable error", data);
+                hls.destroy();
+                break;
+            }
+          }
+        });
         hlsRef.current = hls;
       } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
         audio.src = url;
+        audio.play().catch(() => {});
       } else {
         audio.src = url;
+        audio.play().catch(() => {});
       }
     } else {
+      // Lecture native de fichiers MP3, AAC, WAV, etc.
       audio.src = url;
+      audio.load();
+      audio.play().catch((err) => {
+        console.log("Autoplay audio en attente d'interaction :", err);
+      });
     }
   }, []);
 
@@ -216,13 +264,20 @@ export function AudioPlayerProvider({
   const playBook = useCallback(
     async (
       bookId: string,
-      options?: { preview?: boolean; initialTrackIndex?: number }
+      options?: { preview?: boolean; initialTrackIndex?: number; skipRedirect?: boolean }
     ) => {
       setState((prev) => ({
         ...prev,
         isLoading: true,
         currentBookId: bookId,
       }));
+
+      // Redirection universelle vers la page d'écoute /listen/[id]
+      if (!options?.skipRedirect && typeof window !== "undefined") {
+        if (!window.location.pathname.includes(`/listen/${bookId}`)) {
+          router.push(`/listen/${bookId}`);
+        }
+      }
 
       try {
         const res = await getAudioStreamSession(bookId);
@@ -256,7 +311,7 @@ export function AudioPlayerProvider({
           currentTrackIndex: initialIndex,
           currentTime: 0,
           duration: targetTrack.duration_seconds || 0,
-          isPreview: Boolean(data.is_preview),
+          isPreview: Boolean(data.is_preview || options?.preview),
           previewLimitSeconds: data.preview_limit_seconds || 180,
           isLoading: false,
         }));
@@ -266,13 +321,10 @@ export function AudioPlayerProvider({
           if (audioRef.current) {
             audioRef.current.playbackRate = state.playbackRate;
             audioRef.current.volume = state.isMuted ? 0 : state.volume / 100;
-            audioRef.current.play().catch(() => {
-              // Gestion de la politique d'autoplay navigateur
-            });
           }
         }
 
-        if (data.is_preview) {
+        if (data.is_preview || options?.preview) {
           toast.info("Extrait audio gratuit (3:00 max). Bonne écoute !");
         }
       } catch (err) {
@@ -291,7 +343,12 @@ export function AudioPlayerProvider({
     if (state.isPlaying) {
       audio.pause();
     } else {
-      audio.play().catch(() => {});
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn("Erreur lors de la lecture audio:", err);
+        });
+      }
     }
   }, [state.isPlaying]);
 
@@ -381,6 +438,8 @@ export function AudioPlayerProvider({
       }
     }
   }, [state.tracks, state.currentTrackIndex, loadSource]);
+
+  nextTrackRef.current = handleNextTrack;
 
   const handlePreviousTrack = useCallback(() => {
     if (!state.tracks.length) return;

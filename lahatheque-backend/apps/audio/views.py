@@ -216,46 +216,57 @@ class AudioStreamSessionView(APIView):
         preview_limit_seconds = 180 if is_preview else 0
 
         tracks = AudioTrack.objects.filter(ouvrage_id=ouvrage_id).order_by("chapter_number")
-        if not tracks.exists():
-            return Response({"success": False, "error": "Aucune version audio disponible pour cet ouvrage."}, status=404)
-
-        try:
-            TraceAcces.objects.create(
-                user=request.user,
-                ouvrage_id=ouvrage_id,
-                access_type="audio_preview" if is_preview else "audio_stream",
-                institution=institution_obj,
-                bouquet_subscription=bouquet_sub_obj,
-                ip_address=request.META.get("REMOTE_ADDR", ""),
-                country=request.headers.get("CF-IPCountry", ""),
-                user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
-            )
-        except Exception as e:
-            logger.warning(f"Erreur TraceAcces audio: {e}")
-
-        client = CloudflareStreamClient()
         sessions = []
-        cf_subdomain = getattr(settings, 'CLOUDFLARE_STREAM_SUBDOMAIN', '') or 'customer-m033avyqq0x51sbg.cloudflarestream.com'
-        for track in tracks:
-            token = "stream_token"
-            try:
-                token = client.generate_signed_token(track.stream_id, expiry_seconds=3600)
-            except Exception as e:
-                logger.error(f"Échec génération token audio: {e}")
-                token = "stream_token"
-            signed_url = f"https://{cf_subdomain}/{track.stream_id}/manifest/video.m3u8?token={token}"
-            if track.hls_manifest_url and track.hls_manifest_url.startswith("http"):
-                if token == "stream_token" or "cloudflare" not in track.hls_manifest_url:
+        public_r2_url = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', '') or getattr(settings, 'CLOUDFLARE_R2_PUBLIC_DOMAIN', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
+
+        if not tracks.exists():
+            # Support direct audio file from Ouvrage (R2 or media storage)
+            if ouvrage.file and (ouvrage.format_type == 'audio' or ouvrage.file.name.lower().endswith(('.mp3', '.m4a', '.wav', '.aac', '.ogg'))):
+                file_url = ouvrage.file.url
+                if not file_url.startswith("http"):
+                    file_url = request.build_absolute_uri(file_url)
+                sessions.append({
+                    "id": str(ouvrage.id),
+                    "chapter_number": 1,
+                    "title": ouvrage.title,
+                    "duration_seconds": 720,
+                    "signed_hls_url": file_url,
+                    "captions_vtt_url": None,
+                })
+            else:
+                return Response({"success": False, "error": "Aucune version audio disponible pour cet ouvrage."}, status=404)
+        else:
+            client = CloudflareStreamClient()
+            cf_subdomain = getattr(settings, 'CLOUDFLARE_STREAM_SUBDOMAIN', '') or 'customer-m033avyqq0x51sbg.cloudflarestream.com'
+            for track in tracks:
+                signed_url = ""
+                # 1. URL directe MP3 ou HLS déjà renseignée
+                if track.hls_manifest_url and (track.hls_manifest_url.endswith('.mp3') or 'r2.dev' in track.hls_manifest_url):
+                    signed_url = track.hls_manifest_url
+                # 2. Clé ou chemin de fichier MP3 sur Cloudflare R2
+                elif track.stream_id and (track.stream_id.endswith('.mp3') or '/' in track.stream_id):
+                    signed_url = f"{public_r2_url.rstrip('/')}/{track.stream_id.lstrip('/')}"
+                # 3. Flux Cloudflare Stream avec signature de token
+                elif track.stream_id:
+                    token = "stream_token"
+                    try:
+                        token = client.generate_signed_token(track.stream_id, expiry_seconds=3600)
+                        signed_url = f"https://{cf_subdomain}/{track.stream_id}/manifest/video.m3u8?token={token}"
+                    except Exception as e:
+                        logger.error(f"Échec génération token audio: {e}")
+                        signed_url = track.hls_manifest_url or ""
+                
+                if not signed_url and track.hls_manifest_url:
                     signed_url = track.hls_manifest_url
 
-            sessions.append({
-                "id": str(track.id),
-                "chapter_number": track.chapter_number,
-                "title": track.title,
-                "duration_seconds": track.duration_seconds,
-                "signed_hls_url": signed_url,
-                "captions_vtt_url": track.captions_vtt_url,
-            })
+                sessions.append({
+                    "id": str(track.id),
+                    "chapter_number": track.chapter_number,
+                    "title": track.title,
+                    "duration_seconds": track.duration_seconds,
+                    "signed_hls_url": signed_url,
+                    "captions_vtt_url": track.captions_vtt_url,
+                })
 
         authors_list = []
         if hasattr(ouvrage, 'authors'):
