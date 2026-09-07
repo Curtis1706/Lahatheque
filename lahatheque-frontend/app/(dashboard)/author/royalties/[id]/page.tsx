@@ -13,8 +13,10 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function RoyaltyStatementDetailPage() {
+  const { user } = useAuth();
   const params = useParams();
   const paymentId = (params?.id as string) || "pay-aut-2025-q2";
 
@@ -76,16 +78,22 @@ export default function RoyaltyStatementDetailPage() {
             onClick={async () => {
               try {
                 const { generateOfficialPdf } = await import("@/lib/services/export-service");
+                const authorFullName = user
+                  ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "Auteur Agréé"
+                  : "Auteur / Créateur d'Ouvrage";
+                const authorEmail = user?.email || "auteur@lahatheque.bj";
+                const authorPhone = user?.phone ? ` | ${user.phone}` : "";
+
                 await generateOfficialPdf({
                   docType: "BORDEREAU_REDEVANCES",
                   docNumber: `REL-AUTEUR-${payment.id.slice(0, 8).toUpperCase()}`,
                   date: payment.payment_date || new Date().toLocaleDateString("fr-FR"),
                   period: payment.period,
                   recipient: {
-                    name: "Auteur / Créateur d'Ouvrage",
+                    name: authorFullName,
                     roleOrTitle: "Titulaire de Droits d'Auteur LAHAThèque",
-                    addressOrCampus: "Compte Auteur Agréé",
-                    emailOrPhone: "auteur@lahatheque.bj",
+                    addressOrCampus: `Compte Auteur Agréé • ID: ${user?.id ? user.id.slice(0, 8).toUpperCase() : "AUT-CERT"}`,
+                    emailOrPhone: `${authorEmail}${authorPhone}`,
                   },
                   summaryCards: [
                     { label: "Trimestre / Période", value: payment.period },

@@ -32,10 +32,12 @@ import {
 import type { AuthorRoyaltyPayment, AuthorKpis } from "@/lib/types/author";
 import { toast } from "sonner";
 import { generateOfficialPdf } from "@/lib/services/export-service";
+import { useAuth } from "@/hooks/use-auth";
 
 type QuarterFilter = "all" | 1 | 2 | 3 | 4;
 
 export default function AuthorRoyaltiesPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"statements" | "requests">("statements");
   const [allPayments, setAllPayments] = useState<AuthorRoyaltyPayment[]>([]);
   const [payoutRequests, setPayoutRequests] = useState<PayoutRequestItem[]>([]);
@@ -245,16 +247,22 @@ export default function AuthorRoyaltiesPage() {
         ? `T${row.quarter} ${row.year || 2026}`
         : "T3 2026";
 
+      const authorFullName = user
+        ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "Auteur Agréé"
+        : "Auteur / Créateur d'Ouvrage";
+      const authorEmail = user?.email || "auteur@lahatheque.bj";
+      const authorPhone = user?.phone ? ` | ${user.phone}` : "";
+
       await generateOfficialPdf({
         docType: "BORDEREAU_REDEVANCES",
         docNumber: `REL-${row.year || 2026}-T${row.quarter || 3}`,
         date: row.payment_date || new Date().toLocaleDateString("fr-FR"),
         period: row.period,
         recipient: {
-          name: "Auteur / Créateur d'Ouvrage",
+          name: authorFullName,
           roleOrTitle: "Titulaire de Droits d'Auteur LAHAThèque",
-          addressOrCampus: "Compte Auteur Agréé",
-          emailOrPhone: "auteur@lahatheque.bj",
+          addressOrCampus: `Compte Auteur Agréé • ID: ${user?.id ? user.id.slice(0, 8).toUpperCase() : "AUT-CERT"}`,
+          emailOrPhone: `${authorEmail}${authorPhone}`,
         },
         summaryCards: [
           { label: "Période", value: quarterShortLabel },
@@ -290,16 +298,22 @@ export default function AuthorRoyaltiesPage() {
       const fmtGross = Math.round(periodTotals.totalGross).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
       const fmtEarned = Math.round(periodTotals.totalEarned).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
+      const authorFullName = user
+        ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "Auteur Agréé"
+        : "Auteur / Créateur d'Ouvrage";
+      const authorEmail = user?.email || "auteur@lahatheque.bj";
+      const authorPhone = user?.phone ? ` | ${user.phone}` : "";
+
       await generateOfficialPdf({
         docType: "BORDEREAU_REDEVANCES",
         docNumber: `REL-PERIODE-${Date.now().toString().slice(-6)}`,
         date: new Date().toLocaleDateString("fr-FR"),
         period: rangeLabel,
         recipient: {
-          name: "Auteur / Créateur d'Ouvrage",
+          name: authorFullName,
           roleOrTitle: "Bilan Périodique des Droits d'Auteur",
-          addressOrCampus: "Compte Auteur Agréé",
-          emailOrPhone: "auteur@lahatheque.bj",
+          addressOrCampus: `Compte Auteur Agréé • ID: ${user?.id ? user.id.slice(0, 8).toUpperCase() : "AUT-CERT"}`,
+          emailOrPhone: `${authorEmail}${authorPhone}`,
         },
         summaryCards: [
           { label: "Période Décomptée", value: rangeLabel },
