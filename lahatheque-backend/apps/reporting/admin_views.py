@@ -550,8 +550,87 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
-        payouts = PayoutRequest.objects.all().select_related('author').order_by('-created_at')
         results = []
+
+        # 1. Lignes de redevances acquises par les auteurs par ouvrage (RoyaltyPayoutLine)
+        from apps.rights.models import RoyaltyPayoutLine, RoyaltyRate, RoyaltyCalculation
+        lines = RoyaltyPayoutLine.objects.all().select_related(
+            'author_right__user', 'calculation__ouvrage'
+        ).order_by('-calculation__period_month')
+
+        for pl in lines:
+            author = pl.author_right.user if pl.author_right else None
+            author_name = author.get_full_name() if author else "Auteur"
+            if not author_name and author:
+                author_name = author.email
+            book = pl.calculation.ouvrage if pl.calculation else None
+            book_title = book.title if book else "Ouvrage"
+            period_str = pl.calculation.period_month.strftime("%Y-%m") if (pl.calculation and pl.calculation.period_month) else ""
+
+            rate_obj = RoyaltyRate.objects.filter(ouvrage=book).first() if book else None
+            author_rate = float(rate_obj.author_share_percent) if (rate_obj and rate_obj.author_share_percent is not None) else 15.0
+
+            results.append({
+                "id": f"payout-line-{pl.id}",
+                "line_id": pl.id,
+                "beneficiary_name": author_name,
+                "beneficiary_type": "author",
+                "beneficiary_email": author.email if author else "",
+                "book_title": book_title,
+                "period_month": period_str,
+                "total_reads": pl.calculation.total_reads_count if pl.calculation else 0,
+                "total_revenue": float(pl.calculation.total_revenue) if pl.calculation else 0.0,
+                "amount": float(pl.payout_amount),
+                "payout_amount": float(pl.payout_amount),
+                "status": "processed" if pl.is_settled else "pending",
+                "author_rate_percent": author_rate,
+                "created_at": pl.calculation.period_month.isoformat() if (pl.calculation and pl.calculation.period_month) else None,
+            })
+
+        # 2. Relevés de redevances universités (UniversityRoyaltyStatement)
+        from apps.partners.models import UniversityRoyaltyStatement
+        univ_statements = UniversityRoyaltyStatement.objects.all().select_related('institution').order_by('-created_at')
+        for u in univ_statements:
+            results.append({
+                "id": f"univ-stmt-{u.id}",
+                "statement_id": str(u.id),
+                "beneficiary_name": u.institution.name if u.institution else "Université",
+                "beneficiary_type": "university",
+                "beneficiary_email": u.institution.contact_email if u.institution else "",
+                "book_title": u.reference or "Redevances Catalogue Institutionnel",
+                "period_month": u.period,
+                "total_reads": 0,
+                "total_revenue": float(u.total_sales_catalog or 0),
+                "amount": float(u.net_royalty_amount),
+                "payout_amount": float(u.net_royalty_amount),
+                "status": "processed" if u.status == "paid" else "pending",
+                "university_rate_percent": float(u.royalty_rate or 15.0),
+                "created_at": u.created_at.isoformat() if hasattr(u, 'created_at') and u.created_at else None,
+            })
+
+        # 3. Redevances éditeurs tiers (RoyaltyCalculation avec publisher_payout_amount > 0)
+        pub_calcs = RoyaltyCalculation.objects.filter(publisher_payout_amount__gt=0).select_related('ouvrage__publisher')
+        for rc in pub_calcs:
+            pub = rc.ouvrage.publisher if (rc.ouvrage and rc.ouvrage.publisher) else None
+            if pub:
+                results.append({
+                    "id": f"pub-calc-{rc.id}",
+                    "calculation_id": str(rc.id),
+                    "beneficiary_name": pub.company_name or pub.name or "Éditeur Tiers",
+                    "beneficiary_type": "publisher",
+                    "beneficiary_email": pub.contact_email or "",
+                    "book_title": rc.ouvrage.title,
+                    "period_month": rc.period_month.strftime("%Y-%m"),
+                    "total_reads": rc.total_reads_count,
+                    "total_revenue": float(rc.total_revenue),
+                    "amount": float(rc.publisher_payout_amount),
+                    "payout_amount": float(rc.publisher_payout_amount),
+                    "status": "processed" if rc.is_settled else "pending",
+                    "created_at": rc.period_month.isoformat(),
+                })
+
+        # 4. Demandes de retrait explicites (PayoutRequest)
+        payouts = PayoutRequest.objects.all().select_related('author').order_by('-created_at')
         for p in payouts:
             author_name = f"{p.author.first_name} {p.author.last_name}" if p.author else "Auteur"
             results.append({
@@ -560,6 +639,7 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
                 "beneficiary_type": "author",
                 "beneficiary_email": p.author.email if p.author else "",
                 "amount": float(p.amount),
+                "payout_amount": float(p.amount),
                 "payment_method": p.payment_method,
                 "account_details": p.account_details,
                 "status": p.status,
@@ -573,11 +653,52 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['post'], url_path='process')
     def process_payout(self, request, pk=None):
+        action_type = request.data.get('action') # 'approve' ou 'reject'
+        tx_ref = request.data.get('transaction_reference', '').strip()
+        notes = request.data.get('admin_notes', '').strip()
+
+        # 1. Traitement direct d'une ligne de redevance auteur (RoyaltyPayoutLine)
+        if str(pk).startswith('payout-line-'):
+            from apps.rights.models import RoyaltyPayoutLine
+            line_id = str(pk).replace('payout-line-', '')
+            line = RoyaltyPayoutLine.objects.filter(id=line_id).first()
+            if not line:
+                return Response({"success": False, "error": "Ligne de redevance introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            if action_type == 'approve':
+                line.is_settled = True
+                line.save(update_fields=['is_settled'])
+                JournalAuditAdmin.objects.create(
+                    administrateur=request.user,
+                    action="SETTLE_ROYALTY_PAYOUT_LINE",
+                    ressource_type="RoyaltyPayoutLine",
+                    ressource_id=str(line.id),
+                    details={"amount": float(line.payout_amount), "transaction_reference": tx_ref}
+                )
+                return Response({"success": True, "message": "Redevance auteur marquée comme réglée/versée.", "error": None})
+            elif action_type == 'reject':
+                line.is_settled = False
+                line.save(update_fields=['is_settled'])
+                return Response({"success": True, "message": "Redevance auteur remise en attente.", "error": None})
+
+        # 2. Traitement d'un relevé de redevance université (UniversityRoyaltyStatement)
+        if str(pk).startswith('univ-stmt-'):
+            from apps.partners.models import UniversityRoyaltyStatement
+            stmt_id = str(pk).replace('univ-stmt-', '')
+            stmt = UniversityRoyaltyStatement.objects.filter(id=stmt_id).first()
+            if not stmt:
+                return Response({"success": False, "error": "Relevé de redevance université introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            if action_type == 'approve':
+                stmt.status = 'paid'
+                stmt.save(update_fields=['status'])
+                return Response({"success": True, "message": "Relevé de redevance université marqué comme réglé.", "error": None})
+            elif action_type == 'reject':
+                stmt.status = 'available'
+                stmt.save(update_fields=['status'])
+                return Response({"success": True, "message": "Relevé de redevance université remis en attente.", "error": None})
+
+        # 3. Traitement d'une demande de retrait Mobile Money / Banque (PayoutRequest)
         try:
             payout = PayoutRequest.objects.get(id=pk)
-            action_type = request.data.get('action') # 'approve' ou 'reject'
-            tx_ref = request.data.get('transaction_reference', '').strip()
-            notes = request.data.get('admin_notes', '').strip()
 
             if action_type == 'approve':
                 payout.status = 'processed'

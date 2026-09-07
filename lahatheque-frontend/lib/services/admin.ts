@@ -985,6 +985,8 @@ export async function triggerRoyaltyCalculationNow(): Promise<{
   return json;
 }
 
+export const triggerRoyaltyCalculation = triggerRoyaltyCalculationNow;
+
 // =========================================================================
 // CATALOGUE DES BOUQUETS DOCUMENTAIRES (ADMIN)
 // =========================================================================

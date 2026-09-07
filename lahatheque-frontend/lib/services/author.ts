@@ -10,6 +10,9 @@ import type {
 
 export interface PayoutRequestItem {
   id: string;
+  author_id?: string;
+  author_name?: string;
+  author_email?: string;
   amount: number;
   payment_method: string;
   account_details: string;

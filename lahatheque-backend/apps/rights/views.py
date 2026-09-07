@@ -479,16 +479,25 @@ class AuthorRoyaltiesStatementsView(APIView):
 
 class AuthorPayoutRequestView(APIView):
     """GET / POST /api/v1/rights/author/payout-request/ - Gestion des demandes de retrait d'auteur."""
-    permission_classes = [permissions.IsAuthenticated, IsAuthor]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        qs = PayoutRequest.objects.filter(author=user)
+        if getattr(user, 'role', None) in ['admin', 'super_admin', 'legal_reviewer'] or user.is_superuser:
+            qs = PayoutRequest.objects.all().select_related('author').order_by('-created_at')
+        else:
+            qs = PayoutRequest.objects.filter(author=user).select_related('author').order_by('-created_at')
         
         items = []
         for p in qs:
+            author_name = p.author.get_full_name() if p.author else "Auteur"
+            if not author_name and p.author:
+                author_name = p.author.email
             items.append({
                 "id": str(p.id),
+                "author_id": str(p.author.id) if p.author else None,
+                "author_name": author_name,
+                "author_email": p.author.email if p.author else "",
                 "amount": float(p.amount),
                 "payment_method": p.payment_method,
                 "account_details": p.account_details,
