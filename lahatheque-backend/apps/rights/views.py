@@ -3463,6 +3463,134 @@ class ManuscriptReviewDecisionView(APIView):
         })
 
 
+class IsAdminOrChiefLayout(permissions.BasePermission):
+    """Autorise Admin, Super Admin et Chef Maquettiste."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        allowed_roles = ('chief_layout', 'admin', 'super_admin')
+        user = request.user
+        active = user.active_roles if isinstance(getattr(user, 'active_roles', None), list) else []
+        return user.role in allowed_roles or any(r in active for r in allowed_roles)
+
+
+class PendingManuscriptSubmissionsListView(APIView):
+    """GET /api/v1/rights/manuscripts/pending-catalog-prep/ - Manuscrits prêts à être récupérés."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrChiefLayout]
+
+    def get(self, request):
+        from apps.rights.models import AuthorManuscriptSubmission
+
+        subs = AuthorManuscriptSubmission.objects.filter(
+            status='catalog_preparation'
+        ).select_related('author').order_by('-updated_at')
+
+        data = [{
+            "id": str(s.id),
+            "title": s.title,
+            "author_name": f"{s.author.first_name} {s.author.last_name}".strip() or s.author.username,
+            "author_email": s.author.email,
+            "version_type": s.version_type,
+            "suggested_summary": s.suggested_summary,
+            "suggested_language": s.suggested_language,
+            "manuscript_file_url": s.manuscript_file.url if s.manuscript_file else None,
+            "editorial_note": s.editorial_note,
+            "created_at": s.created_at.isoformat(),
+        } for s in subs]
+
+        return Response({"success": True, "data": data})
+
+
+class ProcessManuscriptSubmissionView(APIView):
+    """POST /api/v1/rights/manuscripts/<id>/process/ - Convertit le manuscrit en ouvrage réel."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrChiefLayout]
+
+    def post(self, request, id):
+        from apps.rights.models import AuthorManuscriptSubmission
+        from apps.catalog.models import Ouvrage, Discipline, BookAuthor
+
+        sub = AuthorManuscriptSubmission.objects.filter(id=id, status='catalog_preparation').first()
+        if not sub:
+            return Response({"success": False, "error": "Manuscrit introuvable ou déjà traité."}, status=404)
+
+        title = request.data.get("title", sub.title).strip()
+        discipline_id = request.data.get("discipline_id")
+        price_digital = request.data.get("price_digital")
+        price_paper = request.data.get("price_paper")
+        is_paper_available = bool(request.data.get("is_paper_available", False))
+        summary = request.data.get("summary", sub.suggested_summary)
+        language = request.data.get("language", sub.suggested_language)
+
+        if not price_digital:
+            return Response({"success": False, "error": "Le prix numérique est requis."}, status=400)
+
+        discipline_obj = None
+        if discipline_id:
+            try:
+                discipline_obj = Discipline.objects.filter(id=int(discipline_id)).first()
+            except (ValueError, TypeError):
+                discipline_obj = Discipline.objects.filter(name__iexact=str(discipline_id).strip()).first()
+
+        ouvrage = Ouvrage.objects.create(
+            title=title,
+            summary=summary,
+            language=language,
+            discipline=discipline_obj,
+            price_digital=float(price_digital),
+            price_paper=float(price_paper) if (is_paper_available and price_paper) else None,
+            is_paper_available=is_paper_available,
+            file=sub.manuscript_file,
+            status='pending_legal_approval',
+            created_by=request.user if request.user.is_authenticated else None,
+        )
+
+        book_author, _ = BookAuthor.objects.get_or_create(
+            first_name=sub.author.first_name,
+            last_name=sub.author.last_name,
+            defaults={"email": sub.author.email, "user": sub.author}
+        )
+        if not book_author.user:
+            book_author.user = sub.author
+            book_author.save(update_fields=["user"])
+        ouvrage.authors.add(book_author)
+
+        sub.status = 'accepted'
+        sub.save(update_fields=['status'])
+
+        try:
+            from apps.reporting.services import notify_user
+            from apps.reporting.models import Notification
+            from apps.accounts.models import User as UserModel
+
+            juristes = UserModel.objects.filter(role__in=['legal_reviewer', 'admin', 'super_admin'], is_active=True)
+            for juriste in juristes:
+                notify_user(
+                    user=juriste,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Nouveau manuscrit prêt pour contrat",
+                    message=f"« {ouvrage.title} » (manuscrit de {sub.author.get_full_name() or sub.author.email}) a été préparé et attend l'établissement du contrat avant publication.",
+                    action_url=f"/legal-reviewer/publication-en-attente/{ouvrage.id}",
+                    resource_id=str(ouvrage.id),
+                )
+
+            notify_user(
+                user=sub.author,
+                notification_type=Notification.NotificationType.SYSTEM,
+                title="Votre manuscrit a été accepté",
+                message=f"« {ouvrage.title} » a été préparé pour publication et est en attente du contrat juridique.",
+                action_url="/author/submissions",
+                resource_id=str(sub.id),
+            )
+        except Exception:
+            pass
+
+        return Response({
+            "success": True,
+            "message": f"« {ouvrage.title} » a été créé et transmis au Juriste.",
+            "data": {"ouvrage_id": str(ouvrage.id)}
+        })
+
+
 class AuthorOrderReturnView(APIView):
     """POST /api/v1/rights/author/orders/<order_id>/return/ - Retour d'une commande à crédit."""
     permission_classes = [permissions.IsAuthenticated, IsAuthor]

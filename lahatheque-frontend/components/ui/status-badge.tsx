@@ -10,6 +10,7 @@ const statusConfig: Record<string, { style: string; defaultLabel: string; defaul
   paid: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Payé", defaultIcon: CheckCircle2 },
   completed: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Terminé", defaultIcon: CheckCircle2 },
   active: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Actif", defaultIcon: CheckCircle2 },
+  accepted: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Accepté", defaultIcon: CheckCircle2 },
 
   error: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Erreur", defaultIcon: XCircle },
   rejected: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Rejeté", defaultIcon: XCircle },

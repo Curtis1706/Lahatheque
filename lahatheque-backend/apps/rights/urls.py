@@ -10,6 +10,8 @@ from .views import (
     AuthorOrderReturnView,
     ManuscriptReviewListView,
     ManuscriptReviewDecisionView,
+    PendingManuscriptSubmissionsListView,
+    ProcessManuscriptSubmissionView,
     LegalKpisView,
     LegalContractsListView,
     LegalContractsFormOptionsView,
@@ -57,6 +59,8 @@ urlpatterns = [
     path('author/orders/<uuid:order_id>/return/', AuthorOrderReturnView.as_view(), name='author-order-return'),
     path('manuscripts/', ManuscriptReviewListView.as_view(), name='manuscripts-review-list'),
     path('manuscripts/<str:id>/decision/', ManuscriptReviewDecisionView.as_view(), name='manuscripts-review-decision'),
+    path('manuscripts/pending-catalog-prep/', PendingManuscriptSubmissionsListView.as_view(), name='pending-manuscript-submissions'),
+    path('manuscripts/<str:id>/process/', ProcessManuscriptSubmissionView.as_view(), name='process-manuscript-submission'),
 
     # Juriste / Legal Reviewer
     path('legal/kpis/', LegalKpisView.as_view(), name='legal-kpis'),

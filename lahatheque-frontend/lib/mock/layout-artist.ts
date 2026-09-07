@@ -218,3 +218,31 @@ export const mockChefMaquettisteKpis: ChefMaquettisteKpi = {
   revisionRequestedThisMonth: 1,
   averageProcessingTimeHours: 18.5,
 };
+
+export const mockPendingManuscriptsPrep = [
+  {
+    id: "sub-prep-001",
+    title: "Traité de Droit Administratif en Afrique de l'Ouest",
+    author_name: "Prof. Joseph DJOGBÉNOU",
+    author_email: "j.djogbenou@fadesp-uac.bj",
+    version_type: "finale",
+    suggested_summary: "Ouvrage doctrinal approfondi couvrant le contentieux administratif, la police administrative et les contrats publics en droit ouest-africain.",
+    suggested_language: "Français",
+    manuscript_file_url: "/mock/droit-administratif-manuscript.pdf",
+    editorial_note: "Qualité rédactionnelle remarquable. Validé par le comité de lecture pour préparation catalogue et mise en vente.",
+    created_at: "2026-08-25T09:30:00Z",
+  },
+  {
+    id: "sub-prep-002",
+    title: "Manuel d'Économétrie Appliquée aux Économies de l'UEMOA",
+    author_name: "Dr. Marceline HOUNKPATIN",
+    author_email: "m.hounkpatin@faseg-uac.bj",
+    version_type: "preview",
+    suggested_summary: "Méthodes quantitatives avancées et applications concrètes sur les séries macroéconomiques régionales.",
+    suggested_language: "Français",
+    manuscript_file_url: "/mock/econometrie-uemoa.pdf",
+    editorial_note: "Livre très attendu par les filières d'économie. Prêt pour finalisation de la maquette.",
+    created_at: "2026-08-28T14:15:00Z",
+  },
+];
+

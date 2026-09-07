@@ -278,7 +278,8 @@ export function DashboardSidebar() {
             groupLabel: "Direction Maquette",
             items: [
               { label: "Vue d'ensemble", href: "/chief-layout", icon: <LayoutDashboard className="size-4" /> },
-              { label: "Manuscrits Auteurs", href: "/chief-layout/manuscripts", icon: <BookOpenCheck className="size-4" /> },
+              { label: "Étude des Manuscrits", href: "/chief-layout/manuscripts", icon: <BookOpenCheck className="size-4" /> },
+              { label: "Manuscrits à Préparer", href: "/chief-layout/manuscript-submissions", icon: <FileCheck className="size-4" /> },
               { label: "Catalogue Ouvrages", href: "/chief-layout/catalog", icon: <BookOpen className="size-4" /> },
               { label: "Déposer un ouvrage", href: "/chief-layout/deposit", icon: <PlusCircle className="size-4" /> },
               { label: "Dépôts à valider", href: "/chief-layout/validation", icon: <CheckSquare className="size-4" /> },
@@ -329,6 +330,7 @@ export function DashboardSidebar() {
               { label: "Validation BAT & Maquettes", href: "/admin/validation", icon: <FileCheck2 className="size-4" /> },
               { label: "Gestion Livres Audio", href: "/admin/audio", icon: <Headphones className="size-4" /> },
               { label: "Manuscrits Reçus (Public)", href: "/admin/manuscript-leads", icon: <Mail className="size-4" /> },
+              { label: "Manuscrits à Préparer", href: "/admin/manuscript-submissions", icon: <FileCheck className="size-4" /> },
               { label: "Dépôts Éditeurs Tiers", href: "/admin/publisher-deposits", icon: <BookOpen className="size-4" /> },
               { label: "Contrats & Droits d'Auteur", href: "/admin/contracts", icon: <Scale className="size-4" /> },
               {

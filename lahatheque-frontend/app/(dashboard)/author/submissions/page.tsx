@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { PenTool, ArrowLeft, PlusCircle, Clock, ChevronRight, FileText } from "lucide-react";
+import { PenTool, ArrowLeft, PlusCircle, Clock, ChevronRight, FileText, CheckCircle2 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getAuthorSubmissions } from "@/lib/services/author";
@@ -46,15 +46,20 @@ export default function AuthorSubmissionsPage() {
       cell: (row) => (
         <div className="space-y-1">
           <StatusBadge status={row.status} />
-          <span className="text-[10px] text-foreground-muted block font-mono">
-            {row.status === "study_pending"
-              ? "Étape 1 : En étude éditoriale"
-              : row.status === "accepted"
-              ? "Étape 2 : Préparation catalogue"
-              : row.status === "correction_requested"
-              ? "Correction demandée"
-              : "Publié"}
-          </span>
+          {row.status === "accepted" && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-success">
+              <CheckCircle2 className="w-4 h-4" /> Accepté — en attente du contrat juridique
+            </span>
+          )}
+          {row.status !== "accepted" && (
+            <span className="text-[10px] text-foreground-muted block font-mono">
+              {row.status === "study_pending"
+                ? "Étape 1 : En étude éditoriale"
+                : row.status === "correction_requested"
+                ? "Correction demandée"
+                : "Publié"}
+            </span>
+          )}
         </div>
       ),
     },

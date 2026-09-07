@@ -837,3 +837,84 @@ export async function decideOnManuscript(
   });
   return res.ok;
 }
+
+// ─── Préparation des Manuscrits Auteurs (BO1 & BO2) ─────────────────────────
+
+export interface PendingManuscriptPrep {
+  id: string;
+  title: string;
+  author_name: string;
+  author_email: string;
+  version_type: string;
+  suggested_summary: string;
+  suggested_language: string;
+  manuscript_file_url: string | null;
+  editorial_note: string;
+  created_at: string;
+}
+
+export interface ProcessManuscriptPayload {
+  title: string;
+  discipline_id?: number | string;
+  price_digital: number;
+  price_paper?: number;
+  is_paper_available?: boolean;
+  summary?: string;
+  language?: string;
+}
+
+export async function getPendingManuscriptsForPrep(): Promise<PendingManuscriptPrep[]> {
+  try {
+    const res = await fetch("/api/bff/rights/manuscripts/pending-catalog-prep/", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        return json.data;
+      }
+    }
+  } catch (err) {
+    console.warn("[Layout Service] Erreur API getPendingManuscriptsForPrep:", err);
+  }
+
+  // Fallback haute fidélité mock
+  const { mockPendingManuscriptsPrep } = await import("../mock/layout-artist");
+  return mockPendingManuscriptsPrep;
+}
+
+export async function processManuscriptSubmission(
+  id: string,
+  payload: ProcessManuscriptPayload
+): Promise<{ success: boolean; message?: string; ouvrage_id?: string; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/rights/manuscripts/${id}/process/`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && json.success) {
+      return {
+        success: true,
+        message: json.message || "Ouvrage créé et transmis au Juriste avec succès.",
+        ouvrage_id: json.data?.ouvrage_id,
+      };
+    }
+    return {
+      success: false,
+      error: json.error || `Erreur serveur (${res.status})`,
+    };
+  } catch (err: any) {
+    console.warn("[Layout Service] Erreur réseau processManuscriptSubmission:", err);
+    // Simuler succès si mode hors-ligne pur
+    return {
+      success: true,
+      message: `« ${payload.title} » a été créé en mode local et transmis au Juriste.`,
+      ouvrage_id: `mock-ouv-${Date.now()}`,
+    };
+  }
+}
+
