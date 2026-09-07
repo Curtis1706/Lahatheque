@@ -595,32 +595,6 @@ class AuthorRoyaltiesStatementsView(APIView):
                     "receipt_url": f"/invoices/REL-AUT-{qd['year']}-T{qd['quarter']}.pdf",
                     "books": real_books,
                 })
-            else:
-                # Trimestre historique de référence
-                q_num = int(qd["quarter"])
-                y_num = int(qd["year"])
-                is_recent_empty = (y_num == 2026 and q_num > 1)
-                sample_gross = 1685000.0 if q_num == 1 else 2000000.0
-                sample_earned = sample_gross * 0.15
-                statements.append({
-                    "id": f"pay-aut-{y_num}-t{q_num}",
-                    "period": str(qd["label"]),
-                    "quarter": q_num,
-                    "year": y_num,
-                    "start_date": str(qd["start"]),
-                    "end_date": str(qd["end"]),
-                    "total_sales_count": 0 if is_recent_empty else 150,
-                    "paper_sales_count": 0 if is_recent_empty else 60,
-                    "digital_sales_count": 0 if is_recent_empty else 90,
-                    "audio_sales_count": 0,
-                    "gross_revenue": 0.0 if is_recent_empty else sample_gross,
-                    "author_percentage_rate": 15.0,
-                    "author_earned_amount": 0.0 if is_recent_empty else sample_earned,
-                    "status": str(qd["status"]),
-                    "payment_date": str(qd["pay_date"]),
-                    "receipt_url": f"/invoices/REL-AUT-{y_num}-T{q_num}.pdf",
-                    "books": [],
-                })
 
         # Filtrage périodique dynamique (quel que soit l'intervalle)
         filtered = statements

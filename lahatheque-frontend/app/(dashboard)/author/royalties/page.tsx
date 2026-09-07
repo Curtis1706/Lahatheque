@@ -228,18 +228,22 @@ export default function AuthorRoyaltiesPage() {
 
       const columnStyles = hasDetailedBooks
         ? {
-            0: { cellWidth: 65 },
-            1: { cellWidth: 32 },
-            2: { halign: "right", cellWidth: 20 },
-            3: { halign: "right", cellWidth: 28 },
+            0: { cellWidth: 62, overflow: "linebreak" },
+            1: { cellWidth: 26, overflow: "linebreak" },
+            2: { halign: "right", cellWidth: 18 },
+            3: { halign: "right", cellWidth: 26 },
             4: { halign: "center", cellWidth: 20 },
-            5: { halign: "right", cellWidth: 28, fontStyle: "bold" },
+            5: { halign: "right", cellWidth: 30, fontStyle: "bold" },
           }
         : undefined;
 
+      const quarterShortLabel = row.quarter
+        ? `T${row.quarter} ${row.year || 2026}`
+        : "T3 2026";
+
       await generateOfficialPdf({
         docType: "BORDEREAU_REDEVANCES",
-        docNumber: `REL-AUTEUR-${row.id.slice(0, 8).toUpperCase()}`,
+        docNumber: `REL-${row.year || 2026}-T${row.quarter || 3}`,
         date: row.payment_date || new Date().toLocaleDateString("fr-FR"),
         period: row.period,
         recipient: {
@@ -249,10 +253,10 @@ export default function AuthorRoyaltiesPage() {
           emailOrPhone: "auteur@lahatheque.bj",
         },
         summaryCards: [
-          { label: "Trimestre / Période", value: row.period },
-          { label: "Ventes Trimestrielles", value: `${row.total_sales_count.toLocaleString("fr-FR")} exemplaires` },
-          { label: "Taux de Rétribution", value: `${row.author_percentage_rate} % (Droits)` },
-          { label: "Statut Règlement", value: row.status === "paid" ? "Payé" : "En cours" },
+          { label: "Période", value: quarterShortLabel },
+          { label: "Ventes Trimestre", value: `${row.total_sales_count.toLocaleString("fr-FR")} ex.` },
+          { label: "Taux Appliqué", value: `${row.author_percentage_rate} %` },
+          { label: "Règlement", value: row.status === "paid" ? "Payé" : "En cours" },
         ],
         tableHeaders,
         tableRows,

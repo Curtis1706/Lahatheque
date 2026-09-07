@@ -221,7 +221,7 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
     const cardCount = options.summaryCards.length;
     const cardGap = 3;
     const cardWidth = (pageWidth - margin * 2 - (cardCount - 1) * cardGap) / cardCount;
-    const cardHeight = 13;
+    const cardHeight = 15;
 
     options.summaryCards.forEach((card, idx) => {
       const cardX = margin + idx * (cardWidth + cardGap);
@@ -229,14 +229,14 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
       doc.roundedRect(cardX, y, cardWidth, cardHeight, 1.5, 1.5, "F");
       
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.5);
+      doc.setFontSize(6);
       doc.setTextColor(...grayMuted);
-      doc.text(card.label.toUpperCase(), cardX + 3, y + 4.5);
+      doc.text(card.label.toUpperCase(), cardX + 3, y + 4.5, { maxWidth: cardWidth - 6 });
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(8.5);
+      doc.setFontSize(8);
       doc.setTextColor(...navyRgb);
-      doc.text(card.value, cardX + 3, y + 10);
+      doc.text(card.value, cardX + 3, y + 10.5, { maxWidth: cardWidth - 6 });
     });
 
     y += cardHeight + 6;
@@ -253,14 +253,14 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
       fillColor: navyRgb,
       textColor: [255, 255, 255],
       fontStyle: "bold",
-      fontSize: 8,
-      cellPadding: 3,
+      fontSize: 7.5,
+      cellPadding: 2.5,
       halign: "left",
     },
     bodyStyles: {
-      fontSize: 7.5,
+      fontSize: 7,
       textColor: textDark,
-      cellPadding: 2.5,
+      cellPadding: 2,
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252],
@@ -270,6 +270,7 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
       lineColor: [229, 231, 235],
       lineWidth: 0.1,
       overflow: "linebreak",
+      valign: "middle",
     },
     didDrawPage: (_data: any) => {
       // En-tête de pagination sur chaque page
@@ -289,6 +290,9 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
     footerBlockY = 20;
   }
 
+  const totalBoxWidth = 72;
+  const totalX = pageWidth - margin - totalBoxWidth;
+
   if (options.totalAmount) {
     const defaultLabel =
       options.docType === "RAPPORT_LOGISTIQUE"
@@ -304,29 +308,28 @@ export async function generateOfficialPdf(options: PdfDocumentOptions): Promise<
         : "TOTAL NET À PAYER :";
 
     const label = options.totalLabel || defaultLabel;
-    const totalBoxWidth = 85;
-    const totalX = pageWidth - margin - totalBoxWidth;
     
     doc.setFillColor(...navyRgb);
     doc.roundedRect(totalX, footerBlockY, totalBoxWidth, 14, 1.5, 1.5, "F");
     
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
+    doc.setFontSize(6.5);
     doc.setTextColor(220, 225, 235);
-    doc.text(label, totalX + 4, footerBlockY + 5.5);
+    doc.text(label, totalX + 4, footerBlockY + 5);
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
+    doc.setFontSize(10);
     doc.setTextColor(...goldRgb);
-    doc.text(options.totalAmount, totalX + 4, footerBlockY + 11);
+    doc.text(options.totalAmount, totalX + 4, footerBlockY + 10.5);
   }
 
   if (options.totalNotes) {
     doc.setFont("helvetica", "italic");
-    doc.setFontSize(7);
+    doc.setFontSize(6.5);
     doc.setTextColor(...grayMuted);
-    doc.text(options.totalNotes, margin, footerBlockY + 8, {
-      maxWidth: pageWidth - margin * 2 - 85,
+    const maxNotesW = pageWidth - margin * 2 - totalBoxWidth - 6;
+    doc.text(options.totalNotes, margin, footerBlockY + 4, {
+      maxWidth: maxNotesW,
     });
   }
 

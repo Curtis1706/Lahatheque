@@ -183,7 +183,7 @@ export async function getAuthorRoyaltyPayments(filters?: {
     });
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+      if (data.success && Array.isArray(data.data)) {
         return data.data;
       }
     }
@@ -191,24 +191,7 @@ export async function getAuthorRoyaltyPayments(filters?: {
     console.warn("[Author Service] API getAuthorRoyaltyPayments error:", err);
   }
 
-  // Fallback haute fidélité sur les relevés trimestriels mockés
-  const { mockAuthorRoyaltyPayments } = await import("../mock/author");
-  let results = [...mockAuthorRoyaltyPayments];
-
-  if (filters?.year) {
-    results = results.filter((r) => r.year === filters.year);
-  }
-  if (filters?.quarter) {
-    results = results.filter((r) => r.quarter === filters.quarter);
-  }
-  if (filters?.start_date) {
-    results = results.filter((r) => (r.end_date ? r.end_date >= filters.start_date! : true));
-  }
-  if (filters?.end_date) {
-    results = results.filter((r) => (r.start_date ? r.start_date <= filters.end_date! : true));
-  }
-
-  return results;
+  return [];
 }
 
 export async function getPayoutRequests(): Promise<PayoutRequestItem[]> {
