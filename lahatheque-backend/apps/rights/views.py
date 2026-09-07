@@ -142,6 +142,18 @@ class AuthorDashboardKPIsView(APIView):
 
         author_name = f"{user.first_name} {user.last_name}".strip() if (user.first_name or user.last_name) else (user.email or "Auteur")
 
+        from apps.reporting.pricing_service import get_platform_config
+        config_platform = get_platform_config()
+
+        paper_discount_pct = float(user.custom_remise_papier_pct if user.custom_remise_papier_pct is not None else config_platform.remise_auteur_papier_pct)
+        digital_discount_pct = float(user.custom_remise_numerique_pct if user.custom_remise_numerique_pct is not None else config_platform.remise_auteur_numerique_pct)
+        audio_discount_pct = float(user.custom_remise_audio_pct if user.custom_remise_audio_pct is not None else getattr(config_platform, 'remise_auteur_audio_pct', 25.0))
+        is_custom_discount = bool(
+            user.custom_remise_papier_pct is not None or
+            user.custom_remise_numerique_pct is not None or
+            user.custom_remise_audio_pct is not None
+        )
+
         return Response({
             "success": True,
             "data": {
@@ -162,6 +174,12 @@ class AuthorDashboardKPIsView(APIView):
                 "stockRemaining": stock_remaining,
                 "stockInitial": stock_initial,
                 "paperSalesCount": paper_sales_total,
+                "authorDiscounts": {
+                    "paper_pct": paper_discount_pct,
+                    "digital_pct": digital_discount_pct,
+                    "audio_pct": audio_discount_pct,
+                    "is_custom": is_custom_discount,
+                },
                 "timelines": {
                     "sales": timeline_sales,
                     "royalties": timeline_royalties,

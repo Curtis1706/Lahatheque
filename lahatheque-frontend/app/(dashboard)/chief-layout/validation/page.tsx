@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { CheckSquare, Search, Filter, ArrowLeft, User, Eye, CheckCircle2, AlertCircle, BookOpen } from "lucide-react";
+import { CheckSquare, Search, Filter, ArrowLeft, User, Eye, CheckCircle2, AlertCircle, BookOpen, Headphones } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
@@ -12,10 +12,12 @@ import { getDisciplines, type DisciplineItem } from "@/lib/services/classificati
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { getPendingDeposits, validateDeposit, requestRevision } from "@/lib/services/layout-artist";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { toast } from "sonner";
 
 export default function ChefValidationPage() {
   const { user } = useAuth();
+  const { playBook } = useAudioPlayer();
   const [deposits, setDeposits] = useState<LayoutDeposit[]>([]);
   const [disciplines, setDisciplines] = useState<DisciplineItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -165,15 +167,29 @@ export default function ChefValidationPage() {
       header: "Actions",
       cell: (row) => (
         <div className="flex items-center gap-1.5 justify-end">
-          <Link
-            href={`/catalog/reader/${row.id}`}
-            target="_blank"
-            onClick={(e) => e.stopPropagation()}
-            className="p-2 rounded-xl border border-border bg-background-secondary hover:bg-navy hover:text-white text-foreground-muted transition-colors inline-flex items-center justify-center min-h-[36px] min-w-[36px]"
-            title="Lire dans la Liseuse LAHAThèque"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-gold" />
-          </Link>
+          {((row as any).is_digital_available !== false && (row as any).format_type !== "audio") ? (
+            <Link
+              href={`/catalog/reader/${row.id}`}
+              target="_blank"
+              onClick={(e) => e.stopPropagation()}
+              className="p-2 rounded-xl border border-border bg-background-secondary hover:bg-navy hover:text-white text-foreground-muted transition-colors inline-flex items-center justify-center min-h-[36px] min-w-[36px]"
+              title="Lire dans la Liseuse LAHAThèque"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-gold" />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                playBook(row.id);
+              }}
+              className="p-2 rounded-xl border border-gold/40 bg-gold/15 hover:bg-gold/25 text-navy transition-colors inline-flex items-center justify-center min-h-[36px] min-w-[36px] cursor-pointer"
+              title="Écouter l'épreuve audio"
+            >
+              <Headphones className="w-3.5 h-3.5 text-gold" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setSelectedDeposit(row)}

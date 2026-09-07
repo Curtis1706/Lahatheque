@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Shield, Tag, Eye, ShoppingBag, Download } from "lucide-react";
+import { ArrowLeft, BookOpen, Shield, Tag, Eye, ShoppingBag, Download, Headphones } from "lucide-react";
 import { getAdminCatalog } from "@/lib/services/admin";
 import { AdminCatalogBook } from "@/lib/types/admin";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -142,13 +142,25 @@ export default function AdminBookDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-          <Link
-            href={`/catalog/reader/${book.id}`}
-            className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy/90 transition-colors flex items-center justify-center gap-2 shadow-xs"
-          >
-            <BookOpen className="w-4 h-4 text-gold" />
-            <span>Lire l'Ouvrage (Lecteur LAHA)</span>
-          </Link>
+          {((book as any).has_audio_version || (book as any).has_audio || (book as any).format_type === "audio") && (
+            <Link
+              href={`/listen/${book.id}`}
+              className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 text-navy text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-xs"
+            >
+              <Headphones className="w-4 h-4 text-gold" />
+              <span>Écouter l&apos;Ouvrage (Lecteur Audio)</span>
+            </Link>
+          )}
+
+          {((book as any).is_digital_available !== false && (book as any).format_type !== "audio") && (
+            <Link
+              href={`/catalog/reader/${book.id}`}
+              className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy/90 transition-colors flex items-center justify-center gap-2 shadow-xs"
+            >
+              <BookOpen className="w-4 h-4 text-gold" />
+              <span>Lire l&apos;Ouvrage (Lecteur LAHA)</span>
+            </Link>
+          )}
 
           <Link
             href={`/admin/catalog/${book.id}/protection`}

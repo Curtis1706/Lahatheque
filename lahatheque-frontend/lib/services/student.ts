@@ -80,11 +80,13 @@ export interface BookAPI {
   price_audio?: number | null;
   has_audio?: boolean;
   is_audio_owned?: boolean;
+  has_audio_access?: boolean;
   cover_url: string;
   is_owned?: boolean;
   has_digital_access?: boolean;
   author_discounted_digital_price?: number | null;
   author_discounted_paper_price?: number | null;
+  author_discounted_audio_price?: number | null;
   // Champs enrichis par la bibliothèque
   progress_percent?: number;
   current_page?: number;
@@ -142,7 +144,7 @@ export interface OrderLineAPI {
   ouvrage_cover_url?: string;
   discipline_name?: string;
   author_name?: string;
-  format_type: "digital" | "paper";
+  format_type: "digital" | "paper" | "audio";
   format_display: string;
   unit_price: number;
   quantity: number;

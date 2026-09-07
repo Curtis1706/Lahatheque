@@ -55,6 +55,20 @@ class User(AbstractUser):
     mfa_enabled = models.BooleanField(default=False)
     mfa_secret = models.CharField(max_length=255, blank=True, null=True)
 
+    # Remises Tarifaires Personnalisées Auteur (null = utilise la configuration globale de la plateforme)
+    custom_remise_papier_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Remise spécifique papier pour cet auteur en % (null = défaut plateforme)"
+    )
+    custom_remise_numerique_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Remise spécifique numérique pour cet auteur en % (null = défaut plateforme)"
+    )
+    custom_remise_audio_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Remise spécifique audio pour cet auteur en % (null = défaut plateforme)"
+    )
+
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
 

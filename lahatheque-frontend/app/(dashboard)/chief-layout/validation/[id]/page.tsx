@@ -174,14 +174,16 @@ export default function ChefValidationDetailPage() {
             <span>Écouter l&apos;audio</span>
           </button>
 
-          <Link
-            href={`/catalog/reader/${deposit.id}`}
-            target="_blank"
-            className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
-          >
-            <BookOpen className="w-4 h-4 text-gold" />
-            Lire dans la Liseuse LAHAThèque
-          </Link>
+          {((deposit as any).is_digital_available !== false && (deposit as any).format_type !== "audio") && (
+            <Link
+              href={`/catalog/reader/${deposit.id}`}
+              target="_blank"
+              className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4 text-gold" />
+              Lire dans la Liseuse LAHAThèque
+            </Link>
+          )}
         </div>
       </div>
 

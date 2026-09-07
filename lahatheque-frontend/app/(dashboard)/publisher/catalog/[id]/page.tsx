@@ -91,13 +91,15 @@ export default function PublisherBookDetailPage() {
               <span>Écouter l&apos;audio</span>
             </button>
           )}
-          <Link
-            href={`/catalog/reader/${book.id}`}
-            className="px-3.5 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-all inline-flex items-center gap-2 shadow-xs min-h-[44px]"
-          >
-            <BookOpen className="w-4 h-4" />
-            Prévisualiser dans la Liseuse
-          </Link>
+          {((book as any).is_digital_available !== false && (book as any).format_type !== "audio") && (
+            <Link
+              href={`/catalog/reader/${book.id}`}
+              className="px-3.5 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-all inline-flex items-center gap-2 shadow-xs min-h-[44px]"
+            >
+              <BookOpen className="w-4 h-4" />
+              Prévisualiser dans la Liseuse
+            </Link>
+          )}
           <Link
             href={`/publisher/catalog/${book.id}/protection`}
             className="px-3.5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"

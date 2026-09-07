@@ -486,14 +486,16 @@ export default function DepositDetailPage() {
               <span>Écouter l&apos;audio</span>
             </button>
 
-            <Link
-              href={`/catalog/reader/${deposit.id}`}
-              target="_blank"
-              className="px-4 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer min-h-[40px]"
-            >
-              <BookOpen className="w-4 h-4 text-gold" />
-              Lire dans la Liseuse
-            </Link>
+            {((deposit as any).is_digital_available !== false && (deposit as any).format_type !== "audio") && (
+              <Link
+                href={`/catalog/reader/${deposit.id}`}
+                target="_blank"
+                className="px-4 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer min-h-[40px]"
+              >
+                <BookOpen className="w-4 h-4 text-gold" />
+                Lire dans la Liseuse
+              </Link>
+            )}
             <StatusBadge status={deposit.status} />
           </div>
         </div>

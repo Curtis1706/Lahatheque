@@ -136,8 +136,9 @@ class Ouvrage(models.Model):
         if self.page_count == 1:
             return 1
 
-        max_allowed = self.page_count - 1  # au moins 1 page reste derrière le mur de paiement
-        proportional = round(self.page_count * 0.12)
+        page_cnt = int(self.page_count)
+        max_allowed = page_cnt - 1  # au moins 1 page reste derrière le mur de paiement
+        proportional = round(page_cnt * 0.12)
         desired = min(30, max(8, proportional))
         return max(1, min(desired, max_allowed))
 
@@ -177,7 +178,7 @@ class Ouvrage(models.Model):
             while Ouvrage.objects.filter(slug=candidate).exclude(pk=self.pk).exists():
                 candidate = f"{base_slug}-{counter}"
                 counter += 1
-            self.slug = candidate
+            self.slug = str(candidate)
         super().save(*args, **kwargs)
 
 

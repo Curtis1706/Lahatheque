@@ -12,12 +12,15 @@ import {
   CheckCircle2,
   Truck,
   Sparkles,
+  Headphones,
 } from "lucide-react";
 import {
   getStudentCatalog,
   type BookAPI,
   type CatalogDataAPI,
 } from "@/lib/services/student";
+import { getAuthorKpis } from "@/lib/services/author";
+import type { AuthorKpis } from "@/lib/types/author";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
 import { AuthorCatalogOrderModal } from "@/components/features/author/author-catalog-order-modal";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
@@ -41,12 +44,32 @@ function SkeletonBook() {
 function AuthorCatalogBookCard({
   book,
   onOpenOrderModal,
+  discounts,
 }: {
   book: BookAPI;
   onOpenOrderModal: (book: BookAPI) => void;
+  discounts?: {
+    paper_pct: number;
+    digital_pct: number;
+    audio_pct: number;
+  };
 }) {
   const authorName =
     book.authors?.map((a) => a.full_name).join(", ") || "Auteur académique";
+
+  const hasDigital = Boolean(book.is_owned || book.has_digital_access);
+  const hasAudioFormat = Boolean(
+    (book as any).has_audio_version ||
+    (book as any).has_audio ||
+    (book as any).price_audio ||
+    (book as any).format === "audio" ||
+    (book as any).format_type === "audio"
+  );
+  const hasAudioOwned = Boolean(book.is_audio_owned || (book as any).has_audio_access);
+
+  const paperDiscount = discounts?.paper_pct ?? 40;
+  const digitalDiscount = discounts?.digital_pct ?? 25;
+  const audioDiscount = discounts?.audio_pct ?? 25;
 
   return (
     <div className="group h-full rounded-3xl border border-border bg-background hover:border-gold/60 hover:shadow-md transition-all flex flex-col overflow-hidden">
@@ -86,62 +109,118 @@ function AuthorCatalogBookCard({
       </div>
 
       <div className="mt-auto p-5 pt-3 space-y-3">
-        <div className="border-t border-border pt-3">
-          {book.is_owned || book.has_digital_access ? (
-            <span className="text-[10px] font-bold text-success bg-success/10 border border-success/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 w-fit">
-              <CheckCircle2 className="w-3 h-3 text-success" /> Déjà acquis
-            </span>
-          ) : (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-gold/15 text-navy border border-gold/30">
-                    Remise Auteur
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
+        {/* Badges d'acquisition et Tarifs Auteur par format */}
+        <div className="border-t border-border pt-3 space-y-2">
+          {/* Badges d'acquisitions déjà obtenues */}
+          {(hasDigital || (hasAudioFormat && hasAudioOwned)) && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {hasDigital && (
+                <span className="text-[10px] font-bold text-success bg-success/10 border border-success/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                  <CheckCircle2 className="w-3 h-3 text-success" /> Numérique acquis
+                </span>
+              )}
+              {hasAudioFormat && hasAudioOwned && (
+                <span className="text-[10px] font-bold text-navy bg-gold/20 border border-gold/40 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                  <Headphones className="w-3 h-3 text-gold" /> Audio acquis
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Tarifs préférentiels pour les formats non encore acquis */}
+          {(!hasDigital || (hasAudioFormat && !hasAudioOwned) || book.is_paper_available) && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-gold/15 text-navy border border-gold/30">
+                  Tarif Préférentiel Auteur
+                </span>
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                {!hasDigital && (
                   <div className="flex items-center gap-1">
-                    <span className="text-[9px] uppercase font-bold text-foreground-muted">Numérique :</span>
+                    <span className="text-[9px] uppercase font-bold text-foreground-muted">
+                      Numérique (-{digitalDiscount}%) :
+                    </span>
                     <span className="font-mono font-bold text-navy text-xs">
-                      {(book.author_discounted_digital_price ?? Math.round((book.price_digital || 3000) * 0.75)).toLocaleString("fr-FR")} FCFA
+                      {(book.author_discounted_digital_price ?? Math.round((book.price_digital || 3000) * (1 - digitalDiscount / 100))).toLocaleString("fr-FR")} FCFA
                     </span>
                     <span className="text-[9px] text-foreground-muted line-through font-mono">
                       {(book.price_digital || 3000).toLocaleString("fr-FR")}
                     </span>
                   </div>
-                  {book.is_paper_available && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[9px] uppercase font-bold text-foreground-muted flex items-center gap-0.5">
-                        <Truck className="w-2.5 h-2.5 text-gold" /> Papier :
-                      </span>
-                      <span className="font-mono font-bold text-gold text-xs">
-                        {(book.author_discounted_paper_price ?? Math.round((book.price_paper || 5000) * 0.6)).toLocaleString("fr-FR")} FCFA
-                      </span>
-                      <span className="text-[9px] text-foreground-muted line-through font-mono">
-                        {(book.price_paper || 5000).toLocaleString("fr-FR")}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                )}
+                {hasAudioFormat && !hasAudioOwned && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] uppercase font-bold text-foreground-muted flex items-center gap-0.5">
+                      <Headphones className="w-2.5 h-2.5 text-gold" /> Audio (-{audioDiscount}%) :
+                    </span>
+                    <span className="font-mono font-bold text-navy text-xs">
+                      {((book as any).author_discounted_audio_price ?? Math.round(((book as any).price_audio || 3500) * (1 - audioDiscount / 100))).toLocaleString("fr-FR")} FCFA
+                    </span>
+                    <span className="text-[9px] text-foreground-muted line-through font-mono">
+                      {((book as any).price_audio || 3500).toLocaleString("fr-FR")}
+                    </span>
+                  </div>
+                )}
+                {book.is_paper_available && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] uppercase font-bold text-foreground-muted flex items-center gap-0.5">
+                      <Truck className="w-2.5 h-2.5 text-gold" /> Papier (-{paperDiscount}%) :
+                    </span>
+                    <span className="font-mono font-bold text-gold text-xs">
+                      {(book.author_discounted_paper_price ?? Math.round((book.price_paper || 5000) * (1 - paperDiscount / 100))).toLocaleString("fr-FR")} FCFA
+                    </span>
+                    <span className="text-[9px] text-foreground-muted line-through font-mono">
+                      {(book.price_paper || 5000).toLocaleString("fr-FR")}
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Boutons d'actions contextuels */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {hasDigital && (
+            <Link
+              href={`/catalog/reader/${book.id}`}
+              className="px-3.5 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-1.5 min-h-[38px] shadow-xs"
+              title="Lire la version numérique"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-gold" />
+              <span>Lire</span>
+            </Link>
+          )}
+
+          {hasAudioFormat && hasAudioOwned && (
+            <Link
+              href={`/catalog/reader/${book.id}?audio=1`}
+              className="px-3.5 py-2 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-colors flex items-center justify-center gap-1.5 min-h-[38px] shadow-xs"
+              title="Écouter le livre audio"
+            >
+              <Headphones className="w-3.5 h-3.5 text-navy" />
+              <span>Écouter</span>
+            </Link>
+          )}
+
+          {(!hasDigital || (hasAudioFormat && !hasAudioOwned) || book.is_paper_available) && (
+            <button
+              type="button"
+              onClick={() => onOpenOrderModal(book)}
+              className="flex-1 px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-dark transition-all flex items-center justify-center gap-1.5 min-h-[38px] shadow-xs cursor-pointer"
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-gold" />
+              <span>{hasDigital || hasAudioOwned ? "Commander autre format" : "Commander"}</span>
+            </button>
+          )}
+
           <Link
             href={`/author/catalog/${book.id}`}
-            className="px-4 py-2 rounded-xl border border-border bg-background-secondary text-navy text-xs font-semibold hover:border-gold/40 transition-colors flex items-center justify-center min-h-[38px]"
+            className="px-3 py-2 rounded-xl border border-border bg-background-secondary text-navy text-xs font-semibold hover:border-gold/40 transition-colors flex items-center justify-center min-h-[38px]"
           >
             Détail
           </Link>
-
-          <button
-            type="button"
-            onClick={() => onOpenOrderModal(book)}
-            className="flex-1 px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-dark transition-all flex items-center justify-center gap-1.5 min-h-[38px]"
-          >
-            <ShoppingBag className="w-3.5 h-3.5 text-gold" />
-            <span>Commander</span>
-          </button>
         </div>
       </div>
     </div>
@@ -150,6 +229,7 @@ function AuthorCatalogBookCard({
 
 export default function AuthorCatalogPage() {
   const [catalog, setCatalog] = useState<CatalogDataAPI | null>(null);
+  const [kpis, setKpis] = useState<AuthorKpis | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState<string>("all");
@@ -160,11 +240,17 @@ export default function AuthorCatalogPage() {
   const fetchCatalog = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getStudentCatalog(
-        search.trim() || undefined,
-        selectedDiscipline !== "all" ? selectedDiscipline : undefined
-      );
+      const [data, kpisData] = await Promise.all([
+        getStudentCatalog(
+          search.trim() || undefined,
+          selectedDiscipline !== "all" ? selectedDiscipline : undefined
+        ),
+        getAuthorKpis().catch(() => null),
+      ]);
       setCatalog(data);
+      if (kpisData) {
+        setKpis(kpisData);
+      }
     } catch {
       // Fallback empty
     } finally {
@@ -180,6 +266,11 @@ export default function AuthorCatalogPage() {
   }, [fetchCatalog]);
 
   const allBooks = catalog?.books || [];
+
+  const paperDiscount = kpis?.authorDiscounts?.paper_pct ?? 40;
+  const digitalDiscount = kpis?.authorDiscounts?.digital_pct ?? 25;
+  const audioDiscount = kpis?.authorDiscounts?.audio_pct ?? 25;
+  const isCustomDiscount = Boolean(kpis?.authorDiscounts?.is_custom);
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto pb-16 animate-in fade-in duration-300">
@@ -210,18 +301,25 @@ export default function AuthorCatalogPage() {
         </Link>
       </div>
 
-      {/* Bannière d'Avantage Tarifaire Auteur */}
+      {/* Bannière d'Avantage Tarifaire Auteur — 100% Dynamique */}
       <div className="p-4 sm:p-5 rounded-3xl bg-gold/10 border border-gold/30 flex items-center justify-between gap-4 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-2xl bg-gold text-navy shrink-0">
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <p className="font-bold text-xs text-navy">
-              Tarif Préférentiel Auteur Actif : -40% sur le papier et -25% sur le numérique
-            </p>
-            <p className="text-[11px] text-foreground-muted">
-              Les prix remisés s&apos;appliquent automatiquement à tous vos achats d&apos;exemplaires, avec option de règlement immédiat ou en dépôt à terme (30 jours).
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-xs text-navy">
+                Tarif Préférentiel Auteur Actif : -{paperDiscount}% sur le papier, -{digitalDiscount}% sur le numérique et -{audioDiscount}% sur l&apos;audio
+              </p>
+              {isCustomDiscount && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-navy text-gold uppercase tracking-wider">
+                  Taux Personnalisé
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-foreground-muted mt-0.5">
+              Chaque format (numérique, audio ou papier) est acquis individuellement selon vos besoins d&apos;étude ou de diffusion, avec option de règlement immédiat ou en dépôt à terme (30 jours).
             </p>
           </div>
         </div>
@@ -274,6 +372,7 @@ export default function AuthorCatalogPage() {
                 key={book.id}
                 book={book}
                 onOpenOrderModal={(b) => setOrderModalBook(b)}
+                discounts={kpis?.authorDiscounts}
               />
             ))}
           </div>

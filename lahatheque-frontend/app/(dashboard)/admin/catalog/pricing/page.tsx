@@ -52,6 +52,7 @@ export default function AdminPricingCascadePage() {
   // Paramètres Multi-Rôles / Profils Acheteurs
   const [authorDigitalDiscount, setAuthorDigitalDiscount] = useState<number>(25);
   const [authorPaperDiscount, setAuthorPaperDiscount] = useState<number>(40);
+  const [authorAudioDiscount, setAuthorAudioDiscount] = useState<number>(25);
 
   const [wholesaleDigitalDiscount, setWholesaleDigitalDiscount] = useState<number>(25);
   const [wholesalePaperDiscount, setWholesalePaperDiscount] = useState<number>(32);
@@ -82,6 +83,7 @@ export default function AdminPricingCascadePage() {
         if (roleDiscountsData.author) {
           setAuthorPaperDiscount(roleDiscountsData.author.paper_pct ?? 40);
           setAuthorDigitalDiscount(roleDiscountsData.author.digital_pct ?? 25);
+          setAuthorAudioDiscount(roleDiscountsData.author.audio_pct ?? 25);
         }
         if (roleDiscountsData.wholesaler) {
           setWholesalePaperDiscount(roleDiscountsData.wholesaler.paper_pct ?? 32);
@@ -133,6 +135,7 @@ export default function AdminPricingCascadePage() {
         author: {
           paper_pct: Number(authorPaperDiscount),
           digital_pct: Number(authorDigitalDiscount),
+          audio_pct: Number(authorAudioDiscount),
         },
         wholesaler: {
           paper_pct: Number(wholesalePaperDiscount),
@@ -371,24 +374,28 @@ export default function AdminPricingCascadePage() {
         title: "Clients & Lecteurs",
         digDiscount: 0,
         papDiscount: 0,
+        audioDiscount: 0,
         badgeClass: "bg-navy-light text-navy",
       },
       author: {
         title: "Auteurs & Chercheurs",
         digDiscount: authorDigitalDiscount,
         papDiscount: authorPaperDiscount,
+        audioDiscount: authorAudioDiscount,
         badgeClass: "bg-gold/15 text-gold border border-gold/30",
       },
       wholesale: {
         title: "Grossistes & Librairies",
         digDiscount: wholesaleDigitalDiscount,
         papDiscount: wholesalePaperDiscount,
+        audioDiscount: 0,
         badgeClass: "bg-emerald-500/15 text-emerald-700 border border-emerald-500/30",
       },
       university: {
         title: "Universités & Campus",
         digDiscount: universityDigitalDiscount,
         papDiscount: universityPaperDiscount,
+        audioDiscount: 0,
         badgeClass: "bg-blue-500/15 text-blue-700 border border-blue-500/30",
       },
     }[activeTabRole];
@@ -432,10 +439,13 @@ export default function AdminPricingCascadePage() {
         cell: (row: AdminCatalogBook) => {
           const dig = row.price_digital || defaultDigitalPrice;
           const pap = row.price_paper || defaultPaperPrice;
+          const hasAud = Boolean(row.has_audio_version || row.has_audio);
+          const aud = row.price_audio || defaultAudioPrice;
           return (
             <div className="space-y-1 font-mono text-xs text-foreground-muted whitespace-nowrap">
               <div>Num: <span className="line-through">{dig.toLocaleString("fr-FR")} XOF</span></div>
               <div>Papier: <span className="line-through">{pap.toLocaleString("fr-FR")} XOF</span></div>
+              {hasAud && <div>Audio: <span className="line-through">{aud.toLocaleString("fr-FR")} XOF</span></div>}
             </div>
           );
         },
@@ -446,8 +456,11 @@ export default function AdminPricingCascadePage() {
         cell: (row: AdminCatalogBook) => {
           const dig = row.price_digital || defaultDigitalPrice;
           const pap = row.price_paper || defaultPaperPrice;
+          const hasAud = Boolean(row.has_audio_version || row.has_audio);
+          const aud = row.price_audio || defaultAudioPrice;
           const netDig = Math.round(dig * (1 - (profileConfig?.digDiscount || 0) / 100));
           const netPap = Math.round(pap * (1 - (profileConfig?.papDiscount || 0) / 100));
+          const netAud = Math.round(aud * (1 - (profileConfig?.audioDiscount || 0) / 100));
 
           return (
             <div className="space-y-1 font-mono text-xs whitespace-nowrap">
@@ -459,6 +472,12 @@ export default function AdminPricingCascadePage() {
                 <span className="text-[10px] font-sans font-bold text-navy">Papier :</span>
                 <span className="font-bold text-gold">{netPap.toLocaleString("fr-FR")} XOF</span>
               </div>
+              {hasAud && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-sans font-bold text-navy">Audio :</span>
+                  <span className="font-bold text-gold">{netAud.toLocaleString("fr-FR")} XOF</span>
+                </div>
+              )}
             </div>
           );
         },
@@ -478,7 +497,7 @@ export default function AdminPricingCascadePage() {
           return (
             <div className="space-y-0.5 whitespace-nowrap">
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block ${profileConfig?.badgeClass}`}>
-                -{discountPct}% de remise
+                -{discountPct}% de remise papier
               </span>
               <p className="text-[10px] font-mono text-emerald-700 font-bold">
                 Économie: {economie.toLocaleString("fr-FR")} XOF / ex.
@@ -506,8 +525,10 @@ export default function AdminPricingCascadePage() {
     activeTabRole,
     defaultDigitalPrice,
     defaultPaperPrice,
+    defaultAudioPrice,
     authorDigitalDiscount,
     authorPaperDiscount,
+    authorAudioDiscount,
     wholesaleDigitalDiscount,
     wholesalePaperDiscount,
     universityDigitalDiscount,
@@ -642,11 +663,27 @@ export default function AdminPricingCascadePage() {
                   <span className="text-[10px] font-bold text-foreground-muted">%</span>
                 </div>
               </div>
+
+              <div>
+                <label className="text-[10px] font-semibold text-foreground-muted block">Remise Audio Auteur</label>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <input
+                    type="number"
+                    min="0"
+                    max="70"
+                    value={authorAudioDiscount}
+                    onChange={(e) => setAuthorAudioDiscount(Number(e.target.value))}
+                    className="w-full p-2 text-xs font-mono font-bold rounded-lg bg-background border border-border text-navy focus:border-gold focus:outline-none"
+                  />
+                  <span className="text-[10px] font-bold text-foreground-muted">%</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="p-2 rounded-xl bg-gold/10 text-gold text-[10px] font-bold text-center border border-gold/20">
-            Ex: Papier à {(defaultPaperPrice * (1 - authorPaperDiscount / 100)).toLocaleString("fr-FR")} XOF
+          <div className="p-2 rounded-xl bg-gold/10 text-gold text-[10px] font-bold text-center border border-gold/20 space-y-0.5">
+            <div>Papier (-{authorPaperDiscount}%) : {(defaultPaperPrice * (1 - authorPaperDiscount / 100)).toLocaleString("fr-FR")} XOF</div>
+            <div>Audio (-{authorAudioDiscount}%) : {(defaultAudioPrice * (1 - authorAudioDiscount / 100)).toLocaleString("fr-FR")} XOF</div>
           </div>
         </div>
 

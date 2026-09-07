@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { BookOpen, PlusCircle, UploadCloud, ArrowLeft, Eye, ShieldCheck, Download, Edit } from "lucide-react";
+import { BookOpen, PlusCircle, UploadCloud, ArrowLeft, Eye, ShieldCheck, Download, Edit, Headphones } from "lucide-react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -96,13 +96,23 @@ export default function PublisherCatalogPage() {
       header: "",
       cell: (row) => (
         <div className="flex items-center gap-2">
-          <Link
-            href={`/catalog/reader/${row.id}`}
-            className="p-2 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 transition-colors text-navy min-h-[36px] inline-flex items-center"
-            title="Prévisualiser dans la Liseuse LAHA"
-          >
-            <BookOpen className="w-4 h-4 text-gold" />
-          </Link>
+          {((row as any).has_audio || (row as any).has_audio_version || (row as any).format_type === 'audio') && (row as any).is_digital_available === false ? (
+            <Link
+              href={`/listen/${row.id}`}
+              className="p-2 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 transition-colors text-navy min-h-[36px] inline-flex items-center"
+              title="Prévisualiser dans le Lecteur Audio LAHA"
+            >
+              <Headphones className="w-4 h-4 text-gold" />
+            </Link>
+          ) : (
+            <Link
+              href={`/catalog/reader/${row.id}`}
+              className="p-2 rounded-xl bg-gold/15 border border-gold/30 hover:bg-gold/25 transition-colors text-navy min-h-[36px] inline-flex items-center"
+              title="Prévisualiser dans la Liseuse LAHA"
+            >
+              <BookOpen className="w-4 h-4 text-gold" />
+            </Link>
+          )}
           <Link
             href={`/publisher/catalog/${row.id}`}
             className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1"

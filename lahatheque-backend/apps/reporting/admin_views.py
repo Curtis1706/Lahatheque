@@ -295,6 +295,9 @@ class AdminGlobalSettingsAPIView(APIView):
                 "prix_defaut_audio_xof": float(config.prix_defaut_audio_xof),
                 "prix_pass_mensuel_xof": float(config.prix_pass_mensuel_xof),
                 "prix_pass_annuel_xof": float(config.prix_pass_annuel_xof),
+                "remise_auteur_papier_pct": float(config.remise_auteur_papier_pct),
+                "remise_auteur_numerique_pct": float(config.remise_auteur_numerique_pct),
+                "remise_auteur_audio_pct": float(config.remise_auteur_audio_pct),
                 "devise_defaut": config.devise_defaut,
                 "watermark_texte_defaut": config.watermark_texte_defaut,
                 "watermark_opacite_defaut": float(config.watermark_opacite_defaut),
@@ -320,7 +323,8 @@ class AdminGlobalSettingsAPIView(APIView):
         data = request.data
         decimal_fields = [
             'prix_defaut_numerique_xof', 'prix_defaut_papier_xof', 'prix_defaut_audio_xof',
-            'prix_pass_mensuel_xof', 'prix_pass_annuel_xof', 'watermark_opacite_defaut'
+            'prix_pass_mensuel_xof', 'prix_pass_annuel_xof', 'watermark_opacite_defaut',
+            'remise_auteur_papier_pct', 'remise_auteur_numerique_pct', 'remise_auteur_audio_pct',
         ]
         int_fields = [
             'duree_session_lecture_minutes', 'delai_relance_depots_jours',
@@ -2407,6 +2411,7 @@ class AdminRoleDiscountsView(APIView):
                 "author": {
                     "paper_pct": float(config.remise_auteur_papier_pct),
                     "digital_pct": float(config.remise_auteur_numerique_pct),
+                    "audio_pct": float(config.remise_auteur_audio_pct),
                 },
                 "wholesaler": {
                     "paper_pct": float(config.remise_grossiste_papier_pct),
@@ -2432,6 +2437,7 @@ class AdminRoleDiscountsView(APIView):
         field_map = {
             ("author", "paper_pct"): "remise_auteur_papier_pct",
             ("author", "digital_pct"): "remise_auteur_numerique_pct",
+            ("author", "audio_pct"): "remise_auteur_audio_pct",
             ("wholesaler", "paper_pct"): "remise_grossiste_papier_pct",
             ("wholesaler", "digital_pct"): "remise_grossiste_numerique_pct",
             ("university", "paper_pct"): "remise_campus_papier_pct",
@@ -2441,8 +2447,8 @@ class AdminRoleDiscountsView(APIView):
         updated_fields = []
         for role_key in ("author", "wholesaler", "university"):
             role_data = data.get(role_key, {})
-            for sub_key in ("paper_pct", "digital_pct"):
-                if sub_key in role_data:
+            for sub_key in ("paper_pct", "digital_pct", "audio_pct"):
+                if (role_key, sub_key) in field_map and sub_key in role_data:
                     model_field = field_map[(role_key, sub_key)]
                     try:
                         setattr(config, model_field, Decimal(str(role_data[sub_key])))

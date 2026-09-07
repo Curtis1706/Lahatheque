@@ -20,6 +20,10 @@ export const MOCK_GLOBAL_CONFIG: GlobalPricingConfig = {
   prix_pass_annuel_xof: 45000,
   devise_defaut: "XOF",
 
+  remise_auteur_papier_pct: 40.0,
+  remise_auteur_numerique_pct: 25.0,
+  remise_auteur_audio_pct: 25.0,
+
   // Barèmes de redevances et répartition par défaut (modifiables par l'admin)
   default_author_royalty_rate: 70.0,
   default_publisher_royalty_rate: 22.0,

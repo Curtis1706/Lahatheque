@@ -249,7 +249,10 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
         except User.DoesNotExist:
             return Response({"error": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
-        allowed_fields = ['first_name', 'last_name', 'phone', 'role', 'is_active', 'country', 'pen_name']
+        allowed_fields = [
+            'first_name', 'last_name', 'phone', 'role', 'is_active', 'country', 'pen_name',
+            'custom_remise_papier_pct', 'custom_remise_numerique_pct', 'custom_remise_audio_pct'
+        ]
         updated_fields = []
 
         for field in allowed_fields:
@@ -349,3 +352,90 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
         except User.DoesNotExist:
             return Response({"error": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, methods=['get', 'patch'], url_path='discounts')
+    def discounts(self, request, pk=None):
+        """
+        GET /api/v1/admin/users/<id>/discounts/
+        PATCH /api/v1/admin/users/<id>/discounts/
+        Consultation et configuration des remises auteur (spécifiques vs politique globale).
+        """
+        try:
+            user = User.objects.get(id=pk)
+        except User.DoesNotExist:
+            return Response({"error": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        from apps.reporting.pricing_service import get_platform_config
+        config = get_platform_config()
+
+        if request.method == 'GET':
+            has_custom = bool(
+                user.custom_remise_papier_pct is not None or
+                user.custom_remise_numerique_pct is not None or
+                user.custom_remise_audio_pct is not None
+            )
+            return Response({
+                "success": True,
+                "data": {
+                    "user_id": str(user.id),
+                    "user_name": f"{user.first_name} {user.last_name}".strip() or user.email,
+                    "role": user.role,
+                    "is_custom": has_custom,
+                    "custom_remise_papier_pct": float(user.custom_remise_papier_pct) if user.custom_remise_papier_pct is not None else None,
+                    "custom_remise_numerique_pct": float(user.custom_remise_numerique_pct) if user.custom_remise_numerique_pct is not None else None,
+                    "custom_remise_audio_pct": float(user.custom_remise_audio_pct) if user.custom_remise_audio_pct is not None else None,
+                    "effective_paper_pct": float(user.custom_remise_papier_pct if user.custom_remise_papier_pct is not None else config.remise_auteur_papier_pct),
+                    "effective_digital_pct": float(user.custom_remise_numerique_pct if user.custom_remise_numerique_pct is not None else config.remise_auteur_numerique_pct),
+                    "effective_audio_pct": float(user.custom_remise_audio_pct if user.custom_remise_audio_pct is not None else getattr(config, 'remise_auteur_audio_pct', 25.0)),
+                    "global_defaults": {
+                        "paper_pct": float(config.remise_auteur_papier_pct),
+                        "digital_pct": float(config.remise_auteur_numerique_pct),
+                        "audio_pct": float(getattr(config, 'remise_auteur_audio_pct', 25.0)),
+                    }
+                }
+            })
+
+        # PATCH: Mise à jour
+        use_global = request.data.get('use_global', False)
+        if use_global:
+            user.custom_remise_papier_pct = None
+            user.custom_remise_numerique_pct = None
+            user.custom_remise_audio_pct = None
+            user.save(update_fields=['custom_remise_papier_pct', 'custom_remise_numerique_pct', 'custom_remise_audio_pct'])
+            return Response({
+                "success": True,
+                "message": f"Remises de {user.email} réalignées sur la politique générale de la plateforme.",
+                "data": {
+                    "is_custom": False,
+                    "effective_paper_pct": float(config.remise_auteur_papier_pct),
+                    "effective_digital_pct": float(config.remise_auteur_numerique_pct),
+                    "effective_audio_pct": float(getattr(config, 'remise_auteur_audio_pct', 25.0)),
+                }
+            })
+
+        # Remises spécifiques
+        from decimal import Decimal
+        updated_fields = []
+        if 'paper_pct' in request.data:
+            user.custom_remise_papier_pct = Decimal(str(request.data['paper_pct']))
+            updated_fields.append('custom_remise_papier_pct')
+        if 'digital_pct' in request.data:
+            user.custom_remise_numerique_pct = Decimal(str(request.data['digital_pct']))
+            updated_fields.append('custom_remise_numerique_pct')
+        if 'audio_pct' in request.data:
+            user.custom_remise_audio_pct = Decimal(str(request.data['audio_pct']))
+            updated_fields.append('custom_remise_audio_pct')
+
+        if updated_fields:
+            user.save(update_fields=updated_fields)
+
+        return Response({
+            "success": True,
+            "message": f"Remises personnalisées appliquées pour {user.email}.",
+            "data": {
+                "is_custom": True,
+                "effective_paper_pct": float(user.custom_remise_papier_pct or config.remise_auteur_papier_pct),
+                "effective_digital_pct": float(user.custom_remise_numerique_pct or config.remise_auteur_numerique_pct),
+                "effective_audio_pct": float(user.custom_remise_audio_pct or getattr(config, 'remise_auteur_audio_pct', 25.0)),
+            }
+        })

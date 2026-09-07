@@ -8,9 +8,10 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { Modal } from "@/components/ui/modal";
 import { CreateAccountModal } from "@/components/features/admin/create-account-modal";
 import { SendEmailModal } from "@/components/features/admin/send-email-modal";
+import { AuthorDiscountsModal } from "@/components/features/admin/author-discounts-modal";
 import { getAdminUsers, toggleAdminUserStatus, deleteAdminUser } from "@/lib/services/admin";
 import { AdminUser, AdminRole, formatRoleLabel, formatCountryName } from "@/lib/types/admin";
-import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2 } from "lucide-react";
+import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2, Sliders, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -31,6 +32,7 @@ export default function AdminRoleUsersPage() {
   const [emailUser, setEmailUser] = useState<AdminUser | null>(null);
   const [inspectUser, setInspectUser] = useState<AdminUser | null>(null);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<AdminUser | null>(null);
+  const [discountUser, setDiscountUser] = useState<AdminUser | null>(null);
 
   const loadRoleUsers = async () => {
     try {
@@ -289,9 +291,32 @@ export default function AdminRoleUsersPage() {
             cell: (row) => <span className="font-mono text-xs font-bold text-foreground">{(row.extra_info?.total_sales_amount || 0).toLocaleString("fr-FR")} FCFA</span>,
           },
           {
-            key: "rights",
-            header: "Droits Acquis",
-            cell: (row) => <span className="font-mono text-xs font-bold text-emerald-600">{(row.extra_info?.pending_royalties || 0).toLocaleString("fr-FR")} FCFA</span>,
+            key: "discount_status",
+            header: "Remise Auteur",
+            cell: (row) => {
+              const isCustom = Boolean(row.extra_info?.has_custom_discount);
+              const paperPct = row.extra_info?.effective_paper_discount ?? 40;
+              const digitalPct = row.extra_info?.effective_digital_discount ?? 25;
+              return (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    {isCustom ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/15 border border-gold/30 text-navy">
+                        <Sparkles className="w-2.5 h-2.5 text-gold" />
+                        Sur-mesure
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-foreground-muted px-2 py-0.5 rounded-full bg-background-secondary border border-border">
+                        Politique standard
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-mono text-foreground-muted">
+                    Papier -{paperPct}% &bull; Num -{digitalPct}%
+                  </p>
+                </div>
+              );
+            },
           },
           {
             key: "last_deposit",
@@ -300,7 +325,52 @@ export default function AdminRoleUsersPage() {
           },
           countryColumn,
           statusColumn,
-          actionsColumn,
+          {
+            key: "author_actions",
+            header: "Actions",
+            className: "text-right",
+            cell: (row) => (
+              <div className="flex items-center justify-end gap-1">
+                <button
+                  onClick={() => setDiscountUser(row)}
+                  className="p-1.5 rounded-lg hover:bg-gold/10 text-gold transition-colors cursor-pointer"
+                  title="Configurer les remises auteur"
+                >
+                  <Sliders className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setEmailUser(row)}
+                  className="p-1.5 rounded-lg hover:bg-navy-light text-navy transition-colors cursor-pointer"
+                  title="Envoyer un e-mail"
+                >
+                  <Mail className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setInspectUser(row)}
+                  className="p-1.5 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
+                  title="Inspecter la fiche"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleToggleActive(row)}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    row.is_active ? "hover:bg-error/15 text-error" : "hover:bg-success/15 text-success"
+                  }`}
+                  title={row.is_active ? "Rendre inactif" : "Réactiver"}
+                >
+                  {row.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => setDeleteConfirmUser(row)}
+                  className="p-1.5 rounded-lg hover:bg-error/15 text-error/80 hover:text-error transition-colors cursor-pointer"
+                  title="Supprimer définitivement le compte"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ),
+          },
         ];
 
       case "universities":
@@ -492,6 +562,14 @@ export default function AdminRoleUsersPage() {
         onClose={() => setIsCreateModalOpen(false)}
         defaultRole={roleSlug as any}
         onSuccess={loadRoleUsers}
+      />
+
+      {/* Modal Remises Auteur Individuelles */}
+      <AuthorDiscountsModal
+        isOpen={!!discountUser}
+        onClose={() => setDiscountUser(null)}
+        user={discountUser}
+        onUpdated={loadRoleUsers}
       />
 
       {/* Modal d'envoi d'e-mail */}

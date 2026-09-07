@@ -186,19 +186,21 @@ class AudioStreamSessionView(APIView):
         access = AccessService.check_user_book_access(request.user, ouvrage_id)
         user_role = getattr(request.user, 'role', '')
 
-        # Rôles bénéficiant d'un accès intégral gracieux (Supervision, Maquette, Juridique, Auteur de son oeuvre)
+        # Rôles de supervision technique plateforme bénéficiant d'un accès intégral gracieux
         is_bypass_role = (
             request.user.is_superuser
             or request.user.is_staff
             or user_role in ['admin', 'super_admin', 'chief_layout', 'layout_artist', 'legal_reviewer']
-            or access.get("reason") in ["privilege_access", "development_access", "author_own_book", "publisher_own_book"]
+            or access.get("reason") in ["privilege_access", "development_access"]
         )
 
+        from django.db.models import Q
         has_audio_purchase = LigneCommande.objects.filter(
             commande__user=request.user,
-            commande__statut_paiement='paid',
             ouvrage_id=ouvrage_id,
             format_type='audio',
+        ).filter(
+            Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
         ).exists()
 
         institution_obj = None

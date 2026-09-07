@@ -17,13 +17,14 @@ import {
   Building2,
   CreditCard,
   Wallet,
+  Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createOrder } from "@/lib/services/commerce-orders";
 import type { BookAPI } from "@/lib/services/student";
 import { InlineLoader } from "@/components/ui/page-loader";
 
-type Format = "digital" | "paper";
+type Format = "digital" | "paper" | "audio";
 
 export function AuthorCatalogOrderModal({
   book,
@@ -38,10 +39,21 @@ export function AuthorCatalogOrderModal({
 }) {
   const router = useRouter();
   const paperAvailable = Boolean(book.is_paper_available) && (book.price_paper ?? 0) > 0;
+  const audioAvailable = Boolean(
+    (book as any).has_audio_version ||
+    (book as any).has_audio ||
+    (book as any).price_audio ||
+    (book as any).format === "audio" ||
+    (book as any).format_type === "audio"
+  );
+  const isDigitalAvailable = (book as any).is_digital_available !== false && (book as any).format_type !== "audio";
   const isDigitalOwned = Boolean(book.is_owned || book.has_digital_access || book.progress_percent !== undefined);
+  const isAudioOwned = Boolean(book.is_audio_owned || (book as any).has_audio_access);
 
   const [format, setFormat] = useState<Format>(() => {
-    if (isDigitalOwned && paperAvailable) return "paper";
+    if (isDigitalAvailable && !isDigitalOwned) return "digital";
+    if (audioAvailable && !isAudioOwned) return "audio";
+    if (paperAvailable) return "paper";
     return "digital";
   });
 
@@ -69,11 +81,28 @@ export function AuthorCatalogOrderModal({
   const [progressPct, setProgressPct] = useState<number>(0);
   const [success, setSuccess] = useState(false);
 
-  const effectiveDigitalPrice = book.author_discounted_digital_price ?? (book.price_digital ?? 0);
-  const effectivePaperPrice = book.author_discounted_paper_price ?? (book.price_paper ?? 0);
-  const unitPrice = format === "digital" ? effectiveDigitalPrice : effectivePaperPrice;
+  // Remises Auteur calculées dynamiquement
+  const baseDigitalPrice = book.price_digital ?? 3000;
+  const effectiveDigitalPrice = book.author_discounted_digital_price ?? Math.round(baseDigitalPrice * 0.75);
+  const digitalDiscountPct = baseDigitalPrice > 0 ? Math.max(0, Math.round((1 - effectiveDigitalPrice / baseDigitalPrice) * 100)) : 25;
+
+  const basePaperPrice = book.price_paper ?? 5000;
+  const effectivePaperPrice = book.author_discounted_paper_price ?? Math.round(basePaperPrice * 0.6);
+  const paperDiscountPct = basePaperPrice > 0 ? Math.max(0, Math.round((1 - effectivePaperPrice / basePaperPrice) * 100)) : 40;
+
+  const baseAudioPrice = (book as any).price_audio ?? 3500;
+  const effectiveAudioPrice = (book as any).author_discounted_audio_price ?? Math.round(baseAudioPrice * 0.75);
+  const audioDiscountPct = baseAudioPrice > 0 ? Math.max(0, Math.round((1 - effectiveAudioPrice / baseAudioPrice) * 100)) : 25;
+
+  const unitPrice =
+    format === "digital"
+      ? effectiveDigitalPrice
+      : format === "audio"
+      ? effectiveAudioPrice
+      : effectivePaperPrice;
+
   const shippingFee = format === "paper" ? 2500 : 0;
-  const total = unitPrice * quantity + shippingFee;
+  const total = unitPrice * (format === "paper" ? quantity : 1) + shippingFee;
 
   const authorsDisplay =
     book.authors && Array.isArray(book.authors) && book.authors.length > 0
@@ -215,7 +244,9 @@ export function AuthorCatalogOrderModal({
                   {settlementMode === "credit"
                     ? `Votre ouvrage est disponible. Le paiement de ${total.toLocaleString("fr-FR")} FCFA est dû avant le ${new Date(creditDueDate).toLocaleDateString("fr-FR")}.`
                     : format === "digital"
-                    ? "L'ouvrage a été ajouté à votre bibliothèque et est prêt pour la lecture."
+                    ? "L'ouvrage a été ajouté à votre bibliothèque et est prêt pour la lecture numérique."
+                    : format === "audio"
+                    ? "La version audio a été débloquée et est disponible en écoute intégrale illimitée."
                     : "Votre commande papier a été enregistrée. Notre équipe prépare votre colis."}
                 </p>
               </div>
@@ -224,12 +255,23 @@ export function AuthorCatalogOrderModal({
                 {format === "digital" && (
                   <button
                     onClick={() => {
-                      router.push("/student/books");
+                      router.push(`/catalog/reader/${book.id}`);
                       onClose();
                     }}
                     className="px-5 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-dark transition-all min-h-[44px]"
                   >
-                    Accéder à ma bibliothèque
+                    Ouvrir dans la Liseuse
+                  </button>
+                )}
+                {format === "audio" && (
+                  <button
+                    onClick={() => {
+                      router.push(`/listen/${book.id}`);
+                      onClose();
+                    }}
+                    className="px-5 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-dark transition-all min-h-[44px]"
+                  >
+                    Écouter le Livre Audio
                   </button>
                 )}
                 <button
@@ -248,11 +290,11 @@ export function AuthorCatalogOrderModal({
               {/* Détails du Livre */}
               <div className="flex gap-4 p-4 rounded-2xl bg-background-secondary border border-border">
                 <div className="w-14 h-20 rounded-xl bg-navy/10 border border-navy/20 flex items-center justify-center shrink-0">
-                  <BookOpen className="w-6 h-6 text-navy/40" />
+                  <BookOpen className="w-6 h-6 text-navy" />
                 </div>
-                <div className="min-w-0 flex-1 space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gold">
-                    {book.discipline_name || "Ouvrage Académique"}
+                <div className="min-w-0 space-y-1">
+                  <span className="text-[10px] font-bold text-gold uppercase tracking-wider">
+                    {book.discipline_name || "Académique"}
                   </span>
                   <h4 className="font-serif font-bold text-navy text-sm line-clamp-2 leading-snug">
                     {book.title}
@@ -261,28 +303,131 @@ export function AuthorCatalogOrderModal({
                 </div>
               </div>
 
+              {/* Bannière de statut d'acquisition */}
+              {isDigitalOwned && isAudioOwned ? (
+                <div className="p-3 rounded-2xl bg-success/10 border border-success/30 flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-bold text-navy">Formats numérique et audio déjà acquis</p>
+                    <p className="text-foreground-muted text-[11px] mt-0.5">
+                      Vos accès de lecture et d&apos;écoute sont actifs. Vous pouvez commander des exemplaires papier physiques supplémentaires avec votre remise auteur de -{paperDiscountPct}%.
+                    </p>
+                  </div>
+                </div>
+              ) : isDigitalOwned ? (
+                <div className="p-3 rounded-2xl bg-success/10 border border-success/30 flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-bold text-navy">Format numérique déjà acquis</p>
+                    <p className="text-foreground-muted text-[11px] mt-0.5">
+                      Votre accès liseuse est actif. Vous pouvez acquérir le livre audio (-{audioDiscountPct}%) ou des exemplaires papier (-{paperDiscountPct}%).
+                    </p>
+                  </div>
+                </div>
+              ) : isAudioOwned ? (
+                <div className="p-3 rounded-2xl bg-gold/15 border border-gold/40 flex items-start gap-2.5">
+                  <Headphones className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-bold text-navy">Format audio déjà acquis</p>
+                    <p className="text-foreground-muted text-[11px] mt-0.5">
+                      Votre écoute intégrale est active. Vous pouvez acquérir le format numérique (-{digitalDiscountPct}%) ou des exemplaires papier (-{paperDiscountPct}%).
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
               {/* Choix du Format */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-navy">Format souhaité</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Format Numérique */}
                   <button
                     type="button"
-                    onClick={() => setFormat("digital")}
+                    onClick={() => {
+                      if (!isDigitalOwned && isDigitalAvailable) setFormat("digital");
+                    }}
+                    disabled={!isDigitalAvailable}
                     className={`p-3.5 rounded-2xl border text-left transition-all min-h-[44px] ${
-                      format === "digital"
-                        ? "border-gold bg-gold/5 ring-1 ring-gold"
-                        : "border-border bg-background-secondary hover:border-gold/40"
+                      isDigitalOwned
+                        ? "border-success/30 bg-success/5 cursor-default"
+                        : !isDigitalAvailable
+                        ? "opacity-50 cursor-not-allowed border-border bg-background-secondary"
+                        : format === "digital"
+                        ? "border-gold bg-gold/5 ring-1 ring-gold cursor-pointer"
+                        : "border-border bg-background-secondary hover:border-gold/40 cursor-pointer"
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <BookOpen className={`w-4 h-4 ${format === "digital" ? "text-gold" : "text-foreground-muted"}`} />
-                      <span className="text-xs font-bold text-navy">Numérique (DRM)</span>
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className={`w-4 h-4 ${isDigitalOwned ? "text-success" : format === "digital" ? "text-gold" : "text-foreground-muted"}`} />
+                        <span className="text-xs font-bold text-navy">Numérique</span>
+                      </div>
+                      {isDigitalOwned && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success/15 text-success flex items-center gap-1">
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Acquis
+                        </span>
+                      )}
                     </div>
-                    <p className="font-mono font-bold text-gold text-sm mt-1">
-                      {(book.price_digital ?? 0).toLocaleString("fr-FR")} FCFA
-                    </p>
+                    <div className="mt-1">
+                      {isDigitalOwned ? (
+                        <p className="text-xs font-bold text-success pt-0.5">Déjà acquis</p>
+                      ) : (
+                        <>
+                          <p className="font-mono font-bold text-gold text-xs sm:text-sm">
+                            {effectiveDigitalPrice.toLocaleString("fr-FR")} FCFA
+                          </p>
+                          <p className="text-[10px] text-foreground-muted line-through font-mono">
+                            {(book.price_digital ?? 3000).toLocaleString("fr-FR")} (-{digitalDiscountPct}%)
+                          </p>
+                        </>
+                      )}
+                    </div>
                   </button>
 
+                  {/* Format Audio */}
+                  {audioAvailable && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isAudioOwned) setFormat("audio");
+                      }}
+                      className={`p-3.5 rounded-2xl border text-left transition-all min-h-[44px] ${
+                        isAudioOwned
+                          ? "border-success/30 bg-success/5 cursor-default"
+                          : format === "audio"
+                          ? "border-gold bg-gold/5 ring-1 ring-gold cursor-pointer"
+                          : "border-border bg-background-secondary hover:border-gold/40 cursor-pointer"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-2">
+                          <Headphones className={`w-4 h-4 ${isAudioOwned ? "text-success" : format === "audio" ? "text-gold" : "text-foreground-muted"}`} />
+                          <span className="text-xs font-bold text-navy">Livre Audio</span>
+                        </div>
+                        {isAudioOwned && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success/15 text-success flex items-center gap-1">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> Acquis
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1">
+                        {isAudioOwned ? (
+                          <p className="text-xs font-bold text-success pt-0.5">Déjà acquis</p>
+                        ) : (
+                          <>
+                            <p className="font-mono font-bold text-gold text-xs sm:text-sm">
+                              {effectiveAudioPrice.toLocaleString("fr-FR")} FCFA
+                            </p>
+                            <p className="text-[10px] text-foreground-muted line-through font-mono">
+                              {((book as any).price_audio ?? 3500).toLocaleString("fr-FR")} (-{audioDiscountPct}%)
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Format Papier */}
                   <button
                     type="button"
                     onClick={() => paperAvailable && setFormat("paper")}
@@ -291,17 +436,24 @@ export function AuthorCatalogOrderModal({
                       !paperAvailable
                         ? "opacity-50 cursor-not-allowed border-border bg-background-secondary"
                         : format === "paper"
-                        ? "border-gold bg-gold/5 ring-1 ring-gold"
-                        : "border-border bg-background-secondary hover:border-gold/40"
+                        ? "border-gold bg-gold/5 ring-1 ring-gold cursor-pointer"
+                        : "border-border bg-background-secondary hover:border-gold/40 cursor-pointer"
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <Truck className={`w-4 h-4 ${format === "paper" ? "text-gold" : "text-foreground-muted"}`} />
-                      <span className="text-xs font-bold text-navy">Livre Papier</span>
+                      <span className="text-xs font-bold text-navy">Papier</span>
                     </div>
-                    <p className="font-mono font-bold text-navy text-sm mt-1">
-                      {paperAvailable ? `${(book.price_paper ?? 0).toLocaleString("fr-FR")} FCFA` : "Indisponible"}
-                    </p>
+                    <div className="mt-1">
+                      <p className="font-mono font-bold text-navy text-xs sm:text-sm">
+                        {paperAvailable ? `${effectivePaperPrice.toLocaleString("fr-FR")} FCFA` : "Indisponible"}
+                      </p>
+                      {paperAvailable && (
+                        <p className="text-[10px] text-foreground-muted line-through font-mono">
+                          {(book.price_paper ?? 5000).toLocaleString("fr-FR")} (-{paperDiscountPct}%)
+                        </p>
+                      )}
+                    </div>
                   </button>
                 </div>
               </div>

@@ -91,6 +91,10 @@ class ConfigurationPlateformeGlobale(models.Model):
         max_digits=5, decimal_places=2, default=Decimal("25.00"),
         help_text="Remise numérique accordée aux Auteurs (%)"
     )
+    remise_auteur_audio_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("25.00"),
+        help_text="Remise audio accordée aux Auteurs (%)"
+    )
     remise_grossiste_papier_pct = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal("32.00"),
         help_text="Remise papier accordée aux Grossistes B2B (%)"
