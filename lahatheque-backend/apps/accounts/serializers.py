@@ -5,6 +5,7 @@ from .models import User, MFAConfig, OTP
 class UserSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
     institution_name = serializers.SerializerMethodField()
+    institution_detail = serializers.SerializerMethodField()
     extra_info = serializers.SerializerMethodField()
 
     class Meta:
@@ -12,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'email', 'username', 'first_name', 'last_name', 'phone', 
             'country', 'role', 'active_roles', 'avatar', 'avatar_url', 
-            'pen_name', 'bio', 'institution', 'institution_name',
+            'pen_name', 'bio', 'institution', 'institution_name', 'institution_detail',
             'is_suspended', 'suspension_reason', 'is_verified', 
             'is_staff', 'is_superuser', 'date_joined', 'extra_info',
             'custom_remise_papier_pct', 'custom_remise_numerique_pct', 'custom_remise_audio_pct',
@@ -38,6 +39,26 @@ class UserSerializer(serializers.ModelSerializer):
     def get_institution_name(self, obj) -> str | None:
         if obj.institution:
             return obj.institution.name
+        from apps.partners.models import Institution
+        inst = Institution.objects.filter(user=obj).first()
+        if inst:
+            return inst.name
+        return None
+
+    def get_institution_detail(self, obj) -> dict | None:
+        inst = obj.institution
+        if not inst:
+            from apps.partners.models import Institution
+            inst = Institution.objects.filter(user=obj).first()
+        if inst:
+            return {
+                "id": str(inst.id),
+                "name": inst.name,
+                "code": inst.code,
+                "short_name": getattr(inst, 'short_name', '') or inst.code,
+                "royalty_rate": float(inst.royalty_rate or 15.0),
+                "country": inst.country,
+            }
         return None
 
     def get_extra_info(self, obj) -> dict:
@@ -160,6 +181,10 @@ class AdminUserCreateSerializer(serializers.Serializer):
         'wholesaler', 'partner_api', 'admin', 'super_admin'
     ])
     institution_id = serializers.UUIDField(required=False, allow_null=True)
+    institution_mode = serializers.ChoiceField(choices=['existing', 'new'], required=False, default='existing')
+    institution_name = serializers.CharField(required=False, allow_blank=True, default='')
+    institution_code = serializers.CharField(required=False, allow_blank=True, default='')
+    institution_country = serializers.CharField(required=False, allow_blank=True, default='BJ')
     temporary_password = serializers.CharField(required=False, allow_blank=True)
 
 

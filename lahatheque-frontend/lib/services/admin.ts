@@ -20,6 +20,8 @@ import {
   AdminSubscriptionItem,
   StockHolder,
   StockTransaction,
+  CreateAdminUserPayload,
+  UpdateAdminUserPayload,
 } from "@/lib/types/admin";
 
 // =========================================================================
@@ -129,7 +131,7 @@ export async function updateAdminUserDiscounts(
   }
 }
 
-export async function createAdminUser(payload: any): Promise<{ success: boolean; data?: any; error?: string; temporary_password?: string }> {
+export async function createAdminUser(payload: CreateAdminUserPayload | any): Promise<{ success: boolean; data?: any; error?: string; temporary_password?: string; suggestion_id?: string }> {
   const res = await fetch('/api/bff/admin/users/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -138,9 +140,35 @@ export async function createAdminUser(payload: any): Promise<{ success: boolean;
 
   const data = await res.json();
   if (!res.ok) {
-    return { success: false, error: data.error || 'Erreur lors de la création du compte.' };
+    return {
+      success: false,
+      error: data.error || 'Erreur lors de la création du compte.',
+      suggestion_id: data.data?.suggestion_id || data.suggestion_id,
+    };
   }
-  return { success: true, data: data.user, temporary_password: data.temporary_password };
+  return {
+    success: true,
+    data: data.data?.user || data.user,
+    temporary_password: data.data?.temporary_password || data.temporary_password,
+  };
+}
+
+export async function updateAdminUser(userId: string, payload: UpdateAdminUserPayload | any): Promise<{ success: boolean; data?: any; error?: string; suggestion_id?: string }> {
+  const res = await fetch(`/api/bff/admin/users/${userId}/`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    return {
+      success: false,
+      error: data.error || 'Erreur lors de la mise à jour du compte.',
+      suggestion_id: data.data?.suggestion_id || data.suggestion_id,
+    };
+  }
+  return { success: true, data: data.data?.user || data.user || data.data };
 }
 
 export async function toggleAdminUserStatus(userId: string, reason?: string): Promise<{ success: boolean; is_suspended?: boolean; error?: string }> {

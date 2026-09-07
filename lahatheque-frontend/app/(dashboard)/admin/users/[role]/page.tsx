@@ -11,7 +11,8 @@ import { SendEmailModal } from "@/components/features/admin/send-email-modal";
 import { AuthorDiscountsModal } from "@/components/features/admin/author-discounts-modal";
 import { getAdminUsers, toggleAdminUserStatus, deleteAdminUser } from "@/lib/services/admin";
 import { AdminUser, AdminRole, formatRoleLabel, formatCountryName } from "@/lib/types/admin";
-import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2, Sliders, Sparkles } from "lucide-react";
+import { EditUniversityUserModal } from "@/components/features/admin/edit-university-user-modal";
+import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2, Sliders, Sparkles, Building2, Pencil } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -33,6 +34,7 @@ export default function AdminRoleUsersPage() {
   const [inspectUser, setInspectUser] = useState<AdminUser | null>(null);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<AdminUser | null>(null);
   const [discountUser, setDiscountUser] = useState<AdminUser | null>(null);
+  const [editUniversityUser, setEditUniversityUser] = useState<AdminUser | null>(null);
 
   const loadRoleUsers = async () => {
     try {
@@ -379,38 +381,107 @@ export default function AdminRoleUsersPage() {
           {
             key: "inst_name",
             header: "Établissement & Contact",
-            cell: (row) => (
-              <div className="flex items-center gap-2.5">
-                <UserAvatar
-                  src={row.avatar_url || row.avatar}
-                  name={row.extra_info?.institution_name || `${row.first_name} ${row.last_name}`}
-                  size="sm"
-                />
-                <div>
-                  <p className="font-bold text-xs text-navy">{row.extra_info?.institution_name || `${row.first_name} ${row.last_name}`}</p>
-                  <p className="text-[11px] text-foreground-muted">{row.email}</p>
+            cell: (row) => {
+              // Prioritize institution_detail from backend, then fallback to institution_name or extra_info
+              const inst = (row as any).institution_detail || (row as any).institution;
+              const instName = inst?.name || (row as any).institution_name || row.extra_info?.institution_name;
+              const instCode = inst?.code || "";
+              const hasInstitution = Boolean(instName);
+              return (
+                <div className="flex items-center gap-2.5">
+                  <UserAvatar
+                    src={row.avatar_url || row.avatar}
+                    name={instName || `${row.first_name} ${row.last_name}`}
+                    size="sm"
+                  />
+                  <div>
+                    {hasInstitution ? (
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-bold text-xs text-navy">{instName}</p>
+                          {instCode && (
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-gold/10 border border-gold/20 text-gold">
+                              {instCode}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-foreground-muted">{row.first_name} {row.last_name} · {row.email}</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-bold text-xs text-foreground">{row.first_name} {row.last_name}</p>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-error/10 border border-error/20 text-error">
+                            Sans institution
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-foreground-muted">{row.email}</p>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ),
+              );
+            },
+          },
+          {
+            key: "royalty_rate",
+            header: "Taux Conventionné",
+            cell: (row) => {
+              const inst = (row as any).institution_detail || (row as any).institution;
+              const rate = inst?.royalty_rate ?? 15.0;
+              return (
+                <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-gold/10 border border-gold/20 text-gold">
+                  {rate}%
+                </span>
+              );
+            },
           },
           {
             key: "bouquets",
             header: "Bouquets Actifs",
-            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-navy-light text-navy font-bold">{row.extra_info?.active_bouquets || 0} Bouquets B2B</span>,
-          },
-          {
-            key: "royalties_due",
-            header: "Redevances Dues",
-            cell: (row) => <span className="font-mono text-xs font-bold text-amber-600">{(row.extra_info?.royalties_due || 0).toLocaleString("fr-FR")} FCFA</span>,
-          },
-          {
-            key: "balance",
-            header: "Solde Compte",
-            cell: (row) => <span className="font-mono text-xs font-bold text-emerald-600">{row.extra_info?.balance ? `${row.extra_info.balance.toLocaleString("fr-FR")} FCFA` : "À jour (0 FCFA)"}</span>,
+            cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-navy/10 text-navy font-bold">{row.extra_info?.active_bouquets || 0} B2B</span>,
           },
           countryColumn,
           statusColumn,
-          actionsColumn,
+          {
+            key: "univ_actions",
+            header: "Actions",
+            className: "text-right",
+            cell: (row) => (
+              <div className="flex items-center justify-end gap-1">
+                <button
+                  onClick={() => setEditUniversityUser(row)}
+                  className="p-1.5 rounded-lg hover:bg-gold/10 text-gold transition-colors cursor-pointer"
+                  title="Modifier le compte et son institution"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setEmailUser(row)}
+                  className="p-1.5 rounded-lg hover:bg-navy-light text-navy transition-colors cursor-pointer"
+                  title="Envoyer un e-mail"
+                >
+                  <Mail className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setInspectUser(row)}
+                  className="p-1.5 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
+                  title="Inspecter la fiche"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleToggleActive(row)}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    row.is_active ? "hover:bg-error/15 text-error" : "hover:bg-success/15 text-success"
+                  }`}
+                  title={row.is_active ? "Rendre inactif" : "Réactiver"}
+                >
+                  {row.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                </button>
+              </div>
+            ),
+          },
         ];
 
       case "publishers":
@@ -683,6 +754,13 @@ export default function AdminRoleUsersPage() {
           </div>
         </Modal>
       )}
+      {/* Modal Édition Compte Université / Institution */}
+      <EditUniversityUserModal
+        isOpen={!!editUniversityUser}
+        onClose={() => setEditUniversityUser(null)}
+        user={editUniversityUser}
+        onUpdated={loadRoleUsers}
+      />
     </div>
   );
 }

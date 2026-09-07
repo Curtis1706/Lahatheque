@@ -10,6 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 
+from decimal import Decimal
 from .models import User
 from .serializers import UserSerializer, AdminUserCreateSerializer
 from .permissions import IsAdminOrSuperAdmin
@@ -170,29 +171,85 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
         """
         serializer = AdminUserCreateSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                "success": False,
+                "data": serializer.errors,
+                "error": "Données de formulaire invalides."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
         email = data['email'].strip().lower()
 
         if User.objects.filter(email=email).exists():
-            return Response({"error": "Cet email est déjà utilisé."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                "success": False,
+                "data": None,
+                "error": "Cet email est déjà utilisé."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         phone = str(data.get('phone', '')).strip().replace(" ", "")
         if phone and User.objects.filter(phone=phone, is_active=True).exists():
-            return Response({"error": "Ce numéro de téléphone est déjà associé à un autre compte."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                "success": False,
+                "data": None,
+                "error": "Ce numéro de téléphone est déjà associé à un autre compte."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         temp_password = data.get('temporary_password') or ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
         institution_id = data.get('institution_id')
+        institution_mode = data.get('institution_mode', 'existing')
+        new_inst_name = data.get('institution_name', '').strip()
+        new_inst_code = data.get('institution_code', '').strip().upper()
+        new_inst_country = data.get('institution_country', 'BJ').strip() or 'BJ'
+
         institution = None
-        if institution_id:
-            try:
-                institution = Institution.objects.get(id=institution_id)
-            except Exception:
-                pass
 
         try:
             with transaction.atomic():
+                if institution_mode == 'new' and new_inst_name:
+                    if not new_inst_code:
+                        stop_words = {'de', 'du', 'des', 'la', 'le', 'et', 'l', "d'"}
+                        words = [w for w in new_inst_name.split() if w.lower() not in stop_words]
+                        new_inst_code = "".join(w[0].upper() for w in words)[:8] or "UNIV"
+
+                    # Edge Case L81 / T019 : Bloquer en cas de doublon et suggérer l'institution existante
+                    existing_inst = Institution.objects.filter(
+                        Q(name__iexact=new_inst_name) | (Q(code__iexact=new_inst_code) if new_inst_code else Q(pk__in=[]))
+                    ).first()
+                    if existing_inst:
+                        return Response({
+                            "success": False,
+                            "data": {
+                                "suggestion_id": str(existing_inst.id),
+                                "suggestion_name": existing_inst.name,
+                                "suggestion_code": existing_inst.code,
+                            },
+                            "error": f"L'institution '{existing_inst.name}' ({existing_inst.code}) existe déjà. Veuillez la sélectionner dans la liste des institutions partenaires existantes."
+                        }, status=status.HTTP_400_BAD_REQUEST)
+
+                    institution = Institution.objects.create(
+                        name=new_inst_name,
+                        short_name=new_inst_code,
+                        code=new_inst_code,
+                        country=new_inst_country,
+                        royalty_rate=Decimal("15.00"),
+                        contract_reference=f"CTR-UNIV-2026-{new_inst_code}",
+                        is_active=True
+                    )
+                elif institution_id:
+                    try:
+                        institution = Institution.objects.get(id=institution_id)
+                    except Institution.DoesNotExist:
+                        pass
+
+                # Règle SC-001 : Zéro compte orphelin pour le rôle university
+                if data['role'] == 'university' and not institution:
+                    return Response({
+                        "success": False,
+                        "data": None,
+                        "error": "Un compte de rôle Université Partenaire doit obligatoirement être rattaché à une institution partenaire officielle."
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
                 user = User.objects.create_user(
                     username=email,
                     email=email,
@@ -207,6 +264,10 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                     is_verified=True,
                 )
 
+                if institution and (not institution.user or institution.user == user):
+                    institution.user = user
+                    institution.save(update_fields=['user'])
+
                 if data['role'] in ['admin', 'super_admin']:
                     user.is_staff = True
                     if data['role'] == 'super_admin':
@@ -218,13 +279,21 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
             return Response({
                 "success": True,
-                "message": f"Compte {ROLE_LABELS.get(data['role'], data['role'])} créé avec succès. Un e-mail d'accès sécurisé a été transmis au titulaire.",
-                "user": UserSerializer(user).data,
-                "email_sent": email_sent
+                "data": {
+                    "user": UserSerializer(user).data,
+                    "message": f"Compte {ROLE_LABELS.get(data['role'], data['role'])} créé avec succès. Un e-mail d'accès sécurisé a été transmis au titulaire.",
+                    "email_sent": email_sent,
+                },
+                "error": None
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            return Response({"error": f"Erreur de création: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"[AdminUserViewSet.create] Erreur de création: {e}", exc_info=True)
+            return Response({
+                "success": False,
+                "data": None,
+                "error": f"Erreur de création: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def destroy(self, request, pk=None):
         """
@@ -234,20 +303,35 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
         try:
             user = User.objects.get(id=pk)
             user_email = user.email
+
+            # Délier de manière sécurisée toute institution associée avant suppression pour éviter le cascade delete (Edge Case L82 / T022)
+            Institution.objects.filter(user=user).update(user=None)
+
             user.delete()
             return Response({
                 "success": True,
-                "message": f"Le compte {user_email} a été supprimé définitivement."
+                "data": {
+                    "message": f"Le compte {user_email} a été supprimé définitivement."
+                },
+                "error": None
             }, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-            return Response({"error": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                "success": False,
+                "data": None,
+                "error": "Utilisateur introuvable."
+            }, status=status.HTTP_404_NOT_FOUND)
 
     def partial_update(self, request, pk=None):
         """PATCH /api/v1/admin/users/<id>/ - Modification d'un compte existant."""
         try:
             user = User.objects.get(id=pk)
         except User.DoesNotExist:
-            return Response({"error": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                "success": False,
+                "data": None,
+                "error": "Utilisateur introuvable."
+            }, status=status.HTTP_404_NOT_FOUND)
 
         allowed_fields = [
             'first_name', 'last_name', 'phone', 'role', 'is_active', 'country', 'pen_name',
@@ -263,24 +347,101 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
         if 'email' in request.data:
             new_email = request.data['email'].strip().lower()
             if new_email != user.email and User.objects.filter(email=new_email).exclude(id=user.id).exists():
-                return Response({"error": "Cet email est déjà utilisé par un autre compte."}, status=400)
+                return Response({
+                    "success": False,
+                    "data": None,
+                    "error": "Cet email est déjà utilisé par un autre compte."
+                }, status=status.HTTP_400_BAD_REQUEST)
             user.email = new_email
             user.username = new_email
             updated_fields.extend(['email', 'username'])
 
-        if updated_fields:
-            user.save(update_fields=updated_fields)
+        # Gestion de l'institution : rattachement d'une institution existante ou création
+        if 'institution_id' in request.data:
+            inst_id = request.data.get('institution_id')
+            if inst_id:
+                try:
+                    inst = Institution.objects.get(id=inst_id)
+                    user.institution = inst
+                    updated_fields.append('institution')
+                    if not inst.user or inst.user == user:
+                        inst.user = user
+                        inst.save(update_fields=['user'])
+                except Institution.DoesNotExist:
+                    return Response({
+                        "success": False,
+                        "data": None,
+                        "error": "Institution introuvable."
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                user.institution = None
+                updated_fields.append('institution')
 
+        if request.data.get('institution_mode') == 'new' and request.data.get('institution_name'):
+            new_name = request.data['institution_name'].strip()
+            new_code = request.data.get('institution_code', '').strip().upper()
+            if not new_code:
+                stop_words = {'de', 'du', 'des', 'la', 'le', 'et', 'l', "d'"}
+                words = [w for w in new_name.split() if w.lower() not in stop_words]
+                new_code = "".join(w[0].upper() for w in words)[:8] or "UNIV"
+
+            # Edge Case L81 / T019 : Bloquer en cas de doublon et suggérer l'institution existante
+            existing_inst = Institution.objects.filter(
+                Q(name__iexact=new_name) | (Q(code__iexact=new_code) if new_code else Q(pk__in=[]))
+            ).first()
+            if existing_inst:
+                return Response({
+                    "success": False,
+                    "data": {
+                        "suggestion_id": str(existing_inst.id),
+                        "suggestion_name": existing_inst.name,
+                        "suggestion_code": existing_inst.code,
+                    },
+                    "error": f"L'institution '{existing_inst.name}' ({existing_inst.code}) existe déjà. Veuillez la sélectionner dans la liste des institutions partenaires existantes."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            inst = Institution.objects.create(
+                name=new_name,
+                short_name=new_code,
+                code=new_code,
+                country=request.data.get('institution_country', user.country or 'BJ'),
+                royalty_rate=Decimal("15.00"),
+                contract_reference=f"CTR-UNIV-2026-{new_code}",
+                is_active=True,
+                user=user
+            )
+            user.institution = inst
+            updated_fields.append('institution')
+
+        # Validation finale SC-001 / T021 : Aucun compte orphelin pour le rôle university après modification
+        effective_role = request.data.get('role', user.role)
+        if effective_role == 'university' and not user.institution:
+            return Response({
+                "success": False,
+                "data": None,
+                "error": "Un compte de rôle Université Partenaire doit obligatoirement être rattaché à une institution partenaire officielle."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if updated_fields:
+            user.save(update_fields=list(set(updated_fields)))
+
+        user_data = UserSerializer(user).data
         return Response({
-            "id": str(user.id),
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "role": user.role,
-            "is_active": user.is_active,
-            "phone": user.phone,
-            "country": user.country,
-        })
+            "success": True,
+            "data": {
+                "user": user_data,
+                "message": "Informations du compte et institution mises à jour avec succès.",
+                "id": str(user.id),
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": user.role,
+                "is_active": user.is_active,
+                "phone": user.phone,
+                "country": user.country,
+            },
+            "error": None
+        }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['patch'], url_path='toggle-status')
     def toggle_status(self, request, pk=None):
@@ -297,11 +458,18 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             status_label = "suspendu" if user.is_suspended else "réactivé"
             return Response({
                 "success": True,
-                "message": f"Le compte de {user.email} a été {status_label}.",
-                "is_suspended": user.is_suspended
+                "data": {
+                    "message": f"Le compte de {user.email} a été {status_label}.",
+                    "is_suspended": user.is_suspended
+                },
+                "error": None
             })
         except User.DoesNotExist:
-            return Response({"error": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                "success": False,
+                "data": None,
+                "error": "Utilisateur introuvable."
+            }, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=['post'], url_path='reset-password')
     def reset_password(self, request, pk=None):
@@ -317,10 +485,17 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
 
             return Response({
                 "success": True,
-                "message": f"Nouveau mot de passe temporaire généré et envoyé par email à {user.email}."
+                "data": {
+                    "message": f"Nouveau mot de passe temporaire généré et envoyé par email à {user.email}."
+                },
+                "error": None
             })
         except User.DoesNotExist:
-            return Response({"error": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                "success": False,
+                "data": None,
+                "error": "Utilisateur introuvable."
+            }, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=['post'], url_path='send-email')
     def send_email(self, request, pk=None):
@@ -334,7 +509,11 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             message = request.data.get('message', '').strip()
 
             if not subject or not message:
-                return Response({"error": "L'objet et le message sont obligatoires."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({
+                    "success": False,
+                    "data": None,
+                    "error": "L'objet et le message sont obligatoires."
+                }, status=status.HTTP_400_BAD_REQUEST)
 
             recipient_name = f"{user.first_name} {user.last_name}".strip() or user.email
             ok = send_custom_notification_email(user.email, recipient_name, subject, message)
@@ -342,16 +521,24 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
             if ok:
                 return Response({
                     "success": True,
-                    "message": f"Email transmis avec succès à {user.email}."
+                    "data": {
+                        "message": f"Email transmis avec succès à {user.email}."
+                    },
+                    "error": None
                 })
             else:
                 return Response({
                     "success": False,
+                    "data": None,
                     "error": "Échec de l'envoi de l'email via le serveur SMTP."
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         except User.DoesNotExist:
-            return Response({"error": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                "success": False,
+                "data": None,
+                "error": "Utilisateur introuvable."
+            }, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=['get', 'patch'], url_path='discounts')
     def discounts(self, request, pk=None):

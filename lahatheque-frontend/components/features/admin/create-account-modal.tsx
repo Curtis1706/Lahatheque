@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { AdminRole } from "@/lib/types/admin";
 import { createAdminUser } from "@/lib/services/admin";
-import { Shield, Mail, CheckCircle2 } from "lucide-react";
+import { Shield, Mail, CheckCircle2, Building2, School, PlusCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export interface CreateAccountModalProps {
@@ -45,6 +45,31 @@ export function CreateAccountModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Institution management
+  const [institutionMode, setInstitutionMode] = useState<"existing" | "new">("existing");
+  const [institutions, setInstitutions] = useState<{ id: string; name: string; code?: string; country?: string }[]>([]);
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState<string>("");
+  const [newInstName, setNewInstName] = useState("");
+  const [newInstCode, setNewInstCode] = useState("");
+  const [newInstCountry, setNewInstCountry] = useState("BJ");
+  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
+
+  const isUniversityRole = selectedRole === "university";
+
+  useEffect(() => {
+    if (isUniversityRole && institutionMode === "existing" && institutions.length === 0) {
+      setLoadingInstitutions(true);
+      fetch("/api/bff/partners/institutions/", { credentials: "include" })
+        .then((r) => r.json())
+        .then((d) => {
+          const list = d?.data || d?.results || [];
+          setInstitutions(list);
+        })
+        .catch(() => {})
+        .finally(() => setLoadingInstitutions(false));
+    }
+  }, [isUniversityRole, institutionMode]);
+
   const handleNextStep1 = () => {
     setStep(2);
   };
@@ -55,17 +80,38 @@ export function CreateAccountModal({
       toast.error("Veuillez remplir tous les champs obligatoires.");
       return;
     }
+    if (isUniversityRole && institutionMode === "existing" && !selectedInstitutionId) {
+      toast.error("Veuillez sélectionner une institution partenaire ou créer une nouvelle.");
+      return;
+    }
+    if (isUniversityRole && institutionMode === "new" && !newInstName.trim()) {
+      toast.error("Veuillez saisir le nom officiel de la nouvelle institution partenaire.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const res = await createAdminUser({
+      const payload: Record<string, unknown> = {
         first_name: formData.firstName,
         last_name: formData.lastName,
         email: formData.email,
         phone: formData.phone,
         country: formData.country,
         role: selectedRole,
-      });
+      };
+
+      if (isUniversityRole) {
+        if (institutionMode === "existing" && selectedInstitutionId) {
+          payload.institution_id = selectedInstitutionId;
+        } else if (institutionMode === "new" && newInstName.trim()) {
+          payload.institution_mode = "new";
+          payload.institution_name = newInstName.trim();
+          payload.institution_code = newInstCode.trim();
+          payload.institution_country = newInstCountry;
+        }
+      }
+
+      const res = await createAdminUser(payload);
 
       if (res.success) {
         setStep(3);
@@ -73,6 +119,17 @@ export function CreateAccountModal({
         onSuccess?.();
       } else {
         toast.error(res.error || "Erreur lors de la création du compte.");
+        if (res.suggestion_id) {
+          setInstitutionMode("existing");
+          setSelectedInstitutionId(res.suggestion_id);
+          fetch("/api/bff/partners/institutions/", { credentials: "include" })
+            .then((r) => r.json())
+            .then((d) => {
+              const list = d?.data || d?.results || [];
+              setInstitutions(list);
+            })
+            .catch(() => {});
+        }
       }
     } catch {
       toast.error("Impossible de contacter le serveur.");
@@ -84,6 +141,11 @@ export function CreateAccountModal({
   const handleResetAndClose = () => {
     setStep(1);
     setFormData({ firstName: "", lastName: "", email: "", phone: "", country: "BJ", institutionName: "" });
+    setSelectedInstitutionId("");
+    setNewInstName("");
+    setNewInstCode("");
+    setNewInstCountry("BJ");
+    setInstitutionMode("existing");
     onClose();
   };
 
@@ -236,16 +298,119 @@ export function CreateAccountModal({
               </div>
             </div>
 
-            {(selectedRole === "partner_api" || selectedRole === "university") && (
-              <div>
-                <label className="text-xs font-medium text-foreground">Nom de l'Université / Institution</label>
-                <input
-                  type="text"
-                  value={formData.institutionName}
-                  onChange={(e) => setFormData({ ...formData, institutionName: e.target.value })}
-                  placeholder="Université d'Abomey-Calavi"
-                  className="w-full mt-1 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none"
-                />
+            {isUniversityRole && (
+              <div className="space-y-3 p-3 rounded-2xl bg-background-secondary border border-border">
+                <div className="flex items-center gap-2 text-xs font-bold text-navy">
+                  <Building2 className="w-4 h-4 text-gold" />
+                  <span>Institution Partenaire Officielle</span>
+                </div>
+
+                {/* Mode switcher */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInstitutionMode("existing")}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                      institutionMode === "existing"
+                        ? "bg-navy text-white border-navy"
+                        : "bg-background border-border text-foreground-muted hover:border-navy"
+                    }`}
+                  >
+                    <School className="w-3.5 h-3.5" />
+                    Rattacher une université existante
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInstitutionMode("new")}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                      institutionMode === "new"
+                        ? "bg-gold text-navy border-gold"
+                        : "bg-background border-border text-foreground-muted hover:border-gold"
+                    }`}
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    Nouvelle institution
+                  </button>
+                </div>
+
+                {/* Existing institution selector */}
+                {institutionMode === "existing" && (
+                  <div>
+                    {loadingInstitutions ? (
+                      <div className="w-full p-2.5 text-xs text-foreground-muted text-center border border-border rounded-xl bg-background">
+                        Chargement des institutions...
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedInstitutionId}
+                        onChange={(e) => setSelectedInstitutionId(e.target.value)}
+                        className="w-full p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none min-h-[44px]"
+                      >
+                        <option value="">-- Sélectionner une université partenaire --</option>
+                        {institutions.map((inst) => (
+                          <option key={inst.id} value={inst.id}>
+                            {inst.name}{inst.code ? ` (${inst.code})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {institutions.length === 0 && !loadingInstitutions && (
+                      <p className="text-[10px] text-foreground-muted mt-1">
+                        Aucune institution trouvée. Utilisez &laquo; Nouvelle institution &raquo; pour en créer une.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* New institution form */}
+                {institutionMode === "new" && (
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="text-[11px] font-medium text-foreground">Nom officiel complet *</label>
+                      <input
+                        type="text"
+                        value={newInstName}
+                        onChange={(e) => setNewInstName(e.target.value)}
+                        placeholder="Université d'Abomey-Calavi"
+                        className="w-full mt-1 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground">Sigle / Code</label>
+                        <input
+                          type="text"
+                          value={newInstCode}
+                          onChange={(e) => setNewInstCode(e.target.value.toUpperCase())}
+                          placeholder="UAC (auto si vide)"
+                          maxLength={12}
+                          className="w-full mt-1 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground">Pays</label>
+                        <select
+                          value={newInstCountry}
+                          onChange={(e) => setNewInstCountry(e.target.value)}
+                          className="w-full mt-1 p-2.5 text-xs rounded-xl bg-background border border-border focus:border-gold focus:outline-none"
+                        >
+                          <option value="BJ">Bénin (BJ)</option>
+                          <option value="TG">Togo (TG)</option>
+                          <option value="CI">Côte d&apos;Ivoire (CI)</option>
+                          <option value="SN">Sénégal (SN)</option>
+                          <option value="NE">Niger (NE)</option>
+                          <option value="GA">Gabon (GA)</option>
+                          <option value="ML">Mali (ML)</option>
+                          <option value="CM">Cameroun (CM)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 p-2 rounded-lg bg-gold/10 border border-gold/20 text-[10px] text-navy">
+                      <Building2 className="w-3 h-3 text-gold shrink-0" />
+                      <span>Taux conventionné : <strong>15%</strong> appliqué par défaut. Modifiable depuis Administration &rsaquo; Redevances.</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

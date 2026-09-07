@@ -85,10 +85,47 @@ export interface AdminUser {
   last_login?: string;
   status?: "active" | "suspended" | "pending_activation";
   organization?: string;
+  institution_id?: string | null;
+  institution?: {
+    id: string;
+    name: string;
+    code?: string;
+    short_name?: string;
+    royalty_rate?: number;
+    country?: string;
+  } | null;
   custom_remise_papier_pct?: number | null;
   custom_remise_numerique_pct?: number | null;
   custom_remise_audio_pct?: number | null;
   extra_info?: Record<string, any>;
+}
+
+export interface CreateAdminUserPayload {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+  country?: string;
+  role: AdminRole;
+  institution_id?: string | null;
+  institution_mode?: "existing" | "new";
+  institution_name?: string;
+  institution_code?: string;
+  institution_country?: string;
+  temporary_password?: string;
+}
+
+export interface UpdateAdminUserPayload {
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  country?: string;
+  email?: string;
+  institution_id?: string | null;
+  institution_mode?: "existing" | "new";
+  institution_name?: string;
+  institution_code?: string;
+  institution_country?: string;
 }
 
 export interface AuthorUserDiscounts {
