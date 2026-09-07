@@ -409,8 +409,7 @@ def task_calculate_monthly_royalties(include_current_month=False):
                 pub_rate = Decimal(str(ouvrage.publisher.contractual_royalty_rate)) / Decimal("100")
                 publisher_payout = (total_sales * pub_rate).quantize(Decimal("0.01"))
 
-            remaining_after_partners = total_sales - university_payout - publisher_payout
-            if remaining_after_partners <= 0:
+            if total_sales <= Decimal("0.00"):
                 continue
 
             book_royalty_rate_obj = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
@@ -419,8 +418,8 @@ def task_calculate_monthly_royalties(include_current_month=False):
             else:
                 global_author_rate = Decimal("0.15")
 
-            author_pool = (remaining_after_partners * global_author_rate).quantize(Decimal("0.01"))
-            platform_revenue = remaining_after_partners - author_pool
+            author_pool = (total_sales * global_author_rate).quantize(Decimal("0.01"))
+            platform_revenue = max(Decimal("0.00"), total_sales - author_pool - publisher_payout - university_payout)
 
             calculation, _ = RoyaltyCalculation.objects.update_or_create(
                 ouvrage=ouvrage,
@@ -511,7 +510,6 @@ def task_calculate_monthly_royalties(include_current_month=False):
 
             for right in author_rights:
                 repartition = RepartitionDroits.objects.filter(ouvrage=ouvrage, beneficiaire=right.user).first()
-                ratio_partenaire = (remaining_after_partners / total_sales) if total_sales > 0 else Decimal("1")
                 coauthor_share = (Decimal(str(right.pool_share_percent)) / Decimal("100")) if right.pool_share_percent is not None else Decimal("1")
 
                 if repartition and (repartition.taux_papier is not None or repartition.taux_numerique is not None or repartition.taux_audio_tts is not None):
@@ -526,9 +524,9 @@ def task_calculate_monthly_royalties(include_current_month=False):
                     taux_audio = (Decimal("0.08") * raw_aud) if raw_aud > Decimal("0.50") else raw_aud
 
                     amount = (
-                        (ventes_fmt['paper'] * ratio_partenaire * taux_papier * coauthor_share) +
-                        (ventes_fmt['digital'] * ratio_partenaire * taux_numerique * coauthor_share) +
-                        (ventes_fmt['audio'] * ratio_partenaire * taux_audio * coauthor_share)
+                        (ventes_fmt['paper'] * taux_papier * coauthor_share) +
+                        (ventes_fmt['digital'] * taux_numerique * coauthor_share) +
+                        (ventes_fmt['audio'] * taux_audio * coauthor_share)
                     ).quantize(Decimal("0.01"))
                 else:
                     amount = (author_pool * coauthor_share).quantize(Decimal("0.01"))
