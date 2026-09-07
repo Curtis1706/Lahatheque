@@ -3,13 +3,15 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { BookOpen, ArrowLeft, BarChart3, Globe, Layers, DollarSign, Download, ShoppingBag, ArrowRight } from "lucide-react";
+import { BookOpen, ArrowLeft, BarChart3, Globe, Layers, DollarSign, Download, ShoppingBag, ArrowRight, Headphones } from "lucide-react";
 import { getAuthorPublishedBookDetails } from "@/lib/services/author";
 import type { AuthorPublishedBook } from "@/lib/types/author";
 import { PageLoader } from "@/components/ui/page-loader";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 
 export default function AuthorBookDetailPage() {
   const params = useParams();
+  const { playBook } = useAudioPlayer();
   const bookId = (params?.id as string) || "pub-book-01";
 
   const [book, setBook] = useState<AuthorPublishedBook | null>(null);
@@ -59,13 +61,26 @@ export default function AuthorBookDetailPage() {
           </p>
         </div>
 
-        <Link
-          href="/author/catalog"
-          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs shrink-0 min-h-[44px]"
-        >
-          <ShoppingBag className="w-4 h-4 text-gold" />
-          <span>Commander cet ouvrage (-40%)</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          {((book as any).has_audio_version || (book as any).has_audio || (book.format_breakdown?.audio ?? 0) > 0) && (
+            <button
+              type="button"
+              onClick={() => playBook(book.id)}
+              className="px-3.5 py-2.5 rounded-xl bg-gold/15 text-navy border border-gold/30 hover:bg-gold/25 text-xs font-bold transition-all inline-flex items-center gap-2 shadow-xs shrink-0 min-h-[44px] cursor-pointer"
+              title="Écouter la version audio de votre ouvrage"
+            >
+              <Headphones className="w-4 h-4 text-gold" />
+              <span>Écouter l&apos;audio</span>
+            </button>
+          )}
+          <Link
+            href="/author/catalog"
+            className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs shrink-0 min-h-[44px]"
+          >
+            <ShoppingBag className="w-4 h-4 text-gold" />
+            <span>Commander cet ouvrage (-40%)</span>
+          </Link>
+        </div>
       </div>
 
       {/* Bannière Remise Auteur pour cet ouvrage */}

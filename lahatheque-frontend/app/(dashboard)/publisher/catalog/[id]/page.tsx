@@ -3,14 +3,16 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, ShieldCheck, Eye, Download, Tag, DollarSign, Lock, Edit3 } from "lucide-react";
+import { ArrowLeft, BookOpen, ShieldCheck, Eye, Download, Tag, DollarSign, Lock, Edit3, Headphones } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ValidationStepTracker } from "@/components/features/publisher/validation-step-tracker";
 import { getPublisherBookDetail } from "@/lib/services/publisher";
 import type { PublisherBook } from "@/lib/types/publisher";
+import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 
 export default function PublisherBookDetailPage() {
   const params = useParams();
+  const { playBook } = useAudioPlayer();
   const bookId = (params?.id as string) || "";
   const [book, setBook] = useState<PublisherBook | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,6 +80,17 @@ export default function PublisherBookDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {((book as any).has_audio_version || (book as any).has_audio || (book as any).price_audio) && (
+            <button
+              type="button"
+              onClick={() => playBook(book.id)}
+              className="px-3.5 py-2.5 rounded-xl bg-gold/15 text-navy border border-gold/30 hover:bg-gold/25 text-xs font-bold transition-all inline-flex items-center gap-2 shadow-xs min-h-[44px] cursor-pointer"
+              title="Écouter l'enregistrement audio (Privilège Éditeur)"
+            >
+              <Headphones className="w-4 h-4 text-gold" />
+              <span>Écouter l&apos;audio</span>
+            </button>
+          )}
           <Link
             href={`/catalog/reader/${book.id}`}
             className="px-3.5 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold-light transition-all inline-flex items-center gap-2 shadow-xs min-h-[44px]"
