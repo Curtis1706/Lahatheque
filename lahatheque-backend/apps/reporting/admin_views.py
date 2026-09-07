@@ -2170,8 +2170,18 @@ class AdminAuthorRoyaltiesReportView(APIView):
             total_due = float(payout_lines.aggregate(t=Sum('payout_amount'))['t'] or 0)
             total_paid = float(payout_lines.filter(is_settled=True).aggregate(t=Sum('payout_amount'))['t'] or 0)
 
+            from apps.rights.models import RoyaltyRate
+
             rights_count = rights.count()
-            avg_rate = float(sum(r.pool_share_percent for r in rights) / rights_count) if rights_count else 0
+            effective_rates = []
+            for r in rights:
+                pool_share = float(r.pool_share_percent) if r.pool_share_percent is not None else 100.0
+                book_rate_obj = RoyaltyRate.objects.filter(ouvrage=r.ouvrage).first()
+                global_rate = float(book_rate_obj.author_share_percent) if (book_rate_obj and book_rate_obj.author_share_percent is not None) else 15.0
+                # Taux effectif par livre = part de répartition × taux global de droits négocié
+                effective_rates.append(global_rate * (pool_share / 100))
+
+            avg_rate = float(sum(effective_rates) / len(effective_rates)) if effective_rates else 0
 
             results.append({
                 "author_id": str(author.id),

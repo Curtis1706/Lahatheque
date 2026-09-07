@@ -217,8 +217,18 @@ class AuthorBooksListView(APIView):
                 ouvrage=b, access_type='download'
             ).count()
             author_right = AuthorRight.objects.filter(ouvrage=b, user=user).first()
-            rate = float(author_right.pool_share_percent) if author_right else 15.0
-            share = rev * (rate / 100)
+
+            from apps.rights.models import RoyaltyRate
+
+            pool_share = float(author_right.pool_share_percent) if author_right else 100.0
+            book_rate_obj = RoyaltyRate.objects.filter(ouvrage=b).first()
+            global_author_rate = float(book_rate_obj.author_share_percent) if (book_rate_obj and book_rate_obj.author_share_percent is not None) else 15.0
+
+            # Taux réellement applicable : part de répartition × taux global de droits négocié,
+            # cohérent avec AuthorBookDetailView (Fiche BH9).
+            effective_rate = global_author_rate * (pool_share / 100)
+            share = rev * (effective_rate / 100)
+            rate = effective_rate
             format_breakdown = {
                 "digital": (lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0) + w_dig_qty,
                 "paper": (lignes.filter(format_type='paper').aggregate(total=Sum('quantity'))['total'] or 0) + w_prt_qty,
