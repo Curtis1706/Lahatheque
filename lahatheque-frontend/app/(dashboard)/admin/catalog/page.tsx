@@ -176,11 +176,17 @@ export default function AdminCatalogPage() {
     },
     {
       key: "price_digital",
-      header: "Prix Numérique / Papier",
+      header: "Formats & Tarifs",
       cell: (row) => (
-        <div className="font-mono text-xs">
-          <span className="font-bold text-navy">{row.price_digital.toLocaleString("fr-FR")} FCFA</span>
+        <div className="font-mono text-xs space-y-0.5">
+          <span className="font-bold text-navy block">{row.price_digital.toLocaleString("fr-FR")} FCFA <span className="text-[9px] font-sans text-foreground-muted font-normal">(Num)</span></span>
           <span className="text-[10px] text-foreground-muted block">Papier: {row.price_paper.toLocaleString("fr-FR")} FCFA</span>
+          {(row.has_audio_version || (row as any).price_audio) && (
+            <span className="text-[10px] text-gold font-bold flex items-center gap-1">
+              <Headphones className="w-3 h-3 text-gold" />
+              <span>Audio: {((row as any).price_audio || 3500).toLocaleString("fr-FR")} FCFA</span>
+            </span>
+          )}
         </div>
       ),
     },
