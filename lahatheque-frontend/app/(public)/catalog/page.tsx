@@ -449,7 +449,7 @@ function CatalogSearchInner() {
                               </button>
                             ) : hasAudio ? (
                               <Link
-                                href={`/listen/${bookSlug}?mode=sample`}
+                                href={`/preview/${bookSlug}`}
                                 className="px-2.5 py-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
                                 title="Écouter l'extrait audio gratuit"
                               >

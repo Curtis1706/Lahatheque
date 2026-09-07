@@ -60,8 +60,8 @@ export function SampleChoiceModal({
       await playBook(book.id, { preview: true });
       router.push(`/listen/${book.id}`);
     } else {
-      // Page publique : redirige directement vers la page d'écoute
-      router.push(`/listen/${book.id}?mode=sample`);
+      // Page publique : redirige vers la page d'extrait public sans auth
+      router.push(`/preview/${book.id}`);
     }
   };
 
