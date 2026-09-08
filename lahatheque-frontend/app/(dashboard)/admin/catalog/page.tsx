@@ -29,6 +29,7 @@ import { InlineLoader } from "@/components/ui/page-loader";
 import { ViewToggle, ViewMode } from "@/components/features/student/view-toggle";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
+import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 
 export default function AdminCatalogPage() {
   const { playBook } = useAudioPlayer();
@@ -189,8 +190,14 @@ export default function AdminCatalogPage() {
       key: "authors",
       header: "Auteur(s) & Éditeur",
       cell: (row) => (
-        <div>
-          <p className="text-xs font-medium text-foreground">{formatAuthors(row.authors, row.author_name)}</p>
+        <div className="max-w-xs space-y-1">
+          <AuthorsDisplay
+            authors={row.authors}
+            fallbackName={row.author_name}
+            bookTitle={row.title}
+            maxVisible={2}
+            className="text-xs font-medium text-foreground"
+          />
           <p className="text-[11px] text-gold font-medium">{row.publisher_name}</p>
         </div>
       ),
@@ -380,7 +387,16 @@ export default function AdminCatalogPage() {
 
                 <div className="space-y-1 text-center">
                   <h3 className="font-serif font-bold text-sm text-foreground line-clamp-2">{book.title}</h3>
-                  <p className="text-xs text-foreground-muted truncate">Par {formatAuthors(book.authors, book.author_name)}</p>
+                  <div className="text-xs text-foreground-muted flex items-center justify-center gap-1">
+                    <span>Par</span>
+                    <AuthorsDisplay
+                      authors={book.authors}
+                      fallbackName={book.author_name}
+                      bookTitle={book.title}
+                      maxVisible={2}
+                      className="text-xs text-foreground-muted"
+                    />
+                  </div>
                   <p className="text-xs text-gold font-medium">{book.publisher_name}</p>
                 </div>
               </div>

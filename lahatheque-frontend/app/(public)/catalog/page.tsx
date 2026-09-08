@@ -24,6 +24,7 @@ import { Book as Book3D } from "@/components/ui/book";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-modal";
+import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 
 // Liste dynamique des années de publication : de l'année en cours jusqu'à 1950
 const CURRENT_YEAR = new Date().getFullYear();
@@ -402,9 +403,16 @@ function CatalogSearchInner() {
                               {book.title}
                             </Link>
                           </h3>
-                          <p className="text-xs text-foreground-muted font-medium">
-                            Par <span className="text-navy font-semibold">{authorName}</span>
-                          </p>
+                          <div className="text-xs text-foreground-muted font-medium flex items-center flex-wrap gap-1">
+                            <span>Par</span>
+                            <AuthorsDisplay
+                              authors={book.authors_details && book.authors_details.length > 0 ? book.authors_details : ((book as any).authors || (book as any).author_name || authorName)}
+                              fallbackName={authorName}
+                              bookTitle={book.title}
+                              maxVisible={2}
+                              className="text-navy font-semibold"
+                            />
+                          </div>
                           <div className="flex flex-wrap items-center gap-2 pt-1">
                             {book.institution_name && (
                               <span className="text-[11px] text-foreground-muted flex items-center gap-1">

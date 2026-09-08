@@ -17,6 +17,7 @@ import { getBookById, searchBooks } from "@/lib/services/catalog";
 import { BookActionButtons } from "@/components/catalog/book-action-buttons";
 import { Book as Book3D } from "@/components/ui/book";
 import { formatEur } from "@/components/cart/cart-drawer";
+import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 
 export default function BookDetailPage() {
   const params = useParams();
@@ -215,9 +216,17 @@ export default function BookDetailPage() {
               </div>
 
               {/* Auteur & Éditeur */}
-              <p className="text-xs sm:text-sm text-foreground">
-                Auteur : <strong className="text-navy">{authorsString}</strong> — <span className="text-foreground-secondary">{book.publisher_name || "LAHA Éditions"}</span>
-              </p>
+              <div className="text-xs sm:text-sm text-foreground flex items-center flex-wrap gap-1.5">
+                <span className="text-foreground-muted">Auteur{book.authors_details?.length && book.authors_details.length > 1 ? "s" : ""} :</span>
+                <AuthorsDisplay
+                  authors={book.authors_details && book.authors_details.length > 0 ? book.authors_details : authorsString}
+                  fallbackName="Auteur certifié"
+                  bookTitle={book.title}
+                  maxVisible={3}
+                  className="text-navy font-semibold"
+                />
+                <span className="text-foreground-secondary">— {book.publisher_name || "LAHA Éditions"}</span>
+              </div>
 
               {/* Badges de Caractéristiques */}
               <div className="flex flex-wrap items-center gap-2 pt-1">
