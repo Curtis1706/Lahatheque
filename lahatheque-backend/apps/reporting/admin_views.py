@@ -2931,25 +2931,21 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
 
     inst_data = {}
     if hasattr(books_qs, "values"):
-        for row in books_qs.values("institution_id", "institution__name", "institution__code").annotate(c=Count("id")):
+        for row in books_qs.filter(institution__isnull=False).values("institution_id", "institution__name", "institution__code").annotate(c=Count("id")):
             iid = row["institution_id"]
-            key = str(iid) if iid else "other"
+            key = str(iid)
             inst_data[key] = {
                 "id": key,
-                "name": row["institution__name"] or "Fonds Propre LAHA / Autres partenaires",
-                "code": row["institution__code"] or "LAHA",
+                "name": row["institution__name"] or "Université Partenaire",
+                "code": row["institution__code"] or "UNIV",
                 "books_count": row["c"],
                 "reads_count": 0,
             }
 
-    # Calcul des consultations réelles par institution sur les ouvrages de ce bouquet
+    # Calcul des consultations réelles par institution universitaire sur les ouvrages de ce bouquet
     if books_qs and inst_data:
         for key, info in inst_data.items():
-            if key != "other":
-                inst_books = books_qs.filter(institution_id=key)
-            else:
-                inst_books = books_qs.filter(institution__isnull=True)
-
+            inst_books = books_qs.filter(institution_id=key)
             sessions_count = ReaderSession.objects.filter(
                 source_type='catalog_book',
                 ouvrage__in=inst_books

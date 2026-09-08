@@ -549,18 +549,7 @@ export default function AdminOverviewDashboard() {
               <p className="text-base sm:text-lg font-bold font-mono text-navy">
                 {bouquetDist.items.length} Établissement{bouquetDist.items.length > 1 ? "s" : ""}
               </p>
-              <span
-                className="text-[10px] text-foreground-muted truncate block"
-                title={
-                  bouquetDist.items.length > 0
-                    ? bouquetDist.items.map((it) => it.institution_code || it.short_name).join(", ")
-                    : "Aucun établissement"
-                }
-              >
-                {bouquetDist.items.length > 0
-                  ? bouquetDist.items.map((it) => it.institution_code || it.short_name).join(", ")
-                  : "Aucun établissement"}
-              </span>
+              <span className="text-[10px] text-foreground-muted">Universités partenaires</span>
             </div>
           </div>
         )}
