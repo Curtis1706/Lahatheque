@@ -130,3 +130,84 @@ class BouquetRevenueDistributionTestCase(TestCase):
             "Relancer la tâche pour la même période a créé des doublons — get_or_create "
             "doit utiliser une clé (institution, period) stable."
         )
+
+    def test_dynamic_rate_cascade(self):
+        """Vérifie la hiérarchie dynamique : taux institution > config globale > repli 15%."""
+        from apps.reporting.pricing_service import get_institution_royalty_rate
+        from apps.reporting.models import ConfigurationPlateformeGlobale
+
+        config = ConfigurationPlateformeGlobale.objects.first()
+        if not config:
+            config = ConfigurationPlateformeGlobale.objects.create()
+        config.default_university_royalty_rate = Decimal("18.50")
+        config.save()
+
+        # 1. Institution avec taux spécifique (22%)
+        inst_custom = Institution.objects.create(name="Univ Sur Mesure", code="USM", country="BJ", royalty_rate=Decimal("22.00"))
+        self.assertEqual(get_institution_royalty_rate(inst_custom), 22.0)
+
+        # 2. Institution sans taux spécifique (repli sur config globale 18.5%)
+        inst_default = Institution.objects.create(name="Univ Globale", code="UG", country="BJ", royalty_rate=None)
+        self.assertEqual(get_institution_royalty_rate(inst_default), 18.5)
+
+        # 3. Aucune institution ni config personnalisée (repli 15%)
+        config.default_university_royalty_rate = None
+        config.save()
+        self.assertEqual(get_institution_royalty_rate(inst_default), 15.0)
+
+    def test_compute_bouquet_distribution_real_aggregation_option_a(self):
+        """Vérifie le calcul 100% Option A et l'agrégation réelle avec consultations."""
+        from apps.reporting.admin_views import compute_bouquet_distribution_payload
+        from apps.reader.models import ReaderSession
+
+        # Assigner des institutions aux livres
+        book_uac = Ouvrage.objects.create(
+            title="Droit Béninois UAC", isbn="978-0-00000-030-1",
+            discipline=self.discipline, format_type="pdf",
+            price_digital=5000, status="published", institution=self.uac
+        )
+        book_una = Ouvrage.objects.create(
+            title="Agronomie UNA", isbn="978-0-00000-030-2",
+            discipline=self.discipline, format_type="pdf",
+            price_digital=5000, status="published", institution=self.una
+        )
+
+        student = User.objects.create_user(
+            username="etu_eval_dyn", email="etu_eval_dyn@test.bj",
+            password="TestPass123!", role="student"
+        )
+
+        # 90 sessions UAC et 10 sessions UNA
+        for _ in range(9):
+            ReaderSession.objects.create(
+                user=student, ouvrage=book_uac, source_type='catalog_book',
+                current_page=1, duration_seconds=60
+            )
+        ReaderSession.objects.create(
+            user=student, ouvrage=book_una, source_type='catalog_book',
+            current_page=1, duration_seconds=60
+        )
+
+        payload = compute_bouquet_distribution_payload(self.offering, requesting_institution_id=str(self.uac.id))
+
+        self.assertIn("distribution", payload)
+        self.assertIn("totals", payload)
+        self.assertEqual(payload["totals"]["total_usage_percentage"], 100.0)
+
+        # Trouver UAC et UNA dans la distribution
+        uac_item = next((it for it in payload["distribution"] if it["institution_id"] == str(self.uac.id)), None)
+        una_item = next((it for it in payload["distribution"] if it["institution_id"] == str(self.una.id)), None)
+
+        self.assertIsNotNone(uac_item)
+        self.assertIsNotNone(una_item)
+        self.assertTrue(uac_item["is_current_institution"])
+        self.assertFalse(una_item["is_current_institution"])
+
+        # Vérification des pourcentages d'audience
+        self.assertAlmostEqual(uac_item["usage_percentage"], 90.0, places=1)
+        self.assertAlmostEqual(una_item["usage_percentage"], 10.0, places=1)
+
+        # Vérification de la part plateforme
+        total_royalties = payload["totals"]["total_royalties"]
+        platform_rev = payload["totals"]["platform_revenue"]
+        self.assertAlmostEqual(total_royalties + platform_rev, payload["annual_price"], places=1)

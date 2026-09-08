@@ -80,3 +80,36 @@ def compute_role_price(ouvrage, role: str, user=None) -> dict:
         "public_paper_price": public_paper,
         "public_audio_price": public_audio,
     }
+
+
+def get_institution_royalty_rate(institution=None, ouvrage=None) -> float:
+    """
+    Résout hiérarchiquement le taux conventionné applicable à une université/institution :
+    1. Taux spécifique par ouvrage / contrat (RoyaltyRate.university_share_percent si ouvrage fourni)
+    2. Taux contractuel propre de l'établissement (Institution.royalty_rate)
+    3. Taux standard global configuré par l'Administrateur (ConfigurationPlateformeGlobale.default_university_royalty_rate)
+    Repli par défaut : 15.00%
+    """
+    if ouvrage is not None:
+        try:
+            from apps.rights.models import RoyaltyRate
+            rr = RoyaltyRate.objects.filter(ouvrage=ouvrage).first()
+            if rr and rr.university_share_percent is not None:
+                return float(rr.university_share_percent)
+        except Exception:
+            pass
+
+    if institution is not None:
+        try:
+            inst_rate = getattr(institution, 'royalty_rate', None)
+            if inst_rate is not None:
+                return float(inst_rate)
+        except Exception:
+            pass
+
+    config = get_platform_config()
+    default_rate = getattr(config, 'default_university_royalty_rate', None)
+    if default_rate is not None:
+        return float(default_rate)
+
+    return 15.00

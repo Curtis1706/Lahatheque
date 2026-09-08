@@ -136,7 +136,6 @@ export interface UniversityBouquetUsageRoyalty {
   id: string;
   bouquet_id: string;
   bouquet_title: string;
-  faculty_code?: string;
   period: string;
   books_included_count: number; // Nombre d'ouvrages de l'université dans ce bouquet (ex: 10)
   total_bouquet_consultations: number; // Consultations globales du bouquet par tous les abonnés
@@ -147,6 +146,39 @@ export interface UniversityBouquetUsageRoyalty {
   applied_rate?: number;
   net_royalty_amount: number; // Redevance nette reversée à l'établissement (XOF)
   currency: string;
+}
+
+export interface UniversityDistributionItem {
+  institution_id: string;
+  institution_name: string;
+  institution_code: string;
+  short_name: string;
+  books_owned_count: number;
+  reads_count: number;
+  usage_share_percent: number;
+  ca_share: number;
+  royalty_rate: number;
+  royalty_amount: number;
+  color: string;
+  is_current_institution?: boolean;
+}
+
+export interface BouquetDistributionResult {
+  bouquet_id: string;
+  bouquet_title: string;
+  annual_price: number;
+  currency: string;
+  total_books_count: number;
+  total_consultations: number;
+  royalty_rate_applied: number;
+  distribution: UniversityDistributionItem[];
+  totals: {
+    total_books: number;
+    total_usage_percentage: number;
+    total_ca: number;
+    total_royalties: number;
+    platform_revenue?: number;
+  };
 }
 
 export interface UniversityRoyaltiesDetailData {

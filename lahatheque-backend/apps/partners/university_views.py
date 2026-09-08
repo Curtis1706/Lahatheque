@@ -562,9 +562,8 @@ class UniversityRoyaltiesView(APIView):
 
     def get(self, request):
         inst = get_user_institution(request.user)
-        from apps.reporting.models import ConfigurationPlateformeGlobale
-        config = ConfigurationPlateformeGlobale.objects.first()
-        global_univ_rate = float(config.default_university_royalty_rate) if (config and hasattr(config, 'default_university_royalty_rate') and config.default_university_royalty_rate is not None) else 15.00
+        from apps.reporting.pricing_service import get_institution_royalty_rate
+        rate = get_institution_royalty_rate(inst)
 
         if not inst:
             return Response({
@@ -572,11 +571,11 @@ class UniversityRoyaltiesView(APIView):
                 "data": {
                     "available_balance": 0.0,
                     "total_paid": 0.0,
-                    "contractual_rate": global_univ_rate,
+                    "contractual_rate": rate,
                     "institution": {
                         "id": "",
                         "name": "Université Partenaire",
-                        "royalty_rate": global_univ_rate
+                        "royalty_rate": rate
                     },
                     "currency": "XOF",
                     "min_withdrawal_threshold": 100000,
@@ -584,8 +583,6 @@ class UniversityRoyaltiesView(APIView):
                 },
                 "error": None
             })
-
-        rate = float(inst.royalty_rate) if (inst and inst.royalty_rate is not None) else global_univ_rate
 
         qs = UniversityRoyaltyStatement.objects.filter(institution=inst)
         statements = []
@@ -678,9 +675,10 @@ class UniversityRoyaltiesView(APIView):
         digital_gross_total = sum(s["gross_amount"] for s in unit_sales if s["format"] == "digital")
         digital_royalties_total = sum(s["royalty_amount"] for s in unit_sales if s["format"] == "digital")
 
-        # Extraction des bouquets réels associés à l'institution
+        # Extraction des bouquets réels associés à l'institution (Section 11 CDC - Zéro mock, zéro faculté)
         from .models import BouquetOffering, UniversityBouquetSubscription
         from apps.reader.models import ReaderSession
+        from apps.protection.models import TraceAcces
 
         bouquet_royalties = []
         bouquet_consultations_count = 0
@@ -695,21 +693,29 @@ class UniversityRoyaltiesView(APIView):
         for sub in subscriptions:
             offering = BouquetOffering.objects.filter(id=sub.offering_id).first() if sub.offering_id else None
             books_qs = offering.get_books_queryset(requesting_institution=inst) if offering else inst.ouvrages.filter(status='published')
+            total_books_in_bouquet = books_qs.count()
             inst_books_in_bouquet = books_qs.filter(institution=inst)
             books_inc_cnt = inst_books_in_bouquet.count()
 
+            # Consultations réelles consolidées (ReaderSession + TraceAcces)
             total_sessions = ReaderSession.objects.filter(
                 source_type='catalog_book',
                 ouvrage__in=books_qs
-            ).count()
+            ).count() + TraceAcces.objects.filter(ouvrage__in=books_qs).count()
 
             univ_sessions = ReaderSession.objects.filter(
                 source_type='catalog_book',
                 ouvrage__in=inst_books_in_bouquet
-            ).count()
+            ).count() + TraceAcces.objects.filter(ouvrage__in=inst_books_in_bouquet).count()
 
-            share_pct = (univ_sessions / total_sessions * 100.0) if total_sessions > 0 else (100.0 if books_inc_cnt > 0 else 0.0)
-            annual_price = float(sub.annual_price)
+            if total_sessions > 0:
+                share_pct = (univ_sessions / total_sessions * 100.0)
+            elif total_books_in_bouquet > 0:
+                share_pct = (books_inc_cnt / total_books_in_bouquet * 100.0)
+            else:
+                share_pct = 0.0
+
+            annual_price = float(sub.annual_price or 0)
             allocated_revenue = annual_price * (share_pct / 100.0)
             b_royalty = allocated_revenue * (rate / 100.0)
 
@@ -717,12 +723,15 @@ class UniversityRoyaltiesView(APIView):
             bouquet_gross_allocated += allocated_revenue
             bouquet_royalties_total += b_royalty
 
+            start_str = sub.start_date.strftime('%d/%m/%Y') if sub.start_date else ""
+            end_str = sub.end_date.strftime('%d/%m/%Y') if sub.end_date else ""
+            period_str = f"{start_str} - {end_str}".strip(" -") or "Annuel"
+
             bouquet_royalties.append({
                 "id": str(sub.id),
                 "bouquet_id": str(sub.offering_id) if sub.offering_id else str(sub.id),
                 "bouquet_title": sub.title,
-                "faculty_code": sub.faculty_code,
-                "period": f"{sub.start_date.strftime('%d/%m/%Y')} - {sub.end_date.strftime('%d/%m/%Y')}",
+                "period": period_str,
                 "books_included_count": books_inc_cnt,
                 "total_bouquet_consultations": total_sessions,
                 "university_consultations": univ_sessions,

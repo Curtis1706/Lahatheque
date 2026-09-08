@@ -30,16 +30,26 @@ export function BouquetPieDistribution({
 }: BouquetPieDistributionProps) {
   const [hoveredUnivId, setHoveredUnivId] = useState<string | null>(null);
 
-  const {
-    bouquet_title,
-    total_ca,
-    currency,
-    royalty_rate,
-    total_royalties,
-    total_books,
-    total_consultations,
-    items,
-  } = distribution;
+  const items = distribution.items || distribution.distribution || [];
+  const bouquet_title = distribution.bouquet_title || "Bouquet Documentaire";
+  const total_ca = distribution.total_ca ?? distribution.annual_price ?? distribution.totals?.total_ca ?? 0;
+  const currency = distribution.currency || "XOF";
+  const royalty_rate = distribution.royalty_rate ?? distribution.royalty_rate_applied ?? 15;
+  const total_royalties = distribution.total_royalties ?? distribution.totals?.total_royalties ?? 0;
+  const total_books = distribution.total_books ?? distribution.total_books_count ?? distribution.totals?.total_books ?? 0;
+  const total_consultations = distribution.total_consultations ?? items.reduce((acc, it) => acc + (it.reads_count || it.consultations_count || 0), 0);
+  const platformRevenue = distribution.totals?.platform_revenue ?? Math.max(0, total_ca - total_royalties);
+
+  if (!items || items.length === 0) {
+    return (
+      <div className="p-6 sm:p-8 rounded-3xl bg-background border border-border space-y-3 text-center">
+        <h3 className="font-serif font-bold text-base text-navy">{bouquet_title}</h3>
+        <p className="text-xs text-foreground-muted">
+          Aucun ouvrage ou aucune consultation n&apos;est actuellement enregistr&eacute; pour ce bouquet.
+        </p>
+      </div>
+    );
+  }
 
   // ─── Calcul SVG pour le diagramme circulaire vectoriel (Pie Chart) ───────
   const size = 320;
@@ -51,7 +61,7 @@ export function BouquetPieDistribution({
   let cumulativeAngle = -Math.PI / 2; // Démarrage à 12h
 
   const slices = items.map((item) => {
-    const fraction = item.usage_share_percent / 100;
+    const fraction = (item.usage_share_percent || 0) / 100;
     const angle = fraction * 2 * Math.PI;
     const startAngle = cumulativeAngle;
     const endAngle = cumulativeAngle + angle;
@@ -95,7 +105,7 @@ export function BouquetPieDistribution({
   });
 
   // ─── Bar Chart Horizontal des Redevances ─────────────────────────────────
-  const maxRoyalty = Math.max(...items.map((it) => it.royalty_amount), 1);
+  const maxRoyalty = Math.max(...items.map((it) => it.royalty_amount || 0), 1);
   // Générateur d'échelle pour l'axe horizontal (adapté au FCFA ou devise standard)
   const stepUnit = isFcfa ? (maxRoyalty > 500000 ? 100000 : 25000) : 50;
   const scaleStep = Math.ceil(maxRoyalty / 4 / stepUnit) * stepUnit || (isFcfa ? 100000 : 100);
@@ -115,19 +125,55 @@ export function BouquetPieDistribution({
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 rounded-3xl bg-background border border-border space-y-8 shadow-xs">
+    <div className="p-4 sm:p-6 md:p-8 rounded-3xl bg-background border border-border space-y-6 shadow-xs">
       {/* Titre Général de la Section */}
       {showTitle && (
         <div className="text-center space-y-1 pb-4 border-b border-border">
           <h2 className="font-serif font-bold text-lg sm:text-2xl text-navy">
-            Répartition des redevances &ndash; Bouquets Documentaires
+            R&eacute;partition des redevances &ndash; Bouquets Documentaires
           </h2>
           <p className="text-xs text-foreground-muted">
-            Modèle de calcul dynamique par usage réel &bull; {bouquet_title} &bull; Taux conventionné :{" "}
+            Mod&egrave;le de calcul dynamique par usage r&eacute;el &bull; {bouquet_title} &bull; Taux conventionn&eacute; :{" "}
             <span className="font-bold text-navy">{royalty_rate}%</span>
           </p>
         </div>
       )}
+
+      {/* Synthèse Financière Option A : Enveloppe CA, Redevances Partenaires, Part Plateforme LAHA */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-1 shadow-xs">
+          <div className="flex items-center gap-2 text-foreground-muted">
+            <DollarSign className="w-4 h-4 text-gold" />
+            <span className="text-[11px] font-bold uppercase tracking-wider">Enveloppe CA Bouquet</span>
+          </div>
+          <p className="font-mono text-lg font-bold text-navy">
+            {total_ca.toLocaleString("fr-FR")} {currency}
+          </p>
+          <p className="text-[10px] text-foreground-muted">Tarif annuel global souscrit</p>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 space-y-1 shadow-xs">
+          <div className="flex items-center gap-2 text-navy">
+            <TrendingUp className="w-4 h-4 text-gold" />
+            <span className="text-[11px] font-bold uppercase tracking-wider">Total Redevances Universit&eacute;s</span>
+          </div>
+          <p className="font-mono text-lg font-bold text-navy">
+            {total_royalties.toLocaleString("fr-FR")} {currency}
+          </p>
+          <p className="text-[10px] text-foreground-muted">Prorata consultations &bull; {items.length} campus</p>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-navy-light border border-navy-hover/20 space-y-1 shadow-xs">
+          <div className="flex items-center gap-2 text-navy">
+            <Layers className="w-4 h-4 text-navy" />
+            <span className="text-[11px] font-bold uppercase tracking-wider">Part Plateforme LAHA</span>
+          </div>
+          <p className="font-mono text-lg font-bold text-navy">
+            {platformRevenue.toLocaleString("fr-FR")} {currency}
+          </p>
+          <p className="text-[10px] text-foreground-muted">Marge r&eacute;siduelle plateforme d&apos;&eacute;dition</p>
+        </div>
+      </div>
 
       {/* ─── GRILLE 2 COLONNES : DIAGRAMME CIRCULAIRE (GAUCHE) & BARRES HORIZONTALES (DROITE) ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">

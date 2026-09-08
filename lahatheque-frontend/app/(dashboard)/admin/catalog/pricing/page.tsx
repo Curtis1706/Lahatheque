@@ -27,7 +27,7 @@ import {
   updateRoleDiscounts,
 } from "@/lib/services/admin";
 import { AdminCatalogBook, GlobalPricingConfig } from "@/lib/types/admin";
-import { getBouquetRoyaltyRate, setBouquetRoyaltyRate } from "@/lib/services/bouquet-distribution";
+import { getBouquetRoyaltyRate } from "@/lib/services/bouquet-distribution";
 import { toast } from "sonner";
 
 export default function AdminPricingCascadePage() {
@@ -93,8 +93,14 @@ export default function AdminPricingCascadePage() {
           setUniversityPaperDiscount(roleDiscountsData.university.paper_pct ?? 25);
           setUniversityDigitalDiscount(roleDiscountsData.university.digital_pct ?? 35);
         }
+        if (roleDiscountsData.default_university_royalty_rate !== undefined) {
+          setUniversityBouquetRoyaltyRate(Number(roleDiscountsData.default_university_royalty_rate));
+        } else if (roleDiscountsData.university?.royalty_rate !== undefined) {
+          setUniversityBouquetRoyaltyRate(Number(roleDiscountsData.university.royalty_rate));
+        } else {
+          setUniversityBouquetRoyaltyRate(getBouquetRoyaltyRate());
+        }
       }
-      setUniversityBouquetRoyaltyRate(getBouquetRoyaltyRate());
     } catch (err) {
       toast.error("Erreur de chargement de la cascade tarifaire.");
     } finally {
@@ -144,9 +150,10 @@ export default function AdminPricingCascadePage() {
         university: {
           paper_pct: Number(universityPaperDiscount),
           digital_pct: Number(universityDigitalDiscount),
+          royalty_rate: Number(universityBouquetRoyaltyRate),
         },
+        default_university_royalty_rate: Number(universityBouquetRoyaltyRate),
       });
-      setBouquetRoyaltyRate(Number(universityBouquetRoyaltyRate));
       if (res.success) {
         toast.success(
           res.message || "Grille tarifaire et taux de redevance bouquets mis à jour pour tous les profils."

@@ -199,7 +199,7 @@ export default function UniversityRoyaltiesPage() {
           { label: "Redevances Bouquets Nettes", value: `${totalBouquetRoyalties.toLocaleString("fr-FR")} ${data.currency}` },
         ],
         tableHeaders: [
-          "Bouquet & Faculté",
+          "Bouquet Documentaire",
           "Livres Inclus",
           "Consultations (Établissement / Total)",
           "Part d'Usage (%)",
@@ -208,7 +208,7 @@ export default function UniversityRoyaltiesPage() {
           "Redevance Nette",
         ],
         tableRows: data.bouquet_royalties.map((b) => [
-          `${b.bouquet_title} (${b.faculty_code || "Campus"})`,
+          b.bouquet_title,
           `${b.books_included_count} ouvrages`,
           `${b.university_consultations.toLocaleString("fr-FR")} / ${b.total_bouquet_consultations.toLocaleString("fr-FR")}`,
           `${b.consultation_share_percent.toFixed(2)}%`,
@@ -527,24 +527,21 @@ export default function UniversityRoyaltiesPage() {
               </span>
             </button>
 
-            {/* Bouton bouquets prorata — masqué temporairement */}
-            <div className="hidden">
-              <button
-                type="button"
-                onClick={() => setActiveTab("bouquets")}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-2 cursor-pointer min-h-[44px] ${
-                  activeTab === "bouquets"
-                    ? "bg-navy text-white shadow-xs"
-                    : "bg-background-secondary text-foreground-muted hover:text-navy border border-border"
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5 text-gold" />
-                <span>Redevances Bouquets (Prorata Consultations)</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
-                  {data.bouquet_royalties.length}
-                </span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("bouquets")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-2 cursor-pointer min-h-[44px] ${
+                activeTab === "bouquets"
+                  ? "bg-navy text-white shadow-xs"
+                  : "bg-background-secondary text-foreground-muted hover:text-navy border border-border"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-gold" />
+              <span>Redevances Bouquets (Prorata Consultations)</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
+                {data.bouquet_royalties.length}
+              </span>
+            </button>
           </div>
 
           {/* Boutons d'export PDF selon l'onglet */}
@@ -694,7 +691,7 @@ export default function UniversityRoyaltiesPage() {
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="px-2 py-0.5 rounded-md bg-navy-light text-navy text-[10px] font-bold">
-                              {bouquet.faculty_code || "Campus"}
+                              Bouquet Partenaire
                             </span>
                             <span className="text-[11px] text-foreground-muted">{bouquet.period}</span>
                           </div>
@@ -799,7 +796,8 @@ export default function UniversityRoyaltiesPage() {
               }
             : null
         }
-        highlightUniversityName="Université"
+        highlightUniversityId={data.institution?.id}
+        highlightUniversityName={data.institution?.name || "Votre Établissement"}
         royaltyRate={data.contractual_rate}
       />
     </div>

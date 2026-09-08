@@ -1,13 +1,15 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { BouquetPieDistribution } from "./bouquet-pie-distribution";
+import { PageLoader } from "@/components/ui/page-loader";
 import {
   computeBouquetDistribution,
   fetchBouquetDistribution,
   type BouquetDistributionResult,
 } from "@/lib/services/bouquet-distribution";
+import { AlertCircle } from "lucide-react";
 
 interface BouquetDistributionModalProps {
   open: boolean;
@@ -38,49 +40,60 @@ export function BouquetDistributionModal({
   highlightUniversityName,
   royaltyRate,
 }: BouquetDistributionModalProps) {
-  const [data, setData] = React.useState<BouquetDistributionResult | null>(() =>
-    bouquet
-      ? computeBouquetDistribution({
-          bouquet_id: bouquet.id,
-          bouquet_title: bouquet.title,
-          total_ca: bouquet.annual_price || 10000,
-          currency: bouquet.currency || "FCFA",
-          custom_royalty_rate: royaltyRate,
-          books: bouquet.books,
-        })
-      : null
-  );
+  const [data, setData] = useState<BouquetDistributionResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (!bouquet) {
+  useEffect(() => {
+    if (!open || !bouquet) {
       setData(null);
+      setError(null);
       return;
     }
 
-    // Affichage instantané via calcul synchrone
-    setData(
-      computeBouquetDistribution({
-        bouquet_id: bouquet.id,
-        bouquet_title: bouquet.title,
-        total_ca: bouquet.annual_price || 10000,
-        currency: bouquet.currency || "FCFA",
-        custom_royalty_rate: royaltyRate,
-        books: bouquet.books,
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    const role = highlightUniversityId ? "university" : "admin";
+
+    fetchBouquetDistribution(bouquet.id, role)
+      .then((res) => {
+        if (!isMounted) return;
+        if (res && res.distribution && res.distribution.length > 0) {
+          setData(res);
+        } else if (bouquet.books && bouquet.books.length > 0) {
+          setData(
+            computeBouquetDistribution({
+              bouquet_id: bouquet.id,
+              bouquet_title: bouquet.title,
+              total_ca: bouquet.annual_price || 0,
+              currency: bouquet.currency || "XOF",
+              custom_royalty_rate: royaltyRate,
+              books: bouquet.books,
+            })
+          );
+        } else if (res) {
+          setData(res);
+        } else {
+          setError("Impossible de charger la répartition de ce bouquet.");
+        }
       })
-    );
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error("Erreur chargement répartition bouquet:", err);
+        setError("Une erreur réseau est survenue lors du chargement de la répartition.");
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
 
-    // Synchronisation en arrière-plan avec l'API Django
-    fetchBouquetDistribution(
-      bouquet.id,
-      highlightUniversityId ? "university" : "admin"
-    ).then((fresh) => {
-      if (fresh && fresh.items && fresh.items.length > 0) {
-        setData(fresh);
-      }
-    });
-  }, [bouquet, royaltyRate, highlightUniversityId]);
+    return () => {
+      isMounted = false;
+    };
+  }, [open, bouquet, royaltyRate, highlightUniversityId]);
 
-  if (!bouquet || !data) return null;
+  if (!open || !bouquet) return null;
 
   return (
     <Modal
@@ -91,12 +104,34 @@ export function BouquetDistributionModal({
       maxHeight="min(90vh, 850px)"
     >
       <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto space-y-4">
-        <BouquetPieDistribution
-          distribution={data}
-          highlightUniversityId={highlightUniversityId}
-          highlightUniversityName={highlightUniversityName}
-          showTitle={false}
-        />
+        {loading ? (
+          <div className="py-16">
+            <PageLoader label="Calcul de la répartition et chargement des consultations" />
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center space-y-3 bg-background-secondary rounded-2xl border border-border">
+            <AlertCircle className="w-8 h-8 text-gold mx-auto" />
+            <p className="text-sm font-semibold text-navy">{error}</p>
+            <p className="text-xs text-foreground-muted">
+              Veuillez vérifier votre connexion ou réessayer ultérieurement.
+            </p>
+          </div>
+        ) : data ? (
+          <BouquetPieDistribution
+            distribution={data}
+            highlightUniversityId={highlightUniversityId}
+            highlightUniversityName={highlightUniversityName}
+            showTitle={false}
+          />
+        ) : (
+          <div className="p-8 text-center space-y-2 bg-background-secondary rounded-2xl border border-border">
+            <p className="text-sm font-semibold text-navy">Aucune donnée de consultation disponible</p>
+            <p className="text-xs text-foreground-muted">
+              Ce bouquet ne comporte pas encore d&apos;activité d&apos;audience enregistrée.
+            </p>
+          </div>
+        )}
+
         <div className="flex justify-end pt-3 border-t border-border">
           <button
             type="button"
