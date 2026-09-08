@@ -403,6 +403,10 @@ function NewLegalContractContent() {
         if (pub) contractingPartyName = pub.name;
       }
 
+      const realBeneficiaryId = selectedAuthorId && !selectedAuthorId.startsWith("custom:")
+        ? selectedAuthorId
+        : undefined;
+
       await createLegalContract(
         {
           title,
@@ -417,8 +421,8 @@ function NewLegalContractContent() {
           notes,
           tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           ouvrage_id: isAuthorType ? selectedBookId : undefined,
-          signataire_user_id: partyType === "author" ? selectedAuthorId : undefined,
-          beneficiary_user_id: partyType === "author" ? selectedAuthorId : undefined,
+          signataire_user_id: partyType === "author" ? realBeneficiaryId : undefined,
+          beneficiary_user_id: partyType === "author" ? realBeneficiaryId : undefined,
           taux_papier: bookHasPaper ? tauxPapier : 0,
           taux_numerique: tauxNumerique,
           taux_audio_tts: bookHasAudio ? tauxAudio : 0,
@@ -790,6 +794,12 @@ function NewLegalContractContent() {
         {/* Étape 3 : Bénéficiaire & Taux de Droits d'Auteur par Format (Fiche R3) */}
         {isAuthorContract && (
           <div className="p-4 sm:p-6 rounded-3xl border border-border bg-background-secondary space-y-4 shadow-xs">
+            {selectedAuthorId?.startsWith("custom:") && (
+              <div className="p-3 rounded-xl bg-warning/10 border border-warning/30 text-xs text-warning-dark">
+                Cet auteur ne correspond à aucun compte réel sur la plateforme. Le contrat sera créé, mais
+                les taux par format ne pourront être enregistrés qu&apos;une fois un compte auteur rattaché.
+              </div>
+            )}
             <h3 className="text-sm font-bold text-navy uppercase tracking-wider">
               Bénéficiaire &amp; Taux de Droits d&apos;Auteur par Format
             </h3>

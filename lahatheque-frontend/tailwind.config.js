@@ -58,6 +58,7 @@ module.exports = {
         },
         warning: {
           DEFAULT: "var(--warning)",
+          dark: "var(--warning-dark)",
         },
         info: {
           DEFAULT: "var(--info)",

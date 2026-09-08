@@ -327,15 +327,19 @@ export async function resetBookPricing(bookId: string): Promise<{ success: boole
   return { success: false, error: data.error || 'Erreur réalignement tarif.' };
 }
 
-export async function deleteAdminCatalogBook(bookId: string): Promise<{ success: boolean; message?: string; error?: string }> {
+export async function deleteAdminCatalogBook(bookId: string): Promise<{ success: boolean; message?: string; error?: string; was_archived?: boolean }> {
   const res = await fetch(`/api/bff/admin/catalog/pricing/${bookId}/`, {
     method: 'DELETE',
   });
   const data = await res.json().catch(() => ({}));
   if (res.ok) {
-    return { success: true, message: data.message || 'Ouvrage supprimé définitivement du catalogue.' };
+    return {
+      success: true,
+      was_archived: data.was_archived,
+      message: data.message || 'Ouvrage retiré du catalogue et de la vitrine.',
+    };
   }
-  return { success: false, error: data.error || 'Erreur lors de la suppression de l\'ouvrage.' };
+  return { success: false, error: data.error || 'Erreur lors du retrait de l\'ouvrage.' };
 }
 
 export async function createAdminCatalogBook(formData: FormData): Promise<{ success: boolean; data?: any; error?: string }> {

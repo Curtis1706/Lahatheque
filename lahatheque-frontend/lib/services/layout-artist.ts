@@ -346,6 +346,8 @@ export async function createDepositWithFiles(
     is_original?: boolean;
     original_language?: string;
     parent_ouvrage_id?: string;
+    audio_file?: File | null;
+    price_audio?: string | number;
     onUploadProgress?: (percent: number, loaded: number, total: number) => void;
   }
 ): Promise<LayoutDeposit> {
@@ -375,8 +377,8 @@ export async function createDepositWithFiles(
     }
   }
 
-  // 2. Enregistrement des métadonnées vers Django (JSON direct ultra-rapide si R2)
-  if (fileKey) {
+  // 2. Enregistrement des métadonnées vers Django (JSON direct ultra-rapide si R2 et pas d'audio_file direct)
+  if (fileKey && !extra?.audio_file) {
     const payload = {
       title: data.metadata?.title || "Nouveau Titre",
       authors_names: data.metadata?.authors?.join(", ") || "",
@@ -392,7 +394,7 @@ export async function createDepositWithFiles(
       format_type: (data.files?.format || "pdf").toLowerCase(),
       price_digital: data.default_price || 5000,
       price_paper: data.admin_price || 7500,
-      price_audio: data.price_audio,
+      price_audio: data.price_audio !== undefined ? data.price_audio : (extra?.price_audio !== undefined && extra?.price_audio !== "" ? Number(extra.price_audio) : undefined),
       has_audio_version: data.has_audio_version ?? false,
       is_paper_available: data.is_paper_available ?? false,
       status: data.status || "draft",
@@ -438,7 +440,7 @@ export async function createDepositWithFiles(
     return mapBackendToDeposit(json.data);
   }
 
-  // Fallback FormData si téléversement standard
+  // Fallback FormData si téléversement standard (ou si audio_file joint)
   const formData = new FormData();
 
   formData.append("title", data.metadata?.title || "Nouveau Titre");
@@ -467,11 +469,16 @@ export async function createDepositWithFiles(
   formData.append("format_type", (data.files?.format || "pdf").toLowerCase());
   formData.append("price_digital", String(data.default_price || 5000));
   formData.append("price_paper", String(data.admin_price || 7500));
-  if (data.price_audio !== undefined) {
-    formData.append("price_audio", String(data.price_audio));
+  const resolvedPriceAudio = data.price_audio !== undefined ? data.price_audio : extra?.price_audio;
+  if (resolvedPriceAudio !== undefined && resolvedPriceAudio !== null && resolvedPriceAudio !== "") {
+    formData.append("price_audio", String(resolvedPriceAudio));
   }
-  if (data.has_audio_version !== undefined) {
-    formData.append("has_audio_version", String(data.has_audio_version));
+  const resolvedHasAudio = data.has_audio_version !== undefined ? data.has_audio_version : Boolean(extra?.audio_file);
+  if (resolvedHasAudio !== undefined) {
+    formData.append("has_audio_version", String(resolvedHasAudio));
+  }
+  if (extra?.audio_file) {
+    formData.append("audio_file", extra.audio_file);
   }
   if (data.is_paper_available !== undefined) {
     formData.append("is_paper_available", String(data.is_paper_available));

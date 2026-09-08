@@ -391,9 +391,11 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             ouvrage = serializer.save()
             is_chief_or_admin = user_role in ('chief_layout', 'admin', 'super_admin') or request.user.is_superuser or request.user.is_staff
 
-            # Si l'utilisateur est Chef Maquettiste (ou admin) et soumet l'ouvrage -> validation directe
+            # Si l'utilisateur est Chef Maquettiste (ou admin) et soumet l'ouvrage -> transmis
+            # au Juriste pour vérification du contrat avant publication, jamais publié
+            # directement.
             if is_chief_or_admin and requested_status in ('submitted', 'published', 'pending_validation'):
-                ouvrage.status = 'published'
+                ouvrage.status = 'pending_legal_approval'
                 if 'is_paper_available' in request.data:
                     val = str(request.data.get('is_paper_available')).lower()
                     ouvrage.is_paper_available = val in ('true', '1', 'yes')
@@ -403,6 +405,51 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                     except (ValueError, TypeError):
                         pass
                 ouvrage.save()
+
+                audio_file = request.FILES.get('audio_file')
+                price_audio = request.data.get('price_audio')
+
+                if audio_file:
+                    try:
+                        from apps.audio.stream_client import CloudflareStreamClient
+                        from apps.audio.models import AudioTrack
+
+                        client = CloudflareStreamClient()
+                        result = client.upload_file(audio_file, filename=audio_file.name)
+                        client.enable_signed_urls(result["stream_id"])
+
+                        AudioTrack.objects.create(
+                            ouvrage=ouvrage,
+                            chapter_number=1,
+                            title=ouvrage.title,
+                            stream_id=result["stream_id"],
+                            hls_manifest_url=result.get("hls_manifest_url") or result.get("hls_url", ""),
+                        )
+
+                        ouvrage.has_audio_version = True
+                        if price_audio:
+                            ouvrage.price_audio = float(price_audio)
+                        ouvrage.save(update_fields=["has_audio_version", "price_audio"])
+                    except Exception as e:
+                        logger.error(f"Échec upload audio lors du dépôt: {e}")
+
+                try:
+                    from apps.accounts.models import User as UserModel
+                    from apps.reporting.services import notify_user
+                    from apps.reporting.models import Notification
+
+                    juristes = UserModel.objects.filter(role__in=['legal_reviewer', 'admin', 'super_admin'], is_active=True)
+                    for juriste in juristes:
+                        notify_user(
+                            user=juriste,
+                            notification_type=Notification.NotificationType.GENERAL,
+                            title="Ouvrage en attente de validation juridique",
+                            message=f"« {ouvrage.title} » a été déposé et attend votre vérification du contrat avant publication.",
+                            action_url=f"/legal-reviewer/publication-en-attente/{ouvrage.id}",
+                            resource_id=str(ouvrage.id),
+                        )
+                except Exception:
+                    pass
 
                 # Protection DRM
                 try:
@@ -446,13 +493,13 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                     except Exception as stock_err:
                         logger.warning(f"Impossible d'initialiser le stock pour l'ouvrage {ouvrage.id}: {stock_err}")
 
-                print(f"[DEPOSIT CREATE SUCCESS] Ouvrage #{ouvrage.id} « {ouvrage.title} » validé et publié directement.", flush=True)
+                print(f"[DEPOSIT CREATE SUCCESS] Ouvrage #{ouvrage.id} « {ouvrage.title} » validé et transmis au Juriste.", flush=True)
                 ouvrage_optimized = Ouvrage.objects.prefetch_related('authors').select_related(
                     'discipline', 'institution', 'publisher', 'pre_edition_dossier'
                 ).get(pk=ouvrage.pk)
                 return Response({
                     "success": True,
-                    "message": f"L'ouvrage « {ouvrage.title} » a été déposé et validé directement. Il est publié sur le catalogue officiel.",
+                    "message": f"L'ouvrage « {ouvrage.title} » a été déposé et transmis au Juriste pour vérification du contrat avant publication.",
                     "data": OuvrageReadSerializer(ouvrage_optimized, context={'request': request}).data
                 }, status=status.HTTP_201_CREATED)
 

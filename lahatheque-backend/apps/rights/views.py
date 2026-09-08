@@ -989,7 +989,7 @@ class LegalContractsListView(APIView):
                 ouvrage = None
 
         signataire = None
-        if signataire_user_id:
+        if signataire_user_id and not str(signataire_user_id).startswith("custom:"):
             try:
                 signataire = User.objects.filter(id=signataire_user_id).first()
                 if signataire and not contracting_party:
@@ -1130,33 +1130,14 @@ class LegalContractsListView(APIView):
             f"fichier='{contrat.file_name}', statut_indexation='{indexing_status}', moteur='{ocr_engine_used}', async_ocr={needs_async_ocr}."
         )
 
-        # Génération réelle d'une suggestion IA pour le contrat téléversé / indexé
+        # Déclenchement asynchrone de la suggestion IA pour le contrat téléversé / indexé (Fiche U1)
         try:
-            from apps.ai_engine.services.openai_service import analyze_document_with_openai
-            import re
-
-            analysis = analyze_document_with_openai(
-                text_sample=contrat.texte_integral_index[:8000] if contrat.texte_integral_index else "",
-                filename=contrat.titre,
-                total_pages=0,
-            )
-
-            pct_match = re.search(r'(\d{1,3})\s*%', contrat.texte_integral_index or "")
-            suggested_pct = float(pct_match.group(1)) if pct_match else 50.0
-            suggested_pct = min(100.0, max(0.0, suggested_pct))
-
-            AIRoyaltySuggestion.objects.create(
-                contrat=contrat,
-                ouvrage=contrat.ouvrage,
-                beneficiaire_nom=contrat.contracting_party or "Auteur Principal",
-                pourcentage_suggere=suggested_pct,
-                clause_extraite=(analysis.get("summary", "") or "")[:500],
-                confiance_score=0.75 if pct_match else 0.5,
-            )
+            from apps.rights.tasks.ai_tasks import trigger_ai_suggestion
+            trigger_ai_suggestion(str(contrat.id))
         except Exception as e:
-            logger.warning(f"Suggestion IA non générée pour le contrat {contrat.id}: {e}")
+            logger.warning(f"Impossible de déclencher la suggestion IA pour le contrat {contrat.id}: {e}")
 
-        # R2 : Un seul bénéficiaire, taux par format indépendants, défaut 5% si non renseigné
+        # R2 : Un seul bénéficiaire, taux par format indépendants, défaut 5% si non renseigné (Fiche U2)
         if ouvrage:
             beneficiary_user_id = (
                 request.data.get("beneficiary_user_id") or
@@ -1171,60 +1152,70 @@ class LegalContractsListView(APIView):
                 except Exception:
                     pass
 
-            if not beneficiary_user_id:
-                return Response({"success": False, "error": "Un bénéficiaire (auteur) est requis."}, status=400)
+            from django.core.exceptions import ValidationError
 
-            from apps.accounts.models import User as UserModel
-            beneficiary_user = UserModel.objects.filter(id=beneficiary_user_id).first()
-            if not beneficiary_user:
-                return Response({"success": False, "error": "Bénéficiaire introuvable."}, status=404)
-
-            def _rate_or_default(key):
-                val = request.data.get(key)
-                if val is None or str(val).strip() == "":
-                    return 5.0
+            beneficiary_user = None
+            if beneficiary_user_id and not str(beneficiary_user_id).startswith("custom:"):
+                from apps.accounts.models import User as UserModel
                 try:
-                    return float(val)
-                except (ValueError, TypeError):
-                    return 5.0
+                    beneficiary_user = UserModel.objects.filter(id=beneficiary_user_id).first()
+                except (ValueError, ValidationError):
+                    beneficiary_user = None
 
-            taux_papier = _rate_or_default("taux_papier")
-            taux_numerique = _rate_or_default("taux_numerique")
-            taux_audio_tts = _rate_or_default("taux_audio_tts")
+            if not beneficiary_user:
+                logger.info(
+                    f"[LegalContracts API] Contrat '{contrat.numero_contrat}' créé sans bénéficiaire "
+                    f"lié à un compte réel (identifiant '{beneficiary_user_id}') — les taux par "
+                    f"format ne seront pas enregistrés tant qu'un compte réel n'est pas rattaché."
+                )
 
-            from apps.rights.models import RepartitionDroits, AuthorRight
+            if beneficiary_user:
+                def _rate_or_default(key):
+                    val = request.data.get(key)
+                    if val is None or str(val).strip() == "":
+                        return 5.0
+                    try:
+                        return float(val)
+                    except (ValueError, TypeError):
+                        return 5.0
 
-            RepartitionDroits.objects.filter(ouvrage=ouvrage).exclude(beneficiaire=beneficiary_user).delete()
-            RepartitionDroits.objects.update_or_create(
-                ouvrage=ouvrage,
-                beneficiaire=beneficiary_user,
-                defaults={
-                    "role_libelle": "Auteur Principal",
-                    "pourcentage": 100.0,
-                    "taux_papier": taux_papier,
-                    "taux_numerique": taux_numerique,
-                    "taux_audio_tts": taux_audio_tts,
-                }
-            )
+                taux_papier = _rate_or_default("taux_papier")
+                taux_numerique = _rate_or_default("taux_numerique")
+                taux_audio_tts = _rate_or_default("taux_audio_tts")
 
-            ba = ouvrage.authors.filter(
-                models.Q(user=beneficiary_user) |
-                models.Q(first_name__iexact=beneficiary_user.first_name, last_name__iexact=beneficiary_user.last_name)
-            ).first()
-            if ba and not ba.user:
-                ba.user = beneficiary_user
-                ba.save(update_fields=['user'])
+                from apps.rights.models import RepartitionDroits, AuthorRight
 
-            AuthorRight.objects.filter(ouvrage=ouvrage).exclude(user=beneficiary_user).delete()
-            AuthorRight.objects.update_or_create(
-                ouvrage=ouvrage,
-                defaults={
-                    "user": beneficiary_user,
-                    "author": ba,
-                    "pool_share_percent": 100.0,
-                    "role": "auteur_principal"
-                }
-            )
+                RepartitionDroits.objects.filter(ouvrage=ouvrage).exclude(beneficiaire=beneficiary_user).delete()
+                RepartitionDroits.objects.update_or_create(
+                    ouvrage=ouvrage,
+                    beneficiaire=beneficiary_user,
+                    defaults={
+                        "role_libelle": "Auteur Principal",
+                        "pourcentage": 100.0,
+                        "taux_papier": taux_papier,
+                        "taux_numerique": taux_numerique,
+                        "taux_audio_tts": taux_audio_tts,
+                    }
+                )
+
+                ba = ouvrage.authors.filter(
+                    models.Q(user=beneficiary_user) |
+                    models.Q(first_name__iexact=beneficiary_user.first_name, last_name__iexact=beneficiary_user.last_name)
+                ).first()
+                if ba and not ba.user:
+                    ba.user = beneficiary_user
+                    ba.save(update_fields=['user'])
+
+                AuthorRight.objects.filter(ouvrage=ouvrage).exclude(user=beneficiary_user).delete()
+                AuthorRight.objects.update_or_create(
+                    ouvrage=ouvrage,
+                    defaults={
+                        "user": beneficiary_user,
+                        "author": ba,
+                        "pool_share_percent": 100.0,
+                        "role": "auteur_principal"
+                    }
+                )
 
         # Si lié à un dossier de pré-édition, mise à jour du statut
         if pre_edition:

@@ -7,7 +7,8 @@ import {
   FileCheck2, 
   Send, 
   CheckCircle2, 
-  Loader2 
+  Loader2,
+  Headphones,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,37 +16,12 @@ export interface DepositSubmissionModalProps {
   isOpen: boolean;
   fileName?: string;
   fileSizeMb?: number;
-  status: "idle" | "uploading" | "processing" | "registering" | "success" | "error";
+  status: "idle" | "uploading" | "processing" | "registering" | "audio_uploading" | "success" | "error";
   errorMessage?: string;
   realProgress?: number;
+  isChiefLayout?: boolean;
+  hasAudio?: boolean;
 }
-
-const STEPS = [
-  {
-    id: "prep",
-    title: "Chiffrement et vérification de l'épreuve",
-    description: "Contrôle d'intégrité et préparation du conteneur sécurisé",
-    icon: ShieldCheck,
-  },
-  {
-    id: "upload",
-    title: "Téléversement direct vers Cloudflare R2",
-    description: "Transfert sécurisé haute vitesse sans passer par le serveur Web",
-    icon: UploadCloud,
-  },
-  {
-    id: "onix",
-    title: "Génération de la notice ONIX 3.0",
-    description: "Structuration des métadonnées et de la classification Dewey",
-    icon: FileCheck2,
-  },
-  {
-    id: "notify",
-    title: "Transmission au Chef Maquettiste",
-    description: "Inscription au registre des épreuves à valider",
-    icon: Send,
-  },
-];
 
 export function DepositSubmissionModal({
   isOpen,
@@ -54,9 +30,46 @@ export function DepositSubmissionModal({
   status,
   errorMessage,
   realProgress,
+  isChiefLayout = false,
+  hasAudio = false,
 }: DepositSubmissionModalProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [progress, setProgress] = useState(10);
+
+  const steps = [
+    {
+      id: "prep",
+      title: "Chiffrement et vérification de l'épreuve",
+      description: "Contrôle d'intégrité et préparation du conteneur sécurisé",
+      icon: ShieldCheck,
+    },
+    {
+      id: "upload",
+      title: "Téléversement direct vers Cloudflare R2",
+      description: "Transfert sécurisé haute vitesse sans passer par le serveur Web",
+      icon: UploadCloud,
+    },
+    {
+      id: "onix",
+      title: "Génération de la notice ONIX 3.0",
+      description: "Structuration des métadonnées et de la classification Dewey",
+      icon: FileCheck2,
+    },
+    ...(hasAudio ? [{
+      id: "audio",
+      title: "Téléversement audio vers Cloudflare Stream",
+      description: "Encodage HLS adaptatif et protection par URL signée",
+      icon: Headphones,
+    }] : []),
+    {
+      id: "notify",
+      title: isChiefLayout ? "Transmission au Pôle Juridique" : "Transmission au Chef Maquettiste",
+      description: isChiefLayout 
+        ? "Inscription au registre des publications en attente de vérification juridique" 
+        : "Inscription au registre des épreuves à valider",
+      icon: Send,
+    },
+  ];
 
   useEffect(() => {
     if (!isOpen) {
@@ -69,37 +82,33 @@ export function DepositSubmissionModal({
       if (realProgress !== undefined && realProgress > 0) {
         if (realProgress >= 100) {
           setCurrentStepIndex(2);
-          setProgress(80);
+          setProgress(75);
         } else {
           setCurrentStepIndex(1);
-          // Échelle 0-100% de l'upload mappée sur 15% à 75% du flux global
-          const mapped = Math.min(75, Math.max(15, Math.round(realProgress * 0.75)));
+          const mapped = Math.min(70, Math.max(15, Math.round(realProgress * 0.70)));
           setProgress(mapped);
         }
       } else {
         setCurrentStepIndex(1);
-        setProgress(40);
+        setProgress(35);
       }
       return;
     }
 
-    let interval: NodeJS.Timeout | undefined = undefined;
-
     if (status === "processing") {
       setCurrentStepIndex(2);
-      setProgress(85);
+      setProgress(75);
     } else if (status === "registering") {
-      setCurrentStepIndex(3);
-      setProgress(95);
+      setCurrentStepIndex(hasAudio ? 3 : 2);
+      setProgress(85);
+    } else if (status === "audio_uploading") {
+      setCurrentStepIndex(hasAudio ? 3 : 2);
+      setProgress(90);
     } else if (status === "success") {
-      setCurrentStepIndex(4);
+      setCurrentStepIndex(steps.length);
       setProgress(100);
     }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isOpen, status, realProgress]);
+  }, [isOpen, status, realProgress, hasAudio, steps.length]);
 
   if (!isOpen) return null;
 
@@ -120,6 +129,8 @@ export function DepositSubmissionModal({
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gold/15 text-gold mb-1">
             {status === "success" ? (
               <CheckCircle2 className="w-6 h-6 text-green-600 animate-in zoom-in-75 duration-200" />
+            ) : status === "audio_uploading" ? (
+              <Headphones className="w-6 h-6 animate-pulse" />
             ) : (
               <UploadCloud className="w-6 h-6 animate-pulse" />
             )}
@@ -127,14 +138,20 @@ export function DepositSubmissionModal({
 
           <h2 className="font-serif text-xl sm:text-2xl font-bold text-navy">
             {status === "success"
-              ? "Maquette transmise avec succès !"
-              : "Transmission de la Maquette en cours"}
+              ? (isChiefLayout ? "Ouvrage transmis avec succès !" : "Maquette transmise avec succès !")
+              : status === "audio_uploading"
+                ? "Téléversement de la version audio en cours..."
+                : (isChiefLayout ? "Transmission de l'Ouvrage au Juriste" : "Transmission de la Maquette en cours")}
           </h2>
 
           <p className="text-xs text-foreground-muted max-w-sm mx-auto">
             {status === "success"
-              ? "Le Chef Maquettiste a été notifié pour vérification et validation."
-              : `Veuillez patienter pendant l'envoi sécurisé de ${fileName ? `« ${fileName} »` : "votre fichier"} ${fileSizeMb ? `(${fileSizeMb.toFixed(1)} Mo)` : ""}.`}
+              ? (isChiefLayout
+                  ? "L'ouvrage a été transmis au Pôle Juridique pour vérification du contrat avant publication."
+                  : "Le Chef Maquettiste a été notifié pour vérification et validation.")
+              : status === "audio_uploading"
+                ? "Transfert sécurisé de la piste audio vers Cloudflare Stream et chiffrement HLS."
+                : `Veuillez patienter pendant l'envoi sécurisé de ${fileName ? `« ${fileName} »` : "votre fichier"} ${fileSizeMb ? `(${fileSizeMb.toFixed(1)} Mo)` : ""}.`}
           </p>
         </div>
 
@@ -154,7 +171,7 @@ export function DepositSubmissionModal({
 
         {/* Steps List */}
         <div className="space-y-3 pt-2">
-          {STEPS.map((step, idx) => {
+          {steps.map((step, idx) => {
             const Icon = step.icon;
             const isCompleted = currentStepIndex > idx || status === "success";
             const isCurrent = currentStepIndex === idx && status !== "success";
