@@ -49,7 +49,7 @@ DEMO_ACCOUNTS = [
         "email": "universite@lahatheque.com",
         "role": "university",
         "first_name": "Prof. Honoré",
-        "last_name": "ADAM (Université UAC)",
+        "last_name": "ADAM",
         "phone": "+2290199556677",
         "country": "BJ"
     },
@@ -112,6 +112,13 @@ for acc in DEMO_ACCOUNTS:
         user.role = acc["role"]
         user.active_roles = [acc["role"]]
         user.is_verified = True
+        if acc["role"] == "university":
+            from apps.partners.models import Institution
+            uac = Institution.objects.filter(code="UAC").first()
+            if uac:
+                user.institution = uac
+                uac.user = user
+                uac.save()
         user.save()
         print(f"[OK] Compte {acc['role']}: {email} | MDP: {password} | Tél: {acc['phone']}")
     except Exception as e:

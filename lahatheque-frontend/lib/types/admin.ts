@@ -94,6 +94,15 @@ export interface AdminUser {
     royalty_rate?: number;
     country?: string;
   } | null;
+  institution_name?: string;
+  institution_detail?: {
+    id: string;
+    name: string;
+    code?: string;
+    short_name?: string;
+    royalty_rate?: number;
+    country?: string;
+  } | null;
   custom_remise_papier_pct?: number | null;
   custom_remise_numerique_pct?: number | null;
   custom_remise_audio_pct?: number | null;

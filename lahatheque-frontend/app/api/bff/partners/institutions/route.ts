@@ -21,6 +21,11 @@ export async function GET(request: NextRequest) {
     headers.set('authorization', authHeader);
   }
 
+  const cookieHeader = request.headers.get('cookie');
+  if (cookieHeader) {
+    headers.set('cookie', cookieHeader);
+  }
+
   try {
     const res = await fetch(targetUrl, {
       method: 'GET',

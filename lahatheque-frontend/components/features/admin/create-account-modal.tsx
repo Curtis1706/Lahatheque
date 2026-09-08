@@ -27,6 +27,25 @@ const ROLE_OPTIONS: { role: AdminRole; label: string; desc: string }[] = [
   { role: "wholesaler", label: "Grossiste", desc: "Achats en gros à tarifs dégressifs et commandes groupées" },
 ];
 
+const normalizeAdminRole = (r?: string): AdminRole => {
+  const map: Record<string, AdminRole> = {
+    universities: "university",
+    auteurs: "author",
+    authors: "author",
+    editeurs: "publisher",
+    publishers: "publisher",
+    juristes: "legal_reviewer",
+    maquettistes: "layout_artist",
+    chefs_maquettistes: "chief_layout",
+    gestionnaires: "manager",
+    managers: "manager",
+    grossistes: "wholesaler",
+    clients: "student",
+    students: "student",
+  };
+  return map[r || ""] || (r as AdminRole) || "student";
+};
+
 export function CreateAccountModal({
   isOpen,
   onClose,
@@ -34,7 +53,7 @@ export function CreateAccountModal({
   onSuccess,
 }: CreateAccountModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedRole, setSelectedRole] = useState<AdminRole>(defaultRole);
+  const [selectedRole, setSelectedRole] = useState<AdminRole>(normalizeAdminRole(defaultRole));
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -57,18 +76,25 @@ export function CreateAccountModal({
   const isUniversityRole = selectedRole === "university";
 
   useEffect(() => {
-    if (isUniversityRole && institutionMode === "existing" && institutions.length === 0) {
+    if (isOpen) {
+      setSelectedRole(normalizeAdminRole(defaultRole));
+      setStep(1);
+    }
+  }, [isOpen, defaultRole]);
+
+  useEffect(() => {
+    if (isOpen && isUniversityRole && institutions.length === 0) {
       setLoadingInstitutions(true);
       fetch("/api/bff/partners/institutions/", { credentials: "include" })
         .then((r) => r.json())
         .then((d) => {
-          const list = d?.data || d?.results || [];
+          const list = d?.data || d?.results || (Array.isArray(d) ? d : []);
           setInstitutions(list);
         })
         .catch(() => {})
         .finally(() => setLoadingInstitutions(false));
     }
-  }, [isUniversityRole, institutionMode]);
+  }, [isOpen, isUniversityRole, institutions.length]);
 
   const handleNextStep1 = () => {
     setStep(2);

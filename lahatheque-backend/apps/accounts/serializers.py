@@ -122,7 +122,11 @@ class UserSerializer(serializers.ModelSerializer):
                 info['compliance_status'] = "Catalogue Conforme" if obj.is_active else "En cours d'audit"
                 info['pending_royalties'] = cnt * 12500 if cnt > 0 else 0
             elif role == 'university':
-                info['institution_name'] = obj.institution.name if obj.institution else (f"Université {obj.last_name}" if obj.last_name else "Université Partenaire")
+                inst_obj = obj.institution
+                if not inst_obj:
+                    from apps.partners.models import Institution
+                    inst_obj = Institution.objects.filter(user=obj).first()
+                info['institution_name'] = inst_obj.name if inst_obj else "Université Partenaire"
                 info['active_bouquets'] = 3
                 info['royalties_due'] = 0
                 info['balance'] = 0

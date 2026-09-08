@@ -70,18 +70,18 @@ export function EditUniversityUserModal({
   }, [user, isOpen]);
 
   useEffect(() => {
-    if (institutionMode === "existing" && institutions.length === 0) {
+    if (isOpen && institutions.length === 0) {
       setLoadingInstitutions(true);
       fetch("/api/bff/partners/institutions/", { credentials: "include" })
         .then((r) => r.json())
         .then((d) => {
-          const list = d?.data || d?.results || [];
+          const list = d?.data || d?.results || (Array.isArray(d) ? d : []);
           setInstitutions(list);
         })
         .catch(() => {})
         .finally(() => setLoadingInstitutions(false));
     }
-  }, [institutionMode]);
+  }, [isOpen, institutions.length]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
