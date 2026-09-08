@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Landmark,
   TrendingUp,
@@ -12,34 +12,62 @@ import {
   RefreshCw,
   Percent,
   CheckCircle2,
-  DollarSign,
   BookOpen,
   Eye,
+  Download,
+  Library,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getAdminGlobalFinance,
-  getAuthorRoyaltiesReport,
+  getAdminPartnerRoyaltiesSummary,
   triggerRoyaltyCalculationNow,
   type AdminGlobalFinance,
-  type AuthorRoyaltyReportLine,
 } from "@/lib/services/admin";
+import { AdminPartnerRoyaltySummary } from "@/lib/types/admin";
 import { AuthorRoyaltyDetailModal } from "@/components/features/admin/author-royalty-detail-modal";
+import { PartnerRoyaltyAccordionRow } from "@/components/features/admin/partner-royalty-accordion-row";
+import { DataTable, DataTableColumn } from "@/components/ui/data-table";
+
+type RoleTab = "all" | "author" | "publisher" | "university";
 
 export default function AdminFinancePage() {
   const [finance, setFinance] = useState<AdminGlobalFinance | null>(null);
-  const [authorRoyalties, setAuthorRoyalties] = useState<AuthorRoyaltyReportLine[]>([]);
+  const [partners, setPartners] = useState<AdminPartnerRoyaltySummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchAuthor, setSearchAuthor] = useState("");
+  const [activeTab, setActiveTab] = useState<RoleTab>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [triggeringCalc, setTriggeringCalc] = useState(false);
   const [selectedAuthor, setSelectedAuthor] = useState<{ id: string; name: string } | null>(null);
+  const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [fData, pData] = await Promise.all([
+        getAdminGlobalFinance(),
+        getAdminPartnerRoyaltiesSummary(),
+      ]);
+      setFinance(fData);
+      setPartners(pData);
+    } catch {
+      toast.error("Erreur lors du chargement des données financières.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleTriggerCalculation = async () => {
     setTriggeringCalc(true);
     try {
       const result = await triggerRoyaltyCalculationNow();
       if (result.success) {
-        toast.success(result.message || "Calcul des redevances exécuté.");
+        toast.success(result.message || "Calcul des redevances exécuté avec succès.");
         loadData();
       } else {
         toast.error(result.error || "Échec du calcul des redevances.");
@@ -51,33 +79,209 @@ export default function AdminFinancePage() {
     }
   };
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [fData, rData] = await Promise.all([
-        getAdminGlobalFinance(),
-        getAuthorRoyaltiesReport(),
-      ]);
-      setFinance(fData);
-      setAuthorRoyalties(rData);
-    } catch {
-      // Fallback empty
-    } finally {
-      setLoading(false);
+  // Filtrage par onglet et recherche
+  const filteredPartners = useMemo(() => {
+    return partners.filter((p) => {
+      const matchesTab = activeTab === "all" || p.partner_type === activeTab;
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        p.partner_name.toLowerCase().includes(q) ||
+        p.partner_id.toLowerCase().includes(q);
+      return matchesTab && matchesSearch;
+    });
+  }, [partners, activeTab, searchQuery]);
+
+  // Compteurs pour badges d'onglets
+  const tabCounts = useMemo(() => {
+    return {
+      all: partners.length,
+      author: partners.filter((p) => p.partner_type === "author").length,
+      publisher: partners.filter((p) => p.partner_type === "publisher").length,
+      university: partners.filter((p) => p.partner_type === "university").length,
+    };
+  }, [partners]);
+
+  const getPartnerTypeBadge = (type: string) => {
+    switch (type) {
+      case "author":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-navy/10 text-navy border border-navy/20">
+            <Users className="w-3 h-3 text-gold" />
+            Auteur
+          </span>
+        );
+      case "publisher":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gold/10 text-gold border border-gold/30">
+            <Building2 className="w-3 h-3 text-gold" />
+            Éditeur Tiers
+          </span>
+        );
+      case "university":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-navy/5 text-navy border border-border">
+            <Library className="w-3 h-3 text-gold" />
+            Université
+          </span>
+        );
+      default:
+        return null;
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const handleExportCsv = () => {
+    if (filteredPartners.length === 0) {
+      toast.info("Aucun partenaire à exporter sur cette sélection.");
+      return;
+    }
 
-  const filteredAuthors = authorRoyalties.filter((a) => {
-    const q = searchAuthor.toLowerCase();
-    return a.author_name.toLowerCase().includes(q) || a.author_id.toLowerCase().includes(q);
-  });
+    const headers = [
+      "ID_Partenaire",
+      "Nom_Partenaire",
+      "Type_Partenaire",
+      "Nombre_Ouvrages",
+      "Ventes_Cumulees",
+      "Taux_Moyen_Pourcent",
+      "CA_Brut_Genere_FCFA",
+      "Redevances_Dues_FCFA",
+      "Redevances_Versees_FCFA",
+      "Solde_Restant_FCFA",
+    ];
+
+    const rows = filteredPartners.map((p) => [
+      `"${p.partner_id}"`,
+      `"${p.partner_name.replace(/"/g, '""')}"`,
+      `"${p.partner_type}"`,
+      p.books_count,
+      p.total_units_sold,
+      p.average_rate_percent,
+      p.total_revenue_generated,
+      p.total_royalties_due,
+      p.total_royalties_paid,
+      p.balance_outstanding,
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map((r) => r.join(";"))].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `recapitulatif_droits_partenaires_${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Export CSV des droits partenaires téléchargé.");
+  };
+
+  const columns: DataTableColumn<AdminPartnerRoyaltySummary>[] = [
+    {
+      key: "partner_name",
+      header: "Ayant-Droit / Partenaire",
+      cell: (row: AdminPartnerRoyaltySummary) => (
+        <div className="space-y-1">
+          <p className="font-poppins font-medium text-xs sm:text-sm text-foreground">
+            {row.partner_name}
+          </p>
+          <div>{getPartnerTypeBadge(row.partner_type)}</div>
+        </div>
+      ),
+    },
+    {
+      key: "books_count",
+      header: "Ouvrages",
+      cell: (row: AdminPartnerRoyaltySummary) => (
+        <div className="flex items-center gap-1.5 text-xs font-poppins">
+          <BookOpen className="w-3.5 h-3.5 text-foreground-muted" />
+          <span className="font-semibold text-foreground">{row.books_count}</span>
+        </div>
+      ),
+    },
+    {
+      key: "total_units_sold",
+      header: "Ventes / Lect.",
+      cell: (row: AdminPartnerRoyaltySummary) => (
+        <span className="font-mono text-xs text-foreground">
+          {row.total_units_sold} ex.
+        </span>
+      ),
+    },
+    {
+      key: "average_rate_percent",
+      header: "Taux Moyen",
+      cell: (row: AdminPartnerRoyaltySummary) => (
+        <span className="inline-flex items-center font-mono text-xs font-bold text-gold">
+          <Percent className="w-3 h-3 mr-0.5" />
+          {row.average_rate_percent}%
+        </span>
+      ),
+    },
+    {
+      key: "total_revenue_generated",
+      header: "CA Brut Généré",
+      cell: (row: AdminPartnerRoyaltySummary) => (
+        <span className="font-mono text-xs font-medium text-foreground">
+          {row.total_revenue_generated.toLocaleString("fr-FR")} FCFA
+        </span>
+      ),
+    },
+    {
+      key: "total_royalties_due",
+      header: "Droits Dûs",
+      cell: (row: AdminPartnerRoyaltySummary) => (
+        <span className="font-mono text-xs font-bold text-navy">
+          {row.total_royalties_due.toLocaleString("fr-FR")} FCFA
+        </span>
+      ),
+    },
+    {
+      key: "total_royalties_paid",
+      header: "Déjà Versé",
+      cell: (row: AdminPartnerRoyaltySummary) => (
+        <span className="font-mono text-xs font-semibold text-success">
+          {row.total_royalties_paid.toLocaleString("fr-FR")} FCFA
+        </span>
+      ),
+    },
+    {
+      key: "balance_outstanding",
+      header: "Solde Restant",
+      cell: (row: AdminPartnerRoyaltySummary) => (
+        <span className="font-mono text-xs font-bold text-navy">
+          {row.balance_outstanding.toLocaleString("fr-FR")} FCFA
+        </span>
+      ),
+    },
+    {
+      key: "partner_id",
+      header: "Actions",
+      cell: (row: AdminPartnerRoyaltySummary) => (
+        <div className="flex items-center justify-end gap-1.5">
+          {row.partner_type === "author" && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedAuthor({ id: row.partner_id, name: row.partner_name });
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-background text-navy hover:text-gold hover:border-gold/40 text-xs font-semibold transition-all min-h-[36px]"
+              title="Consulter le relevé officiel de l'auteur"
+            >
+              <Eye className="w-3.5 h-3.5 text-gold" />
+              <span className="hidden sm:inline">Détail</span>
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-12 animate-in fade-in duration-300">
+    <div className="p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-12 animate-in fade-in duration-300 font-poppins">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -90,22 +294,34 @@ export default function AdminFinancePage() {
             Finances Globales de la Plateforme
           </h1>
           <p className="text-sm text-foreground-muted mt-1">
-            Vue consolidée 360° des encaissements, créances, bouquets universitaires et redevances auteurs
+            Vue consolidée 360° des encaissements, créances, marge plateforme et redevances partenaires
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={loadData}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-background-secondary border border-border text-navy hover:border-gold/40 text-xs font-bold transition-all min-h-[44px]"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-gold" : "text-foreground-muted"}`} />
-          <span>Actualiser</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={handleTriggerCalculation}
+            disabled={triggeringCalc}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover disabled:opacity-50 transition-all min-h-[44px]"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${triggeringCalc ? "animate-spin text-gold" : ""}`} />
+            <span>{triggeringCalc ? "Calcul..." : "Recalculer Redevances"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={loadData}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-background-secondary border border-border text-navy hover:border-gold/40 text-xs font-bold transition-all min-h-[44px]"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-gold" : "text-foreground-muted"}`} />
+            <span>Actualiser</span>
+          </button>
+        </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* 360° Executive KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-3xl bg-background border border-border space-y-3">
           <div className="flex items-center justify-between">
@@ -118,22 +334,22 @@ export default function AdminFinancePage() {
             <div className="font-serif text-2xl font-bold text-navy">
               {(finance?.total_platform_revenue || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
             </div>
-            <p className="text-xs text-foreground-muted mt-1">Tous flux (clients, univ., grossistes)</p>
+            <p className="text-xs text-foreground-muted mt-1">Tous flux réconciliés (clients, univ., grossistes)</p>
           </div>
         </div>
 
         <div className="p-5 rounded-3xl bg-background border border-border space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Crédits Auteurs en Cours</span>
-            <div className="p-2.5 rounded-2xl bg-gold/10 text-gold border border-gold/20">
-              <Clock className="w-5 h-5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Redevances Totales Dues</span>
+            <div className="p-2.5 rounded-2xl bg-navy/5 text-navy border border-border">
+              <Percent className="w-5 h-5 text-gold" />
             </div>
           </div>
           <div>
             <div className="font-serif text-2xl font-bold text-navy">
-              {(finance?.credit?.outstanding_total || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
+              {(finance?.royalties_overview?.total_generated || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
             </div>
-            <p className="text-xs text-foreground-muted mt-1">{finance?.credit?.outstanding_count || 0} commande{(finance?.credit?.outstanding_count || 0) > 1 ? "s" : ""} en attente</p>
+            <p className="text-xs text-foreground-muted mt-1">Droits calculés revenant aux partenaires</p>
           </div>
         </div>
 
@@ -146,24 +362,57 @@ export default function AdminFinancePage() {
           </div>
           <div>
             <div className="font-serif text-2xl font-bold text-navy">
-              {(finance?.author_payouts?.total_processed || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
+              {(finance?.royalties_overview?.total_paid || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
             </div>
-            <p className="text-xs text-foreground-muted mt-1">Versements effectués aux auteurs</p>
+            <p className="text-xs text-foreground-muted mt-1">Versements effectués aux ayant-droits</p>
           </div>
         </div>
 
         <div className="p-5 rounded-3xl bg-background border border-border space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Redevances en Attente</span>
-            <div className="p-2.5 rounded-2xl bg-navy/5 text-navy border border-border">
-              <DollarSign className="w-5 h-5 text-gold" />
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Solde Restant Exigible</span>
+            <div className="p-2.5 rounded-2xl bg-gold/10 text-gold border border-gold/20">
+              <Clock className="w-5 h-5" />
             </div>
           </div>
           <div>
             <div className="font-serif text-2xl font-bold text-navy">
-              {(finance?.author_payouts?.total_pending || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
+              {(finance?.royalties_overview?.total_outstanding || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
             </div>
-            <p className="text-xs text-foreground-muted mt-1">{finance?.author_payouts?.pending_count || 0} demande{(finance?.author_payouts?.pending_count || 0) > 1 ? "s" : ""} de retrait</p>
+            <p className="text-xs text-foreground-muted mt-1">Engagements en attente de liquidation</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Marge Plateforme & Créances */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="p-5 rounded-3xl bg-background border border-border flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Marge Nette Plateforme</span>
+            <div className="font-serif text-xl font-bold text-navy">
+              {(finance?.platform_margin?.net_retained_platform || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
+            </div>
+            <p className="text-xs text-foreground-muted">
+              Taux moyen de rétention LAHA : <strong className="text-navy">{finance?.platform_margin?.commission_rate_avg || 0}%</strong>
+            </p>
+          </div>
+          <div className="p-3 rounded-2xl bg-gold/10 text-gold border border-gold/20 flex-shrink-0">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-background border border-border flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Créances en Cours d&apos;Encaissement</span>
+            <div className="font-serif text-xl font-bold text-navy">
+              {(finance?.credit?.outstanding_total || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
+            </div>
+            <p className="text-xs text-foreground-muted">
+              {finance?.credit?.outstanding_count || 0} commande{(finance?.credit?.outstanding_count || 0) > 1 ? "s" : ""} en attente de dénouement
+            </p>
+          </div>
+          <div className="p-3 rounded-2xl bg-navy/5 text-navy border border-border flex-shrink-0">
+            <Wallet className="w-6 h-6 text-gold" />
           </div>
         </div>
       </div>
@@ -217,149 +466,129 @@ export default function AdminFinancePage() {
         </div>
       </div>
 
-      {/* Author Royalties Table */}
+      {/* Multi-Partner Royalties Table */}
       <div className="p-6 rounded-3xl bg-background border border-border space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="font-serif text-lg font-bold text-navy">État Récapitulatif des Redevances par Auteur</h2>
+            <h2 className="font-serif text-lg font-bold text-navy">
+              État Récapitulatif Consolidé des Droits & Redevances Partenaires
+            </h2>
             <p className="text-xs text-foreground-muted mt-0.5">
-              Calcul des droits selon les taux contractuels, volumes vendus et montants versés
+              Synthèse multi-partenaires avec lignes d&apos;ouvrages dépliables en accordéon pour chaque ayant-droit
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={handleTriggerCalculation}
-              disabled={triggeringCalc}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-navy text-white text-sm font-semibold hover:bg-navy-hover disabled:opacity-50 transition-colors min-h-[44px]"
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-background-secondary border border-border text-navy hover:border-gold/40 text-xs font-semibold transition-all min-h-[40px]"
             >
-              <RefreshCw className={`w-4 h-4 ${triggeringCalc ? "animate-spin" : ""}`} />
-              {triggeringCalc ? "Calcul en cours..." : "Recalculer les Redevances Maintenant"}
+              <Download className="w-3.5 h-3.5 text-gold" />
+              <span>Exporter CSV</span>
             </button>
-
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Rechercher un auteur..."
-                value={searchAuthor}
-                onChange={(e) => setSearchAuthor(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-border bg-background-secondary text-navy placeholder:text-foreground-muted focus:outline-none focus:border-gold min-h-[44px]"
-              />
-            </div>
           </div>
         </div>
 
-        {/* Mobile View: Cards */}
-        <div className="block lg:hidden space-y-3">
-          {filteredAuthors.map((a) => (
-            <div key={a.author_id} className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-xs text-navy">{a.author_name}</span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gold bg-gold/10 px-2 py-0.5 rounded-full border border-gold/20">
-                  <Percent className="w-3 h-3" /> {a.royalty_rate_percent}%
-                </span>
-              </div>
+        {/* Filter Tabs & Search */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+          {/* Role Tabs */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-background-secondary border border-border overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setActiveTab("all")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
+                activeTab === "all"
+                  ? "bg-navy text-white shadow-xs"
+                  : "text-foreground-muted hover:text-navy"
+              }`}
+            >
+              <span>Tous</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                activeTab === "all" ? "bg-white/20 text-white" : "bg-navy/5 text-foreground-muted"
+              }`}>
+                {tabCounts.all}
+              </span>
+            </button>
 
-              <div className="grid grid-cols-2 gap-2 text-xs text-foreground-muted pt-1">
-                <div>
-                  <span>Ouvrages : </span>
-                  <span className="font-bold text-navy">{a.books_count}</span>
-                </div>
-                <div>
-                  <span>Ventes : </span>
-                  <span className="font-bold text-navy">{a.books_sold_total} ex.</span>
-                </div>
-                <div>
-                  <span>Total Dû : </span>
-                  <span className="font-mono font-bold text-navy">{a.total_royalties_due.toLocaleString("fr-FR")} F</span>
-                </div>
-                <div>
-                  <span>Déjà Versé : </span>
-                  <span className="font-mono font-bold text-success">{a.total_royalties_paid.toLocaleString("fr-FR")} F</span>
-                </div>
-              </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("author")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
+                activeTab === "author"
+                  ? "bg-navy text-white shadow-xs"
+                  : "text-foreground-muted hover:text-navy"
+              }`}
+            >
+              <span>Auteurs</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                activeTab === "author" ? "bg-white/20 text-white" : "bg-navy/5 text-foreground-muted"
+              }`}>
+                {tabCounts.author}
+              </span>
+            </button>
 
-              <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
-                <span className="font-semibold text-foreground-muted">Solde Restant :</span>
-                <span className="font-mono font-bold text-navy">{a.total_royalties_outstanding.toLocaleString("fr-FR")} FCFA</span>
-              </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("publisher")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
+                activeTab === "publisher"
+                  ? "bg-navy text-white shadow-xs"
+                  : "text-foreground-muted hover:text-navy"
+              }`}
+            >
+              <span>Éditeurs Tiers</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                activeTab === "publisher" ? "bg-white/20 text-white" : "bg-navy/5 text-foreground-muted"
+              }`}>
+                {tabCounts.publisher}
+              </span>
+            </button>
 
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedAuthor({ id: a.author_id, name: a.author_name })}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-background border border-border text-navy hover:text-gold hover:border-gold/40 text-xs font-semibold transition-all min-h-[44px]"
-                >
-                  <Eye className="w-3.5 h-3.5 text-gold" />
-                  <span>Détail des redevances</span>
-                </button>
-              </div>
-            </div>
-          ))}
+            <button
+              type="button"
+              onClick={() => setActiveTab("university")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
+                activeTab === "university"
+                  ? "bg-navy text-white shadow-xs"
+                  : "text-foreground-muted hover:text-navy"
+              }`}
+            >
+              <span>Universités</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                activeTab === "university" ? "bg-white/20 text-white" : "bg-navy/5 text-foreground-muted"
+              }`}>
+                {tabCounts.university}
+              </span>
+            </button>
+          </div>
 
-          {filteredAuthors.length === 0 && (
-            <div className="p-8 text-center text-xs text-foreground-muted">
-              Aucun auteur avec redevances trouvé.
-            </div>
-          )}
+          {/* Search Input */}
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Rechercher un partenaire..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-border bg-background-secondary text-navy placeholder:text-foreground-muted focus:outline-none focus:border-gold min-h-[44px]"
+            />
+          </div>
         </div>
 
-        {/* Desktop View: Table */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-border text-foreground-muted">
-                <th className="pb-3 font-semibold uppercase tracking-wider">Auteur Partenaire</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-center">Ouvrages</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-center">Ventes Cumulées</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-center">Taux Moyen</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-right">Total Droit Dû</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-right">Total Déjà Versé</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-right">Solde Restant</th>
-                <th className="pb-3 font-semibold uppercase tracking-wider text-right pr-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredAuthors.map((a) => (
-                <tr key={a.author_id} className="hover:bg-background-secondary/50 transition-colors">
-                  <td className="py-3.5 font-medium text-navy">{a.author_name}</td>
-                  <td className="py-3.5 text-center font-bold text-navy">
-                    <span className="inline-flex items-center gap-1">
-                      <BookOpen className="w-3.5 h-3.5 text-foreground-muted" />
-                      {a.books_count}
-                    </span>
-                  </td>
-                  <td className="py-3.5 text-center font-bold text-navy">{a.books_sold_total} ex.</td>
-                  <td className="py-3.5 text-center font-mono font-bold text-gold">{a.royalty_rate_percent}%</td>
-                  <td className="py-3.5 font-mono font-bold text-navy text-right">{a.total_royalties_due.toLocaleString("fr-FR")} FCFA</td>
-                  <td className="py-3.5 font-mono font-bold text-success text-right">{a.total_royalties_paid.toLocaleString("fr-FR")} FCFA</td>
-                  <td className="py-3.5 font-mono font-bold text-navy text-right">{a.total_royalties_outstanding.toLocaleString("fr-FR")} FCFA</td>
-                  <td className="py-3.5 text-right pr-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedAuthor({ id: a.author_id, name: a.author_name })}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-background text-navy hover:text-gold hover:border-gold/40 text-xs font-semibold transition-all min-h-[36px]"
-                      title="Consulter la fiche détaillée"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-gold" />
-                      <span>Détails</span>
-                    </button>
-                  </td>
-                </tr>
-              ))}
-
-              {filteredAuthors.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-foreground-muted">
-                    Aucun auteur avec redevances trouvé.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {/* Data Table with Expandable Row */}
+        <DataTable
+          data={filteredPartners}
+          columns={columns}
+          rowKey="partner_id"
+          pageSize={10}
+          searchable={false}
+          loading={loading}
+          emptyMessage="Aucun ayant-droit ou partenaire trouvé correspondant aux critères."
+          renderExpandedRow={(partner: AdminPartnerRoyaltySummary) => <PartnerRoyaltyAccordionRow partner={partner} />}
+          expandedRowKeys={expandedRowKeys}
+          onExpandedRowsChange={setExpandedRowKeys}
+        />
       </div>
 
       <AuthorRoyaltyDetailModal

@@ -70,12 +70,18 @@ class PayoutRequest(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payout_requests')
+    beneficiary_type = models.CharField(max_length=20, default='author')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    gross_base_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    purpose_label = models.CharField(max_length=255, blank=True, default='')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='momo')
     account_details = models.CharField(max_length=255)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     admin_notes = models.TextField(blank=True)
     transaction_reference = models.CharField(max_length=100, blank=True)
+    payout_date = models.DateField(null=True, blank=True)
+    receipt_file = models.FileField(upload_to='payout_receipts/%Y/%m/', null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
     processed_by = models.ForeignKey(

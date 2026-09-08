@@ -535,4 +535,8 @@ export interface StockTransaction {
   status: string;
 }
 
+// Réexport des types financiers unifiés
+export * from "./admin-finance";
+
+
 

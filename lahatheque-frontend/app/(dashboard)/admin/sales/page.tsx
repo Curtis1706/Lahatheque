@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -8,226 +8,223 @@ import {
   TimeSlotFilter,
   Period,
 } from "@/components/ui/total-sales-chart";
+import { getAdminConsolidatedSales, getAdminKpis } from "@/lib/services/admin";
 import {
-  getAdminSales,
-  getAdminKpis,
-  getRevenueCategoryBreakdown,
-} from "@/lib/services/admin";
-import {
-  AdminSale,
+  AdminSaleOrder,
+  AdminSalesConsolidatedResponse,
   AdminKpi,
-  RevenueCategoryBreakdown,
 } from "@/lib/types/admin";
-import { Download, Clock, X } from "lucide-react";
+import { Download, Clock, Filter, ShoppingBag, BookOpen, Layers, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { generateCsvExport } from "@/lib/services/export-service";
+import { OrderItemsAccordionRow } from "@/components/features/admin/order-items-accordion-row";
 
 export default function AdminSalesPage() {
-  const [sales, setSales] = useState<AdminSale[]>([]);
+  const [salesData, setSalesData] = useState<AdminSalesConsolidatedResponse | null>(null);
   const [kpis, setKpis] = useState<AdminKpi | null>(null);
-  const [revenueBreakdown, setRevenueBreakdown] = useState<RevenueCategoryBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // État de la plage horaire et de la période
+  // Filtres
+  const [selectedChannel, setSelectedChannel] = useState<string>("all");
   const [timeSlot, setTimeSlot] = useState<TimeSlotFilter | null>(null);
   const [period, setPeriod] = useState<Period>("1m");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  const loadConsolidatedSales = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [data, kpisRes] = await Promise.all([
+        getAdminConsolidatedSales({
+          channel: selectedChannel !== "all" ? selectedChannel : undefined,
+          period: period || undefined,
+          time_slot: timeSlot && timeSlot.id !== "all" ? timeSlot.id : undefined,
+          q: searchQuery || undefined,
+        }),
+        getAdminKpis().catch(() => null),
+      ]);
+      setSalesData(data);
+      if (kpisRes) setKpis(kpisRes);
+    } catch {
+      toast.error("Erreur lors de la récupération des ventes consolidées.");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedChannel, period, timeSlot, searchQuery]);
 
   useEffect(() => {
-    async function loadSalesData() {
-      try {
-        setLoading(true);
-        const [salesData, kpisData, breakdownData] = await Promise.all([
-          getAdminSales(),
-          getAdminKpis(),
-          getRevenueCategoryBreakdown(),
-        ]);
-        setSales(salesData);
-        setKpis(kpisData);
-        setRevenueBreakdown(breakdownData);
-      } catch {
-        toast.error("Erreur de chargement des ventes.");
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadSalesData();
-  }, []);
+    loadConsolidatedSales();
+  }, [loadConsolidatedSales]);
 
-  // Ventes filtrées selon la plage horaire
-  const filteredSales = useMemo(() => {
-    if (!timeSlot || timeSlot.id === "all") return sales;
-    return sales.filter((s) => {
-      if (!s.created_at) return true;
-      const d = new Date(s.created_at);
-      if (isNaN(d.getTime())) return true;
-      const h = d.getHours();
-      const { startHour, endHour } = timeSlot;
-      if (startHour <= endHour) {
-        return h >= startHour && h <= endHour;
-      } else {
-        return h >= startHour || h <= endHour;
-      }
-    });
-  }, [sales, timeSlot]);
-
-  // Montant consolidé selon le créneau
-  const computedTotalRevenue = useMemo(() => {
-    if (!timeSlot || timeSlot.id === "all") {
-      return kpis?.totalRevenue ?? 0;
-    }
-    return filteredSales.reduce((sum, s) => sum + (s.amount || 0), 0);
-  }, [filteredSales, timeSlot, kpis]);
-
-  // Ventilation des canaux selon le créneau
+  // Données de ventilation par canal pour le graphique
   const computedChannels = useMemo(() => {
-    if (!timeSlot || timeSlot.id === "all") {
-      return revenueBreakdown.map((c) => ({
-        name: c.label,
-        amount: c.amount,
-        change: `${c.percentage >= 0 ? "+" : ""}${c.percentage}%`,
-        isPositive: c.percentage >= 0,
-      }));
-    }
-
-    const catMap: Record<string, { label: string; amount: number }> = {
-      unitaire_digital: { label: "Ventes numériques unitaires", amount: 0 },
-      bouquet_institution: { label: "Bouquets Universités (B2B)", amount: 0 },
-      abonnement_individuel: { label: "Abonnements Lecteur & Pass", amount: 0 },
-      grossiste_papier: { label: "Commandes Grossistes & Réassort", amount: 0 },
-      unitaire_papier: { label: "Livres physiques (papier)", amount: 0 },
-    };
-
-    filteredSales.forEach((s) => {
-      const key = s.type || "unitaire_digital";
-      if (!catMap[key]) {
-        catMap[key] = { label: key, amount: 0 };
-      }
-      catMap[key].amount += s.amount || 0;
-    });
-
-    const total = Object.values(catMap).reduce((acc, c) => acc + c.amount, 0);
-
-    const activeList = Object.values(catMap).filter((c) => c.amount > 0);
-    if (activeList.length === 0) {
-      return revenueBreakdown.map((c) => ({
-        name: c.label,
-        amount: 0,
-        change: "0%",
+    if (!salesData?.channel_breakdown) return [];
+    const cb = salesData.channel_breakdown;
+    return [
+      {
+        name: "Ventes Unitaires B2C",
+        amount: cb.b2c_individual?.amount || 0,
+        change: `${cb.b2c_individual?.percentage || 0}%`,
         isPositive: true,
-      }));
-    }
-
-    return activeList.map((c) => {
-      const pct = total > 0 ? Math.round((c.amount / total) * 100) : 0;
-      return {
-        name: c.label,
-        amount: c.amount,
-        change: `${pct}%`,
+      },
+      {
+        name: "Bouquets Campus B2B",
+        amount: cb.b2b_university?.amount || 0,
+        change: `${cb.b2b_university?.percentage || 0}%`,
         isPositive: true,
-      };
-    });
-  }, [filteredSales, timeSlot, revenueBreakdown]);
+      },
+      {
+        name: "Commandes Grossistes B2B",
+        amount: cb.b2b_wholesale?.amount || 0,
+        change: `${cb.b2b_wholesale?.percentage || 0}%`,
+        isPositive: true,
+      },
+    ];
+  }, [salesData]);
 
-  // Données de courbe temporelle pour la plage horaire
+  // Total CA dynamique calculé
+  const totalRevenue = useMemo(() => {
+    return salesData?.total_revenue_consolidated ?? 0;
+  }, [salesData]);
+
+  // Données de courbe temporelle
   const computedTimelineData = useMemo(() => {
-    if (!timeSlot || timeSlot.id === "all") {
-      return (kpis?.salesCurve ?? []).map((p) => ({
+    const orders = salesData?.orders || [];
+    if (timeSlot && timeSlot.id !== "all") {
+      const { startHour, endHour } = timeSlot;
+      const hours: number[] = [];
+      if (startHour <= endHour) {
+        for (let h = startHour; h <= endHour; h++) hours.push(h);
+      } else {
+        for (let h = startHour; h <= 23; h++) hours.push(h);
+        for (let h = 0; h <= endHour; h++) hours.push(h);
+      }
+
+      let cumulative = 0;
+      return hours.map((h, idx) => {
+        const hourOrders = orders.filter((o) => {
+          if (!o.created_at) return false;
+          const d = new Date(o.created_at);
+          return !isNaN(d.getTime()) && d.getHours() === h;
+        });
+        const hourTotal = hourOrders.reduce((sum, o) => sum + (o.net_amount_paid || 0), 0);
+        cumulative += hourTotal;
+        const fallback = Math.round((totalRevenue * (idx + 1)) / hours.length);
+        return {
+          label: `${String(h).padStart(2, "0")}h`,
+          value: cumulative > 0 ? cumulative : fallback,
+        };
+      });
+    }
+
+    if (kpis?.salesCurve && kpis.salesCurve.length > 0) {
+      return kpis.salesCurve.map((p) => ({
         label: p.month,
         value: p.total,
       }));
     }
 
-    const { startHour, endHour } = timeSlot;
-    const hours: number[] = [];
-    if (startHour <= endHour) {
-      for (let h = startHour; h <= endHour; h++) hours.push(h);
-    } else {
-      for (let h = startHour; h <= 23; h++) hours.push(h);
-      for (let h = 0; h <= endHour; h++) hours.push(h);
-    }
+    // Fallback dynamique
+    return [
+      { label: "S-3", value: Math.round(totalRevenue * 0.2) },
+      { label: "S-2", value: Math.round(totalRevenue * 0.45) },
+      { label: "S-1", value: Math.round(totalRevenue * 0.75) },
+      { label: "Actuel", value: totalRevenue },
+    ];
+  }, [salesData, timeSlot, kpis, totalRevenue]);
 
-    let cumulative = 0;
-    return hours.map((h, idx) => {
-      const hourSales = filteredSales.filter((s) => {
-        if (!s.created_at) return false;
-        const d = new Date(s.created_at);
-        return !isNaN(d.getTime()) && d.getHours() === h;
-      });
-      const hourTotal = hourSales.reduce((sum, s) => sum + (s.amount || 0), 0);
-      cumulative += hourTotal;
-
-      const fallbackVal = Math.round((computedTotalRevenue * (idx + 1)) / hours.length);
-      return {
-        label: `${String(h).padStart(2, "0")}h`,
-        value: cumulative > 0 ? cumulative : fallbackVal,
-      };
-    });
-  }, [timeSlot, filteredSales, kpis, computedTotalRevenue]);
-
-  const columns: DataTableColumn<AdminSale>[] = [
+  // Colonnes du DataTable pour les commandes consolidées
+  const columns: DataTableColumn<AdminSaleOrder>[] = [
     {
-      key: "id",
+      key: "order_reference",
       header: "N° Commande",
-      cell: (row) => <span className="font-mono text-xs font-bold text-navy">{row.order_number || row.id}</span>,
-    },
-    {
-      key: "user_name",
-      header: "Acheteur",
       cell: (row) => (
-        <div>
-          <p className="font-medium text-xs text-foreground">{row.user_name}</p>
-          <p className="text-[11px] text-foreground-muted">{row.user_email}</p>
+        <div className="flex items-center gap-1.5 font-poppins">
+          <span className="font-mono text-xs font-bold text-navy">
+            {row.order_reference}
+          </span>
         </div>
       ),
     },
     {
-      key: "item",
-      header: "Produit / Intitulé",
+      key: "buyer_name",
+      header: "Client / Établissement",
       cell: (row) => (
-        <span className="text-xs text-foreground font-medium">
-          {row.book_title || row.subscription_name}
+        <div className="font-poppins">
+          <p className="font-medium text-xs text-foreground line-clamp-1">
+            {row.buyer_name}
+          </p>
+          <p className="text-[11px] text-foreground-muted line-clamp-1 font-mono">
+            {row.buyer_email || "N/A"}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "channel",
+      header: "Canal de Vente",
+      cell: (row) => {
+        const isUniv = row.channel === "b2b_university";
+        const isWs = row.channel === "b2b_wholesale";
+        return (
+          <span
+            className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium border ${
+              isUniv
+                ? "bg-gold/10 text-navy border-gold/30"
+                : isWs
+                ? "bg-navy/10 text-navy border-navy/20"
+                : "bg-background-secondary text-foreground-muted border-border"
+            }`}
+          >
+            {isUniv ? (
+              <Layers className="w-3 h-3 text-gold" />
+            ) : isWs ? (
+              <ShoppingBag className="w-3 h-3 text-navy" />
+            ) : (
+              <BookOpen className="w-3 h-3 text-foreground-muted" />
+            )}
+            {row.channel_label}
+          </span>
+        );
+      },
+    },
+    {
+      key: "items_count",
+      header: "Articles",
+      className: "text-center",
+      cell: (row) => (
+        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-navy/5 text-navy border border-navy/10">
+          {row.items_count} {row.items_count > 1 ? "ouvrages" : "ouvrage"}
         </span>
       ),
     },
     {
-      key: "type",
-      header: "Catégorie",
-      cell: (row) => (
-        <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy/10 text-navy font-semibold border border-navy/20">
-          {row.type === "unitaire_digital"
-            ? "Livre numérique"
-            : row.type === "grossiste_papier"
-            ? "Grossiste (Papier)"
-            : row.type === "grossiste_numerique"
-            ? "Grossiste (Numérique)"
-            : row.type === "bouquet_institution"
-            ? "Bouquet B2B"
-            : row.type === "abonnement_individuel"
-            ? "Pass Lecteur"
-            : "Livre papier"}
-        </span>
-      ),
-    },
-    {
-      key: "amount",
-      header: "Montant",
+      key: "net_amount_paid",
+      header: "Montant Net Réglé",
       cell: (row) => (
         <span className="font-mono text-xs font-bold text-navy">
-          {row.amount.toLocaleString("fr-FR")} {row.currency || "XOF"}
+          {row.net_amount_paid.toLocaleString("fr-FR")} FCFA
         </span>
       ),
     },
     {
-      key: "payment_status",
-      header: "Paiement",
-      cell: (row) => <StatusBadge status={row.payment_status} />,
+      key: "payment_method",
+      header: "Règlement",
+      cell: (row) => (
+        <div className="text-xs font-poppins">
+          <span className="text-foreground">{row.payment_method}</span>
+          <div className="flex items-center gap-1 text-[11px] text-foreground-muted mt-0.5">
+            <CheckCircle2 className="w-3 h-3 text-gold" />
+            <span>Payé</span>
+          </div>
+        </div>
+      ),
     },
     {
       key: "created_at",
-      header: "Date & Heure",
+      header: "Date d'Achat",
       cell: (row) => (
-        <div className="font-mono text-xs">
-          <span className="text-foreground font-semibold">
+        <div className="text-xs font-poppins">
+          <span className="text-foreground font-medium font-mono">
             {row.created_at ? new Date(row.created_at).toLocaleDateString("fr-FR") : "N/A"}
           </span>
           {row.created_at && (
@@ -241,64 +238,87 @@ export default function AdminSalesPage() {
   ];
 
   const handleExportCsv = () => {
-    if (!filteredSales || filteredSales.length === 0) {
+    const orders = salesData?.orders || [];
+    if (orders.length === 0) {
       toast.info("Aucune vente à exporter sur cette sélection.");
       return;
     }
 
-    const slotSuffix = timeSlot && timeSlot.id !== "all" ? `_${timeSlot.startHour}h-${timeSlot.endHour}h` : "";
-    const filename = `journal_ventes_lahatheque${slotSuffix}_${new Date().toISOString().slice(0, 10)}`;
+    const filename = `ventes_consolidees_lahatheque_${new Date().toISOString().slice(0, 10)}`;
 
-    generateCsvExport(
-      filteredSales.map((s) => ({
-        Numero_Commande: s.order_number || s.id,
-        Client: s.user_name || s.buyer_name || s.user_email,
-        Email: s.user_email || s.buyer_email || "",
-        Article_Achete: s.book_title || s.item_title || s.subscription_name || "Abonnement / Bouquet",
-        Type_Produit: s.type || s.item_type || "unitaire",
-        Moyen_Paiement: s.payment_method || "Mobile Money",
-        Montant_FCFA: s.amount,
-        Devise: s.currency || "XOF",
-        Statut_Paiement: s.payment_status,
-        Date_Transaction: s.created_at ? new Date(s.created_at).toLocaleDateString("fr-FR") : "",
-        Heure_Transaction: s.created_at
-          ? new Date(s.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-          : "",
-        Pays: s.country || "BJ",
-      })),
-      filename
-    );
-    toast.success("Journal des ventes exporté avec succès (format UTF-8 BOM pour Excel) !");
+    const exportRows: any[] = [];
+    orders.forEach((o) => {
+      if (o.items && o.items.length > 0) {
+        o.items.forEach((item) => {
+          exportRows.push({
+            Numero_Commande: o.order_reference,
+            Canal: o.channel_label,
+            Client: o.buyer_name,
+            Email: o.buyer_email,
+            Titre_Ouvrage: item.book_title,
+            Format: item.format,
+            Quantite: item.quantity,
+            Prix_Unitaire_FCFA: item.unit_price,
+            Sous_Total_FCFA: item.subtotal,
+            Montant_Total_Commande_FCFA: o.net_amount_paid,
+            Mode_Paiement: o.payment_method,
+            Statut: o.payment_status,
+            Date: o.created_at ? new Date(o.created_at).toLocaleDateString("fr-FR") : "",
+            Heure: o.created_at ? new Date(o.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "",
+          });
+        });
+      } else {
+        exportRows.push({
+          Numero_Commande: o.order_reference,
+          Canal: o.channel_label,
+          Client: o.buyer_name,
+          Email: o.buyer_email,
+          Titre_Ouvrage: "Commande globale",
+          Format: "N/A",
+          Quantite: o.items_count,
+          Prix_Unitaire_FCFA: o.net_amount_paid,
+          Sous_Total_FCFA: o.net_amount_paid,
+          Montant_Total_Commande_FCFA: o.net_amount_paid,
+          Mode_Paiement: o.payment_method,
+          Statut: o.payment_status,
+          Date: o.created_at ? new Date(o.created_at).toLocaleDateString("fr-FR") : "",
+          Heure: o.created_at ? new Date(o.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "",
+        });
+      }
+    });
+
+    generateCsvExport(exportRows, filename);
+    toast.success("Journal détaillé des ventes consolidées exporté avec succès !");
   };
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
+      {/* En-tête de la page */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy">
             Gestion des Ventes &amp; Revenus Commercialisés
           </h1>
-          <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">
-            Historique des achats unitaires, abonnements B2C, bouquets universitaires B2B et analyse par plages horaires.
+          <p className="text-xs sm:text-sm text-foreground-muted mt-0.5 font-poppins">
+            Supervision exhaustive et réconciliation 100% dynamique du Chiffre d&apos;Affaires consolidé avec détail des articles.
           </p>
         </div>
 
         <button
           type="button"
           onClick={handleExportCsv}
-          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-xs shrink-0 cursor-pointer min-h-[44px]"
+          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-xs shrink-0 cursor-pointer min-h-[44px] font-poppins"
         >
           <Download className="w-4 h-4 text-gold" />
-          Exporter le Journal ({filteredSales.length})
+          Exporter le Journal ({salesData?.total_orders_count || 0})
         </button>
       </div>
 
-      {/* Graphique d'évolution des ventes avec sélection de période et de plage horaire */}
+      {/* Graphique et récapitulatif consolidé */}
       <TotalSalesChart
         title="Progression des Ventes & Revenus"
-        subtitle="Pilotage chronologique du chiffre d'affaires et ventilation par canal de vente"
-        totalAmountText={`${computedTotalRevenue.toLocaleString("fr-FR")} FCFA`}
+        subtitle="Pilotage chronologique du chiffre d'affaires consolidé et ventilation dynamique par canal"
+        totalAmountText={`${totalRevenue.toLocaleString("fr-FR")} FCFA`}
         growthBadgeText={`${(kpis?.revenueTrend ?? 0) >= 0 ? "+" : ""}${kpis?.revenueTrend ?? 0}%`}
         channels={computedChannels}
         curvePoints={computedTimelineData.map((p) => p.value)}
@@ -310,46 +330,61 @@ export default function AdminSalesPage() {
         onPeriodChange={setPeriod}
       />
 
-      {/* Tableau des ventes filtrable */}
+      {/* Filtres par canaux & créneaux */}
       <div className="space-y-3">
-        {timeSlot && timeSlot.id !== "all" && (
-          <div className="p-3 rounded-2xl bg-gold/10 border border-gold/20 flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-navy">
-              <Clock className="w-4 h-4 text-gold shrink-0" />
-              <span>
-                Filtre horaire actif : <strong>{timeSlot.label}</strong> • Affichage de <strong>{filteredSales.length}</strong> transaction(s)
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setTimeSlot(null)}
-              className="text-xs font-bold text-navy hover:text-navy-hover underline cursor-pointer"
-            >
-              Réinitialiser
-            </button>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Onglets des canaux */}
+          <div className="inline-flex p-1 rounded-xl bg-background-secondary border border-border text-xs font-poppins">
+            {[
+              { id: "all", label: "Tous les canaux" },
+              { id: "b2c_individual", label: "Ventes Unitaires B2C" },
+              { id: "b2b_university", label: "Bouquets Campus B2B" },
+              { id: "b2b_wholesale", label: "Commandes Grossistes B2B" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSelectedChannel(tab.id)}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                  selectedChannel === tab.id
+                    ? "bg-navy text-white shadow-xs"
+                    : "text-foreground-muted hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-        )}
 
+          {/* Indicateur de filtre horaire actif */}
+          {timeSlot && timeSlot.id !== "all" && (
+            <div className="p-2 px-3 rounded-xl bg-gold/10 border border-gold/20 flex items-center gap-2 text-xs font-poppins">
+              <Clock className="w-3.5 h-3.5 text-gold shrink-0" />
+              <span className="text-navy">
+                Créneau : <strong>{timeSlot.label}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setTimeSlot(null)}
+                className="text-[11px] font-bold text-navy hover:underline ml-1 cursor-pointer"
+              >
+                Effacer
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Data Table avec accordéon dépliable pour chaque commande */}
         <DataTable
-          data={filteredSales}
+          data={salesData?.orders || []}
           columns={columns}
           rowKey="id"
           loading={loading}
-          filterKey="type"
-          filterOptions={[
-            { value: "all", label: "Toutes les catégories" },
-            { value: "unitaire_digital", label: "Ventes numériques unitaires" },
-            { value: "bouquet_institution", label: "Bouquets Universités (B2B)" },
-            { value: "abonnement_individuel", label: "Pass & Abonnements" },
-            { value: "unitaire_papier", label: "Livres physiques (papier)" },
-          ]}
-          filterPlaceholder="Filtrer par catégorie..."
-          searchPlaceholder="Rechercher par client, e-mail ou référence..."
-          emptyMessage={
-            timeSlot && timeSlot.id !== "all"
-              ? "Aucune transaction enregistrée sur cette plage horaire."
-              : "Aucune vente enregistrée."
-          }
+          searchPlaceholder="Rechercher par référence, acheteur, livre..."
+          emptyMessage="Aucune commande enregistrée correspondant aux critères sélectionnés."
+          renderExpandedRow={(order: AdminSaleOrder) => (
+            <OrderItemsAccordionRow order={order} />
+          )}
         />
       </div>
     </div>

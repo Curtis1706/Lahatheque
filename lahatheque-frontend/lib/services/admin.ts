@@ -22,6 +22,11 @@ import {
   StockTransaction,
   CreateAdminUserPayload,
   UpdateAdminUserPayload,
+  AdminSalesConsolidatedResponse,
+  AdminPayoutRequest,
+  AdminPayoutKpis,
+  AdminPayoutsListResponse,
+  AdminPartnerRoyaltySummary,
 } from "@/lib/types/admin";
 
 // =========================================================================
@@ -385,7 +390,51 @@ export async function getAdminSales(): Promise<AdminSale[]> {
   const res = await fetch('/api/bff/admin/sales', { cache: 'no-store' });
   if (!res.ok) throw new Error(`Erreur chargement ventes admin: ${res.status}`);
   const json = await res.json();
-  return json.data || json.results || [];
+  if (Array.isArray(json.data)) return json.data;
+  if (json.data?.orders && Array.isArray(json.data.orders)) {
+    return json.data.orders.map((o: any) => ({
+      id: o.order_reference || o.id,
+      order_number: o.order_reference,
+      user_name: o.buyer_name,
+      user_email: o.buyer_email,
+      buyer_name: o.buyer_name,
+      buyer_email: o.buyer_email,
+      buyer_type: o.buyer_role,
+      book_title: o.items?.[0]?.book_title || "Commande d'ouvrages",
+      item_title: o.items?.[0]?.book_title || "Commande d'ouvrages",
+      type: o.channel === 'b2c_individual'
+        ? (o.items?.[0]?.format === 'paper' ? 'unitaire_papier' : 'unitaire_digital')
+        : (o.channel === 'b2b_university' ? 'bouquet_institution' : 'grossiste_papier'),
+      item_type: o.items?.[0]?.format === 'paper' ? 'paper_book' : 'digital_book',
+      amount: o.net_amount_paid,
+      currency: "XOF",
+      payment_method: o.payment_method,
+      payment_status: o.payment_status,
+      order_status: "completed",
+      created_at: o.created_at,
+      country: "BJ",
+    }));
+  }
+  return json.results || [];
+}
+
+export async function getAdminConsolidatedSales(params?: {
+  channel?: string;
+  period?: string;
+  time_slot?: string;
+  q?: string;
+}): Promise<AdminSalesConsolidatedResponse> {
+  const query = new URLSearchParams();
+  if (params?.channel && params.channel !== 'all') query.set('channel', params.channel);
+  if (params?.period && params.period !== 'all') query.set('period', params.period);
+  if (params?.time_slot && params.time_slot !== 'all') query.set('time_slot', params.time_slot);
+  if (params?.q) query.set('q', params.q);
+
+  const qs = query.toString();
+  const res = await fetch(`/api/bff/admin/sales${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Erreur chargement ventes consolidées: ${res.status}`);
+  const json = await res.json();
+  return json.data;
 }
 
 export async function rotatePartnerApiSecret(keyId: string): Promise<{ clientSecret: string; secretWarning: string } | null> {
@@ -406,11 +455,115 @@ export async function getAdminRoyalties(beneficiaryType?: "author" | "publisher"
   const res = await fetch('/api/bff/admin/royalties/payouts', { cache: 'no-store' });
   if (!res.ok) throw new Error(`Erreur versements redevances: ${res.status}`);
   const json = await res.json();
-  let list = (json.data || json.results || []) as AdminRoyalty[];
+  const rawList = Array.isArray(json.data) ? json.data : (json.data?.results || json.results || []);
+  let list = rawList as AdminRoyalty[];
   if (beneficiaryType) {
     list = list.filter((r) => r.beneficiary_type === beneficiaryType);
   }
   return list;
+}
+
+export async function getAdminPayouts(params?: {
+  status?: string;
+  type?: string;
+  q?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<AdminPayoutsListResponse> {
+  const query = new URLSearchParams();
+  if (params?.status && params.status !== 'all') query.set('status', params.status);
+  if (params?.type && params.type !== 'all') query.set('type', params.type);
+  if (params?.q) query.set('q', params.q);
+  if (params?.page) query.set('page', String(params.page));
+  if (params?.page_size) query.set('page_size', String(params.page_size));
+
+  const qs = query.toString();
+  const res = await fetch(`/api/bff/admin/royalties/payouts${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Erreur chargement demandes de versement: ${res.status}`);
+  const json = await res.json();
+  return json.data;
+}
+
+export async function getAdminPayoutKpis(): Promise<AdminPayoutKpis> {
+  const res = await fetch('/api/bff/admin/royalties/payouts/kpis/', { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Erreur chargement KPIs versements: ${res.status}`);
+  const json = await res.json();
+  return json.data;
+}
+
+export async function validatePayoutRequest(
+  payoutId: string,
+  data: {
+    transaction_reference: string;
+    payout_date?: string;
+    receipt_file?: File | null;
+    admin_notes?: string;
+  }
+): Promise<{ success: boolean; message?: string; error?: string; data?: any }> {
+  let body: BodyInit;
+  const headers: HeadersInit = {};
+
+  if (data.receipt_file) {
+    const fd = new FormData();
+    fd.append('transaction_reference', data.transaction_reference);
+    if (data.payout_date) fd.append('payout_date', data.payout_date);
+    if (data.admin_notes) fd.append('admin_notes', data.admin_notes);
+    fd.append('receipt_file', data.receipt_file);
+    body = fd;
+  } else {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify({
+      transaction_reference: data.transaction_reference,
+      payout_date: data.payout_date,
+      admin_notes: data.admin_notes,
+    });
+  }
+
+  const res = await fetch(`/api/bff/admin/royalties/payouts/${payoutId}/validate/`, {
+    method: 'POST',
+    headers,
+    body,
+  });
+  const json = await res.json();
+  if (res.ok && json.success) {
+    return { success: true, message: json.message, data: json.data };
+  }
+  return { success: false, error: json.error || 'Erreur lors de la validation du versement.' };
+}
+
+export async function rejectPayoutRequest(
+  payoutId: string,
+  reason: string,
+  adminNotes?: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const res = await fetch(`/api/bff/admin/royalties/payouts/${payoutId}/reject/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rejection_reason: reason,
+      admin_notes: adminNotes,
+    }),
+  });
+  const json = await res.json();
+  if (res.ok && json.success) {
+    return { success: true, message: json.message };
+  }
+  return { success: false, error: json.error || 'Erreur lors du rejet du versement.' };
+}
+
+export async function getAdminPartnerRoyaltiesSummary(
+  role?: string,
+  q?: string
+): Promise<AdminPartnerRoyaltySummary[]> {
+  const query = new URLSearchParams();
+  if (role && role !== 'all') query.set('role', role);
+  if (q) query.set('q', q);
+
+  const qs = query.toString();
+  const res = await fetch(`/api/bff/admin/finance/partner-royalties${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Erreur chargement synthèse partenaires: ${res.status}`);
+  const json = await res.json();
+  return json.data || [];
 }
 
 export async function processRoyaltyPayout(
@@ -900,6 +1053,15 @@ export interface AdminGlobalFinance {
   credit: { outstanding_total: number; outstanding_count: number };
   subscriptions: { active_count: number };
   author_payouts: { total_processed: number; total_pending: number; pending_count: number };
+  royalties_overview?: {
+    total_generated: number;
+    total_paid: number;
+    total_outstanding: number;
+  };
+  platform_margin?: {
+    commission_rate_avg: number;
+    net_retained_platform: number;
+  };
 }
 
 export interface AuthorRoyaltyReportLine {

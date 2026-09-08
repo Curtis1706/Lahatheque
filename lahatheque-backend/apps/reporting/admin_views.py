@@ -581,109 +581,266 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
+        from apps.rights.models import PayoutRequest
+        from django.db.models import Q
+
+        status_filter = request.GET.get('status', 'all')
+        type_filter = request.GET.get('type') or request.GET.get('beneficiary_type', 'all')
+        query = request.GET.get('q', '').strip().lower()
+
+        qs = PayoutRequest.objects.all().select_related('author').order_by('-created_at')
+
+        if status_filter and status_filter != 'all':
+            qs = qs.filter(status=status_filter)
+
+        if type_filter and type_filter != 'all':
+            qs = qs.filter(beneficiary_type=type_filter)
+
+        if query:
+            qs = qs.filter(
+                Q(author__first_name__icontains=query) |
+                Q(author__last_name__icontains=query) |
+                Q(author__email__icontains=query) |
+                Q(purpose_label__icontains=query) |
+                Q(account_details__icontains=query) |
+                Q(transaction_reference__icontains=query)
+            )
+
         results = []
+        for p in qs:
+            author_name = (p.author.get_full_name() if p.author else "") or (p.author.email if p.author else "Bénéficiaire")
+            rate = round(float(p.amount) / float(p.gross_base_amount) * 100, 1) if (p.gross_base_amount and p.gross_base_amount > 0) else 15.0
+            receipt_url = p.receipt_file.url if p.receipt_file else None
 
-        # 1. Lignes de redevances acquises par les auteurs par ouvrage (RoyaltyPayoutLine)
-        from apps.rights.models import RoyaltyPayoutLine, RoyaltyRate, RoyaltyCalculation
-        lines = RoyaltyPayoutLine.objects.all().select_related(
-            'author_right__user', 'calculation__ouvrage'
-        ).order_by('-calculation__period_month')
-
-        for pl in lines:
-            author = pl.author_right.user if pl.author_right else None
-            author_name = author.get_full_name() if author else "Auteur"
-            if not author_name and author:
-                author_name = author.email
-            book = pl.calculation.ouvrage if pl.calculation else None
-            book_title = book.title if book else "Ouvrage"
-            period_str = pl.calculation.period_month.strftime("%Y-%m") if (pl.calculation and pl.calculation.period_month) else ""
-
-            from apps.rights.models import RepartitionDroits
-            rep = RepartitionDroits.objects.filter(ouvrage=book, beneficiaire=author).first() if (book and author) else None
-            if not rep and book:
-                rep = RepartitionDroits.objects.filter(ouvrage=book).first()
-            author_rate = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 5.0
-
-            results.append({
-                "id": f"payout-line-{pl.id}",
-                "line_id": pl.id,
-                "beneficiary_name": author_name,
-                "beneficiary_type": "author",
-                "beneficiary_email": author.email if author else "",
-                "book_title": book_title,
-                "period_month": period_str,
-                "total_reads": pl.calculation.total_reads_count if pl.calculation else 0,
-                "total_revenue": float(pl.calculation.total_revenue) if pl.calculation else 0.0,
-                "amount": float(pl.payout_amount),
-                "payout_amount": float(pl.payout_amount),
-                "status": "processed" if pl.is_settled else "pending",
-                "author_rate_percent": author_rate,
-                "created_at": pl.calculation.period_month.isoformat() if (pl.calculation and pl.calculation.period_month) else None,
-            })
-
-        # 2. Relevés de redevances universités (UniversityRoyaltyStatement)
-        from apps.partners.models import UniversityRoyaltyStatement
-        univ_statements = UniversityRoyaltyStatement.objects.all().select_related('institution').order_by('-created_at')
-        for u in univ_statements:
-            results.append({
-                "id": f"univ-stmt-{u.id}",
-                "statement_id": str(u.id),
-                "beneficiary_name": u.institution.name if u.institution else "Université",
-                "beneficiary_type": "university",
-                "beneficiary_email": u.institution.contact_email if u.institution else "",
-                "book_title": u.reference or "Redevances Catalogue Institutionnel",
-                "period_month": u.period,
-                "total_reads": 0,
-                "total_revenue": float(u.total_sales_catalog or 0),
-                "amount": float(u.net_royalty_amount),
-                "payout_amount": float(u.net_royalty_amount),
-                "status": "processed" if u.status == "paid" else "pending",
-                "university_rate_percent": float(u.royalty_rate or 15.0),
-                "created_at": u.created_at.isoformat() if hasattr(u, 'created_at') and u.created_at else None,
-            })
-
-        # 3. Redevances éditeurs tiers (RoyaltyCalculation avec publisher_payout_amount > 0)
-        pub_calcs = RoyaltyCalculation.objects.filter(publisher_payout_amount__gt=0).select_related('ouvrage__publisher')
-        for rc in pub_calcs:
-            pub = rc.ouvrage.publisher if (rc.ouvrage and rc.ouvrage.publisher) else None
-            if pub:
-                results.append({
-                    "id": f"pub-calc-{rc.id}",
-                    "calculation_id": str(rc.id),
-                    "beneficiary_name": pub.company_name or pub.name or "Éditeur Tiers",
-                    "beneficiary_type": "publisher",
-                    "beneficiary_email": pub.contact_email or "",
-                    "book_title": rc.ouvrage.title,
-                    "period_month": rc.period_month.strftime("%Y-%m"),
-                    "total_reads": rc.total_reads_count,
-                    "total_revenue": float(rc.total_revenue),
-                    "amount": float(rc.publisher_payout_amount),
-                    "payout_amount": float(rc.publisher_payout_amount),
-                    "status": "processed" if rc.is_settled else "pending",
-                    "created_at": rc.period_month.isoformat(),
-                })
-
-        # 4. Demandes de retrait explicites (PayoutRequest)
-        payouts = PayoutRequest.objects.all().select_related('author').order_by('-created_at')
-        for p in payouts:
-            author_name = f"{p.author.first_name} {p.author.last_name}" if p.author else "Auteur"
             results.append({
                 "id": str(p.id),
+                "beneficiary_id": str(p.author.id) if p.author else "",
                 "beneficiary_name": author_name,
-                "beneficiary_type": "author",
+                "beneficiary_type": p.beneficiary_type or "author",
                 "beneficiary_email": p.author.email if p.author else "",
+                "purpose_label": p.purpose_label or "Redevances sur ventes d'ouvrages",
+                "gross_base_amount": float(p.gross_base_amount or 0),
+                "effective_rate_percent": rate,
+                "net_payout_amount": float(p.amount),
+                "payment_method": p.payment_method,
+                "payment_details_preview": p.account_details,
+                "status": p.status,
+                "transaction_reference": p.transaction_reference or None,
+                "payout_date": str(p.payout_date) if p.payout_date else None,
+                "receipt_file_url": receipt_url,
+                "rejection_reason": p.rejection_reason or None,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                # Compatibilité rétroactive
                 "amount": float(p.amount),
                 "payout_amount": float(p.amount),
-                "payment_method": p.payment_method,
+                "book_title": p.purpose_label or "Redevances",
                 "account_details": p.account_details,
-                "status": p.status,
-                "transaction_reference": p.transaction_reference,
                 "admin_notes": p.admin_notes,
-                "created_at": p.created_at.isoformat() if p.created_at else None,
-                "processed_at": p.processed_at.isoformat() if p.processed_at else None,
             })
 
-        return Response({"success": True, "data": results, "error": None})
+        total_count = len(results)
+        try:
+            page = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('page_size', 10))
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 10
+
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_results = results[start_idx:end_idx]
+
+        return Response({
+            "success": True,
+            "data": {
+                "count": total_count,
+                "page": page,
+                "total_pages": total_pages,
+                "results": paginated_results,
+            },
+            "error": None
+        })
+
+    @action(detail=False, methods=['get'], url_path='kpis')
+    def kpis(self, request):
+        """
+        GET /api/v1/admin/royalties/payouts/kpis/
+        Indicateurs exécutifs de gestion des versements de redevances.
+        """
+        from apps.rights.models import PayoutRequest
+        from django.db.models import Sum
+        from django.utils import timezone
+        now = timezone.now()
+
+        pending_qs = PayoutRequest.objects.filter(status__in=['pending', 'approved'])
+        total_pending_amount = float(pending_qs.aggregate(s=Sum('amount'))['s'] or 0.0)
+        pending_count = pending_qs.count()
+
+        settled_month_qs = PayoutRequest.objects.filter(
+            status='processed',
+            processed_at__year=now.year,
+            processed_at__month=now.month
+        )
+        total_settled_month = float(settled_month_qs.aggregate(s=Sum('amount'))['s'] or 0.0)
+        settled_month_count = settled_month_qs.count()
+
+        distinct_beneficiaries = PayoutRequest.objects.values('author').distinct().count()
+
+        return Response({
+            "success": True,
+            "data": {
+                "total_pending_amount": total_pending_amount,
+                "pending_count": pending_count,
+                "total_settled_this_month": total_settled_month,
+                "settled_this_month_count": settled_month_count,
+                "distinct_beneficiaries_count": distinct_beneficiaries,
+                "average_processing_time_hours": 24.0,
+            },
+            "error": None
+        })
+
+    @action(detail=True, methods=['post'], url_path='validate')
+    def validate_payout(self, request, pk=None):
+        """
+        POST /api/v1/admin/royalties/payouts/{id}/validate/
+        Validation officielle d'un versement avec enregistrement de référence et justificatif.
+        """
+        from apps.rights.models import PayoutRequest
+        from apps.reporting.models import JournalAuditAdmin, Notification
+        from apps.reporting.services import notify_user
+        from django.utils import timezone
+
+        try:
+            payout = PayoutRequest.objects.get(id=pk)
+        except PayoutRequest.DoesNotExist:
+            return Response({"success": False, "error": "Demande de versement introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        tx_ref = request.data.get('transaction_reference', '').strip()
+        if not tx_ref:
+            return Response({"success": False, "error": "La référence de transaction est obligatoire pour valider le versement."}, status=status.HTTP_400_BAD_REQUEST)
+
+        payout_date_str = request.data.get('payout_date')
+        if payout_date_str:
+            try:
+                payout.payout_date = timezone.datetime.strptime(payout_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                payout.payout_date = timezone.now().date()
+        else:
+            payout.payout_date = timezone.now().date()
+
+        if 'receipt_file' in request.FILES:
+            payout.receipt_file = request.FILES['receipt_file']
+
+        admin_notes = request.data.get('admin_notes', '').strip()
+        if admin_notes:
+            payout.admin_notes = admin_notes
+
+        payout.status = 'processed'
+        payout.transaction_reference = tx_ref
+        payout.processed_at = timezone.now()
+        payout.processed_by = request.user
+        payout.save()
+
+        JournalAuditAdmin.objects.create(
+            administrateur=request.user,
+            action="VALIDATE_ROYALTY_PAYOUT",
+            ressource_type="PayoutRequest",
+            ressource_id=str(payout.id),
+            details={"amount": float(payout.amount), "transaction_reference": tx_ref}
+        )
+
+        try:
+            if payout.author:
+                notify_user(
+                    user=payout.author,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Versement de vos redevances validé",
+                    message=f"Votre versement de {float(payout.amount):,.0f} XOF a été exécuté. Référence : {tx_ref}.",
+                    action_url="/author/royalties",
+                    resource_id=str(payout.id),
+                )
+        except Exception:
+            pass
+
+        receipt_url = payout.receipt_file.url if payout.receipt_file else None
+
+        return Response({
+            "success": True,
+            "message": "Versement validé avec succès. Référence enregistrée.",
+            "data": {
+                "id": str(payout.id),
+                "status": "processed",
+                "transaction_reference": payout.transaction_reference,
+                "payout_date": str(payout.payout_date),
+                "receipt_file_url": receipt_url,
+            },
+            "error": None
+        })
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject_payout(self, request, pk=None):
+        """
+        POST /api/v1/admin/royalties/payouts/{id}/reject/
+        Rejet formel d'une demande de versement avec motif explicite obligatoire.
+        """
+        from apps.rights.models import PayoutRequest
+        from apps.reporting.models import JournalAuditAdmin, Notification
+        from apps.reporting.services import notify_user
+        from django.utils import timezone
+
+        try:
+            payout = PayoutRequest.objects.get(id=pk)
+        except PayoutRequest.DoesNotExist:
+            return Response({"success": False, "error": "Demande de versement introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        reason = request.data.get('rejection_reason', '').strip()
+        if not reason or len(reason) < 3:
+            return Response({"success": False, "error": "Le motif de rejet est obligatoire."}, status=status.HTTP_400_BAD_REQUEST)
+
+        admin_notes = request.data.get('admin_notes', '').strip()
+        if admin_notes:
+            payout.admin_notes = admin_notes
+
+        payout.status = 'rejected'
+        payout.rejection_reason = reason
+        payout.processed_at = timezone.now()
+        payout.processed_by = request.user
+        payout.save()
+
+        JournalAuditAdmin.objects.create(
+            administrateur=request.user,
+            action="REJECT_ROYALTY_PAYOUT",
+            ressource_type="PayoutRequest",
+            ressource_id=str(payout.id),
+            details={"amount": float(payout.amount), "reason": reason}
+        )
+
+        try:
+            if payout.author:
+                notify_user(
+                    user=payout.author,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Demande de versement refusée",
+                    message=f"Votre demande de versement de {float(payout.amount):,.0f} XOF a été rejetée. Motif : {reason}.",
+                    action_url="/author/royalties",
+                    resource_id=str(payout.id),
+                )
+        except Exception:
+            pass
+
+        return Response({
+            "success": True,
+            "message": "Demande de versement rejetée.",
+            "data": {
+                "id": str(payout.id),
+                "status": "rejected",
+                "rejection_reason": payout.rejection_reason,
+            },
+            "error": None
+        })
 
     @action(detail=True, methods=['post'], url_path='process')
     def process_payout(self, request, pk=None):
@@ -2080,123 +2237,270 @@ class AdminReportExportAPIView(APIView):
 class AdminSalesListAPIView(APIView):
     """
     GET /api/v1/admin/sales/
-    Liste des ventes réelles, tous canaux et rôles confondus (lecteurs, auteurs, universités, grossistes).
+    Endpoint de réconciliation exhaustive et dynamique du Chiffre d'Affaires consolidé.
+    Agrège :
+      1. Commandes unitaires B2C (Order paid) avec leurs lignes (LigneCommande)
+      2. Commandes institutionnelles B2B (UniversityPaperOrder exclude cancelled)
+      3. Commandes grossistes B2B (WholesaleOrder exclude cancelled)
     """
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def get(self, request):
-        from apps.commerce.models import LigneCommande, WholesaleOrder, WholesaleOrderStatus
+        from apps.commerce.models import Order, WholesaleOrder, WholesaleOrderStatus
+        from apps.partners.models import UniversityPaperOrder
+        from datetime import timedelta
+        from django.utils import timezone
 
-        results = []
+        channel_filter = request.GET.get('channel', 'all')
+        period_filter = request.GET.get('period', 'all')
+        time_slot = request.GET.get('time_slot')
+        query = request.GET.get('q', '').strip().lower()
 
-        # 1. Commandes unitaires & particuliers / auteurs / universités
-        lignes = (
-            LigneCommande.objects
-            .select_related('commande', 'commande__user', 'ouvrage')
-            .order_by('-commande__created_at')[:200]
-        )
-        for l in lignes:
-            buyer = l.commande.user
-            role_label = ""
-            if buyer and hasattr(buyer, "role"):
-                r = buyer.role
-                if r == "author":
-                    role_label = " (Auteur)"
-                elif r == "university":
-                    role_label = " (Université)"
-                elif r == "wholesaler":
-                    role_label = " (Grossiste)"
-                elif r == "student":
-                    role_label = " (Lecteur)"
+        now = timezone.now()
+        since_date = None
+        if period_filter == '1d':
+            since_date = now - timedelta(days=1)
+        elif period_filter == '1w':
+            since_date = now - timedelta(days=7)
+        elif period_filter == '1m':
+            since_date = now - timedelta(days=30)
+        elif period_filter == '3m':
+            since_date = now - timedelta(days=90)
+        elif period_filter == '1y':
+            since_date = now - timedelta(days=365)
 
-            user_display = (buyer.get_full_name() if buyer else "") or (buyer.email if buyer else "Client")
-            if role_label and role_label.strip(" ()").lower() not in user_display.lower():
-                buyer_name = f"{user_display}{role_label}"
-            else:
-                buyer_name = user_display
+        orders_list = []
 
-            results.append({
-                "id": str(l.id),
-                "order_number": getattr(l.commande, 'reference', str(l.commande.id)[:8].upper()),
-                "user_email": buyer.email if buyer else "N/A",
-                "user_name": buyer_name,
-                "buyer_name": buyer_name,
-                "buyer_email": buyer.email if buyer else "N/A",
-                "buyer_type": getattr(buyer, 'role', 'individual'),
-                "item_type": "paper_book" if l.format_type == 'paper' else "digital_book",
-                "type": "unitaire_digital" if l.format_type == 'digital' else "unitaire_papier",
-                "item_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
-                "book_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
-                "amount": float(l.unit_price) * (l.quantity or 1),
-                "currency": "XOF",
-                "payment_method": getattr(l.commande, 'mode_paiement', 'mobile_money'),
-                "payment_status": l.commande.statut_paiement if l.commande.statut_paiement in ['paid', 'pending', 'failed', 'refunded'] else 'paid',
-                "order_status": "completed" if l.commande.statut_commande == 'completed' else "pending",
-                "created_at": l.commande.created_at.isoformat() if l.commande.created_at else None,
-                "country": getattr(buyer, 'country', 'BJ') if buyer else 'BJ',
-            })
+        # 1. B2C / Commandes unitaires (Order)
+        if channel_filter in ['all', 'b2c_individual']:
+            qs_orders = Order.objects.filter(statut_paiement='paid').select_related('user').prefetch_related('lignes__ouvrage')
+            if since_date:
+                qs_orders = qs_orders.filter(created_at__gte=since_date)
 
-        # 2. Commandes Grossistes (WholesaleOrder)
-        w_orders = (
-            WholesaleOrder.objects
-            .exclude(status=WholesaleOrderStatus.CANCELLED)
-            .select_related('user')
-            .prefetch_related('items__book')
-            .order_by('-created_at')[:100]
-        )
-        for wo in w_orders:
-            buyer = wo.user
-            user_full = buyer.get_full_name() if buyer else ""
-            buyer_name = f"{wo.company_name} (Grossiste - {user_full or buyer.email})" if (user_full or buyer) else f"{wo.company_name} (Grossiste)"
+            for o in qs_orders:
+                buyer = o.user
+                buyer_name = (buyer.get_full_name() if buyer else "") or (buyer.email if buyer else "Client")
+                buyer_email = buyer.email if buyer else ""
+                buyer_role = getattr(buyer, 'role', 'student')
+                ref = str(o.id)[:8].upper()
 
-            for it in wo.items.all():
-                if it.print_copies_qty > 0:
-                    results.append({
-                        "id": f"{it.id}-print",
-                        "order_number": wo.reference or str(wo.id)[:8].upper(),
-                        "user_email": buyer.email if buyer else "N/A",
-                        "user_name": buyer_name,
-                        "buyer_name": buyer_name,
-                        "buyer_email": buyer.email if buyer else "N/A",
-                        "buyer_type": "wholesaler",
-                        "item_type": "paper_book",
-                        "type": "grossiste_papier",
-                        "item_title": f"{it.title} ({it.print_copies_qty} ex.)",
-                        "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
-                        "amount": float(it.print_unit_price * it.print_copies_qty),
-                        "currency": "XOF",
-                        "payment_method": "Facturation B2B",
-                        "payment_status": "paid",
-                        "order_status": "completed" if wo.status == WholesaleOrderStatus.DELIVERED else "pending",
-                        "created_at": wo.created_at.isoformat() if wo.created_at else None,
-                        "country": getattr(buyer, 'country', 'BJ') if buyer else 'BJ',
+                items = []
+                for l in o.lignes.all():
+                    items.append({
+                        "id": str(l.id),
+                        "book_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
+                        "isbn": getattr(l.ouvrage, 'isbn', '') or '',
+                        "format": l.format_type or 'digital',
+                        "quantity": l.quantity or 1,
+                        "unit_price": float(l.unit_price or 0),
+                        "discount_amount": 0.0,
+                        "subtotal": float(l.unit_price or 0) * (l.quantity or 1),
                     })
-                if it.digital_licenses_qty > 0:
-                    results.append({
-                        "id": f"{it.id}-digital",
-                        "order_number": wo.reference or str(wo.id)[:8].upper(),
-                        "user_email": buyer.email if buyer else "N/A",
-                        "user_name": buyer_name,
-                        "buyer_name": buyer_name,
-                        "buyer_email": buyer.email if buyer else "N/A",
-                        "buyer_type": "wholesaler",
-                        "item_type": "digital_book",
-                        "type": "grossiste_numerique",
-                        "item_title": f"{it.title} (Licence B2B)",
-                        "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
-                        "amount": float(it.digital_unit_price * it.digital_licenses_qty),
-                        "currency": "XOF",
-                        "payment_method": "Facturation B2B",
-                        "payment_status": "paid",
-                        "order_status": "completed" if wo.status == WholesaleOrderStatus.DELIVERED else "pending",
-                        "created_at": wo.created_at.isoformat() if wo.created_at else None,
-                        "country": getattr(buyer, 'country', 'BJ') if buyer else 'BJ',
+
+                orders_list.append({
+                    "id": f"ord-{str(o.id)[:8]}",
+                    "order_reference": ref,
+                    "channel": "b2c_individual",
+                    "channel_label": "Vente Unitaire Lecteur",
+                    "buyer_name": buyer_name,
+                    "buyer_email": buyer_email,
+                    "buyer_role": buyer_role if buyer_role in ['student', 'author', 'university', 'wholesaler'] else 'client',
+                    "created_at": o.created_at.isoformat() if o.created_at else None,
+                    "payment_method": o.get_mode_paiement_display() if hasattr(o, 'get_mode_paiement_display') else (o.mode_paiement or "Mobile Money"),
+                    "payment_status": "paid",
+                    "gross_amount": float(o.total_amount or 0),
+                    "discount_total": 0.0,
+                    "net_amount_paid": float(o.total_amount or 0),
+                    "items_count": len(items),
+                    "items": items,
+                })
+
+        # 2. B2B Universités (UniversityPaperOrder)
+        if channel_filter in ['all', 'b2b_university']:
+            qs_univ = UniversityPaperOrder.objects.exclude(status='cancelled').select_related('institution', 'institution__user')
+            if since_date:
+                qs_univ = qs_univ.filter(created_at__gte=since_date)
+
+            for uo in qs_univ:
+                inst = uo.institution
+                inst_name = inst.name if inst else "Université Partenaire"
+                inst_email = getattr(inst.user, 'email', '') if inst and inst.user else (getattr(inst, 'contact_email', '') or "contact@institution.bj")
+                ref = uo.order_number or f"UNIV-{str(uo.id)[:8].upper()}"
+
+                raw_items = uo.items if isinstance(uo.items, list) else []
+                items = []
+                for idx, it in enumerate(raw_items):
+                    qty = it.get('quantity', 1) or 1
+                    uprice = float(it.get('unit_price', 0) or 0)
+                    items.append({
+                        "id": f"univ-{uo.id}-{idx}",
+                        "book_title": it.get('title') or "Ouvrage Papier Universitaire",
+                        "isbn": it.get('isbn', '') or '',
+                        "format": "paper",
+                        "quantity": qty,
+                        "unit_price": uprice,
+                        "discount_amount": 0.0,
+                        "subtotal": uprice * qty,
                     })
+
+                if not items:
+                    items.append({
+                        "id": f"univ-{uo.id}-0",
+                        "book_title": f"Commande Institutionnelle ({ref})",
+                        "isbn": "",
+                        "format": "paper",
+                        "quantity": 1,
+                        "unit_price": float(uo.total_amount or 0),
+                        "discount_amount": 0.0,
+                        "subtotal": float(uo.total_amount or 0),
+                    })
+
+                orders_list.append({
+                    "id": f"univ-{str(uo.id)[:8]}",
+                    "order_reference": ref,
+                    "channel": "b2b_university",
+                    "channel_label": "Commande Campus B2B",
+                    "buyer_name": inst_name,
+                    "buyer_email": inst_email,
+                    "buyer_role": "university",
+                    "created_at": uo.created_at.isoformat() if uo.created_at else None,
+                    "payment_method": "Virement Bancaire Institutionnel",
+                    "payment_status": "paid",
+                    "gross_amount": float(uo.total_amount or 0),
+                    "discount_total": 0.0,
+                    "net_amount_paid": float(uo.total_amount or 0),
+                    "items_count": len(items),
+                    "items": items,
+                })
+
+        # 3. B2B Grossistes (WholesaleOrder)
+        if channel_filter in ['all', 'b2b_wholesale']:
+            qs_ws = WholesaleOrder.objects.exclude(status=WholesaleOrderStatus.CANCELLED).select_related('user').prefetch_related('items__book')
+            if since_date:
+                qs_ws = qs_ws.filter(created_at__gte=since_date)
+
+            for wo in qs_ws:
+                buyer = wo.user
+                buyer_name = f"{wo.company_name} (Grossiste)"
+                buyer_email = buyer.email if buyer else ""
+                ref = wo.reference or f"GROSS-{str(wo.id)[:8].upper()}"
+
+                items = []
+                for it in wo.items.all():
+                    if it.print_copies_qty > 0:
+                        items.append({
+                            "id": f"{it.id}-print",
+                            "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
+                            "isbn": getattr(it.book, 'isbn', '') if it.book else '',
+                            "format": "paper",
+                            "quantity": it.print_copies_qty,
+                            "unit_price": float(it.print_unit_price or 0),
+                            "discount_amount": 0.0,
+                            "subtotal": float(it.print_unit_price or 0) * it.print_copies_qty,
+                        })
+                    if it.digital_licenses_qty > 0:
+                        items.append({
+                            "id": f"{it.id}-digital",
+                            "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
+                            "isbn": getattr(it.book, 'isbn', '') if it.book else '',
+                            "format": "digital",
+                            "quantity": it.digital_licenses_qty,
+                            "unit_price": float(it.digital_unit_price or 0),
+                            "discount_amount": 0.0,
+                            "subtotal": float(it.digital_unit_price or 0) * it.digital_licenses_qty,
+                        })
+
+                orders_list.append({
+                    "id": f"ws-{str(wo.id)[:8]}",
+                    "order_reference": ref,
+                    "channel": "b2b_wholesale",
+                    "channel_label": "Commande Grossiste B2B",
+                    "buyer_name": buyer_name,
+                    "buyer_email": buyer_email,
+                    "buyer_role": "wholesaler",
+                    "created_at": wo.created_at.isoformat() if wo.created_at else None,
+                    "payment_method": "Facturation B2B",
+                    "payment_status": "paid" if wo.status == WholesaleOrderStatus.DELIVERED else "pending",
+                    "gross_amount": float(wo.total_amount or 0),
+                    "discount_total": 0.0,
+                    "net_amount_paid": float(wo.total_amount or 0),
+                    "items_count": len(items),
+                    "items": items,
+                })
+
+        # Filtrage par plage horaire
+        if time_slot in ['morning', 'afternoon', 'evening', 'night']:
+            slot_ranges = {
+                'morning': (6, 12),
+                'afternoon': (12, 18),
+                'evening': (18, 24),
+                'night': (0, 6),
+            }
+            start_h, end_h = slot_ranges[time_slot]
+            filtered_by_slot = []
+            for ord_item in orders_list:
+                if ord_item['created_at']:
+                    dt = timezone.datetime.fromisoformat(ord_item['created_at'].replace('Z', '+00:00'))
+                    h = dt.hour
+                    if start_h <= h < end_h:
+                        filtered_by_slot.append(ord_item)
+            orders_list = filtered_by_slot
+
+        # Filtrage textuel q
+        if query:
+            filtered_by_q = []
+            for o in orders_list:
+                match = (
+                    query in o['order_reference'].lower()
+                    or query in o['buyer_name'].lower()
+                    or query in o['buyer_email'].lower()
+                    or any(query in it['book_title'].lower() for it in o['items'])
+                )
+                if match:
+                    filtered_by_q.append(o)
+            orders_list = filtered_by_q
 
         # Tri chronologique décroissant
-        results.sort(key=lambda x: x["created_at"] or "", reverse=True)
+        orders_list.sort(key=lambda x: x["created_at"] or "", reverse=True)
 
-        return Response({"success": True, "data": results, "error": None})
+        # Calcul des agrégats
+        total_rev = sum(o["net_amount_paid"] for o in orders_list)
+        b2c_orders = [o for o in orders_list if o["channel"] == "b2c_individual"]
+        univ_orders = [o for o in orders_list if o["channel"] == "b2b_university"]
+        ws_orders = [o for o in orders_list if o["channel"] == "b2b_wholesale"]
+
+        b2c_amount = sum(o["net_amount_paid"] for o in b2c_orders)
+        univ_amount = sum(o["net_amount_paid"] for o in univ_orders)
+        ws_amount = sum(o["net_amount_paid"] for o in ws_orders)
+
+        channel_breakdown = {
+            "b2c_individual": {
+                "amount": b2c_amount,
+                "orders_count": len(b2c_orders),
+                "percentage": round((b2c_amount / total_rev * 100), 1) if total_rev > 0 else 0.0,
+            },
+            "b2b_university": {
+                "amount": univ_amount,
+                "orders_count": len(univ_orders),
+                "percentage": round((univ_amount / total_rev * 100), 1) if total_rev > 0 else 0.0,
+            },
+            "b2b_wholesale": {
+                "amount": ws_amount,
+                "orders_count": len(ws_orders),
+                "percentage": round((ws_amount / total_rev * 100), 1) if total_rev > 0 else 0.0,
+            },
+        }
+
+        return Response({
+            "success": True,
+            "data": {
+                "total_revenue_consolidated": total_rev,
+                "total_orders_count": len(orders_list),
+                "channel_breakdown": channel_breakdown,
+                "orders": orders_list,
+            },
+            "error": None
+        })
 
 
 class AdminSalesByCountryAPIView(APIView):
@@ -2306,13 +2610,13 @@ class AdminSubscriptionsListAPIView(APIView):
 
 
 class AdminGlobalFinanceView(APIView):
-    """GET /api/v1/admin/finance/global/ - Vue financière complète — tous paiements."""
+    """GET /api/v1/admin/finance/global/ - Vue financière complète — tous paiements et marges."""
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def get(self, request):
         from apps.commerce.models import Order, Subscription, WholesaleOrder
-        from apps.partners.models import UniversityPaperOrder
-        from apps.rights.models import PayoutRequest
+        from apps.partners.models import UniversityPaperOrder, UniversityRoyaltyStatement
+        from apps.rights.models import PayoutRequest, RoyaltyPayoutLine
         from django.db.models import Sum
 
         orders_paid = Order.objects.filter(statut_paiement='paid')
@@ -2323,20 +2627,33 @@ class AdminGlobalFinanceView(APIView):
         payouts_processed = PayoutRequest.objects.filter(status='processed')
         payouts_pending = PayoutRequest.objects.filter(status='pending')
 
-        total_platform_revenue = (
-            float(orders_paid.aggregate(t=Sum('total_amount'))['t'] or 0) +
-            float(univ_orders.aggregate(t=Sum('total_amount'))['t'] or 0) +
-            float(wholesale_orders.aggregate(t=Sum('total_amount'))['t'] or 0)
-        )
+        rev_orders = float(orders_paid.aggregate(t=Sum('total_amount'))['t'] or 0)
+        rev_univ = float(univ_orders.aggregate(t=Sum('total_amount'))['t'] or 0)
+        rev_ws = float(wholesale_orders.aggregate(t=Sum('total_amount'))['t'] or 0)
+        total_platform_revenue = rev_orders + rev_univ + rev_ws
+
+        total_royalties_generated = 0.0
+        try:
+            total_royalties_generated = (
+                float(RoyaltyPayoutLine.objects.aggregate(s=Sum('payout_amount'))['s'] or 0.0) +
+                float(UniversityRoyaltyStatement.objects.aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+            )
+        except Exception:
+            pass
+
+        total_royalties_paid = float(payouts_processed.aggregate(t=Sum('amount'))['t'] or 0)
+        total_royalties_pending = float(payouts_pending.aggregate(t=Sum('amount'))['t'] or 0)
+        net_retained = max(0.0, total_platform_revenue - total_royalties_generated)
+        avg_commission = round((net_retained / total_platform_revenue * 100), 1) if total_platform_revenue > 0 else 85.0
 
         return Response({
             "success": True,
             "data": {
                 "total_platform_revenue": total_platform_revenue,
                 "breakdown": {
-                    "student_author_orders": {"total": float(orders_paid.aggregate(t=Sum('total_amount'))['t'] or 0), "count": orders_paid.count()},
-                    "university_orders": {"total": float(univ_orders.aggregate(t=Sum('total_amount'))['t'] or 0), "count": univ_orders.count()},
-                    "wholesale_orders": {"total": float(wholesale_orders.aggregate(t=Sum('total_amount'))['t'] or 0), "count": wholesale_orders.count()},
+                    "student_author_orders": {"total": rev_orders, "count": orders_paid.count()},
+                    "university_orders": {"total": rev_univ, "count": univ_orders.count()},
+                    "wholesale_orders": {"total": rev_ws, "count": wholesale_orders.count()},
                 },
                 "credit": {
                     "outstanding_total": float(orders_credit_outstanding.aggregate(t=Sum('total_amount'))['t'] or 0),
@@ -2344,12 +2661,226 @@ class AdminGlobalFinanceView(APIView):
                 },
                 "subscriptions": {"active_count": subscriptions_active.count()},
                 "author_payouts": {
-                    "total_processed": float(payouts_processed.aggregate(t=Sum('amount'))['t'] or 0),
-                    "total_pending": float(payouts_pending.aggregate(t=Sum('amount'))['t'] or 0),
+                    "total_processed": total_royalties_paid,
+                    "total_pending": total_royalties_pending,
                     "pending_count": payouts_pending.count(),
                 },
-            }
+                "royalties_overview": {
+                    "total_generated": total_royalties_generated,
+                    "total_paid": total_royalties_paid,
+                    "total_outstanding": total_royalties_pending,
+                },
+                "platform_margin": {
+                    "commission_rate_avg": avg_commission,
+                    "net_retained_platform": net_retained,
+                }
+            },
+            "error": None
         })
+
+
+class AdminPartnerRoyaltiesView(APIView):
+    """
+    GET /api/v1/admin/finance/partner-royalties/
+    Rapport consolidé multi-partenaires (auteurs, éditeurs tiers, universités) avec détails des ouvrages.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from apps.rights.models import RoyaltyPayoutLine, RoyaltyCalculation, RepartitionDroits, PayoutRequest
+        from apps.publishers_portal.models import Publisher
+        from apps.partners.models import Institution, UniversityRoyaltyStatement, UniversityPaperOrder
+        from apps.catalog.models import Ouvrage
+        from django.db.models import Sum
+
+        role_filter = request.GET.get('role', 'all')
+        query = request.GET.get('q', '').strip().lower()
+
+        results = []
+
+        # 1. Auteurs
+        if role_filter in ['all', 'author']:
+            author_lines = RoyaltyPayoutLine.objects.all().select_related(
+                'author_right__user', 'calculation__ouvrage'
+            )
+            author_map = {}
+            for pl in author_lines:
+                user = pl.author_right.user if pl.author_right else None
+                if not user:
+                    continue
+                uid = str(user.id)
+                if uid not in author_map:
+                    u_name = (user.get_full_name() or user.email)
+                    author_map[uid] = {
+                        "partner_id": uid,
+                        "partner_name": u_name,
+                        "partner_type": "author",
+                        "books_dict": {},
+                        "total_royalties_due": 0.0,
+                    }
+
+                book = pl.calculation.ouvrage if pl.calculation else None
+                b_id = str(book.id) if book else f"book-{pl.id}"
+                b_title = book.title if book else "Ouvrage"
+                payout_amt = float(pl.payout_amount)
+                rev_gen = float(pl.calculation.total_revenue) if pl.calculation else (payout_amt / 0.15)
+                reads = pl.calculation.total_reads_count if pl.calculation else 1
+
+                rep = RepartitionDroits.objects.filter(ouvrage=book, beneficiaire=user).first() if book else None
+                rate = float(rep.taux_numerique) if (rep and rep.taux_numerique is not None) else 15.0
+
+                if b_id not in author_map[uid]["books_dict"]:
+                    author_map[uid]["books_dict"][b_id] = {
+                        "book_id": b_id,
+                        "title": b_title,
+                        "format": "paper" if pl.calculation and getattr(pl.calculation, 'format_type', '') == 'paper' else "digital",
+                        "units_or_reads_count": 0,
+                        "effective_rate_percent": rate,
+                        "gross_revenue_generated": 0.0,
+                        "royalties_earned": 0.0,
+                    }
+
+                author_map[uid]["books_dict"][b_id]["units_or_reads_count"] += reads
+                author_map[uid]["books_dict"][b_id]["gross_revenue_generated"] += rev_gen
+                author_map[uid]["books_dict"][b_id]["royalties_earned"] += payout_amt
+                author_map[uid]["total_royalties_due"] += payout_amt
+
+            for uid, a_data in author_map.items():
+                paid_sum = float(PayoutRequest.objects.filter(author_id=uid, status='processed').aggregate(s=Sum('amount'))['s'] or 0.0)
+                books_list = list(a_data["books_dict"].values())
+                total_rev = sum(b["gross_revenue_generated"] for b in books_list)
+                total_units = sum(b["units_or_reads_count"] for b in books_list)
+                rates = [b["effective_rate_percent"] for b in books_list]
+                avg_rate = round(sum(rates) / len(rates), 1) if rates else 15.0
+
+                results.append({
+                    "partner_id": a_data["partner_id"],
+                    "partner_name": a_data["partner_name"],
+                    "partner_type": "author",
+                    "books_count": len(books_list),
+                    "total_units_sold": total_units,
+                    "average_rate_percent": avg_rate,
+                    "total_revenue_generated": total_rev,
+                    "total_royalties_due": a_data["total_royalties_due"],
+                    "total_royalties_paid": paid_sum,
+                    "balance_outstanding": max(0.0, a_data["total_royalties_due"] - paid_sum),
+                    "books": books_list,
+                })
+
+        # 2. Éditeurs Tiers
+        if role_filter in ['all', 'publisher']:
+            publishers = Publisher.objects.all()
+            for pub in publishers:
+                pub_books = Ouvrage.objects.filter(publisher=pub)
+                pub_calcs = RoyaltyCalculation.objects.filter(ouvrage__in=pub_books, publisher_payout_amount__gt=0)
+                books_list = []
+                for c in pub_calcs:
+                    books_list.append({
+                        "book_id": str(c.ouvrage.id) if c.ouvrage else "",
+                        "title": c.ouvrage.title if c.ouvrage else "Ouvrage",
+                        "format": "digital",
+                        "units_or_reads_count": c.total_reads_count,
+                        "effective_rate_percent": float(pub.contractual_royalty_rate or 15.0),
+                        "gross_revenue_generated": float(c.total_revenue),
+                        "royalties_earned": float(c.publisher_payout_amount),
+                    })
+
+                total_due = sum(b["royalties_earned"] for b in books_list)
+                total_rev = sum(b["gross_revenue_generated"] for b in books_list)
+                total_units = sum(b["units_or_reads_count"] for b in books_list)
+
+                if not books_list and pub_books.exists():
+                    first_b = pub_books.first()
+                    books_list.append({
+                        "book_id": str(first_b.id),
+                        "title": first_b.title,
+                        "format": "digital",
+                        "units_or_reads_count": 0,
+                        "effective_rate_percent": float(pub.contractual_royalty_rate or 15.0),
+                        "gross_revenue_generated": 0.0,
+                        "royalties_earned": 0.0,
+                    })
+
+                results.append({
+                    "partner_id": str(pub.id),
+                    "partner_name": pub.company_name or pub.name or "Maison d'édition",
+                    "partner_type": "publisher",
+                    "books_count": pub_books.count(),
+                    "total_units_sold": total_units,
+                    "average_rate_percent": float(pub.contractual_royalty_rate or 15.0),
+                    "total_revenue_generated": total_rev,
+                    "total_royalties_due": total_due,
+                    "total_royalties_paid": 0.0,
+                    "balance_outstanding": total_due,
+                    "books": books_list,
+                })
+
+        # 3. Universités Partenaires
+        if role_filter in ['all', 'university']:
+            institutions = Institution.objects.all()
+            for inst in institutions:
+                stmts = UniversityRoyaltyStatement.objects.filter(institution=inst)
+                total_rev = float(stmts.aggregate(s=Sum('total_sales_catalog'))['s'] or 0.0)
+                total_due = float(stmts.aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+                total_paid = float(stmts.filter(status='paid').aggregate(s=Sum('net_royalty_amount'))['s'] or 0.0)
+
+                univ_paper_orders = UniversityPaperOrder.objects.filter(institution=inst).exclude(status='cancelled')
+                paper_rev = float(univ_paper_orders.aggregate(s=Sum('total_amount'))['s'] or 0.0)
+                if paper_rev > total_rev:
+                    total_rev = paper_rev
+                    total_due = max(total_due, round(total_rev * (float(inst.royalty_rate or 5.0) / 100), 2))
+
+                books_list = []
+                for s in stmts:
+                    books_list.append({
+                        "book_id": str(s.id),
+                        "title": s.reference or "Redevances Catalogue Campus",
+                        "format": "bouquet",
+                        "units_or_reads_count": 1,
+                        "effective_rate_percent": float(s.royalty_rate or inst.royalty_rate or 15.0),
+                        "gross_revenue_generated": float(s.total_sales_catalog or 0),
+                        "royalties_earned": float(s.net_royalty_amount),
+                    })
+
+                if not books_list and univ_paper_orders.exists():
+                    first_o = univ_paper_orders.first()
+                    books_list.append({
+                        "book_id": str(first_o.id),
+                        "title": f"Commande Campus {first_o.order_number}",
+                        "format": "paper",
+                        "units_or_reads_count": 1,
+                        "effective_rate_percent": float(inst.royalty_rate or 5.0),
+                        "gross_revenue_generated": paper_rev,
+                        "royalties_earned": total_due,
+                    })
+
+                results.append({
+                    "partner_id": str(inst.id),
+                    "partner_name": inst.name,
+                    "partner_type": "university",
+                    "books_count": max(1, len(books_list)),
+                    "total_units_sold": max(1, len(books_list)),
+                    "average_rate_percent": float(inst.royalty_rate or 15.0),
+                    "total_revenue_generated": total_rev,
+                    "total_royalties_due": total_due,
+                    "total_royalties_paid": total_paid,
+                    "balance_outstanding": max(0.0, total_due - total_paid),
+                    "books": books_list,
+                })
+
+        if query:
+            filtered = []
+            for r in results:
+                match = (
+                    query in r['partner_name'].lower()
+                    or any(query in b['title'].lower() for b in r['books'])
+                )
+                if match:
+                    filtered.append(r)
+            results = filtered
+
+        results.sort(key=lambda x: x["total_revenue_generated"], reverse=True)
+        return Response({"success": True, "data": results, "error": None})
 
 
 def _reconcile_author_rights_for_user(author):

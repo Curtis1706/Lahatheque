@@ -74,6 +74,7 @@ import {
   HelpCircle,
   Mail,
   Headphones,
+  CreditCard,
 } from "lucide-react";
 
 interface SubLinkItem {
@@ -344,9 +345,17 @@ export function DashboardSidebar() {
                 ],
               },
               { label: "Gestion des commandes", href: "/admin/orders", icon: <PackageCheck className="size-4" /> },
-              { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="size-4" /> },
-              { label: "Finances Globales", href: "/admin/finance", icon: <Landmark className="size-4" /> },
-              { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="size-4" /> },
+              {
+                label: "Gestion des Finances",
+                href: "/admin/finance",
+                icon: <Wallet className="size-4" />,
+                sublinks: [
+                  { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="size-3.5" /> },
+                  { label: "Finances Globales", href: "/admin/finance", icon: <Landmark className="size-3.5" /> },
+                  { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="size-3.5" /> },
+                  { label: "Demandes de Versement", href: "/admin/payouts", icon: <CreditCard className="size-3.5" /> },
+                ],
+              },
               { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="size-4" /> },
               { label: "Reporting & Exports", href: "/admin/reports", icon: <FileSpreadsheet className="size-4" /> },
               { label: "Clés API & Partenaires", href: "/admin/api", icon: <Key className="size-4" /> },
@@ -460,7 +469,9 @@ export function DashboardSidebar() {
     for (const group of groups) {
       for (const item of group.items) {
         if (item.sublinks) {
-          const isChildActive = item.sublinks.some((sub) => pathname === sub.href);
+          const isChildActive = item.sublinks.some(
+            (sub) => pathname === sub.href || (sub.href.startsWith("/") && pathname.startsWith(sub.href + "/"))
+          );
           if (isChildActive) {
             setOpenSection(item.label);
             matched = true;
@@ -547,7 +558,9 @@ export function DashboardSidebar() {
                   const hasSublinks = Boolean(item.sublinks && item.sublinks.length > 0);
                   const isDirectActive = pathname === item.href;
                   const isChildActive = Boolean(
-                    item.sublinks?.some((sub) => pathname === sub.href)
+                    item.sublinks?.some(
+                      (sub) => pathname === sub.href || (sub.href.startsWith("/") && pathname.startsWith(sub.href + "/"))
+                    )
                   );
                   const isActive = isDirectActive || isChildActive;
                   const isOpen = openSection === item.label;
@@ -575,22 +588,27 @@ export function DashboardSidebar() {
 
                       {hasSublinks && item.sublinks ? (
                         <AnimatedSidebarMenuSub open={isOpen}>
-                          {item.sublinks.map((sub) => (
-                            <AnimatedSidebarMenuSubItem key={sub.href + sub.label}>
-                              <AnimatedSidebarMenuSubButton
-                                href={sub.href === "#contact" ? undefined : sub.href}
-                                isActive={pathname === sub.href}
-                                icon={sub.icon}
-                                onSelect={() => {
-                                  if (sub.href === "#contact") {
-                                    window.dispatchEvent(new CustomEvent("app-open-contact"));
-                                  }
-                                }}
-                              >
-                                {sub.label}
-                              </AnimatedSidebarMenuSubButton>
-                            </AnimatedSidebarMenuSubItem>
-                          ))}
+                          {item.sublinks.map((sub) => {
+                            const isSubActive =
+                              pathname === sub.href ||
+                              (sub.href.startsWith("/") && pathname.startsWith(sub.href + "/"));
+                            return (
+                              <AnimatedSidebarMenuSubItem key={sub.href + sub.label}>
+                                <AnimatedSidebarMenuSubButton
+                                  href={sub.href === "#contact" ? undefined : sub.href}
+                                  isActive={isSubActive}
+                                  icon={sub.icon}
+                                  onSelect={() => {
+                                    if (sub.href === "#contact") {
+                                      window.dispatchEvent(new CustomEvent("app-open-contact"));
+                                    }
+                                  }}
+                                >
+                                  {sub.label}
+                                </AnimatedSidebarMenuSubButton>
+                              </AnimatedSidebarMenuSubItem>
+                            );
+                          })}
                         </AnimatedSidebarMenuSub>
                       ) : null}
                     </AnimatedSidebarMenuItem>
