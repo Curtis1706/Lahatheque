@@ -61,14 +61,16 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
     def get_languages(self, obj):
         versions = obj.language_versions.all()
         if not versions.exists():
+            cover = getattr(obj, 'cover_url', None) or (obj.cover_image.url if (obj.cover_image and hasattr(obj.cover_image, 'url')) else None)
+            file_key = str(obj.file.name) if (obj.file and hasattr(obj.file, 'name') and obj.file.name) else ""
             return [{
                 "id": str(obj.id),
                 "language": obj.language or "fr",
                 "is_original": True,
                 "title": obj.title,
                 "summary": obj.summary,
-                "r2_key_pdf": obj.r2_key,
-                "cover_url": obj.cover_image.url if obj.cover_image else (obj.cover_url or None),
+                "r2_key_pdf": getattr(obj, 'r2_key', '') or file_key,
+                "cover_url": cover,
                 "page_count": getattr(obj, "page_count", 0) or getattr(obj, "total_pages", 0) or 0,
                 "is_paper_available": getattr(obj, "is_paper_available", False),
                 "paper_stock": getattr(obj, "stock_disponible", 0) or 0,
@@ -82,7 +84,7 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
                 "title": v.title,
                 "summary": v.summary,
                 "r2_key_pdf": v.r2_key_pdf,
-                "cover_url": v.cover_url or (obj.cover_image.url if obj.cover_image else None),
+                "cover_url": v.cover_url or getattr(obj, 'cover_url', None) or (obj.cover_image.url if (obj.cover_image and hasattr(obj.cover_image, 'url')) else None),
                 "page_count": v.page_count,
                 "is_paper_available": v.is_paper_available,
                 "paper_stock": v.paper_stock,

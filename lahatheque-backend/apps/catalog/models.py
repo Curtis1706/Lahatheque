@@ -178,6 +178,42 @@ class Ouvrage(models.Model):
                 return sorted(list(set(langs)))
         return [str(self.language)] if self.language else ['fr']
 
+    @property
+    def original_language(self) -> str:
+        if hasattr(self, '_original_language_val') and self._original_language_val:
+            return self._original_language_val
+        if self.pk and hasattr(self, 'language_versions'):
+            orig = self.language_versions.filter(is_original=True).first()
+            if orig and orig.language:
+                return str(orig.language)
+        return str(self.language or 'fr')
+
+    @original_language.setter
+    def original_language(self, value: str):
+        self._original_language_val = value
+
+    @property
+    def is_original(self) -> bool:
+        if hasattr(self, '_is_original_val'):
+            return bool(self._is_original_val)
+        return True
+
+    @is_original.setter
+    def is_original(self, value: bool):
+        self._is_original_val = bool(value)
+
+    @property
+    def r2_key(self) -> str:
+        if hasattr(self, '_r2_key_val') and self._r2_key_val:
+            return self._r2_key_val
+        if self.file:
+            return str(self.file.name)
+        return ""
+
+    @r2_key.setter
+    def r2_key(self, value: str):
+        self._r2_key_val = value
+
     def save(self, *args, **kwargs):
         if not self.slug:
             base_title = self.title or f"ouvrage-{uuid.uuid4().hex[:8]}"

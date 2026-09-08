@@ -442,9 +442,9 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             cover_url = b.cover_image.url if (b.cover_image and hasattr(b.cover_image, 'url')) else ""
 
             lang_versions = list(b.language_versions.values('id', 'language', 'is_original', 'title', 'page_count'))
-            avail_langs = [lv['language'] for lv in lang_versions]
+            avail_langs = [lv['language'] for lv in lang_versions if lv.get('language')]
             if not avail_langs:
-                avail_langs = [b.original_language or b.language or 'fr']
+                avail_langs = [getattr(b, 'original_language', None) or b.language or 'fr']
 
             results.append({
                 "id": str(b.id),
@@ -460,7 +460,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "price_paper": price_pap,
                 "price_audio": float(b.price_audio) if b.price_audio is not None else None,
                 "has_audio_version": bool(getattr(b, "has_audio_version", False)),
-                "has_audio": bool(getattr(b, "has_audio_version", False) or b.audio_tracks.exists()),
+                "has_audio": bool(getattr(b, "has_audio_version", False) or (hasattr(b, 'audio_tracks') and b.audio_tracks.exists())),
                 "uses_default_pricing": not has_custom,
                 "status": b.status,
                 "is_original": getattr(b, 'is_original', True),
@@ -470,8 +470,9 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "languages": [
                     {
                         "id": str(lv['id']),
-                        "language_code": lv['language_code'],
-                        "is_original": lv['is_original'],
+                        "language": lv.get('language') or 'fr',
+                        "language_code": lv.get('language') or 'fr',
+                        "is_original": bool(lv.get('is_original', False)),
                         "title": lv.get('title') or b.title,
                         "page_count": lv.get('page_count') or b.page_count or 0,
                     }
