@@ -115,6 +115,11 @@ class LigneCommande(models.Model):
     commande = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='lignes')
     ouvrage = models.ForeignKey('catalog.Ouvrage', on_delete=models.CASCADE, related_name='lignes_commandes')
     format_type = models.CharField(max_length=20, choices=FORMAT_CHOICES, default='digital')
+    selected_language = models.CharField(
+        max_length=10,
+        default='fr',
+        verbose_name="Langue sélectionnée (exemplaires physiques)"
+    )
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     quantity = models.IntegerField(default=1)
 

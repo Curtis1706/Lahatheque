@@ -16,7 +16,7 @@ class LigneCommandeSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = LigneCommande
-        fields = ['id', 'ouvrage', 'ouvrage_title', 'format_type', 'unit_price', 'quantity']
+        fields = ['id', 'ouvrage', 'ouvrage_title', 'format_type', 'selected_language', 'unit_price', 'quantity']
 
 class PhysicalDeliverySerializer(serializers.ModelSerializer):
     class Meta:
@@ -61,6 +61,7 @@ class OrderSerializer(serializers.ModelSerializer):
 class CreateOrderItemSerializer(serializers.Serializer):
     ouvrage_id = serializers.UUIDField()
     format_type = serializers.ChoiceField(choices=['digital', 'paper', 'audio'], default='digital')
+    selected_language = serializers.CharField(required=False, default='fr', max_length=10)
     quantity = serializers.IntegerField(default=1, min_value=1)
 
 class CreateOrderSerializer(serializers.Serializer):

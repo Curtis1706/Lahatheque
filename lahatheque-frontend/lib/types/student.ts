@@ -57,10 +57,23 @@ export interface ClientBookAccess {
   cover_color?: string;
   cover_pattern?: string;
   cover_image?: string;
-  is_recommended?: boolean;
   course_code?: string;
   course_name?: string;
+  is_recommended?: boolean;
   expiresInDays?: number;
+  available_languages?: string[];
+  languages?: Array<{
+    id: string;
+    language: string;
+    is_original: boolean;
+    title: string;
+    summary?: string;
+    cover_url?: string;
+    page_count: number;
+    is_paper_available: boolean;
+    paper_stock: number;
+    translation_status: string;
+  }>;
 }
 
 // Alias

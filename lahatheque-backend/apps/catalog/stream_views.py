@@ -6,6 +6,7 @@ Conforme aux spécifications DRM de LAHAThèque (docs/drm/01-architecture-cible.
 import logging
 import re
 from typing import Optional, Tuple
+from django.conf import settings
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from rest_framework.views import APIView
@@ -44,8 +45,10 @@ class BookStreamView(APIView):
     DEFAULT_CHUNK_SIZE = 256 * 1024
 
     def get(self, request, book_id):
-        # 1. Vérification des droits d'accès utilisateur
-        access_result = AccessService.check_user_book_access(request.user, book_id)
+        requested_lang = request.query_params.get("lang") or request.query_params.get("language")
+
+        # 1. Vérification des droits d'accès utilisateur avec support multilingue
+        access_result = AccessService.check_user_book_access(request.user, book_id, language=requested_lang)
         if not access_result.get("access_granted"):
             return JsonResponse({
                 "success": False,
@@ -110,11 +113,12 @@ class BookStreamView(APIView):
             "is_partner": False,
         }
 
-        # 4. Obtention du dérivé filigrané en cache
+        # 4. Obtention du dérivé filigrané en cache (ségrégation par langue demandée)
+        source_ref = f"{book_id}:{requested_lang}" if requested_lang else str(book_id)
         try:
             pdf_bytes, total_size = DerivedMaterializer.get_or_create_derived(
                 source_type="catalog_book",
-                source_reference=str(book_id),
+                source_reference=source_ref,
                 user_info=user_info,
                 config=effective_config
             )
@@ -329,6 +333,20 @@ class BookCoverStreamView(APIView):
                 return response
             except Exception:
                 pass
+
+        # 1.5. Si la couverture WebP existe sur R2 (bucket principal lahatheque)
+        try:
+            from apps.catalog.services.cover_generator import get_r2_s3_client
+            r2_s3 = get_r2_s3_client()
+            r2_bucket = getattr(settings, 'CLOUDFLARE_R2_BUCKET_NAME', 'lahatheque')
+            cover_key = f"covers/{str(ouvrage.id)}/cover.webp"
+            r2_obj = r2_s3.get_object(Bucket=r2_bucket, Key=cover_key)
+            img_data = r2_obj['Body'].read()
+            response = HttpResponse(img_data, content_type="image/webp")
+            response["Cache-Control"] = "public, max-age=86400"
+            return response
+        except Exception:
+            pass
 
         # 2. Sinon, extraction de la 1ère page du PDF
         try:

@@ -33,6 +33,8 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     author_discounted_digital_price = serializers.SerializerMethodField()
     author_discounted_paper_price = serializers.SerializerMethodField()
     author_discounted_audio_price = serializers.SerializerMethodField()
+    available_languages = serializers.SerializerMethodField()
+    languages = serializers.SerializerMethodField()
 
     class Meta:
         model = Ouvrage
@@ -44,6 +46,7 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             'is_paper_available', 'cover_url', 'is_owned', 'has_digital_access',
             'has_audio_version', 'price_audio', 'has_audio', 'is_audio_owned',
             'author_discounted_digital_price', 'author_discounted_paper_price', 'author_discounted_audio_price',
+            'available_languages', 'languages',
         ]
 
     def get_author_name(self, obj) -> str:
@@ -117,6 +120,30 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             from apps.reporting.pricing_service import compute_role_price
             return compute_role_price(obj, "author", user=request.user)["audio_price"]
         return None
+
+    def get_available_languages(self, obj) -> list:
+        return obj.available_languages
+
+    def get_languages(self, obj) -> list:
+        if hasattr(obj, 'language_versions'):
+            return [
+                {
+                    "id": str(lv.id),
+                    "language": lv.language,
+                    "is_original": lv.is_original,
+                    "title": lv.title,
+                    "summary": lv.summary,
+                    "r2_key_pdf": lv.r2_key_pdf,
+                    "r2_key_epub": lv.r2_key_epub,
+                    "cover_url": lv.cover_url or obj.cover_url,
+                    "page_count": lv.page_count,
+                    "is_paper_available": lv.is_paper_available,
+                    "paper_stock": lv.paper_stock,
+                    "translation_status": lv.translation_status,
+                }
+                for lv in obj.language_versions.all()
+            ]
+        return []
 
 
 class ReadingProgressSerializer(serializers.ModelSerializer):

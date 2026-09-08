@@ -270,6 +270,30 @@ Recherche et consultation des ouvrages publiés du catalogue académique.
       "sample_pages_count": 15,
       "publication_date": "2026-01-15",
       "language": "fr",
+      "is_original": true,
+      "available_languages": ["fr", "en"],
+      "languages": [
+        {
+          "id": "e1f1c5b0-7d12-4e9a-9e11-8a9d12345601",
+          "language_code": "fr",
+          "language_name": "Français",
+          "is_original": true,
+          "page_count": 348,
+          "has_pdf": true,
+          "has_sample": true,
+          "stock": 100
+        },
+        {
+          "id": "e1f1c5b0-7d12-4e9a-9e11-8a9d12345602",
+          "language_code": "en",
+          "language_name": "Anglais",
+          "is_original": false,
+          "page_count": 342,
+          "has_pdf": true,
+          "has_sample": true,
+          "stock": 50
+        }
+      ],
       "summary": "Analyse comparative des régimes constitutionnels africains...",
       "status": "published",
       "price_digital": 5000.0,
@@ -312,6 +336,30 @@ Consultation de la fiche détaillée d'un ouvrage du catalogue.
     "sample_pages_count": 15,
     "publication_date": "2026-01-15",
     "language": "fr",
+    "is_original": true,
+    "available_languages": ["fr", "en"],
+    "languages": [
+      {
+        "id": "e1f1c5b0-7d12-4e9a-9e11-8a9d12345601",
+        "language_code": "fr",
+        "language_name": "Français",
+        "is_original": true,
+        "page_count": 348,
+        "has_pdf": true,
+        "has_sample": true,
+        "stock": 100
+      },
+      {
+        "id": "e1f1c5b0-7d12-4e9a-9e11-8a9d12345602",
+        "language_code": "en",
+        "language_name": "Anglais",
+        "is_original": false,
+        "page_count": 342,
+        "has_pdf": true,
+        "has_sample": true,
+        "stock": 50
+      }
+    ],
     "summary": "Analyse comparative des régimes constitutionnels africains...",
     "status": "published",
     "price_digital": 5000.0,
@@ -378,7 +426,7 @@ Statistiques réelles de consultation pour l'institution rattachée au partenair
 ### 4.3 Moteur Liseuse & Sessions de Lecture Hébergées
 
 #### `POST /api/v1/reader/sessions/`
-Point d'entrée pour générer une session de lecture.
+Point d'entrée pour générer une session de lecture sécurisée. Supporte la sélection de langue initiale. Tout accès numérique confère automatiquement l'accès à l'ensemble des déclinaisons linguistiques disponibles de l'ouvrage sans surcoût.
 
 * **Corps JSON** :
 ```json
@@ -387,6 +435,7 @@ Point d'entrée pour générer une session de lecture.
   "external_user_id": "STU-2026-994",
   "external_user_name": "Koffi Mensah",
   "external_user_email": "koffi.mensah@univ.bj",
+  "language": "en",
   "user_ip": "154.68.24.112",
   "return_url": "https://univ.bj/cours/droit",
   "session_duration_minutes": 120,
@@ -403,16 +452,21 @@ Point d'entrée pour générer une session de lecture.
   "success": true,
   "data": {
     "session_id": "rs_a89f3c9e120d",
-    "reader_url": "https://lahatheque.com/read/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "reader_url": "https://lahatheque.com/read/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...?lang=en",
     "expires_at": "2026-09-01T16:00:00Z",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "available_languages": ["fr", "en"],
+    "selected_language": "en"
   },
   "error": null
 }
 ```
 
-#### `GET /api/v1/reader/sessions/stream/`
-Flux PDF binaire chiffré et filigrané à la volée. Appelé automatiquement par la liseuse.
+#### `GET /api/v1/reader/sessions/stream/?lang={language_code}`
+Flux PDF binaire chiffré et filigrané dynamiquement à la volée. Supporte le streaming HTTP Range (206 Partial Content).
+* **Paramètres URL** :
+  - `token` (obligatoire) : Jeton de session de lecture
+  - `lang` (optionnel) : Code ISO de la langue désirée (ex: `fr`, `en`). Si omis, le flux renvoie la langue de session ou la langue originale.
 
 #### `POST /api/v1/reader/sessions/progress/`
 Synchronisation périodique de la progression de lecture.
@@ -428,6 +482,35 @@ Synchronisation périodique de la progression de lecture.
 
 #### `POST /api/v1/reader/sessions/quiz-submit/`
 Soumission des réponses au quiz interactif avec notation instantanée.
+
+---
+
+### 4.4 Commandes d'Ouvrages Papiers & Stocks par Langue (CDC Section 9.2)
+
+Lors de la passation d'une commande d'exemplaire papier (`POST /api/bff/orders/`), la sélection de la langue est strictement obligatoire si l'ouvrage est disponible en plusieurs versions.
+
+* **Gestion des stocks** : Chaque version linguistique (`OuvrageLanguageVersion`) dispose de son propre stock physique dédié. La validation d'une commande décrémente spécifiquement le stock de la version linguistique choisie.
+* **Bordereau logistique** : Le bordereau de préparation expédition affiche obligatoirement la pastille de langue (ex: `[Édition Papier - ANGLAIS]` ou `[Édition Papier - FRANÇAIS]`) pour prévenir toute erreur de préparation en entrepôt.
+
+* **Exemple de payload de commande** :
+```json
+{
+  "items": [
+    {
+      "book_id": "e4a2c5b0-7d12-4e9a-9e11-8a9d12345678",
+      "format": "paper",
+      "selected_language": "en",
+      "quantity": 2
+    }
+  ],
+  "shipping_address": {
+    "full_name": "Amina Traoré",
+    "address_line1": "Boulevard Saint-Michel, Immeuble Laha",
+    "city": "Cotonou",
+    "country": "BJ"
+  }
+}
+```
 
 ---
 

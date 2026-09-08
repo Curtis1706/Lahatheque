@@ -441,6 +441,11 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
 
             cover_url = b.cover_image.url if (b.cover_image and hasattr(b.cover_image, 'url')) else ""
 
+            lang_versions = list(b.language_versions.values('id', 'language', 'is_original', 'title', 'page_count'))
+            avail_langs = [lv['language'] for lv in lang_versions]
+            if not avail_langs:
+                avail_langs = [b.original_language or b.language or 'fr']
+
             results.append({
                 "id": str(b.id),
                 "isbn": b.isbn or "",
@@ -458,6 +463,20 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "has_audio": bool(getattr(b, "has_audio_version", False) or b.audio_tracks.exists()),
                 "uses_default_pricing": not has_custom,
                 "status": b.status,
+                "is_original": getattr(b, 'is_original', True),
+                "original_language": getattr(b, 'original_language', 'fr'),
+                "language": b.language or 'fr',
+                "available_languages": avail_langs,
+                "languages": [
+                    {
+                        "id": str(lv['id']),
+                        "language_code": lv['language_code'],
+                        "is_original": lv['is_original'],
+                        "title": lv.get('title') or b.title,
+                        "page_count": lv.get('page_count') or b.page_count or 0,
+                    }
+                    for lv in lang_versions
+                ],
             })
 
         return Response({"success": True, "data": results, "error": None})
@@ -482,6 +501,10 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 book.title = str(data['title'])
             if 'status' in data and data['status']:
                 book.status = str(data['status'])
+            if 'is_original' in data:
+                book.is_original = bool(data['is_original'])
+            if 'original_language' in data and data['original_language']:
+                book.original_language = str(data['original_language'])[:10]
             book.save()
 
             if request.user and request.user.is_authenticated:

@@ -291,7 +291,16 @@ export async function getAdminCatalog(): Promise<AdminCatalogBook[]> {
 
 export async function updateBookPricing(
   bookId: string,
-  pricing: { price_digital?: number; price_paper?: number; price_audio?: number; has_audio_version?: boolean; title?: string; status?: string }
+  pricing: { 
+    price_digital?: number; 
+    price_paper?: number; 
+    price_audio?: number; 
+    has_audio_version?: boolean; 
+    title?: string; 
+    status?: string;
+    is_original?: boolean;
+    original_language?: string;
+  }
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   const res = await fetch(`/api/bff/admin/catalog/pricing/${bookId}/`, {
     method: 'PATCH',

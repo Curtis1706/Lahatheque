@@ -23,6 +23,10 @@ app.conf.beat_schedule = {
         'task': 'apps.reporting.tasks.task_distribute_bouquet_revenue',
         'schedule': crontab(day_of_month='2', hour='4', minute='0'),
     },
+    'sync-r2-multilingual-books': {
+        'task': 'apps.catalog.tasks.task_sync_r2_multilingual_books',
+        'schedule': crontab(minute='30', hour='*/6'),
+    },
 }
 
 @app.task(bind=True)

@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Eye,
   Headphones,
+  Languages,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClientBookAccess } from "@/lib/types/student";
@@ -35,6 +36,9 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
   const [showSampleChoice, setShowSampleChoice] = useState(false);
   const [showPaperModal, setShowPaperModal] = useState(false);
   const [isFav, setIsFav] = useState(book.is_favorite);
+  const [selectedLang, setSelectedLang] = useState<string>(
+    book.available_languages?.[0] || book.language || "fr"
+  );
 
   const hasAudio = Boolean(
     book.has_audio_version ||
@@ -69,11 +73,17 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
     bookTitle: string,
     price: number,
     address: string,
-    quantity: number
+    quantity: number,
+    language?: string
   ) => {
     try {
       await createOrder({
-        items: [{ ouvrage_id: bookId, format_type: "paper", quantity }],
+        items: [{
+          ouvrage_id: bookId,
+          format_type: "paper",
+          quantity,
+          selected_language: language || "fr"
+        }],
         type_commande: "personnel",
         mode_paiement: "especes",
         shipping_address: address,
@@ -125,6 +135,12 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gold px-2 py-0.5 rounded-md bg-gold/15 border border-gold/30">
                     <Headphones className="w-3 h-3 text-gold" />
                     Livre Audio
+                  </span>
+                )}
+                {book.available_languages && book.available_languages.length > 1 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gold px-2 py-0.5 rounded-md bg-navy/5 border border-gold/30">
+                    <Languages className="w-3 h-3 text-gold" />
+                    {book.available_languages.map((l) => l.toUpperCase()).join(" • ")}
                   </span>
                 )}
               </div>
@@ -236,8 +252,28 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
                 </button>
               )}
 
+              {book.available_languages && book.available_languages.length > 1 && (
+                <div className="inline-flex items-center rounded-xl bg-background-secondary border border-border p-0.5 text-xs">
+                  {book.available_languages.map((lang) => (
+                    <button
+                      key={lang}
+                      type="button"
+                      onClick={() => setSelectedLang(lang)}
+                      className={cn(
+                        "px-2 py-1 rounded-lg font-bold text-[10px] uppercase transition-colors",
+                        selectedLang.toLowerCase() === lang.toLowerCase()
+                          ? "bg-navy text-gold"
+                          : "text-foreground-muted hover:text-navy"
+                      )}
+                    >
+                      {lang}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <Link
-                href={`/catalog/reader/${book.id}`}
+                href={`/catalog/reader/${book.id}${selectedLang ? `?lang=${selectedLang}` : ""}`}
                 className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[36px]"
               >
                 Lire

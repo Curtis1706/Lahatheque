@@ -116,6 +116,16 @@ class AudioTrackUploadView(APIView):
         manifest_url = result.get("hls_url", "") or result.get("hls_manifest_url", "")
         track_duration = duration_seconds or result.get("duration") or 0
 
+        narration_language = request.data.get("narration_language", "fr") or "fr"
+        language_version_id = request.data.get("language_version_id")
+        language_version = None
+        if language_version_id:
+            from apps.catalog.models import OuvrageLanguageVersion
+            language_version = OuvrageLanguageVersion.objects.filter(id=language_version_id, ouvrage=ouvrage).first()
+        elif narration_language:
+            from apps.catalog.models import OuvrageLanguageVersion
+            language_version = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage, language__iexact=narration_language).first()
+
         if is_replace:
             existing_track = AudioTrack.objects.filter(ouvrage=ouvrage, chapter_number=chapter_number).first()
             if not existing_track:
@@ -124,6 +134,8 @@ class AudioTrackUploadView(APIView):
                 existing_track.stream_id = result["stream_id"]
                 existing_track.hls_manifest_url = manifest_url
                 existing_track.duration_seconds = track_duration
+                existing_track.narration_language = narration_language
+                existing_track.language_version = language_version
                 if title:
                     existing_track.title = title
                 existing_track.save()
@@ -131,6 +143,8 @@ class AudioTrackUploadView(APIView):
             else:
                 track = AudioTrack.objects.create(
                     ouvrage=ouvrage,
+                    language_version=language_version,
+                    narration_language=narration_language,
                     chapter_number=chapter_number,
                     title=title or ouvrage.title,
                     duration_seconds=track_duration,
@@ -140,6 +154,8 @@ class AudioTrackUploadView(APIView):
         else:
             track = AudioTrack.objects.create(
                 ouvrage=ouvrage,
+                language_version=language_version,
+                narration_language=narration_language,
                 chapter_number=chapter_number,
                 title=title or ouvrage.title,
                 duration_seconds=track_duration,
@@ -217,7 +233,19 @@ class AudioStreamSessionView(APIView):
         is_preview = not has_full_access
         preview_limit_seconds = 180 if is_preview else 0
 
-        tracks = AudioTrack.objects.filter(ouvrage_id=ouvrage_id).order_by("order_index", "chapter_number", "id")
+        # Filtre optionnel par langue de narration (ex: ?language=fr ou ?language=en)
+        requested_lang = request.query_params.get("language", "").strip().lower() or None
+
+        tracks_qs = AudioTrack.objects.filter(ouvrage_id=ouvrage_id)
+        if requested_lang:
+            tracks_qs = tracks_qs.filter(narration_language__iexact=requested_lang)
+            # Si aucune piste pour la langue demandée, on log mais on ne bloque pas
+            if not tracks_qs.exists():
+                logger.warning(f"[AudioStreamSession] Aucune piste {requested_lang} pour ouvrage {ouvrage_id}, retour toutes pistes.")
+                tracks_qs = AudioTrack.objects.filter(ouvrage_id=ouvrage_id)
+
+        tracks = tracks_qs.order_by("narration_language", "order_index", "chapter_number", "id")
+
         sessions = []
         public_r2_url = getattr(settings, 'CLOUDFLARE_R2_PUBLIC_URL', '') or getattr(settings, 'CLOUDFLARE_R2_PUBLIC_DOMAIN', 'https://pub-98cb000b12874eae9d7deed8a2ead6ee.r2.dev')
 
@@ -275,6 +303,7 @@ class AudioStreamSessionView(APIView):
                     "order_index": getattr(track, 'order_index', 0),
                     "track_type": getattr(track, 'track_type', 'chapter'),
                     "voice_gender": getattr(track, 'voice_gender', 'male'),
+                    "narration_language": getattr(track, 'narration_language', 'fr'),
                     "title": track.title,
                     "duration_seconds": track.duration_seconds,
                     "signed_hls_url": signed_url,
@@ -300,6 +329,7 @@ class AudioStreamSessionView(APIView):
                 "authors": authors_list,
                 "is_preview": is_preview,
                 "preview_limit_seconds": preview_limit_seconds,
+                "requested_language": requested_lang,  # langue filtrée, ou null si toutes langues
                 "tracks": sessions,
                 "expires_in": 3600,
             }
@@ -592,6 +622,11 @@ class AudioEligibleBooksView(APIView):
         books_data = []
         for b in qs[:30]:
             authors_str = ", ".join([f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]) if b.authors.exists() else (b.publisher_name or "Auteur LAHA")
+            lang_versions = list(b.language_versions.values('id', 'language', 'is_original'))
+            avail_langs = [lv['language'] for lv in lang_versions]
+            if not avail_langs:
+                avail_langs = [b.language or 'fr']
+
             books_data.append({
                 "id": str(b.id),
                 "title": b.title,
@@ -603,6 +638,15 @@ class AudioEligibleBooksView(APIView):
                 "cover_url": b.cover_url,
                 "price_xof": float(b.price_digital or 2500),
                 "has_audio_version": bool(b.has_audio_version),
+                "available_languages": avail_langs,
+                "languages": [
+                    {
+                        "id": str(lv['id']),
+                        "language_code": lv['language'],  # champ réel = `language` sur le modèle
+                        "is_original": lv['is_original'],
+                    }
+                    for lv in lang_versions
+                ],
             })
 
         return Response({"success": True, "data": books_data})
@@ -672,6 +716,16 @@ class AudioStudioSubmitView(APIView):
         # Sauvegarde des pistes Voix Homme & Voix Femme
         tracks_created = 0
 
+        narration_language = data.get("narration_language", "fr") or "fr"
+        language_version_id = data.get("language_version_id")
+        language_version = None
+        if language_version_id:
+            from apps.catalog.models import OuvrageLanguageVersion
+            language_version = OuvrageLanguageVersion.objects.filter(id=language_version_id, ouvrage=ouvrage).first()
+        elif narration_language and ouvrage:
+            from apps.catalog.models import OuvrageLanguageVersion
+            language_version = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage, language__iexact=narration_language).first()
+
         # 1. Livre complet Voix Homme
         male_full_file = request.FILES.get("male_full_track")
         if male_full_file:
@@ -679,6 +733,8 @@ class AudioStudioSubmitView(APIView):
             AudioTrack.objects.filter(ouvrage=ouvrage, voice_gender="male", track_type="full").delete()
             AudioTrack.objects.create(
                 ouvrage=ouvrage,
+                language_version=language_version,
+                narration_language=narration_language,
                 voice_gender="male",
                 track_type="full",
                 chapter_number=0,
@@ -697,6 +753,8 @@ class AudioStudioSubmitView(APIView):
             AudioTrack.objects.filter(ouvrage=ouvrage, voice_gender="female", track_type="full").delete()
             AudioTrack.objects.create(
                 ouvrage=ouvrage,
+                language_version=language_version,
+                narration_language=narration_language,
                 voice_gender="female",
                 track_type="full",
                 chapter_number=0,
@@ -717,6 +775,8 @@ class AudioStudioSubmitView(APIView):
                 chap_dur = int(data.get(f"male_chapter_{i}_duration", 0))
                 AudioTrack.objects.create(
                     ouvrage=ouvrage,
+                    language_version=language_version,
+                    narration_language=narration_language,
                     voice_gender="male",
                     track_type="chapter",
                     chapter_number=i + 1,
@@ -737,6 +797,8 @@ class AudioStudioSubmitView(APIView):
                 chap_dur = int(data.get(f"female_chapter_{i}_duration", 0))
                 AudioTrack.objects.create(
                     ouvrage=ouvrage,
+                    language_version=language_version,
+                    narration_language=narration_language,
                     voice_gender="female",
                     track_type="chapter",
                     chapter_number=i + 1,

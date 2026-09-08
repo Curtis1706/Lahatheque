@@ -11,6 +11,7 @@ import {
   AlertCircle, 
   Info, 
   Layers,
+  Languages,
   ArrowRight,
   Headphones
 } from "lucide-react";
@@ -54,6 +55,8 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
     price_eur: 3.80,
     cover_image: null,
     cover_url: "",
+    narration_language: "fr",
+    available_languages: ["fr", "en"],
     male_tracks: initialVoiceTracks,
     female_tracks: initialVoiceTracks,
   });
@@ -65,6 +68,10 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
   // Gestion du rattachement
   const handleSelectBook = (book: any) => {
     if (book) {
+      const availLangs: string[] = book.available_languages || (book.languages ? book.languages.map((l: any) => l.language_code) : ["fr", "en"]);
+      const selectedLang = availLangs.includes("fr") ? "fr" : (availLangs[0] || "fr");
+      const matchedVersion = book.languages?.find((l: any) => l.language_code === selectedLang);
+
       setFormState((prev) => ({
         ...prev,
         is_attached: true,
@@ -75,6 +82,9 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
         country: book.country || "Bénin",
         cover_url: book.cover_url || "",
         cover_image: null,
+        available_languages: availLangs,
+        narration_language: selectedLang,
+        language_version_id: matchedVersion ? matchedVersion.id : undefined,
       }));
     } else {
       setFormState((prev) => ({
@@ -82,6 +92,9 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
         is_attached: false,
         attached_book_id: "",
         cover_url: "",
+        available_languages: ["fr", "en"],
+        narration_language: "fr",
+        language_version_id: undefined,
       }));
     }
   };
@@ -141,6 +154,10 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
 
       formData.append("price_xof", String(formState.price_xof));
       formData.append("price_eur", String(formState.price_eur));
+      formData.append("narration_language", formState.narration_language);
+      if (formState.language_version_id) {
+        formData.append("language_version_id", formState.language_version_id);
+      }
 
       // Voix Homme
       if (formState.male_tracks.full_track.file) {
@@ -387,6 +404,54 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
             <span className="text-xs text-foreground-muted">
               Standard LAHA Éditions
             </span>
+          </div>
+
+          {/* Langue de narration de la version audio */}
+          <div className="p-4 rounded-2xl bg-background border border-border space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-2">
+                <Languages className="w-4 h-4 text-gold" />
+                Langue de la narration audio
+              </label>
+              {formState.is_attached && (
+                <span className="text-[10px] font-semibold text-foreground-muted">
+                  Édition du livre
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-foreground-muted">
+              Indiquez la langue de lecture pour laquelle ces pistes audio sont enregistrées.
+            </p>
+            <div className="flex items-center gap-2 pt-0.5">
+              {(formState.available_languages && formState.available_languages.length > 0
+                ? formState.available_languages
+                : ["fr", "en"]
+              ).map((lang) => {
+                const isSelected = formState.narration_language.toLowerCase() === lang.toLowerCase();
+                return (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => {
+                      setFormState((prev) => ({
+                        ...prev,
+                        narration_language: lang,
+                      }));
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? "bg-navy text-white shadow-xs"
+                        : "bg-background-secondary text-foreground-muted hover:text-navy border border-border"
+                    }`}
+                  >
+                    <span className="text-[10px] uppercase font-mono px-1 py-0.5 rounded bg-gold/20 text-gold">
+                      {lang.toUpperCase()}
+                    </span>
+                    <span>{lang.toLowerCase() === "fr" ? "Français" : "English"}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Voix Homme */}

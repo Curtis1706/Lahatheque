@@ -105,7 +105,9 @@ class CreateOrderView(APIView):
                         'error': f"Vous possédez déjà la version audio de « {ouvrage.title} »."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Vérification du stock disponible pour le format papier, agrégé sur tous les entrepôts
+            selected_language = item.get('selected_language') or 'fr'
+
+            # Vérification du stock disponible pour le format papier, agrégé sur tous les entrepôts et versions linguistiques
             if format_type == 'paper':
                 has_paper = True
 
@@ -113,6 +115,21 @@ class CreateOrderView(APIView):
                     return Response({
                         'error': f"« {ouvrage.title} » n'est pas disponible en version papier."
                     }, status=status.HTTP_400_BAD_REQUEST)
+
+                from apps.catalog.models import OuvrageLanguageVersion
+                lang_ver = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage, language__iexact=selected_language).first()
+                if lang_ver:
+                    if not lang_ver.is_paper_available:
+                        return Response({
+                            'error': f"L'édition {selected_language.upper()} de « {ouvrage.title} » n'est pas disponible en version papier."
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                    if lang_ver.paper_stock < quantity:
+                        return Response({
+                            'error': f"Stock insuffisant pour l'édition {selected_language.upper()} de « {ouvrage.title} » "
+                                     f"(disponible : {lang_ver.paper_stock}, demandé : {quantity})."
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                    lang_ver.paper_stock -= quantity
+                    lang_ver.save(update_fields=['paper_stock'])
 
                 from django.db.models import Sum, F
                 from apps.commerce.models import StockOuvrage
@@ -126,7 +143,7 @@ class CreateOrderView(APIView):
                         (s.quantite_reelle - s.quantite_reservee) for s in stocks_locked
                     )
 
-                    if total_disponible < quantity:
+                    if stocks_locked and total_disponible < quantity:
                         return Response({
                             'error': f"Stock insuffisant pour '{ouvrage.title}' en format Papier "
                                      f"(disponible : {total_disponible}, demandé : {quantity})."
@@ -157,6 +174,7 @@ class CreateOrderView(APIView):
             lignes_to_create.append({
                 'ouvrage': ouvrage,
                 'format_type': format_type,
+                'selected_language': selected_language,
                 'unit_price': unit_price,
                 'quantity': quantity
             })
@@ -185,6 +203,7 @@ class CreateOrderView(APIView):
                     commande=commande,
                     ouvrage=l['ouvrage'],
                     format_type=l['format_type'],
+                    selected_language=l.get('selected_language', 'fr'),
                     unit_price=l['unit_price'],
                     quantity=l['quantity']
                 )

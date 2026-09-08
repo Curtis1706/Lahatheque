@@ -11,7 +11,9 @@ export async function GET(
   context: any
 ) {
   const { id } = await context.params;
-  const targetUrl = `${DJANGO_API_URL}/v1/catalog/books/${id}/stream/`;
+  const lang = request.nextUrl.searchParams.get('lang');
+  const queryString = lang ? `?lang=${encodeURIComponent(lang)}` : '';
+  const targetUrl = `${DJANGO_API_URL}/v1/catalog/books/${id}/stream/${queryString}`;
 
   const accessToken = request.cookies.get('laha_access')?.value || request.cookies.get('access_token')?.value;
   const authHeader = request.headers.get('authorization');

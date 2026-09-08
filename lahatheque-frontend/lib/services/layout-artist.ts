@@ -95,6 +95,10 @@ function mapBackendToDeposit(b: any, fallbackUserId?: string): LayoutDeposit {
     audio_duration_seconds: b.audio_duration_seconds ? Number(b.audio_duration_seconds) : undefined,
     is_paper_available: Boolean(b.is_paper_available),
     pre_edition_dossier: b.pre_edition_dossier || null,
+    is_original: b.is_original ?? true,
+    original_language: b.original_language || "fr",
+    parent_ouvrage_title: b.parent_ouvrage?.title || b.parent_ouvrage_title || undefined,
+    available_languages: b.available_languages || [],
   };
 }
 
@@ -339,6 +343,9 @@ export async function createDepositWithFiles(
   extra?: { 
     pre_edition_dossier_id?: string; 
     authors_emails?: string;
+    is_original?: boolean;
+    original_language?: string;
+    parent_ouvrage_id?: string;
     onUploadProgress?: (percent: number, loaded: number, total: number) => void;
   }
 ): Promise<LayoutDeposit> {
@@ -375,6 +382,9 @@ export async function createDepositWithFiles(
       authors_names: data.metadata?.authors?.join(", ") || "",
       authors_emails: extra?.authors_emails || "",
       pre_edition_dossier_id: extra?.pre_edition_dossier_id || "",
+      is_original: extra?.is_original ?? true,
+      original_language: extra?.original_language || "fr",
+      parent_ouvrage_id: extra?.parent_ouvrage_id || "",
       isbn: data.metadata?.isbn || "",
       publisher_name: data.metadata?.publisher_name || "",
       summary: data.metadata?.summary || "",
@@ -441,6 +451,15 @@ export async function createDepositWithFiles(
   }
   if (extra?.pre_edition_dossier_id) {
     formData.append("pre_edition_dossier_id", extra.pre_edition_dossier_id);
+  }
+  if (extra?.is_original !== undefined) {
+    formData.append("is_original", String(extra.is_original));
+  }
+  if (extra?.original_language) {
+    formData.append("original_language", extra.original_language);
+  }
+  if (extra?.parent_ouvrage_id) {
+    formData.append("parent_ouvrage_id", extra.parent_ouvrage_id);
   }
   formData.append("isbn", data.metadata?.isbn || "");
   formData.append("summary", data.metadata?.summary || "");

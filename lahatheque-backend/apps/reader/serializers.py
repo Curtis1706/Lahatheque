@@ -108,6 +108,7 @@ class ReaderSessionCreateSerializer(serializers.Serializer):
 
     return_url = serializers.URLField(max_length=500, required=True)
     ttl_seconds = serializers.IntegerField(default=14400, min_value=300, max_value=86400, required=False)
+    language = serializers.CharField(max_length=10, required=False, default="", allow_blank=True)
 
     theme = ThemeConfigSerializer(required=False, default=dict)
     quiz = QuizConfigSerializer(required=False, default=dict)
@@ -202,13 +203,17 @@ class ReaderSessionDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_book(self, obj: ReaderSession) -> Dict[str, Any]:
+        selected_lang = obj.metadata.get('language', 'fr') if isinstance(obj.metadata, dict) else 'fr'
         if obj.ouvrage:
+            avail_langs = obj.ouvrage.available_languages
             return {
                 "id": str(obj.ouvrage.id),
                 "title": obj.ouvrage.titre,
                 "author": obj.ouvrage.auteur,
                 "total_pages": getattr(obj.ouvrage, 'nombre_pages', 0) or 64,
                 "has_audio": bool(obj.custom_audio_url or getattr(obj.ouvrage, 'fichier_audio', None)),
+                "available_languages": avail_langs,
+                "selected_language": selected_lang,
             }
         return {
             "id": str(obj.id),
@@ -216,6 +221,8 @@ class ReaderSessionDetailSerializer(serializers.ModelSerializer):
             "author": obj.custom_document_author or "Auteur Partenaire",
             "total_pages": (obj.metadata.get('total_pages') if isinstance(obj.metadata, dict) and obj.metadata.get('total_pages') else 1),
             "has_audio": bool(obj.custom_audio_url),
+            "available_languages": ["fr"],
+            "selected_language": selected_lang,
         }
 
     def get_progress(self, obj: ReaderSession) -> Dict[str, Any]:

@@ -54,6 +54,8 @@ export interface HostedReaderBookInfo {
   total_pages: number;
   has_audio: boolean;
   audio_url?: string | null;
+  language?: string;
+  available_languages?: string[];
 }
 
 export interface HostedReaderEndUser {

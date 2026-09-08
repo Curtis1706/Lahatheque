@@ -10,15 +10,16 @@ interface UseTextToSpeechProps {
   rawPdfData: string | ArrayBuffer | Uint8Array | null;
   effectiveImmersionMode: boolean;
   viewMode: ViewMode;
+  currentLanguage?: string;
 }
 
 const OPENAI_VOICES = [
-  { voiceURI: 'openai-nova',    name: 'Nova — Douce & Chaleureuse',    lang: 'fr-FR', emoji: '👩' },
-  { voiceURI: 'openai-shimmer', name: 'Shimmer — Expressive & Claire', lang: 'fr-FR', emoji: '🌟' },
-  { voiceURI: 'openai-alloy',   name: 'Alloy — Neutre & Professionnelle', lang: 'fr-FR', emoji: '🔊' },
-  { voiceURI: 'openai-fable',   name: 'Fable — Narrative & Captivante', lang: 'en-GB', emoji: '📖' },
-  { voiceURI: 'openai-echo',    name: 'Echo — Grave & Posée',           lang: 'fr-FR', emoji: '👨' },
-  { voiceURI: 'openai-onyx',    name: 'Onyx — Profonde & Autoritaire',  lang: 'fr-FR', emoji: '🎙️' },
+  { voiceURI: 'openai-nova',    name: 'Nova — Douce & Chaleureuse',    lang: 'fr-FR', tag: '[FR]' },
+  { voiceURI: 'openai-shimmer', name: 'Shimmer — Expressive & Claire', lang: 'fr-FR', tag: '[FR]' },
+  { voiceURI: 'openai-alloy',   name: 'Alloy — Neutre & Professionnelle', lang: 'fr-FR', tag: '[FR]' },
+  { voiceURI: 'openai-fable',   name: 'Fable — Narrative & Captivante', lang: 'en-US', tag: '[EN]' },
+  { voiceURI: 'openai-echo',    name: 'Echo — Grave & Posée',           lang: 'fr-FR', tag: '[FR]' },
+  { voiceURI: 'openai-onyx',    name: 'Onyx — Profonde & Autoritaire',  lang: 'fr-FR', tag: '[FR]' },
 ] as const;
 
 type OpenAIVoiceId = 'nova' | 'shimmer' | 'alloy' | 'fable' | 'echo' | 'onyx';
@@ -59,7 +60,7 @@ function chunkText(text: string, maxLen = 800): string[] {
   return chunks;
 }
 
-export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmersionMode, viewMode }: UseTextToSpeechProps) {
+export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmersionMode, viewMode, currentLanguage = 'fr' }: UseTextToSpeechProps) {
   const [isTtsActive, setIsTtsActive] = useState(false);
   const [isTtsPaused, setIsTtsPaused] = useState(false);
   const [ttsRate, setTtsRateState] = useState(1);
@@ -68,6 +69,15 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
   const [ttsPageText, setTtsPageText] = useState<string>("");
   const [isFetchingTtsText, setIsFetchingTtsText] = useState(false);
   const [showVoicePicker, setShowVoicePicker] = useState(false);
+
+  // Synchroniser la voix TTS avec la langue active du document
+  useEffect(() => {
+    const lang = (currentLanguage || 'fr').toLowerCase();
+    const matchingVoice = OPENAI_VOICES.find(v => v.lang.toLowerCase().startsWith(lang));
+    if (matchingVoice) {
+      setTtsVoice(makeVoice(matchingVoice));
+    }
+  }, [currentLanguage]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlsRef = useRef<string[]>([]);
@@ -112,7 +122,7 @@ export function useTextToSpeech({ book, currentPage, rawPdfData, effectiveImmers
 
     const tagVoice = (v: SpeechSynthesisVoice) => {
       const found = OPENAI_VOICES.find(o => o.voiceURI === v.voiceURI);
-      return found?.emoji || '🔊';
+      return found?.tag || '[FR]';
     };
 
     return { fr, en, others, tagVoice };

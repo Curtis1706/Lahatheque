@@ -84,6 +84,7 @@ Pour créer une session de lecture (`POST /api/v1/reader/sessions/`), vous trans
 | `external_user_name` | String | **Requis** (Nom complet) | **Requis** (Nom complet) |
 | `external_user_email` | String | **Requis** (Email) | **Requis** (Email) |
 | `user_ip` | String (IP) | **Requis** (IP du lecteur) | **Requis** (IP du lecteur) |
+| `language` | String (Code ISO: `fr`, `en`...) | *Optionnel* (Langue de lecture souhaitée ; par défaut : langue originale de l'ouvrage) | *Optionnel* (Langue de l'interface) |
 | `return_url` | String (URL) | **Requis** | **Requis** |
 | `theme` | Objet | Optionnel | Optionnel |
 | `quiz` | Objet | Optionnel | Optionnel |
@@ -135,6 +136,21 @@ Pour créer une session de lecture (`POST /api/v1/reader/sessions/`), vous trans
       "price_digital": 5000.0,
       "price_paper": 8500.0,
       "is_paper_available": true,
+      "available_languages": ["fr", "en"],
+      "languages": [
+        {
+          "id": "v-fr-01",
+          "language": "fr",
+          "is_original": true,
+          "format_type": "pdf"
+        },
+        {
+          "id": "v-en-02",
+          "language": "en",
+          "is_original": false,
+          "format_type": "pdf"
+        }
+      ],
       "cover_url": "https://lahatheque.com/api/bff/catalog/books/e4a2c5b0-7d12-4e9a-9e11-8a9d12345678/cover/"
     }
   ]

@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 export interface CartItem {
-  id: string; // bookId + '_' + format
+  id: string; // bookId + '_' + format (+ '_' + selectedLanguage)
   bookId: string;
   title: string;
   author: string;
@@ -12,6 +12,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   maxStockPaper?: number;
+  selectedLanguage?: string;
   category?: string;
   country?: string;
   level?: string;
@@ -66,7 +67,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
 
   const addItem = (newItem: Omit<CartItem, "id">, autoOpenDrawer: boolean = true) => {
-    const itemId = `${newItem.bookId}_${newItem.format}`;
+    const suffix = newItem.selectedLanguage ? `_${newItem.selectedLanguage}` : "";
+    const itemId = `${newItem.bookId}_${newItem.format}${suffix}`;
     setItems((prev) => {
       const existing = prev.find((i) => i.id === itemId);
       if (existing) {

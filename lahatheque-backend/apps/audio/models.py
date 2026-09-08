@@ -15,6 +15,20 @@ class AudioTrack(models.Model):
     ]
 
     ouvrage = models.ForeignKey('catalog.Ouvrage', on_delete=models.CASCADE, related_name='audio_tracks')
+    language_version = models.ForeignKey(
+        'catalog.OuvrageLanguageVersion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audio_tracks',
+        help_text="Version linguistique spécifique à laquelle cette piste audio est rattachée"
+    )
+    narration_language = models.CharField(
+        max_length=10,
+        default='fr',
+        blank=True,
+        help_text="Code ISO de la langue de narration (ex: fr, en)"
+    )
     voice_gender = models.CharField(max_length=10, choices=VOICE_GENDER_CHOICES, default='male')
     track_type = models.CharField(max_length=10, choices=TRACK_TYPE_CHOICES, default='chapter')
     chapter_number = models.IntegerField(default=1)

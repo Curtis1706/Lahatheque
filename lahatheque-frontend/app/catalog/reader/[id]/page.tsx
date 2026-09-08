@@ -160,6 +160,8 @@ import { useTextToSpeech } from "./hooks/useTextToSpeech"
 import { useAnnotations } from "./hooks/useAnnotations"
 import { usePdfReaderSecurity } from "./hooks/usePdfReaderSecurity"
 import { getDrmGlobalSettings } from "@/lib/services/protection"
+import { computeProportionalPage } from "@/lib/services/reader-progression"
+import { ReaderLanguageSelector } from "@/components/features/reader/reader-language-selector"
 
 const PDF_RANGE_CHUNK_SIZE = 256 * 1024
 
@@ -283,6 +285,7 @@ export default function DocumentReaderPage() {
   const [currentPage, setCurrentPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [isSampleMode, setIsSampleMode] = useState(false)
+  const [showSampleEndOverlay, setShowSampleEndOverlay] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -300,7 +303,46 @@ export default function DocumentReaderPage() {
   const isOfficeDoc = book?.file?.match(/\.(docx|doc|pptx|ppt|xlsx|xls)$/i)
   const effectiveImmersionMode = (isMobile || isAudioOnly || isOfficeDoc) ? false : isImmersionMode
 
-  const [showSampleEndOverlay, setShowSampleEndOverlay] = useState(false)
+  const [currentLanguage, setCurrentLanguage] = useState<string>("fr");
+
+  useEffect(() => {
+    if (book?.language) {
+      setCurrentLanguage(book.language);
+    }
+  }, [book]);
+
+  const availableLanguages = useMemo(() => {
+    if (!book) return ["fr"];
+    if (book.available_languages && book.available_languages.length > 0) {
+      return book.available_languages;
+    }
+    if (book.languages && book.languages.length > 0) {
+      return book.languages.map((l: any) => l.language);
+    }
+    return [book.language || "fr"];
+  }, [book]);
+
+  const handleLanguageChange = useCallback((newLang: string) => {
+    if (!book || newLang.toLowerCase() === currentLanguage.toLowerCase()) return;
+
+    const oldTotal = totalPages > 0 ? totalPages : 100;
+    const targetVer = book.languages?.find((l: any) => l.language.toLowerCase() === newLang.toLowerCase());
+    const newTotal = targetVer?.page_count || oldTotal;
+
+    const newPage1Based = computeProportionalPage(currentPage + 1, oldTotal, newTotal);
+    const newPage0Based = Math.max(0, newPage1Based - 1);
+
+    setCurrentLanguage(newLang);
+    setCurrentPage(newPage0Based);
+
+    const isSample = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'sample';
+    const newStreamUrl = isSample
+      ? `/api/bff/catalog/books/${id}/sample/?lang=${newLang}`
+      : `/api/bff/catalog/books/${id}/stream/?lang=${newLang}`;
+
+    setRawPdfData(newStreamUrl);
+    toast.success(`Langue basculée en ${newLang.toUpperCase()} (Page ${newPage1Based})`);
+  }, [book, currentLanguage, currentPage, totalPages, id]);
 
   const {
     isTtsActive,
@@ -323,7 +365,8 @@ export default function DocumentReaderPage() {
     currentPage,
     rawPdfData,
     effectiveImmersionMode,
-    viewMode
+    viewMode,
+    currentLanguage,
   })
 
   const { notes, setNotes, fetchAnnotations, handleDeleteAnnotation, handleHighlight } = useAnnotations(id as string)
@@ -902,6 +945,9 @@ export default function DocumentReaderPage() {
           onStopTts={stopTts}
           ttsRate={ttsRate}
           onToggleTtsRate={() => setTtsRate(ttsRate === 2 ? 0.75 : ttsRate + 0.25)}
+          availableLanguages={availableLanguages}
+          currentLanguage={currentLanguage}
+          onLanguageChange={handleLanguageChange}
         />
 
         {showSampleEndOverlay && (
@@ -1033,6 +1079,15 @@ export default function DocumentReaderPage() {
               <LayoutGrid size={15} />
               <span className="hidden md:inline">Mode Immersion 3D</span>
             </Button>
+          )}
+
+          {/* Sélecteur de Langue Multilingue */}
+          {availableLanguages && availableLanguages.length > 1 && (
+            <ReaderLanguageSelector
+              availableLanguages={availableLanguages}
+              currentLanguage={currentLanguage}
+              onLanguageChange={handleLanguageChange}
+            />
           )}
 
 

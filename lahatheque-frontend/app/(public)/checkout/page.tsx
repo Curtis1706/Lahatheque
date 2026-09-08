@@ -180,6 +180,7 @@ export default function CheckoutPage() {
         ouvrage_id: item.bookId,
         format_type: item.format,
         quantity: item.quantity,
+        selected_language: item.selectedLanguage || (item.format === "paper" ? "fr" : undefined),
       })),
     };
 
@@ -407,7 +408,7 @@ export default function CheckoutPage() {
                   <div className="min-w-0">
                     <p className="font-bold text-navy truncate">{item.title}</p>
                     <p className="text-[10px] text-foreground-muted">
-                      {item.format === "digital" ? "Livre numérique" : item.format === "audio" ? "Livre audio" : "Livre papier"} x {item.quantity}
+                      {item.format === "digital" ? "Livre numérique" : item.format === "audio" ? "Livre audio" : `Livre papier${item.selectedLanguage ? ` (${item.selectedLanguage.toUpperCase()})` : ""}`} x {item.quantity}
                     </p>
                   </div>
                   <span className="font-semibold text-navy shrink-0">

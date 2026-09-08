@@ -74,18 +74,73 @@ class DocumentSourceAdapter:
         return cls.get_document_bytes(source_type, source_reference, options)
 
     @classmethod
+    def _fetch_r2_object(cls, r2_key: str) -> Optional[bytes]:
+        """Télécharge un objet depuis Cloudflare R2 (bucket livres en priorité, puis bucket plateforme)."""
+        from apps.catalog.services.cover_generator import get_r2_books_client, get_r2_s3_client
+        # 1. Essai sur le bucket laha-books-production (lecture seule)
+        try:
+            s3 = get_r2_books_client()
+            bucket = getattr(settings, 'CLOUDFLARE_R2_BOOKS_BUCKET_NAME', 'laha-books-production')
+            resp = s3.get_object(Bucket=bucket, Key=r2_key)
+            return resp['Body'].read()
+        except Exception as e1:
+            logger.debug(f"Objet R2 non trouvé dans bucket livres ({r2_key}): {e1}")
+
+        # 2. Fallback sur le bucket plateforme principal (lahatheque)
+        try:
+            s3 = get_r2_s3_client()
+            bucket = getattr(settings, 'CLOUDFLARE_R2_BUCKET_NAME', 'lahatheque')
+            resp = s3.get_object(Bucket=bucket, Key=r2_key)
+            return resp['Body'].read()
+        except Exception as e2:
+            logger.error(f"Erreur téléchargement R2 pour {r2_key}: {e2}")
+        return None
+
+    @classmethod
     def _fetch_catalog_book(cls, book_id: str) -> bytes:
         """Récupère le fichier d'un ouvrage du catalogue interne LAHAThèque ou d'un dépôt éditeur/manuscrit."""
-        from apps.catalog.models import Ouvrage
+        from apps.catalog.models import Ouvrage, OuvrageLanguageVersion
+
+        clean_book_id = book_id
+        requested_lang = None
+        if ":" in clean_book_id:
+            clean_book_id, requested_lang = clean_book_id.split(":", 1)
+
+        # 1. Vérification si clean_book_id est l'identifiant d'une OuvrageLanguageVersion
+        lang_version = None
+        try:
+            lang_version = OuvrageLanguageVersion.objects.filter(id=clean_book_id).first()
+        except Exception:
+            pass
+
+        if not lang_version and requested_lang:
+            lang_version = OuvrageLanguageVersion.objects.filter(
+                ouvrage_id=clean_book_id, language__iexact=requested_lang
+            ).first()
+
+        if lang_version and lang_version.r2_key_pdf:
+            data = cls._fetch_r2_object(lang_version.r2_key_pdf)
+            if data:
+                return data
 
         ouvrage = None
         try:
-            ouvrage = Ouvrage.objects.get(id=book_id)
+            ouvrage = Ouvrage.objects.get(id=clean_book_id)
         except (Ouvrage.DoesNotExist, Exception):
-            # Fallback sur slug si book_id n'est pas un UUID valide
-            ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
+            # Fallback sur slug ou ISBN
+            ouvrage = Ouvrage.objects.filter(isbn=clean_book_id).first()
 
         if ouvrage:
+            # Si une déclinaison linguistique R2 existe pour cet ouvrage
+            if requested_lang:
+                lv = OuvrageLanguageVersion.objects.filter(
+                    ouvrage=ouvrage, language__iexact=requested_lang
+                ).first()
+                if lv and lv.r2_key_pdf:
+                    data = cls._fetch_r2_object(lv.r2_key_pdf)
+                    if data:
+                        return data
+
             # Le champ fichier est 'file' sur le modèle Ouvrage
             if ouvrage.file:
                 try:
@@ -94,8 +149,15 @@ class DocumentSourceAdapter:
                 except Exception as e:
                     logger.error(f"Erreur lecture fichier ouvrage {book_id}: {e}")
 
+            # Si le fichier local n'existe pas mais qu'une déclinaison R2 originale existe
+            orig_lv = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage).order_by('-is_original').first()
+            if orig_lv and orig_lv.r2_key_pdf:
+                data = cls._fetch_r2_object(orig_lv.r2_key_pdf)
+                if data:
+                    return data
+
             # Fallback fichier physique de test
-            fallback_path = os.path.join(settings.BASE_DIR, "media", f"{book_id}.pdf")
+            fallback_path = os.path.join(settings.BASE_DIR, "media", f"{clean_book_id}.pdf")
             if os.path.exists(fallback_path):
                 with open(fallback_path, "rb") as f:
                     return f.read()

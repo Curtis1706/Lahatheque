@@ -153,7 +153,7 @@ export function CartDrawer() {
                           ) : item.format === "digital" ? (
                             "Livre numérique"
                           ) : (
-                            "Livre broché"
+                            `Livre broché${item.selectedLanguage ? ` (${item.selectedLanguage.toUpperCase()})` : ""}`
                           )}
                         </span>
                       </p>

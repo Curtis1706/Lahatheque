@@ -79,6 +79,10 @@ export interface LayoutDeposit {
   audio_duration_seconds?: number;
   is_paper_available?: boolean;
   pre_edition_dossier?: any;
+  is_original?: boolean;
+  original_language?: string;
+  parent_ouvrage_title?: string;
+  available_languages?: string[];
 }
 
 export interface SparklinePoint {

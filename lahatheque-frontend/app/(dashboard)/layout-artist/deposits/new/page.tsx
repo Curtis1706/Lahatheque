@@ -27,6 +27,7 @@ import {
   UserCheck,
   Users,
   Loader2,
+  Languages,
 } from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
@@ -89,6 +90,11 @@ export default function NewDepositPage() {
   const [coverPreview, setCoverPreview] = useState<string | undefined>(undefined);
 
   // Metadata State
+  const [isOriginal, setIsOriginal] = useState(true);
+  const [selectedParentBook, setSelectedParentBook] = useState<any | null>(null);
+  const [allEligibleBooks, setAllEligibleBooks] = useState<any[]>([]);
+  const [parentBookSearch, setParentBookSearch] = useState("");
+  const [isParentBookOpen, setIsParentBookOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [authorsStr, setAuthorsStr] = useState("");
@@ -141,6 +147,16 @@ export default function NewDepositPage() {
     }).catch(() => {
       setLoadingAuthors(false);
     });
+
+    // Préchargement des ouvrages éligibles pour rattachement de traduction
+    fetch("/api/bff/audio/eligible-books/", { credentials: "include" })
+      .then((res) => res.json())
+      .then((json) => {
+        setAllEligibleBooks(json.data || json.results || []);
+      })
+      .catch((err) => {
+        console.warn("[Deposit Page] Impossible de charger les ouvrages éligibles:", err);
+      });
   }, []);
 
   const handleAddAuthor = (name: string) => {
@@ -354,6 +370,9 @@ export default function NewDepositPage() {
         {
           pre_edition_dossier_id: selectedPreEdition?.id,
           authors_emails: authorsEmailsStr,
+          is_original: isOriginal,
+          original_language: isOriginal ? (language.toLowerCase().startsWith("en") ? "en" : "fr") : (selectedParentBook?.language || "fr"),
+          parent_ouvrage_id: !isOriginal && selectedParentBook ? selectedParentBook.id : undefined,
         }
       );
       console.log(`[Deposit Page] Brouillon enregistré avec succès. ID: ${dep.id}`);
@@ -432,6 +451,9 @@ export default function NewDepositPage() {
         {
           pre_edition_dossier_id: selectedPreEdition?.id,
           authors_emails: authorsEmailsStr,
+          is_original: isOriginal,
+          original_language: isOriginal ? (language.toLowerCase().startsWith("en") ? "en" : "fr") : (selectedParentBook?.language || "fr"),
+          parent_ouvrage_id: !isOriginal && selectedParentBook ? selectedParentBook.id : undefined,
           onUploadProgress: (percent) => {
             setUploadProgress(percent);
             // Dès que l'upload R2 est terminé, on passe visuellement à l'étape ONIX
@@ -798,6 +820,148 @@ export default function NewDepositPage() {
                           </div>
                         )}
                       </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Type d'édition : Original vs Traduction */}
+            <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3 shadow-xs">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-2">
+                  <Languages className="w-4 h-4 text-gold" />
+                  Nature de la version déposée
+                </label>
+                <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-gold/10 text-gold">
+                  {isOriginal ? "Édition Originale" : "Déclinaison / Traduction"}
+                </span>
+              </div>
+              <p className="text-[11px] text-foreground-muted">
+                Précisez s'il s'agit d'un ouvrage original ou d'une traduction linguistique rattachée à un livre existant au catalogue.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOriginal(true);
+                    setSelectedParentBook(null);
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    isOriginal
+                      ? "bg-navy text-white shadow-xs"
+                      : "bg-background text-foreground-muted hover:text-navy border border-border"
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-gold" />
+                  <span>Ouvrage Original</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOriginal(false);
+                    if (!language.toLowerCase().startsWith("en")) {
+                      setLanguage("Anglais");
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    !isOriginal
+                      ? "bg-navy text-white shadow-xs"
+                      : "bg-background text-foreground-muted hover:text-navy border border-border"
+                  }`}
+                >
+                  <Languages className="w-3.5 h-3.5 text-gold" />
+                  <span>Traduction d'un Ouvrage Existant</span>
+                </button>
+              </div>
+
+              {/* Sélecteur de l'ouvrage parent si traduction */}
+              {!isOriginal && (
+                <div className="pt-3 border-t border-border space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy block">
+                    Sélectionner l'ouvrage original de référence *
+                  </label>
+                  {selectedParentBook ? (
+                    <div className="p-3 bg-gold/10 border border-gold/40 rounded-xl flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-12 rounded bg-background border border-border overflow-hidden shrink-0 flex items-center justify-center">
+                          {selectedParentBook.cover_url ? (
+                            <img src={selectedParentBook.cover_url} alt={selectedParentBook.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <BookOpen className="w-4 h-4 text-gold" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-navy truncate">{selectedParentBook.title}</p>
+                          <p className="text-[11px] text-foreground-muted truncate">
+                            Par {selectedParentBook.author || selectedParentBook.authors_display} • {selectedParentBook.category}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedParentBook(null)}
+                        className="text-xs text-foreground-muted hover:text-red-500 font-bold px-2 py-1 transition-colors cursor-pointer"
+                      >
+                        Changer
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Rechercher l'ouvrage original par titre ou auteur..."
+                        value={parentBookSearch}
+                        onChange={(e) => {
+                          setParentBookSearch(e.target.value);
+                          setIsParentBookOpen(true);
+                        }}
+                        onFocus={() => setIsParentBookOpen(true)}
+                        className="w-full bg-background border border-border rounded-xl pl-9 pr-4 py-2 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[40px]"
+                      />
+                      {isParentBookOpen && (
+                        <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-background border border-border rounded-2xl shadow-xl max-h-48 overflow-y-auto divide-y divide-border">
+                          {allEligibleBooks
+                            .filter((b) =>
+                              !parentBookSearch.trim() ||
+                              b.title.toLowerCase().includes(parentBookSearch.toLowerCase()) ||
+                              (b.author && b.author.toLowerCase().includes(parentBookSearch.toLowerCase()))
+                            )
+                            .slice(0, 10)
+                            .map((b) => (
+                              <button
+                                key={b.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedParentBook(b);
+                                  setIsParentBookOpen(false);
+                                  if (!title) setTitle(`${b.title} (English Edition)`);
+                                  if (!authorsStr && (b.author || b.authors_display)) {
+                                    const aName = b.author || b.authors_display;
+                                    setAuthorsStr(aName);
+                                    setSelectedAuthors([aName]);
+                                  }
+                                  if (b.category) {
+                                    setCategories([b.category]);
+                                    setGenreCategory(b.category);
+                                  }
+                                }}
+                                className="w-full p-2.5 text-left hover:bg-navy/5 flex items-center justify-between gap-2 text-xs cursor-pointer"
+                              >
+                                <div className="truncate">
+                                  <span className="font-bold text-navy block truncate">{b.title}</span>
+                                  <span className="text-[11px] text-foreground-muted block truncate">{b.author || b.authors_display}</span>
+                                </div>
+                                <span className="text-[10px] font-bold text-gold bg-gold/10 px-2 py-0.5 rounded shrink-0">
+                                  Lier
+                                </span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

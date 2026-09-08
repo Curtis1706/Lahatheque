@@ -103,6 +103,7 @@ export interface ManagerOrderItem {
   isbn: string;
   quantity: number;
   format_type?: string;
+  selected_language?: string;
   unit_price?: number;
   total_price?: number;
 }

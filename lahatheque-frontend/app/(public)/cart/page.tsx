@@ -110,7 +110,7 @@ export default function CartPage() {
                   <p className="text-xs text-foreground-muted">
                     {item.country || "Bénin"} • {item.category || "Scolaires"} •{" "}
                     <span className="font-semibold text-navy">
-                      {item.format === "digital" ? "Livre numérique" : "Livre broché"}
+                      {item.format === "digital" ? "Livre numérique" : item.format === "audio" ? "Livre audio" : `Livre broché${item.selectedLanguage ? ` (${item.selectedLanguage.toUpperCase()})` : ""}`}
                     </span>
                   </p>
 

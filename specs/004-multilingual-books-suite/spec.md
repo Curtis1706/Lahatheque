@@ -1,0 +1,181 @@
+
+# Feature Specification: Gestion et Lecture Multilingue des Livres (Original & Traductions)
+
+**Feature Branch**: `004-multilingual-books-suite`
+**Created**: 2026-09-08
+**Status**: Draft
+**Input**: User description: "les livres ajoutés là il peut avoir la version français comme il peut avoir la version anglaise et etc, genre un original et ses traductions, celui qui paie un livre a droit aux versions de langues disponibles, pour le papier il peut avoir une langue dispo comme plusieurs, vocal je ne sais pas comment ça va se passer, en fait le client a pris assez de livre numérique en anglais et autre puis avec un worker les a traduis en pdf/epub français, donc comment faire pour ajouter ces livres et tout, on doit penser à toutes les subtilités pour le projet, donc voila analyse bien et tout, dans la liseuse de lahathèque et l'api, quand un livre a deux versions ils auront dans le header des actions, un bouton pour passer à la langue suivante et ça va charger le pdf/epub traduit ? ou comment on fait , en fait pense à tout"
+
+---
+
+## Clarifications
+
+### Session 2026-09-08
+
+- Q: Le TTS doit-il être intégré dans la liseuse ou géré exclusivement par les pages audio dédiées ? → A: Option C — Suppression complète du TTS de la liseuse. L'audio est géré exclusivement par les pages dédiées existantes (ajout, gestion, lecture de livres audio). La liseuse reste un lecteur visuel uniquement.
+- Q: Architecture dual-bucket — comment séparer le bucket livres du bucket média plateforme ? → A: Option B — Deux jeux de variables d'environnement distincts : `CLOUDFLARE_R2_BOOKS_*` (Access Key, Secret, Endpoint) pour la lecture seule des PDFs/EPUBs depuis `laha-books-production`, et `CLOUDFLARE_R2_*` existants (inchangés) pour toutes les écritures plateforme (couvertures générées, audio, uploads maquettiste). Les couvertures WebP extraites de la page 1 du PDF R2 sont écrites dans le bucket principal `lahatheque` via les credentials existants.
+
+- Q: Comment identifier de manière fiable la langue originale face aux traductions dans le bucket R2 ? → A: Option A : Détection par métadonnées du fichier source (`original.pdf`, `source.epub`) ou arborescence de langue (`EN/` vs `FR/` sous `jobs/`), avec balisage `is_original = True` pour la version source et possibilité d'ajustement manuel par l'administrateur.
+- Q: Comment renseigner les métadonnées éditoriales (titre, auteur, résumé, catégories, redevances) des ouvrages ingérés depuis R2 ? → A: Réutilisation intégrale du pipeline IA d'extraction documentaire du workflow maquettiste/chef maquettiste (analyse ciblée des 15 premières pages et 15 dernières pages du document pour capturer titre, sommaire, introduction, conclusion et 4e de couverture), restriction stricte des catégories à celles existant en base de données, et application d'un taux de redevance numérique par défaut de 5% pour les droits d'auteur.
+- Q: Quel est le rôle du fichier manifest.json trouvé dans les dossiers de jobs ? → A: Le `manifest.json` est un manifeste technique d'analyse de layout et de découpage de traduction (compte de blocs texte/figure/formule, profil OCR/vectoriel), sans métadonnées éditoriales (qui sont donc extraites par l'IA à partir du document source).
+- Q: Comment garantir la rétrocompatibilité de l'API REST déjà exploitée par les SaaS partenaires (LahaLex, universités) ? → A: Stratégie additive sans rupture (zéro breaking change) : conservation de 100% des champs existants au premier niveau (`language`, `title`, `format_type`, etc.) pointant vers la version de référence, et ajout de champs non-bloquants (`available_languages`, `languages`) pour exposer les déclinaisons linguistiques.
+- Q: Quels sont les ajustements requis sur les différents dashboards et la logique métier ? → A: Admin/Catalogue (badge multilingue, bascule `is_original`), Logistique (ségrégation stricte des stocks papier par langue et mention d'édition sur les bordereaux), Finance/Auteurs (redevance unique sur la licence numérique et ventilation des ventes papier par langue), Partenaires/Universités (filtre par langue disponible sur les bouquets).
+- Q: Comment adapter l'interface de dépôt et de soumission du maquettiste et du chef maquettiste pour le multilinguisme ? → A: Le formulaire maquettiste (`/layout-artist/deposits/new`) intègre un sélecteur de type de dépôt : soit "Nouvel ouvrage (Original)" avec extraction IA documentaire classique, soit "Traduction / Déclinaison linguistique" avec sélection de l'ouvrage maître dans le catalogue, choix de la langue cible et téléversement direct de la maquette traduite (`is_original = False`). Les traductions peuvent ainsi être soit synchronisées automatiquement depuis R2 (fichiers issus des workers), soit téléversées directement par l'équipe maquettiste via le composant d'upload R2 direct lorsqu'une nouvelle traduction humaine ou externe est prête. Dans le dashboard du Chef Maquettiste (`/chief-layout/validation`), la file différencie clairement les originaux des traductions et effectue le rattachement direct à l'ouvrage parent sans créer d'ouvrage doublon.
+- Q: Comment gérer l'ajout et le rattachement de livres audio dans un contexte multilingue ? → A: Dans le studio audio (`AudioStudioForm` sous `/layout-artist/audio/new`), lors du rattachement à un ouvrage existant, le système demande la langue de la narration audio (`fr`, `en`...) et associe directement les pistes audio (voix masculine/féminine) à la déclinaison linguistique correspondante (`OuvrageLanguageVersion`). Un même ouvrage maître peut ainsi héberger une version audio française et/ou une version audio anglaise.
+- Q: Comment gérer la couverture des versions traduites et l'absence d'images de couverture dédiées dans le bucket R2 ? → A: Option A avec extraction automatisée : les déclinaisons traduites héritent de la couverture de l'ouvrage maître par défaut avec possibilité de surcharge. Pour l'ingestion des 1 600+ livres R2, le script extrait automatiquement la première page du fichier original (`original.pdf` ou couverture intégrée EPUB) pour générer et rattacher l'image de couverture (`cover_url`).
+- Q: En cas d'échec d'extraction des métadonnées par l'IA sur certains PDF atypiques ou scannés lors de l'ingestion de masse, comment l'importateur doit-il réagir ? → A: Option A (Brouillon avec alerte de révision) : l'importateur reste non-bloquant et crée l'ouvrage avec le statut `draft`, un titre technique provisoire basé sur l'identifiant du dossier R2 (`books/<uuid>/`), et le place dans la file d'examen administratif/maquettiste pour saisie manuelle.
+
+---
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - Modélisation & Importation du Catalogue Multilingue depuis Cloudflare R2 (Priority: P1) - MVP
+
+En tant qu'administrateur de LAHAThèque, je souhaite importer automatiquement les 1 600+ ouvrages du bucket Cloudflare R2 (`laha-books-production`) et modéliser chaque livre comme une entité maîtresse liée à ses versions linguistiques (original `EN` et traductions `FR` en PDF et EPUB), afin que le catalogue reflète fidèlement la richesse multilingue de la plateforme.
+
+**Why this priority**: C'est le socle architectural absolu. Sans modélisation propre liant l'original à ses traductions, aucune expérience utilisateur (achat, sélection papier, liseuse) n'est possible.
+
+**Independent Test**: Lancer la commande d'importation du bucket R2 sur un échantillon d'ouvrages, vérifier en base et sur l'API `/api/v1/catalog/books/<id>/` que l'ouvrage renvoie sa liste de déclinaisons linguistiques disponibles avec leurs fichiers respectifs (`original.pdf`, `translated.pdf`, `translated.epub`).
+
+**Acceptance Scenarios**:
+
+1. **Given** un dossier d'ouvrage dans R2 comportant `EN/original.pdf` et `FR/jobs/<job_id>/translated.pdf`, **When** le catalogue synchronise cet ouvrage, **Then** un seul `Ouvrage` est créé/mis à jour, possédant deux versions linguistiques associées (`en` marquée comme originale, et `fr` marquée comme traduction).
+2. **Given** un ouvrage comportant uniquement une version anglaise dans R2, **When** l'importateur s'exécute, **Then** l'ouvrage est enregistré avec sa langue unique `en`, prêt à recevoir ultérieurement une traduction si le worker la génère.
+
+---
+
+### User Story 2 - Achat Numérique Unifié avec Accès Toutes Langues (Priority: P1)
+
+En tant que lecteur/client sur LAHAThèque, lorsque j'achète la licence numérique d'un livre, je souhaite avoir accès automatiquement et sans surcoût à **toutes les langues disponibles** (originale et traductions actuelles ou futures) dans ma bibliothèque.
+
+**Why this priority**: Règle métier cardinale fixée par le client : un seul achat numérique confère le droit universel de lire l'ouvrage dans toutes ses langues disponibles.
+
+**Independent Test**: Acheter un livre numérique bilingue (ex: *Crosstalk between the osteogenic...*), ouvrir sa bibliothèque `/student/books`, constater que le livre apparaît sous une vignette unique avec le badge `FR • EN`, et pouvoir ouvrir la lecture dans l'une ou l'autre langue.
+
+**Acceptance Scenarios**:
+
+1. **Given** un livre proposé en anglais et en français, **When** le client achète la version numérique (PDF ou EPUB), **Then** une seule licence d'accès numérique est générée, autorisant la lecture en `FR` et en `EN`.
+2. **Given** un lecteur ayant déjà acheté un ouvrage en anglais, **When** un worker de traduction livre plus tard la version française dans R2, **Then** la version française devient automatiquement accessible au lecteur dans sa bibliothèque sans aucun paiement additionnel.
+
+---
+
+### User Story 3 - Commande Physique Papier avec Sélection de la Langue & Stocks Dédiés (Priority: P1)
+
+En tant qu'acheteur d'un exemplaire papier, je souhaite choisir la langue de l'exemplaire physique que je recevrai chez moi (ex: commander le livre papier en français ou en anglais), et être clairement informé si une langue n'est disponible qu'en numérique.
+
+**Why this priority**: Un livre papier est un objet matériel physique imprimé dans une langue précise. L'entrepôt et le bon de livraison doivent savoir exactement quel exemplaire expédier.
+
+**Independent Test**: Sur la page produit d'un livre disponible en papier en français et en anglais, sélectionner le format Papier, choisir la langue "Français", valider la commande et vérifier que le récapitulatif de commande et le stock décomptent spécifiquement l'édition papier française.
+
+**Acceptance Scenarios**:
+
+1. **Given** un livre disposant de stock papier en français (15 ex.) et en anglais (5 ex.), **When** l'acheteur sélectionne le format Papier, **Then** un sélecteur obligatoire de langue papier s'affiche, indiquant la disponibilité pour chaque langue.
+2. **Given** un livre dont seule la version anglaise est imprimée en papier alors que la version française n'existe qu'en numérique, **When** l'acheteur consulte les options papier, **Then** le choix "Français" est désactivé avec la mention « Disponible uniquement en format numérique (PDF/EPUB) ».
+3. **Given** une commande papier validée, **When** le bon de livraison est émis, **Then** la langue choisie apparaît explicitement sur la ligne de commande (ex: *« Livre Papier (Édition Française) »*).
+
+---
+
+### User Story 4 - Bascule de Langue Instantanée dans la Liseuse LAHAThèque (Priority: P2)
+
+En tant que lecteur dans la liseuse LAHAThèque (PDF et EPUB), lorsqu'un livre dispose de plusieurs langues, je souhaite disposer d'un bouton élégant dans la barre d'en-tête me permettant de basculer instantanément vers la version traduite sans perdre ma progression de lecture.
+
+**Why this priority**: Expérience de lecture de niveau international permettant l'apprentissage bilingue et la comparaison linguistique en un clic.
+
+**Independent Test**: Ouvrir un livre en anglais dans le lecteur PDF à la page 15, cliquer sur le bouton de langue `FR` dans l'en-tête, constater le rechargement fluide du fichier `translated.pdf` directement à la page correspondante (environ page 15) avec le filigrane DRM de sécurité préservé.
+
+**Acceptance Scenarios**:
+
+1. **Given** un lecteur visualisant un ouvrage multilingue, **When** il observe la barre supérieure de la liseuse, **Then** un sélecteur de langue compact (`[FR] [EN]`) avec icône Lucide `Languages` est visible.
+2. **Given** le lecteur à 35% de son livre en anglais, **When** il clique sur `FR`, **Then** la liseuse charge la version française en appliquant un ratio de progression proportionnel pour le positionner au même endroit dans le texte.
+3. **Given** un ouvrage ne disposant que d'une seule langue, **When** la liseuse s'ouvre, **Then** le sélecteur de langue est masqué pour ne pas encombrer l'interface.
+
+---
+
+### User Story 5 - Gestion Audio Multilingue via Pages Dédiées (Priority: P2)
+
+En tant que lecteur/gestionnaire audio sur LAHAThèque, je souhaite que le rattachement de narrations audio et la lecture de livres audio soient gérés exclusivement via les pages dédiées existantes (studio audio, gestion, lecteur audio), avec support de la langue de narration.
+
+**Clarification (2026-09-08)** : Le TTS natif dans la liseuse est supprimé. La liseuse est un lecteur visuel uniquement. L'audio passe exclusivement par les pages dédiées existantes.
+
+**Why this priority**: Évite la duplication du système audio et exploite l'infrastructure existante (studio audio, lecteur audio dédié) pour le support multilingue.
+
+**Independent Test**: Déposer une narration audio en français dans le studio audio rattaché à un livre bilingue (`/layout-artist/audio/new`), vérifier l'association à la `OuvrageLanguageVersion` FR, puis confirmer la lecture audio depuis la page lecteur audio dédiée.
+
+**Acceptance Scenarios**:
+
+1. **Given** un livre disposant d'une narration audio produite en studio pour une langue donnée, **When** le format audio est sélectionné sur les pages dédiées, **Then** le fichier audio officiel correspondant à cette langue est diffusé.
+2. **Given** le studio audio (`/layout-artist/audio/new`), **When** l'éditeur rattache un fichier audio à un ouvrage bilingue, **Then** le système demande la langue de narration et associe les pistes audio à la `OuvrageLanguageVersion` correspondante.
+
+---
+
+## Edge Cases
+
+- **Asymétrie des formats disponibles entre langues** : Que se passe-t-il si un ouvrage dispose d'un PDF et d'un EPUB en anglais, mais uniquement d'un EPUB en français (comme pour 4 des 12 ouvrages R2 actuels) ?
+  *Comportement* : L'interface affiche clairement les formats disponibles par langue. Si le lecteur est dans le lecteur PDF et bascule vers le français qui n'existe qu'en EPUB, la liseuse bascule automatiquement sur le lecteur EPUB adapté avec un message informatif discret (« Passage au format EPUB français »).
+- **Décalage de pagination entre version originale et traduction** : Les traductions françaises ont généralement 10 à 20% de mots en plus que l'anglais, changeant la pagination globale.
+  *Comportement* : La bascule de langue utilise un calcul proportionnel basé sur le pourcentage d'avancement (`page_courante / total_pages`) plutôt qu'un numéro de page brut, assurant au lecteur de reprendre sa lecture dans le même chapitre/section.
+- **Ajout asynchrone d'une nouvelle traduction par le worker** : Si un livre est traduit plusieurs semaines après sa mise en ligne, comment le catalogue s'actualise-t-il ?
+  *Comportement* : Le webhook ou la commande de réconciliation R2 associe la nouvelle version linguistique sans créer de doublon d'ouvrage et sans altérer les commandes passées.
+- **Filigrane DRM lors du changement de langue** :
+  *Comportement* : L'URL de streaming sécurisée générée par l'API BFF applique instantanément le filigrane dynamique de l'utilisateur (`Nom Prénom - Email - Date`) sur la nouvelle version linguistique demandée.
+
+---
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+- **FR-001**: Le modèle de données du catalogue DOIT dissocier l'entité maîtresse de l'ouvrage (`Ouvrage`) de ses déclinaisons linguistiques (`OuvrageLanguageVersion` ou équivalent), supportant l'association d'une langue originale et de multiples traductions.
+- **FR-002**: Chaque version linguistique DOIT enregistrer de manière indépendante ses clés de stockage Cloudflare R2 pour le fichier PDF (`pdf_file_url`), le fichier EPUB (`epub_file_url`), le fichier audio éventuel (`audio_file_url`), ainsi que ses indicateurs de disponibilité et de stock papier.
+- **FR-003**: Le système DOIT fournir une commande d'ingestion et de synchronisation automatisée capable de scanner le bucket Cloudflare R2 `laha-books-production`, de regrouper les fichiers sous un même identifiant d'ouvrage (`books/<uuid>/`), et de rattacher automatiquement les versions `EN` et `FR`.
+- **FR-004**: L'achat d'un droit numérique (licence de lecture d'un `Ouvrage`) DOIT conférer un droit d'accès illimité à l'ensemble des versions linguistiques numériques associées à cet ouvrage, sans surcoût.
+- **FR-005**: La fiche produit de l'ouvrage (`/catalog/[id]`) DOIT afficher les badges de langues disponibles (ex: `FR • EN`) et adapter la sélection des formats en fonction des langues réelles disponibles.
+- **FR-006**: Lors de l'achat au format Papier, l'acheteur DOIT obligatoirement sélectionner la langue de l'exemplaire physique parmi les langues disposant d'un stock papier strictement supérieur à zéro.
+- **FR-007**: La commande client et la ligne de commande (`LigneCommande`) DOIVENT mémoriser la langue spécifique choisie pour chaque article papier commandé pour garantir l'exactitude de la préparation logistique.
+- **FR-008**: La liseuse LAHAThèque (lecteur PDF et lecteur EPUB) DOIT afficher un sélecteur de langue dans sa barre d'en-tête supérieure dès lors que l'ouvrage ouvert possède au moins deux versions linguistiques disponibles.
+- **FR-009**: Le changement de langue dans la liseuse DOIT s'effectuer de manière asynchrone et fluide, sans rechargement complet de la page web, en conservant la progression relative de lecture et en maintenant la protection DRM avec filigrane dynamique.
+- **FR-010**: ~~Le module de lecture vocale DOIT configurer la synthèse vocale (Web Speech API) sur la locale linguistique de la version actuellement affichée~~ **SUPPRIMÉ** — La liseuse est un lecteur visuel uniquement. Le TTS natif dans la liseuse est retiré. L'audio est géré exclusivement par les pages dédiées existantes (studio audio, gestion, lecteur audio). Le studio audio (`/layout-artist/audio/new`) DOIT permettre la sélection de la langue de narration lors du rattachement d'un fichier audio à un ouvrage.
+- **FR-011**: L'API REST Django DOIT exposer sur les endpoints `/api/v1/catalog/books/<id>/` et `/api/v1/reader/books/<id>/` la liste ordonnée des langues disponibles avec leurs métadonnées pour permettre aux clients web et mobiles d'orchestrer la bascule.
+- **FR-012**: L'ingestion R2 DOIT appliquer l'Option A pour qualifier la langue originale : détection via les métadonnées du fichier source (`original.pdf`, `source.epub`) ou l'arborescence racine (`EN/`), assignant `is_original = True` à la version source et `is_original = False` aux versions sous `jobs/` ou dossiers de traduction (`FR/`), avec droit de modification réservé à l'administrateur.
+- **FR-013**: L'extraction des métadonnées éditoriales (titre, sous-titre, auteurs, résumé, pages, mots-clés, classification Dewey) lors de l'importation DOIT mobiliser le pipeline d'intelligence artificielle strictement identique au workflow maquettiste/chef maquettiste : extraction ciblée des 15 premières pages et des 15 dernières pages du document (via PyMuPDF / PDF.js) afin de capturer fidèlement la page de titre, le copyright, la table des matières, la conclusion et la 4e de couverture. L'affectation disciplinaire DOIT être rigoureusement contrainte aux catégories réelles existantes en base de données (`CategorieOuvrage`) sans création arbitraire.
+- **FR-014**: Pour tout ouvrage ingéré automatiquement, le système DOIT appliquer le taux de redevance auteur/éditeur par défaut de 5% sur les ventes numériques, tout en permettant au profil juriste/admin d'ajuster ou d'associer ultérieurement un contrat formel.
+- **FR-015**: L'API REST externe et partenaire (notamment `/api/v1/partner/catalog/`, `/api/v1/reader/sessions/`, `/api/v1/student/books/`) DOIT maintenir une rétrocompatibilité descendante absolue (zéro breaking change) : les champs existants (`language`, `title`, `format_type`, `file_url`, etc.) sont préservés au premier niveau et mappés sur la version originale/principale, et enrichis des nouveaux champs optionnels non-bloquants (`available_languages`, `languages`).
+- **FR-016**: Les tableaux de bord concernés DOIVENT adapter leur logique sans perturber les workflows existants :
+  - *Dashboard Admin/Catalogue* : affichage des badges multilingues (`FR • EN`), consultation/détachement des versions et gestion du toggle `is_original`.
+  - *Dashboard Logistique/Entrepôt* : affichage obligatoire de la langue physique commandée sur les bons de préparation et décompte strict des stocks physiques par langue.
+  - *Dashboard Finance/Auteurs* : calcul unifié des redevances numériques (taux par défaut de 5% ou contractuel) et ventilation par langue des ventes d'exemplaires papier.
+  - *Dashboard Universités/Partenaires* : intégration de filtres linguistiques dans le sélecteur de bouquets et le catalogue académique.
+- **FR-017**: Le formulaire de soumission de maquette (`/layout-artist/deposits/new`) DOIT offrir le choix entre le dépôt d'un nouvel ouvrage original et le dépôt d'une traduction liée à un ouvrage existant du catalogue, avec possibilité de téléverser directement le fichier traduit (`translated.pdf`, `translated.epub`) vers Cloudflare R2 s'il n'existe pas encore dans le bucket. Les métadonnées de l'ouvrage maître sont pré-remplies et la version est balisée `is_original = False`. La file du Chef Maquettiste (`/chief-layout/validation`) DOIT afficher la filiation linguistique et rattacher automatiquement la version validée sous l'ouvrage maître existant sans duplication.
+- **FR-018**: Le studio audio (`/layout-artist/audio/new`) DOIT permettre de sélectionner la langue de narration lors du rattachement d'un livre audio à un ouvrage (`fr`, `en`...), et stocker les flux audio sous la déclinaison linguistique correspondante (`OuvrageLanguageVersion`), assurant ainsi la disponibilité des narrations audio par langue.
+- **FR-019**: La gestion des couvertures DOIT supporter l'héritage par défaut de la couverture originale vers toutes les versions linguistiques, avec possibilité de téléverser une couverture traduite personnalisée. Lors de l'ingestion des ouvrages R2, le pipeline DOIT extraire automatiquement la première page du document original (`original.pdf` ou première page EPUB) pour matérialiser l'image de couverture de l'ouvrage.
+- **FR-020**: En cas d'échec ou d'incapacité d'extraction des métadonnées par l'IA lors de l'ingestion de masse, le processus DOIT rester non-bloquant : l'ouvrage est automatiquement créé avec le statut `draft` et un identifiant provisoire, puis placé dans la file d'examen manuel pour régularisation sans bloquer la synchronisation du reste du catalogue.
+
+---
+
+### Key Entities *(include if feature involves data)*
+
+- **Ouvrage (BookMaster)** : Entité maîtresse représentant l'œuvre intellectuelle. Attributs : identifiant unique (UUID R2 ou slug), titre de référence, auteur principal, éditeur, catégorie/discipline, date de publication, prix unitaire de la licence numérique, prix de base de l'exemplaire papier.
+- **OuvrageLanguageVersion (BookLanguageEdition)** : Déclinaison linguistique spécifique de l'ouvrage. Attributs : liaison ForeignKey vers `Ouvrage`, code langue ISO (`fr`, `en`, `es`, etc.), booléen `is_original` (vrai pour la version source), titre dans cette langue, chemin relatif / clé R2 (`r2_key_pdf`, `r2_key_epub`), disponibilité papier (`is_paper_available`), stock physique dédié (`paper_stock`), statut de traduction (`ready`, `in_progress`).
+- **UserBookAccess (LicenceLecteur)** : Droit de lecture concédé à un utilisateur pour un `Ouvrage`. Confère l'accès à toutes les `OuvrageLanguageVersion` rattachées à cet ouvrage.
+- **LigneCommande (OrderItem)** : Ligne d'achat spécifiant le format (`paper`, `digital`, `audio`), la quantité, et pour le papier, la langue de l'exemplaire physique commandé (`selected_language`).
+
+---
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: **100% des 1 601 ouvrages R2** et de leurs déclinaisons linguistiques existantes (originaux anglais et 12+ traductions françaises) sont indexables et rattachables en base de données sans duplication d'ouvrage.
+- **SC-002**: Un lecteur ayant acheté un livre numérique bilingue peut basculer entre la version française et la version anglaise dans la liseuse en **moins de 1,5 seconde** sur une connexion haut débit standard.
+- **SC-003**: **0% d'ambiguïté logistique** : 100% des commandes de livres physiques comportent la langue exacte commandée sur le bordereau d'expédition.
+- **SC-004**: **0 friction tarifaire** : Aucun utilisateur n'est refacturé pour accéder à une version traduite d'un ouvrage numérique dont il détient déjà la licence.
+- **SC-005**: Le filigrane DRM de sécurité est apposé avec **100% de fiabilité** sur toutes les langues consultées.
+
+---
+
+## Assumptions
+
+- Les fichiers sources hébergés sur Cloudflare R2 respectent la convention de nommage `books/<uuid>/EN/...` pour l'anglais et `books/<uuid>/FR/...` pour le français.
+- Le prix de la licence numérique d'un livre couvre l'ensemble des traductions numériques fournies par la plateforme pour ce titre.
+- Les stocks physiques de livres papier sont gérés séparément selon la langue d'impression (ex: un entrepôt peut avoir 20 exemplaires en français et 0 en anglais pour le même titre).
+- La liseuse web existante dans LAHAThèque utilise PDF.js pour les fichiers PDF et un moteur de rendu compatible EPUB (ex: epub.js ou équivalent), tous deux capables de recevoir dynamiquement une nouvelle URL de flux sans recréer le conteneur DOM.

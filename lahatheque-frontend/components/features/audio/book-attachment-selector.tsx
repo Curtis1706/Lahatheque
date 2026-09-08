@@ -14,6 +14,12 @@ interface EligibleBookItem {
   cover_url?: string;
   price_xof: number;
   has_audio_version: boolean;
+  available_languages?: string[];
+  languages?: Array<{
+    id: string;
+    language_code: string;
+    is_original: boolean;
+  }>;
 }
 
 interface BookAttachmentSelectorProps {

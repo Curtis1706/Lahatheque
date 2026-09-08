@@ -169,6 +169,15 @@ class Ouvrage(models.Model):
                 return ", ".join([f"{a.first_name} {a.last_name}".strip() for a in authors_qs.all()])
         return ""
 
+    @property
+    def available_languages(self) -> list[str]:
+        """Retourne la liste des codes langues disponibles pour cet ouvrage."""
+        if self.pk and hasattr(self, 'language_versions'):
+            langs = [str(l) for l in self.language_versions.values_list('language', flat=True)]
+            if langs:
+                return sorted(list(set(langs)))
+        return [str(self.language)] if self.language else ['fr']
+
     def save(self, *args, **kwargs):
         if not self.slug:
             base_title = self.title or f"ouvrage-{uuid.uuid4().hex[:8]}"
@@ -226,3 +235,58 @@ class MetadataONIX(models.Model):
     onix_xml = models.TextField()
     onix_version = models.CharField(max_length=10, default='3.0')
     last_imported_at = models.DateTimeField(auto_now=True)
+
+
+class OuvrageLanguageVersion(models.Model):
+    """
+    Déclinaison linguistique d'un ouvrage maître (ex: version originale anglaise, traduction française).
+    """
+    TRANSLATION_STATUS_CHOICES = [
+        ('ready', 'Prêt'),
+        ('in_progress', 'En cours de traduction'),
+        ('draft', 'Brouillon'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ouvrage = models.ForeignKey(
+        Ouvrage,
+        on_delete=models.CASCADE,
+        related_name='language_versions'
+    )
+    language = models.CharField(max_length=10, db_index=True)
+    is_original = models.BooleanField(default=False, db_index=True)
+    title = models.CharField(max_length=255)
+    summary = models.TextField(blank=True, default='')
+    r2_key_pdf = models.CharField(max_length=512, blank=True, default='')
+    r2_key_epub = models.CharField(max_length=512, blank=True, default='')
+    r2_key_audio = models.CharField(max_length=512, blank=True, default='')
+    cover_url = models.URLField(max_length=1024, blank=True, default='')
+    page_count = models.PositiveIntegerField(default=0)
+    is_paper_available = models.BooleanField(default=False)
+    paper_stock = models.PositiveIntegerField(default=0)
+    translation_status = models.CharField(
+        max_length=30,
+        choices=TRANSLATION_STATUS_CHOICES,
+        default='ready',
+        db_index=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_original', 'language']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ouvrage', 'language'],
+                name='unique_ouvrage_language_version'
+            )
+        ]
+        indexes = [
+            models.Index(fields=['ouvrage', 'language']),
+            models.Index(fields=['language', 'is_original']),
+        ]
+
+    def __str__(self) -> str:
+        role = "Original" if self.is_original else "Traduction"
+        return f"{self.title} [{self.language.upper()}] ({role})"
+

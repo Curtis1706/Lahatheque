@@ -1,18 +1,19 @@
 "use client";
 
 import React, { useState } from "react";
-import { PackageCheck, Truck, ShoppingBag } from "lucide-react";
+import { PackageCheck, Truck, ShoppingBag, Languages } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import type { ClientBookAccess } from "@/lib/types/student";
 import { BookCover } from "./book-cover";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { cn } from "@/lib/utils";
 
 interface PaperOrderModalProps {
   book: (Partial<ClientBookAccess> & { id: string; title: string; author?: string; price_paper?: number; paper_price?: number }) | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirmOrder: (bookId: string, bookTitle: string, price: number, address: string, quantity: number) => Promise<void>;
+  onConfirmOrder: (bookId: string, bookTitle: string, price: number, address: string, quantity: number, language?: string) => Promise<void>;
 }
 
 export function PaperOrderModal({
@@ -23,6 +24,7 @@ export function PaperOrderModal({
 }: PaperOrderModalProps) {
   const [shippingAddress, setShippingAddress] = useState("Campus Universitaire d'Abomey-Calavi, Résidence Hassan II, Chambre B-14, Cotonou, Bénin");
   const [quantity, setQuantity] = useState(1);
+  const [selectedLanguage, setSelectedLanguage] = useState(book?.language || "fr");
   const [submitting, setSubmitting] = useState(false);
 
   if (!book) return null;
@@ -44,7 +46,7 @@ export function PaperOrderModal({
 
     setSubmitting(true);
     try {
-      await onConfirmOrder(book.id, book.title, unitPrice, shippingAddress, quantity);
+      await onConfirmOrder(book.id, book.title, unitPrice, shippingAddress, quantity, selectedLanguage);
       toast.success(`Commande de ${quantity} exemplaire(s) enregistrée avec succès !`);
       onClose();
     } catch (err: unknown) {
@@ -81,6 +83,43 @@ export function PaperOrderModal({
             <p className="text-xs font-mono font-bold text-gold">
               Prix unitaire : {unitPrice.toLocaleString("fr-FR")} XOF
             </p>
+          </div>
+        </div>
+
+        {/* Sélection de l'Édition Linguistique */}
+        <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-2">
+          <label className="font-bold text-navy flex items-center gap-1.5">
+            <Languages className="w-4 h-4 text-gold" />
+            Édition linguistique papier souhaitée *
+          </label>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            {(book.available_languages && book.available_languages.length > 0
+              ? book.available_languages
+              : ["fr", "en"]
+            ).map((lang) => {
+              const isSelected = selectedLanguage.toLowerCase() === lang.toLowerCase();
+              const label = lang.toLowerCase() === "fr" ? "Édition Française" : lang.toLowerCase() === "en" ? "Édition Anglaise" : `Édition ${lang.toUpperCase()}`;
+              return (
+                <button
+                  key={lang}
+                  type="button"
+                  onClick={() => setSelectedLanguage(lang)}
+                  className={cn(
+                    "p-2.5 rounded-xl border text-left transition-all",
+                    isSelected
+                      ? "bg-navy text-white border-gold shadow-xs"
+                      : "bg-background text-navy border-border hover:border-gold/50"
+                  )}
+                >
+                  <p className={cn("font-bold text-xs", isSelected ? "text-gold" : "text-navy")}>
+                    [{lang.toUpperCase()}] {label}
+                  </p>
+                  <p className={cn("text-[10px]", isSelected ? "text-white/80" : "text-foreground-muted")}>
+                    Impression & reliure officielle
+                  </p>
+                </button>
+              );
+            })}
           </div>
         </div>
 

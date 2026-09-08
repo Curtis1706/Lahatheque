@@ -11,6 +11,7 @@ import {
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { PageLoader, InlineLoader } from '@/components/ui/page-loader';
+import { ReaderLanguageSelector } from '@/components/features/reader/reader-language-selector';
 
 // Types
 import { Annotation } from './flipbook/types';
@@ -82,6 +83,9 @@ interface FlipBookProps {
   hideInternalHeader?: boolean;
   hideQuiz?: boolean;
   isSample?: boolean;
+  availableLanguages?: string[];
+  currentLanguage?: string;
+  onLanguageChange?: (language: string) => void;
 }
 
 // ─── Page Component (display only) ───────────────────────────
@@ -278,6 +282,9 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
   hideQuiz = false,
   isSample = false,
   onLastPageReached,
+  availableLanguages,
+  currentLanguage,
+  onLanguageChange,
 }) => {
   const [numPages, setNumPages]     = useState<number>(0);
   const [pages, setPages]           = useState<string[]>([]);
@@ -590,6 +597,15 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             >
               {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
             </button>
+
+            {/* Sélecteur Multilingue */}
+            {availableLanguages && availableLanguages.length > 1 && onLanguageChange && (
+              <ReaderLanguageSelector
+                availableLanguages={availableLanguages}
+                currentLanguage={currentLanguage || 'fr'}
+                onLanguageChange={onLanguageChange}
+              />
+            )}
 
             {/* TTS Read Aloud (Masqué)
             {onToggleTts && (

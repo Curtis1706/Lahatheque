@@ -17,7 +17,8 @@ import {
   Laptop,
   Headphones,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Languages
 } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { formatEur } from "@/components/cart/cart-drawer";
@@ -45,6 +46,15 @@ interface BookActionButtonsProps {
     stock_disponible?: number;
     is_paper_available?: boolean;
     is_digital_available?: boolean;
+    available_languages?: string[];
+    languages?: {
+      id: string;
+      language: string;
+      is_original: boolean;
+      is_paper_available: boolean;
+      paper_stock: number;
+      title?: string;
+    }[];
   };
 }
 
@@ -52,10 +62,29 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
   const router = useRouter();
   const { addItem } = useCart();
 
+  const availableLangs = (
+    book.available_languages && book.available_languages.length > 0
+      ? book.available_languages
+      : book.languages && book.languages.length > 0
+      ? book.languages.map((l) => l.language)
+      : ["fr"]
+  );
+
+  const [paperLanguage, setPaperLanguage] = useState<string>(() => {
+    if (availableLangs.includes("fr")) return "fr";
+    return availableLangs[0] || "fr";
+  });
+
+  const currentLangVer = book.languages?.find(
+    (l) => l.language.toLowerCase() === paperLanguage.toLowerCase()
+  );
+  const stockPaper = currentLangVer != null ? currentLangVer.paper_stock : (book.stock_disponible ?? 15);
+  const isPaperAvailable = currentLangVer != null 
+    ? (currentLangVer.is_paper_available && book.is_paper_available !== false) 
+    : (book.is_paper_available !== false);
+
   const isAudioAvailable = Boolean(book.has_audio_version || book.has_audio || book.format_type === "audio");
-  const isPaperAvailable = book.is_paper_available !== false;
   const isDigitalAvailable = book.is_digital_available !== false && book.format_type !== "audio";
-  const stockPaper = book.stock_disponible ?? 15;
 
   // Sélection multiple : chaque format peut être coché indépendamment
   const [selectedPaper, setSelectedPaper] = useState<boolean>(isPaperAvailable && stockPaper > 0);
@@ -108,6 +137,7 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
         price: pricePaper,
         quantity: quantity,
         maxStockPaper: stockPaper,
+        selectedLanguage: paperLanguage,
       }, false);
     }
 
@@ -296,6 +326,55 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
             </button>
           )}
         </div>
+
+        {/* Sélecteur obligatoire de langue pour le format papier si plusieurs langues */}
+        {selectedPaper && availableLangs.length > 1 && (
+          <div className="p-3.5 rounded-2xl bg-background border border-border space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                <Languages className="w-3.5 h-3.5 text-gold" />
+                Langue de l'exemplaire papier
+              </span>
+              <span className="text-[10px] text-foreground-muted font-mono">
+                Stock dédié par langue
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {availableLangs.map((lang) => {
+                const langVer = book.languages?.find((l) => l.language.toLowerCase() === lang.toLowerCase());
+                const langStock = langVer ? langVer.paper_stock : stockPaper;
+                const isLangAvailable = langVer ? (langVer.is_paper_available && langStock > 0) : stockPaper > 0;
+                const isSelected = paperLanguage.toLowerCase() === lang.toLowerCase();
+                const label = lang.toUpperCase() === "FR" ? "Français" : lang.toUpperCase() === "EN" ? "Anglais" : lang.toUpperCase();
+
+                return (
+                  <button
+                    key={lang}
+                    type="button"
+                    disabled={!isLangAvailable}
+                    onClick={() => setPaperLanguage(lang.toLowerCase())}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all flex items-center gap-2 cursor-pointer ${
+                      isSelected
+                        ? "bg-navy text-white border-navy shadow-xs"
+                        : isLangAvailable
+                        ? "bg-background-secondary text-foreground hover:border-gold/60 border-border"
+                        : "opacity-40 cursor-not-allowed border-border bg-background"
+                    }`}
+                  >
+                    <span className="font-mono font-bold">[{lang.toUpperCase()}]</span>
+                    <span>{label}</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${
+                      isSelected ? "bg-white/20 text-white" : "bg-background text-foreground-muted border border-border"
+                    }`}>
+                      {isLangAvailable ? `Stock : ${langStock}` : "Rupture"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2. Récapitulatif du Total & Ligne d'Actions */}
@@ -306,7 +385,7 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
             <span className="text-[11px] text-foreground-muted font-semibold">Total sélectionné :</span>
             <div className="text-xs font-bold text-navy">
               {[
-                selectedPaper && `Papier (x${quantity})`,
+                selectedPaper && `Papier [${paperLanguage.toUpperCase()}] (x${quantity})`,
                 selectedDigital && "Numérique",
                 selectedAudio && "Audio",
               ].filter(Boolean).join(" + ") || "Aucun format sélectionné"}

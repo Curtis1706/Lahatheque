@@ -6,6 +6,7 @@
 export interface OrderItemPayload {
   ouvrage_id: string;
   format_type: "digital" | "paper" | "audio";
+  selected_language?: string;
   quantity: number;
 }
 

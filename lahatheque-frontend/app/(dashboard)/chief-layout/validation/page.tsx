@@ -102,11 +102,27 @@ export default function ChefValidationPage() {
             coverUrl={row.files?.cover_url}
             size="xs"
           />
-          <div className="min-w-0">
-            <p className="font-bold text-xs text-navy group-hover:underline truncate max-w-[200px]">
+          <div className="min-w-0 space-y-1">
+            <p className="font-bold text-xs text-navy group-hover:underline truncate max-w-[220px]">
               {row.metadata.title}
             </p>
-            <p className="text-[10px] text-foreground-muted font-mono mt-0.5">{row.metadata.authors.join(", ")}</p>
+            <p className="text-[10px] text-foreground-muted font-mono truncate max-w-[200px]">{row.metadata.authors.join(", ")}</p>
+            <div>
+              {row.is_original === false ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold/15 text-navy border border-gold/30">
+                  <span className="font-mono text-gold">Traduction [{(row.metadata.language || "EN").slice(0, 2).toUpperCase()}]</span>
+                  {row.parent_ouvrage_title && (
+                    <span className="text-foreground-muted truncate max-w-[130px]">
+                      • Liée à : {row.parent_ouvrage_title}
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-navy/10 text-navy border border-navy/20">
+                  <span className="font-mono text-navy">Édition originale [{(row.metadata.language || "FR").slice(0, 2).toUpperCase()}]</span>
+                </span>
+              )}
+            </div>
           </div>
         </button>
       ),

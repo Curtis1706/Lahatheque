@@ -105,6 +105,9 @@ export interface AudioStudioFormState {
   price_eur: number;
   cover_image: File | null;
   cover_url: string;
+  narration_language: string;
+  language_version_id?: string;
+  available_languages?: string[];
   male_tracks: VoiceTrackGroup;
   female_tracks: VoiceTrackGroup;
 }

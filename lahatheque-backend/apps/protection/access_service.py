@@ -39,13 +39,28 @@ class AccessService:
         return None
 
     @staticmethod
-    def check_user_book_access(user, book_id) -> dict:
+    def check_user_book_access(user, book_id, language: str | None = None) -> dict:
         """
         Vérifie si un utilisateur a le droit de consulter un ouvrage donné.
+        Accorde un accès universel à toutes les déclinaisons linguistiques de l'ouvrage maître.
         Retourne un dictionnaire avec access_granted (bool), reason (str), et stream_url.
         """
         if not user or not user.is_authenticated:
             return {"access_granted": False, "reason": "unauthenticated"}
+
+        # Résolution de l'ouvrage maître si book_id correspond à une version linguistique spécifique
+        resolved_book_id = book_id
+        resolved_lang = language
+        try:
+            from apps.catalog.models import OuvrageLanguageVersion
+            lang_version = OuvrageLanguageVersion.objects.filter(id=book_id).select_related('ouvrage').first()
+            if lang_version:
+                resolved_book_id = lang_version.ouvrage_id
+                resolved_lang = resolved_lang or lang_version.language
+        except Exception:
+            pass
+
+        stream_query = f"?lang={resolved_lang}" if resolved_lang else ""
 
         # Privilèges administratifs & réviseurs légaux / éditoriaux / maquettistes de plateforme
         platform_roles = ['admin', 'super_admin', 'chief_layout', 'layout_artist', 'legal_reviewer']
@@ -60,14 +75,16 @@ class AccessService:
             return {
                 "access_granted": True,
                 "reason": "privilege_access" if (user.is_superuser or user.is_staff) else "development_access",
-                "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
+                "resolved_book_id": str(resolved_book_id),
+                "language": resolved_lang,
+                "stream_url": f"/api/v1/catalog/books/{resolved_book_id}/stream/{stream_query}"
             }
 
         # Achat individuel payé ou achat à crédit accordé (Strictement restreint au format numérique)
         from django.db.models import Q
         has_purchased_digital = LigneCommande.objects.filter(
             commande__user=user,
-            ouvrage_id=book_id,
+            ouvrage_id=resolved_book_id,
             format_type='digital',
         ).filter(
             Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
@@ -77,7 +94,9 @@ class AccessService:
             return {
                 "access_granted": True,
                 "reason": "individual_purchase",
-                "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
+                "resolved_book_id": str(resolved_book_id),
+                "language": resolved_lang,
+                "stream_url": f"/api/v1/catalog/books/{resolved_book_id}/stream/{stream_query}"
             }
 
         # Abonnement individuel actif
@@ -90,7 +109,9 @@ class AccessService:
             return {
                 "access_granted": True,
                 "reason": "active_subscription",
-                "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
+                "resolved_book_id": str(resolved_book_id),
+                "language": resolved_lang,
+                "stream_url": f"/api/v1/catalog/books/{resolved_book_id}/stream/{stream_query}"
             }
 
         # Bouquet souscrit directement par le Client (conforme CDC section 8)

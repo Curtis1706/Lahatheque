@@ -41,4 +41,28 @@ export interface Book {
   cover_text_color?: string;
   cover_image?: string;
   cover_url?: string;
+  available_languages?: string[];
+  languages?: LanguageVersionItem[];
 }
+
+export interface LanguageVersionItem {
+  id: string;
+  language: string;
+  is_original: boolean;
+  title: string;
+  summary?: string;
+  r2_key_pdf?: string;
+  r2_key_epub?: string;
+  r2_key_audio?: string;
+  cover_url?: string;
+  page_count: number;
+  is_paper_available: boolean;
+  paper_stock: number;
+  translation_status: "ready" | "in_progress" | "draft";
+  created_at?: string;
+}
+
+export interface OuvrageLanguageVersion extends LanguageVersionItem {
+  ouvrage_id?: string;
+}
+

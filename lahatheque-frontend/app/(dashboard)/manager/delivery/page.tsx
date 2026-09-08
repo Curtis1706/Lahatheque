@@ -96,6 +96,11 @@ export default function DeliveryToShipPage() {
                 <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold bg-gold/15 text-navy">
                   {totalEx} ex.
                 </span>
+                {firstItem.selected_language && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-navy text-gold">
+                    Édition {firstItem.selected_language.toUpperCase()}
+                  </span>
+                )}
                 {row.items.length > 1 && (
                   <span className="text-[10px] text-foreground-muted">
                     +{row.items.length - 1} autre{row.items.length > 2 ? "s" : ""}

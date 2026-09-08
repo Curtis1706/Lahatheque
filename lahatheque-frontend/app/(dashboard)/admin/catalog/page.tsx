@@ -21,6 +21,7 @@ import {
   PlusCircle,
   Headphones,
   RefreshCw,
+  Languages,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -43,6 +44,8 @@ export default function AdminCatalogPage() {
   const [editPriceAudio, setEditPriceAudio] = useState<number>(3500);
   const [editHasAudioVersion, setEditHasAudioVersion] = useState<boolean>(false);
   const [editStatus, setEditStatus] = useState<AdminCatalogBook["status"]>("published");
+  const [editIsOriginal, setEditIsOriginal] = useState<boolean>(true);
+  const [editOriginalLanguage, setEditOriginalLanguage] = useState<string>("fr");
   const [saving, setSaving] = useState(false);
 
   // State pour la gestion audio
@@ -74,6 +77,8 @@ export default function AdminCatalogPage() {
     setEditPriceAudio(book.price_audio || 3500);
     setEditHasAudioVersion(Boolean(book.has_audio_version || book.has_audio));
     setEditStatus(book.status);
+    setEditIsOriginal(book.is_original !== false);
+    setEditOriginalLanguage(book.original_language || book.language || "fr");
   };
 
   const handleSaveBook = async (e: React.FormEvent) => {
@@ -89,6 +94,8 @@ export default function AdminCatalogPage() {
         price_audio: editHasAudioVersion ? editPriceAudio : undefined,
         has_audio_version: editHasAudioVersion,
         status: editStatus,
+        is_original: editIsOriginal,
+        original_language: editOriginalLanguage,
       });
 
       toast.success("Ouvrage et tarifs mis à jour avec succès !");
@@ -104,6 +111,8 @@ export default function AdminCatalogPage() {
                 has_audio_version: editHasAudioVersion,
                 has_audio: editHasAudioVersion || b.has_audio,
                 status: editStatus,
+                is_original: editIsOriginal,
+                original_language: editOriginalLanguage,
               }
             : b
         )
@@ -157,9 +166,21 @@ export default function AdminCatalogPage() {
             coverUrl={row.cover_image || row.cover_url}
             size="xs"
           />
-          <div className="min-w-0 max-w-xs">
+          <div className="min-w-0 max-w-xs space-y-0.5">
             <p className="font-semibold text-xs text-foreground truncate">{row.title}</p>
             <p className="text-[11px] font-mono text-foreground-muted">ISBN: {row.isbn || "—"}</p>
+            <div className="flex flex-wrap items-center gap-1 pt-0.5">
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                row.is_original !== false ? "bg-navy/10 text-navy" : "bg-gold/20 text-gold"
+              }`}>
+                {row.is_original !== false ? "Original" : "Traduction"} [{((row.original_language || row.language || "fr") as string).slice(0, 2).toUpperCase()}]
+              </span>
+              {row.available_languages && row.available_languages.length > 1 && (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-background-secondary text-foreground-muted border border-border">
+                  {row.available_languages.map((l: string) => l.toUpperCase()).join(" • ")}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       ),
@@ -525,6 +546,42 @@ export default function AdminCatalogPage() {
                     />
                   </div>
                 )}
+              </div>
+
+              {/* Déclinaison linguistique & Édition Originale */}
+              <div className="p-3.5 rounded-2xl bg-background-secondary border border-border space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-navy flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editIsOriginal}
+                      onChange={(e) => setEditIsOriginal(e.target.checked)}
+                      className="w-4 h-4 rounded border-border text-navy focus:ring-navy cursor-pointer"
+                    />
+                    <span>Édition Originale de Référence</span>
+                  </label>
+                  <span className="text-[10px] text-gold font-bold uppercase">
+                    {editIsOriginal ? "Original" : "Traduction"}
+                  </span>
+                </div>
+
+                <div className="space-y-1 pt-1">
+                  <label className="text-[11px] font-bold text-navy uppercase tracking-wider flex items-center gap-1">
+                    <Languages className="w-3.5 h-3.5 text-gold" />
+                    Langue du Texte
+                  </label>
+                  <select
+                    value={editOriginalLanguage}
+                    onChange={(e) => setEditOriginalLanguage(e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground focus:ring-2 focus:ring-navy"
+                  >
+                    <option value="fr">Français (FR)</option>
+                    <option value="en">Anglais (EN)</option>
+                    <option value="es">Espagnol (ES)</option>
+                    <option value="pt">Portugais (PT)</option>
+                    <option value="de">Allemand (DE)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-1.5">

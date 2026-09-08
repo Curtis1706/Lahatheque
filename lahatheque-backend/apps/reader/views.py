@@ -118,6 +118,16 @@ class ReaderSessionViewSet(ViewSet):
             if user_ip:
                 session_metadata['user_ip'] = user_ip
 
+            # Support de la langue de lecture demandée
+            req_lang = (
+                validated_data.get('language')
+                or request.data.get('language')
+                or request.query_params.get('language')
+                or ''
+            ).strip().lower()
+            if req_lang:
+                session_metadata['language'] = req_lang
+
             # 2. Création de la session
             session = ReaderSession.objects.create(
                 partner=partner,
@@ -144,9 +154,11 @@ class ReaderSessionViewSet(ViewSet):
             session.token_hash = token_hash
             session.save()
 
-        # 4. Construction de l'URL publique de lecture
+        # 4. Construction de l'URL publique de lecture (avec paramètre de langue si spécifié)
         frontend_base = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
         reader_url = f"{frontend_base.rstrip('/')}/read/{token_str}"
+        if req_lang:
+            reader_url = f"{reader_url}?lang={req_lang}"
 
         # 5. Déclenchement webhook asynchrone reader.session.opened (non bloquant)
         try:
@@ -159,6 +171,7 @@ class ReaderSessionViewSet(ViewSet):
                     "external_user_ref": end_user.external_ref,
                     "book_id": str(session.ouvrage_id) if session.ouvrage_id else None,
                     "document_title": session.ouvrage.titre if session.ouvrage else session.custom_document_title,
+                    "language": req_lang or (session.ouvrage.original_language if session.ouvrage else "fr"),
                     "expires_at": expires_at.isoformat()
                 }
             )
@@ -171,12 +184,18 @@ class ReaderSessionViewSet(ViewSet):
             else (session.metadata.get('total_pages') if isinstance(session.metadata, dict) and session.metadata.get('total_pages') else 1)
         )
 
+        avail_langs = []
+        if session.ouvrage:
+            avail_langs = session.ouvrage.available_languages
+
         book_info = {
             "id": str(session.ouvrage_id) if session.ouvrage_id else str(session.id),
             "title": session.ouvrage.titre if session.ouvrage else session.custom_document_title,
             "author_name": session.ouvrage.auteur if session.ouvrage else session.custom_document_author,
             "total_pages": total_pages_val,
             "has_audio": bool(session.custom_audio_url or getattr(session.ouvrage, 'fichier_audio', None)),
+            "available_languages": avail_langs,
+            "selected_language": req_lang or (avail_langs[0] if avail_langs else "fr"),
         }
 
         return standard_response(

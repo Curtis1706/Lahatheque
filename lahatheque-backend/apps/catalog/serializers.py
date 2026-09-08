@@ -48,10 +48,48 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
     has_audio = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     created_by_id = serializers.SerializerMethodField()
+    available_languages = serializers.SerializerMethodField()
+    languages = serializers.SerializerMethodField()
 
     class Meta:
         model = Ouvrage
         fields = '__all__'
+
+    def get_available_languages(self, obj):
+        return obj.available_languages
+
+    def get_languages(self, obj):
+        versions = obj.language_versions.all()
+        if not versions.exists():
+            return [{
+                "id": str(obj.id),
+                "language": obj.language or "fr",
+                "is_original": True,
+                "title": obj.title,
+                "summary": obj.summary,
+                "r2_key_pdf": obj.r2_key,
+                "cover_url": obj.cover_image.url if obj.cover_image else (obj.cover_url or None),
+                "page_count": getattr(obj, "page_count", 0) or getattr(obj, "total_pages", 0) or 0,
+                "is_paper_available": getattr(obj, "is_paper_available", False),
+                "paper_stock": getattr(obj, "stock_disponible", 0) or 0,
+                "translation_status": "ready",
+            }]
+        return [
+            {
+                "id": str(v.id),
+                "language": v.language,
+                "is_original": v.is_original,
+                "title": v.title,
+                "summary": v.summary,
+                "r2_key_pdf": v.r2_key_pdf,
+                "cover_url": v.cover_url or (obj.cover_image.url if obj.cover_image else None),
+                "page_count": v.page_count,
+                "is_paper_available": v.is_paper_available,
+                "paper_stock": v.paper_stock,
+                "translation_status": v.translation_status,
+            }
+            for v in versions
+        ]
 
     def get_created_by_name(self, obj):
         if obj.created_by:
@@ -116,6 +154,7 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
 
 # Alias pour rétrocompatibilité
 OuvrageSerializer = OuvrageReadSerializer
+OuvrageBasicSerializer = OuvrageReadSerializer
 
 
 class OuvrageCreateSerializer(serializers.Serializer):
@@ -169,6 +208,11 @@ class OuvrageCreateSerializer(serializers.Serializer):
     file_key = serializers.CharField(required=False, allow_blank=True, default='')
     cover_key = serializers.CharField(required=False, allow_blank=True, default='')
     file_size_bytes = serializers.IntegerField(required=False, default=0)
+
+    # Multilingue & Déclinaisons
+    is_original = serializers.BooleanField(required=False, default=True)
+    original_language = serializers.CharField(max_length=10, required=False, default='fr')
+    parent_ouvrage_id = serializers.CharField(required=False, allow_blank=True, default='')
 
     # Fichiers (optionnels — fallback multipart)
     book_file = serializers.FileField(required=False, allow_null=True)
@@ -243,6 +287,11 @@ class OuvrageCreateSerializer(serializers.Serializer):
                             Publisher.objects.filter(name__iexact=publisher_name.strip()).first() or \
                             Publisher.objects.filter(company_name__icontains=publisher_name.strip()).first()
         resolved_publisher_name = publisher_name.strip() if publisher_name else (publisher_obj.company_name if publisher_obj else "")
+
+        # Données multilingues
+        is_original_val = validated_data.pop('is_original', True)
+        orig_lang = validated_data.pop('original_language', 'fr')
+        parent_id = validated_data.pop('parent_ouvrage_id', '')
 
         # Extraction des identifiants et données d'auteurs
         author_id = validated_data.pop('author_id', '')
@@ -388,7 +437,39 @@ class OuvrageCreateSerializer(serializers.Serializer):
         elif cover_image:
             ouvrage.cover_image = cover_image
 
+        ouvrage.is_original = bool(is_original_val)
+        if orig_lang:
+            ouvrage.original_language = orig_lang[:10]
+
         ouvrage.save()
+
+        # Synchronisation de la déclinaison linguistique (OuvrageLanguageVersion)
+        from apps.catalog.models import OuvrageLanguageVersion
+        target_parent = None
+        if parent_id and not is_original_val:
+            target_parent = Ouvrage.objects.filter(id=parent_id).first()
+
+        target_ouvrage = target_parent or ouvrage
+        target_lang = (ouvrage.language or orig_lang or 'fr').strip().lower()
+        if target_lang.startswith('fr'):
+            target_lang = 'fr'
+        elif target_lang.startswith('en'):
+            target_lang = 'en'
+
+        try:
+            OuvrageLanguageVersion.objects.update_or_create(
+                ouvrage=target_ouvrage,
+                language_code=target_lang,
+                defaults={
+                    'title': ouvrage.title,
+                    'file': ouvrage.file,
+                    'is_original': bool(is_original_val),
+                    'page_count': ouvrage.page_count or 0,
+                    'is_active': True,
+                }
+            )
+        except Exception as lang_ver_err:
+            logger.warning(f"Erreur enregistrement OuvrageLanguageVersion pour {ouvrage.id}: {lang_ver_err}")
 
         # Réinitialiser les auteurs si mise à jour
         if existing_ouvrage and (authors_names or author_user_id or author_id):

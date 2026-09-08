@@ -57,6 +57,8 @@ import {
 } from "@/lib/services/protection";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { computeProportionalPage } from "@/lib/services/reader-progression";
+import { ReaderLanguageSelector } from "@/components/features/reader/reader-language-selector";
 
 // French localization for PDF Viewer
 const fr_FR_Locale = {
@@ -101,6 +103,52 @@ export default function HostedReaderPage() {
   const [totalPages, setTotalPages] = useState(28);
   const [isExiting, setIsExiting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState<string>("fr");
+
+  useEffect(() => {
+    if (session?.book?.language) {
+      setCurrentLanguage(session.book.language);
+    }
+  }, [session]);
+
+  const availableLanguages = useMemo(() => {
+    if (!session?.book) return ["fr"];
+    if (session.book.available_languages && session.book.available_languages.length > 0) {
+      return session.book.available_languages;
+    }
+    return [session.book.language || "fr"];
+  }, [session]);
+
+  const handleLanguageChange = useCallback(async (newLang: string) => {
+    if (newLang.toLowerCase() === currentLanguage.toLowerCase()) return;
+
+    const oldTotal = totalPages > 0 ? totalPages : 100;
+    const newPage1Based = computeProportionalPage(currentPage, oldTotal, oldTotal);
+
+    setCurrentLanguage(newLang);
+    setCurrentPage(newPage1Based);
+
+    try {
+      const targetUrl = `/api/bff/reader/sessions/stream/?lang=${newLang}`;
+      const streamRes = await fetch(targetUrl, {
+        headers: {
+          Accept: "application/pdf",
+          "X-Reader-Token": token,
+        },
+        credentials: "include",
+      });
+      if (streamRes.ok) {
+        const blob = await streamRes.blob();
+        if (blob && blob.size > 100) {
+          const blobUrl = URL.createObjectURL(blob);
+          setRawPdfData(blobUrl);
+          toast.success(`Langue basculée en ${newLang.toUpperCase()} (Page ${newPage1Based})`);
+        }
+      }
+    } catch (err) {
+      console.warn("Erreur lors de la bascule de langue:", err);
+    }
+  }, [currentLanguage, currentPage, totalPages, token]);
 
   // Annotations & Notes State
   const [notes, setNotes] = useState<any[]>([]);
@@ -272,7 +320,7 @@ export default function HostedReaderPage() {
       const utterance = new SpeechSynthesisUtterance(
         `Lecture du document : ${docTitle}. Page ${currentPage}.`
       );
-      utterance.lang = "fr-FR";
+      utterance.lang = currentLanguage.toLowerCase().startsWith("en") ? "en-US" : "fr-FR";
       utterance.rate = 1.0;
       utterance.onend = () => setIsTtsActive(false);
       utterance.onerror = () => setIsTtsActive(false);
@@ -690,6 +738,15 @@ export default function HostedReaderPage() {
 
 
 
+          {/* Sélecteur de Langue Multilingue */}
+          {availableLanguages && availableLanguages.length > 1 && (
+            <ReaderLanguageSelector
+              availableLanguages={availableLanguages}
+              currentLanguage={currentLanguage}
+              onLanguageChange={handleLanguageChange}
+            />
+          )}
+
           {/* Commutateur Bimodal (3D Immersion vs Normal) */}
           <div className="flex items-center bg-black/30 p-0.5 rounded-lg border border-white/10">
             <button
@@ -748,6 +805,9 @@ export default function HostedReaderPage() {
             onDocumentLoad={handleDocumentLoad}
             onPageChange={handlePageChange}
             onClose={handleExit}
+            availableLanguages={availableLanguages}
+            currentLanguage={currentLanguage}
+            onLanguageChange={handleLanguageChange}
           />
         ) : (
           /* Mode Normal Vertical avec @react-pdf-viewer (Boîte à outils complète + 4 onglets latéraux) */

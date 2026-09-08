@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: API Multilingue Catalogue & Liseuse LAHAThèque
+  version: 1.0.0
+  description: Spécification des contrats d'API enrichis pour le catalogue multilingue, les sessions liseuse et les partenaires SaaS.
+
+paths:
+  /api/v1/partner/catalog/:
+    get:
+      summary: Consultation du catalogue partenaire (Rétrocompatible)
+      security:
+        - OAuth2Bearer: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: discipline
+          in: query
+          schema:
+            type: string
+        - name: language
+          in: query
+          description: Filtre facultatif sur la langue disponible
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Liste des ouvrages avec métadonnées multilingues additives
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  count:
+                    type: integer
+                    example: 1
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OuvrageMultilingualPayload'
+
+  /api/v1/reader/sessions/:
+    post:
+      summary: Création d'une session de lecture sécurisée
+      security:
+        - OAuth2Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - external_user_id
+                - external_user_name
+                - external_user_email
+                - user_ip
+                - return_url
+              properties:
+                book_id:
+                  type: string
+                  format: uuid
+                document_url:
+                  type: string
+                  format: uri
+                language:
+                  type: string
+                  example: fr
+                  description: Langue désirée pour la session (par défaut langue originale de l'ouvrage)
+                external_user_id:
+                  type: string
+                external_user_name:
+                  type: string
+                external_user_email:
+                  type: string
+                  format: email
+                user_ip:
+                  type: string
+                return_url:
+                  type: string
+                  format: uri
+      responses:
+        '201':
+          description: Session créée avec URL de la liseuse
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      session_id:
+                        type: string
+                        format: uuid
+                      reader_url:
+                        type: string
+                        format: uri
+                      active_language:
+                        type: string
+                        example: fr
+                      available_languages:
+                        type: array
+                        items:
+                          type: string
+                        example: ["fr", "en"]
+
+  /api/v1/reader/books/{id}/stream/:
+    get:
+      summary: Streaming protégé avec filigrane dynamique pour une langue donnée
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+            example: fr
+      responses:
+        '206':
+          description: Flux binaire PDF/EPUB fragmenté avec filigrane dynamique
+        '200':
+          description: Flux binaire complet
+
+components:
+  securitySchemes:
+    OAuth2Bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LanguageVersionItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        language:
+          type: string
+          example: fr
+        is_original:
+          type: boolean
+          example: false
+        title:
+          type: string
+          example: "Titre en Français"
+        format_type:
+          type: string
+          example: "pdf"
+        page_count:
+          type: integer
+          example: 160
+        is_paper_available:
+          type: boolean
+          example: true
+
+    OuvrageMultilingualPayload:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        isbn:
+          type: string
+          example: "978-99919-123-4-5"
+        title:
+          type: string
+          example: "Original Book Title"
+        language:
+          type: string
+          example: "en"
+          description: Langue originale de référence (champ historique préservé)
+        price_digital:
+          type: number
+          example: 5000.0
+        price_paper:
+          type: number
+          example: 8500.0
+        is_paper_available:
+          type: boolean
+          example: true
+        cover_url:
+          type: string
+          format: uri
+        available_languages:
+          type: array
+          items:
+            type: string
+          example: ["en", "fr"]
+        languages:
+          type: array
+          items:
+            $ref: '#/components/schemas/LanguageVersionItem'

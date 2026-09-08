@@ -212,6 +212,16 @@ export interface AdminCatalogBook {
   drm_active?: boolean;
   total_reads?: number;
   total_revenue?: number;
+  is_original?: boolean;
+  original_language?: string;
+  language?: string;
+  available_languages?: string[];
+  languages?: Array<{
+    id: string;
+    language_code: string;
+    is_original: boolean;
+    page_count?: number;
+  }>;
 }
 
 export interface AdminSale {
