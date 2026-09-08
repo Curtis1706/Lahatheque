@@ -38,6 +38,7 @@ import {
   type PreEditionSearchResult,
   type AuthorSearchResult 
 } from "@/lib/services/layout-artist";
+import { uploadAudioTrack } from "@/lib/services/audio";
 import { extractBookMetadataWithAi, type AiBookAnalysisResult } from "@/lib/services/ai";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { cn } from "@/lib/utils";
@@ -63,7 +64,7 @@ export default function ChiefLayoutDepositPage() {
 
   // Transmission Modal State
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
-  const [submissionStatus, setSubmissionStatus] = useState<"idle" | "uploading" | "processing" | "registering" | "success" | "error">("idle");
+  const [submissionStatus, setSubmissionStatus] = useState<"idle" | "uploading" | "processing" | "registering" | "audio_uploading" | "success" | "error">("idle");
   const [submissionError, setSubmissionError] = useState<string | undefined>(undefined);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
 
@@ -71,6 +72,10 @@ export default function ChiefLayoutDepositPage() {
   const [bookFile, setBookFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | undefined>(undefined);
+
+  // Audio State (Fiche T3)
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [priceAudio, setPriceAudio] = useState<string>("");
 
   // Metadata State
   const [title, setTitle] = useState("");
@@ -316,7 +321,8 @@ export default function ChiefLayoutDepositPage() {
   const handleSaveDraft = async () => {
     setSaving(true);
     try {
-      await createDepositWithFiles(
+      const parsedAudioPrice = priceAudio && !isNaN(Number(priceAudio)) ? Number(priceAudio) : undefined;
+      const deposit = await createDepositWithFiles(
         {
           metadata: {
             title: title || "Nouveau Dépôt Chef",
@@ -346,6 +352,8 @@ export default function ChiefLayoutDepositPage() {
           status: "draft",
           default_price: priceDigital,
           admin_price: isPaperAvailable ? pricePaper : 0,
+          price_audio: parsedAudioPrice,
+          has_audio_version: Boolean(audioFile),
           is_paper_available: isPaperAvailable,
         },
         bookFile,
@@ -353,8 +361,18 @@ export default function ChiefLayoutDepositPage() {
         {
           pre_edition_dossier_id: selectedPreEdition?.id,
           authors_emails: authorsEmailsStr,
+          price_audio: parsedAudioPrice,
         }
       );
+
+      if (audioFile && deposit?.id) {
+        try {
+          await uploadAudioTrack(deposit.id, audioFile, title || "Livre Audio", undefined, false, parsedAudioPrice);
+        } catch (audioErr) {
+          console.warn("[Chief Deposit] Échec upload audio brouillon:", audioErr);
+        }
+      }
+
       toast.success("Brouillon sauvegardé avec succès.");
       router.push("/chief-layout");
     } catch (err: unknown) {
@@ -377,12 +395,19 @@ export default function ChiefLayoutDepositPage() {
       return;
     }
 
+    if (audioFile && (!priceAudio || isNaN(Number(priceAudio)) || Number(priceAudio) <= 0)) {
+      toast.error("Veuillez renseigner un prix valide pour la version audio.");
+      setCurrentStep(2);
+      return;
+    }
+
     setSaving(true);
     setSubmissionError(undefined);
     setIsSubmissionModalOpen(true);
     setSubmissionStatus("uploading");
 
     try {
+      const parsedAudioPrice = priceAudio && !isNaN(Number(priceAudio)) ? Number(priceAudio) : undefined;
       const depPromise = createDepositWithFiles(
         {
           metadata: {
@@ -413,6 +438,8 @@ export default function ChiefLayoutDepositPage() {
           status: "pending_validation",
           default_price: priceDigital,
           admin_price: isPaperAvailable ? pricePaper : 0,
+          price_audio: parsedAudioPrice,
+          has_audio_version: Boolean(audioFile),
           is_paper_available: isPaperAvailable,
         },
         bookFile,
@@ -420,6 +447,7 @@ export default function ChiefLayoutDepositPage() {
         {
           pre_edition_dossier_id: selectedPreEdition?.id,
           authors_emails: authorsEmailsStr,
+          price_audio: parsedAudioPrice,
           onUploadProgress: (percent) => {
             setUploadProgress(percent);
             if (percent >= 100) {
@@ -429,20 +457,42 @@ export default function ChiefLayoutDepositPage() {
         }
       );
 
-      await depPromise;
+      const createdDeposit = await depPromise;
 
       setSubmissionStatus("processing");
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      setSubmissionStatus("registering");
       await new Promise((resolve) => setTimeout(resolve, 600));
 
+      setSubmissionStatus("registering");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Étape séparée : téléversement de la piste audio si fournie (anti-timeout)
+      if (audioFile && createdDeposit?.id) {
+        setSubmissionStatus("audio_uploading");
+        try {
+          const audioUploadRes = await uploadAudioTrack(
+            createdDeposit.id,
+            audioFile,
+            title || "Livre Audio",
+            undefined,
+            false,
+            parsedAudioPrice
+          );
+          if (!audioUploadRes.success && audioUploadRes.error) {
+            console.warn("[Chief Deposit] Avertissement upload audio:", audioUploadRes.error);
+            toast.warning(`Ouvrage créé mais la piste audio n'a pas pu être téléversée : ${audioUploadRes.error}`);
+          }
+        } catch (audioErr: any) {
+          console.error("[Chief Deposit] Erreur téléversement audio:", audioErr);
+          toast.warning("Ouvrage créé. Le fichier audio a rencontré un problème d'envoi et pourra être rajouté ultérieurement.");
+        }
+      }
+
       setSubmissionStatus("success");
-      toast.success(`L'ouvrage « ${title} » a été déposé avec succès !`);
+      toast.success(`L'ouvrage « ${title} » a été déposé et transmis au Juriste pour vérification du contrat.`);
 
       setTimeout(() => {
         window.location.href = "/chief-layout/catalog";
-      }, 1000);
+      }, 1200);
     } catch (err: any) {
       const is502 = err.message?.includes("502") || err.message?.includes("Impossible de contacter");
       if (is502) {
@@ -1062,6 +1112,37 @@ export default function ChiefLayoutDepositPage() {
                   />
                 </button>
               </div>
+
+              {/* Version Audio (Optionnelle) - Fiche T3 */}
+              <div className="pt-3 border-t border-border/50 space-y-2">
+                <label className="block text-xs font-bold text-navy uppercase tracking-wider">
+                  Version Audio (Optionnelle)
+                </label>
+                <input
+                  type="file"
+                  accept="audio/mpeg,audio/mp4,.mp3,.m4b"
+                  onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-navy/10 file:text-navy hover:file:bg-navy/20 cursor-pointer"
+                />
+                {audioFile && (
+                  <div>
+                    <label className="block text-[11px] font-bold text-foreground-muted uppercase mb-1 mt-2">
+                      Prix Version Audio (FCFA) *
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={priceAudio}
+                      onChange={(e) => setPriceAudio(e.target.value)}
+                      placeholder="Ex: 2000"
+                      className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background-secondary text-foreground focus:ring-2 focus:ring-navy"
+                    />
+                  </div>
+                )}
+                <p className="text-[10px] text-foreground-muted">
+                  Fichier MP3 ou M4B complet du livre audio. Le prix n&apos;est requis que si un fichier est déposé.
+                </p>
+              </div>
             </div>
 
             {/* Résumé */}
@@ -1360,7 +1441,7 @@ export default function ChiefLayoutDepositPage() {
                 <p className="text-foreground font-semibold">Auteur(s) : {authorsStr || "Auteur LAHA"}</p>
                 <p className="text-foreground-muted">Genre : {genreCategory}</p>
                 
-                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-border">
                   <div>
                     <span className="text-[10px] text-foreground-muted uppercase font-bold">Prix Numérique</span>
                     <p className="text-xs font-bold text-navy font-mono">{priceDigital.toLocaleString("fr-FR")} XOF</p>
@@ -1371,6 +1452,14 @@ export default function ChiefLayoutDepositPage() {
                       {isPaperAvailable ? `${pricePaper.toLocaleString("fr-FR")} XOF (Disponible)` : "Non disponible"}
                     </p>
                   </div>
+                  {audioFile && (
+                    <div>
+                      <span className="text-[10px] text-foreground-muted uppercase font-bold">Version Audio</span>
+                      <p className="text-xs font-bold text-navy font-mono">
+                        {priceAudio ? `${Number(priceAudio).toLocaleString("fr-FR")} XOF` : "Fichier joint"}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {university && university !== "Non affilié (Grand Public / Fiction / Scolaire)" && (
@@ -1427,6 +1516,8 @@ export default function ChiefLayoutDepositPage() {
         status={submissionStatus}
         errorMessage={submissionError}
         realProgress={uploadProgress}
+        isChiefLayout={true}
+        hasAudio={Boolean(audioFile)}
       />
     </div>
   );
