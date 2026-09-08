@@ -67,9 +67,9 @@
 
 **Independent Test**: Modifier `default_university_royalty_rate` dans l'administration, rafraîchir l'espace université et constater le recalcul immédiat des barres de redevance et montants nets.
 
-- [ ] T015 [US3] Assurer la synchronisation sans cache rigide des barèmes globaux dans `lahatheque-backend/apps/reporting/admin_views.py`
-- [ ] T016 [P] [US3] Synchroniser le badge de taux conventionné et les formules d'affichage dans `lahatheque-frontend/app/(dashboard)/university/royalties/page.tsx`
-- [ ] T017 [US3] Ajouter les tests automatisés de non-régression sur la cascade des taux dans `lahatheque-backend/apps/reporting/tests/test_bouquet_revenue_distribution.py`
+- [X] T015 [US3] Assurer la synchronisation sans cache rigide des barèmes globaux dans `lahatheque-backend/apps/reporting/admin_views.py`
+- [X] T016 [P] [US3] Synchroniser le badge de taux conventionné et les formules d'affichage dans `lahatheque-frontend/app/(dashboard)/university/royalties/page.tsx`
+- [X] T017 [US3] Ajouter les tests automatisés de non-régression sur la cascade des taux dans `lahatheque-backend/apps/reporting/tests/test_bouquet_revenue_distribution.py`
 
 **Checkpoint**: Les barèmes et calculs sont 100% dynamiques et réactifs aux modifications administratives.
 
@@ -79,9 +79,9 @@
 
 **Purpose**: Nettoyage du code, élimination des mocks et validation des scénarios de test
 
-- [ ] T018 [P] Déprécier et purger les données statiques obsolètes dans `lahatheque-frontend/lib/mock/university-royalties.ts`
-- [ ] T019 Exécuter la suite de tests backend avec `python manage.py test apps.reporting.tests.test_bouquet_revenue_distribution`
-- [ ] T020 Valider les scénarios de bout en bout décrits dans `specs/002-bouquet-royalties-distribution/quickstart.md`
+- [X] T018 [P] Déprécier et purger les données statiques obsolètes dans `lahatheque-frontend/lib/mock/university-royalties.ts`
+- [X] T019 Exécuter la suite de tests backend avec `python manage.py test apps.reporting.tests.test_bouquet_revenue_distribution`
+- [X] T020 Valider les scénarios de bout en bout décrits dans `specs/002-bouquet-royalties-distribution/quickstart.md`
 
 ---
 
