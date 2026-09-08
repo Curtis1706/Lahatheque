@@ -111,6 +111,25 @@ class ConfigurationPlateformeGlobale(models.Model):
         max_digits=5, decimal_places=2, default=Decimal("35.00"),
         help_text="Remise numérique accordée aux Universités/Campus (%)"
     )
+
+    # ── Barèmes Globaux de Répartition des Redevances ─────────────────────────
+    default_author_royalty_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("70.00"),
+        help_text="Taux standard des droits d'auteur (%)"
+    )
+    default_publisher_royalty_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("22.00"),
+        help_text="Taux standard des éditeurs tiers (%)"
+    )
+    default_university_royalty_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("15.00"),
+        help_text="Taux standard des universités partenaires (%)"
+    )
+    default_platform_share_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal("8.00"),
+        help_text="Commission de la plateforme (%)"
+    )
+
     devise_defaut = models.CharField(max_length=8, default="XOF")
 
     # ── DRM & Paramètres de Protection ─────────────────────────────────────────

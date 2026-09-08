@@ -4,6 +4,7 @@ Vues d'administration globale et endpoints REST pour le tableau de bord Admin LA
 """
 
 import csv
+import logging
 from decimal import Decimal
 from datetime import timedelta
 from django.http import HttpResponse
@@ -34,6 +35,9 @@ class StandardAdminPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
     max_page_size = 100
+
+
+logger = logging.getLogger(__name__)
 
 
 class AdminPanoramicStatsAPIView(APIView):
@@ -310,6 +314,10 @@ class AdminGlobalSettingsAPIView(APIView):
                 "moneroo_actif": config.moneroo_actif,
                 "stripe_actif": config.stripe_actif,
                 "fastermessage_sms_actif": config.fastermessage_sms_actif,
+                "default_author_royalty_rate": float(config.default_author_royalty_rate),
+                "default_publisher_royalty_rate": float(config.default_publisher_royalty_rate),
+                "default_university_royalty_rate": float(config.default_university_royalty_rate),
+                "default_platform_share_rate": float(config.default_platform_share_rate),
                 "updated_at": config.updated_at.isoformat() if config.updated_at else None,
             },
             "error": None
@@ -325,6 +333,8 @@ class AdminGlobalSettingsAPIView(APIView):
             'prix_defaut_numerique_xof', 'prix_defaut_papier_xof', 'prix_defaut_audio_xof',
             'prix_pass_mensuel_xof', 'prix_pass_annuel_xof', 'watermark_opacite_defaut',
             'remise_auteur_papier_pct', 'remise_auteur_numerique_pct', 'remise_auteur_audio_pct',
+            'default_author_royalty_rate', 'default_publisher_royalty_rate',
+            'default_university_royalty_rate', 'default_platform_share_rate',
         ]
         int_fields = [
             'duree_session_lecture_minutes', 'delai_relance_depots_jours',
@@ -335,6 +345,16 @@ class AdminGlobalSettingsAPIView(APIView):
             'moneroo_actif', 'stripe_actif', 'fastermessage_sms_actif'
         ]
         str_fields = ['devise_defaut', 'watermark_texte_defaut']
+
+        if 'default_university_royalty_rate' in data:
+            try:
+                new_univ_rate = Decimal(str(data['default_university_royalty_rate']))
+                old_univ_rate = config.default_university_royalty_rate
+                if old_univ_rate != new_univ_rate:
+                    from apps.partners.models import Institution
+                    Institution.objects.filter(royalty_rate=old_univ_rate).update(royalty_rate=new_univ_rate)
+            except Exception as univ_err:
+                logger.warning(f"Erreur sync taux universités par défaut: {univ_err}")
 
         for field in decimal_fields:
             if field in data:
@@ -372,6 +392,10 @@ class AdminGlobalSettingsAPIView(APIView):
                 "prix_defaut_audio_xof": float(config.prix_defaut_audio_xof),
                 "prix_pass_mensuel_xof": float(config.prix_pass_mensuel_xof),
                 "prix_pass_annuel_xof": float(config.prix_pass_annuel_xof),
+                "default_author_royalty_rate": float(config.default_author_royalty_rate),
+                "default_publisher_royalty_rate": float(config.default_publisher_royalty_rate),
+                "default_university_royalty_rate": float(config.default_university_royalty_rate),
+                "default_platform_share_rate": float(config.default_platform_share_rate),
             },
             "error": None
         })
@@ -858,12 +882,12 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
             # 3. Établissements Universitaires Partenaires (Institution)
             institutions = Institution.objects.filter(is_active=True).order_by('name')[:20]
             for inst in institutions:
-                if not any(r["contract_reference"] == inst.contract_reference for r in results):
+                if not any(r["partner_id"] == str(inst.id) for r in results):
                     results.append({
                         "partner_id": str(inst.id),
                         "partner_name": inst.name or inst.short_name,
                         "partner_type": "university",
-                        "contract_reference": inst.contract_reference or "CTR-UNIV",
+                        "contract_reference": inst.contract_reference or f"CTR-UNIV-{inst.code or str(inst.id)[:6].upper()}",
                         "custom_royalty_rate": float(inst.royalty_rate),
                         "payout_frequency": "quarterly",
                         "payment_method_preferred": "bank",

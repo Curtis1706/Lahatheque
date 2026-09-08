@@ -562,17 +562,21 @@ class UniversityRoyaltiesView(APIView):
 
     def get(self, request):
         inst = get_user_institution(request.user)
+        from apps.reporting.models import ConfigurationPlateformeGlobale
+        config = ConfigurationPlateformeGlobale.objects.first()
+        global_univ_rate = float(config.default_university_royalty_rate) if (config and hasattr(config, 'default_university_royalty_rate') and config.default_university_royalty_rate is not None) else 15.00
+
         if not inst:
             return Response({
                 "success": True,
                 "data": {
                     "available_balance": 0.0,
                     "total_paid": 0.0,
-                    "contractual_rate": 15.00,
+                    "contractual_rate": global_univ_rate,
                     "institution": {
                         "id": "",
                         "name": "Université Partenaire",
-                        "royalty_rate": 15.00
+                        "royalty_rate": global_univ_rate
                     },
                     "currency": "XOF",
                     "min_withdrawal_threshold": 100000,
@@ -581,7 +585,7 @@ class UniversityRoyaltiesView(APIView):
                 "error": None
             })
 
-        rate = float(inst.royalty_rate) if inst and inst.royalty_rate else 15.00
+        rate = float(inst.royalty_rate) if (inst and inst.royalty_rate is not None) else global_univ_rate
 
         qs = UniversityRoyaltyStatement.objects.filter(institution=inst)
         statements = []
@@ -731,7 +735,7 @@ class UniversityRoyaltiesView(APIView):
             })
 
         total_earned = paper_royalties_total + digital_royalties_total + bouquet_royalties_total
-        available_balance = max(0.0, total_earned - total_paid) if avail_bal == 0.0 else avail_bal
+        available_balance = max(0.0, total_earned - total_paid) if total_earned > 0 else avail_bal
 
         resp_data = {
             "available_balance": available_balance,
