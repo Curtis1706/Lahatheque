@@ -32,9 +32,9 @@ Ces règles sont TOUJOURS actives, sur tout écran/composant/page construit pour
 - **Zéro omission, zéro survol, zéro troncature** : Pour tout audit, analyse de sécurité, implémentation, refactoring ou tâche d'ingénierie, **la lecture intégrale de 100% des lignes de chaque fichier concerné est strictement obligatoire**.
 - Il est formellement interdit de sauter des lignes, de supposer du contenu, ou de laisser la moindre lettre de côté. Chaque fichier analysé (Python, TypeScript, configuration, modèle, sérialiseur, permission, vue) doit être lu et inspecté du premier au dernier caractère.
 
-## 📐 Périmètre
-- On construit uniquement le FRONT (Next.js App Router + TypeScript + Tailwind). Exclus : pages vitrine publiques marketing.
-- Zéro appel réseau réel, zéro wiring vers Django. Toutes les données passent par `lib/mock/*.ts` + `lib/services/*.ts` (async, typés sur les modèles Django réels du plan de specs techniques).
+## 📐 Périmètre & Données Réelles (Interdiction Absolue des Mocks)
+- On construit le front-end Next.js App Router (TypeScript + Tailwind) et les routes BFF associées (`app/api/bff/...`).
+- **Interdiction Formelle et Définitive des Données Mockées** : Zéro mock, zéro bouchon statique. Toutes les données proviennent obligatoirement des véritables endpoints de l'API Django via le client HTTP ou le proxy BFF (`/api/bff/...`), avec authentification par cookies `HttpOnly` et typage TypeScript strict calqué sur les modèles Django réels.
 
 ## 🎨 Couleurs — règle absolue
 - Aucune couleur codée en dur, jamais. Pas de `bg-[#...]`, pas de hex/rgb inline, pas de classe Tailwind de couleur choisie au hasard (`text-red-500` improvisé).

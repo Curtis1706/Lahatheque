@@ -94,11 +94,11 @@ Liste explicitement :
 - Les modales déclenchées depuis cet écran (confirmation, détail rapide, upload, aperçu…)
 - Le layout partagé utilisé (sidebar/topbar/breadcrumb du shell dashboard)
 
-## Étape 3 — Données mockées typées
+## Étape 3 — Données réelles typées et services API connectés (Interdiction Absolue des Mocks)
 
-1. Crée/complète l'interface TypeScript dans `lib/types/<module>.ts`, alignée champ pour champ sur le modèle Django (Étape 1).
-2. Crée/complète `lib/mock/<module>.ts` avec 3 à 8 objets réalistes (vrais noms d'universités/pays du cahier des charges : UAC, UNA, Université de Parakou, BJ/SN/NE/TG/CI/GA/CD).
-3. Crée/complète `lib/services/<module>.ts` : fonctions async avec délai simulé, jamais de fetch en dur dans un composant.
+1. Crée/complète l'interface TypeScript dans `lib/types/<module>.ts`, rigoureusement alignée champ pour champ sur le modèle Django réel (Étape 1).
+2. **Interdiction totale et définitive des mocks** : Zéro fichier `lib/mock/*.ts`, zéro donnée statique ou bouchonnée. Toutes les données doivent provenir de l'API réelle.
+3. Crée/complète `lib/services/<module>.ts` : fonctions asynchrones appelant les véritables endpoints Django via le proxy BFF (`app/api/bff/...`) ou le client unifié, avec cookies `credentials: 'include'`.
 
 ## Étape 4 — Recherche de composants 21st.dev (CHECKPOINT NON-SKIPPABLE, effort obligatoire)
 
@@ -129,7 +129,7 @@ Rédige tous les textes d'interface en français, ton direct et fonctionnel (voi
 
 1. Écris le composant/page en TypeScript strict, accessible (ARIA, HTML sémantique).
 2. Compose la page à partir de composants fins ; la logique vit dans les composants/hooks, pas dans la page.
-3. Vérifie qu'aucun appel réseau réel n'a été introduit — uniquement les services mockés de l'étape 3.
+3. Connecte directement la page aux services réels de l'étape 3 via les routes BFF (`app/api/bff/...`) et le backend Django.
 
 ## Étape 8 — Checklist finale avant de considérer l'écran terminé
 
