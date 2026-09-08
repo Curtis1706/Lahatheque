@@ -522,28 +522,52 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
 
     def destroy(self, request, pk=None):
         try:
+            from django.db.models import ProtectedError
+
             book = Ouvrage.objects.get(id=pk)
             book_title = book.titre or getattr(book, 'title', 'Sans titre')
+            was_archived = False
+
+            try:
+                # Tentative de suppression physique si aucune contrainte de clé protégée n'existe
+                book.delete()
+            except ProtectedError:
+                # Si l'ouvrage est référencé par des droits d'auteur (AuthorRight), des lignes de redevance
+                # (RoyaltyPayoutLine), des contrats ou des commandes, la suppression physique est interdite.
+                # L'ouvrage est retiré du catalogue public et de la vitrine via l'archivage (soft-delete).
+                book.status = 'archived'
+                book.save(update_fields=['status'])
+                was_archived = True
 
             if request.user and request.user.is_authenticated:
                 JournalAuditAdmin.objects.create(
                     administrateur=request.user,
-                    action="DELETE_BOOK_CATALOG",
+                    action="ARCHIVE_BOOK_CATALOG" if was_archived else "DELETE_BOOK_CATALOG",
                     ressource_type="Ouvrage",
-                    ressource_id=str(book.id),
-                    details={"title": book_title, "status": book.status, "isbn": book.isbn}
+                    ressource_id=str(pk),
+                    details={
+                        "title": book_title,
+                        "status": "archived" if was_archived else "deleted",
+                        "isbn": book.isbn,
+                        "was_archived": was_archived,
+                    }
                 )
 
-            book.delete()
+            if was_archived:
+                message = f"L'ouvrage '{book_title}' est lié à des droits ou transactions protégées. Il a été retiré de la publication (archivé) et n'apparaît plus sur le catalogue ni sur la vitrine."
+            else:
+                message = f"L'ouvrage '{book_title}' a été supprimé définitivement du catalogue."
+
             return Response({
                 "success": True,
-                "message": f"L'ouvrage '{book_title}' a été supprimé définitivement du catalogue.",
+                "was_archived": was_archived,
+                "message": message,
                 "error": None
             })
         except Ouvrage.DoesNotExist:
             return Response({"success": False, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"success": False, "error": f"Erreur lors de la suppression: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"success": False, "error": f"Erreur lors de l'opération: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def _resolve_real_royalty_rate(contract, partner_type):

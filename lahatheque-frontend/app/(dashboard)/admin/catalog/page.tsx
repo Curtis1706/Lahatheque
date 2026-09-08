@@ -124,14 +124,14 @@ export default function AdminCatalogPage() {
     try {
       const res = await deleteAdminCatalogBook(target.id);
       if (res.success) {
-        toast.success(`L'ouvrage "${target.title}" a été supprimé définitivement du catalogue.`);
+        toast.success(res.message || `L'ouvrage "${target.title}" a été retiré du catalogue et de la vitrine.`);
       } else {
-        toast.error(res.error || "Erreur lors de la suppression de l'ouvrage.");
+        toast.error(res.error || "Erreur lors du retrait de l'ouvrage.");
         const data = await getAdminCatalog();
         setBooks(data);
       }
     } catch {
-      toast.error("Erreur serveur lors de la suppression.");
+      toast.error("Erreur serveur lors de l'opération.");
       const data = await getAdminCatalog();
       setBooks(data);
     }
@@ -277,7 +277,7 @@ export default function AdminCatalogPage() {
             type="button"
             onClick={() => setDeleteConfirmBook(row)}
             className="p-1.5 rounded-lg border border-border bg-background hover:bg-error/15 text-foreground-muted hover:text-error transition-colors cursor-pointer"
-            title="Supprimer définitivement l'ouvrage"
+            title="Retirer du catalogue / Archiver"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -408,7 +408,7 @@ export default function AdminCatalogPage() {
                     type="button"
                     onClick={() => setDeleteConfirmBook(book)}
                     className="p-2 rounded-xl bg-error/10 hover:bg-error/20 text-error transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
-                    title="Supprimer définitivement l'ouvrage"
+                    title="Retirer du catalogue / Archiver"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -569,21 +569,21 @@ export default function AdminCatalogPage() {
         </div>
       )}
 
-      {/* Modal Confirmation de Suppression d'un Ouvrage */}
+      {/* Modal Confirmation de Retrait d'un Ouvrage du Catalogue */}
       {deleteConfirmBook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-in fade-in">
-          <div className="bg-background rounded-3xl border border-border p-6 max-w-sm w-full shadow-2xl space-y-4 text-center animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-dark/80 animate-in fade-in">
+          <div className="bg-background rounded-3xl border border-border p-6 max-w-md w-full shadow-2xl space-y-4 text-center animate-in zoom-in-95">
             <div className="w-12 h-12 rounded-full bg-error/15 text-error mx-auto flex items-center justify-center">
               <Trash2 className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-serif font-bold text-base text-foreground">Supprimer l&apos;Ouvrage</h3>
-              <p className="text-xs text-foreground-muted mt-1.5">
-                Êtes-vous sûr de vouloir supprimer définitivement l&apos;ouvrage{" "}
-                <span className="font-semibold text-foreground">
+              <h3 className="font-serif font-bold text-base text-navy">Retirer l&apos;Ouvrage du Catalogue</h3>
+              <p className="text-xs text-foreground-muted mt-1.5 leading-relaxed">
+                Êtes-vous sûr de vouloir retirer l&apos;ouvrage{" "}
+                <span className="font-semibold text-navy">
                   &laquo; {deleteConfirmBook.title} &raquo;
                 </span>{" "}
-                du catalogue ? Cette action est irréversible.
+                du catalogue ? L&apos;ouvrage ne sera plus visible sur les catalogues et la vitrine publique.
               </p>
             </div>
             <div className="flex justify-center gap-3 pt-2">
@@ -599,7 +599,7 @@ export default function AdminCatalogPage() {
                 onClick={handleDeleteBook}
                 className="px-4 py-2 rounded-xl bg-error text-white font-bold text-xs hover:bg-error/90 transition-colors cursor-pointer shadow-xs"
               >
-                Supprimer Définitivement
+                Retirer du Catalogue
               </button>
             </div>
           </div>
