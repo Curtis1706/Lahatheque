@@ -459,13 +459,17 @@ class OuvrageCreateSerializer(serializers.Serializer):
 
         # ─── Configuration Automatique des Droits & Redevances de Vente ────────────
         try:
+            pub_rate = float(publisher_obj.contractual_royalty_rate) if (publisher_obj and getattr(publisher_obj, 'contractual_royalty_rate', None) is not None) else (22.00 if publisher_obj else 0.00)
+            auth_rate = 15.00 if selected_author_user else 0.00
+            plat_rate = max(0.00, 100.00 - auth_rate - pub_rate)
+
             # 1. Barème standard de redevances
             RoyaltyRate.objects.get_or_create(
                 ouvrage=ouvrage,
                 defaults={
-                    "author_share_percent": 15.00 if selected_author_user else 0.00,
-                    "publisher_share_percent": 0.00,
-                    "platform_share_percent": 85.00 if selected_author_user else 100.00
+                    "author_share_percent": auth_rate,
+                    "publisher_share_percent": pub_rate,
+                    "platform_share_percent": plat_rate
                 }
             )
 
@@ -501,9 +505,9 @@ class OuvrageCreateSerializer(serializers.Serializer):
                         beneficiaire=publisher_obj.user,
                         role_libelle="Éditeur Tiers",
                         pourcentage=100.00 if not selected_author_user else 30.00,
-                        taux_papier=70.00,
-                        taux_numerique=70.00,
-                        taux_audio_tts=50.00,
+                        taux_papier=pub_rate,
+                        taux_numerique=pub_rate,
+                        taux_audio_tts=pub_rate,
                     )
         except Exception as rights_err:
             logger.warning(f"Impossible d'initialiser les droits d'auteur pour {ouvrage.id}: {rights_err}")

@@ -792,48 +792,138 @@ export default function ChiefLayoutDepositPage() {
 
             {/* Auteurs, Éditeur, ISBN, Année */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-1.5 sm:col-span-2">
+              {/* Auteur(s) Combobox avec recherche et tags — identique au maquettiste */}
+              <div className="space-y-1.5 sm:col-span-2" ref={authorDropdownRef}>
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Auteur(s) *</label>
-                  <span className="text-[10px] text-foreground-muted">Séparer par des virgules si multiples</span>
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-gold" />
+                    Auteur(s) *
+                  </label>
+                  {aiResult?.authors && aiResult.authors.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedAuthors(aiResult.authors);
+                        setAuthorsStr(aiResult.authors.join(", "));
+                      }}
+                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Wand2 className="w-2.5 h-2.5" />
+                      IA ({aiResult.authors.length})
+                    </button>
+                  )}
                 </div>
-                <input
-                  type="text"
-                  required
-                  placeholder="Pr. Jean KOUADIO, Dr. Aminata SOW"
-                  value={authorsStr}
-                  onChange={(e) => handleAuthorsStrChange(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                />
-                {/* Suggestions d'auteurs certifiés de la plateforme */}
-                {allAuthors.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    <span className="text-[10px] text-foreground-muted font-medium">Auteurs certifiés :</span>
-                    {allAuthors.slice(0, 5).map((auth: AuthorSearchResult) => {
-                      const isSelected = selectedAuthors.includes(auth.name);
-                      return (
+
+                {/* Badges d'auteurs sélectionnés */}
+                {selectedAuthors.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pb-1">
+                    {selectedAuthors.map((authorName) => (
+                      <span
+                        key={authorName}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-navy/10 text-navy font-semibold text-xs rounded-xl border border-navy/20"
+                      >
+                        <span className="truncate max-w-[150px]">{authorName}</span>
                         <button
-                          key={auth.id}
                           type="button"
-                          onClick={() => {
-                            if (isSelected) {
-                              handleRemoveAuthor(auth.name);
-                            } else {
-                              handleAddAuthor(auth.name);
-                            }
-                          }}
-                          className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
-                            isSelected
-                              ? "bg-navy text-white border-navy font-bold"
-                              : "bg-background-secondary text-navy hover:bg-gold/15 border-border"
-                          }`}
+                          onClick={() => handleRemoveAuthor(authorName)}
+                          className="text-foreground-muted hover:text-red-500 transition-colors cursor-pointer"
+                          title="Retirer"
                         >
-                          {auth.name}
+                          <X className="w-3 h-3" />
                         </button>
-                      );
-                    })}
+                      </span>
+                    ))}
                   </div>
                 )}
+
+                {/* Champ Combobox de recherche et ajout */}
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Rechercher ou saisir un auteur..."
+                      value={authorSearch}
+                      onChange={(e) => {
+                        setAuthorSearch(e.target.value);
+                        setIsAuthorOpen(true);
+                      }}
+                      onFocus={() => setIsAuthorOpen(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && authorSearch.trim()) {
+                          e.preventDefault();
+                          handleAddAuthor(authorSearch);
+                        }
+                      }}
+                      className="w-full bg-background border border-border rounded-xl pl-8 pr-8 py-2.5 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsAuthorOpen(!isAuthorOpen)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted p-1 hover:text-navy cursor-pointer"
+                    >
+                      <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", isAuthorOpen && "rotate-180")} />
+                    </button>
+                  </div>
+
+                  {/* Input caché requis pour la validation HTML */}
+                  <input
+                    type="text"
+                    required
+                    value={authorsStr}
+                    onChange={(e) => handleAuthorsStrChange(e.target.value)}
+                    className="sr-only"
+                    tabIndex={-1}
+                  />
+
+                  {/* Liste déroulante des auteurs */}
+                  {isAuthorOpen && (
+                    <div className="absolute z-30 top-full mt-1.5 left-0 right-0 bg-background border border-border rounded-2xl shadow-xl overflow-hidden max-h-56 overflow-y-auto divide-y divide-border animate-in fade-in-0 zoom-in-95 duration-150">
+                      {authorSearch.trim() && !allAuthors.some((a) => a.name.toLowerCase() === authorSearch.toLowerCase().trim()) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleAddAuthor(authorSearch);
+                            setIsAuthorOpen(false);
+                          }}
+                          className="w-full text-left p-3 hover:bg-gold/10 transition-colors flex items-center justify-between text-xs text-gold font-bold cursor-pointer"
+                        >
+                          <span>+ Ajouter « {authorSearch.trim()} »</span>
+                          <span className="text-[10px] bg-gold/20 px-2 py-0.5 rounded">Entrée ↵</span>
+                        </button>
+                      )}
+                      {filteredAuthors.length > 0 ? (
+                        filteredAuthors.map((author) => (
+                          <button
+                            key={author.id || author.name}
+                            type="button"
+                            onClick={() => {
+                              handleAddAuthor(author.name);
+                              setIsAuthorOpen(false);
+                            }}
+                            className="w-full text-left p-3 hover:bg-navy/5 transition-colors flex items-center justify-between gap-2 text-xs cursor-pointer"
+                          >
+                            <div>
+                              <p className="font-semibold text-navy">{author.name}</p>
+                              <p className="text-[11px] text-foreground-muted">
+                                {author.institution || author.email || "Auteur certifié LAHA"}
+                              </p>
+                            </div>
+                            <span className="text-[10px] font-bold text-gold bg-gold/10 px-2 py-0.5 rounded-md shrink-0">
+                              Choisir
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        !authorSearch.trim() && (
+                          <div className="p-3 text-center text-xs text-foreground-muted">
+                            {loadingAuthors ? "Chargement des auteurs..." : "Tapez un nom pour ajouter un auteur."}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Email(s) des auteurs pour notification & attribution des droits */}
