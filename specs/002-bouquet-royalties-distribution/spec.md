@@ -14,6 +14,7 @@
 - Q: Doit-on ventiler les bouquets et redevances par faculté ou au niveau global de l'université ? → A: Suppression intégrale de la notion de faculté. Les bouquets documentaires et les redevances sont suivis et gérés exclusivement au niveau institutionnel de l'université partenaire.
 - Q: Que consulte l'Administrateur dans son diagramme circulaire (camembert) et ses graphiques de redevances sur les bouquets ? → A: L'administrateur consulte la répartition macroscopique inter-universitaire de chaque bouquet : la part d'audience réelle (%) de chaque établissement contributeur, les montants des redevances dus à chacun selon son taux conventionné respectif, ainsi que la marge résiduelle conservée par la plateforme LAHA.
 - Q: Que doit représenter exactement le diagramme circulaire (camembert) lorsque l'Administrateur consulte la répartition d'un bouquet documentaire ? → A: Option A : Le camembert ventile 100 % de l'usage entre les universités partenaires détentrices des ouvrages (UAC, Parakou, UNA...), avec le détail des redevances par barre horizontale et la part résiduelle de la plateforme LAHA affichée en synthèse financière à côté (reproduction fidèle du schéma Section 11 du Cahier des Charges).
+- Q: Sur le tableau de bord principal de l'Administrateur (/admin), comment doit être sélectionné le bouquet documentaire affiché dans le bloc de synthèse ? → A: Option A : Afficher par défaut le premier bouquet actif, avec un sélecteur déroulant pour basculer instantanément d'un bouquet à l'autre.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -91,7 +92,7 @@ En tant qu'administrateur de la plateforme ou gestionnaire universitaire, je sou
   - En utilisant par défaut le taux général des universités partenaires configuré au niveau de la plateforme par l'administrateur central (`ConfigurationPlateformeGlobale.default_university_royalty_rate`).
 - **FR-006**: Le système DOIT afficher l'onglet "Redevances Bouquets (Prorata Consultations)" de manière pleinement accessible, visible et active dans l'interface du tableau de bord universitaire (suppression de tout masque d'affichage).
 - **FR-007**: Le système DOIT exclure toute segmentation ou filtrage par faculté dans les tableaux de bord de redevances, la gestion des abonnements et des redevances bouquets s'effectuant exclusivement au niveau global de l'Université.
-- **FR-008**: Dans l'espace administration (`/admin/royalties/universities` et `/admin/catalog/bouquets`), le système DOIT afficher pour chaque bouquet :
+- **FR-008**: Dans l'espace administration (sur le tableau de bord principal `/admin` avec sélecteur déroulant de bouquet, ainsi que sur `/admin/royalties/universities` et `/admin/catalog/bouquets`), le système DOIT afficher pour chaque bouquet :
   - Le camembert complet ventilant l'audience réelle entre toutes les universités partenaires détentrices des livres.
   - Le graphique en barres horizontales des redevances dues à chaque université partenaire.
   - La synthèse financière distinguant le montant global reversé aux universités et la marge résiduelle conservée par la plateforme LAHA.

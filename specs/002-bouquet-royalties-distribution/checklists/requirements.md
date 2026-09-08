@@ -34,6 +34,7 @@
 - Session de clarification 2026-09-08 validée :
   1. Notion de faculté retirée (gestion exclusive au niveau institutionnel de l'université).
   2. Rôle Administrateur formalisé : Option A entérinée (camembert ventilant 100% de l'usage entre les universités partenaires détentrices des livres, barres horizontales pour les redevances dues, et synthèse financière séparée pour la part plateforme LAHA).
-  3. Règle absolue 0% de mocks : alimentation exclusive par les flux réels de lectures/abonnements.
-  4. Dynamisme hiérarchique des taux (taux conventionné par université > barème global admin).
+  3. Tableau de bord Administrateur principal (/admin) : sélection par défaut du premier bouquet actif avec sélecteur déroulant interactif pour basculer instantanément d'un bouquet à l'autre sans rechargement.
+  4. Règle absolue 0% de mocks : alimentation exclusive par les flux réels de lectures/abonnements.
+  5. Dynamisme hiérarchique des taux (taux conventionné par université > barème global admin).
 - Spécification prête à 100% pour la phase de planification (/speckit-plan).

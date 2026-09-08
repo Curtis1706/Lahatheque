@@ -14,8 +14,10 @@ import {
   getAdminReminders,
   getRevenueCategoryBreakdown,
   getAdminContracts,
+  getAvailableBouquets,
 } from "@/lib/services/admin";
 import {
+  fetchBouquetDistribution,
   computeBouquetDistribution,
   BouquetDistributionResult,
 } from "@/lib/services/bouquet-distribution";
@@ -92,17 +94,24 @@ export default function AdminOverviewDashboard() {
   const [activeBottomTab, setActiveBottomTab] = useState<"sales" | "contracts">("sales");
   const [loading, setLoading] = useState(true);
 
+  // Gestion dynamique des bouquets documentaires réels (ZÉRO mock)
+  const [bouquetsList, setBouquetsList] = useState<Array<{ id: string; title: string }>>([]);
+  const [selectedBouquetId, setSelectedBouquetId] = useState<string>("");
+  const [bouquetDist, setBouquetDist] = useState<BouquetDistributionResult | null>(null);
+  const [loadingBouquet, setLoadingBouquet] = useState<boolean>(false);
+
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [kpiData, rolesData, salesData, remindersData, revenueBreakdownData, contractsData] = await Promise.all([
+        const [kpiData, rolesData, salesData, remindersData, revenueBreakdownData, contractsData, availableBouquets] = await Promise.all([
           getAdminKpis(),
           getRoleDistribution(),
           getAdminSales(),
           getAdminReminders(),
           getRevenueCategoryBreakdown(),
           getAdminContracts().catch(() => []),
+          getAvailableBouquets().catch(() => []),
         ]);
         setKpis(kpiData);
         setRolesDist(rolesData);
@@ -110,6 +119,14 @@ export default function AdminOverviewDashboard() {
         setReminders(remindersData);
         setRevenueBreakdown(revenueBreakdownData);
         setContracts(contractsData || []);
+        setBouquetsList(availableBouquets || []);
+
+        if (availableBouquets && availableBouquets.length > 0) {
+          const defaultBouquet = availableBouquets[0];
+          setSelectedBouquetId(defaultBouquet.id);
+          const dist = await fetchBouquetDistribution(defaultBouquet.id, "admin");
+          setBouquetDist(dist);
+        }
       } catch (err) {
         console.error("Erreur de chargement du dashboard admin", err);
       } finally {
@@ -119,15 +136,20 @@ export default function AdminOverviewDashboard() {
     loadData();
   }, []);
 
-  const totalUsersCount = rolesDist.reduce((acc, r) => acc + r.count, 0);
+  const handleSelectBouquet = async (bId: string) => {
+    setSelectedBouquetId(bId);
+    setLoadingBouquet(true);
+    try {
+      const dist = await fetchBouquetDistribution(bId, "admin");
+      setBouquetDist(dist);
+    } catch (err) {
+      console.error("Erreur chargement répartition bouquet:", err);
+    } finally {
+      setLoadingBouquet(false);
+    }
+  };
 
-  // Modèle de calcul unique et officiel de référence
-  const bouquetDist: BouquetDistributionResult = computeBouquetDistribution({
-    bouquet_id: "bouquet-reference-cdc",
-    bouquet_title: "Bouquets Documentaires Multi-Universités",
-    total_ca: 10000000,
-    currency: "FCFA",
-  });
+  const totalUsersCount = rolesDist.reduce((acc, r) => acc + r.count, 0);
 
   const donutSegments: DonutChartSegment[] = rolesDist
     .filter((r) => r.count > 0)
@@ -453,11 +475,35 @@ export default function AdminOverviewDashboard() {
               R&eacute;partition des Redevances &ndash; Bouquets Documentaires
             </h2>
             <p className="text-xs text-foreground-muted">
-              Consolidation multi-campus et r&eacute;partition proportionnelle &bull; Taux conventionn&eacute; : <span className="font-bold text-navy">15 %</span>
+              Consolidation multi-campus et r&eacute;partition proportionnelle &bull; Taux conventionn&eacute; :{" "}
+              <span className="font-bold text-navy">
+                {bouquetDist ? `${bouquetDist.royalty_rate_applied ?? bouquetDist.royalty_rate ?? 15} %` : "15 %"}
+              </span>
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            {bouquetsList.length > 0 && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="bouquet-select" className="text-xs font-semibold text-foreground-muted">
+                  Bouquet :
+                </label>
+                <select
+                  id="bouquet-select"
+                  value={selectedBouquetId}
+                  onChange={(e) => handleSelectBouquet(e.target.value)}
+                  disabled={loadingBouquet}
+                  className="px-3 py-2 rounded-xl bg-background border border-border text-navy text-xs font-bold focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[44px] cursor-pointer"
+                >
+                  {bouquetsList.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <Link
               href="/admin/catalog/bouquets"
               className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
@@ -489,7 +535,9 @@ export default function AdminOverviewDashboard() {
             </div>
 
             <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
-              <span className="text-[11px] font-medium text-foreground-muted">Enveloppe Redevances (15%)</span>
+              <span className="text-[11px] font-medium text-foreground-muted">
+                Enveloppe Redevances ({bouquetDist.royalty_rate_applied ?? bouquetDist.royalty_rate ?? 15}%)
+              </span>
               <p className="text-base sm:text-lg font-bold font-mono text-gold">
                 {bouquetDist.total_royalties.toLocaleString("fr-FR")} {bouquetDist.currency}
               </p>
@@ -499,20 +547,38 @@ export default function AdminOverviewDashboard() {
             <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
               <span className="text-[11px] font-medium text-foreground-muted">Établissements Actifs</span>
               <p className="text-base sm:text-lg font-bold font-mono text-navy">
-                {bouquetDist.items.length} Campus
+                {bouquetDist.items.length} Établissement{bouquetDist.items.length > 1 ? "s" : ""}
               </p>
-              <span className="text-[10px] text-foreground-muted">UAC, Parakou, UNA</span>
+              <span
+                className="text-[10px] text-foreground-muted truncate block"
+                title={
+                  bouquetDist.items.length > 0
+                    ? bouquetDist.items.map((it) => it.institution_code || it.short_name).join(", ")
+                    : "Aucun établissement"
+                }
+              >
+                {bouquetDist.items.length > 0
+                  ? bouquetDist.items.map((it) => it.institution_code || it.short_name).join(", ")
+                  : "Aucun établissement"}
+              </span>
             </div>
           </div>
         )}
 
         {/* Intégration du composant visuel BouquetPieDistribution */}
-        {bouquetDist && (
+        {bouquetDist ? (
           <div className="w-full">
             <BouquetPieDistribution
               distribution={bouquetDist}
               showTitle={false}
             />
+          </div>
+        ) : (
+          <div className="p-8 rounded-3xl bg-background border border-border text-center space-y-2">
+            <Building2 className="w-8 h-8 text-foreground-muted mx-auto opacity-50" />
+            <p className="text-xs text-foreground-muted">
+              {loading ? "Chargement des données de répartition..." : "Aucun bouquet documentaire actif configuré."}
+            </p>
           </div>
         )}
       </div>
