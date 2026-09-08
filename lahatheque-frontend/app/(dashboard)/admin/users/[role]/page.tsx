@@ -9,10 +9,10 @@ import { Modal } from "@/components/ui/modal";
 import { CreateAccountModal } from "@/components/features/admin/create-account-modal";
 import { SendEmailModal } from "@/components/features/admin/send-email-modal";
 import { AuthorDiscountsModal } from "@/components/features/admin/author-discounts-modal";
-import { getAdminUsers, toggleAdminUserStatus, deleteAdminUser } from "@/lib/services/admin";
+import { getAdminUsers, toggleAdminUserStatus, deleteAdminUser, updatePartnerRoyaltyRate } from "@/lib/services/admin";
 import { AdminUser, AdminRole, formatRoleLabel, formatCountryName } from "@/lib/types/admin";
 import { EditUniversityUserModal } from "@/components/features/admin/edit-university-user-modal";
-import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2, Sliders, Sparkles, Building2, Pencil } from "lucide-react";
+import { Users, UserPlus, Eye, XCircle, CheckCircle, ArrowLeft, Mail, FileText, CheckCheck, Clock, Trash2, Sliders, Sparkles, Building2, Pencil, Percent, Save } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -35,6 +35,11 @@ export default function AdminRoleUsersPage() {
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<AdminUser | null>(null);
   const [discountUser, setDiscountUser] = useState<AdminUser | null>(null);
   const [editUniversityUser, setEditUniversityUser] = useState<AdminUser | null>(null);
+
+  // Modale taux redevance éditeur
+  const [ratePublisher, setRatePublisher] = useState<AdminUser | null>(null);
+  const [publisherNewRate, setPublisherNewRate] = useState<number>(22);
+  const [savingPublisherRate, setSavingPublisherRate] = useState(false);
 
   const loadRoleUsers = async () => {
     try {
@@ -103,6 +108,34 @@ export default function AdminRoleUsersPage() {
     } catch {
       toast.error("Erreur serveur lors de la suppression.");
       loadRoleUsers();
+    }
+  };
+
+  const handleOpenPublisherRate = (user: AdminUser) => {
+    setRatePublisher(user);
+    // Utiliser le taux actuel s'il est disponible dans extra_info, sinon 22 par défaut
+    setPublisherNewRate(user.extra_info?.contractual_royalty_rate ?? 22);
+  };
+
+  const handleSavePublisherRate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ratePublisher) return;
+    // Le partner_id de la maison d'édition = l'id du Publisher profile, pas l'id User
+    // On l'obtient via extra_info.publisher_profile_id (si fourni) ou on essaie avec l'id user
+    const publisherProfileId = ratePublisher.extra_info?.publisher_profile_id || ratePublisher.id;
+    setSavingPublisherRate(true);
+    try {
+      const res = await updatePartnerRoyaltyRate(publisherProfileId, publisherNewRate);
+      if (res.success) {
+        toast.success(`Taux de redevance de ${ratePublisher.first_name} ${ratePublisher.last_name} modifié à ${publisherNewRate}%.`);
+        setRatePublisher(null);
+      } else {
+        toast.error(res.error || "Erreur de mise à jour du taux.");
+      }
+    } catch {
+      toast.error("Erreur de communication avec le serveur.");
+    } finally {
+      setSavingPublisherRate(false);
     }
   };
 
@@ -515,13 +548,71 @@ export default function AdminRoleUsersPage() {
             cell: (row) => <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-semibold">{row.extra_info?.compliance_status || (row.is_active ? "Catalogue Conforme" : "En cours d'audit")}</span>,
           },
           {
+            key: "royalty_rate",
+            header: "Taux Redevance",
+            cell: (row) => {
+              const rate = row.extra_info?.contractual_royalty_rate ?? 22;
+              return (
+                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-gold/10 border border-gold/20 text-gold">
+                  {rate}%
+                </span>
+              );
+            },
+          },
+          {
             key: "royalties",
-            header: "Redevances",
+            header: "Redevances Dues",
             cell: (row) => <span className="font-mono text-xs font-bold text-foreground">{(row.extra_info?.pending_royalties || 0).toLocaleString("fr-FR")} FCFA</span>,
           },
           countryColumn,
           statusColumn,
-          actionsColumn,
+          {
+            key: "pub_actions",
+            header: "Actions",
+            className: "text-right",
+            cell: (row) => (
+              <div className="flex items-center justify-end gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleOpenPublisherRate(row)}
+                  className="p-1.5 rounded-lg hover:bg-gold/10 text-gold transition-colors cursor-pointer"
+                  title="Modifier le taux de redevance contractuel"
+                >
+                  <Percent className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setEmailUser(row)}
+                  className="p-1.5 rounded-lg hover:bg-navy-light text-navy transition-colors cursor-pointer"
+                  title="Envoyer un e-mail"
+                >
+                  <Mail className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setInspectUser(row)}
+                  className="p-1.5 rounded-lg hover:bg-background-secondary text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
+                  title="Inspecter la fiche"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleToggleActive(row)}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    row.is_active ? "hover:bg-error/15 text-error" : "hover:bg-success/15 text-success"
+                  }`}
+                  title={row.is_active ? "Rendre inactif" : "Réactiver"}
+                >
+                  {row.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => setDeleteConfirmUser(row)}
+                  className="p-1.5 rounded-lg hover:bg-error/15 text-error/80 hover:text-error transition-colors cursor-pointer"
+                  title="Supprimer définitivement le compte"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ),
+          },
         ];
 
       case "clients":
@@ -761,6 +852,62 @@ export default function AdminRoleUsersPage() {
         user={editUniversityUser}
         onUpdated={loadRoleUsers}
       />
+
+      {/* Modale Taux de Redevance Éditeur */}
+      {ratePublisher && (
+        <Modal
+          open={!!ratePublisher}
+          onClose={() => setRatePublisher(null)}
+          title={`Modifier le taux de redevance — ${ratePublisher.first_name} ${ratePublisher.last_name}`}
+        >
+          <form onSubmit={handleSavePublisherRate} className="space-y-4 pt-2">
+            <div className="p-3 rounded-xl bg-background-secondary border border-border text-xs text-foreground-muted space-y-1">
+              <p><strong className="text-foreground">Éditeur :</strong> {ratePublisher.first_name} {ratePublisher.last_name}</p>
+              <p><strong className="text-foreground">E-mail :</strong> {ratePublisher.email}</p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-foreground">
+                Nouveau Taux de Redevance Contractuel (%)
+              </label>
+              <div className="flex items-center gap-2 mt-1.5">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={publisherNewRate}
+                  onChange={(e) => setPublisherNewRate(Number(e.target.value))}
+                  className="w-full p-2.5 text-sm font-mono font-bold rounded-xl bg-background border border-border text-foreground focus:border-gold focus:outline-none"
+                  required
+                />
+                <span className="text-sm font-bold text-foreground-muted">%</span>
+              </div>
+              <p className="text-[11px] text-foreground-muted mt-1.5">
+                Ce taux s&apos;applique sur toutes les ventes des ouvrages déposés par cet éditeur.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setRatePublisher(null)}
+                className="px-4 py-2 rounded-xl border border-border text-xs font-semibold hover:bg-background-secondary text-foreground"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={savingPublisherRate}
+                className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5 text-gold" />
+                {savingPublisherRate ? "Enregistrement..." : "Confirmer le Taux"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

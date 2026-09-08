@@ -630,11 +630,27 @@ class UniversityRoyaltiesView(APIView):
             if not authors:
                 authors = ["Auteur Universitaire"]
 
+            cover_url = ""
+            if l.ouvrage and l.ouvrage.cover_image:
+                try:
+                    cover_url = l.ouvrage.cover_image.url
+                except Exception:
+                    cover_url = str(l.ouvrage.cover_image)
+
+            user_role = getattr(l.commande.user, 'role', '') if (l.commande and l.commande.user) else ''
+            if user_role in ('wholesaler', 'grossiste'):
+                buyer_type = "grossiste"
+            elif user_role in ('institution', 'university'):
+                buyer_type = "institution"
+            else:
+                buyer_type = "client"
+
             unit_sales.append({
                 "id": str(l.id),
                 "transaction_ref": f"TX-UNIV-{str(l.commande_id)[:8].upper()}",
                 "book_id": str(l.ouvrage_id),
                 "book_title": l.ouvrage.title,
+                "cover_url": cover_url,
                 "authors": authors,
                 "discipline": l.ouvrage.discipline.name if l.ouvrage.discipline else "Général",
                 "format": "paper" if l.format_type == "paper" else "digital",
@@ -645,12 +661,80 @@ class UniversityRoyaltiesView(APIView):
                 "applied_rate": applied_rate,
                 "royalty_amount": r_amount,
                 "currency": "XOF",
-                "buyer_type": "etudiant" if getattr(l.commande.user, 'role', '') == 'student' else "particulier",
+                "buyer_type": buyer_type,
                 "date": l.commande.created_at.strftime("%Y-%m-%d") if l.commande.created_at else str(timezone.now().date()),
             })
 
+        # Calcul des totaux réels des ventes unitaires
+        paper_sales_count = sum(s["quantity"] for s in unit_sales if s["format"] == "paper")
+        paper_gross_total = sum(s["gross_amount"] for s in unit_sales if s["format"] == "paper")
+        paper_royalties_total = sum(s["royalty_amount"] for s in unit_sales if s["format"] == "paper")
+
+        digital_sales_count = sum(s["quantity"] for s in unit_sales if s["format"] == "digital")
+        digital_gross_total = sum(s["gross_amount"] for s in unit_sales if s["format"] == "digital")
+        digital_royalties_total = sum(s["royalty_amount"] for s in unit_sales if s["format"] == "digital")
+
+        # Extraction des bouquets réels associés à l'institution
+        from .models import BouquetOffering, UniversityBouquetSubscription
+        from apps.reader.models import ReaderSession
+
+        bouquet_royalties = []
+        bouquet_consultations_count = 0
+        bouquet_gross_allocated = 0.0
+        bouquet_royalties_total = 0.0
+
+        subscriptions = UniversityBouquetSubscription.objects.filter(
+            institution=inst,
+            status='active'
+        ).select_related('institution')
+
+        for sub in subscriptions:
+            offering = BouquetOffering.objects.filter(id=sub.offering_id).first() if sub.offering_id else None
+            books_qs = offering.get_books_queryset(requesting_institution=inst) if offering else inst.ouvrages.filter(status='published')
+            inst_books_in_bouquet = books_qs.filter(institution=inst)
+            books_inc_cnt = inst_books_in_bouquet.count()
+
+            total_sessions = ReaderSession.objects.filter(
+                source_type='catalog_book',
+                ouvrage__in=books_qs
+            ).count()
+
+            univ_sessions = ReaderSession.objects.filter(
+                source_type='catalog_book',
+                ouvrage__in=inst_books_in_bouquet
+            ).count()
+
+            share_pct = (univ_sessions / total_sessions * 100.0) if total_sessions > 0 else (100.0 if books_inc_cnt > 0 else 0.0)
+            annual_price = float(sub.annual_price)
+            allocated_revenue = annual_price * (share_pct / 100.0)
+            b_royalty = allocated_revenue * (rate / 100.0)
+
+            bouquet_consultations_count += univ_sessions
+            bouquet_gross_allocated += allocated_revenue
+            bouquet_royalties_total += b_royalty
+
+            bouquet_royalties.append({
+                "id": str(sub.id),
+                "bouquet_id": str(sub.offering_id) if sub.offering_id else str(sub.id),
+                "bouquet_title": sub.title,
+                "faculty_code": sub.faculty_code,
+                "period": f"{sub.start_date.strftime('%d/%m/%Y')} - {sub.end_date.strftime('%d/%m/%Y')}",
+                "books_included_count": books_inc_cnt,
+                "total_bouquet_consultations": total_sessions,
+                "university_consultations": univ_sessions,
+                "consultation_share_percent": round(share_pct, 2),
+                "bouquet_revenue_allocated": round(allocated_revenue, 2),
+                "royalty_rate": rate,
+                "applied_rate": rate,
+                "net_royalty_amount": round(b_royalty, 2),
+                "currency": sub.currency or "XOF",
+            })
+
+        total_earned = paper_royalties_total + digital_royalties_total + bouquet_royalties_total
+        available_balance = max(0.0, total_earned - total_paid) if avail_bal == 0.0 else avail_bal
+
         resp_data = {
-            "available_balance": avail_bal,
+            "available_balance": available_balance,
             "total_paid": total_paid,
             "contractual_rate": rate,
             "institution": {
@@ -660,10 +744,21 @@ class UniversityRoyaltiesView(APIView):
             },
             "currency": "XOF",
             "min_withdrawal_threshold": 100000,
+            "totals_summary": {
+                "paper_sales_count": paper_sales_count,
+                "paper_royalties_total": paper_royalties_total,
+                "paper_gross_total": paper_gross_total,
+                "digital_sales_count": digital_sales_count,
+                "digital_royalties_total": digital_royalties_total,
+                "digital_gross_total": digital_gross_total,
+                "bouquet_consultations_count": bouquet_consultations_count,
+                "bouquet_royalties_total": bouquet_royalties_total,
+                "bouquet_gross_allocated": bouquet_gross_allocated,
+            },
+            "unit_sales": unit_sales,
+            "bouquet_royalties": bouquet_royalties,
             "statements": statements
         }
-        if unit_sales:
-            resp_data["unit_sales"] = unit_sales
 
         return Response({
             "success": True,

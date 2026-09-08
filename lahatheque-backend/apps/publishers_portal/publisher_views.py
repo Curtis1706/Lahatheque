@@ -1332,11 +1332,16 @@ class PublisherDepositPublishView(APIView):
         try:
             discipline_obj, _ = Discipline.objects.get_or_create(name=deposit.discipline)
 
+            pub_name = ""
+            if deposit.publisher:
+                pub_name = deposit.publisher.company_name or deposit.publisher.name or deposit.publisher.trade_name
+
             ouvrage = Ouvrage.objects.create(
                 title=deposit.title,
                 subtitle=deposit.subtitle,
                 isbn=deposit.isbn_digital[:64] if deposit.isbn_digital else "",
                 publisher=deposit.publisher,
+                publisher_name=pub_name,
                 discipline=discipline_obj,
                 language=deposit.language,
                 summary=deposit.summary,

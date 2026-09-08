@@ -9,7 +9,6 @@ import type {
   UniversityRoyaltiesDetailData,
   UniversityProfileData,
 } from "../types/university";
-import { buildUniversityRoyaltiesDetailData } from "../mock/university-royalties";
 
 const BFF = "/api/bff/partners/university";
 
@@ -182,29 +181,68 @@ export async function createUniversityPaperOrder(order: {
 export async function getUniversityRoyalties(): Promise<UniversityRoyaltiesDetailData> {
   try {
     const res = await bffGet<any>("/royalties/");
-    if (res && (res.unit_sales || res.bouquet_royalties)) {
+    if (res) {
       const contractualRate = Number(res.contractual_rate ?? 15);
       const currency = res.currency ?? "XOF";
-      const fallback = buildUniversityRoyaltiesDetailData(contractualRate, currency);
+      const totalsSummary = res.totals_summary ?? {
+        paper_sales_count: 0,
+        paper_royalties_total: 0,
+        paper_gross_total: 0,
+        digital_sales_count: 0,
+        digital_royalties_total: 0,
+        digital_gross_total: 0,
+        bouquet_consultations_count: 0,
+        bouquet_royalties_total: 0,
+        bouquet_gross_allocated: 0,
+      };
 
       return {
-        available_balance: res.summary?.total_available ?? res.available_balance ?? fallback.available_balance,
-        total_paid: res.summary?.total_paid ?? res.total_paid ?? fallback.total_paid,
+        available_balance: Number(res.available_balance ?? res.summary?.total_available ?? 0),
+        total_paid: Number(res.total_paid ?? res.summary?.total_paid ?? 0),
         contractual_rate: contractualRate,
-        institution: res.institution || fallback.institution,
+        institution: res.institution ?? {
+          id: "",
+          name: "Établissement Universitaire Partenaire",
+          royalty_rate: contractualRate,
+        },
         currency,
         min_withdrawal_threshold: Number(res.min_withdrawal_threshold ?? 100000),
-        totals_summary: res.totals_summary ?? fallback.totals_summary,
-        unit_sales: Array.isArray(res.unit_sales) && res.unit_sales.length > 0 ? res.unit_sales : fallback.unit_sales,
-        bouquet_royalties: Array.isArray(res.bouquet_royalties) && res.bouquet_royalties.length > 0 ? res.bouquet_royalties : fallback.bouquet_royalties,
+        totals_summary: totalsSummary,
+        unit_sales: Array.isArray(res.unit_sales) ? res.unit_sales : [],
+        bouquet_royalties: Array.isArray(res.bouquet_royalties) ? res.bouquet_royalties : [],
         statements: Array.isArray(res.statements) ? res.statements : [],
       };
     }
   } catch (err) {
-    // Si l'endpoint n'est pas encore implémenté ou en mock
+    console.error("[getUniversityRoyalties Error]", err);
   }
 
-  return buildUniversityRoyaltiesDetailData(15, "XOF");
+  return {
+    available_balance: 0,
+    total_paid: 0,
+    contractual_rate: 15,
+    institution: {
+      id: "",
+      name: "Établissement Universitaire Partenaire",
+      royalty_rate: 15,
+    },
+    currency: "XOF",
+    min_withdrawal_threshold: 100000,
+    totals_summary: {
+      paper_sales_count: 0,
+      paper_royalties_total: 0,
+      paper_gross_total: 0,
+      digital_sales_count: 0,
+      digital_royalties_total: 0,
+      digital_gross_total: 0,
+      bouquet_consultations_count: 0,
+      bouquet_royalties_total: 0,
+      bouquet_gross_allocated: 0,
+    },
+    unit_sales: [],
+    bouquet_royalties: [],
+    statements: [],
+  };
 }
 
 export async function requestUniversityRoyaltyWithdrawal(amount: number): Promise<boolean> {

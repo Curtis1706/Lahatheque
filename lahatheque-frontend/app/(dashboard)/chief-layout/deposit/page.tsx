@@ -21,13 +21,23 @@ import {
   Search,
   ChevronDown,
   X,
+  Plus,
+  Users,
+  Check,
 } from "lucide-react";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper } from "@/components/features/layout-artist/deposit-wizard-stepper";
 import { AIAnalysisProgressCard } from "@/components/features/layout-artist/ai-analysis-progress-card";
+import { DepositSubmissionModal } from "@/components/features/layout-artist/deposit-submission-modal";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
-import { createDepositWithFiles, searchPreEditions, type PreEditionSearchResult } from "@/lib/services/layout-artist";
+import { 
+  createDepositWithFiles, 
+  searchPreEditions, 
+  searchAuthors,
+  type PreEditionSearchResult,
+  type AuthorSearchResult 
+} from "@/lib/services/layout-artist";
 import { extractBookMetadataWithAi, type AiBookAnalysisResult } from "@/lib/services/ai";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { cn } from "@/lib/utils";
@@ -51,6 +61,12 @@ export default function ChiefLayoutDepositPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
+  // Transmission Modal State
+  const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<"idle" | "uploading" | "processing" | "registering" | "success" | "error">("idle");
+  const [submissionError, setSubmissionError] = useState<string | undefined>(undefined);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+
   // Form State
   const [bookFile, setBookFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -60,6 +76,7 @@ export default function ChiefLayoutDepositPage() {
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [authorsStr, setAuthorsStr] = useState("");
+  const [authorsEmailsStr, setAuthorsEmailsStr] = useState("");
   const [publisherName, setPublisherName] = useState("LAHA Éditions");
   const [year, setYear] = useState(2026);
   const [language, setLanguage] = useState("Français");
@@ -68,6 +85,14 @@ export default function ChiefLayoutDepositPage() {
   const [priceDigital, setPriceDigital] = useState(5000);
   const [isPaperAvailable, setIsPaperAvailable] = useState(false);
   const [pricePaper, setPricePaper] = useState(7500);
+
+  // Authors State (Searchable Combobox & Tags)
+  const [authorSearch, setAuthorSearch] = useState("");
+  const [allAuthors, setAllAuthors] = useState<AuthorSearchResult[]>([]);
+  const [selectedAuthors, setSelectedAuthors] = useState<string[]>([]);
+  const [isAuthorOpen, setIsAuthorOpen] = useState(false);
+  const [loadingAuthors, setLoadingAuthors] = useState(false);
+  const authorDropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Classification State
   const [realDisciplines, setRealDisciplines] = useState<DisciplineItem[]>([]);
@@ -102,7 +127,60 @@ export default function ChiefLayoutDepositPage() {
       .catch(() => {
         setLoadingPreEditions(false);
       });
+
+    // Préchargement automatique de la liste des auteurs certifiés
+    setLoadingAuthors(true);
+    searchAuthors("").then((res) => {
+      setAllAuthors(res || []);
+      setLoadingAuthors(false);
+    }).catch(() => {
+      setLoadingAuthors(false);
+    });
   }, []);
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (authorDropdownRef.current && !authorDropdownRef.current.contains(event.target as Node)) {
+        setIsAuthorOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleAddAuthor = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (!selectedAuthors.includes(trimmed)) {
+      const updated = [...selectedAuthors, trimmed];
+      setSelectedAuthors(updated);
+      setAuthorsStr(updated.join(", "));
+    }
+    setAuthorSearch("");
+  };
+
+  const handleRemoveAuthor = (nameToRemove: string) => {
+    const updated = selectedAuthors.filter((a) => a !== nameToRemove);
+    setSelectedAuthors(updated);
+    setAuthorsStr(updated.join(", "));
+  };
+
+  const handleAuthorsStrChange = (val: string) => {
+    setAuthorsStr(val);
+    const parsed = val.split(",").map((s) => s.trim()).filter(Boolean);
+    setSelectedAuthors(parsed);
+  };
+
+  const filteredAuthors = allAuthors.filter((a) => {
+    if (selectedAuthors.includes(a.name)) return false;
+    if (!authorSearch.trim()) return true;
+    const q = authorSearch.toLowerCase();
+    return (
+      a.name.toLowerCase().includes(q) ||
+      (a.institution && a.institution.toLowerCase().includes(q)) ||
+      (a.email && a.email.toLowerCase().includes(q))
+    );
+  });
 
   const handleSelectPreEdition = (dossier: PreEditionSearchResult | null) => {
     setSelectedPreEdition(dossier);
@@ -110,12 +188,16 @@ export default function ChiefLayoutDepositPage() {
     setPreEditionSearch("");
     if (dossier) {
       if (dossier.titre_previsionnel) setTitle(dossier.titre_previsionnel);
-      if (dossier.auteur_nom) setAuthorsStr(dossier.auteur_nom);
+      if (dossier.auteur_nom) {
+        setSelectedAuthors([dossier.auteur_nom]);
+        setAuthorsStr(dossier.auteur_nom);
+      }
+      if (dossier.auteur_email) setAuthorsEmailsStr(dossier.auteur_email);
       if (dossier.universite_nom) setUniversity(dossier.universite_nom);
       if (dossier.faculte_nom) setFaculty(dossier.faculte_nom);
       toast.success(`Dossier ${dossier.code_dossier} rattaché ! Métadonnées pré-remplies.`);
     } else {
-      toast.info("Veuillez sélectionner un dossier de pré-édition valide.");
+      toast.info("Dossier de pré-édition détaché.");
     }
   };
 
@@ -154,7 +236,10 @@ export default function ChiefLayoutDepositPage() {
         // Auto-application initiale
         if (!title || title === file.name.replace(/\.[^/.]+$/, "")) setTitle(result.data.title);
         if (!subtitle && result.data.subtitle) setSubtitle(result.data.subtitle);
-        if (!authorsStr && result.data.authors?.length) setAuthorsStr(result.data.authors.join(", "));
+        if (!authorsStr && result.data.authors?.length) {
+          setSelectedAuthors(result.data.authors);
+          setAuthorsStr(result.data.authors.join(", "));
+        }
         if (result.data.publisher_name) setPublisherName(result.data.publisher_name);
         if (!summary && result.data.summary) setSummary(result.data.summary);
         if (!isbn && result.data.isbn) setIsbn(result.data.isbn);
@@ -185,7 +270,10 @@ export default function ChiefLayoutDepositPage() {
     if (!aiResult) return;
     if (aiResult.title) setTitle(aiResult.title);
     if (aiResult.subtitle) setSubtitle(aiResult.subtitle);
-    if (aiResult.authors && aiResult.authors.length > 0) setAuthorsStr(aiResult.authors.join(", "));
+    if (aiResult.authors && aiResult.authors.length > 0) {
+      setSelectedAuthors(aiResult.authors);
+      setAuthorsStr(aiResult.authors.join(", "));
+    }
     if (aiResult.publisher_name) setPublisherName(aiResult.publisher_name);
     if (aiResult.isbn) setIsbn(aiResult.isbn);
     if (aiResult.summary) setSummary(aiResult.summary);
@@ -217,24 +305,15 @@ export default function ChiefLayoutDepositPage() {
     const realFound = realDisciplines.find((d) => d.name === newGenre);
     if (realFound && realFound.code_dewey) {
       setDeweyCode(realFound.code_dewey);
-    }
-    const found = matchGenreCategory(newGenre);
-    if (found) {
-      if (!realFound?.code_dewey) {
-        setDeweyCode(found.dewey);
-      }
-      if (found.faculty) {
-        setFaculty(found.faculty);
+    } else {
+      const g = matchGenreCategory(newGenre);
+      if (g.dewey) {
+        setDeweyCode(g.dewey);
       }
     }
   };
 
   const handleSaveDraft = async () => {
-    if (!selectedPreEdition) {
-      toast.error("Veuillez sélectionner un dossier de pré-édition instruit par le Juriste.");
-      setCurrentStep(2);
-      return;
-    }
     setSaving(true);
     try {
       await createDepositWithFiles(
@@ -242,7 +321,7 @@ export default function ChiefLayoutDepositPage() {
           metadata: {
             title: title || "Nouveau Dépôt Chef",
             subtitle,
-            authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur LAHA"],
+            authors: selectedAuthors.length > 0 ? selectedAuthors : ["Auteur LAHA"],
             publisher_name: publisherName,
             publication_year: year,
             language,
@@ -273,6 +352,7 @@ export default function ChiefLayoutDepositPage() {
         coverFile,
         {
           pre_edition_dossier_id: selectedPreEdition?.id,
+          authors_emails: authorsEmailsStr,
         }
       );
       toast.success("Brouillon sauvegardé avec succès.");
@@ -298,13 +378,17 @@ export default function ChiefLayoutDepositPage() {
     }
 
     setSaving(true);
+    setSubmissionError(undefined);
+    setIsSubmissionModalOpen(true);
+    setSubmissionStatus("uploading");
+
     try {
-      await createDepositWithFiles(
+      const depPromise = createDepositWithFiles(
         {
           metadata: {
             title,
             subtitle,
-            authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur LAHA"],
+            authors: selectedAuthors.length > 0 ? selectedAuthors : ["Auteur LAHA"],
             publisher_name: publisherName,
             publication_year: year,
             language,
@@ -335,17 +419,43 @@ export default function ChiefLayoutDepositPage() {
         coverFile,
         {
           pre_edition_dossier_id: selectedPreEdition?.id,
+          authors_emails: authorsEmailsStr,
+          onUploadProgress: (percent) => {
+            setUploadProgress(percent);
+            if (percent >= 100) {
+              setSubmissionStatus("processing");
+            }
+          },
         }
       );
 
-      toast.success(
-        `L'ouvrage « ${title} » a été déposé avec succès et transmis au Pôle Juridique pour validation contractuelle.`
-      );
-      router.push("/chief-layout");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erreur lors de la transmission du dépôt.";
-      toast.error(msg);
-    } finally {
+      await depPromise;
+
+      setSubmissionStatus("processing");
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      setSubmissionStatus("registering");
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      setSubmissionStatus("success");
+      toast.success(`L'ouvrage « ${title} » a été déposé avec succès !`);
+
+      setTimeout(() => {
+        window.location.href = "/chief-layout/catalog";
+      }, 1000);
+    } catch (err: any) {
+      const is502 = err.message?.includes("502") || err.message?.includes("Impossible de contacter");
+      if (is502) {
+        toast.info("Transmission envoyée. Si votre dépôt n'apparaît pas, patientez quelques secondes et actualisez.");
+        setTimeout(() => {
+          window.location.href = "/chief-layout/catalog";
+        }, 2500);
+        return;
+      }
+
+      setSubmissionStatus("error");
+      setSubmissionError(err.message || "Erreur lors de la transmission du dépôt.");
+      toast.error(err.message || "Erreur lors de la transmission du dépôt.");
       setSaving(false);
     }
   };
@@ -682,19 +792,71 @@ export default function ChiefLayoutDepositPage() {
 
             {/* Auteurs, Éditeur, ISBN, Année */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-navy">Auteur(s) *</label>
+              <div className="space-y-1.5 sm:col-span-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Auteur(s) *</label>
+                  <span className="text-[10px] text-foreground-muted">Séparer par des virgules si multiples</span>
+                </div>
                 <input
                   type="text"
                   required
                   placeholder="Pr. Jean KOUADIO, Dr. Aminata SOW"
                   value={authorsStr}
-                  onChange={(e) => setAuthorsStr(e.target.value)}
+                  onChange={(e) => handleAuthorsStrChange(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                 />
+                {/* Suggestions d'auteurs certifiés de la plateforme */}
+                {allAuthors.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] text-foreground-muted font-medium">Auteurs certifiés :</span>
+                    {allAuthors.slice(0, 5).map((auth: AuthorSearchResult) => {
+                      const isSelected = selectedAuthors.includes(auth.name);
+                      return (
+                        <button
+                          key={auth.id}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              handleRemoveAuthor(auth.name);
+                            } else {
+                              handleAddAuthor(auth.name);
+                            }
+                          }}
+                          className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-navy text-white border-navy font-bold"
+                              : "bg-background-secondary text-navy hover:bg-gold/15 border-border"
+                          }`}
+                        >
+                          {auth.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-1.5">
+              {/* Email(s) des auteurs pour notification & attribution des droits */}
+              <div className="space-y-1.5 sm:col-span-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                    Email(s) de l&apos;Auteur (Notification &amp; Droits)
+                  </label>
+                  <span className="text-[10px] text-gold font-medium">Création de compte auto</span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="auteur@institution.edu (séparer par des virgules si multiples)"
+                  value={authorsEmailsStr}
+                  onChange={(e) => setAuthorsEmailsStr(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
+                />
+                <p className="text-[10px] text-foreground-muted">
+                  Permet de rattacher automatiquement l&apos;ouvrage au compte auteur et de lui verser ses royalties.
+                </p>
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-1">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">Maison d&apos;Édition *</label>
                   {aiResult?.publisher_name && (
@@ -716,7 +878,7 @@ export default function ChiefLayoutDepositPage() {
                 />
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-1">
                 <label className="text-xs font-bold uppercase tracking-wider text-navy">ISBN-13</label>
                 <input
                   type="text"
@@ -727,7 +889,7 @@ export default function ChiefLayoutDepositPage() {
                 />
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-navy">Année de Publication</label>
                 <input
                   type="number"
@@ -1166,6 +1328,16 @@ export default function ChiefLayoutDepositPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de progression de téléversement et dépôt */}
+      <DepositSubmissionModal
+        isOpen={isSubmissionModalOpen}
+        fileName={bookFile?.name}
+        fileSizeMb={bookFile ? parseFloat((bookFile.size / (1024 * 1024)).toFixed(2)) : undefined}
+        status={submissionStatus}
+        errorMessage={submissionError}
+        realProgress={uploadProgress}
+      />
     </div>
   );
 }

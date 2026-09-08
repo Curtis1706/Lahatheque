@@ -121,6 +121,15 @@ class UserSerializer(serializers.ModelSerializer):
                 info['books_count'] = cnt
                 info['compliance_status'] = "Catalogue Conforme" if obj.is_active else "En cours d'audit"
                 info['pending_royalties'] = cnt * 12500 if cnt > 0 else 0
+                # Exposer le profil Publisher pour la modification du taux
+                try:
+                    from apps.publishers_portal.models import Publisher
+                    pub_profile = Publisher.objects.filter(user=obj).first()
+                    if pub_profile:
+                        info['publisher_profile_id'] = str(pub_profile.id)
+                        info['contractual_royalty_rate'] = float(pub_profile.contractual_royalty_rate)
+                except Exception:
+                    pass
             elif role == 'university':
                 inst_obj = obj.institution
                 if not inst_obj:

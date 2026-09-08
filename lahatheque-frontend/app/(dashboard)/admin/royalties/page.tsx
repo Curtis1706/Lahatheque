@@ -318,6 +318,96 @@ export default function AdminRoyaltiesManagementPage() {
     },
   ];
 
+  // Colonnes DataTable pour les Taux Contractuels Dérogatoires par Partenaire
+  const partnerColumns: DataTableColumn<PartnerRoyaltyConfig>[] = [
+    {
+      key: "partner_name",
+      header: "Partenaire & Raison Sociale",
+      className: "min-w-[220px]",
+      cell: (row) => (
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-xs text-foreground">{row.partner_name}</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                row.partner_type === "publisher"
+                  ? "bg-gold/15 text-gold"
+                  : row.partner_type === "university"
+                  ? "bg-navy-light text-navy"
+                  : "bg-background-secondary text-foreground-muted border border-border"
+              }`}
+            >
+              {row.partner_type === "publisher"
+                ? "Maison d'édition"
+                : row.partner_type === "university"
+                ? "Université"
+                : "Auteur"}
+            </span>
+          </div>
+          <p className="text-[11px] text-foreground-muted font-mono">{row.contract_reference}</p>
+        </div>
+      ),
+    },
+    {
+      key: "custom_royalty_rate",
+      header: "Taux Contractuel",
+      className: "min-w-[130px] whitespace-nowrap",
+      cell: (row) => (
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-sm font-bold text-navy px-2.5 py-0.5 rounded-lg bg-navy-light border border-navy/10">
+            {row.custom_royalty_rate}%
+          </span>
+          <span className="text-[10px] text-foreground-muted font-medium">HT</span>
+        </div>
+      ),
+    },
+    {
+      key: "account_identifier",
+      header: "Canal & Coordonnées",
+      className: "min-w-[200px]",
+      hideOnMobile: true,
+      cell: (row) => (
+        <div className="text-xs text-foreground-muted space-y-0.5">
+          <div className="flex items-center gap-1.5 font-medium text-foreground">
+            <CreditCard className="w-3.5 h-3.5 text-gold" />
+            <span>{row.payment_method_preferred === "bank" ? "Virement Bancaire" : "Mobile Money"}</span>
+          </div>
+          <p className="text-[11px] text-foreground-muted truncate max-w-[240px]">
+            {row.account_identifier || "Compte conventionné"}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "last_updated",
+      header: "Dernière MAJ",
+      className: "min-w-[120px] whitespace-nowrap",
+      hideOnMobile: true,
+      cell: (row) => (
+        <span className="text-xs text-foreground-muted font-mono">
+          {row.last_updated || "2026-01-01"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Action",
+      className: "text-right min-w-[130px]",
+      cell: (row) => (
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={() => handleOpenEditPartner(row)}
+            className="px-3 py-1.5 rounded-xl bg-navy-light text-navy font-semibold text-xs hover:bg-navy hover:text-white transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs min-h-[34px]"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-gold" />
+            <span>Modifier Taux</span>
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -511,58 +601,38 @@ export default function AdminRoyaltiesManagementPage() {
         </div>
       </form>
 
-      {/* 2. Tableau des Taux Spécifiques Négociés par Partenaire */}
+      {/* 2. Tableau des Taux Spécifiques Négociés par Partenaire (DataTable) */}
       <div className="p-5 sm:p-6 rounded-2xl bg-background-secondary border border-border space-y-4 shadow-xs">
-        <div className="flex items-center justify-between pb-3 border-b border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
           <div>
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Percent className="w-4 h-4 text-gold" />
               Taux Contractuels Dérogatoires par Partenaire
             </h2>
             <p className="text-xs text-foreground-muted mt-0.5">
-              Modifier individuellement les pourcentages accordés aux éditeurs, auteurs majeurs ou universités.
+              Modifier individuellement les pourcentages accordés aux maisons d&apos;édition, auteurs majeurs ou universités.
             </p>
           </div>
+          <span className="text-xs text-foreground-muted font-medium">
+            {partnerConfigs.length} partenaire(s) conventionné(s)
+          </span>
         </div>
 
-        {partnerConfigs.length === 0 ? (
-          <div className="p-6 rounded-xl bg-background border border-border text-center text-xs text-foreground-muted">
-            Aucun barème contractuel dérogatoire actif enregistré pour le moment.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {partnerConfigs.map((p) => (
-              <div
-                key={p.partner_id}
-                className="p-4 rounded-xl bg-background border border-border hover:border-gold/60 transition-all flex flex-col justify-between gap-3 shadow-xs"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-foreground truncate">{p.partner_name}</span>
-                    <span className="text-xs font-mono font-bold text-navy px-2 py-0.5 rounded-full bg-navy-light">
-                      {p.custom_royalty_rate}%
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-foreground-muted font-mono">Contrat: {p.contract_reference}</p>
-                  <p className="text-[11px] text-foreground-muted">
-                    Canal: {p.payment_method_preferred === "bank" ? "Virement Bancaire" : "Mobile Money"} ({p.account_identifier})
-                  </p>
-                </div>
-
-                <div className="pt-2 border-t border-border flex items-center justify-between">
-                  <span className="text-[10px] text-foreground-muted">MAJ: {p.last_updated}</span>
-                  <button
-                    onClick={() => handleOpenEditPartner(p)}
-                    className="px-3 py-1.5 rounded-lg bg-navy-light text-navy font-semibold text-xs hover:bg-navy hover:text-white transition-colors flex items-center gap-1"
-                  >
-                    <Edit3 className="w-3.5 h-3.5 text-gold" />
-                    Modifier Taux
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <DataTable
+          data={partnerConfigs}
+          columns={partnerColumns}
+          rowKey="partner_id"
+          loading={loading}
+          searchPlaceholder="Rechercher un partenaire, un contrat ou des coordonnées..."
+          filterKey="partner_type"
+          filterPlaceholder="Filtrer par type de partenaire"
+          filterOptions={[
+            { value: "publisher", label: "Maisons d'édition" },
+            { value: "university", label: "Universités" },
+            { value: "author", label: "Auteurs majeurs" },
+          ]}
+          emptyMessage="Aucun barème contractuel dérogatoire actif enregistré pour le moment."
+        />
       </div>
 
       {/* 3. Demandes de Versement en Attente & Règlements */}

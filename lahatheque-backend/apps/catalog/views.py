@@ -602,6 +602,26 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             elif 'non affilié' in str(institution_name).lower():
                 ouvrage.institution = None
 
+        # Maison d'Édition / Publisher
+        if 'publisher_name' in request.data or 'publisher_id' in request.data:
+            from apps.publishers_portal.models import Publisher
+            pub_id = request.data.get('publisher_id')
+            pub_name = str(request.data.get('publisher_name', '')).strip()
+            pub_obj = None
+            if pub_id:
+                try:
+                    pub_obj = Publisher.objects.filter(id=pub_id).first()
+                except Exception:
+                    pub_obj = None
+            if not pub_obj and pub_name:
+                pub_obj = (
+                    Publisher.objects.filter(company_name__iexact=pub_name).first() or
+                    Publisher.objects.filter(name__iexact=pub_name).first() or
+                    Publisher.objects.filter(company_name__icontains=pub_name).first()
+                )
+            ouvrage.publisher = pub_obj
+            ouvrage.publisher_name = pub_name if pub_name else (pub_obj.company_name if pub_obj else '')
+
         # Statut (Chef Maquettiste / Admin)
         if is_chief_or_admin and 'status' in request.data:
             ouvrage.status = request.data['status']

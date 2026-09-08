@@ -38,7 +38,7 @@ export const mockUniversityUnitSales: UniversityUnitSaleRoyalty[] = [
     applied_rate: 15,
     royalty_amount: 21000,
     currency: "XOF",
-    buyer_type: "etudiant",
+    buyer_type: "client",
     date: "2026-03-01",
   },
   {
@@ -74,7 +74,7 @@ export const mockUniversityUnitSales: UniversityUnitSaleRoyalty[] = [
     applied_rate: 10, // Même livre, taux spécifique 10%
     royalty_amount: 17500,
     currency: "XOF",
-    buyer_type: "etudiant",
+    buyer_type: "client",
     date: "2026-02-25",
   },
   {
@@ -110,7 +110,7 @@ export const mockUniversityUnitSales: UniversityUnitSaleRoyalty[] = [
     applied_rate: 15,
     royalty_amount: 30375,
     currency: "XOF",
-    buyer_type: "etudiant",
+    buyer_type: "client",
     date: "2026-02-18",
   },
   {

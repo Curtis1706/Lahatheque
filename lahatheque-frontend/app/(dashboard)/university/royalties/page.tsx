@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { BouquetDistributionModal } from "@/components/features/bouquets/bouquet-distribution-modal";
 import { UniversityRoyaltyCard } from "@/components/features/university/university-royalty-card";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import {
   getUniversityRoyalties,
@@ -92,7 +93,9 @@ export default function UniversityRoyaltiesPage() {
         formatFilter === "all" || sale.format === formatFilter;
 
       const matchesBuyer =
-        buyerFilter === "all" || sale.buyer_type === buyerFilter;
+        buyerFilter === "all" ||
+        (buyerFilter === "client" && ["client", "etudiant", "student", "particulier"].includes((sale.buyer_type || "").toLowerCase())) ||
+        (sale.buyer_type || "").toLowerCase() === buyerFilter.toLowerCase();
 
       return matchesSearch && matchesFormat && matchesBuyer;
     });
@@ -229,40 +232,57 @@ export default function UniversityRoyaltiesPage() {
     {
       key: "transaction_ref",
       header: "Réf & Date",
+      className: "min-w-[140px] whitespace-nowrap",
       cell: (row) => (
-        <div>
-          <span className="font-mono text-xs font-bold text-navy">{row.transaction_ref}</span>
-          <p className="text-[11px] text-foreground-muted">{row.date}</p>
+        <div className="space-y-0.5 whitespace-nowrap">
+          <span className="font-mono text-xs font-bold text-navy tracking-tight">{row.transaction_ref}</span>
+          <p className="text-[11px] text-foreground-muted font-medium">{row.date}</p>
         </div>
       ),
     },
     {
       key: "book_title",
       header: "Ouvrage & Discipline",
+      className: "min-w-[320px]",
       cell: (row) => (
-        <div className="max-w-xs">
-          <p className="text-xs font-bold text-navy line-clamp-1">{row.book_title}</p>
-          <p className="text-[11px] text-foreground-muted line-clamp-1">
-            {row.authors.join(", ")} &bull;{" "}
-            <span className="text-navy font-medium">{row.discipline}</span>
-          </p>
+        <div className="flex items-center gap-3 py-1">
+          <BookCover3D
+            title={row.book_title}
+            authors={row.authors}
+            discipline={row.discipline}
+            coverUrl={row.cover_url}
+            size="xs"
+            interactive={false}
+          />
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="font-serif font-bold text-xs text-navy leading-snug truncate" title={row.book_title}>
+              {row.book_title}
+            </p>
+            <p className="text-[11px] text-foreground-muted truncate">
+              {row.authors.join(", ")}
+            </p>
+            <span className="inline-flex items-center text-[10px] font-medium text-gold bg-gold/10 px-2 py-0.5 rounded-md">
+              {row.discipline}
+            </span>
+          </div>
         </div>
       ),
     },
     {
       key: "format",
       header: "Format",
+      className: "min-w-[110px] whitespace-nowrap",
       cell: (row) => {
         if (row.format === "paper") {
           return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
               <BookOpen className="w-3 h-3 text-amber-700" />
               Papier
             </span>
           );
         }
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-navy-light text-navy border border-navy-hover/20">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-navy-light text-navy border border-navy-hover/20 shadow-2xs">
             <Laptop className="w-3 h-3 text-gold" />
             Numérique
           </span>
@@ -272,12 +292,13 @@ export default function UniversityRoyaltiesPage() {
     {
       key: "quantity",
       header: "Qté & Prix",
+      className: "min-w-[120px] whitespace-nowrap",
       hideOnMobile: true,
       cell: (row) => (
-        <div>
+        <div className="whitespace-nowrap space-y-0.5">
           <span className="font-bold text-xs text-navy">{row.quantity} ex.</span>
-          <p className="text-[10px] text-foreground-muted">
-            {row.unit_price.toLocaleString("fr-FR")} {row.currency} / u
+          <p className="text-[11px] text-foreground-muted font-mono">
+            {row.unit_price.toLocaleString("fr-FR")} {row.currency} <span className="text-[10px] font-sans text-foreground-muted/70">/ unité</span>
           </p>
         </div>
       ),
@@ -285,9 +306,10 @@ export default function UniversityRoyaltiesPage() {
     {
       key: "gross_amount",
       header: "Montant Brut (HT)",
+      className: "min-w-[130px] whitespace-nowrap",
       hideOnMobile: true,
       cell: (row) => (
-        <span className="font-mono text-xs text-foreground font-semibold">
+        <span className="font-mono text-xs text-navy font-semibold whitespace-nowrap">
           {row.gross_amount.toLocaleString("fr-FR")} {row.currency}
         </span>
       ),
@@ -295,18 +317,22 @@ export default function UniversityRoyaltiesPage() {
     {
       key: "royalty_rate",
       header: "Taux",
+      className: "min-w-[120px] whitespace-nowrap",
       hideOnMobile: true,
       cell: (row) => {
         const instRate = data?.institution?.royalty_rate ?? data?.contractual_rate ?? 15;
         const appliedRate = row.applied_rate ?? row.royalty_rate;
         return (
-          <div className="flex flex-col gap-1">
-            <span className="font-bold text-xs text-navy bg-navy-light px-2 py-0.5 rounded-md inline-block w-fit">
+          <div className="flex flex-col gap-1 whitespace-nowrap">
+            <span className="font-bold text-xs text-navy bg-navy-light px-2.5 py-0.5 rounded-md inline-block w-fit font-mono border border-navy-hover/15">
               {appliedRate}%
             </span>
             {appliedRate !== instRate && (
-              <span className="text-[10px] text-gold font-semibold">
-                Taux spécifique à ce contrat : {appliedRate}% (au lieu du taux général {instRate}%)
+              <span
+                className="text-[10px] text-gold font-medium"
+                title={`Taux spécifique conventionné : ${appliedRate}% (taux standard : ${instRate}%)`}
+              >
+                Contrat spécifique ({appliedRate}%)
               </span>
             )}
           </div>
@@ -316,8 +342,9 @@ export default function UniversityRoyaltiesPage() {
     {
       key: "royalty_amount",
       header: "Redevance Nette",
+      className: "min-w-[130px] whitespace-nowrap",
       cell: (row) => (
-        <span className="font-mono text-xs font-bold text-navy">
+        <span className="font-mono text-xs font-bold text-navy whitespace-nowrap">
           {row.royalty_amount.toLocaleString("fr-FR")} {row.currency}
         </span>
       ),
@@ -325,17 +352,21 @@ export default function UniversityRoyaltiesPage() {
     {
       key: "buyer_type",
       header: "Acheteur",
+      className: "min-w-[100px] whitespace-nowrap",
       hideOnMobile: true,
       cell: (row) => {
-        const labels: Record<string, string> = {
-          etudiant: "Étudiant",
-          particulier: "Particulier",
-          institution: "Institution",
-          grossiste: "Grossiste",
-        };
+        const buyer = (row.buyer_type || "").toLowerCase();
+        let displayLabel = "Client";
+        if (buyer === "grossiste" || buyer === "wholesaler") {
+          displayLabel = "Grossiste";
+        } else if (buyer === "institution" || buyer === "university") {
+          displayLabel = "Institution";
+        } else {
+          displayLabel = "Client";
+        }
         return (
-          <span className="text-[11px] font-medium text-foreground-muted uppercase tracking-wider">
-            {labels[row.buyer_type] || row.buyer_type}
+          <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wider">
+            {displayLabel}
           </span>
         );
       },
@@ -373,10 +404,6 @@ export default function UniversityRoyaltiesPage() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Vue d&apos;ensemble
           </Link>
-          <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
-            <DollarSign className="w-4 h-4 text-gold" />
-            Rémunération Institutionnelle (Section 4.1.6 &amp; 7)
-          </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
             Détail des Redevances de l&apos;Établissement ({data.contractual_rate}% HT)
           </h1>
@@ -500,21 +527,24 @@ export default function UniversityRoyaltiesPage() {
               </span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab("bouquets")}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-2 cursor-pointer min-h-[44px] ${
-                activeTab === "bouquets"
-                  ? "bg-navy text-white shadow-xs"
-                  : "bg-background-secondary text-foreground-muted hover:text-navy border border-border"
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5 text-gold" />
-              <span>Redevances Bouquets (Prorata Consultations)</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
-                {data.bouquet_royalties.length}
-              </span>
-            </button>
+            {/* Bouton bouquets prorata — masqué temporairement */}
+            <div className="hidden">
+              <button
+                type="button"
+                onClick={() => setActiveTab("bouquets")}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-2 cursor-pointer min-h-[44px] ${
+                  activeTab === "bouquets"
+                    ? "bg-navy text-white shadow-xs"
+                    : "bg-background-secondary text-foreground-muted hover:text-navy border border-border"
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 text-gold" />
+                <span>Redevances Bouquets (Prorata Consultations)</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
+                  {data.bouquet_royalties.length}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Boutons d'export PDF selon l'onglet */}
@@ -576,9 +606,8 @@ export default function UniversityRoyaltiesPage() {
                     className="text-xs bg-transparent text-navy font-semibold focus:outline-none cursor-pointer py-1"
                   >
                     <option value="all">Tous les Acheteurs</option>
-                    <option value="etudiant">Étudiants</option>
+                    <option value="client">Clients</option>
                     <option value="institution">Institutions / Bibliothèques</option>
-                    <option value="particulier">Particuliers</option>
                     <option value="grossiste">Grossistes / Libraires</option>
                   </select>
                 </div>
@@ -591,6 +620,7 @@ export default function UniversityRoyaltiesPage() {
               columns={unitSalesColumns}
               rowKey="id"
               loading={loading}
+              searchable={false}
               emptyMessage="Aucune vente unitaire trouvée pour ces critères de recherche."
               pageSize={10}
             />
@@ -643,104 +673,114 @@ export default function UniversityRoyaltiesPage() {
               </div>
             </div>
 
-            {/* Cartes Détaillées par Bouquet */}
-            <div className="grid grid-cols-1 gap-4">
-              {data.bouquet_royalties.map((bouquet) => {
-                return (
-                  <div
-                    key={bouquet.id}
-                    className="p-5 rounded-3xl bg-background border border-border hover:border-gold/50 transition-all space-y-4 shadow-xs"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-md bg-navy-light text-navy text-[10px] font-bold">
-                            {bouquet.faculty_code || "Campus"}
-                          </span>
-                          <span className="text-[11px] text-foreground-muted">{bouquet.period}</span>
+            {/* Cartes Détaillées par Bouquet ou État Vide */}
+            {data.bouquet_royalties.length === 0 ? (
+              <div className="p-8 text-center bg-background rounded-3xl border border-border space-y-2">
+                <Layers className="w-8 h-8 text-foreground-muted mx-auto" />
+                <h4 className="font-serif text-base font-bold text-navy">Aucun abonnement bouquet actif</h4>
+                <p className="text-xs text-foreground-muted max-w-md mx-auto">
+                  Aucun bouquet documentaire n&apos;est actuellement souscrit ou n&apos;a encore généré de consultations pour votre établissement.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {data.bouquet_royalties.map((bouquet) => {
+                  return (
+                    <div
+                      key={bouquet.id}
+                      className="p-5 rounded-3xl bg-background border border-border hover:border-gold/50 transition-all space-y-4 shadow-xs"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-md bg-navy-light text-navy text-[10px] font-bold">
+                              {bouquet.faculty_code || "Campus"}
+                            </span>
+                            <span className="text-[11px] text-foreground-muted">{bouquet.period}</span>
+                          </div>
+                          <h3 className="font-serif text-lg font-bold text-navy">
+                            {bouquet.bouquet_title}
+                          </h3>
                         </div>
-                        <h3 className="font-serif text-lg font-bold text-navy">
-                          {bouquet.bouquet_title}
-                        </h3>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-3 py-1.5 rounded-full bg-gold/10 border border-gold/30 text-navy font-bold text-xs">
+                            {bouquet.books_included_count} ouvrages de votre établissement
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBouquetForDistribution(bouquet)}
+                            className="px-3 py-1.5 rounded-full bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs min-h-[34px]"
+                          >
+                            <PieChart className="w-3.5 h-3.5 text-gold" />
+                            <span>Répartition &amp; Redevances</span>
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-3 py-1.5 rounded-full bg-gold/10 border border-gold/30 text-navy font-bold text-xs">
-                          {bouquet.books_included_count} ouvrages de votre établissement
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedBouquetForDistribution(bouquet)}
-                          className="px-3 py-1.5 rounded-full bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs min-h-[34px]"
-                        >
-                          <PieChart className="w-3.5 h-3.5 text-gold" />
-                          <span>Répartition &amp; Redevances</span>
-                        </button>
+                      {/* Jauge et Chiffres de Consultation */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-foreground-muted">
+                            Part de Consultation de vos Livres dans le Bouquet :
+                          </span>
+                          <span className="font-bold text-navy font-mono text-sm">
+                            {bouquet.consultation_share_percent.toFixed(2)} % des lectures
+                          </span>
+                        </div>
+
+                        {/* Barre de progression visuelle */}
+                        <div className="w-full h-3 bg-background-secondary rounded-full overflow-hidden border border-border">
+                          <div
+                            className="h-full bg-gold rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, bouquet.consultation_share_percent)}%` }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-foreground-muted">
+                          <span>
+                            <strong className="text-navy">{bouquet.university_consultations.toLocaleString("fr-FR")}</strong> consultations de vos {bouquet.books_included_count} livres
+                          </span>
+                          <span>
+                            Sur un total global de <strong className="text-navy">{bouquet.total_bouquet_consultations.toLocaleString("fr-FR")}</strong> consultations
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Grille Financière du Bouquet */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                        <div className="p-3 rounded-xl bg-background-secondary border border-border">
+                          <span className="text-[10px] text-foreground-muted uppercase tracking-wider block font-bold">
+                            Assiette CA Proratisée
+                          </span>
+                          <p className="font-mono text-sm font-bold text-navy mt-0.5">
+                            {bouquet.bouquet_revenue_allocated.toLocaleString("fr-FR")} {bouquet.currency}
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-background-secondary border border-border">
+                          <span className="text-[10px] text-foreground-muted uppercase tracking-wider block font-bold">
+                            Taux Partenaire Appliqué
+                          </span>
+                          <p className="font-mono text-sm font-bold text-navy mt-0.5">
+                            {bouquet.royalty_rate} % HT
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-navy-light border border-navy-hover/30">
+                          <span className="text-[10px] text-navy uppercase tracking-wider block font-bold">
+                            Redevance Nette Reversée
+                          </span>
+                          <p className="font-mono text-base font-bold text-navy mt-0.5">
+                            {bouquet.net_royalty_amount.toLocaleString("fr-FR")} {bouquet.currency}
+                          </p>
+                        </div>
                       </div>
                     </div>
-
-                    {/* Jauge et Chiffres de Consultation */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-foreground-muted">
-                          Part de Consultation de vos Livres dans le Bouquet :
-                        </span>
-                        <span className="font-bold text-navy font-mono text-sm">
-                          {bouquet.consultation_share_percent.toFixed(2)} % des lectures
-                        </span>
-                      </div>
-
-                      {/* Barre de progression visuelle */}
-                      <div className="w-full h-3 bg-background-secondary rounded-full overflow-hidden border border-border">
-                        <div
-                          className="h-full bg-gold rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(100, bouquet.consultation_share_percent)}%` }}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-foreground-muted">
-                        <span>
-                          <strong className="text-navy">{bouquet.university_consultations.toLocaleString("fr-FR")}</strong> consultations de vos {bouquet.books_included_count} livres
-                        </span>
-                        <span>
-                          Sur un total global de <strong className="text-navy">{bouquet.total_bouquet_consultations.toLocaleString("fr-FR")}</strong> consultations
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Grille Financière du Bouquet */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                      <div className="p-3 rounded-xl bg-background-secondary border border-border">
-                        <span className="text-[10px] text-foreground-muted uppercase tracking-wider block font-bold">
-                          Assiette CA Proratisée
-                        </span>
-                        <p className="font-mono text-sm font-bold text-navy mt-0.5">
-                          {bouquet.bouquet_revenue_allocated.toLocaleString("fr-FR")} {bouquet.currency}
-                        </p>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-background-secondary border border-border">
-                        <span className="text-[10px] text-foreground-muted uppercase tracking-wider block font-bold">
-                          Taux Partenaire Appliqué
-                        </span>
-                        <p className="font-mono text-sm font-bold text-navy mt-0.5">
-                          {bouquet.royalty_rate} % HT
-                        </p>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-navy-light border border-navy-hover/30">
-                        <span className="text-[10px] text-navy uppercase tracking-wider block font-bold">
-                          Redevance Nette Reversée
-                        </span>
-                        <p className="font-mono text-base font-bold text-navy mt-0.5">
-                          {bouquet.net_royalty_amount.toLocaleString("fr-FR")} {bouquet.currency}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

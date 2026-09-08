@@ -819,23 +819,43 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
         try:
             from apps.rights.models import ContratLegal
             from apps.partners.models import Institution
+            from apps.publishers_portal.models import Publisher
 
             results = []
+
+            # 1. Maisons d'Édition Tiers (Publisher)
+            publishers = Publisher.objects.all().order_by('company_name')
+            for pub in publishers:
+                results.append({
+                    "partner_id": str(pub.id),
+                    "partner_name": pub.company_name or pub.name or "Maison d'édition",
+                    "partner_type": "publisher",
+                    "contract_reference": pub.contract_reference or f"CTR-PUB-{str(pub.id)[:8].upper()}",
+                    "custom_royalty_rate": float(pub.contractual_royalty_rate),
+                    "payout_frequency": "monthly",
+                    "payment_method_preferred": "bank" if pub.bank_name else "momo",
+                    "account_identifier": pub.bank_name or pub.momo_number or "Compte éditeur",
+                    "last_updated": pub.updated_at.strftime("%Y-%m-%d") if getattr(pub, 'updated_at', None) else "2026-01-01",
+                })
+
+            # 2. Contrats légaux dérogatoires
             contracts = ContratLegal.objects.filter(status='active').order_by('-created_at')[:50]
             for c in contracts:
                 p_type = "publisher" if c.type_contrat in ["editeur_tiers", "pre_edition"] else ("university" if c.type_contrat == "partenariat_universite" else "author")
-                results.append({
-                    "partner_id": str(c.id),
-                    "partner_name": c.contracting_party or c.titre,
-                    "partner_type": p_type,
-                    "contract_reference": c.numero_contrat,
-                    "custom_royalty_rate": _resolve_real_royalty_rate(c, p_type),
-                    "payout_frequency": "monthly",
-                    "payment_method_preferred": "bank",
-                    "account_identifier": "Compte conventionné",
-                    "last_updated": c.date_signature.isoformat() if c.date_signature else c.created_at.strftime("%Y-%m-%d"),
-                })
+                if not any(r["partner_name"] == (c.contracting_party or c.titre) for r in results):
+                    results.append({
+                        "partner_id": str(c.id),
+                        "partner_name": c.contracting_party or c.titre,
+                        "partner_type": p_type,
+                        "contract_reference": c.numero_contrat,
+                        "custom_royalty_rate": _resolve_real_royalty_rate(c, p_type),
+                        "payout_frequency": "monthly",
+                        "payment_method_preferred": "bank",
+                        "account_identifier": "Compte conventionné",
+                        "last_updated": c.date_signature.isoformat() if c.date_signature else c.created_at.strftime("%Y-%m-%d"),
+                    })
 
+            # 3. Établissements Universitaires Partenaires (Institution)
             institutions = Institution.objects.filter(is_active=True).order_by('name')[:20]
             for inst in institutions:
                 if not any(r["contract_reference"] == inst.contract_reference for r in results):
@@ -860,7 +880,7 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
     def update_partner_rate(self, request):
         """
         POST /api/v1/admin/royalties/payouts/partners/rate/
-        Mise à jour du taux dérogatoire d'un partenaire.
+        Mise à jour du taux dérogatoire d'un partenaire (Publisher, Institution ou ContratLegal).
         """
         partner_id = request.data.get('partner_id')
         new_rate = request.data.get('new_rate')
@@ -870,18 +890,32 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
         try:
             from apps.partners.models import Institution
             from apps.rights.models import ContratLegal
+            from apps.publishers_portal.models import Publisher
 
             updated_name = ""
-            try:
-                inst = Institution.objects.get(id=partner_id)
-                inst.royalty_rate = float(new_rate)
-                inst.save(update_fields=['royalty_rate'])
-                updated_name = inst.name
-            except Institution.DoesNotExist:
-                c = ContratLegal.objects.get(id=partner_id)
-                c.notes = f"{c.notes}\n[Taux dérogatoire ajusté à {new_rate}% par admin]".strip()
-                c.save(update_fields=['notes'])
-                updated_name = c.contracting_party or c.titre
+            updated_type = ""
+
+            # Recherche dans Publisher (Maisons d'édition)
+            pub = Publisher.objects.filter(id=partner_id).first()
+            if pub:
+                pub.contractual_royalty_rate = Decimal(str(new_rate))
+                pub.updated_at = timezone.now()
+                pub.save(update_fields=['contractual_royalty_rate', 'updated_at'])
+                updated_name = pub.company_name or pub.name
+                updated_type = "Publisher"
+            else:
+                try:
+                    inst = Institution.objects.get(id=partner_id)
+                    inst.royalty_rate = float(new_rate)
+                    inst.save(update_fields=['royalty_rate'])
+                    updated_name = inst.name
+                    updated_type = "Institution"
+                except Institution.DoesNotExist:
+                    c = ContratLegal.objects.get(id=partner_id)
+                    c.notes = f"{c.notes}\n[Taux dérogatoire ajusté à {new_rate}% par admin]".strip()
+                    c.save(update_fields=['notes'])
+                    updated_name = c.contracting_party or c.titre
+                    updated_type = "ContratLegal"
 
             JournalAuditAdmin.objects.create(
                 administrateur=request.user,

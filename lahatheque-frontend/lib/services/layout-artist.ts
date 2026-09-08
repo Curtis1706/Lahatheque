@@ -51,6 +51,7 @@ function mapBackendToDeposit(b: any, fallbackUserId?: string): LayoutDeposit {
       summary: b.summary || "",
       summary_source: b.summary_source || (b.classification_source === "ai_suggested" ? "ai_suggested" : (b.summary ? "ai_suggested" : "manual")),
       isbn: b.isbn || "",
+      publisher_name: b.publisher_name || b.publisher?.company_name || b.publisher?.name || "",
       keywords: Array.isArray(b.keywords) ? b.keywords : (typeof b.keywords === "string" && b.keywords ? b.keywords.split(",").map((k: string) => k.trim()) : []),
       pre_edition_code: b.pre_edition_dossier?.code_dossier || b.pre_edition_code || "",
       pre_edition_title: b.pre_edition_dossier?.titre_previsionnel || b.pre_edition_title || "",
@@ -178,6 +179,9 @@ export async function createDeposit(data: Partial<LayoutDeposit>): Promise<Layou
   formData.append("isbn", data.metadata?.isbn || "");
   formData.append("summary", data.metadata?.summary || "");
   formData.append("language", data.metadata?.language || "fr");
+  if (data.metadata?.publisher_name) {
+    formData.append("publisher_name", data.metadata.publisher_name);
+  }
   formData.append("format_type", (data.files?.format || "pdf").toLowerCase());
   formData.append("price_digital", String(data.default_price || 5000));
   if (data.price_audio !== undefined) formData.append("price_audio", String(data.price_audio));
@@ -372,6 +376,7 @@ export async function createDepositWithFiles(
       authors_emails: extra?.authors_emails || "",
       pre_edition_dossier_id: extra?.pre_edition_dossier_id || "",
       isbn: data.metadata?.isbn || "",
+      publisher_name: data.metadata?.publisher_name || "",
       summary: data.metadata?.summary || "",
       language: data.metadata?.language || "fr",
       format_type: (data.files?.format || "pdf").toLowerCase(),
@@ -527,6 +532,7 @@ export async function updateDeposit(
       if (updates.metadata.authors) formData.append("authors_names", updates.metadata.authors.join(", "));
       if (updates.metadata.summary !== undefined) formData.append("summary", updates.metadata.summary);
       if (updates.metadata.language) formData.append("language", updates.metadata.language);
+      if (updates.metadata.publisher_name !== undefined) formData.append("publisher_name", updates.metadata.publisher_name);
       if (updates.metadata.isbn !== undefined) formData.append("isbn", updates.metadata.isbn);
       if (updates.metadata.keywords) formData.append("keywords", JSON.stringify(updates.metadata.keywords));
       if (updates.metadata.language_source) formData.append("language_source", updates.metadata.language_source);
@@ -571,6 +577,7 @@ export async function updateDeposit(
     if (updates.metadata.authors) payload.authors_names = updates.metadata.authors.join(", ");
     if (updates.metadata.summary !== undefined) payload.summary = updates.metadata.summary;
     if (updates.metadata.language) payload.language = updates.metadata.language;
+    if (updates.metadata.publisher_name !== undefined) payload.publisher_name = updates.metadata.publisher_name;
     if (updates.metadata.isbn !== undefined) payload.isbn = updates.metadata.isbn;
     if (updates.metadata.keywords) payload.keywords = updates.metadata.keywords;
     if (updates.metadata.language_source) payload.language_source = updates.metadata.language_source;

@@ -320,6 +320,10 @@ class OuvrageCreateSerializer(serializers.Serializer):
             ouvrage.discipline = discipline_obj
             ouvrage.institution = institution_obj
             ouvrage.publisher = publisher_obj or ouvrage.publisher
+            if resolved_publisher_name:
+                ouvrage.publisher_name = resolved_publisher_name
+            elif publisher_obj:
+                ouvrage.publisher_name = publisher_obj.company_name or publisher_obj.name
             ouvrage.pre_edition_dossier = dossier
             ouvrage.rejection_reason = ''  # Réinitialiser le motif de rejet lors d'une nouvelle soumission
         else:

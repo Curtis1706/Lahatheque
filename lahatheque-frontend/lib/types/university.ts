@@ -117,6 +117,7 @@ export interface UniversityUnitSaleRoyalty {
   transaction_ref: string;
   book_id: string;
   book_title: string;
+  cover_url?: string;
   authors: string[];
   discipline: string;
   format: "paper" | "digital";
@@ -127,7 +128,7 @@ export interface UniversityUnitSaleRoyalty {
   applied_rate?: number; // Taux spécifique appliqué à ce livre/contrat
   royalty_amount: number; // Montant net de la redevance (ex: gross_amount * applied_rate / 100)
   currency: string;
-  buyer_type: "etudiant" | "particulier" | "institution" | "grossiste";
+  buyer_type: "client" | "etudiant" | "particulier" | "institution" | "grossiste" | string;
   date: string;
 }
 

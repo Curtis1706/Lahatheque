@@ -71,10 +71,13 @@ class Publisher(models.Model):
         return f"{self.company_name or self.name} ({self.get_entity_type_display()})"
 
     def save(self, *args, **kwargs):
-        if not self.name and self.company_name:
-            self.name = self.company_name
-        elif not self.company_name and self.name:
-            self.company_name = self.name
+        update_fields = kwargs.get('update_fields')
+        # Ne synchroniser name/company_name que lors d'un save() complet (pas partiel)
+        if update_fields is None:
+            if not self.name and self.company_name:
+                self.name = self.company_name
+            elif not self.company_name and self.name:
+                self.company_name = self.name
         super().save(*args, **kwargs)
 
 
