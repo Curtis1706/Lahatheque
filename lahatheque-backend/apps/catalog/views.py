@@ -177,16 +177,19 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
     def list(self, request, *args, **kwargs):
         """Liste paginée avec cache côté serveur (5 min) pour un affichage instantané."""
         cache_key = _catalog_cache_key('public_list', dict(request.query_params))
-        cached = cache.get(cache_key)
-        if cached is not None:
-            logger.debug('[Catalog] Cache HIT : %s', cache_key)
-            return Response(cached)
+        try:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+        except Exception:
+            pass
 
         response = super().list(request, *args, **kwargs)
-        # Ne mettre en cache que les réponses 200 sans authentification
         if response.status_code == 200:
-            cache.set(cache_key, response.data, CATALOG_CACHE_TTL)
-            logger.debug('[Catalog] Cache SET : %s', cache_key)
+            try:
+                cache.set(cache_key, response.data, CATALOG_CACHE_TTL)
+            except Exception:
+                pass
         return response
 
     def retrieve(self, request, *args, **kwargs):
@@ -432,13 +435,19 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             status_p = request.query_params.get('status', 'all')
             discipline_p = request.query_params.get('discipline', 'all')
             cache_key = f"chief_layout_catalog_all_{status_p}_{discipline_p}"
-            cached_data = cache.get(cache_key)
-            if cached_data is not None:
-                return Response(cached_data)
+            try:
+                cached_data = cache.get(cache_key)
+                if cached_data is not None:
+                    return Response(cached_data)
+            except Exception:
+                pass
 
             response = super().list(request, *args, **kwargs)
             if response.status_code == 200:
-                cache.set(cache_key, response.data, 300)
+                try:
+                    cache.set(cache_key, response.data, 300)
+                except Exception:
+                    pass
             return response
 
         return super().list(request, *args, **kwargs)

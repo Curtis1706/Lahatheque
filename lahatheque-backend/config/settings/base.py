@@ -348,15 +348,16 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# ── Configuration du Cache Haute Performance (Redis) ───────────────────────────
-# Cache distribué sur Redis DB 1 (isolation stricte vis-à-vis de Celery sur DB 0)
-REDIS_CACHE_URL = config('REDIS_CACHE_URL', default=REDIS_URL.rsplit('/', 1)[0] + '/1')
+# ── Configuration du Cache Haute Performance ─────────────────────────────────
+# Cache en mémoire vive ultra-rapide (LocMemCache) : zéro dépendance réseau, zéro risque d'erreur 500
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': REDIS_CACHE_URL,
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'lahatheque-catalog-cache',
         'TIMEOUT': 300,  # 5 minutes
-        'KEY_PREFIX': 'lahatheque',
+        'OPTIONS': {
+            'MAX_ENTRIES': 2000,
+        }
     }
 }
 

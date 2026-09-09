@@ -636,9 +636,12 @@ class StudentCatalogView(APIView):
         params_copy = dict(request.query_params)
         raw_key = f"student_catalog:{user.pk}:{sorted(params_copy.items())}"
         cache_key = "student:" + hashlib.md5(raw_key.encode()).hexdigest()
-        cached = cache.get(cache_key)
-        if cached is not None:
-            return Response(cached)
+        try:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+        except Exception:
+            pass
 
         qs = (
             Ouvrage.objects
@@ -778,7 +781,10 @@ class StudentCatalogView(APIView):
             'error': None,
         }
         # Mise en cache : invalide rapidement (2 min) pour refléter les achats
-        cache.set(cache_key, payload, 120)
+        try:
+            cache.set(cache_key, payload, 120)
+        except Exception:
+            pass
         return Response(payload)
 
 

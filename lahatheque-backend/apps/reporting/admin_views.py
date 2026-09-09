@@ -413,9 +413,12 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
 
     def list(self, request):
         cache_key = "admin_catalog_pricing_all"
-        cached_results = cache.get(cache_key)
-        if cached_results is not None:
-            return Response({"success": True, "data": cached_results, "error": None})
+        try:
+            cached_results = cache.get(cache_key)
+            if cached_results is not None:
+                return Response({"success": True, "data": cached_results, "error": None})
+        except Exception:
+            pass
 
         config = ConfigurationPlateformeGlobale.objects.first()
         def_num = float(config.prix_defaut_numerique_xof) if config else 3000.0
@@ -489,7 +492,10 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 ],
             })
 
-        cache.set(cache_key, results, 300)
+        try:
+            cache.set(cache_key, results, 300)
+        except Exception:
+            pass
         return Response({"success": True, "data": results, "error": None})
 
     def partial_update(self, request, pk=None):
