@@ -28,6 +28,11 @@ export interface DataTableProps<T> {
   filterKey?: keyof T;
   filterOptions?: DataTableFilterOption[];
   filterPlaceholder?: string;
+  /** Deuxième filtre optionnel (ex: langue, catégorie) */
+  secondaryFilterKey?: keyof T | (string & {});
+  secondaryFilterOptions?: DataTableFilterOption[];
+  secondaryFilterPlaceholder?: string;
+  secondaryFilterFn?: (row: T, filterValue: string) => boolean;
   searchPlaceholder?: string;
   /** Rendu mobile d'une ligne (card). Si absent, table seulement */
   mobileCard?: (row: T) => React.ReactNode;
@@ -68,6 +73,10 @@ export function DataTable<T extends Record<string, any>>({
   filterKey,
   filterOptions,
   filterPlaceholder = "Tous les statuts",
+  secondaryFilterKey,
+  secondaryFilterOptions,
+  secondaryFilterPlaceholder = "Tous",
+  secondaryFilterFn,
   searchPlaceholder = "Rechercher...",
   mobileCard,
   emptyState,
@@ -87,6 +96,7 @@ export function DataTable<T extends Record<string, any>>({
 }: DataTableProps<T>) {
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+  const [secondaryFilter, setSecondaryFilter] = React.useState("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [itemsPerPage, setItemsPerPage] = React.useState(pageSize);
   const [internalExpandedKeys, setInternalExpandedKeys] = React.useState<string[]>([]);
@@ -108,7 +118,7 @@ export function DataTable<T extends Record<string, any>>({
   // Reset page to 1 when search or filter changes
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, secondaryFilter]);
 
   // Filtrage natif React
   const filtered = React.useMemo(() => {
@@ -129,8 +139,16 @@ export function DataTable<T extends Record<string, any>>({
       rows = rows.filter((row) => String(row[filterKey]) === statusFilter);
     }
 
+    if (secondaryFilter !== "all") {
+      if (secondaryFilterFn) {
+        rows = rows.filter((row) => secondaryFilterFn(row, secondaryFilter));
+      } else if (secondaryFilterKey) {
+        rows = rows.filter((row) => String(row[secondaryFilterKey]) === secondaryFilter);
+      }
+    }
+
     return rows;
-  }, [data, search, statusFilter, filterKey, searchable]);
+  }, [data, search, statusFilter, secondaryFilter, filterKey, secondaryFilterKey, secondaryFilterFn, searchable]);
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
   const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
@@ -141,8 +159,9 @@ export function DataTable<T extends Record<string, any>>({
     return filtered.slice(start, start + itemsPerPage);
   }, [filtered, safeCurrentPage, itemsPerPage, showPagination]);
 
-  const hasHeader = Boolean(searchable || (filterOptions && filterKey) || headerActions);
-  const hasFilters = Boolean((searchable && search) || statusFilter !== "all");
+  const hasSecondaryFilter = Boolean(secondaryFilterOptions && (secondaryFilterKey || secondaryFilterFn));
+  const hasHeader = Boolean(searchable || (filterOptions && filterKey) || hasSecondaryFilter || headerActions);
+  const hasFilters = Boolean((searchable && search) || statusFilter !== "all" || secondaryFilter !== "all");
 
   return (
     <div className={cn("bg-background border border-border rounded-2xl shadow-sm overflow-hidden", className)}>
@@ -193,6 +212,31 @@ export function DataTable<T extends Record<string, any>>({
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-foreground-muted text-xs">▾</span>
               </div>
             )}
+
+            {/* Filtre secondaire (ex: langue) */}
+            {hasSecondaryFilter && (
+              <div className="relative">
+                <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-muted pointer-events-none" aria-hidden="true" />
+                <select
+                  aria-label={secondaryFilterPlaceholder}
+                  value={secondaryFilter}
+                  onChange={(e) => setSecondaryFilter(e.target.value)}
+                  className={cn(
+                    "pl-8 pr-8 py-2 rounded-xl border border-border bg-background",
+                    "text-sm text-foreground appearance-none cursor-pointer",
+                    "focus:outline-none focus:ring-2 focus:ring-navy focus:border-navy transition-all"
+                  )}
+                >
+                  <option value="all">{secondaryFilterPlaceholder}</option>
+                  {secondaryFilterOptions?.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-foreground-muted text-xs">▾</span>
+              </div>
+            )}
           </div>
 
           {/* Actions header (bouton Exporter, Nouveau, etc.) */}
@@ -222,7 +266,7 @@ export function DataTable<T extends Record<string, any>>({
             </p>
             {hasFilters && (
               <button
-                onClick={() => { setSearch(""); setStatusFilter("all"); }}
+                onClick={() => { setSearch(""); setStatusFilter("all"); setSecondaryFilter("all"); }}
                 className="text-gold hover:text-gold-dark text-xs font-bold underline underline-offset-4"
               >
                 Réinitialiser les filtres

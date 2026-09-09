@@ -673,6 +673,33 @@ class StudentCatalogView(APIView):
         elif format_type and format_type != 'all':
             qs = qs.filter(format_type=format_type)
 
+        language = request.query_params.get('language')
+        if language and language != 'all':
+            lang_low = language.lower().strip()
+            if lang_low in ('fr', 'french', 'francais', 'français'):
+                qs = qs.filter(
+                    Q(language__iexact='fr') |
+                    Q(language__iexact='Français') |
+                    Q(language_versions__language__iexact='fr', language_versions__translation_status='ready')
+                ).distinct()
+            elif lang_low in ('en', 'english', 'anglais'):
+                qs = qs.filter(
+                    Q(language__iexact='en') |
+                    Q(language_versions__language__iexact='en')
+                ).distinct()
+            elif lang_low in ('bilingual', 'bilingue', 'multi'):
+                qs = qs.filter(
+                    language_versions__language__iexact='fr',
+                    language_versions__translation_status='ready'
+                ).filter(
+                    language_versions__language__iexact='en'
+                ).distinct()
+            else:
+                qs = qs.filter(
+                    Q(language__iexact=language) |
+                    Q(language_versions__language__iexact=language)
+                ).distinct()
+
         qs = qs.order_by('-created_at', '-id')
 
         # Calcul vectorisé / batch de l'accès utilisateur pour éviter 500+ requêtes SQL N+1

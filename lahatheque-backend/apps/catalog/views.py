@@ -140,13 +140,36 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
                     Q(institution__short_name__iexact=inst_val)
                 )
 
-        # 6. Filtre langue (langue originale ou déclinaison linguistique disponible)
+        # 6. Filtre langue (langue originale ou déclinaison linguistique disponible, avec support bilingue et alias)
         lang_val = self.request.query_params.get('language')
         if lang_val and lang_val.lower() != 'all':
-            qs = qs.filter(
-                Q(language__iexact=lang_val) |
-                Q(language_versions__language__iexact=lang_val)
-            ).distinct()
+            lang_low = lang_val.lower().strip()
+            if lang_low in ('bilingual', 'bilingue', 'multi'):
+                qs = qs.filter(
+                    Q(language__iexact='fr') |
+                    Q(language__iexact='Français') |
+                    Q(language_versions__language__iexact='fr', language_versions__translation_status='ready')
+                ).filter(
+                    Q(language__iexact='en') |
+                    Q(language_versions__language__iexact='en')
+                ).distinct()
+            elif lang_low in ('fr', 'french', 'francais', 'français'):
+                qs = qs.filter(
+                    Q(language__iexact='fr') |
+                    Q(language__iexact='Français') |
+                    Q(language_versions__language__iexact='fr', language_versions__translation_status='ready')
+                ).distinct()
+            elif lang_low in ('en', 'english', 'anglais'):
+                qs = qs.filter(
+                    Q(language__iexact='en') |
+                    Q(language_versions__language__iexact='en')
+                ).distinct()
+            else:
+                # Logique du commit distant pour tout code ISO (ex: 'es', 'pt', etc.)
+                qs = qs.filter(
+                    Q(language__iexact=lang_val) |
+                    Q(language_versions__language__iexact=lang_val)
+                ).distinct()
 
         # 7. Filtre pays
         country_val = self.request.query_params.get('country')

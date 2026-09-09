@@ -19,6 +19,7 @@ import {
   Filter,
   ChevronDown,
   X,
+  Languages,
 } from "lucide-react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -30,6 +31,7 @@ import { DisciplineCombobox } from "@/components/features/catalog/discipline-com
 import { getWholesalerBooks } from "@/lib/services/wholesaler";
 import type { WholesalerBookItem, WholesalerCartItem } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
+import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
 
 export default function WholesalerCatalogPage() {
   const router = useRouter();
@@ -39,6 +41,7 @@ export default function WholesalerCatalogPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
+  const [languageFilter, setLanguageFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // Panier grossiste state
@@ -76,6 +79,7 @@ export default function WholesalerCatalogPage() {
   const filteredBooks = useMemo(() => {
     return books.filter((b) => {
       if (disciplineFilter !== "all" && b.discipline !== disciplineFilter) return false;
+      if (!matchesLanguageFilter(b, languageFilter)) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = b.title.toLowerCase().includes(q);
@@ -87,7 +91,7 @@ export default function WholesalerCatalogPage() {
       }
       return true;
     });
-  }, [books, searchQuery, disciplineFilter]);
+  }, [books, searchQuery, disciplineFilter, languageFilter]);
 
   const handleAddToCart = (book: WholesalerBookItem) => {
     setCart((prev) => {
@@ -329,12 +333,29 @@ export default function WholesalerCatalogPage() {
             />
           </div>
 
-          {(disciplineFilter !== "all" || searchQuery) && (
+          {/* Sélecteur de Langue */}
+          <div className="w-full sm:w-52">
+            <select
+              value={languageFilter}
+              onChange={(e) => setLanguageFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px] cursor-pointer"
+              aria-label="Filtrer par langue"
+            >
+              {CATALOG_LANGUAGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {(disciplineFilter !== "all" || languageFilter !== "all" || searchQuery) && (
             <button
               type="button"
               onClick={() => {
                 setSearchQuery("");
                 setDisciplineFilter("all");
+                setLanguageFilter("all");
               }}
               className="px-3 py-2 text-xs text-foreground-muted hover:text-error transition-colors flex items-center gap-1 cursor-pointer shrink-0"
               title="Réinitialiser les filtres"
@@ -431,6 +452,7 @@ export default function WholesalerCatalogPage() {
             onClick={() => {
               setSearchQuery("");
               setDisciplineFilter("all");
+              setLanguageFilter("all");
             }}
             className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors cursor-pointer"
           >

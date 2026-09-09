@@ -56,6 +56,10 @@ export interface UniversityBookCatalogItem {
   cover_url?: string;
   consultations_count: number;
   stock_paper_available: number;
+  language?: string;
+  original_language?: string;
+  available_languages?: string[];
+  is_original?: boolean;
 }
 
 export interface UniversityPaperOrderItem {

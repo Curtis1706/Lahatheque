@@ -2,18 +2,20 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { BookOpen, PlusCircle, UploadCloud, ArrowLeft, Eye, ShieldCheck, Download, Edit, Headphones } from "lucide-react";
+import { BookOpen, PlusCircle, UploadCloud, ArrowLeft, Eye, ShieldCheck, Download, Edit, Headphones, Languages } from "lucide-react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getPublisherBooks } from "@/lib/services/publisher";
 import type { PublisherBook } from "@/lib/types/publisher";
+import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
 
 export default function PublisherCatalogPage() {
   const [books, setBooks] = useState<PublisherBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [languageFilter, setLanguageFilter] = useState("all");
 
   useEffect(() => {
     async function loadData() {
@@ -28,6 +30,7 @@ export default function PublisherCatalogPage() {
   const filteredBooks = useMemo(() => {
     return books.filter((b) => {
       if (statusFilter !== "all" && b.status !== statusFilter) return false;
+      if (!matchesLanguageFilter(b, languageFilter)) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = b.title.toLowerCase().includes(q);
@@ -37,7 +40,7 @@ export default function PublisherCatalogPage() {
       }
       return true;
     });
-  }, [books, searchQuery, statusFilter]);
+  }, [books, searchQuery, statusFilter, languageFilter]);
 
   const columns: DataTableColumn<PublisherBook>[] = [
     {
@@ -179,21 +182,38 @@ export default function PublisherCatalogPage() {
       </div>
 
       {/* Filtres & Recherche */}
-      <div className="p-4 rounded-2xl bg-background border border-border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Rechercher un ouvrage par titre, ISBN ou auteur..."
-          className="w-full sm:w-80 px-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
-        />
+      <div className="p-4 rounded-2xl bg-background border border-border flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-center gap-3 flex-1">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Rechercher par titre, ISBN ou auteur..."
+            className="w-full sm:w-72 px-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
+          />
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+          <div className="w-full sm:w-48">
+            <select
+              value={languageFilter}
+              onChange={(e) => setLanguageFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px] cursor-pointer"
+              aria-label="Filtrer par langue"
+            >
+              {CATALOG_LANGUAGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto">
           {[
             { id: "all", label: "Tous les statuts" },
             { id: "published", label: "Publiés" },
-            { id: "pending", label: "En cours de validation" },
-            { id: "revision_requested", label: "Correction demandée" },
+            { id: "pending", label: "En cours" },
+            { id: "revision_requested", label: "Correction" },
           ].map((st) => (
             <button
               key={st.id}
