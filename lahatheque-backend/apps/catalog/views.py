@@ -136,7 +136,19 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
         if year_val and year_val.isdigit():
             qs = qs.filter(publication_date__year=int(year_val))
 
-        return qs.order_by('-created_at')
+        # 9. Tri dynamique
+        ordering = self.request.query_params.get('ordering', '-created_at')
+        ordering_map = {
+            '-created_at': ('-created_at', '-id'),
+            'created_at': ('created_at', 'id'),
+            'title_asc': ('title', '-created_at'),
+            'title_desc': ('-title', '-created_at'),
+            'price_asc': ('price_digital', '-created_at'),
+            'price_desc': ('-price_digital', '-created_at'),
+            '-publication_date': ('-publication_date', '-created_at'),
+        }
+        order_tuple = ordering_map.get(ordering, ('-created_at', '-id'))
+        return qs.order_by(*order_tuple)
 
     def retrieve(self, request, *args, **kwargs):
         pk = kwargs.get('pk')

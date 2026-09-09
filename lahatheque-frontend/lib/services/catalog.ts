@@ -9,6 +9,19 @@ export interface SearchFilters {
   country?: string;
   format?: string;
   year?: string | number;
+  page?: number;
+  page_size?: number;
+  ordering?: string;
+}
+
+export interface PaginatedCatalogResponse {
+  results: Book[];
+  count: number;
+  total_pages: number;
+  current_page: number;
+  page_size: number;
+  next: string | null;
+  previous: string | null;
 }
 
 export interface InstitutionOption {
@@ -59,9 +72,12 @@ export async function getInstitutions(): Promise<InstitutionOption[]> {
 }
 
 /**
- * Recherche réelle des ouvrages du catalogue depuis la base de données (zéro mock)
+ * Recherche réelle paginée des ouvrages du catalogue depuis la base de données (zéro mock)
  */
-export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
+export async function searchCatalogBooks(filters: SearchFilters): Promise<PaginatedCatalogResponse> {
+  const currentPage = Math.max(1, filters.page || 1);
+  const pageSize = Math.max(1, filters.page_size || 20);
+
   try {
     const params = new URLSearchParams();
     if (filters.q) params.set("q", filters.q.trim());
@@ -72,8 +88,11 @@ export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
     if (filters.country) params.set("country", filters.country.trim());
     if (filters.format) params.set("format", filters.format.trim());
     if (filters.year) params.set("year", filters.year.toString().trim());
+    if (filters.ordering) params.set("ordering", filters.ordering.trim());
+    params.set("page", String(currentPage));
+    params.set("page_size", String(pageSize));
 
-    const queryStr = params.toString() ? `?${params.toString()}` : "";
+    const queryStr = `?${params.toString()}`;
     const isServer = typeof window === "undefined";
     const url = isServer
       ? `${getBaseApiUrl()}/v1/catalog/books/${queryStr}`
@@ -86,24 +105,70 @@ export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
 
     if (res.ok) {
       const json = await res.json();
-      if (Array.isArray(json)) {
-        return json;
-      }
-      if (json && Array.isArray(json.data)) {
-        return json.data;
-      }
+
+      // Cas 1 : Réponse standard DRF PageNumberPagination { count, next, previous, results }
       if (json && Array.isArray(json.results)) {
-        return json.results;
+        const count = typeof json.count === "number" ? json.count : json.results.length;
+        return {
+          results: json.results,
+          count,
+          total_pages: Math.ceil(count / pageSize) || 1,
+          current_page: currentPage,
+          page_size: pageSize,
+          next: json.next || null,
+          previous: json.previous || null,
+        };
       }
+
+      // Cas 2 : Réponse enveloppée standard { success: true, data: { count, results, ... } }
       if (json && json.data && Array.isArray(json.data.results)) {
-        return json.data.results;
+        const count = typeof json.data.count === "number" ? json.data.count : json.data.results.length;
+        return {
+          results: json.data.results,
+          count,
+          total_pages: Math.ceil(count / pageSize) || 1,
+          current_page: currentPage,
+          page_size: pageSize,
+          next: json.data.next || null,
+          previous: json.data.previous || null,
+        };
       }
+
+      // Cas 3 : Données brutes sous forme de tableau
+      const rawList = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+      const count = rawList.length;
+      return {
+        results: rawList,
+        count,
+        total_pages: Math.ceil(count / pageSize) || 1,
+        current_page: currentPage,
+        page_size: pageSize,
+        next: null,
+        previous: null,
+      };
     }
-    return [];
   } catch (err) {
-    console.error("Erreur API catalogue:", err);
-    return [];
+    console.error("Erreur API catalogue paginée:", err);
   }
+
+  return {
+    results: [],
+    count: 0,
+    total_pages: 1,
+    current_page: currentPage,
+    page_size: pageSize,
+    next: null,
+    previous: null,
+  };
+}
+
+/**
+ * Recherche réelle des ouvrages du catalogue depuis la base de données (zéro mock)
+ * Maintient la signature originale pour rétrocompatibilité totale avec les autres composants.
+ */
+export async function searchBooks(filters: SearchFilters): Promise<Book[]> {
+  const paginated = await searchCatalogBooks(filters);
+  return paginated.results;
 }
 
 /**

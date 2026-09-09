@@ -417,10 +417,10 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
 
         books = (
             Ouvrage.objects
-            .select_related('publisher', 'discipline')
-            .prefetch_related('authors')
+            .select_related('publisher', 'discipline', 'institution')
+            .prefetch_related('authors', 'language_versions', 'audio_tracks')
             .all()
-            .order_by('-publication_date', '-id')[:100]
+            .order_by('-created_at', '-id')[:100]
         )
         results = []
         for b in books:
@@ -438,13 +438,16 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 pub_name = b.institution.name
 
             authors_list = [f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]
+            cover_url = b.cover_url or ""
 
-            cover_url = b.cover_image.url if (b.cover_image and hasattr(b.cover_image, 'url')) else ""
-
-            lang_versions = list(b.language_versions.values('id', 'language', 'is_original', 'title', 'page_count'))
-            avail_langs = [lv['language'] for lv in lang_versions if lv.get('language')]
+            # Exploitation du prefetch_related en mémoire (zéro requête SQL additionnelle)
+            lang_versions = list(b.language_versions.all())
+            avail_langs = [lv.language for lv in lang_versions if lv.language]
             if not avail_langs:
                 avail_langs = [getattr(b, 'original_language', None) or b.language or 'fr']
+
+            audio_tracks_list = list(b.audio_tracks.all()) if hasattr(b, 'audio_tracks') else []
+            has_audio = bool(getattr(b, "has_audio_version", False) or len(audio_tracks_list) > 0)
 
             results.append({
                 "id": str(b.id),
@@ -460,7 +463,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "price_paper": price_pap,
                 "price_audio": float(b.price_audio) if b.price_audio is not None else None,
                 "has_audio_version": bool(getattr(b, "has_audio_version", False)),
-                "has_audio": bool(getattr(b, "has_audio_version", False) or (hasattr(b, 'audio_tracks') and b.audio_tracks.exists())),
+                "has_audio": has_audio,
                 "uses_default_pricing": not has_custom,
                 "status": b.status,
                 "is_original": getattr(b, 'is_original', True),
@@ -469,12 +472,12 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "available_languages": avail_langs,
                 "languages": [
                     {
-                        "id": str(lv['id']),
-                        "language": lv.get('language') or 'fr',
-                        "language_code": lv.get('language') or 'fr',
-                        "is_original": bool(lv.get('is_original', False)),
-                        "title": lv.get('title') or b.title,
-                        "page_count": lv.get('page_count') or b.page_count or 0,
+                        "id": str(lv.id),
+                        "language": lv.language or 'fr',
+                        "language_code": lv.language or 'fr',
+                        "is_original": bool(lv.is_original),
+                        "title": lv.title or b.title,
+                        "page_count": lv.page_count or b.page_count or 0,
                     }
                     for lv in lang_versions
                 ],

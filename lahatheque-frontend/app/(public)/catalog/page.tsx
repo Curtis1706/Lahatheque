@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { 
   Search, 
@@ -15,16 +15,19 @@ import {
   ArrowRight,
   Calendar,
   Headphones,
-  Laptop
+  Laptop,
+  ArrowUpDown,
+  RotateCcw
 } from "lucide-react";
 import { Book } from "@/lib/types/catalog";
-import { searchBooks, getInstitutions, type InstitutionOption } from "@/lib/services/catalog";
+import { searchCatalogBooks, getInstitutions, type InstitutionOption } from "@/lib/services/catalog";
 import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import { Book as Book3D } from "@/components/ui/book";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-modal";
 import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
+import { Pagination } from "@/components/ui/pagination";
 
 // Liste dynamique des années de publication : de l'année en cours jusqu'à 1950
 const CURRENT_YEAR = new Date().getFullYear();
@@ -34,13 +37,20 @@ const PUBLICATION_YEARS = Array.from(
 );
 
 function CatalogSearchInner() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const urlQuery = searchParams.get("q") || "";
+  const urlPage = parseInt(searchParams.get("page") || "1", 10);
+  const urlPageSize = parseInt(searchParams.get("page_size") || "20", 10);
+  const urlOrdering = searchParams.get("ordering") || "-created_at";
 
   const { disciplineNames } = useDisciplines();
   const [books, setBooks] = useState<Book[]>([]);
   const [institutions, setInstitutions] = useState<InstitutionOption[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filtres
   const [searchQuery, setSearchQuery] = useState(urlQuery);
   const [authorQuery, setAuthorQuery] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
@@ -48,12 +58,21 @@ function CatalogSearchInner() {
   const [selectedLanguage, setSelectedLanguage] = useState("");
   const [selectedFormat, setSelectedFormat] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
+  const [ordering, setOrdering] = useState(urlOrdering);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [selectedSampleBook, setSelectedSampleBook] = useState<Book | null>(null);
 
+  // Pagination dynamique réelle
+  const [currentPage, setCurrentPage] = useState<number>(Number.isNaN(urlPage) || urlPage < 1 ? 1 : urlPage);
+  const [pageSize, setPageSize] = useState<number>(Number.isNaN(urlPageSize) || urlPageSize < 1 ? 20 : urlPageSize);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+
+  const resultsTopRef = useRef<HTMLDivElement>(null);
+
   // Chargement dynamique des universités de la base de données
   useEffect(() => {
-    getInstitutions().then((data) => {
+    getInstitutions().then((data: InstitutionOption[]) => {
       if (data && data.length > 0) {
         setInstitutions(data);
       }
@@ -67,29 +86,65 @@ function CatalogSearchInner() {
     }
   }, [urlQuery]);
 
+  // Réinitialiser à la page 1 lorsque les filtres changent
+  const handleFilterChange = (setter: (val: any) => void, val: any) => {
+    setter(val);
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     const fetchBooks = async () => {
       setLoading(true);
       try {
-        const data = await searchBooks({
+        const data = await searchCatalogBooks({
           q: searchQuery || undefined,
           author: authorQuery || undefined,
           discipline: selectedDiscipline || undefined,
           institution: selectedInstitution || undefined,
           language: selectedLanguage || undefined,
           format: selectedFormat || undefined,
-          year: selectedYear || undefined
+          year: selectedYear || undefined,
+          ordering: ordering || undefined,
+          page: currentPage,
+          page_size: pageSize,
         });
-        setBooks(data);
+        setBooks(data.results);
+        setTotalCount(data.count);
+        setTotalPages(data.total_pages);
       } catch (err) {
-        console.error(err);
+        console.error("Erreur lors du chargement du catalogue:", err);
       } finally {
         setLoading(false);
       }
     };
 
     fetchBooks();
-  }, [searchQuery, authorQuery, selectedDiscipline, selectedInstitution, selectedLanguage, selectedFormat, selectedYear]);
+  }, [
+    searchQuery, 
+    authorQuery, 
+    selectedDiscipline, 
+    selectedInstitution, 
+    selectedLanguage, 
+    selectedFormat, 
+    selectedYear,
+    ordering,
+    currentPage,
+    pageSize
+  ]);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    if (resultsTopRef.current) {
+      resultsTopRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.scrollTo({ top: 280, behavior: "smooth" });
+    }
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -99,11 +154,16 @@ function CatalogSearchInner() {
     setSelectedLanguage("");
     setSelectedFormat("");
     setSelectedYear("");
+    setOrdering("-created_at");
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = Boolean(
-    searchQuery || authorQuery || selectedDiscipline || selectedInstitution || selectedLanguage || selectedFormat || selectedYear
+    searchQuery || authorQuery || selectedDiscipline || selectedInstitution || selectedLanguage || selectedFormat || selectedYear || ordering !== "-created_at"
   );
+
+  const startItem = totalCount > 0 ? (currentPage - 1) * pageSize + 1 : 0;
+  const endItem = Math.min(currentPage * pageSize, totalCount);
 
   return (
     <div className="min-h-screen bg-background text-foreground py-8 px-4 sm:px-6 lg:px-12 max-w-[1920px] mx-auto">
@@ -128,12 +188,12 @@ function CatalogSearchInner() {
           <div className="w-full sm:max-w-2xl">
             <ActionSearchBar 
               initialValue={searchQuery}
-              onSearch={(val) => setSearchQuery(val)}
+              onSearch={(val) => handleFilterChange(setSearchQuery, val)}
               onSelectAction={(category, value) => {
                 if (category === "discipline") {
-                  setSelectedDiscipline(value);
+                  handleFilterChange(setSelectedDiscipline, value);
                 } else if (category === "institution") {
-                  setSelectedInstitution(value);
+                  handleFilterChange(setSelectedInstitution, value);
                 }
               }}
             />
@@ -182,13 +242,13 @@ function CatalogSearchInner() {
                   type="text"
                   placeholder="Ex: Kouassi, Yao, Traoré..."
                   value={authorQuery}
-                  onChange={(e) => setAuthorQuery(e.target.value)}
+                  onChange={(e) => handleFilterChange(setAuthorQuery, e.target.value)}
                   className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none placeholder:text-foreground-muted/60"
                 />
                 {authorQuery && (
                   <button 
-                    onClick={() => setAuthorQuery("")} 
-                    className="absolute right-2.5 top-2.5 text-foreground-muted hover:text-navy"
+                    onClick={() => handleFilterChange(setAuthorQuery, "")} 
+                    className="absolute right-2.5 top-2.5 text-foreground-muted hover:text-navy cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -204,7 +264,7 @@ function CatalogSearchInner() {
               </label>
               <select
                 value={selectedInstitution}
-                onChange={(e) => setSelectedInstitution(e.target.value)}
+                onChange={(e) => handleFilterChange(setSelectedInstitution, e.target.value)}
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
                 <option value="">Toutes les universités</option>
@@ -224,7 +284,7 @@ function CatalogSearchInner() {
               </label>
               <select
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
+                onChange={(e) => handleFilterChange(setSelectedYear, e.target.value)}
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
                 <option value="">Toutes les années</option>
@@ -244,7 +304,7 @@ function CatalogSearchInner() {
               </label>
               <DisciplineCombobox
                 value={selectedDiscipline}
-                onChange={setSelectedDiscipline}
+                onChange={(val) => handleFilterChange(setSelectedDiscipline, val)}
                 includeAllOption={true}
                 placeholder="Toutes les disciplines..."
                 searchPlaceholder="Rechercher parmi les disciplines..."
@@ -259,7 +319,7 @@ function CatalogSearchInner() {
               </label>
               <select
                 value={selectedFormat}
-                onChange={(e) => setSelectedFormat(e.target.value)}
+                onChange={(e) => handleFilterChange(setSelectedFormat, e.target.value)}
                 className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
               >
                 <option value="">Tous les formats</option>
@@ -273,14 +333,81 @@ function CatalogSearchInner() {
           {/* Liste des Ouvrages */}
           <main className="md:col-span-8 lg:col-span-9 space-y-6">
             
-            {/* Barre de compteur de résultats */}
-            <div className="flex items-center justify-between text-xs text-foreground-muted border-b border-border pb-3">
-              <span>
-                <strong>{books.length}</strong> ouvrage{books.length > 1 ? "s" : ""} disponible{books.length > 1 ? "s" : ""}
-              </span>
-              {hasActiveFilters && (
-                <span className="text-gold font-medium">Filtres actifs</span>
-              )}
+            {/* Barre de compteur de résultats et options de tri (Norme e-commerce & bibliothèques) */}
+            <div 
+              ref={resultsTopRef}
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border-b border-border pb-4"
+            >
+              <div className="space-y-0.5">
+                <p className="text-foreground font-medium">
+                  {totalCount > 0 ? (
+                    <>
+                      Affichage de <strong className="text-navy">{startItem}</strong> à{" "}
+                      <strong className="text-navy">{endItem}</strong> sur{" "}
+                      <strong className="text-navy">{totalCount}</strong> ouvrage{totalCount > 1 ? "s" : ""} disponible{totalCount > 1 ? "s" : ""}
+                    </>
+                  ) : (
+                    <span className="text-foreground-muted">0 ouvrage disponible</span>
+                  )}
+                </p>
+                {hasActiveFilters && (
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <span className="text-[11px] font-semibold text-gold bg-gold/10 px-2 py-0.5 rounded-full border border-gold/30">
+                      Filtres actifs
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="text-[11px] text-foreground-muted hover:text-navy underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3 text-gold" />
+                      Tout effacer
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Contrôles de Tri et Éléments par Page */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Sélecteur de tri */}
+                <div className="flex items-center gap-1.5 bg-background-secondary border border-border rounded-xl px-2.5 py-1.5 shadow-2xs">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-gold shrink-0" />
+                  <label htmlFor="catalog-sort" className="text-[11px] font-medium text-foreground-muted shrink-0 hidden sm:inline">
+                    Trier par :
+                  </label>
+                  <select
+                    id="catalog-sort"
+                    value={ordering}
+                    onChange={(e) => handleFilterChange(setOrdering, e.target.value)}
+                    className="bg-transparent text-navy text-xs font-semibold focus:outline-none cursor-pointer pr-1"
+                  >
+                    <option value="-created_at">Plus récents</option>
+                    <option value="created_at">Plus anciens</option>
+                    <option value="title_asc">Titre (A → Z)</option>
+                    <option value="title_desc">Titre (Z → A)</option>
+                    <option value="price_asc">Prix croissant</option>
+                    <option value="price_desc">Prix décroissant</option>
+                    <option value="-publication_date">Année de parution</option>
+                  </select>
+                </div>
+
+                {/* Sélecteur de nombre d'éléments par page */}
+                <div className="flex items-center gap-1.5 bg-background-secondary border border-border rounded-xl px-2.5 py-1.5 shadow-2xs">
+                  <span className="text-[11px] font-medium text-foreground-muted shrink-0">
+                    Par page :
+                  </span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    className="bg-transparent text-navy text-xs font-semibold focus:outline-none cursor-pointer pr-1 font-mono"
+                  >
+                    <option value={12}>12</option>
+                    <option value={20}>20</option>
+                    <option value={36}>36</option>
+                    <option value={48}>48</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             {/* Squelette de Chargement */}
@@ -311,9 +438,9 @@ function CatalogSearchInner() {
                 </button>
               </div>
             ) : (
-
-              /* Grille de Cartes d'Ouvrages */
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+              <>
+                {/* Grille de Cartes d'Ouvrages */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                 {books.map((book) => {
                   const authorName = book.authors_details && book.authors_details.length > 0 
                     ? book.authors_details.map(a => `${a.first_name} ${a.last_name}`).join(", ")
@@ -488,6 +615,21 @@ function CatalogSearchInner() {
                   );
                 })}
               </div>
+
+                {/* Pagination Standard du Marché (Norme e-commerce & bibliothèque académique) */}
+                <div className="pt-2">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={totalCount}
+                    pageSize={pageSize}
+                    onPageChange={handlePageChange}
+                    onPageSizeChange={handlePageSizeChange}
+                    pageSizeOptions={[12, 20, 36, 48]}
+                    itemLabel="ouvrages disponibles"
+                  />
+                </div>
+              </>
             )}
           </main>
         </div>
