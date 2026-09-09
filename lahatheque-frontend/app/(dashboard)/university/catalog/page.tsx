@@ -15,6 +15,7 @@ import { UniversityBookDetailModal } from "@/components/features/university/univ
 import { getUniversityCatalog } from "@/lib/services/university";
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import type { UniversityBookCatalogItem } from "@/lib/types/university";
+import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
 
 export default function UniversityCatalogPage() {
   const [books, setBooks] = useState<UniversityBookCatalogItem[]>([]);
@@ -207,6 +208,10 @@ export default function UniversityCatalogPage() {
         filterKey="discipline"
         filterOptions={disciplineNames.map((d) => ({ value: d, label: d }))}
         filterPlaceholder="Toutes les disciplines"
+        secondaryFilterKey="language"
+        secondaryFilterOptions={CATALOG_LANGUAGE_OPTIONS}
+        secondaryFilterPlaceholder="Toutes les langues"
+        secondaryFilterFn={(row, lang) => matchesLanguageFilter(row, lang)}
         emptyMessage="Aucun ouvrage ne correspond à votre recherche."
         pageSize={10}
         mobileCard={(row) => (

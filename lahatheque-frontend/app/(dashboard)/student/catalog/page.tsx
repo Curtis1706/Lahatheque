@@ -15,6 +15,7 @@ import {
   RotateCcw,
   X,
   Headphones,
+  Languages,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -30,6 +31,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ViewToggle, type ViewMode } from "@/components/features/student/view-toggle";
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
+import { CATALOG_LANGUAGE_OPTIONS } from "@/lib/constants/catalog-languages";
 
 // ─── Skeletons ────────────────────────────────────────────────────────────────
 
@@ -413,6 +415,7 @@ export default function StudentCatalogPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState("all");
+  const [selectedLanguage, setSelectedLanguage] = useState("all");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
@@ -442,7 +445,8 @@ export default function StudentCatalogPage() {
         selectedDiscipline !== "all" ? selectedDiscipline : undefined,
         undefined,
         currentPage,
-        pageSize
+        pageSize,
+        selectedLanguage !== "all" ? selectedLanguage : undefined
       );
       setCatalogData(data);
     } catch (err: unknown) {
@@ -452,7 +456,7 @@ export default function StudentCatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQ, selectedDiscipline, currentPage, pageSize]);
+  }, [debouncedQ, selectedDiscipline, selectedLanguage, currentPage, pageSize]);
 
   useEffect(() => {
     loadCatalog();
@@ -509,6 +513,7 @@ export default function StudentCatalogPage() {
   const handleResetFilters = () => {
     setSearchQuery("");
     setSelectedDiscipline("all");
+    setSelectedLanguage("all");
     setCurrentPage(1);
     toast.info("Filtres réinitialisés");
   };
@@ -598,8 +603,27 @@ export default function StudentCatalogPage() {
             />
           </div>
 
+          {/* Sélecteur de Langue */}
+          <div className="w-full sm:w-52 sm:shrink-0">
+            <select
+              value={selectedLanguage}
+              onChange={(e) => {
+                setSelectedLanguage(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-3 py-2.5 text-xs sm:text-sm bg-background-secondary border border-border rounded-2xl text-navy focus:outline-none focus:border-gold min-h-[44px] cursor-pointer"
+              aria-label="Filtrer par langue"
+            >
+              {CATALOG_LANGUAGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Bouton Réinitialiser si filtre actif */}
-          {(searchQuery || selectedDiscipline !== "all") && (
+          {(searchQuery || selectedDiscipline !== "all" || selectedLanguage !== "all") && (
             <button
               type="button"
               onClick={handleResetFilters}

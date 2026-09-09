@@ -80,6 +80,7 @@ export interface LayoutDeposit {
   is_paper_available?: boolean;
   pre_edition_dossier?: any;
   is_original?: boolean;
+  language?: string;
   original_language?: string;
   parent_ouvrage_title?: string;
   available_languages?: string[];

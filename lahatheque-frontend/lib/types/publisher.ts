@@ -46,6 +46,9 @@ export interface PublisherBook {
   discipline: string;
   disciplines?: string[];
   language?: string;
+  original_language?: string;
+  available_languages?: string[];
+  is_original?: boolean;
   keywords: string[];
   target_audience: "universitaire" | "professionnel" | "grand_public";
   price: number;

@@ -367,12 +367,14 @@ export async function getStudentCatalog(
   discipline?: string,
   format?: string,
   page?: number,
-  pageSize?: number
+  pageSize?: number,
+  language?: string
 ): Promise<CatalogDataAPI> {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (discipline && discipline !== "all") params.set("discipline", discipline);
   if (format && format !== "all") params.set("format", format);
+  if (language && language !== "all") params.set("language", language);
   if (page) params.set("page", String(page));
   if (pageSize) params.set("page_size", String(pageSize));
   const query = params.toString();

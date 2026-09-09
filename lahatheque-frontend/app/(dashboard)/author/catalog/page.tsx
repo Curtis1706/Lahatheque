@@ -13,6 +13,7 @@ import {
   Truck,
   Sparkles,
   Headphones,
+  Languages,
 } from "lucide-react";
 import {
   getStudentCatalog,
@@ -24,6 +25,7 @@ import type { AuthorKpis } from "@/lib/types/author";
 import { BookSampleModal } from "@/components/features/student/book-sample-modal";
 import { AuthorCatalogOrderModal } from "@/components/features/author/author-catalog-order-modal";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
+import { CATALOG_LANGUAGE_OPTIONS } from "@/lib/constants/catalog-languages";
 
 function SkeletonBook() {
   return (
@@ -233,6 +235,7 @@ export default function AuthorCatalogPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState<string>("all");
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
 
   const [sampleBook, setSampleBook] = useState<BookAPI | null>(null);
   const [orderModalBook, setOrderModalBook] = useState<BookAPI | null>(null);
@@ -243,7 +246,11 @@ export default function AuthorCatalogPage() {
       const [data, kpisData] = await Promise.all([
         getStudentCatalog(
           search.trim() || undefined,
-          selectedDiscipline !== "all" ? selectedDiscipline : undefined
+          selectedDiscipline !== "all" ? selectedDiscipline : undefined,
+          undefined,
+          undefined,
+          undefined,
+          selectedLanguage !== "all" ? selectedLanguage : undefined
         ),
         getAuthorKpis().catch(() => null),
       ]);
@@ -256,7 +263,7 @@ export default function AuthorCatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDiscipline, search]);
+  }, [selectedDiscipline, selectedLanguage, search]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -348,6 +355,36 @@ export default function AuthorCatalogPage() {
             allOptionLabel="Toutes les disciplines"
           />
         </div>
+
+        {/* Sélecteur de Langue */}
+        <div className="w-full sm:w-52">
+          <select
+            value={selectedLanguage}
+            onChange={(e) => setSelectedLanguage(e.target.value)}
+            className="w-full px-3 py-2.5 text-xs rounded-2xl border border-border bg-background-secondary text-navy focus:outline-none focus:border-gold min-h-[44px] cursor-pointer"
+            aria-label="Filtrer par langue"
+          >
+            {CATALOG_LANGUAGE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {(search || selectedDiscipline !== "all" || selectedLanguage !== "all") && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setSelectedDiscipline("all");
+              setSelectedLanguage("all");
+            }}
+            className="px-4 py-2 text-xs font-semibold text-gold hover:text-gold-dark transition-colors shrink-0 flex items-center justify-center cursor-pointer min-h-[44px]"
+          >
+            Réinitialiser
+          </button>
+        )}
       </div>
 
 

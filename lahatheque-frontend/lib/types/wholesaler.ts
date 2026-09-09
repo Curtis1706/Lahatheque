@@ -28,6 +28,10 @@ export interface WholesalerBookItem {
   is_paper_available?: boolean;
   sample_excerpt_url?: string;
   summary: string;
+  language?: string;
+  original_language?: string;
+  available_languages?: string[];
+  is_original?: boolean;
 }
 
 export interface WholesalerCartItem {

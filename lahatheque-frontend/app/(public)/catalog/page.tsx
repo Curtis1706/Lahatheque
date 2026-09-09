@@ -17,7 +17,8 @@ import {
   Headphones,
   Laptop,
   ArrowUpDown,
-  RotateCcw
+  RotateCcw,
+  Languages,
 } from "lucide-react";
 import { Book } from "@/lib/types/catalog";
 import { searchCatalogBooks, getInstitutions, type InstitutionOption } from "@/lib/services/catalog";
@@ -28,6 +29,7 @@ import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-modal";
 import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 import { Pagination } from "@/components/ui/pagination";
+import { CATALOG_LANGUAGE_OPTIONS } from "@/lib/constants/catalog-languages";
 
 // Liste dynamique des années de publication : de l'année en cours jusqu'à 1950
 const CURRENT_YEAR = new Date().getFullYear();
@@ -41,6 +43,7 @@ function CatalogSearchInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const urlQuery = searchParams.get("q") || "";
+  const urlLanguage = searchParams.get("language") || "";
   const urlPage = parseInt(searchParams.get("page") || "1", 10);
   const urlPageSize = parseInt(searchParams.get("page_size") || "20", 10);
   const urlOrdering = searchParams.get("ordering") || "-created_at";
@@ -55,7 +58,7 @@ function CatalogSearchInner() {
   const [authorQuery, setAuthorQuery] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
   const [selectedInstitution, setSelectedInstitution] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState(urlLanguage);
   const [selectedFormat, setSelectedFormat] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [ordering, setOrdering] = useState(urlOrdering);
@@ -326,6 +329,25 @@ function CatalogSearchInner() {
                 <option value="digital">Livre numérique</option>
                 <option value="paper">Livre papier</option>
                 <option value="audio">Livre audio</option>
+              </select>
+            </div>
+
+            {/* Filtre Langue */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                <Languages className="w-3.5 h-3.5 text-gold" />
+                Langue de Publication
+              </label>
+              <select
+                value={selectedLanguage}
+                onChange={(e) => handleFilterChange(setSelectedLanguage, e.target.value === "all" ? "" : e.target.value)}
+                className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
+              >
+                {CATALOG_LANGUAGE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value === "all" ? "" : opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
           </aside>

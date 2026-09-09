@@ -24,6 +24,7 @@ import { useAudioPlayer } from "@/components/features/audio/audio-player-context
 import { getCatalogBooks } from "@/lib/services/layout-artist";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
+import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
 
 export default function ChiefLayoutCatalogPage() {
   const { playBook } = useAudioPlayer();
@@ -304,6 +305,10 @@ export default function ChiefLayoutCatalogPage() {
           { value: "revision_requested", label: "Retouche demandée" },
           { value: "draft", label: "Brouillons" },
         ]}
+        secondaryFilterKey="language"
+        secondaryFilterOptions={CATALOG_LANGUAGE_OPTIONS}
+        secondaryFilterPlaceholder="Toutes les langues"
+        secondaryFilterFn={(row, lang) => matchesLanguageFilter(row, lang)}
         searchPlaceholder="Rechercher par titre, auteur, discipline ou ISBN..."
         pageSize={10}
         pageSizeOptions={[10, 20, 50, 100]}

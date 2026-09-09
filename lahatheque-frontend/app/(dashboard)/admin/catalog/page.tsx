@@ -30,12 +30,15 @@ import { ViewToggle, ViewMode } from "@/components/features/student/view-toggle"
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
 import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
+import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
 
 export default function AdminCatalogPage() {
   const { playBook } = useAudioPlayer();
   const [books, setBooks] = useState<AdminCatalogBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [gridLanguage, setGridLanguage] = useState<string>("all");
+  const [gridSearch, setGridSearch] = useState<string>("");
 
   // State pour la modale d'édition
   const [editingBook, setEditingBook] = useState<AdminCatalogBook | null>(null);
@@ -314,6 +317,17 @@ export default function AdminCatalogPage() {
     },
   ];
 
+  const displayedGridBooks = books.filter((book) => {
+    const matchesLang = matchesLanguageFilter(book, gridLanguage);
+    const q = gridSearch.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      book.title.toLowerCase().includes(q) ||
+      (book.author_name && book.author_name.toLowerCase().includes(q)) ||
+      (Array.isArray(book.authors) && book.authors.some((a) => a.toLowerCase().includes(q)));
+    return matchesLang && matchesSearch;
+  });
+
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto space-y-6">
       {/* En-tête de la page */}
@@ -363,96 +377,131 @@ export default function AdminCatalogPage() {
 
       {/* Mode de vue conditionnel (Grille / Liste) */}
       {viewMode === "grid" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {books.map((book) => (
-            <div key={book.id} className="p-4 rounded-2xl bg-background border border-border space-y-3 hover:border-gold/50 transition-all flex flex-col justify-between group shadow-2xs">
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-navy-light text-navy font-bold truncate max-w-[120px]">
-                    {book.discipline || "Général"}
-                  </span>
-                  <StatusBadge status={book.status} />
-                </div>
-
-                {/* Couverture 3D élégante centrée */}
-                <div className="flex justify-center py-1">
-                  <BookCover3D
-                    title={book.title}
-                    authors={book.authors || book.author_name}
-                    discipline={book.discipline}
-                    coverUrl={book.cover_image || book.cover_url}
-                    size="sm"
-                  />
-                </div>
-
-                <div className="space-y-1 text-center">
-                  <h3 className="font-serif font-bold text-sm text-foreground line-clamp-2">{book.title}</h3>
-                  <div className="text-xs text-foreground-muted flex items-center justify-center gap-1">
-                    <span>Par</span>
-                    <AuthorsDisplay
-                      authors={book.authors}
-                      fallbackName={book.author_name}
-                      bookTitle={book.title}
-                      maxVisible={2}
-                      className="text-xs text-foreground-muted"
-                    />
-                  </div>
-                  <p className="text-xs text-gold font-medium">{book.publisher_name}</p>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-border space-y-2 font-mono text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-navy">{book.price_digital.toLocaleString("fr-FR")} FCFA</span>
-                  <span className="text-[10px] text-foreground-muted uppercase font-bold">{book.protection_type || "LCP"}</span>
-                </div>
-                <div className="flex items-center gap-2 pt-1 font-sans">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEditModal(book)}
-                    className="p-2 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
-                    title="Modifier l'ouvrage et ses tarifs"
-                  >
-                    <Pencil className="w-3.5 h-3.5 text-gold" />
-                  </button>
-                  <Link
-                    href={`/admin/catalog/${book.id}/protection`}
-                    className="flex-1 py-2 px-2 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy text-[11px] font-bold text-center transition-colors flex items-center justify-center gap-1 min-h-[36px]"
-                  >
-                    <Shield className="w-3 h-3 text-gold" />
-                    <span>Protection</span>
-                  </Link>
-                  {((book as any).has_audio || (book as any).has_audio_version || (book as any).format_type === 'audio') && (book as any).is_digital_available === false ? (
-                    <Link
-                      href={`/listen/${book.id}`}
-                      target="_blank"
-                      className="p-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
-                      title="Ouvrir dans le lecteur audio sécurisé"
-                    >
-                      <Headphones className="w-3.5 h-3.5 text-gold" />
-                    </Link>
-                  ) : (
-                    <Link
-                      href={`/catalog/reader/${book.id}`}
-                      target="_blank"
-                      className="p-2 rounded-xl bg-navy/10 hover:bg-navy hover:text-white text-navy transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
-                      title="Ouvrir dans le lecteur sécurisé"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </Link>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setDeleteConfirmBook(book)}
-                    className="p-2 rounded-xl bg-error/10 hover:bg-error/20 text-error transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
-                    title="Retirer du catalogue / Archiver"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-background border border-border">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Rechercher par titre ou auteur..."
+                value={gridSearch}
+                onChange={(e) => setGridSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-background-secondary border border-border text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-navy outline-none"
+              />
             </div>
-          ))}
+            <div className="flex items-center gap-2">
+              <Languages className="w-4 h-4 text-gold shrink-0" />
+              <select
+                value={gridLanguage}
+                onChange={(e) => setGridLanguage(e.target.value)}
+                className="py-2 px-3 text-xs rounded-xl bg-background-secondary border border-border text-foreground focus:ring-2 focus:ring-navy outline-none cursor-pointer"
+              >
+                {CATALOG_LANGUAGE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {displayedGridBooks.length === 0 ? (
+            <div className="p-8 text-center rounded-2xl bg-background border border-border text-foreground-muted text-xs">
+              Aucun ouvrage ne correspond à vos critères de recherche ou de langue.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {displayedGridBooks.map((book) => (
+                <div key={book.id} className="p-4 rounded-2xl bg-background border border-border space-y-3 hover:border-gold/50 transition-all flex flex-col justify-between group shadow-2xs">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-navy-light text-navy font-bold truncate max-w-[120px]">
+                        {book.discipline || "Général"}
+                      </span>
+                      <StatusBadge status={book.status} />
+                    </div>
+
+                    {/* Couverture 3D élégante centrée */}
+                    <div className="flex justify-center py-1">
+                      <BookCover3D
+                        title={book.title}
+                        authors={book.authors || book.author_name}
+                        discipline={book.discipline}
+                        coverUrl={book.cover_image || book.cover_url}
+                        size="sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1 text-center">
+                      <h3 className="font-serif font-bold text-sm text-foreground line-clamp-2">{book.title}</h3>
+                      <div className="text-xs text-foreground-muted flex items-center justify-center gap-1">
+                        <span>Par</span>
+                        <AuthorsDisplay
+                          authors={book.authors}
+                          fallbackName={book.author_name}
+                          bookTitle={book.title}
+                          maxVisible={2}
+                          className="text-xs text-foreground-muted"
+                        />
+                      </div>
+                      <p className="text-xs text-gold font-medium">{book.publisher_name}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-border space-y-2 font-mono text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-navy">{book.price_digital.toLocaleString("fr-FR")} FCFA</span>
+                      <span className="text-[10px] text-foreground-muted uppercase font-bold">{book.protection_type || "LCP"}</span>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1 font-sans">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(book)}
+                        className="p-2 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        title="Modifier l'ouvrage et ses tarifs"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-gold" />
+                      </button>
+                      <Link
+                        href={`/admin/catalog/${book.id}/protection`}
+                        className="flex-1 py-2 px-2 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy text-[11px] font-bold text-center transition-colors flex items-center justify-center gap-1 min-h-[36px]"
+                      >
+                        <Shield className="w-3 h-3 text-gold" />
+                        <span>Protection</span>
+                      </Link>
+                      {((book as any).has_audio || (book as any).has_audio_version || (book as any).format_type === 'audio') && (book as any).is_digital_available === false ? (
+                        <Link
+                          href={`/listen/${book.id}`}
+                          target="_blank"
+                          className="p-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+                          title="Ouvrir dans le lecteur audio sécurisé"
+                        >
+                          <Headphones className="w-3.5 h-3.5 text-gold" />
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/catalog/reader/${book.id}`}
+                          target="_blank"
+                          className="p-2 rounded-xl bg-navy/10 hover:bg-navy hover:text-white text-navy transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+                          title="Ouvrir dans le lecteur sécurisé"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </Link>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirmBook(book)}
+                        className="p-2 rounded-xl bg-error/10 hover:bg-error/20 text-error transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        title="Retirer du catalogue / Archiver"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <DataTable
@@ -468,6 +517,10 @@ export default function AdminCatalogPage() {
             { value: "draft", label: "Brouillons" },
             { value: "archived", label: "Archivés" },
           ]}
+          secondaryFilterKey="language"
+          secondaryFilterOptions={CATALOG_LANGUAGE_OPTIONS}
+          secondaryFilterPlaceholder="Toutes les langues"
+          secondaryFilterFn={(row, lang) => matchesLanguageFilter(row, lang)}
           searchPlaceholder="Rechercher par titre ou auteur..."
         />
       )}
