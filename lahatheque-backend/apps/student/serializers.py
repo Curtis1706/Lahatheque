@@ -74,6 +74,9 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
 
     def get_is_owned(self, obj) -> bool:
         request = self.context.get('request')
+        # En contexte Machine-to-Machine partenaire, aucun utilisateur connecté : court-circuit immédiat anti-N+1
+        if self.context.get('is_partner_context') or getattr(request, 'is_partner', False) or getattr(request, 'partner', None):
+            return False
         if request and request.user and request.user.is_authenticated:
             user_owned_ids = self.context.get('user_owned_ids')
             if user_owned_ids is not None:
@@ -100,6 +103,9 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
 
     def get_is_audio_owned(self, obj) -> bool:
         request = self.context.get('request')
+        # En contexte Machine-to-Machine partenaire, aucun utilisateur connecté : court-circuit immédiat
+        if self.context.get('is_partner_context') or getattr(request, 'is_partner', False) or getattr(request, 'partner', None):
+            return False
         if request and request.user and request.user.is_authenticated:
             user_audio_ids = self.context.get('user_audio_ids')
             if user_audio_ids is not None:

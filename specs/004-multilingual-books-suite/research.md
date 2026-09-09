@@ -189,3 +189,50 @@ Les plateformes partenaires (universités, LahaLex, intégrateurs d'accès mixte
 ### Studio Audio (`/layout-artist/audio/new`)
 - Lors du rattachement d'un livre audio à un ouvrage multilingue, un champ obligatoire sélectionne la langue de narration (`fr`, `en`...).
 - Les pistes audio sont directement stockées et liées à l'entrée `OuvrageLanguageVersion` correspondante.
+
+---
+
+## 6. Pipeline de Conversion EPUB vers PDF & Protection Anti-Surcharge (FR-021, SC-006)
+
+### Problématique
+La plateforme LAHAThèque héberge des fichiers EPUB issus de Cloudflare R2 (`r2_key_epub`). Intégrer un moteur EPUB tiers côté client (ex: `epub.js`) briserait l'uniformité des deux liseuses (Immersion 3D et Lecteur Classique), compliquerait l'apposition du filigrane DRM et ralentirait l'expérience de lecture.
+
+### Décision d'Architecture
+1. **Conversion Vectorielle Backend Exclusive (PyMuPDF)** : Le backend Django convertit l'EPUB en PDF vectoriel paginé haute fidélité via PyMuPDF (`fitz.open(stream=..., filetype='epub').convert_to_pdf()`). Les deux lecteurs restent 100% compatibles et uniformes en PDF natif.
+2. **Verrou Distribué Redis Anti-Thundering Herd** : Un verrou Redis éphémère (`laha:epub_convert:<hash>`, timeout 120s) prévient tout risque de conversion simultanée par plusieurs workers lors d'un pic de consultations.
+3. **Persistance R2 Immédiate (`r2_key_pdf`)** : Dès la première conversion, le PDF résultant est téléversé sur Cloudflare R2 (bucket `lahatheque`) et sa clé est enregistrée dans `OuvrageLanguageVersion.r2_key_pdf`. Tous les accès futurs sont servis directement depuis R2/CDN sans aucun recalcul CPU.
+
+---
+
+## 7. Haute Performance & Cache Redis sur le Catalogue Partenaire (FR-015, FR-024)
+
+### Problématique
+L'endpoint `GET /api/v1/partner/catalog/` était borné arbitrairement par `qs[:100]`, sans filtre linguistique, et effectuait des requêtes N+1 sur `language_versions` et `authors`. De plus, les partenaires SaaS ne disposent pas de Redis sur leur propre infrastructure.
+
+### Décision d'Architecture
+1. **Cache Redis Côté Serveur LAHAThèque** : Le cache Redis est opéré sur notre infrastructure LAHAThèque (TTL 15 min avec invalidation ciblée lors de la publication d'un livre). Les partenaires SaaS bénéficient d'une réponse ultra-rapide (1 à 2 ms) par simple appel HTTP sans avoir besoin d'installer Redis chez eux.
+2. **Suppression du Plafond Statique de 100 Ouvrages** : Permet le chargement complet des 1 600+ ouvrages et de toutes les disciplines, avec support optionnel de pagination (`page`, `page_size`).
+3. **Préchargement Relationnel Anti-N+1** : `select_related('discipline', 'institution')` et `prefetch_related('authors', 'language_versions')`.
+4. **Filtrage Linguistique Dédié** : Support du paramètre de requête `?language=fr` ou `?language=en` filtrant sur la présence de la langue demandée dans `OuvrageLanguageVersion`.
+5. **Court-circuit M2M pour `is_owned` et `has_digital_access`** : En contexte M2M partenaire, ces champs sont toujours forcés à `false` sans déclencher de vérification de droits `AccessService`, éliminant les requêtes SQL superflues.
+
+---
+
+## 8. Streaming Multilingue Sécurisé & Mise à Jour du Guide Partenaire (FR-009, FR-024)
+
+### Streaming avec Cascade de Résolution de Langue
+Sur `GET /api/v1/reader/sessions/stream/`, la résolution de la version linguistique s'opère en cascade non-bloquante :
+1. Paramètre HTTP `?lang=` passé par la liseuse hébergée lors d'un switch de langue.
+2. Métadonnée de session `session.metadata['language']` définie à la création (`POST /api/v1/reader/sessions/`).
+3. Langue originale de l'ouvrage (`session.ouvrage.original_language` ou `'fr'`) comme repli par défaut garanti sans erreur 400/404.
+
+Le gestionnaire `DerivedMaterializer` reçoit la référence sous la forme `{ouvrage_id}:{lang}` et génère/sert le dérivé chiffré filigrané spécifique à cette langue.
+
+### Mise à Jour Exhaustive du Guide Partenaire Accès Mixte
+Mise à jour complète de `GUIDE_INTEGRATION_ACCES_MIXTE.md` et de ses trois SDKs (Python, TypeScript, PHP) pour intégrer :
+- Paramètre `language` dans `POST /api/v1/reader/sessions/` et dans les méthodes SDK `open_catalog_book`.
+- Champs additifs `available_languages`, `languages`, `has_audio` dans `GET /api/v1/partner/catalog/`.
+- Paramètre `?language=` et levée de limite dans la recherche catalogue.
+- Explication transparente du cache Redis opéré par LAHAThèque.
+- Précision sur le streaming transparent des EPUBs convertis en PDF vectoriel côté serveur.
+- Payload enrichi avec `language` sur le Webhook `reader.session.opened`.

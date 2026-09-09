@@ -21,9 +21,20 @@ paths:
             type: string
         - name: language
           in: query
-          description: Filtre facultatif sur la langue disponible
+          description: Filtre facultatif sur la langue disponible (ex: fr, en)
           schema:
             type: string
+        - name: page
+          in: query
+          description: Numéro de page (optionnel)
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          description: Nombre d'ouvrages par page (optionnel, sans limite si omis)
+          schema:
+            type: integer
       responses:
         '200':
           description: Liste des ouvrages avec métadonnées multilingues additives
@@ -103,18 +114,55 @@ paths:
                       reader_url:
                         type: string
                         format: uri
-                      active_language:
+                      expires_at:
                         type: string
-                        example: fr
-                      available_languages:
-                        type: array
-                        items:
-                          type: string
-                        example: ["fr", "en"]
+                        format: date-time
+                      book:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          title:
+                            type: string
+                          author_name:
+                            type: string
+                          total_pages:
+                            type: integer
+                          has_audio:
+                            type: boolean
+                          available_languages:
+                            type: array
+                            items:
+                              type: string
+                            example: ["fr", "en"]
+                          selected_language:
+                            type: string
+                            example: fr
+
+  /api/v1/reader/sessions/stream/:
+    get:
+      summary: Streaming protégé de session avec résolution dynamique de langue et filigrane DRM
+      security:
+        - SessionTokenHeader: []
+        - BearerToken: []
+      parameters:
+        - name: lang
+          in: query
+          required: false
+          description: Code langue cible pour bascule dynamique (ex: fr, en)
+          schema:
+            type: string
+            example: fr
+      responses:
+        '206':
+          description: Flux binaire PDF vectoriel fragmenté (Range Requests) avec filigrane dynamique
+        '200':
+          description: Flux binaire PDF complet avec filigrane dynamique
 
   /api/v1/reader/books/{id}/stream/:
     get:
-      summary: Streaming protégé avec filigrane dynamique pour une langue donnée
+      summary: Streaming protégé interne avec filigrane dynamique pour une langue donnée
       parameters:
         - name: id
           in: path
@@ -130,7 +178,7 @@ paths:
             example: fr
       responses:
         '206':
-          description: Flux binaire PDF/EPUB fragmenté avec filigrane dynamique
+          description: Flux binaire PDF fragmenté avec filigrane dynamique
         '200':
           description: Flux binaire complet
 
@@ -138,6 +186,12 @@ components:
   securitySchemes:
     OAuth2Bearer:
       type: http
+      scheme: bearer
+      bearerFormat: JWT
+    SessionTokenHeader:
+      type: apiKey
+      in: header
+      name: X-Reader-Token
       scheme: bearer
       bearerFormat: JWT
 

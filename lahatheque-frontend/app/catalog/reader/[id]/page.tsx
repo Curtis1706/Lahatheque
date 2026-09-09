@@ -303,11 +303,24 @@ export default function DocumentReaderPage() {
   const isOfficeDoc = book?.file?.match(/\.(docx|doc|pptx|ppt|xlsx|xls)$/i)
   const effectiveImmersionMode = (isMobile || isAudioOnly || isOfficeDoc) ? false : isImmersionMode
 
-  const [currentLanguage, setCurrentLanguage] = useState<string>("fr");
+  const [currentLanguage, setCurrentLanguage] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const urlLang = new URLSearchParams(window.location.search).get('lang');
+      if (urlLang) return urlLang.toLowerCase();
+    }
+    return "fr";
+  });
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlLang = new URLSearchParams(window.location.search).get('lang');
+      if (urlLang) {
+        setCurrentLanguage(urlLang.toLowerCase());
+        return;
+      }
+    }
     if (book?.language) {
-      setCurrentLanguage(book.language);
+      setCurrentLanguage(book.language.toLowerCase());
     }
   }, [book]);
 
@@ -641,17 +654,24 @@ export default function DocumentReaderPage() {
           format_type: "pdf" as const,
           file: "",
           progress: { last_page: 0 },
+          language: "fr",
+          available_languages: ["fr"],
+          languages: [],
         }));
         setBook(data as any)
         if (data && 'progress' in data && data.progress && !isSampleMode) {
           setCurrentPage(data.progress.last_page || 0)
         }
 
+        const urlLang = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null;
+        const initialLang = (urlLang || (data as any)?.language || "fr").toLowerCase();
+        const langQuery = initialLang ? `?lang=${encodeURIComponent(initialLang)}` : '';
+
         // --- CHARGEMENT PROGRESSIF HAUTE PERFORMANCE (STREAMING HTTP 206) ---
         // Transmet directement l'URL de streaming au lecteur sans télécharger tout le fichier à l'avance
         const targetStreamUrl = isSampleMode
-          ? `/api/bff/catalog/books/${id}/sample/`
-          : ((data && data.file) ? data.file : (id === 'lesson_pdf' ? '' : `/api/bff/catalog/books/${id}/stream/`));
+          ? `/api/bff/catalog/books/${id}/sample/${langQuery}`
+          : ((data && data.file && !data.file.startsWith('/api/')) ? data.file : (id === 'lesson_pdf' ? '' : `/api/bff/catalog/books/${id}/stream/${langQuery}`));
 
         if (targetStreamUrl) {
           setRawPdfData(targetStreamUrl);
@@ -891,7 +911,7 @@ export default function DocumentReaderPage() {
           watermarkLahaSubtext={drmSettings?.watermark_laha_subtext}
         />
         <FlipBookReader
-          key={`${id}_${currentPosition}_${safeDrmOpacity}_${drmSettings?.watermark_laha_template || ""}`}
+          key={`${id}_${currentLanguage}_${currentPosition}_${safeDrmOpacity}_${drmSettings?.watermark_laha_template || ""}`}
           fileUrl={streamPdfUrl}
           bookId={id as string}
           initialPage={isSampleMode ? 0 : currentPage}

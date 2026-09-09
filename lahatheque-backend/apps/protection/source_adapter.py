@@ -4,6 +4,8 @@ Supporte le catalogue interne (R2/local), les URLs distantes externes avec prote
 et whitelist de serveurs partenaires (incluant sous-domaines automatiques), ainsi que les téléversements directs.
 """
 
+import hashlib
+import io
 import ipaddress
 import logging
 import os
@@ -97,6 +99,130 @@ class DocumentSourceAdapter:
         return None
 
     @classmethod
+    def _convert_epub_bytes_to_pdf(cls, epub_data: bytes) -> Optional[bytes]:
+        """Convertit un flux binaire EPUB en flux PDF vectoriel haute fidélité en mémoire vive via PyMuPDF."""
+        if not epub_data:
+            return None
+        try:
+            import fitz
+            with fitz.open(stream=epub_data, filetype="epub") as doc:
+                return doc.convert_to_pdf()
+        except Exception as e:
+            logger.error(f"Erreur conversion EPUB en PDF en mémoire: {e}")
+            return None
+
+    @classmethod
+    def _upload_pdf_to_r2(cls, pdf_data: bytes, r2_key: str) -> bool:
+        """
+        Téléverse un flux PDF converti sur le bucket principal Cloudflare R2 (lahatheque).
+        Retourne True si l'upload a réussi, False sinon.
+        """
+        try:
+            from apps.catalog.services.cover_generator import get_r2_s3_client
+            s3 = get_r2_s3_client()
+            bucket = getattr(settings, 'CLOUDFLARE_R2_BUCKET_NAME', 'lahatheque')
+            s3.upload_fileobj(
+                io.BytesIO(pdf_data),
+                bucket,
+                r2_key,
+                ExtraArgs={'ContentType': 'application/pdf'}
+            )
+            logger.info(f"PDF converti depuis EPUB téléversé avec succès sur R2 : {r2_key} ({len(pdf_data) // 1024} Ko)")
+            return True
+        except Exception as e:
+            logger.error(f"Echec téléversement PDF converti sur R2 ({r2_key}): {e}")
+            return False
+
+    @classmethod
+    def _get_redis_client(cls):
+        """Retourne un client Redis depuis REDIS_URL ou None si Redis est indisponible."""
+        try:
+            import redis as redis_lib
+            redis_url = getattr(settings, 'REDIS_URL', None)
+            if not redis_url:
+                return None
+            client = redis_lib.from_url(redis_url, socket_connect_timeout=2, socket_timeout=5)
+            client.ping()
+            return client
+        except Exception:
+            return None
+
+    @classmethod
+    def _convert_epub_and_persist(cls, lang_version, epub_r2_key: str) -> Optional[bytes]:
+        """
+        Convertit un EPUB en PDF avec verrou Redis distribué anti-thundering herd.
+
+        Comportement :
+        1. Acquiert un verrou Redis sur la clé EPUB (120s max) pour éviter les conversions simultanées.
+        2. Ré-vérifie r2_key_pdf en BDD après acquisition du verrou (cas où un autre process a déjà converti).
+        3. Convertit l'EPUB en PDF vectoriel via PyMuPDF.
+        4. Uploade le PDF sur Cloudflare R2 (bucket lahatheque) et met à jour r2_key_pdf en BDD.
+        5. Libère le verrou et retourne le PDF.
+
+        En cas d'indisponibilité Redis : conversion directe sans verrou (fallback gracieux, sans persistance R2).
+        """
+        lock_key = f"laha:epub_convert:{hashlib.sha256(epub_r2_key.encode()).hexdigest()[:32]}"
+        redis_client = cls._get_redis_client()
+
+        # Calcule la clé R2 du PDF converti : même chemin que l'EPUB, extension remplacée par .pdf
+        pdf_r2_key = (
+            epub_r2_key.rsplit('.epub', 1)[0] + '_converted.pdf'
+            if epub_r2_key.lower().endswith('.epub')
+            else epub_r2_key + '_converted.pdf'
+        )
+
+        def do_convert_and_persist() -> Optional[bytes]:
+            """Effectue la conversion, l'upload R2 et la mise à jour BDD."""
+            # Ré-vérification après acquisition du verrou (un autre process a peut-être déjà converti)
+            lang_version.refresh_from_db()
+            if lang_version.r2_key_pdf:
+                data = cls._fetch_r2_object(lang_version.r2_key_pdf)
+                if data:
+                    logger.info(f"EPUB deja converti par un autre process (r2_key_pdf: {lang_version.r2_key_pdf}).")
+                    return data
+
+            # Téléchargement de l'EPUB depuis R2
+            epub_data = cls._fetch_r2_object(epub_r2_key)
+            if not epub_data:
+                logger.error(f"Impossible de télécharger l'EPUB depuis R2: {epub_r2_key}")
+                return None
+
+            # Conversion EPUB → PDF vectoriel
+            logger.info(f"Démarrage conversion EPUB -> PDF : {epub_r2_key} ({len(epub_data) // 1024} Ko)")
+            pdf_data = cls._convert_epub_bytes_to_pdf(epub_data)
+            if not pdf_data:
+                return None
+            logger.info(f"Conversion terminée : {len(pdf_data) // 1024} Ko de PDF généré.")
+
+            # Persistance sur R2 + mise à jour BDD
+            if cls._upload_pdf_to_r2(pdf_data, pdf_r2_key):
+                try:
+                    lang_version.r2_key_pdf = pdf_r2_key
+                    lang_version.save(update_fields=['r2_key_pdf'])
+                    logger.info(f"r2_key_pdf mis a jour en BDD : {pdf_r2_key}")
+                except Exception as e:
+                    logger.error(f"Echec mise a jour r2_key_pdf en BDD: {e}")
+
+            return pdf_data
+
+        if redis_client is None:
+            # Fallback sans verrou si Redis est indisponible
+            logger.warning("Redis indisponible - conversion EPUB sans verrou distribue (fallback gracieux).")
+            epub_data = cls._fetch_r2_object(epub_r2_key)
+            return cls._convert_epub_bytes_to_pdf(epub_data) if epub_data else None
+
+        try:
+            import redis as redis_lib
+            lock = redis_client.lock(lock_key, timeout=120, blocking_timeout=125)
+            with lock:
+                return do_convert_and_persist()
+        except Exception as e:
+            logger.error(f"Erreur verrou Redis pour conversion EPUB ({epub_r2_key}): {e}")
+            # Fallback gracieux en cas d'erreur Redis
+            epub_data = cls._fetch_r2_object(epub_r2_key)
+            return cls._convert_epub_bytes_to_pdf(epub_data) if epub_data else None
+
+    @classmethod
     def _fetch_catalog_book(cls, book_id: str) -> bytes:
         """Récupère le fichier d'un ouvrage du catalogue interne LAHAThèque ou d'un dépôt éditeur/manuscrit."""
         from apps.catalog.models import Ouvrage, OuvrageLanguageVersion
@@ -118,10 +244,15 @@ class DocumentSourceAdapter:
                 ouvrage_id=clean_book_id, language__iexact=requested_lang
             ).first()
 
-        if lang_version and lang_version.r2_key_pdf:
-            data = cls._fetch_r2_object(lang_version.r2_key_pdf)
-            if data:
-                return data
+        if lang_version:
+            if lang_version.r2_key_pdf:
+                data = cls._fetch_r2_object(lang_version.r2_key_pdf)
+                if data:
+                    return data
+            if lang_version.r2_key_epub:
+                pdf_data = cls._convert_epub_and_persist(lang_version, lang_version.r2_key_epub)
+                if pdf_data:
+                    return pdf_data
 
         ouvrage = None
         try:
@@ -136,25 +267,40 @@ class DocumentSourceAdapter:
                 lv = OuvrageLanguageVersion.objects.filter(
                     ouvrage=ouvrage, language__iexact=requested_lang
                 ).first()
-                if lv and lv.r2_key_pdf:
-                    data = cls._fetch_r2_object(lv.r2_key_pdf)
-                    if data:
-                        return data
+                if lv:
+                    if lv.r2_key_pdf:
+                        data = cls._fetch_r2_object(lv.r2_key_pdf)
+                        if data:
+                            return data
+                    if lv.r2_key_epub:
+                        pdf_data = cls._convert_epub_and_persist(lv, lv.r2_key_epub)
+                        if pdf_data:
+                            return pdf_data
 
             # Le champ fichier est 'file' sur le modèle Ouvrage
             if ouvrage.file:
                 try:
                     with ouvrage.file.open("rb") as f:
-                        return f.read()
+                        file_bytes = f.read()
+                        if str(ouvrage.file.name).lower().endswith(".epub"):
+                            pdf_data = cls._convert_epub_bytes_to_pdf(file_bytes)
+                            if pdf_data:
+                                return pdf_data
+                        return file_bytes
                 except Exception as e:
                     logger.error(f"Erreur lecture fichier ouvrage {book_id}: {e}")
 
             # Si le fichier local n'existe pas mais qu'une déclinaison R2 originale existe
             orig_lv = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage).order_by('-is_original').first()
-            if orig_lv and orig_lv.r2_key_pdf:
-                data = cls._fetch_r2_object(orig_lv.r2_key_pdf)
-                if data:
-                    return data
+            if orig_lv:
+                if orig_lv.r2_key_pdf:
+                    data = cls._fetch_r2_object(orig_lv.r2_key_pdf)
+                    if data:
+                        return data
+                if orig_lv.r2_key_epub:
+                    pdf_data = cls._convert_epub_and_persist(orig_lv, orig_lv.r2_key_epub)
+                    if pdf_data:
+                        return pdf_data
 
             # Fallback fichier physique de test
             fallback_path = os.path.join(settings.BASE_DIR, "media", f"{clean_book_id}.pdf")

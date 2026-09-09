@@ -58,3 +58,12 @@
 - [X]  CHK019 Le studio audio prend-il en compte la langue de narration lors du rattachement à un ouvrage pour lier l'audio à la déclinaison linguistique idoine ? [FR-018]
 - [X]  CHK020 L'héritage de couverture et l'extraction automatique de la première page du document original R2 pour générer la couverture sont-ils documentés ? [FR-019]
 - [X]  CHK021 Le traitement non-bloquant des échecs d'extraction IA (brouillon draft et file de révision) est-il documenté pour garantir la résilience de l'ingestion ? [FR-020]
+
+---
+
+## 7. Conversion EPUB, Performance & Intégration Partenaire
+
+- [X]  CHK022 La conversion automatisée EPUB → PDF vectoriel avec stockage sur Cloudflare R2 et verrou distribué Redis anti-thundering herd est-elle garantie ? [FR-021, SC-006]
+- [X]  CHK023 La mise à jour exhaustive et obligatoire du document `GUIDE_INTEGRATION_ACCES_MIXTE.md` et de ses trois SDKs (Python, TypeScript, PHP) est-elle spécifiée ? [FR-024]
+- [X]  CHK024 Le chargement rapide sans limitation arbitraire du catalogue partenaire via cache Redis serveur LAHAThèque et préchargement relationnel est-il formalisé ? [FR-015, FR-024]
+- [X]  CHK025 La résolution dynamique en cascade de la langue sur le streaming de session partenaire (`?lang=`) avec repli transparent sans rupture est-elle actée ? [FR-009, FR-024]

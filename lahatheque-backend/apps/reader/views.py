@@ -819,9 +819,21 @@ class ReaderProtectedStreamView(APIView):
         # 3. Matérialisation du dérivé filigrané (catalogue interne OU BYOD externe)
         try:
             if session.source_type == "catalog_book" and session.ouvrage_id:
+                # Résolution en cascade de la version linguistique demandée (FR-009, FR-024)
+                session_meta = session.metadata if isinstance(session.metadata, dict) else {}
+                requested_lang = (
+                    request.query_params.get('lang')
+                    or session_meta.get('language')
+                    or (session.ouvrage.original_language if session.ouvrage else 'fr')
+                )
+                if requested_lang:
+                    requested_lang = str(requested_lang).strip().lower()
+
+                source_ref = f"{session.ouvrage_id}:{requested_lang}" if requested_lang else str(session.ouvrage_id)
+
                 pdf_bytes, total_size = DerivedMaterializer.get_or_create_derived(
                     source_type="catalog_book",
-                    source_reference=str(session.ouvrage_id),
+                    source_reference=source_ref,
                     user_info=user_info,
                     config=effective_config,
                 )
@@ -916,39 +928,123 @@ class ReaderProtectedStreamView(APIView):
 
 # ─── Vues API Partenaire Externe (CDC Section 9.1) ────────────────────────────
 
+# Durée de mise en cache du catalogue partenaire (15 minutes)
+PARTNER_CATALOG_CACHE_TTL = 900
+
+
 class PartnerCatalogListView(APIView):
-    """GET /api/v1/partner/catalog/ - Consultation du catalogue pour partenaires externes (CDC 9.1)."""
+    """
+    GET /api/v1/partner/catalog/ - Consultation du catalogue pour partenaires externes (CDC 9.1).
+    Optimisé pour la haute performance :
+    - Mise en cache Redis serveur LAHAThèque (TTL 15 min avec invalidation lors des publications)
+    - Préchargement relationnel complet anti-N+1 (authors, language_versions, audio_tracks)
+    - Suppression du plafond statique de 100 ouvrages (chargement intégral ou pagination page/page_size)
+    - Support des filtres : q (recherche textuelle), discipline, language (filtre bilingue)
+    - Court-circuit M2M pour is_owned et has_digital_access (toujours false, zéro requête AccessService)
+    """
     authentication_classes = [PartnerAuthentication]
     permission_classes = [IsAuthenticatedPartner]
 
     def get(self, request):
+        import hashlib
+        from django.core.cache import cache
+        from django.db.models import Q
         from apps.catalog.models import Ouvrage
         from apps.student.serializers import OuvrageBasicSerializer
 
         partner = getattr(request, 'partner', None)
         restricted_bouquet = getattr(partner, 'restricted_bouquet', None) if partner else None
+        partner_id = str(partner.id) if partner else "anon"
+        bouquet_id = str(restricted_bouquet.id) if restricted_bouquet else "all"
 
+        # 1. Clé de cache déterministe contextuelle au partenaire et aux filtres
+        query_items = sorted(request.query_params.items())
+        cache_raw = f"partner_catalog:{partner_id}:{bouquet_id}:{query_items}"
+        cache_key = "partner:cat:" + hashlib.md5(cache_raw.encode("utf-8")).hexdigest()
+
+        cached_response = cache.get(cache_key)
+        if cached_response is not None:
+            return Response(cached_response)
+
+        # 2. Construction du QuerySet avec préchargement complet anti-N+1
         if restricted_bouquet:
             institution = getattr(partner, 'linked_institution', None)
             qs = restricted_bouquet.get_books_queryset(requesting_institution=institution).select_related(
                 'discipline', 'institution'
-            ).prefetch_related('authors')
+            ).prefetch_related('authors', 'language_versions', 'audio_tracks')
         else:
-            qs = Ouvrage.objects.filter(status='published').select_related('discipline', 'institution').prefetch_related('authors')
+            qs = Ouvrage.objects.filter(status='published').select_related(
+                'discipline', 'institution'
+            ).prefetch_related('authors', 'language_versions', 'audio_tracks')
 
+        # 3. Filtre textuel (titre, sous-titre, résumé, isbn, auteurs)
         q = request.query_params.get('q', '').strip()
         if q:
-            qs = qs.filter(title__icontains=q)
+            qs = qs.filter(
+                Q(title__icontains=q) |
+                Q(subtitle__icontains=q) |
+                Q(summary__icontains=q) |
+                Q(isbn__icontains=q) |
+                Q(authors__first_name__icontains=q) |
+                Q(authors__last_name__icontains=q)
+            ).distinct()
 
+        # 4. Filtre discipline
         discipline = request.query_params.get('discipline', '').strip()
         if discipline:
             qs = qs.filter(discipline__name__icontains=discipline)
 
-        total_count = qs.count()
-        qs = qs[:100]
+        # 5. Filtre linguistique dédié (langue principale ou déclinaison disponible)
+        language = request.query_params.get('language', '').strip().lower()
+        if language:
+            qs = qs.filter(
+                Q(language=language) |
+                Q(language_versions__language=language)
+            ).distinct()
 
-        serializer = OuvrageBasicSerializer(qs, many=True, context={'request': request})
-        return Response({"success": True, "data": serializer.data, "count": total_count})
+        total_count = qs.count()
+
+        # 6. Pagination optionnelle (sans borne rigide de 100 par défaut si non spécifié)
+        page_num = request.query_params.get('page')
+        page_size = request.query_params.get('page_size') or request.query_params.get('limit')
+
+        if page_size:
+            try:
+                page_size_int = max(1, min(int(page_size), 500))
+            except (ValueError, TypeError):
+                page_size_int = 50
+            try:
+                page_num_int = max(1, int(page_num or 1))
+            except (ValueError, TypeError):
+                page_num_int = 1
+            start = (page_num_int - 1) * page_size_int
+            end = start + page_size_int
+            qs = qs[start:end]
+        elif page_num:
+            try:
+                page_num_int = max(1, int(page_num))
+            except (ValueError, TypeError):
+                page_num_int = 1
+            page_size_int = 50
+            start = (page_num_int - 1) * page_size_int
+            end = start + page_size_int
+            qs = qs[start:end]
+
+        serializer = OuvrageBasicSerializer(
+            qs,
+            many=True,
+            context={'request': request, 'is_partner_context': True}
+        )
+        response_data = {
+            "success": True,
+            "data": serializer.data,
+            "count": total_count
+        }
+
+        # 7. Mise en cache Redis serveur LAHAThèque (15 min)
+        cache.set(cache_key, response_data, timeout=PARTNER_CATALOG_CACHE_TTL)
+
+        return Response(response_data)
 
 
 class PartnerCatalogDetailView(APIView):
@@ -964,7 +1060,9 @@ class PartnerCatalogDetailView(APIView):
         restricted_bouquet = getattr(partner, 'restricted_bouquet', None) if partner else None
 
         try:
-            ouvrage = Ouvrage.objects.get(id=id, status='published')
+            ouvrage = Ouvrage.objects.select_related(
+                'discipline', 'institution'
+            ).prefetch_related('authors', 'language_versions', 'audio_tracks').get(id=id, status='published')
         except (Ouvrage.DoesNotExist, Exception):
             return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
 
@@ -974,7 +1072,10 @@ class PartnerCatalogDetailView(APIView):
             if ouvrage.id not in allowed_ids:
                 return Response({"success": False, "error": "Cet ouvrage n'appartient pas au bouquet autorisé pour cette clé."}, status=403)
 
-        serializer = OuvrageBasicSerializer(ouvrage, context={'request': request})
+        serializer = OuvrageBasicSerializer(
+            ouvrage,
+            context={'request': request, 'is_partner_context': True}
+        )
         return Response({"success": True, "data": serializer.data})
 
 

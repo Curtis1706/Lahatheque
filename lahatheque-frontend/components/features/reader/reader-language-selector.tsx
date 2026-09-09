@@ -68,8 +68,8 @@ export function ReaderLanguageSelector({
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-bold transition-all min-h-[36px]",
-          "bg-background hover:bg-background-secondary border-border hover:border-gold/60 text-navy",
+          "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border font-bold transition-all min-h-[36px] cursor-pointer shrink-0",
+          "bg-navy-dark hover:bg-navy border-navy-hover text-white/90 hover:text-gold",
           "focus:outline-none focus:ring-2 focus:ring-gold/30",
           disabled && "opacity-50 cursor-not-allowed"
         )}
@@ -78,11 +78,11 @@ export function ReaderLanguageSelector({
         aria-expanded={open}
       >
         <Languages className="w-4 h-4 text-gold shrink-0" />
-        <span className="font-mono text-[11px] text-gold">{currentMeta.label}</span>
+        <span className="font-mono text-[11px] text-gold font-bold">{currentMeta.label}</span>
         <span className="hidden sm:inline font-sans text-xs">{currentMeta.full}</span>
         <ChevronDown
           className={cn(
-            "w-3.5 h-3.5 text-foreground-muted transition-transform duration-200",
+            "w-3.5 h-3.5 text-gold/70 transition-transform duration-200 shrink-0",
             open && "rotate-180"
           )}
         />
@@ -92,13 +92,13 @@ export function ReaderLanguageSelector({
       {open && (
         <div
           className={cn(
-            "absolute right-0 mt-1.5 w-48 rounded-2xl overflow-hidden z-50",
-            "bg-background border border-border shadow-lg backdrop-blur-md",
-            "animate-in fade-in-50 zoom-in-95 duration-150 p-1 space-y-0.5"
+            "absolute right-0 mt-2 w-52 rounded-2xl overflow-hidden z-[1000]",
+            "bg-navy-dark border border-navy-hover shadow-2xl backdrop-blur-md",
+            "animate-in fade-in-50 zoom-in-95 duration-150 p-1.5 space-y-1"
           )}
           role="listbox"
         >
-          <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-foreground-muted border-b border-border mb-1">
+          <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gold border-b border-navy-hover mb-1">
             Traductions disponibles
           </div>
 
@@ -123,19 +123,19 @@ export function ReaderLanguageSelector({
                   setOpen(false);
                 }}
                 className={cn(
-                  "flex items-center justify-between w-full px-2.5 py-2 rounded-xl text-left transition-colors cursor-pointer",
+                  "flex items-center justify-between w-full px-3 py-2 rounded-xl text-left transition-colors cursor-pointer",
                   isSelected
-                    ? "bg-navy text-white font-bold"
-                    : "text-navy hover:bg-background-secondary font-medium"
+                    ? "bg-gold text-navy font-bold shadow-xs"
+                    : "text-white/90 hover:bg-navy hover:text-gold font-medium"
                 )}
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <span
                     className={cn(
                       "font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md",
                       isSelected
-                        ? "bg-gold text-navy"
-                        : "bg-navy/5 text-gold border border-gold/30"
+                        ? "bg-navy text-gold"
+                        : "bg-navy border border-navy-hover text-gold"
                     )}
                   >
                     {meta.label}
@@ -143,7 +143,7 @@ export function ReaderLanguageSelector({
                   <span className="truncate text-xs">{meta.full}</span>
                 </div>
 
-                {isSelected && <Check className="w-3.5 h-3.5 text-gold shrink-0 ml-2" />}
+                {isSelected && <Check className="w-4 h-4 text-navy shrink-0 ml-2" />}
               </button>
             );
           })}
