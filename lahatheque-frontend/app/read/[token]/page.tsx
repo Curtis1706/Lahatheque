@@ -106,6 +106,13 @@ export default function HostedReaderPage() {
   const [currentLanguage, setCurrentLanguage] = useState<string>("fr");
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlLang = new URLSearchParams(window.location.search).get("lang");
+      if (urlLang) {
+        setCurrentLanguage(urlLang.toLowerCase());
+        return;
+      }
+    }
     if (session?.book?.language) {
       setCurrentLanguage(session.book.language);
     }
@@ -214,7 +221,8 @@ export default function HostedReaderPage() {
 
     // Le flux protégé exige le token de session en en-tête X-Reader-Token —
     // jamais de lien direct vers le fichier brut.
-    const targetUrl = "/api/bff/reader/sessions/stream/";
+    const initialLang = (session.book?.language || currentLanguage || "fr").toLowerCase();
+    const targetUrl = `/api/bff/reader/sessions/stream/?lang=${initialLang}`;
     if (!token) return;
 
     const loadBlob = async () => {

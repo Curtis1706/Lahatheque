@@ -96,6 +96,8 @@ class ReaderTokenService:
 
         session = ReaderSession.objects.select_related(
             'partner', 'ouvrage', 'end_user'
+        ).prefetch_related(
+            'ouvrage__language_versions'
         ).filter(id=session_id).first()
 
         if not session:
