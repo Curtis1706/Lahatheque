@@ -15,7 +15,16 @@ import {
   GraduationCap,
   CheckCircle2,
   ShoppingBag,
+  Plus,
+  Trash2,
+  Languages,
+  Search,
+  FileUp,
+  Globe,
 } from "lucide-react";
+import { uploadFileDirectlyToR2 } from "@/lib/services/storage";
+import { updateAdminBook } from "@/lib/services/admin";
+import type { AdminCatalogLanguageVersion } from "@/lib/types/admin";
 import { FileDropzone } from "@/components/features/layout-artist/file-dropzone";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { DepositWizardStepper } from "@/components/features/layout-artist/deposit-wizard-stepper";
@@ -33,8 +42,30 @@ import {
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
+import { AuthorCombobox } from "@/components/features/catalog/author-combobox";
 import { UniversityCombobox } from "@/components/features/catalog/university-combobox";
+import { CountryCombobox } from "@/components/features/catalog/country-combobox";
 import { toast } from "sonner";
+
+const AVAILABLE_LANGUAGES_LIST = [
+  { code: "fr", label: "Français (FR)" },
+  { code: "en", label: "Anglais (EN)" },
+  { code: "es", label: "Espagnol (ES)" },
+  { code: "pt", label: "Portugais (PT)" },
+  { code: "de", label: "Allemand (DE)" },
+  { code: "ar", label: "Arabe (AR)" },
+  { code: "zh", label: "Chinois (ZH)" },
+];
+
+export interface InitialTranslationEntry {
+  id: string;
+  language: string;
+  title: string;
+  file: File | null;
+  status: "ready" | "in_progress" | "draft";
+  is_paper_available: boolean;
+  paper_stock: number;
+}
 
 export default function AdminNewProductPage() {
   const router = useRouter();
@@ -49,7 +80,8 @@ export default function AdminNewProductPage() {
   // Metadata State
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
-  const [authorsStr, setAuthorsStr] = useState("");
+  const [authors, setAuthors] = useState<string[]>(["Auteur LAHA"]);
+  const [newAuthorInput, setNewAuthorInput] = useState("");
   const [publisherName, setPublisherName] = useState("LAHA Éditions");
   const [year, setYear] = useState(2026);
   const [language, setLanguage] = useState("Français");
@@ -58,6 +90,50 @@ export default function AdminNewProductPage() {
   const [priceDigital, setPriceDigital] = useState(5000);
   const [isPaperAvailable, setIsPaperAvailable] = useState(false);
   const [pricePaper, setPricePaper] = useState(7500);
+
+  // Multilingual & Translation Declination
+  const [isOriginal, setIsOriginal] = useState(true);
+  const [originalLanguage, setOriginalLanguage] = useState("fr");
+  const [allEligibleBooks, setAllEligibleBooks] = useState<any[]>([]);
+  const [parentBookSearch, setParentBookSearch] = useState("");
+  const [isParentBookOpen, setIsParentBookOpen] = useState(false);
+  const [selectedParentBook, setSelectedParentBook] = useState<any | null>(null);
+
+  // Translations addition directly during creation
+  const [translations, setTranslations] = useState<InitialTranslationEntry[]>([]);
+  const [addLangCode, setAddLangCode] = useState("en");
+  const [addLangTitle, setAddLangTitle] = useState("");
+  const [addLangStatus, setAddLangStatus] = useState<"ready" | "in_progress" | "draft">("ready");
+  const [addLangFile, setAddLangFile] = useState<File | null>(null);
+  const [addLangPaper, setAddLangPaper] = useState(false);
+  const [addLangStock, setAddLangStock] = useState(0);
+
+  const handleAddTranslation = () => {
+    if (!addLangCode) return;
+    if (translations.some((t) => t.language.toLowerCase() === addLangCode.toLowerCase())) {
+      toast.error(`La traduction en ${addLangCode.toUpperCase()} est déjà configurée.`);
+      return;
+    }
+    const item: InitialTranslationEntry = {
+      id: Math.random().toString(36).substring(2, 9),
+      language: addLangCode,
+      title: addLangTitle.trim() || `${title || "Ouvrage"} (${addLangCode.toUpperCase()})`,
+      file: addLangFile,
+      status: addLangStatus,
+      is_paper_available: addLangPaper,
+      paper_stock: addLangStock,
+    };
+    setTranslations([...translations, item]);
+    setAddLangTitle("");
+    setAddLangFile(null);
+    setAddLangPaper(false);
+    setAddLangStock(0);
+    toast.success(`Déclinaison ${addLangCode.toUpperCase()} ajoutée.`);
+  };
+
+  const handleRemoveTranslation = (id: string) => {
+    setTranslations(translations.filter((t) => t.id !== id));
+  };
 
   // Classification State
   const [realDisciplines, setRealDisciplines] = useState<DisciplineItem[]>([]);
@@ -75,9 +151,9 @@ export default function AdminNewProductPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<AiBookAnalysisResult | null>(null);
 
-  // Chargement des disciplines
+  // Chargement des disciplines et des livres pour rattachement de traduction
   useEffect(() => {
-    async function loadDisciplines() {
+    async function loadInitialData() {
       try {
         const data = await getDisciplines();
         if (data && data.length > 0) {
@@ -90,9 +166,36 @@ export default function AdminNewProductPage() {
       } catch (err) {
         console.error("Erreur chargement disciplines", err);
       }
+
+      try {
+        const res = await fetch("/api/bff/audio/eligible-books/?limit=all", { credentials: "include" });
+        if (res.ok) {
+          const json = await res.json();
+          setAllEligibleBooks(json.data || json.results || []);
+        }
+      } catch (err) {
+        console.warn("[Admin New Book] Impossible de charger les ouvrages éligibles:", err);
+      }
     }
-    loadDisciplines();
+    loadInitialData();
   }, []);
+
+  const handleAddAuthor = () => {
+    const trimmed = newAuthorInput.trim();
+    if (!trimmed) return;
+    if (!authors.includes(trimmed)) {
+      setAuthors([...authors, trimmed]);
+    }
+    setNewAuthorInput("");
+  };
+
+  const handleRemoveAuthor = (index: number) => {
+    if (authors.length <= 1) {
+      toast.error("Un ouvrage doit avoir au minimum un auteur.");
+      return;
+    }
+    setAuthors(authors.filter((_, idx) => idx !== index));
+  };
 
   const handleBookFileSelect = async (file: File) => {
     setBookFile(file);
@@ -116,7 +219,7 @@ export default function AdminNewProductPage() {
         // Auto-application initiale
         if (!title || title === file.name.replace(/\.[^/.]+$/, "")) setTitle(result.data.title);
         if (!subtitle && result.data.subtitle) setSubtitle(result.data.subtitle);
-        if (!authorsStr && result.data.authors?.length) setAuthorsStr(result.data.authors.join(", "));
+        if (result.data.authors && result.data.authors.length > 0) setAuthors(result.data.authors);
         if (result.data.publisher_name) setPublisherName(result.data.publisher_name);
         if (!summary && result.data.summary) setSummary(result.data.summary);
         if (!isbn && result.data.isbn) setIsbn(result.data.isbn);
@@ -149,7 +252,7 @@ export default function AdminNewProductPage() {
     if (!aiResult) return;
     if (aiResult.title) setTitle(aiResult.title);
     if (aiResult.subtitle) setSubtitle(aiResult.subtitle);
-    if (aiResult.authors && aiResult.authors.length > 0) setAuthorsStr(aiResult.authors.join(", "));
+    if (aiResult.authors && aiResult.authors.length > 0) setAuthors(aiResult.authors);
     if (aiResult.publisher_name) setPublisherName(aiResult.publisher_name);
     if (aiResult.isbn) setIsbn(aiResult.isbn);
     if (aiResult.summary) setSummary(aiResult.summary);
@@ -185,7 +288,7 @@ export default function AdminNewProductPage() {
           metadata: {
             title: title || "Nouveau Livre Admin",
             subtitle,
-            authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur LAHA"],
+            authors: authors.length > 0 ? authors : ["Auteur LAHA"],
             publisher_name: publisherName,
             publication_year: year,
             language,
@@ -213,7 +316,12 @@ export default function AdminNewProductPage() {
           is_paper_available: isPaperAvailable,
         },
         bookFile,
-        coverFile
+        coverFile,
+        {
+          is_original: isOriginal,
+          original_language: originalLanguage,
+          parent_ouvrage_id: !isOriginal && selectedParentBook ? String(selectedParentBook.id) : undefined,
+        }
       );
       toast.success("Brouillon sauvegardé avec succès.");
       router.push("/admin/catalog");
@@ -233,12 +341,12 @@ export default function AdminNewProductPage() {
 
     setSaving(true);
     try {
-      await createDepositWithFiles(
+      const createdDeposit = await createDepositWithFiles(
         {
           metadata: {
             title,
             subtitle,
-            authors: authorsStr ? authorsStr.split(",").map((a) => a.trim()) : ["Auteur LAHA"],
+            authors: authors.length > 0 ? authors : ["Auteur LAHA"],
             publisher_name: publisherName,
             publication_year: year,
             language,
@@ -266,8 +374,60 @@ export default function AdminNewProductPage() {
           is_paper_available: isPaperAvailable,
         },
         bookFile,
-        coverFile
+        coverFile,
+        {
+          is_original: isOriginal,
+          original_language: originalLanguage,
+          parent_ouvrage_id: !isOriginal && selectedParentBook ? String(selectedParentBook.id) : undefined,
+        }
       );
+
+      // Si des versions traduites supplémentaires ont été configurées
+      if (createdDeposit?.id && translations.length > 0) {
+        toast.info("Téléversement et rattachement des traductions...");
+        const langPayload: AdminCatalogLanguageVersion[] = [
+          {
+            language: originalLanguage || "fr",
+            is_original: true,
+            title: title,
+            summary: summary,
+            translation_status: "ready",
+            page_count: 0,
+            is_paper_available: isPaperAvailable,
+            paper_stock: 0,
+          },
+        ];
+
+        for (const tr of translations) {
+          let trKey = "";
+          if (tr.file) {
+            try {
+              const trRes = await uploadFileDirectlyToR2(tr.file, "book");
+              if (trRes.fileKey) trKey = trRes.fileKey;
+            } catch (trErr) {
+              console.warn(`Échec téléversement traduction ${tr.language}:`, trErr);
+            }
+          }
+          langPayload.push({
+            language: tr.language,
+            is_original: false,
+            title: tr.title,
+            summary: summary,
+            r2_key_pdf: trKey,
+            translation_status: tr.status,
+            page_count: 0,
+            is_paper_available: tr.is_paper_available,
+            paper_stock: tr.paper_stock,
+          });
+        }
+
+        await updateAdminBook(String(createdDeposit.id), {
+          languages: langPayload,
+          is_original: isOriginal,
+          original_language: originalLanguage,
+        });
+      }
+
       toast.success(`L'ouvrage « ${title} » a été ajouté et publié immédiatement au catalogue officiel !`);
       router.push("/admin/catalog");
     } catch (err: unknown) {
@@ -487,20 +647,282 @@ export default function AdminNewProductPage() {
               />
             </div>
 
-            {/* Auteurs, Éditeur, ISBN, Année */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-navy">Auteur(s) *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Pr. Jean KOUADIO, Dr. Aminata SOW"
-                  value={authorsStr}
-                  onChange={(e) => setAuthorsStr(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                />
+            {/* Déclinaison & Multilinguisme */}
+            <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                    <Languages className="w-4 h-4 text-gold" />
+                    Nature de la version déposée
+                  </span>
+                  <p className="text-[11px] text-foreground-muted">
+                    Précisez s&apos;il s&apos;agit d&apos;une œuvre originale ou d&apos;une traduction à rattacher à un ouvrage maître existant.
+                  </p>
+                </div>
+                <div className="inline-flex rounded-xl p-1 bg-background border border-border">
+                  <button
+                    type="button"
+                    onClick={() => setIsOriginal(true)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      isOriginal ? "bg-navy text-white shadow-xs" : "text-foreground-muted hover:text-navy"
+                    }`}
+                  >
+                    Œuvre Originale
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsOriginal(false)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      !isOriginal ? "bg-gold text-navy shadow-xs" : "text-foreground-muted hover:text-navy"
+                    }`}
+                  >
+                    Version Traduite
+                  </button>
+                </div>
               </div>
 
+              {!isOriginal && (
+                <div className="pt-3 border-t border-border space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy block">
+                    Sélectionner l&apos;ouvrage original de référence *
+                  </label>
+                  {selectedParentBook ? (
+                    <div className="p-3 bg-gold/10 border border-gold/40 rounded-xl flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-12 rounded bg-background border border-border overflow-hidden shrink-0 flex items-center justify-center">
+                          {selectedParentBook.cover_url ? (
+                            <img src={selectedParentBook.cover_url} alt={selectedParentBook.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <BookOpen className="w-4 h-4 text-gold" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-navy truncate">{selectedParentBook.title}</p>
+                          <p className="text-[11px] text-foreground-muted truncate">
+                            Par {selectedParentBook.author || selectedParentBook.authors_display} • {selectedParentBook.category}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedParentBook(null)}
+                        className="text-xs text-foreground-muted hover:text-red-500 font-bold px-2 py-1 transition-colors cursor-pointer"
+                      >
+                        Changer
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Rechercher l'ouvrage original par titre ou auteur..."
+                        value={parentBookSearch}
+                        onChange={(e) => {
+                          setParentBookSearch(e.target.value);
+                          setIsParentBookOpen(true);
+                        }}
+                        onFocus={() => setIsParentBookOpen(true)}
+                        className="w-full bg-background border border-border rounded-xl pl-9 pr-4 py-2 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[40px]"
+                      />
+                      {isParentBookOpen && (
+                        <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-background border border-border rounded-2xl shadow-xl max-h-48 overflow-y-auto divide-y divide-border">
+                          {allEligibleBooks
+                            .filter((b) =>
+                              !parentBookSearch.trim() ||
+                              b.title.toLowerCase().includes(parentBookSearch.toLowerCase()) ||
+                              (b.author && b.author.toLowerCase().includes(parentBookSearch.toLowerCase()))
+                            )
+                            .slice(0, 10)
+                            .map((b) => (
+                              <button
+                                key={b.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedParentBook(b);
+                                  setIsParentBookOpen(false);
+                                  if (!title) setTitle(`${b.title} (Traduction)`);
+                                  if (b.author || b.authors_display) {
+                                    const aName = b.author || b.authors_display;
+                                    setAuthors([aName]);
+                                  }
+                                  if (b.category) {
+                                    setCategories([b.category]);
+                                    setGenreCategory(b.category);
+                                  }
+                                }}
+                                className="w-full p-2.5 text-left hover:bg-navy/5 flex items-center justify-between gap-2 text-xs cursor-pointer"
+                              >
+                                <div className="truncate">
+                                  <span className="font-bold text-navy block truncate">{b.title}</span>
+                                  <span className="text-[11px] text-foreground-muted block truncate">{b.author || b.authors_display}</span>
+                                </div>
+                                <span className="text-[10px] font-bold text-gold bg-gold/10 px-2 py-0.5 rounded shrink-0">
+                                  Lier
+                                </span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Déclinaisons Linguistiques & Traductions Additionnelles (Multi-upload dès la création) */}
+            {isOriginal && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-background-secondary border border-border space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-2.5">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+                      <Globe className="w-4 h-4 text-gold" />
+                      Traductions &amp; Déclinaisons Linguistiques (Optionnel dès l&apos;ajout)
+                    </span>
+                    <p className="text-[11px] text-foreground-muted">
+                      Ajoutez et téléversez directement les fichiers traduits (PDF / EPUB) dès cette étape.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-gold/15 text-navy border border-gold/30 shrink-0">
+                    {translations.length} traduction(s) configurée(s)
+                  </span>
+                </div>
+
+                {/* Formulaire d'ajout d'une version traduite */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-3 bg-background border border-border rounded-xl items-end">
+                  <div className="sm:col-span-3 space-y-1">
+                    <label className="text-[10px] font-bold text-navy uppercase">Langue Cible</label>
+                    <select
+                      value={addLangCode}
+                      onChange={(e) => setAddLangCode(e.target.value)}
+                      className="w-full bg-background-secondary border border-border rounded-lg p-2 text-xs text-foreground min-h-[36px]"
+                    >
+                      {AVAILABLE_LANGUAGES_LIST.filter((l) => l.code !== originalLanguage).map((lang) => (
+                        <option key={lang.code} value={lang.code}>
+                          {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-4 space-y-1">
+                    <label className="text-[10px] font-bold text-navy uppercase">Titre Traduit</label>
+                    <input
+                      type="text"
+                      value={addLangTitle}
+                      onChange={(e) => setAddLangTitle(e.target.value)}
+                      placeholder="Titre dans cette langue..."
+                      className="w-full bg-background-secondary border border-border rounded-lg p-2 text-xs text-foreground min-h-[36px]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-3 space-y-1">
+                    <label className="text-[10px] font-bold text-navy uppercase">Fichier Traduit (PDF/EPUB)</label>
+                    <input
+                      type="file"
+                      accept=".pdf,.epub"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setAddLangFile(e.target.files[0]);
+                        }
+                      }}
+                      className="w-full text-xs text-foreground file:mr-2 file:py-1 file:px-2 file:rounded-md file:border file:border-border file:text-[11px] file:bg-navy/10 file:text-navy cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <button
+                      type="button"
+                      onClick={handleAddTranslation}
+                      className="w-full py-2 px-3 rounded-lg bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors flex items-center justify-center gap-1 min-h-[36px] cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Ajouter
+                    </button>
+                  </div>
+                </div>
+
+                {/* Liste des traductions configurées */}
+                {translations.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    {translations.map((tr) => (
+                      <div
+                        key={tr.id}
+                        className="p-2.5 rounded-xl bg-background border border-border flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono font-bold text-[10px] px-2 py-0.5 rounded bg-gold/15 text-navy border border-gold/30">
+                            {tr.language.toUpperCase()}
+                          </span>
+                          <span className="font-bold text-navy truncate">{tr.title}</span>
+                          {tr.file && (
+                            <span className="text-[11px] text-foreground-muted truncate font-mono">
+                              ({tr.file.name})
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTranslation(tr.id)}
+                          className="p-1 rounded-lg hover:bg-error/10 text-foreground-muted hover:text-error transition-colors cursor-pointer"
+                          title="Retirer cette traduction"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Auteurs multiples avec AuthorCombobox */}
+            <div className="space-y-3 pt-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center justify-between">
+                <span>Auteur(s) &amp; Contributeurs *</span>
+                <span className="text-[11px] font-normal text-foreground-muted">{authors.length} auteur(s)</span>
+              </label>
+
+              <div className="flex flex-wrap gap-2">
+                {authors.map((author, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 bg-navy/5 border border-navy/20 rounded-xl px-3 py-1.5 text-xs text-navy font-medium"
+                  >
+                    <span>{author}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAuthor(idx)}
+                      className="text-foreground-muted hover:text-red-500 transition-colors cursor-pointer"
+                      title="Retirer cet auteur"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2 max-w-lg items-center">
+                <div className="flex-1">
+                  <AuthorCombobox
+                    value={newAuthorInput}
+                    onChange={(name) => setNewAuthorInput(name)}
+                    placeholder="Rechercher en base ou saisir un auteur..."
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddAuthor}
+                  className="px-4 py-2.5 rounded-xl bg-navy text-gold text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 min-h-[44px]"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Ajouter</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Éditeur, ISBN, Année */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">Maison d&apos;Édition *</label>
@@ -836,17 +1258,11 @@ export default function AdminNewProductPage() {
                     </button>
                   )}
                 </div>
-                <select
+                <CountryCombobox
                   value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                >
-                  {getCountryOptions(aiResult?.country ? matchCountry(aiResult.country) : null, country).map((c, i) => (
-                    <option key={i} value={c.code}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(name, code) => setCountry(code || name)}
+                  placeholder="Sélectionner le pays..."
+                />
               </div>
             </div>
           </div>
@@ -890,7 +1306,7 @@ export default function AdminNewProductPage() {
             <div className="w-full flex flex-col items-center justify-center p-4 rounded-2xl bg-navy/5 border border-border shadow-xs">
               <BookCover3D
                 title={title || "Titre de l'ouvrage"}
-                authors={authorsStr || "Auteur LAHA"}
+                authors={authors.length > 0 ? authors.join(", ") : "Auteur LAHA"}
                 discipline={faculty || genreCategory}
                 coverUrl={coverPreview}
                 size="md"
@@ -913,11 +1329,18 @@ export default function AdminNewProductPage() {
                     Dewey {deweyCode}
                   </span>
                 </div>
-                <p className="text-foreground font-semibold">Auteur(s) : {authorsStr || "Auteur LAHA"}</p>
+                <p className="text-foreground font-semibold">
+                  Auteur(s) : {authors.length > 0 ? authors.join(", ") : "Auteur LAHA"}
+                </p>
                 <p className="text-foreground font-semibold">
                   Maison d&apos;Édition : <span className="text-gold">{publisherName || "Non spécifiée"}</span>
                 </p>
                 <p className="text-foreground-muted">Genre : {genreCategory}</p>
+                {!isOriginal && (
+                  <p className="text-xs font-bold text-gold">
+                    Version Traduite rattachée à : {selectedParentBook?.title || "Ouvrage maître"}
+                  </p>
+                )}
 
                 <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border">
                   <div>

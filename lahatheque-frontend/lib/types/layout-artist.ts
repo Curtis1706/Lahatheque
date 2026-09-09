@@ -82,6 +82,7 @@ export interface LayoutDeposit {
   is_original?: boolean;
   language?: string;
   original_language?: string;
+  parent_ouvrage_id?: string;
   parent_ouvrage_title?: string;
   available_languages?: string[];
 }

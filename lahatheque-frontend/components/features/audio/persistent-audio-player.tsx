@@ -72,22 +72,22 @@ export function PersistentAudioPlayer() {
 
   return (
     <div
-      className="fixed z-40 bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-8 md:w-[500px] lg:w-[560px] bg-navy-dark/95 backdrop-blur-xl border border-gold/30 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300"
+      className="fixed z-40 bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-8 md:w-[520px] lg:w-[580px] bg-background/95 backdrop-blur-xl border border-border dark:border-gold/30 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300"
       style={{
-        boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 20px rgba(176, 141, 66, 0.15)",
+        boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.25), 0 0 20px rgba(176, 141, 66, 0.15)",
       }}
     >
       {/* Barre de progression interactive supérieure */}
       <div
         onClick={handleProgressBarClick}
-        className="w-full h-1.5 bg-navy/80 cursor-pointer relative group/progress transition-all hover:h-2"
+        className="w-full h-1.5 bg-background-secondary cursor-pointer relative group/progress transition-all hover:h-2"
         title="Cliquer pour naviguer dans l'audio"
       >
         <div
           className="h-full bg-gold rounded-r-full transition-all duration-150 relative"
           style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
         >
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white rounded-full opacity-0 group-hover/progress:opacity-100 shadow-sm" />
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-gold-dark rounded-full opacity-0 group-hover/progress:opacity-100 shadow-sm" />
         </div>
       </div>
 
@@ -96,7 +96,7 @@ export function PersistentAudioPlayer() {
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div
             onClick={handleOpenImmersive}
-            className="w-12 h-12 rounded-xl bg-navy border border-border overflow-hidden shrink-0 cursor-pointer relative group"
+            className="w-12 h-12 rounded-xl bg-background-secondary border border-border overflow-hidden shrink-0 cursor-pointer relative group"
             title="Agrandir le lecteur"
           >
             {state.currentCoverUrl ? (
@@ -110,7 +110,7 @@ export function PersistentAudioPlayer() {
                 <Headphones className="w-6 h-6" />
               </div>
             )}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+            <div className="absolute inset-0 bg-navy/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
               <Maximize2 className="w-4 h-4" />
             </div>
           </div>
@@ -119,17 +119,18 @@ export function PersistentAudioPlayer() {
             <div className="flex items-center gap-2">
               <h4
                 onClick={handleOpenImmersive}
-                className="font-serif font-bold text-xs sm:text-sm text-white truncate cursor-pointer hover:text-gold transition-colors"
+                className="font-serif font-bold text-xs sm:text-sm text-foreground truncate cursor-pointer hover:text-gold transition-colors"
+                title={state.currentBookTitle}
               >
                 {state.currentBookTitle}
               </h4>
               {state.isPreview && (
-                <span className="shrink-0 text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-gold/20 text-gold border border-gold/30">
+                <span className="shrink-0 text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-gold/15 text-gold border border-gold/30">
                   Extrait
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-foreground-muted font-sans truncate">
+            <p className="text-[11px] text-foreground-muted font-sans truncate" title={state.currentAuthors}>
               {state.currentAuthors}
             </p>
             <div className="text-[10px] text-foreground-muted tabular-nums mt-0.5">
@@ -143,18 +144,18 @@ export function PersistentAudioPlayer() {
           <button
             type="button"
             onClick={() => seekRelative(-10)}
-            className="relative w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer"
+            className="relative w-8 h-8 rounded-full flex items-center justify-center text-foreground-muted hover:text-gold hover:bg-background-secondary transition-colors cursor-pointer"
             title="Reculer de 10 secondes"
           >
             <RotateCcw className="w-4 h-4" />
-            <span className="absolute -bottom-1 text-[8px] font-bold text-gold/80">10</span>
+            <span className="absolute -bottom-1 text-[8px] font-bold text-gold">10</span>
           </button>
 
           <button
             type="button"
             onClick={togglePlay}
             disabled={state.isLoading}
-            className="w-10 h-10 rounded-full bg-gold text-navy-dark flex items-center justify-center hover:bg-gold-hover hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer disabled:opacity-50"
+            className="w-10 h-10 rounded-full bg-gold text-navy-dark flex items-center justify-center hover:bg-gold-light hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer disabled:opacity-50"
             title={state.isPlaying ? "Mettre en pause" : "Écouter"}
           >
             {state.isPlaying ? (
@@ -167,11 +168,11 @@ export function PersistentAudioPlayer() {
           <button
             type="button"
             onClick={() => seekRelative(10)}
-            className="relative w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer"
+            className="relative w-8 h-8 rounded-full flex items-center justify-center text-foreground-muted hover:text-gold hover:bg-background-secondary transition-colors cursor-pointer"
             title="Avancer de 10 secondes"
           >
             <RotateCw className="w-4 h-4" />
-            <span className="absolute -bottom-1 text-[8px] font-bold text-gold/80">10</span>
+            <span className="absolute -bottom-1 text-[8px] font-bold text-gold">10</span>
           </button>
 
           {/* Volume (desktop) */}
@@ -179,11 +180,11 @@ export function PersistentAudioPlayer() {
             <button
               type="button"
               onClick={toggleMute}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-background-secondary transition-colors cursor-pointer"
               title={state.isMuted ? "Rétablir le son" : "Couper le son"}
             >
               {state.isMuted || state.volume === 0 ? (
-                <VolumeX className="w-4 h-4 text-red-400" />
+                <VolumeX className="w-4 h-4 text-error" />
               ) : (
                 <Volume2 className="w-4 h-4" />
               )}
@@ -203,18 +204,19 @@ export function PersistentAudioPlayer() {
           <button
             type="button"
             onClick={handleOpenImmersive}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-gold hover:bg-white/5 transition-colors cursor-pointer ml-1"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-foreground-muted hover:text-gold hover:bg-background-secondary transition-colors cursor-pointer ml-1"
             title="Plein écran / Vue immersive"
           >
             <Maximize2 className="w-4 h-4" />
           </button>
 
-          {/* Fermer */}
+          {/* Bouton Fermer le lecteur */}
           <button
             type="button"
             onClick={closePlayer}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Fermer le lecteur"
+            className="w-8 h-8 rounded-full flex items-center justify-center bg-background-secondary hover:bg-error/15 text-foreground-muted hover:text-error border border-border hover:border-error/30 transition-all cursor-pointer shrink-0 ml-1 shadow-sm"
+            title="Fermer le lecteur audio"
+            aria-label="Fermer le lecteur audio"
           >
             <X className="w-4 h-4" />
           </button>

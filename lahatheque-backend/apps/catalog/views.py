@@ -826,6 +826,40 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
         if 'cover_image' in request.FILES:
             ouvrage.cover_image = request.FILES['cover_image']
 
+        # Multilinguisme & Déclinaison
+        if 'is_original' in request.data:
+            val = str(request.data['is_original']).lower()
+            ouvrage.is_original = val in ('true', '1', 'yes')
+        if 'original_language' in request.data:
+            ouvrage.original_language = str(request.data['original_language'])[:10]
+        if 'language' in request.data:
+            raw_lang = str(request.data['language']).strip()[:10]
+            if raw_lang:
+                ouvrage.language = raw_lang
+
+        parent_id = str(request.data.get('parent_ouvrage_id', '')).strip()
+        if parent_id and not getattr(ouvrage, 'is_original', True):
+            from apps.catalog.models import OuvrageLanguageVersion
+            parent_ouvrage = Ouvrage.objects.filter(id=parent_id).first()
+            if parent_ouvrage:
+                target_lang = (ouvrage.language or 'fr').strip().lower()
+                if target_lang.startswith('fr'):
+                    target_lang = 'fr'
+                elif target_lang.startswith('en'):
+                    target_lang = 'en'
+                OuvrageLanguageVersion.objects.update_or_create(
+                    ouvrage=parent_ouvrage,
+                    language=target_lang,
+                    defaults={
+                        'title': ouvrage.title,
+                        'summary': ouvrage.summary or '',
+                        'r2_key_pdf': ouvrage.file.name if ouvrage.file else '',
+                        'is_original': False,
+                        'page_count': ouvrage.page_count or 0,
+                        'translation_status': 'ready',
+                    }
+                )
+
         ouvrage.save()
         return Response({
             "success": True,

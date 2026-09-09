@@ -57,6 +57,7 @@ import { getDisciplines, type DisciplineItem } from "@/lib/services/classificati
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
 import { UniversityCombobox } from "@/components/features/catalog/university-combobox";
+import { CountryCombobox } from "@/components/features/catalog/country-combobox";
 
 export default function NewDepositPage() {
   const router = useRouter();
@@ -149,7 +150,7 @@ export default function NewDepositPage() {
     });
 
     // Préchargement des ouvrages éligibles pour rattachement de traduction
-    fetch("/api/bff/audio/eligible-books/", { credentials: "include" })
+    fetch("/api/bff/audio/eligible-books/?limit=all", { credentials: "include" })
       .then((res) => res.json())
       .then((json) => {
         setAllEligibleBooks(json.data || json.results || []);
@@ -1493,17 +1494,11 @@ export default function NewDepositPage() {
                     </button>
                   )}
                 </div>
-                <select
+                <CountryCombobox
                   value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                >
-                  {getCountryOptions(aiResult?.country ? matchCountry(aiResult.country) : null, country).map((c, i) => (
-                    <option key={i} value={c.code}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(name, code) => setCountry(code || name)}
+                  placeholder="Sélectionner le pays..."
+                />
               </div>
             </div>
           </div>

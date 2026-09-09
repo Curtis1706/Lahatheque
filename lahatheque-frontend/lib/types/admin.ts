@@ -184,10 +184,28 @@ export interface RevenueCategoryBreakdown {
   colorToken: string;
 }
 
+export interface AdminCatalogLanguageVersion {
+  id?: string;
+  language: string;
+  language_code?: string;
+  is_original: boolean;
+  title?: string;
+  summary?: string;
+  r2_key_pdf?: string;
+  r2_key_epub?: string;
+  cover_url?: string;
+  page_count?: number;
+  is_paper_available?: boolean;
+  paper_stock?: number;
+  translation_status?: "ready" | "in_progress" | "draft";
+}
+
 export interface AdminCatalogBook {
   id: string;
   isbn?: string;
   title: string;
+  subtitle?: string;
+  summary?: string;
   cover_url?: string;
   cover_image?: string;
   authors: string[];
@@ -209,6 +227,11 @@ export interface AdminCatalogBook {
   consultation_count: number;
   publication_date?: string;
   published_at?: string;
+  publication_year?: number;
+  page_count?: number;
+  is_paper_available?: boolean;
+  paper_stock?: number;
+  file_url?: string;
   drm_active?: boolean;
   total_reads?: number;
   total_revenue?: number;
@@ -216,12 +239,10 @@ export interface AdminCatalogBook {
   original_language?: string;
   language?: string;
   available_languages?: string[];
-  languages?: Array<{
-    id: string;
-    language_code: string;
-    is_original: boolean;
-    page_count?: number;
-  }>;
+  languages?: AdminCatalogLanguageVersion[];
+  institution?: string;
+  country?: string;
+  disciplines?: string[];
 }
 
 export interface AdminSale {

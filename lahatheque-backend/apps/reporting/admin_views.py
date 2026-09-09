@@ -462,6 +462,15 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "id": str(b.id),
                 "isbn": b.isbn or "",
                 "title": b.titre,
+                "subtitle": getattr(b, 'subtitle', '') or "",
+                "summary": b.summary or "",
+                "publication_year": b.publication_date.year if b.publication_date else (b.created_at.year if b.created_at else 2026),
+                "page_count": b.page_count or 0,
+                "is_paper_available": bool(getattr(b, 'is_paper_available', False)),
+                "paper_stock": getattr(b, 'paper_stock', 0) or 0,
+                "protection_type": b.protection_type or 'lcp',
+                "format_type": b.format_type or 'pdf',
+                "file_url": b.file.url if b.file else "",
                 "cover_url": cover_url,
                 "cover_image": cover_url,
                 "authors": authors_list,
@@ -486,7 +495,14 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                         "language_code": lv.language or 'fr',
                         "is_original": bool(lv.is_original),
                         "title": lv.title or b.title,
+                        "summary": lv.summary or "",
                         "page_count": lv.page_count or b.page_count or 0,
+                        "r2_key_pdf": lv.r2_key_pdf or "",
+                        "r2_key_epub": lv.r2_key_epub or "",
+                        "cover_url": lv.cover_url or "",
+                        "is_paper_available": bool(lv.is_paper_available),
+                        "paper_stock": lv.paper_stock or 0,
+                        "translation_status": lv.translation_status or 'ready',
                     }
                     for lv in lang_versions
                 ],
@@ -497,6 +513,102 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
         except Exception:
             pass
         return Response({"success": True, "data": results, "error": None})
+
+    def retrieve(self, request, pk=None):
+        try:
+            b = (
+                Ouvrage.objects
+                .select_related('publisher', 'discipline', 'institution')
+                .prefetch_related('authors', 'language_versions', 'audio_tracks')
+                .get(id=pk)
+            )
+            config = ConfigurationPlateformeGlobale.objects.first()
+            def_num = float(config.prix_defaut_numerique_xof) if config else 3000.0
+            def_pap = float(config.prix_defaut_papier_xof) if config else 5000.0
+
+            price_num = float(b.price_digital) if b.price_digital is not None else def_num
+            price_pap = float(b.price_paper) if b.price_paper is not None else def_pap
+            has_custom = (
+                b.price_digital is not None and float(b.price_digital) != def_num
+            ) or (
+                b.price_paper is not None and float(b.price_paper) != def_pap
+            )
+            pub_name = b.publisher_name
+            if not pub_name and b.publisher:
+                pub_name = b.publisher.company_name or b.publisher.name or ""
+            if not pub_name and b.institution:
+                pub_name = b.institution.name
+
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]
+            cover_url = b.cover_url or ""
+            lang_versions = list(b.language_versions.all())
+            avail_langs = [lv.language for lv in lang_versions if lv.language]
+            if not avail_langs:
+                avail_langs = [getattr(b, 'original_language', None) or b.language or 'fr']
+
+            audio_tracks_list = list(b.audio_tracks.all()) if hasattr(b, 'audio_tracks') else []
+            has_audio = bool(getattr(b, "has_audio_version", False) or len(audio_tracks_list) > 0)
+
+            instit_name = b.institution.name if b.institution else ""
+            disciplines_list = [d.name for d in b.disciplines.all()] if hasattr(b, 'disciplines') else []
+            if not disciplines_list and b.discipline:
+                disciplines_list = [b.discipline.name]
+
+            data = {
+                "id": str(b.id),
+                "isbn": b.isbn or "",
+                "title": b.titre,
+                "subtitle": getattr(b, 'subtitle', '') or "",
+                "summary": b.summary or "",
+                "publication_year": b.publication_date.year if b.publication_date else (b.created_at.year if b.created_at else 2026),
+                "page_count": b.page_count or 0,
+                "is_paper_available": bool(getattr(b, 'is_paper_available', False)),
+                "paper_stock": getattr(b, 'paper_stock', 0) or 0,
+                "protection_type": b.protection_type or 'lcp',
+                "format_type": b.format_type or 'pdf',
+                "file_url": b.file.url if b.file else "",
+                "cover_url": cover_url,
+                "cover_image": cover_url,
+                "authors": authors_list,
+                "author_name": ", ".join(authors_list) if authors_list else "Auteur non renseigné",
+                "publisher_name": pub_name,
+                "discipline": b.discipline.name if b.discipline else (disciplines_list[0] if disciplines_list else "Non classé"),
+                "disciplines": disciplines_list,
+                "institution": instit_name,
+                "country": getattr(b, 'country', 'BJ') or 'BJ',
+                "price_digital": price_num,
+                "price_paper": price_pap,
+                "price_audio": float(b.price_audio) if b.price_audio is not None else None,
+                "has_audio_version": bool(getattr(b, "has_audio_version", False)),
+                "has_audio": has_audio,
+                "uses_default_pricing": not has_custom,
+                "status": b.status,
+                "is_original": getattr(b, 'is_original', True),
+                "original_language": getattr(b, 'original_language', 'fr'),
+                "language": b.language or 'fr',
+                "available_languages": avail_langs,
+                "languages": [
+                    {
+                        "id": str(lv.id),
+                        "language": lv.language or 'fr',
+                        "language_code": lv.language or 'fr',
+                        "is_original": bool(lv.is_original),
+                        "title": lv.title or b.title,
+                        "summary": lv.summary or "",
+                        "page_count": lv.page_count or b.page_count or 0,
+                        "r2_key_pdf": lv.r2_key_pdf or "",
+                        "r2_key_epub": lv.r2_key_epub or "",
+                        "cover_url": lv.cover_url or "",
+                        "is_paper_available": bool(lv.is_paper_available),
+                        "paper_stock": lv.paper_stock or 0,
+                        "translation_status": lv.translation_status or 'ready',
+                    }
+                    for lv in lang_versions
+                ],
+            }
+            return Response({"success": True, "data": data, "error": None})
+        except Ouvrage.DoesNotExist:
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
     def partial_update(self, request, pk=None):
         try:
@@ -516,20 +628,152 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 book.has_audio_version = val in ('true', '1', 'yes')
             if 'title' in data and data['title']:
                 book.title = str(data['title'])
+            if 'subtitle' in data:
+                book.subtitle = str(data['subtitle'])
+            if 'summary' in data:
+                book.summary = str(data['summary'])
+            if 'isbn' in data:
+                book.isbn = str(data['isbn'])
+            if 'publisher_name' in data:
+                book.publisher_name = str(data['publisher_name'])
+            if 'page_count' in data and data['page_count'] is not None:
+                try:
+                    book.page_count = int(data['page_count'])
+                except Exception:
+                    pass
+            if 'publication_year' in data and data['publication_year']:
+                import datetime
+                try:
+                    book.publication_date = datetime.date(int(data['publication_year']), 1, 1)
+                except Exception:
+                    pass
+            if 'is_paper_available' in data:
+                book.is_paper_available = bool(data['is_paper_available'])
+            if 'paper_stock' in data and data['paper_stock'] is not None:
+                try:
+                    book.paper_stock = int(data['paper_stock'])
+                except Exception:
+                    pass
+            if 'protection_type' in data and data['protection_type']:
+                book.protection_type = str(data['protection_type'])
+            if 'format_type' in data and data['format_type']:
+                book.format_type = str(data['format_type'])
+            if 'discipline' in data and data['discipline']:
+                from apps.catalog.models import Discipline
+                disc_name = str(data['discipline']).strip()
+                if disc_name:
+                    disc = Discipline.objects.filter(name__iexact=disc_name).first()
+                    if not disc:
+                        disc = Discipline.objects.create(name=disc_name)
+                    book.discipline = disc
+            if 'disciplines' in data and isinstance(data['disciplines'], list):
+                from apps.catalog.models import Discipline
+                disc_objs = []
+                for d_name in data['disciplines']:
+                    d_str = str(d_name).strip()
+                    if d_str:
+                        d_obj, _ = Discipline.objects.get_or_create(name=d_str)
+                        disc_objs.append(d_obj)
+                if disc_objs:
+                    book.disciplines.set(disc_objs)
+                    if not book.discipline:
+                        book.discipline = disc_objs[0]
+            if 'institution' in data:
+                inst_name = str(data['institution']).strip()
+                if inst_name and not inst_name.startswith("Non affilié"):
+                    from apps.partners.models import Institution
+                    inst = Institution.objects.filter(name__iexact=inst_name).first()
+                    if not inst:
+                        inst = Institution.objects.create(name=inst_name)
+                    book.institution = inst
+                else:
+                    book.institution = None
+            if 'country' in data and data['country']:
+                book.country = str(data['country']).strip()[:10]
+            if 'cover_key' in data and data['cover_key']:
+                book.cover_image.name = str(data['cover_key'])
+            if 'file_key' in data and data['file_key']:
+                book.file.name = str(data['file_key'])
             if 'status' in data and data['status']:
                 book.status = str(data['status'])
             if 'is_original' in data:
                 book.is_original = bool(data['is_original'])
             if 'original_language' in data and data['original_language']:
                 book.original_language = str(data['original_language'])[:10]
+                book.language = str(data['original_language'])[:10]
+
+            # Mise à jour des auteurs multiples
+            if 'authors' in data and isinstance(data['authors'], list):
+                from apps.catalog.models import BookAuthor
+                new_authors = []
+                for a_item in data['authors']:
+                    if isinstance(a_item, str) and a_item.strip():
+                        parts = a_item.strip().split()
+                        fn = parts[0]
+                        ln = " ".join(parts[1:]) if len(parts) > 1 else ""
+                        ba, _ = BookAuthor.objects.get_or_create(first_name=fn, last_name=ln)
+                        new_authors.append(ba)
+                    elif isinstance(a_item, dict):
+                        fn = a_item.get('first_name', '').strip()
+                        ln = a_item.get('last_name', '').strip()
+                        if fn or ln:
+                            ba, _ = BookAuthor.objects.get_or_create(first_name=fn, last_name=ln)
+                            new_authors.append(ba)
+                if new_authors:
+                    book.authors.set(new_authors)
+
             book.save()
+
+            # Synchronisation des déclinaisons linguistiques (OuvrageLanguageVersion)
+            from apps.catalog.models import OuvrageLanguageVersion
+            if 'languages' in data and isinstance(data['languages'], list):
+                for lv_data in data['languages']:
+                    lang_code = (lv_data.get('language') or lv_data.get('language_code') or '').strip().lower()
+                    if not lang_code:
+                        continue
+                    is_orig = bool(lv_data.get('is_original', False))
+                    defaults = {
+                        'title': lv_data.get('title') or book.title,
+                        'summary': lv_data.get('summary', '') or book.summary,
+                        'is_original': is_orig,
+                        'is_paper_available': bool(lv_data.get('is_paper_available', False)),
+                        'paper_stock': int(lv_data.get('paper_stock', 0)),
+                        'translation_status': lv_data.get('translation_status', 'ready'),
+                    }
+                    if lv_data.get('r2_key_pdf'):
+                        defaults['r2_key_pdf'] = str(lv_data['r2_key_pdf'])
+                    if lv_data.get('r2_key_epub'):
+                        defaults['r2_key_epub'] = str(lv_data['r2_key_epub'])
+                    if lv_data.get('cover_url'):
+                        defaults['cover_url'] = str(lv_data['cover_url'])
+                    if lv_data.get('page_count') is not None:
+                        try:
+                            defaults['page_count'] = int(lv_data['page_count'])
+                        except Exception:
+                            pass
+
+                    OuvrageLanguageVersion.objects.update_or_create(
+                        ouvrage=book,
+                        language=lang_code,
+                        defaults=defaults
+                    )
+
+            if 'deleted_languages' in data and isinstance(data['deleted_languages'], list):
+                for del_code in data['deleted_languages']:
+                    del_clean = str(del_code).strip().lower()
+                    if del_clean:
+                        OuvrageLanguageVersion.objects.filter(
+                            ouvrage=book,
+                            language__iexact=del_clean,
+                            is_original=False
+                        ).delete()
 
             cache.delete("admin_catalog_pricing_all")
 
             if request.user and request.user.is_authenticated:
                 JournalAuditAdmin.objects.create(
                     administrateur=request.user,
-                    action="UPDATE_BOOK_SPECIFIC_PRICING",
+                    action="UPDATE_BOOK_COMPLETE",
                     ressource_type="Ouvrage",
                     ressource_id=str(book.id),
                     details=data

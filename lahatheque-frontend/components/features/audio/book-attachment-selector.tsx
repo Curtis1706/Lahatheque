@@ -31,16 +31,23 @@ export function BookAttachmentSelector({ onSelectBook, selectedBook }: BookAttac
   const [searchQuery, setSearchQuery] = useState("");
   const [books, setBooks] = useState<EligibleBookItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalBooks, setTotalBooks] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
     const fetchBooks = async () => {
       setLoading(true);
+      setPage(1);
       try {
-        const results = await getEligibleBooksForAttachment(searchQuery);
+        const res = await getEligibleBooksForAttachment(searchQuery, 1, 50);
         if (active) {
-          setBooks(results);
+          setBooks(res.books);
+          setTotalBooks(res.total);
+          setHasNext(res.hasNext);
         }
       } catch (err) {
         console.error("Erreur recherche livres pour rattachement:", err);
@@ -58,6 +65,25 @@ export function BookAttachmentSelector({ onSelectBook, selectedBook }: BookAttac
       clearTimeout(timer);
     };
   }, [searchQuery]);
+
+  const handleLoadMore = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (loadingMore || !hasNext) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
+    try {
+      const res = await getEligibleBooksForAttachment(searchQuery, nextPage, 50);
+      setBooks((prev) => [...prev, ...res.books]);
+      setPage(nextPage);
+      setHasNext(res.hasNext);
+      setTotalBooks(res.total);
+    } catch (err) {
+      console.error("Erreur chargement page suivante:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -168,6 +194,35 @@ export function BookAttachmentSelector({ onSelectBook, selectedBook }: BookAttac
                     )}
                   </button>
                 ))
+              )}
+
+              {books.length > 0 && hasNext && (
+                <div className="p-3 bg-background-secondary/90 border-t border-border flex items-center justify-between sticky bottom-0 backdrop-blur-xs">
+                  <span className="text-[11px] text-foreground-muted font-medium">
+                    {books.length} affichés sur {totalBooks}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="px-3.5 py-1.5 rounded-xl bg-navy hover:bg-navy-hover text-gold text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-gold animate-spin" />
+                        <span>Chargement...</span>
+                      </>
+                    ) : (
+                      <span>Charger 50 suivants</span>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {books.length > 0 && !hasNext && (
+                <div className="p-2.5 bg-background-secondary/40 text-center text-[11px] text-foreground-muted font-medium border-t border-border">
+                  Tous les {totalBooks} ouvrages disponibles sont chargés
+                </div>
               )}
             </div>
           )}

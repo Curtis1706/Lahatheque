@@ -573,13 +573,14 @@ class OuvrageCreateSerializer(serializers.Serializer):
         try:
             OuvrageLanguageVersion.objects.update_or_create(
                 ouvrage=target_ouvrage,
-                language_code=target_lang,
+                language=target_lang,
                 defaults={
                     'title': ouvrage.title,
-                    'file': ouvrage.file,
+                    'summary': ouvrage.summary or '',
+                    'r2_key_pdf': file_key or (ouvrage.file.name if ouvrage.file else ''),
                     'is_original': bool(is_original_val),
                     'page_count': ouvrage.page_count or 0,
-                    'is_active': True,
+                    'translation_status': 'ready',
                 }
             )
         except Exception as lang_ver_err:

@@ -15,6 +15,7 @@ import {
   RefreshCw,
   BookOpen,
   ArrowRight,
+  Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
@@ -229,11 +230,24 @@ export default function LegalPendingPublicationPage() {
                       <p className="text-xs text-foreground-muted line-clamp-1">
                         {book.authors?.length ? book.authors.join(", ") : "Auteur non spécifié"}
                       </p>
-                      {book.discipline && (
-                        <span className="inline-block text-[10px] font-semibold text-navy bg-navy/5 px-2 py-0.5 rounded-md border border-navy/10">
-                          {book.discipline}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        {book.discipline && (
+                          <span className="inline-block text-[10px] font-semibold text-navy bg-navy/5 px-2 py-0.5 rounded-md border border-navy/10">
+                            {book.discipline}
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                          book.is_original !== false ? "bg-navy/10 text-navy" : "bg-gold/20 text-gold"
+                        }`}>
+                          {book.is_original !== false ? "Original" : "Traduction"} [{((book.original_language || book.language || "fr") as string).slice(0, 2).toUpperCase()}]
                         </span>
-                      )}
+                        {book.has_audio_version && (
+                          <span className="text-[10px] text-gold font-bold flex items-center gap-1">
+                            <Headphones className="w-3 h-3 text-gold" />
+                            Audio
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -329,6 +343,24 @@ export default function LegalPendingPublicationPage() {
                               <p className="text-[11px] text-foreground-muted truncate">
                                 {book.authors?.length ? book.authors.join(", ") : "Auteur non spécifié"}
                               </p>
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                                  book.is_original !== false ? "bg-navy/10 text-navy" : "bg-gold/20 text-gold"
+                                }`}>
+                                  {book.is_original !== false ? "Original" : "Traduction"} [{((book.original_language || book.language || "fr") as string).slice(0, 2).toUpperCase()}]
+                                </span>
+                                {book.available_languages && book.available_languages.length > 1 && (
+                                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-background-secondary text-foreground-muted border border-border">
+                                    {book.available_languages.map((l: string) => l.toUpperCase()).join(" • ")}
+                                  </span>
+                                )}
+                                {book.has_audio_version && (
+                                  <span className="text-[10px] text-gold font-bold flex items-center gap-1">
+                                    <Headphones className="w-3 h-3 text-gold" />
+                                    Audio
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>

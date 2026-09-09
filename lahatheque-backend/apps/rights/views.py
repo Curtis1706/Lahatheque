@@ -4039,11 +4039,23 @@ class LegalPendingPublicationListView(APIView):
         from apps.catalog.models import Ouvrage
         from apps.rights.models import ContratLegal
 
-        ouvrages = Ouvrage.objects.filter(status='pending_legal_approval').select_related('discipline').prefetch_related('authors')
+        ouvrages = Ouvrage.objects.filter(status='pending_legal_approval').select_related('discipline').prefetch_related('authors', 'language_versions')
 
         data = []
         for o in ouvrages:
             has_contract = ContratLegal.objects.filter(ouvrage=o, status='active').exists()
+            lang_versions = list(o.language_versions.all())
+            is_orig = True
+            orig_lang = o.language or 'fr'
+            avail_langs = [o.language or 'fr']
+            if lang_versions:
+                avail_langs = sorted(list(set([lv.language for lv in lang_versions if lv.language])))
+                for lv in lang_versions:
+                    if lv.is_original:
+                        is_orig = True
+                        orig_lang = lv.language
+                        break
+
             data.append({
                 "id": str(o.id),
                 "title": o.title,
@@ -4052,6 +4064,12 @@ class LegalPendingPublicationListView(APIView):
                 "has_active_contract": has_contract,
                 "cover_url": o.cover_image.url if getattr(o, 'cover_image', None) else None,
                 "created_at": o.created_at.isoformat() if hasattr(o, 'created_at') and o.created_at else None,
+                "language": o.language or 'fr',
+                "is_original": is_orig,
+                "original_language": orig_lang,
+                "available_languages": avail_langs,
+                "has_audio_version": bool(o.has_audio_version),
+                "price_audio": float(o.price_audio) if o.price_audio else None,
             })
 
         return Response({"success": True, "data": data})

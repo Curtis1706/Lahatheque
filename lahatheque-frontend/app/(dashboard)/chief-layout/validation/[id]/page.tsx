@@ -18,12 +18,14 @@ import {
   Layers,
   GraduationCap,
   Headphones,
+  Languages,
+  Search,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
 import { VitrinePreviewCard } from "@/components/features/chief-layout/vitrine-preview-card";
 import { RevisionModal } from "@/components/features/chief-layout/revision-modal";
-import { getDepositDetail, validateDeposit, requestRevision } from "@/lib/services/layout-artist";
+import { getDepositDetail, validateDeposit, requestRevision, updateDeposit } from "@/lib/services/layout-artist";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
@@ -45,16 +47,57 @@ export default function ChefValidationDetailPage() {
   const [pricePaper, setPricePaper] = useState<number>(7500);
   const [isPaperAvailable, setIsPaperAvailable] = useState(false);
 
+  // Translation & Language Adjustment State
+  const [isOriginal, setIsOriginal] = useState<boolean>(true);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("Français");
+  const [allEligibleBooks, setAllEligibleBooks] = useState<any[]>([]);
+  const [selectedParentBook, setSelectedParentBook] = useState<any | null>(null);
+  const [parentBookSearch, setParentBookSearch] = useState("");
+  const [isParentBookOpen, setIsParentBookOpen] = useState(false);
+
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await getDepositDetail(id);
-      setDeposit(data);
-      if (data) {
-        if (data.default_price) setPriceDigital(data.default_price);
-        if (data.is_paper_available !== undefined) setIsPaperAvailable(data.is_paper_available);
+      try {
+        const [data, eligibleRes] = await Promise.all([
+          getDepositDetail(id),
+          fetch("/api/bff/audio/eligible-books/?limit=all", { credentials: "include" })
+            .then((r) => r.json())
+            .catch(() => ({ data: [] })),
+        ]);
+
+        setDeposit(data);
+        const eligibleList = eligibleRes?.data || eligibleRes?.results || [];
+        setAllEligibleBooks(eligibleList);
+
+        if (data) {
+          if (data.default_price) setPriceDigital(data.default_price);
+          if (data.is_paper_available !== undefined) setIsPaperAvailable(data.is_paper_available);
+          
+          const isOrig = data.is_original !== false;
+          setIsOriginal(isOrig);
+          setSelectedLanguage(data.metadata?.language || "Français");
+
+          if (!isOrig) {
+            if (data.parent_ouvrage_id || data.parent_ouvrage_title) {
+              const matched = eligibleList.find((b: any) => String(b.id) === String(data.parent_ouvrage_id));
+              if (matched) {
+                setSelectedParentBook(matched);
+              } else {
+                setSelectedParentBook({
+                  id: data.parent_ouvrage_id || "linked",
+                  title: data.parent_ouvrage_title || "Ouvrage de référence",
+                  author: data.metadata?.authors?.[0] || "",
+                });
+              }
+            }
+          }
+        }
+      } catch (err) {
+        toast.error("Impossible de charger les détails du dépôt.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     loadData();
   }, [id]);
@@ -62,17 +105,33 @@ export default function ChefValidationDetailPage() {
   const handleValidate = async () => {
     if (!deposit) return;
     setValidating(true);
-    const success = await validateDeposit(
-      deposit.id,
-      undefined,
-      priceDigital,
-      isPaperAvailable ? pricePaper : 0,
-      isPaperAvailable
-    );
-    setValidating(false);
-    if (success) {
-      toast.success("Ouvrage validé avec succès ! Transmis au Juriste pour vérification contractuelle avant publication.");
-      router.push("/chief-layout/validation");
+    try {
+      // Sauvegarde préalable des corrections linguistiques et de rattachement
+      await updateDeposit(deposit.id, {
+        metadata: {
+          ...deposit.metadata,
+          language: selectedLanguage,
+        },
+        is_original: isOriginal,
+        original_language: isOriginal ? (selectedLanguage.toLowerCase().startsWith("en") ? "en" : "fr") : "fr",
+        parent_ouvrage_id: !isOriginal && selectedParentBook ? String(selectedParentBook.id) : undefined,
+      } as any);
+
+      const success = await validateDeposit(
+        deposit.id,
+        undefined,
+        priceDigital,
+        isPaperAvailable ? pricePaper : 0,
+        isPaperAvailable
+      );
+      if (success) {
+        toast.success("Ouvrage validé avec succès ! Transmis au Juriste pour vérification contractuelle avant publication.");
+        router.push("/chief-layout/validation");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la validation.");
+    } finally {
+      setValidating(false);
     }
   };
 
@@ -227,11 +286,41 @@ export default function ChefValidationDetailPage() {
             <AISuggestionBadge source={deposit.classification.source} />
           </h3>
 
-          <div className="space-y-2 text-xs">
+          <div className="space-y-2.5 text-xs">
             <p><span className="text-foreground-muted font-medium">Titre :</span> <span className="font-semibold text-foreground">{deposit.metadata.title}</span></p>
-            <p><span className="text-foreground-muted font-medium">Auteur(s) :</span> <span className="text-foreground">{deposit.metadata.authors.join(", ")}</span></p>
+            {deposit.metadata.subtitle && (
+              <p><span className="text-foreground-muted font-medium">Sous-titre :</span> <span className="text-foreground">{deposit.metadata.subtitle}</span></p>
+            )}
+            <div>
+              <span className="text-foreground-muted font-medium block mb-1">Auteur(s) &amp; Contributeurs :</span>
+              <div className="flex flex-wrap gap-1.5">
+                {deposit.metadata.authors.map((a, i) => (
+                  <span key={i} className="px-2.5 py-0.5 rounded-lg bg-navy/5 text-navy font-semibold text-[11px] border border-navy/15">
+                    {a}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {deposit.metadata.publisher_name && (
+              <p><span className="text-foreground-muted font-medium">Maison d&apos;Édition :</span> <span className="text-foreground font-semibold">{deposit.metadata.publisher_name}</span></p>
+            )}
             <p><span className="text-foreground-muted font-medium">Langue :</span> <span className="text-foreground font-semibold">{deposit.metadata.language}</span></p>
-            <p><span className="text-foreground-muted font-medium">Discipline :</span> <span className="text-foreground font-semibold">{deposit.classification.discipline}</span></p>
+            {deposit.is_original === false && (
+              <div className="p-2 rounded-xl bg-gold/10 border border-gold/30 text-navy font-semibold text-[11px]">
+                Version Traduite {deposit.parent_ouvrage_title ? `rattachée à : ${deposit.parent_ouvrage_title}` : ""}
+              </div>
+            )}
+            <p>
+              <span className="text-foreground-muted font-medium">Discipline(s) :</span>{" "}
+              <span className="text-foreground font-semibold">
+                {deposit.classification.disciplines && deposit.classification.disciplines.length > 0
+                  ? deposit.classification.disciplines.join(" • ")
+                  : deposit.classification.discipline}
+              </span>
+            </p>
+            {deposit.classification.country && (
+              <p><span className="text-foreground-muted font-medium">Pays d&apos;Ancrage :</span> <span className="text-foreground font-semibold">{deposit.classification.country}</span></p>
+            )}
             {deposit.classification.university && (
               <p className="flex items-center gap-1">
                 <GraduationCap className="w-3.5 h-3.5 text-gold shrink-0" />
@@ -283,6 +372,154 @@ export default function ChefValidationDetailPage() {
             <Sparkles className="w-5 h-5 text-gold" />
             <h3 className="text-sm font-bold text-navy">Décision de validation éditoriale</h3>
           </div>
+
+          {/* Vérification & Ajustement Linguistique */}
+          <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                <Languages className="w-4 h-4 text-gold" />
+                Vérification Linguistique &amp; Nature de l&apos;Ouvrage
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-navy block mb-1.5">Nature de l&apos;œuvre</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOriginal(true);
+                      setSelectedParentBook(null);
+                    }}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      isOriginal
+                        ? "bg-navy text-white shadow-xs"
+                        : "bg-background text-foreground-muted hover:text-navy border border-border"
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-gold" />
+                    <span>Original</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOriginal(false);
+                      if (selectedLanguage.toLowerCase() === "français") {
+                        setSelectedLanguage("Anglais");
+                      }
+                    }}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      !isOriginal
+                        ? "bg-navy text-white shadow-xs"
+                        : "bg-background text-foreground-muted hover:text-navy border border-border"
+                    }`}
+                  >
+                    <Languages className="w-3.5 h-3.5 text-gold" />
+                    <span>Traduction</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-navy block mb-1.5">Langue de l&apos;épreuve</label>
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground font-semibold focus:ring-2 focus:ring-navy min-h-[38px]"
+                >
+                  <option value="Français">Français</option>
+                  <option value="Anglais">Anglais</option>
+                  <option value="Portugais">Portugais</option>
+                  <option value="Espagnol">Espagnol</option>
+                  <option value="Arabe">Arabe</option>
+                  <option value="Fon">Fon</option>
+                  <option value="Yoruba">Yoruba</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Si Traduction: sélection ou correction de l'ouvrage original de référence */}
+            {!isOriginal && (
+              <div className="pt-2 border-t border-border space-y-2">
+                <label className="text-[11px] font-bold text-navy block">
+                  Ouvrage original rattaché au catalogue *
+                </label>
+                {selectedParentBook ? (
+                  <div className="p-3 bg-gold/10 border border-gold/40 rounded-xl flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-10 rounded bg-background border border-border overflow-hidden shrink-0 flex items-center justify-center">
+                        {selectedParentBook.cover_url ? (
+                          <img src={selectedParentBook.cover_url} alt={selectedParentBook.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <BookOpen className="w-3.5 h-3.5 text-gold" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-navy truncate">{selectedParentBook.title}</p>
+                        <p className="text-[11px] text-foreground-muted truncate">
+                          Par {selectedParentBook.author || selectedParentBook.authors_display || "Auteur"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedParentBook(null)}
+                      className="text-xs text-foreground-muted hover:text-red-500 font-bold px-2 py-1 transition-colors cursor-pointer"
+                    >
+                      Changer
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Rechercher l'ouvrage original par titre ou auteur..."
+                      value={parentBookSearch}
+                      onChange={(e) => {
+                        setParentBookSearch(e.target.value);
+                        setIsParentBookOpen(true);
+                      }}
+                      onFocus={() => setIsParentBookOpen(true)}
+                      className="w-full bg-background border border-border rounded-xl pl-9 pr-4 py-2 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[38px]"
+                    />
+                    {isParentBookOpen && (
+                      <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-background border border-border rounded-2xl shadow-xl max-h-48 overflow-y-auto divide-y divide-border">
+                        {allEligibleBooks
+                          .filter((b) =>
+                            !parentBookSearch.trim() ||
+                            (b.title && b.title.toLowerCase().includes(parentBookSearch.toLowerCase())) ||
+                            (b.author && b.author.toLowerCase().includes(parentBookSearch.toLowerCase()))
+                          )
+                          .slice(0, 10)
+                          .map((b) => (
+                            <button
+                              key={b.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedParentBook(b);
+                                setIsParentBookOpen(false);
+                              }}
+                              className="w-full p-2.5 text-left hover:bg-navy/5 flex items-center justify-between gap-2 text-xs cursor-pointer"
+                            >
+                              <div className="truncate">
+                                <span className="font-bold text-navy block truncate">{b.title}</span>
+                                <span className="text-[11px] text-foreground-muted block truncate">{b.author || b.authors_display}</span>
+                              </div>
+                              <span className="text-[10px] font-bold text-gold bg-gold/10 px-2 py-0.5 rounded shrink-0">
+                                Lier
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Toggle Disponibilité Papier */}
           <div className="flex items-center justify-between p-3.5 rounded-2xl border border-border bg-background-secondary">
             <div>

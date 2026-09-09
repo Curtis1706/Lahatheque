@@ -27,6 +27,9 @@ import {
   Eye,
   UserCheck,
   Headphones,
+  Plus,
+  Trash2,
+  Languages,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
@@ -45,7 +48,9 @@ import { extractBookMetadataWithAi, type AiBookAnalysisResult } from "@/lib/serv
 import { getDisciplines, type DisciplineItem } from "@/lib/services/classification";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
+import { AuthorCombobox } from "@/components/features/catalog/author-combobox";
 import { UniversityCombobox } from "@/components/features/catalog/university-combobox";
+import { CountryCombobox } from "@/components/features/catalog/country-combobox";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
@@ -74,9 +79,18 @@ export default function DepositDetailPage() {
   const [aiResult, setAiResult] = useState<AiBookAnalysisResult | null>(null);
 
   // Form State - Métadonnées
+  const [isOriginal, setIsOriginal] = useState(true);
+  const [originalLanguage, setOriginalLanguage] = useState("fr");
+  const [allEligibleBooks, setAllEligibleBooks] = useState<any[]>([]);
+  const [parentBookSearch, setParentBookSearch] = useState("");
+  const [isParentBookOpen, setIsParentBookOpen] = useState(false);
+  const [selectedParentBook, setSelectedParentBook] = useState<any | null>(null);
+
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [authorsStr, setAuthorsStr] = useState("");
+  const [authors, setAuthors] = useState<string[]>([]);
+  const [newAuthorInput, setNewAuthorInput] = useState("");
   const [publisherName, setPublisherName] = useState("LAHA Éditions");
   const [year, setYear] = useState(2026);
   const [language, setLanguage] = useState("Français");
@@ -114,20 +128,49 @@ export default function DepositDetailPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const [data, preEditions, authors] = await Promise.all([
+        const [data, preEditions, authors, eligibleRes] = await Promise.all([
           getDepositDetail(id),
           searchPreEditions("").catch(() => []),
           searchAuthors("").catch(() => []),
+          fetch("/api/bff/audio/eligible-books/?limit=all", { credentials: "include" })
+            .then((r) => r.json())
+            .catch(() => ({ data: [] })),
         ]);
         
         setDeposit(data);
         setPreEditionsList(preEditions || []);
         setAuthorsList(authors || []);
 
+        const eligibleList = eligibleRes?.data || eligibleRes?.results || [];
+        setAllEligibleBooks(eligibleList);
+
         if (data) {
+          const isOrig = data.is_original !== false;
+          setIsOriginal(isOrig);
+          setOriginalLanguage(data.original_language || "fr");
+
+          if (!isOrig) {
+            if (data.parent_ouvrage_id || data.parent_ouvrage_title) {
+              const matched = eligibleList.find((b: any) => String(b.id) === String(data.parent_ouvrage_id));
+              if (matched) {
+                setSelectedParentBook(matched);
+              } else {
+                setSelectedParentBook({
+                  id: data.parent_ouvrage_id || "linked",
+                  title: data.parent_ouvrage_title || "Ouvrage de référence",
+                  author: data.metadata?.authors?.[0] || "",
+                });
+              }
+            }
+          }
+
           setTitle(data.metadata.title || "");
           setSubtitle(data.metadata.subtitle || "");
-          setAuthorsStr(data.metadata.authors.join(", "));
+          const initialAuthors = data.metadata.authors && data.metadata.authors.length > 0
+            ? data.metadata.authors
+            : (data.metadata.authors ? [data.metadata.authors.join(", ")] : ["Auteur LAHA"]);
+          setAuthors(initialAuthors);
+          setAuthorsStr(initialAuthors.join(", "));
           setPublisherName(data.metadata.publisher_name || "LAHA Éditions");
           setYear(data.metadata.publication_year || 2026);
           setLanguage(data.metadata.language || "Français");
@@ -185,13 +228,37 @@ export default function DepositDetailPage() {
     subtitle: a.email || a.bio || "Auteur enregistré",
   }));
 
+  const handleAddAuthor = () => {
+    const trimmed = newAuthorInput.trim();
+    if (!trimmed) return;
+    if (!authors.includes(trimmed)) {
+      const updated = [...authors, trimmed];
+      setAuthors(updated);
+      setAuthorsStr(updated.join(", "));
+    }
+    setNewAuthorInput("");
+  };
+
+  const handleRemoveAuthor = (index: number) => {
+    if (authors.length <= 1) {
+      toast.error("Un ouvrage doit avoir au minimum un auteur.");
+      return;
+    }
+    const updated = authors.filter((_, idx) => idx !== index);
+    setAuthors(updated);
+    setAuthorsStr(updated.join(", "));
+  };
+
   const handlePreEditionSelect = (selectedId: string) => {
     setSelectedPreEditionId(selectedId);
     if (!selectedId) return;
     const found = preEditionsList.find((p) => p.id === selectedId);
     if (found) {
       if (found.titre_previsionnel && !title) setTitle(found.titre_previsionnel);
-      if (found.auteur_nom && !authorsStr) setAuthorsStr(found.auteur_nom);
+      if (found.auteur_nom) {
+        setAuthors([found.auteur_nom]);
+        setAuthorsStr(found.auteur_nom);
+      }
       if (found.universite_nom && !university) setUniversity(found.universite_nom);
       if (found.faculte_nom && !faculty) setFaculty(found.faculte_nom);
       toast.info(`Informations du dossier ${found.code_dossier} appliquées.`);
@@ -199,10 +266,10 @@ export default function DepositDetailPage() {
   };
 
   const handleAuthorSelect = (authorName: string) => {
-    if (!authorsStr) {
-      setAuthorsStr(authorName);
-    } else if (!authorsStr.includes(authorName)) {
-      setAuthorsStr(`${authorsStr}, ${authorName}`);
+    if (!authors.includes(authorName)) {
+      const updated = [...authors, authorName];
+      setAuthors(updated);
+      setAuthorsStr(updated.join(", "));
     }
   };
 
@@ -231,7 +298,10 @@ export default function DepositDetailPage() {
     if (!aiResult) return;
     if (aiResult.title) setTitle(aiResult.title);
     if (aiResult.subtitle) setSubtitle(aiResult.subtitle);
-    if (aiResult.authors && aiResult.authors.length > 0) setAuthorsStr(aiResult.authors.join(", "));
+    if (aiResult.authors && aiResult.authors.length > 0) {
+      setAuthors(aiResult.authors);
+      setAuthorsStr(aiResult.authors.join(", "));
+    }
     if (aiResult.publisher_name) setPublisherName(aiResult.publisher_name);
     if (aiResult.publication_year) setYear(aiResult.publication_year);
     if (aiResult.language) setLanguage(aiResult.language);
@@ -310,7 +380,7 @@ export default function DepositDetailPage() {
             ...deposit.metadata,
             title,
             subtitle,
-            authors: authorsStr.split(",").map((a) => a.trim()).filter(Boolean),
+            authors: authors.length > 0 ? authors : authorsStr.split(",").map((a) => a.trim()).filter(Boolean),
             publisher_name: publisherName,
             publication_year: Number(year),
             language,
@@ -338,7 +408,10 @@ export default function DepositDetailPage() {
           price_audio: hasAudioVersion ? Number(priceAudio) : undefined,
           has_audio_version: hasAudioVersion,
           is_paper_available: isPaperAvailable,
-        },
+          is_original: isOriginal,
+          original_language: originalLanguage,
+          parent_ouvrage_id: !isOriginal && selectedParentBook ? String(selectedParentBook.id) : undefined,
+        } as any,
         newBookFile,
         newCoverFile
       );
@@ -721,6 +794,160 @@ export default function DepositDetailPage() {
             )}
           </div>
 
+          {/* Nature de la Maquette (Original vs Traduction) */}
+          <div className="space-y-2 p-3.5 bg-background border border-border rounded-2xl">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                <Languages className="w-3.5 h-3.5 text-gold" />
+                Nature de l&apos;ouvrage maquetté
+              </label>
+            </div>
+            <p className="text-[11px] text-foreground-muted">
+              Précisez s&apos;il s&apos;agit d&apos;un ouvrage original ou d&apos;une déclinaison traduite rattachée à un livre du catalogue.
+            </p>
+
+            {!isEditing ? (
+              <div className="p-3 bg-background-secondary rounded-xl border border-border">
+                {isOriginal ? (
+                  <div className="flex items-center gap-2 text-xs font-semibold text-navy">
+                    <BookOpen className="w-4 h-4 text-gold" />
+                    <span>Œuvre Originale (Langue : {language || "Français"})</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-navy">
+                      <Languages className="w-4 h-4 text-gold" />
+                      <span>
+                        Version Traduite en {language} rattachée à :{" "}
+                        <strong className="text-gold">
+                          {selectedParentBook?.title || deposit.parent_ouvrage_title || "Ouvrage de référence"}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3 pt-1">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOriginal(true);
+                      setSelectedParentBook(null);
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                      isOriginal
+                        ? "bg-navy text-white shadow-xs"
+                        : "bg-background text-foreground-muted hover:text-navy border border-border"
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-gold" />
+                    <span>Ouvrage Original</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOriginal(false);
+                      if (language.toLowerCase() === "français") {
+                        setLanguage("Anglais");
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                      !isOriginal
+                        ? "bg-navy text-white shadow-xs"
+                        : "bg-background text-foreground-muted hover:text-navy border border-border"
+                    }`}
+                  >
+                    <Languages className="w-3.5 h-3.5 text-gold" />
+                    <span>Traduction d&apos;un Ouvrage Existant</span>
+                  </button>
+                </div>
+
+                {/* Sélecteur de l'ouvrage parent si traduction */}
+                {!isOriginal && (
+                  <div className="pt-3 border-t border-border space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-navy block">
+                      Ouvrage original de référence *
+                    </label>
+                    {selectedParentBook ? (
+                      <div className="p-3 bg-gold/10 border border-gold/40 rounded-xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-9 h-12 rounded bg-background border border-border overflow-hidden shrink-0 flex items-center justify-center">
+                            {selectedParentBook.cover_url ? (
+                              <img src={selectedParentBook.cover_url} alt={selectedParentBook.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <BookOpen className="w-4 h-4 text-gold" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-navy truncate">{selectedParentBook.title}</p>
+                            <p className="text-[11px] text-foreground-muted truncate">
+                              Par {selectedParentBook.author || selectedParentBook.authors_display || "Auteur"} {selectedParentBook.category ? `• ${selectedParentBook.category}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedParentBook(null)}
+                          className="text-xs text-foreground-muted hover:text-red-500 font-bold px-2 py-1 transition-colors cursor-pointer"
+                        >
+                          Changer
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Rechercher l'ouvrage original par titre ou auteur..."
+                          value={parentBookSearch}
+                          onChange={(e) => {
+                            setParentBookSearch(e.target.value);
+                            setIsParentBookOpen(true);
+                          }}
+                          onFocus={() => setIsParentBookOpen(true)}
+                          className="w-full bg-background border border-border rounded-xl pl-9 pr-4 py-2 text-xs text-foreground focus:ring-2 focus:ring-navy min-h-[40px]"
+                        />
+                        {isParentBookOpen && (
+                          <div className="absolute z-30 top-full mt-1 left-0 right-0 bg-background border border-border rounded-2xl shadow-xl max-h-48 overflow-y-auto divide-y divide-border">
+                            {allEligibleBooks
+                              .filter((b) =>
+                                !parentBookSearch.trim() ||
+                                (b.title && b.title.toLowerCase().includes(parentBookSearch.toLowerCase())) ||
+                                (b.author && b.author.toLowerCase().includes(parentBookSearch.toLowerCase()))
+                              )
+                              .slice(0, 10)
+                              .map((b) => (
+                                <button
+                                  key={b.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedParentBook(b);
+                                    setIsParentBookOpen(false);
+                                  }}
+                                  className="w-full p-2.5 text-left hover:bg-navy/5 flex items-center justify-between gap-2 text-xs cursor-pointer"
+                                >
+                                  <div className="truncate">
+                                    <span className="font-bold text-navy block truncate">{b.title}</span>
+                                    <span className="text-[11px] text-foreground-muted block truncate">{b.author || b.authors_display}</span>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-gold bg-gold/10 px-2 py-0.5 rounded shrink-0">
+                                    Lier
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="space-y-3.5 text-xs">
             {/* Titre & Sous-titre */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -776,13 +1003,18 @@ export default function DepositDetailPage() {
 
             {/* Auteurs, Année & Langue */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              <div className="sm:col-span-1 space-y-1.5">
+              <div className="sm:col-span-1 space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Auteur(s) *</label>
+                  <label className="block font-semibold text-navy">
+                    Auteur(s) * <span className="text-[11px] font-normal text-foreground-muted">({authors.length})</span>
+                  </label>
                   {isEditing && aiResult?.authors?.length && (
                     <button
                       type="button"
-                      onClick={() => setAuthorsStr(aiResult.authors.join(", "))}
+                      onClick={() => {
+                        setAuthors(aiResult.authors);
+                        setAuthorsStr(aiResult.authors.join(", "));
+                      }}
                       className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
                     >
                       <Wand2 className="w-2.5 h-2.5" />
@@ -790,24 +1022,46 @@ export default function DepositDetailPage() {
                     </button>
                   )}
                 </div>
-                <input
-                  type="text"
-                  disabled={!isEditing}
-                  value={authorsStr}
-                  onChange={(e) => setAuthorsStr(e.target.value)}
-                  placeholder="Pr. Jean KOUADIO, Dr. Aminata SOW"
-                  className={inputClass}
-                />
-                {isEditing && authorOptions.length > 0 && (
-                  <div className="pt-1">
-                    <SearchableSelect
-                      options={authorOptions}
-                      value=""
-                      onChange={handleAuthorSelect}
-                      placeholder="Ajouter un auteur enregistré..."
-                      searchPlaceholder="Rechercher par nom..."
-                      icon={<UserCheck className="w-3.5 h-3.5 text-gold" />}
-                    />
+
+                {/* Badges d'auteurs */}
+                <div className="flex flex-wrap gap-1.5 min-h-[36px] p-1.5 rounded-xl bg-background border border-border items-center">
+                  {authors.map((author, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1.5 bg-navy/5 border border-navy/20 rounded-lg px-2.5 py-1 text-xs text-navy font-medium"
+                    >
+                      <span>{author}</span>
+                      {isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAuthor(idx)}
+                          className="text-foreground-muted hover:text-red-500 transition-colors cursor-pointer"
+                          title="Retirer cet auteur"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {isEditing && (
+                  <div className="flex gap-1.5 items-center pt-1">
+                    <div className="flex-1">
+                      <AuthorCombobox
+                        value={newAuthorInput}
+                        onChange={(name) => setNewAuthorInput(name)}
+                        placeholder="Rechercher ou saisir un auteur..."
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddAuthor}
+                      className="px-3 py-2 rounded-xl bg-navy text-gold text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1 cursor-pointer shrink-0 min-h-[38px]"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Ajouter</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1119,17 +1373,15 @@ export default function DepositDetailPage() {
               </div>
             </div>
 
-            {/* Code Pays */}
+            {/* Pays d'ancrage / d'origine */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
-                <label className="block font-semibold text-navy">Code Pays (ISO)</label>
-                <input
-                  type="text"
-                  disabled={!isEditing}
+                <label className="block font-semibold text-navy">Pays d&apos;Édition / d&apos;Origine</label>
+                <CountryCombobox
                   value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  placeholder="BJ, CI, SN, BR, etc."
-                  className={inputClass}
+                  onChange={(name, code) => setCountry(code || name)}
+                  disabled={!isEditing}
+                  placeholder="Sélectionner le pays..."
                 />
               </div>
             </div>

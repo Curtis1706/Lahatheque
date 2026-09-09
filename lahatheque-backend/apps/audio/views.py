@@ -605,11 +605,18 @@ class AudioEligibleBooksView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        import math
         from apps.catalog.models import Ouvrage
         from django.db.models import Q
 
         q = request.query_params.get("q", "").strip()
-        qs = Ouvrage.objects.filter(status__in=['published', 'approved', 'draft']).order_by('-created_at')
+        qs = (
+            Ouvrage.objects
+            .filter(status__in=['published', 'approved', 'draft'])
+            .select_related('discipline', 'publisher')
+            .prefetch_related('authors', 'language_versions')
+            .order_by('-created_at', '-id')
+        )
 
         if q:
             qs = qs.filter(
@@ -619,37 +626,79 @@ class AudioEligibleBooksView(APIView):
                 Q(authors__last_name__icontains=q)
             ).distinct()
 
+        total_count = qs.count()
+
+        # Pagination robuste
+        page = 1
+        try:
+            page = max(1, int(request.query_params.get("page", 1)))
+        except (ValueError, TypeError):
+            page = 1
+
+        limit_param = request.query_params.get("limit") or request.query_params.get("page_size")
+        page_size = 50
+        if limit_param:
+            try:
+                val = int(limit_param)
+                if val > 0:
+                    page_size = min(val, 500)
+            except (ValueError, TypeError):
+                page_size = 50
+
+        if limit_param == "all":
+            paged_qs = qs
+            has_next = False
+            total_pages = 1
+        else:
+            start = (page - 1) * page_size
+            end = start + page_size
+            paged_qs = qs[start:end]
+            has_next = end < total_count
+            total_pages = math.ceil(total_count / page_size) if page_size > 0 else 1
+
         books_data = []
-        for b in qs[:30]:
-            authors_str = ", ".join([f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]) if b.authors.exists() else (b.publisher_name or "Auteur LAHA")
-            lang_versions = list(b.language_versions.values('id', 'language', 'is_original'))
-            avail_langs = [lv['language'] for lv in lang_versions]
+        for b in paged_qs:
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]
+            authors_str = ", ".join(authors_list) if authors_list else (b.publisher_name or "Auteur LAHA")
+            lang_versions = list(b.language_versions.all())
+            avail_langs = [lv.language for lv in lang_versions if lv.language]
             if not avail_langs:
                 avail_langs = [b.language or 'fr']
 
             books_data.append({
                 "id": str(b.id),
                 "title": b.title,
-                "isbn": b.isbn,
+                "isbn": b.isbn or "",
                 "author": authors_str,
                 "authors_display": authors_str,
                 "category": b.discipline.name if b.discipline else "Général",
                 "country": b.country or "BJ",
-                "cover_url": b.cover_url,
+                "cover_url": b.cover_url or "",
                 "price_xof": float(b.price_digital or 2500),
                 "has_audio_version": bool(b.has_audio_version),
                 "available_languages": avail_langs,
                 "languages": [
                     {
-                        "id": str(lv['id']),
-                        "language_code": lv['language'],  # champ réel = `language` sur le modèle
-                        "is_original": lv['is_original'],
+                        "id": str(lv.id),
+                        "language_code": lv.language or 'fr',
+                        "is_original": bool(lv.is_original),
                     }
                     for lv in lang_versions
                 ],
             })
 
-        return Response({"success": True, "data": books_data})
+        return Response({
+            "success": True,
+            "data": books_data,
+            "pagination": {
+                "total": total_count,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+                "has_next": has_next,
+            },
+            "error": None
+        })
 
 
 class AudioStudioSubmitView(APIView):
