@@ -1,81 +1,217 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   BookOpen,
-  Search,
-  Filter,
   Plus,
-  Edit,
+  Pencil,
   ExternalLink,
-  ShieldCheck,
-  ShoppingBag,
+  Eye,
   Sparkles,
-  Layers,
-  GraduationCap,
-  Play,
   CheckCircle2,
-  AlertCircle,
-  FileText,
+  ShoppingBag,
   Clock,
-  Package,
   Headphones,
+  GraduationCap,
 } from "lucide-react";
-import type { LayoutDeposit } from "@/lib/types/layout-artist";
-import { getCatalogBooks } from "@/lib/services/layout-artist";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 import { EditBookModal } from "@/components/features/chief-layout/edit-book-modal";
-import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
+import { getCatalogBooks } from "@/lib/services/layout-artist";
+import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
 export default function ChiefLayoutCatalogPage() {
   const { playBook } = useAudioPlayer();
   const [books, setBooks] = useState<LayoutDeposit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDiscipline, setSelectedDiscipline] = useState("all");
-  const [selectedPaperFilter, setSelectedPaperFilter] = useState<"all" | "paper_only" | "digital_only">("all");
-  const [selectedStatus, setSelectedStatus] = useState("all");
 
-  // Editing state
+  // Modale d'édition
   const [editingBook, setEditingBook] = useState<LayoutDeposit | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getCatalogBooks({
-        search: searchQuery || undefined,
-        discipline: selectedDiscipline !== "all" ? selectedDiscipline : undefined,
-        status: selectedStatus !== "all" ? selectedStatus : undefined,
-      });
+      const data = await getCatalogBooks();
       setBooks(data);
     } catch {
-      toast.error("Erreur de chargement du catalogue");
+      toast.error("Erreur lors du chargement du catalogue");
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedDiscipline, selectedStatus]);
+  }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadData();
-    }, 300);
-    return () => clearTimeout(timer);
+    loadData();
   }, [loadData]);
 
-  // Client-side filtering for paper availability
-  const filteredBooks = books.filter((b) => {
-    if (selectedPaperFilter === "paper_only") return Boolean(b.is_paper_available);
-    if (selectedPaperFilter === "digital_only") return !b.is_paper_available;
-    return true;
-  });
-
-  // KPI statistics
+  // Statistiques KPIs calculées sur l'intégralité du catalogue
   const totalCount = books.length;
-  const publishedCount = books.filter((b) => b.status === "published").length;
-  const paperAvailableCount = books.filter((b) => b.is_paper_available).length;
-  const pendingCount = books.filter((b) => b.status === "pending_validation").length;
+  const publishedCount = useMemo(
+    () => books.filter((b) => b.status === "published").length,
+    [books]
+  );
+  const paperAvailableCount = useMemo(
+    () => books.filter((b) => Boolean(b.is_paper_available)).length,
+    [books]
+  );
+  const pendingCount = useMemo(
+    () => books.filter((b) => b.status === "pending_validation").length,
+    [books]
+  );
+
+  // Colonnes du DataTable
+  const columns: DataTableColumn<LayoutDeposit>[] = [
+    {
+      key: "title",
+      header: "Ouvrage & Couverture",
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          <BookCover3D
+            title={row.metadata.title}
+            authors={row.metadata.authors}
+            discipline={row.classification.discipline}
+            coverUrl={row.files.cover_url}
+            size="xs"
+          />
+          <div className="min-w-0 max-w-xs space-y-0.5">
+            <p className="font-semibold text-xs text-foreground truncate">
+              {row.metadata.title}
+            </p>
+            <p className="text-[11px] font-mono text-foreground-muted">
+              ISBN: {row.metadata.isbn || "—"}
+            </p>
+            <div className="flex flex-wrap items-center gap-1 pt-0.5">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-navy/10 text-navy">
+                Langue: {(row.metadata.language || "fr").toUpperCase()}
+              </span>
+              {Boolean(row.files.format) && (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-background-secondary text-foreground-muted border border-border uppercase">
+                  {row.files.format}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "authors",
+      header: "Auteur(s) & Institution",
+      cell: (row) => (
+        <div className="max-w-xs space-y-1">
+          <AuthorsDisplay
+            authors={row.metadata.authors}
+            bookTitle={row.metadata.title}
+            maxVisible={2}
+            className="text-xs font-medium text-foreground"
+          />
+          {row.classification.university ? (
+            <p className="text-[11px] text-gold font-medium flex items-center gap-1">
+              <GraduationCap className="w-3 h-3 text-gold shrink-0" />
+              <span className="truncate">{row.classification.university}</span>
+            </p>
+          ) : (
+            <p className="text-[11px] text-foreground-muted">Édition LAHA</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "discipline",
+      header: "Discipline",
+      cell: (row) => (
+        <span className="text-xs px-2.5 py-0.5 rounded-full bg-background-secondary border border-border text-foreground-muted font-medium inline-block max-w-[150px] truncate">
+          {row.classification.discipline || "Non classé"}
+        </span>
+      ),
+    },
+    {
+      key: "pricing",
+      header: "Formats & Tarifs",
+      cell: (row) => (
+        <div className="font-mono text-xs space-y-0.5">
+          <span className="font-bold text-navy block">
+            {row.default_price.toLocaleString("fr-FR")} XOF{" "}
+            <span className="text-[9px] font-sans text-foreground-muted font-normal">
+              (Numérique)
+            </span>
+          </span>
+          <span className="text-[10px] text-foreground-muted block">
+            Papier:{" "}
+            <strong className={row.is_paper_available ? "text-gold font-bold" : "text-foreground-muted"}>
+              {row.is_paper_available
+                ? `${(row.admin_price || 7500).toLocaleString("fr-FR")} XOF`
+                : "Désactivé"}
+            </strong>
+          </span>
+          {(row.has_audio_version || (row as any).has_audio || row.price_audio) && (
+            <span className="text-[10px] text-gold font-bold flex items-center gap-1">
+              <Headphones className="w-3 h-3 text-gold shrink-0" />
+              <span>
+                Audio: {(row.price_audio || 3500).toLocaleString("fr-FR")} XOF
+              </span>
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Statut Dépôt",
+      cell: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: "id",
+      header: "Actions",
+      className: "text-right",
+      cell: (row) => (
+        <div className="flex items-center gap-1.5 justify-end">
+          <button
+            type="button"
+            onClick={() => setEditingBook(row)}
+            className="p-1.5 rounded-lg border border-border bg-background hover:bg-gold hover:text-navy text-foreground-muted transition-colors cursor-pointer"
+            title="Modifier l'ouvrage et ses tarifs"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+
+          {(row.has_audio_version || (row as any).has_audio || row.price_audio) && (
+            <button
+              type="button"
+              onClick={() => playBook(row.id)}
+              className="p-1.5 rounded-lg border border-gold/40 bg-gold/10 hover:bg-gold hover:text-navy text-gold transition-colors cursor-pointer"
+              title="Écouter la piste audio"
+            >
+              <Headphones className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          <Link
+            href={`/catalog/reader/${row.id}`}
+            target="_blank"
+            className="p-1.5 rounded-lg border border-border bg-background hover:bg-navy hover:text-white text-foreground-muted transition-colors cursor-pointer"
+            title="Aperçu dans la liseuse sécurisée"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </Link>
+
+          <Link
+            href={`/student/catalog/${row.id}`}
+            target="_blank"
+            className="p-1.5 rounded-lg border border-border bg-background hover:border-gold hover:text-navy text-foreground-muted transition-colors cursor-pointer"
+            title="Consulter sur le catalogue public"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto animate-in fade-in duration-300">
@@ -99,27 +235,27 @@ export default function ChiefLayoutCatalogPage() {
             Catalogue des Ouvrages
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Consultez tous les ouvrages de la bibliothèque, modifiez leurs métadonnées, prix et activez la disponibilité papier.
+            Supervision de l&apos;ensemble du catalogue universitaire, modification des métadonnées, prix et activation de la disponibilité papier.
           </p>
         </div>
 
         <Link
           href="/chief-layout/deposit"
-          className="px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-navy font-bold text-xs flex items-center gap-2 shadow-sm transition-all shrink-0 min-h-[44px] cursor-pointer"
+          className="px-5 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-navy font-bold text-xs flex items-center gap-2 shadow-xs transition-all shrink-0 min-h-[44px] cursor-pointer"
         >
           <Plus className="w-4 h-4 text-navy" />
           Déposer un Nouvel Ouvrage
         </Link>
       </div>
 
-      {/* Stats Cards */}
+      {/* Cartes de KPIs Réels */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-2xl bg-background border border-border space-y-1 shadow-xs">
           <span className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
             Total Ouvrages
           </span>
           <p className="text-xl sm:text-2xl font-serif font-bold text-navy">
-            {totalCount}
+            {totalCount.toLocaleString("fr-FR")}
           </p>
           <span className="text-[10px] text-foreground-muted">Au catalogue global</span>
         </div>
@@ -130,7 +266,7 @@ export default function ChiefLayoutCatalogPage() {
             Publiés en Ligne
           </span>
           <p className="text-xl sm:text-2xl font-serif font-bold text-navy">
-            {publishedCount}
+            {publishedCount.toLocaleString("fr-FR")}
           </p>
           <span className="text-[10px] text-success font-medium">Accessibles aux lecteurs</span>
         </div>
@@ -141,7 +277,7 @@ export default function ChiefLayoutCatalogPage() {
             Version Papier
           </span>
           <p className="text-xl sm:text-2xl font-serif font-bold text-navy">
-            {paperAvailableCount}
+            {paperAvailableCount.toLocaleString("fr-FR")}
           </p>
           <span className="text-[10px] text-gold font-medium">Commandables en physique</span>
         </div>
@@ -152,234 +288,34 @@ export default function ChiefLayoutCatalogPage() {
             En Attente
           </span>
           <p className="text-xl sm:text-2xl font-serif font-bold text-navy">
-            {pendingCount}
+            {pendingCount.toLocaleString("fr-FR")}
           </p>
           <span className="text-[10px] text-foreground-muted">À valider</span>
         </div>
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="p-4 rounded-3xl bg-background-secondary border border-border space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          {/* Search */}
-          <div className="md:col-span-2 relative">
-            <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Rechercher par titre, auteur, discipline ou ISBN..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-background border border-border text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-            />
-          </div>
+      {/* DataTable Professionnel des Ouvrages */}
+      <DataTable
+        data={books}
+        columns={columns}
+        rowKey="id"
+        loading={loading}
+        filterKey="status"
+        filterOptions={[
+          { value: "all", label: "Tous les statuts" },
+          { value: "published", label: "Publiés" },
+          { value: "submitted", label: "En Attente" },
+          { value: "pending_legal_approval", label: "Approbation Juridique" },
+          { value: "revision_requested", label: "Retouche demandée" },
+          { value: "draft", label: "Brouillons" },
+        ]}
+        searchPlaceholder="Rechercher par titre, auteur, discipline ou ISBN..."
+        pageSize={10}
+        pageSizeOptions={[10, 20, 50, 100]}
+        emptyMessage="Aucun ouvrage ne correspond à vos critères de recherche."
+      />
 
-          {/* Discipline filter avec Combobox recherche + sélection de toutes les disciplines en base */}
-          <div className="w-full">
-            <DisciplineCombobox
-              value={selectedDiscipline === "all" ? "" : selectedDiscipline}
-              onChange={(val) => setSelectedDiscipline(val || "all")}
-              placeholder="Toutes les disciplines"
-              searchPlaceholder="Rechercher une discipline..."
-              includeAllOption={true}
-              allOptionLabel="Toutes les disciplines"
-            />
-          </div>
-
-          {/* Paper Availability filter */}
-          <div>
-            <select
-              value={selectedPaperFilter}
-              onChange={(e) => setSelectedPaperFilter(e.target.value as any)}
-              className="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-xs text-navy font-semibold focus:ring-2 focus:ring-navy min-h-[44px]"
-            >
-              <option value="all">Tous les formats</option>
-              <option value="paper_only">Disponible en Papier</option>
-              <option value="digital_only">Numérique Uniquement</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Books List / Table */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-56 rounded-3xl bg-navy/5 border border-border p-4 space-y-3" />
-          ))}
-        </div>
-      ) : filteredBooks.length === 0 ? (
-        <div className="p-12 rounded-3xl bg-background border border-border text-center space-y-3 shadow-xs">
-          <BookOpen className="w-10 h-10 text-foreground-muted mx-auto" />
-          <h3 className="font-serif font-bold text-navy text-base">Aucun ouvrage trouvé</h3>
-          <p className="text-xs text-foreground-muted max-w-md mx-auto">
-            Aucun livre ne correspond à vos critères de recherche. Vous pouvez réinitialiser les filtres ou déposer un nouvel ouvrage.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setSearchQuery("");
-              setSelectedDiscipline("all");
-              setSelectedPaperFilter("all");
-            }}
-            className="px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[40px] cursor-pointer"
-          >
-            Réinitialiser les filtres
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredBooks.map((book) => {
-            const isPublished = book.status === "published";
-            const authorsList = book.metadata.authors.join(", ") || "Auteur LAHA";
-
-            return (
-              <div
-                key={book.id}
-                className="rounded-3xl bg-background border border-border p-5 shadow-xs hover:border-gold/60 transition-all flex flex-col justify-between space-y-4 group"
-              >
-                {/* Top: Cover + Info */}
-                <div className="flex gap-4">
-                  {/* Cover */}
-                  <div className="w-20 h-28 rounded-xl bg-navy/5 border border-border overflow-hidden shrink-0 relative shadow-2xs">
-                    {book.files.cover_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={book.files.cover_url}
-                        alt={book.metadata.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center text-foreground-muted text-[10px]">
-                        <BookOpen className="w-6 h-6 text-gold mb-1" />
-                        PDF
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Title & metadata */}
-                  <div className="flex-1 space-y-1.5 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                        isPublished
-                          ? "bg-success/15 text-success"
-                          : book.status === "revision_requested"
-                          ? "bg-rose-500/15 text-rose-600"
-                          : "bg-gold/15 text-gold"
-                      }`}>
-                        {isPublished ? "En Ligne" : book.status === "revision_requested" ? "Retouche" : "Attente"}
-                      </span>
-
-                      {book.classification.discipline && (
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-background-secondary text-foreground-muted font-medium truncate max-w-[130px]">
-                          {book.classification.discipline}
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="font-serif font-bold text-sm text-navy line-clamp-2 leading-snug">
-                      {book.metadata.title}
-                    </h3>
-                    <p className="text-[11px] text-foreground-muted line-clamp-1">
-                      Par {authorsList}
-                    </p>
-
-                    {book.classification.university && (
-                      <p className="text-[10px] text-navy font-semibold truncate flex items-center gap-1">
-                        <GraduationCap className="w-3 h-3 text-gold shrink-0" />
-                        {book.classification.university}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Formats & Tarifs Box */}
-                <div className={`p-3 rounded-2xl bg-background-secondary border border-border grid gap-2 text-xs ${
-                  book.has_audio_version || book.has_audio || book.price_audio ? "grid-cols-3" : "grid-cols-2"
-                }`}>
-                  <div>
-                    <span className="text-[10px] text-foreground-muted uppercase font-bold block truncate">
-                      Numérique
-                    </span>
-                    <span className="font-mono font-bold text-navy text-xs">
-                      {book.default_price.toLocaleString("fr-FR")} XOF
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] text-foreground-muted uppercase font-bold block truncate">
-                      Papier
-                    </span>
-                    <span className={`font-mono text-xs font-bold ${
-                      book.is_paper_available ? "text-gold" : "text-foreground-muted/60"
-                    }`}>
-                      {book.is_paper_available
-                        ? `${(book.admin_price || 7500).toLocaleString("fr-FR")} XOF`
-                        : "Désactivé"}
-                    </span>
-                  </div>
-
-                  {(book.has_audio_version || book.has_audio || book.price_audio) && (
-                    <div>
-                      <span className="text-[10px] text-gold uppercase font-bold flex items-center gap-1 truncate">
-                        <Headphones className="w-2.5 h-2.5 text-gold" />
-                        Audio
-                      </span>
-                      <span className="font-mono font-bold text-gold text-xs">
-                        {(book.price_audio || 3500).toLocaleString("fr-FR")} XOF
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Bottom Actions */}
-                <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingBook(book)}
-                    className="flex-1 py-2 px-3 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center justify-center gap-1.5 min-h-[40px] shadow-xs cursor-pointer"
-                  >
-                    <Edit className="w-3.5 h-3.5 text-gold" />
-                    Modifier
-                  </button>
-
-                  {(book.has_audio_version || book.has_audio || book.price_audio) && (
-                    <button
-                      type="button"
-                      onClick={() => playBook(book.id)}
-                      className="p-2 rounded-xl bg-gold/15 border border-gold/40 text-navy hover:bg-gold/25 transition-colors flex items-center justify-center min-h-[40px] min-w-[40px] cursor-pointer"
-                      title="Écouter la version audio"
-                    >
-                      <Headphones className="w-4 h-4 text-gold" />
-                    </button>
-                  )}
-
-                  <Link
-                    href={`/student/catalog/${book.id}`}
-                    target="_blank"
-                    className="p-2 rounded-xl bg-background border border-border text-navy hover:border-gold hover:text-gold transition-colors flex items-center justify-center min-h-[40px] min-w-[40px]"
-                    title="Voir sur le catalogue public"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </Link>
-
-                  {((book as any).is_digital_available !== false && (book as any).format_type !== 'audio') && (
-                    <Link
-                      href={`/catalog/reader/${book.id}`}
-                      target="_blank"
-                      className="p-2 rounded-xl bg-background border border-border text-navy hover:border-gold hover:text-gold transition-colors flex items-center justify-center min-h-[40px] min-w-[40px]"
-                      title="Ouvrir dans la Liseuse DRM"
-                    >
-                      <Play className="w-4 h-4 text-gold fill-gold" />
-                    </Link>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Edit Modal */}
+      {/* Modale d'Édition Rapide */}
       {editingBook && (
         <EditBookModal
           book={editingBook}
@@ -389,6 +325,7 @@ export default function ChiefLayoutCatalogPage() {
             setBooks((prev) =>
               prev.map((b) => (b.id === updated.id ? updated : b))
             );
+            toast.success("Ouvrage mis à jour avec succès !");
           }}
         />
       )}

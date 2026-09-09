@@ -439,7 +439,10 @@ export default function StudentCatalogPage() {
     try {
       const data = await getStudentCatalog(
         debouncedQ || undefined,
-        selectedDiscipline !== "all" ? selectedDiscipline : undefined
+        selectedDiscipline !== "all" ? selectedDiscipline : undefined,
+        undefined,
+        currentPage,
+        pageSize
       );
       setCatalogData(data);
     } catch (err: unknown) {
@@ -449,7 +452,7 @@ export default function StudentCatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQ, selectedDiscipline]);
+  }, [debouncedQ, selectedDiscipline, currentPage, pageSize]);
 
   useEffect(() => {
     loadCatalog();
@@ -481,34 +484,11 @@ export default function StudentCatalogPage() {
   };
 
   const { disciplines: dbDisciplines } = useDisciplines();
-  const allBooks = catalogData?.books || [];
+  const books = catalogData?.books || [];
+  const totalBooks = catalogData?.total ?? books.length;
+  const totalPages = catalogData?.total_pages ?? (Math.ceil(totalBooks / pageSize) || 1);
   const disciplines = dbDisciplines && dbDisciplines.length > 0 ? dbDisciplines : (catalogData?.disciplines || []);
   const disciplineNames = useMemo(() => disciplines.map((d) => d.name), [disciplines]);
-
-  // Filtrage local immédiat et robuste en complément de l'API
-  const filteredBooks = useMemo(() => {
-    if (!allBooks) return [];
-    if (selectedDiscipline === "all" || !selectedDiscipline) return allBooks;
-    const target = selectedDiscipline.toLowerCase();
-    return allBooks.filter((b) => {
-      const name = (b.discipline_name || "").toLowerCase();
-      const disc = ((b as any).discipline || "").toLowerCase();
-      return (
-        name.includes(target) ||
-        disc.includes(target) ||
-        String((b as any).discipline_id) === selectedDiscipline
-      );
-    });
-  }, [allBooks, selectedDiscipline]);
-
-  // Pagination calculée sur les ouvrages filtrés
-  const totalBooks = filteredBooks.length;
-  const totalPages = Math.ceil(totalBooks / pageSize) || 1;
-
-  const paginatedBooks = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredBooks.slice(start, start + pageSize);
-  }, [filteredBooks, currentPage, pageSize]);
 
   const handleDisciplineSelect = (disciplineId: string, disciplineName: string) => {
     setSelectedDiscipline(disciplineId);
@@ -668,7 +648,7 @@ export default function StudentCatalogPage() {
               ))}
             </div>
           )
-        ) : allBooks.length === 0 ? (
+        ) : books.length === 0 ? (
           <div className="py-20 px-6 rounded-3xl bg-background border border-dashed border-border text-center space-y-4 shadow-xs">
             <div className="w-14 h-14 rounded-2xl bg-navy/5 flex items-center justify-center mx-auto text-foreground-muted">
               <BookOpen className="w-7 h-7 opacity-60" />
@@ -694,7 +674,7 @@ export default function StudentCatalogPage() {
           <>
             {viewMode === "grid" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {paginatedBooks.map((book) => (
+                {books.map((book) => (
                   <CatalogBookCard
                     key={book.id}
                     book={book}
@@ -705,7 +685,7 @@ export default function StudentCatalogPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {paginatedBooks.map((book) => (
+                {books.map((book) => (
                   <CatalogBookListItem
                     key={book.id}
                     book={book}

@@ -414,7 +414,7 @@ class Command(BaseCommand):
                     "price_paper": 7500.00,
                     "page_count": total_pages,
                     "discipline": discipline_obj,
-                    "is_paper_available": True,
+                    "is_paper_available": False,
                     "cover_image": f"covers/{book_uuid_str}/cover.webp" if cover_url else "",
                 },
             )

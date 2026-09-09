@@ -18,7 +18,7 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
     """Catalogue public en lecture seule."""
     queryset = Ouvrage.objects.filter(status='published').select_related(
         'publisher', 'discipline', 'institution'
-    ).prefetch_related('authors')
+    ).prefetch_related('authors', 'language_versions', 'audio_tracks', 'disciplines')
     serializer_class = OuvrageReadSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -340,11 +340,11 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
         if is_chief_or_admin and (self.request.query_params.get('all') == 'true' or self.action in ('retrieve', 'update', 'partial_update', 'destroy')):
             qs = Ouvrage.objects.all().select_related(
                 'publisher', 'discipline', 'institution', 'created_by'
-            ).prefetch_related('authors')
+            ).prefetch_related('authors', 'language_versions', 'audio_tracks')
         else:
             qs = Ouvrage.objects.filter(
                 created_by=user
-            ).select_related('publisher', 'discipline', 'institution').prefetch_related('authors')
+            ).select_related('publisher', 'discipline', 'institution').prefetch_related('authors', 'language_versions', 'audio_tracks')
 
         status_filter = self.request.query_params.get('status')
         if status_filter:
@@ -360,6 +360,11 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             qs = qs.filter(discipline_id=discipline)
 
         return qs.order_by('-created_at')
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('all') == 'true' or self.request.query_params.get('no_page') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
 
     def get_serializer_class(self):
         if self.action == 'create':

@@ -59,8 +59,8 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
         return obj.available_languages
 
     def get_languages(self, obj):
-        versions = obj.language_versions.all()
-        if not versions.exists():
+        versions = list(obj.language_versions.all()) if hasattr(obj, 'language_versions') else []
+        if not versions:
             cover = getattr(obj, 'cover_url', None) or (obj.cover_image.url if (obj.cover_image and hasattr(obj.cover_image, 'url')) else None)
             file_key = str(obj.file.name) if (obj.file and hasattr(obj.file, 'name') and obj.file.name) else ""
             return [{
@@ -117,30 +117,40 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
     def get_discipline_name(self, obj):
         if obj.discipline:
             return obj.discipline.name
-        if obj.pk and hasattr(obj, 'disciplines') and obj.disciplines.exists():
-            first_d = obj.disciplines.first()
-            return first_d.name if first_d else ""
+        if obj.pk and hasattr(obj, 'disciplines'):
+            discs = list(obj.disciplines.all())
+            if discs:
+                return discs[0].name
         return ""
 
     def get_disciplines_names(self, obj):
-        if obj.pk and hasattr(obj, 'disciplines') and obj.disciplines.exists():
-            return [d.name for d in obj.disciplines.all()]
+        if obj.pk and hasattr(obj, 'disciplines'):
+            discs = list(obj.disciplines.all())
+            if discs:
+                return [d.name for d in discs]
         if obj.discipline:
             return [obj.discipline.name]
         return []
 
     def get_authors_names(self, obj):
-        if obj.pk and obj.authors.exists():
-            return ", ".join([f"{a.first_name} {a.last_name}".strip() for a in obj.authors.all()])
+        if obj.pk and hasattr(obj, 'authors'):
+            authors = list(obj.authors.all())
+            if authors:
+                return ", ".join([f"{a.first_name} {a.last_name}".strip() for a in authors if f"{a.first_name} {a.last_name}".strip()])
         return ""
 
     def get_is_owned(self, obj) -> bool:
         request = self.context.get('request')
-        if request and request.user and request.user.is_authenticated:
-            from apps.protection.access_service import AccessService
-            access_info = AccessService.check_user_book_access(request.user, str(obj.id))
-            return bool(access_info.get("access_granted"))
-        return False
+        if not request or not request.user or not request.user.is_authenticated:
+            return False
+        user_owned_ids = self.context.get('user_owned_ids')
+        if user_owned_ids is not None:
+            if user_owned_ids is True:
+                return True
+            return str(obj.id) in user_owned_ids
+        from apps.protection.access_service import AccessService
+        access_info = AccessService.check_user_book_access(request.user, str(obj.id))
+        return bool(access_info.get("access_granted"))
 
     def get_has_digital_access(self, obj) -> bool:
         return self.get_is_owned(obj)
@@ -151,7 +161,14 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
         return bool(obj.file or obj.format_type in ['pdf', 'epub'])
 
     def get_has_audio(self, obj) -> bool:
-        return bool(obj.has_audio_version or obj.format_type == 'audio' or (hasattr(obj, 'audio_tracks') and obj.audio_tracks.exists()))
+        if bool(getattr(obj, 'has_audio_version', False)) or getattr(obj, 'format_type', '') == 'audio':
+            return True
+        if hasattr(obj, 'audio_tracks'):
+            tracks = getattr(obj, '_prefetched_objects_cache', {}).get('audio_tracks')
+            if tracks is not None:
+                return len(tracks) > 0
+            return obj.audio_tracks.exists()
+        return False
 
 
 # Alias pour rétrocompatibilité

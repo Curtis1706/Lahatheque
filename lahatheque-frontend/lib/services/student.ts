@@ -253,8 +253,11 @@ export interface StudentProfileAPI {
 
 export interface CatalogDataAPI {
   books: BookAPI[];
-  disciplines: { id: string; name: string }[];
+  disciplines?: { id: string; name: string }[];
   total: number;
+  total_pages?: number;
+  current_page?: number;
+  page_size?: number;
 }
 
 // ─── Vue d'ensemble KPIs ───────────────────────────────────────────────────────
@@ -362,12 +365,16 @@ export async function requestAffiliation(payload: {
 export async function getStudentCatalog(
   q?: string,
   discipline?: string,
-  format?: string
+  format?: string,
+  page?: number,
+  pageSize?: number
 ): Promise<CatalogDataAPI> {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (discipline && discipline !== "all") params.set("discipline", discipline);
   if (format && format !== "all") params.set("format", format);
+  if (page) params.set("page", String(page));
+  if (pageSize) params.set("page_size", String(pageSize));
   const query = params.toString();
   return bffGet<CatalogDataAPI>(`/catalog/${query ? `?${query}` : ""}`);
 }

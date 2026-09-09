@@ -720,10 +720,34 @@ class StudentCatalogView(APIView):
                     ).values_list('ouvrage_id', flat=True)
                 )
 
-        disciplines = Discipline.objects.all().order_by('name').values('id', 'name')
+        total_count = qs.count()
+
+        # Support de la pagination serveur native
+        page_param = request.query_params.get('page')
+        page_size_param = request.query_params.get('page_size')
+
+        if page_param is not None or page_size_param is not None:
+            try:
+                page = max(1, int(page_param or 1))
+            except (ValueError, TypeError):
+                page = 1
+            try:
+                page_size = max(1, min(100, int(page_size_param or 12)))
+            except (ValueError, TypeError):
+                page_size = 12
+
+            total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+            start = (page - 1) * page_size
+            end = start + page_size
+            books_slice = qs[start:end]
+        else:
+            page = 1
+            page_size = total_count
+            total_pages = 1
+            books_slice = qs
 
         serializer = OuvrageBasicSerializer(
-            qs,
+            books_slice,
             many=True,
             context={
                 'request': request,
@@ -735,8 +759,10 @@ class StudentCatalogView(APIView):
             'success': True,
             'data': {
                 'books': serializer.data,
-                'disciplines': list(disciplines),
-                'total': qs.count(),
+                'total': total_count,
+                'total_pages': total_pages,
+                'current_page': page,
+                'page_size': page_size,
             },
             'error': None,
         })
