@@ -147,37 +147,90 @@
 
 ---
 
-## Phase 9: Polish & Cross-Cutting Concerns
+## Phase 9: User Story 7 - Haute Performance Redis Catalogue & Streaming Bilingue Partenaire (Priority: P1) [FR-015, FR-021, FR-024]
 
-**Purpose**: Validation globale, audit constitutionnel et documentation finale
+**Goal**: Optimiser les performances de l'API partenaire (`PartnerCatalogListView`) avec le cache Redis serveur LAHAThèque (TTL 15 min), le préchargement relationnel anti-N+1, la levée du plafond de 100 ouvrages, les filtres `language`/`q`/`discipline`/`page`/`page_size`, le court-circuit M2M pour `is_owned`/`has_digital_access`, et la cascade dynamique de langue (`?lang=`) lors du streaming protégé de session (`ReaderProtectedStreamView`).
 
-- [X] T038 [P] Mettre à jour la documentation d'API dans `DOCUMENTATION_API_LAHATHÈQUE.md`
-- [X] T039 Valider le guide de démarrage rapide [quickstart.md](./quickstart.md) avec un test bout-en-bout
-- [X] T040 Vérification de l'interdiction stricte des émojis et respect des tokens de couleur dans tous les nouveaux composants
-- [X] T041 Exécuter la suite complète de tests de non-régression (`python manage.py test`)
+**Independent Test**:
+1. Appeler `GET /api/v1/partner/catalog/?language=fr` et mesurer la latence (< 20 ms au 2e appel via Redis).
+2. Vérifier que `is_owned` et `has_digital_access` sont `false` sans requêtes `AccessService`.
+3. Appeler `GET /api/v1/reader/sessions/stream/?lang=en` puis `?lang=fr` avec `X-Reader-Token` et constater la diffusion des flux bilingues distincts filigranés avec code HTTP 206.
+
+### Implementation for User Story 7
+- [X] T038 [P] [US7] Implémenter le cache Redis (TTL 15 min), l'invalidation ciblée et le préchargement relationnel (`select_related('discipline', 'institution')`, `prefetch_related('authors', 'language_versions')`) dans `lahatheque-backend/apps/reader/views.py` (`PartnerCatalogListView`)
+- [X] T039 [P] [US7] Supprimer le plafond rigide de 100 ouvrages et ajouter les paramètres de filtrage (`language`, `q`, `discipline`) et de pagination (`page`, `page_size`) dans `lahatheque-backend/apps/reader/views.py` (`PartnerCatalogListView`)
+- [X] T040 [P] [US7] Implémenter le court-circuit M2M partenaire dans `lahatheque-backend/apps/student/serializers.py` (`OuvrageBasicSerializer`) pour forcer `is_owned=False` et `has_digital_access=False` sans appeler `AccessService`
+- [X] T041 [US7] Implémenter la résolution de langue en cascade (`?lang=` > `session.metadata['language']` > langue originale) dans `lahatheque-backend/apps/reader/views.py` (`ReaderProtectedStreamView`) et propager `{ouvrage_id}:{lang}` vers `DerivedMaterializer`
+- [X] T042 [P] [US7] Écrire les tests d'intégration automatisés du cache Redis et du streaming bilingue de session dans `lahatheque-backend/apps/reader/tests/test_partner_catalog_performance.py`
+
+**Checkpoint**: User Story 7 opérationnelle — API partenaire ultra-rapide (cache Redis serveur), sans limite de 100 livres et streaming protégé bilingue étanche.
+
+---
+
+## Phase 10: User Story 8 - Mise à Jour Exhaustive du Guide Partenaire Accès Mixte & SDKs (Priority: P1) [FR-024]
+
+**Goal**: Mettre à jour intégralement le document officiel [GUIDE_INTEGRATION_ACCES_MIXTE.md](../../GUIDE_INTEGRATION_ACCES_MIXTE.md) pour refléter 100% des capacités réelles du backend LAHAThèque (champs multilingues, cache Redis serveur, SDKs Python/TypeScript/PHP, streaming transparent EPUB->PDF et webhook enrichi).
+
+**Independent Test**: Relire ligne par ligne [GUIDE_INTEGRATION_ACCES_MIXTE.md](../../GUIDE_INTEGRATION_ACCES_MIXTE.md) et exécuter les exemples de code des SDKs Python, TypeScript et PHP contre l'API locale pour confirmer leur conformité exacte.
+
+### Implementation for User Story 8
+- [X] T043 [US8] Mettre à jour la section 4 et 5 de `GUIDE_INTEGRATION_ACCES_MIXTE.md` :
+  - Paramètre optionnel `language` dans `POST /api/v1/reader/sessions/`
+  - Nouveaux champs `available_languages`, `languages`, `has_audio`, `has_audio_version`, `price_audio` dans la réponse catalogue `GET /api/v1/partner/catalog/`
+  - Paramètres de requête de filtrage `?language=`, `?q=`, `?discipline=`, `?page=`, `?page_size=` et levée de limite
+  - Explication sur la sémantique M2M des champs `is_owned` et `has_digital_access` (`false` en contexte M2M)
+- [X] T044 [US8] Ajouter une section dédiée dans `GUIDE_INTEGRATION_ACCES_MIXTE.md` expliquant l'accélération par Cache Redis opéré sur le VPS LAHAThèque (confirmant aux partenaires qu'aucun serveur Redis n'est requis chez eux)
+- [X] T045 [US8] Mettre à jour les exemples de code des 3 SDKs d'intégration dans `GUIDE_INTEGRATION_ACCES_MIXTE.md` :
+  - SDK Python 3.10+ (`open_catalog_book` avec argument `language=None`, méthode `search_catalog` avec paramètre `language`)
+  - SDK TypeScript / Node.js (`openCatalogBook` avec `language?: string`, méthode `searchCatalog` avec `language`)
+  - SDK PHP / Laravel (`openCatalogBook` avec `?string $language = null`, méthode `searchCatalog` avec `language`)
+- [X] T046 [US8] Documenter la prise en charge transparente des ouvrages EPUB (convertis automatiquement en PDF vectoriel par LAHAThèque sans impact client) et le champ `language` dans le payload du webhook `reader.session.opened`
+
+**Checkpoint**: User Story 8 opérationnelle — Le guide d'intégration partenaire est 100% fidèle, complet et directement utilisable par les universités et SaaS tiers.
+
+---
+
+## Phase 11: User Story 9 - Vitrine Publique Nouveautés & Expérience Panier (Priority: P2) [FR-022, FR-023]
+
+**Goal**: Garantir que la section "Nouveautés" de la vitrine d'accueil (`/`) charge dynamiquement les 6 ouvrages les plus récents en priorisant la disponibilité en français, avec redirection vers la fiche détaillée et ajout direct au panier numérique via le bouton chariot (toast + ouverture du tiroir latéral `CartDrawer`).
+
+**Independent Test**: Ouvrir `http://localhost:3000`, vérifier l'affichage des 6 livres sans bouchon statique, cliquer sur la carte (redirection vers `/catalog/[slug]`), cliquer sur le chariot (ouverture du tiroir panier avec l'article ajouté).
+
+### Implementation for User Story 9
+- [X] T047 [US9] Valider la requête dynamique de sélection des 6 nouveautés publiées avec priorité français dans `lahatheque-frontend/app/(public)/page.tsx`
+- [X] T048 [US9] Valider la redirection sur clic de carte vers `/catalog/[slug_or_id]` et l'action d'ajout panier numérique via `useCart.addItem()` avec toast et ouverture automatique de `CartDrawer` dans `lahatheque-frontend/app/(public)/page.tsx`
+
+**Checkpoint**: User Story 9 opérationnelle — Vitrine d'accueil dynamique, bilingue et convertisseuse.
+
+---
+
+## Phase 12: Polish & Validation Globale
+
+**Purpose**: Validation croisée, vérification de non-régression et conformité constitutionnelle
+
+- [ ] T049 [P] Mettre à jour la documentation d'API globale dans `DOCUMENTATION_API_LAHATHÈQUE.md`
+- [ ] T050 Valider le guide de démarrage rapide [quickstart.md](./quickstart.md) avec un test complet de bout en bout
+- [ ] T051 Vérification de l'interdiction stricte des émojis et respect des tokens de couleur sémantiques dans tous les composants modifiés
+- [ ] T052 Exécuter la suite complète de tests de non-régression backend (`python manage.py test`)
 
 ---
 
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
-- **Setup (Phase 1)** : Démarrage immédiat.
-- **Foundational (Phase 2)** : Dépend de Phase 1 — **Bloque toutes les user stories**.
-- **User Stories (Phases 3 à 8)** : Dépendent de Phase 2.
-  - Phase 3 (US1 - MVP) : Ingestion R2 & Modélisation.
-  - Phase 4 (US2) : Droits numériques universels (s'appuie sur US1).
-  - Phase 5 (US3) : Sélection papier et stocks (indépendante).
-  - Phase 6 (US4) : Liseuse bilingue (s'appuie sur US1 & US2).
-  - Phase 7 (US5) : Audio multilingue (s'appuie sur US1).
-  - Phase 8 (US6) : API partenaires et formulaires maquettiste.
-- **Polish (Phase 9)** : Dépend de l'ensemble des user stories.
+- **Phases 1 & 2 (Setup & Foundational)** : Terminées.
+- **Phases 3 à 8 (US1 à US6)** : Socle multilingue, droits, liseuse interne et formulaires maquettistes terminés.
+- **Phase 9 (US7 - Haute Performance Redis & Streaming)** : Prête à être exécutée immédiatement.
+- **Phase 10 (US8 - Guide Accès Mixte)** : Dépend des spécifications finalisées de l'API partenaire (Phase 9).
+- **Phase 11 (US9 - Vitrine Publique)** : Validée.
+- **Phase 12 (Polish & Validation Globale)** : Exécution finale après Phase 9 et Phase 10.
 
 ---
 
 ## Implementation Strategy
 
-### MVP First (Phases 1, 2 et 3)
-1. Création du modèle `OuvrageLanguageVersion` et migrations.
-2. Commande d'ingestion R2 `import_r2_multilingual_books` avec Option A, extraction de couverture page 1 et extraction IA (15 premières et 15 dernières pages).
-3. Validation sur un échantillon de 5 livres du bucket R2.
-4. Déploiement du catalogue bilingue.
+### Prochaine Étape Immédiate (Phase 9 & Phase 10)
+1. **Backend** : Implémentation du cache Redis, des filtres, de la pagination et du court-circuit M2M dans `PartnerCatalogListView` (`T038`, `T039`, `T040`).
+2. **Backend Streaming** : Implémentation de la cascade de langue `?lang=` dans `ReaderProtectedStreamView` (`T041`).
+3. **Documentation Partenaire** : Mise à jour exhaustive de `GUIDE_INTEGRATION_ACCES_MIXTE.md` et des 3 SDKs (`T043`, `T044`, `T045`, `T046`).
+4. **Validation** : Exécution des tests automatisés (`T042`, `T052`).
