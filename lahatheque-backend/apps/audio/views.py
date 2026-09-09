@@ -17,12 +17,12 @@ logger = logging.getLogger(__name__)
 class IsAudioUploader(BasePermission):
     """Autorise uniquement les maquettistes, éditeurs, juristes et administrateurs."""
     def has_permission(self, request, view):
-        return bool(
-            request.user and request.user.is_authenticated
-            and getattr(request.user, 'role', '') in [
-                'layout_artist', 'chief_layout', 'publisher', 'admin', 'super_admin'
-            ]
-        )
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        allowed = ['layout_artist', 'chief_layout', 'publisher', 'admin', 'super_admin']
+        active = user.active_roles if isinstance(getattr(user, 'active_roles', None), list) else []
+        return bool(getattr(user, 'role', '') in allowed or any(r in allowed for r in active) or user.is_superuser)
 
 
 class AudioTrackViewSet(viewsets.ModelViewSet):
@@ -670,6 +670,17 @@ class AudioStudioSubmitView(APIView):
         price_xof = Decimal(str(price_xof_val)) if price_xof_val else Decimal("2500.00")
         price_eur = Decimal(str(price_eur_val)) if price_eur_val else Decimal("3.80")
 
+        user = request.user
+        user_role = getattr(user, "role", "")
+        active_roles = user.active_roles if isinstance(getattr(user, "active_roles", None), list) else []
+        is_admin_or_super = (
+            user_role in ["admin", "super_admin"]
+            or any(r in ["admin", "super_admin"] for r in active_roles)
+            or user.is_superuser
+            or getattr(user, "is_staff", False)
+        )
+        target_audio_status = "published" if is_admin_or_super else "pending_layout_validation"
+
         ouvrage = None
         if is_attached and attached_book_id:
             try:
@@ -677,8 +688,12 @@ class AudioStudioSubmitView(APIView):
                 ouvrage.has_audio_version = True
                 ouvrage.price_audio = price_xof
                 ouvrage.price_audio_eur = price_eur
-                ouvrage.audio_status = "pending_layout_validation"
-                ouvrage.save(update_fields=["has_audio_version", "price_audio", "price_audio_eur", "audio_status"])
+                ouvrage.audio_status = target_audio_status
+                if is_admin_or_super:
+                    ouvrage.status = "published"
+                    ouvrage.save(update_fields=["has_audio_version", "price_audio", "price_audio_eur", "audio_status", "status"])
+                else:
+                    ouvrage.save(update_fields=["has_audio_version", "price_audio", "price_audio_eur", "audio_status"])
             except Ouvrage.DoesNotExist:
                 return Response({"success": False, "error": "Ouvrage de rattachement introuvable."}, status=404)
         else:
@@ -692,12 +707,12 @@ class AudioStudioSubmitView(APIView):
                 country=data.get("country", "BJ"),
                 format_type="audio",
                 has_audio_version=True,
-                audio_status="pending_layout_validation",
+                audio_status=target_audio_status,
                 price_digital=price_xof,
                 price_audio=price_xof,
                 price_audio_eur=price_eur,
                 created_by=request.user,
-                status="published" if getattr(request.user, "role", "") in ["admin", "super_admin"] else "draft",
+                status="published" if is_admin_or_super else "draft",
             )
 
             cover_key = data.get("cover_r2_key")
@@ -772,6 +787,12 @@ class AudioStudioSubmitView(APIView):
 
         _alert_juriste_if_contract_missing_audio_rate(ouvrage)
 
+        success_msg = (
+            "Livre audio enregistré et publié avec succès au catalogue."
+            if is_admin_or_super
+            else "Livre audio enregistré avec succès et transmis pour validation."
+        )
+
         return Response({
             "success": True,
             "data": {
@@ -779,7 +800,7 @@ class AudioStudioSubmitView(APIView):
                 "title": ouvrage.title,
                 "audio_status": ouvrage.audio_status,
                 "tracks_created": tracks_created,
-                "message": "Livre audio enregistré avec succès."
+                "message": success_msg
             }
         })
 

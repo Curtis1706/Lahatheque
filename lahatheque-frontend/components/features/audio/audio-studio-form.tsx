@@ -267,7 +267,12 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
 
       const res = await submitAudioStudioForm(payload);
       if (res.success) {
-        setSuccessMessage("Le livre audio a été enregistré avec succès et transmis pour validation.");
+        setSuccessMessage(
+          res.data?.message ||
+          (role === "admin"
+            ? "Le livre audio a été enregistré et publié avec succès au catalogue."
+            : "Le livre audio a été enregistré avec succès et transmis pour validation.")
+        );
         setTimeout(() => {
           router.push(onSuccessRedirectPath);
         }, 1500);
