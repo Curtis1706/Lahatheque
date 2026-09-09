@@ -83,20 +83,28 @@ def task_scan_and_send_deposit_reminders():
                 f"Cordialement,\nL'équipe LAHAThèque"
             )
 
-            from django.core.mail import send_mail
-            from django.conf import settings as django_settings
+            from apps.communications.services.email_service import send_transactional_email
 
             email_sent = False
             error_detail = ""
             try:
-                send_mail(
+                result = send_transactional_email(
+                    email_type="deposit_reminder",
+                    to_email=recipient_email,
                     subject=subject,
-                    message=body_text,
-                    from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'contact@lahatheque.com'),
-                    recipient_list=[recipient_email],
-                    fail_silently=False,
+                    template_name="emails/admin/custom_message.html",
+                    context={
+                        "body_text": body_text,
+                        "message_body": body_text,
+                        "recipient_name": recipient_name,
+                        "custom_subject": subject,
+                    },
+                    recipient_name=recipient_name,
+                    async_send=False,
                 )
-                email_sent = True
+                email_sent = bool(getattr(result, "success", False))
+                if not email_sent:
+                    error_detail = str(getattr(result, "error", "Échec inconnu"))
             except Exception as mail_err:
                 error_detail = str(mail_err)
                 logger.error(f"Échec envoi relance dépôt {deposit.id} à {recipient_email}: {mail_err}")
@@ -162,20 +170,28 @@ def task_scan_and_send_unpaid_reminders():
                 f"L'équipe LAHAThèque"
             )
 
-            from django.core.mail import send_mail
-            from django.conf import settings as django_settings
+            from apps.communications.services.email_service import send_transactional_email
 
             email_sent = False
             error_detail = ""
             try:
-                send_mail(
+                result = send_transactional_email(
+                    email_type="unpaid_reminder",
+                    to_email=recipient_email,
                     subject=subject,
-                    message=body_text,
-                    from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'contact@lahatheque.com'),
-                    recipient_list=[recipient_email],
-                    fail_silently=False,
+                    template_name="emails/admin/custom_message.html",
+                    context={
+                        "body_text": body_text,
+                        "message_body": body_text,
+                        "recipient_name": recipient_name,
+                        "custom_subject": subject,
+                    },
+                    recipient_name=recipient_name,
+                    async_send=False,
                 )
-                email_sent = True
+                email_sent = bool(getattr(result, "success", False))
+                if not email_sent:
+                    error_detail = str(getattr(result, "error", "Échec inconnu"))
             except Exception as mail_err:
                 error_detail = str(mail_err)
                 logger.error(f"Échec envoi relance impayé {order.id} à {recipient_email}: {mail_err}")
@@ -241,20 +257,28 @@ def task_scan_and_send_subscription_expiry_reminders():
                 f"L'équipe LAHAThèque"
             )
 
-            from django.core.mail import send_mail
-            from django.conf import settings as django_settings
+            from apps.communications.services.email_service import send_transactional_email
 
             email_sent = False
             error_detail = ""
             try:
-                send_mail(
+                result = send_transactional_email(
+                    email_type="subscription_expiry_reminder",
+                    to_email=recipient_email,
                     subject=subject,
-                    message=body_text,
-                    from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'contact@lahatheque.com'),
-                    recipient_list=[recipient_email],
-                    fail_silently=False,
+                    template_name="emails/admin/custom_message.html",
+                    context={
+                        "body_text": body_text,
+                        "message_body": body_text,
+                        "recipient_name": recipient_name,
+                        "custom_subject": subject,
+                    },
+                    recipient_name=recipient_name,
+                    async_send=False,
                 )
-                email_sent = True
+                email_sent = bool(getattr(result, "success", False))
+                if not email_sent:
+                    error_detail = str(getattr(result, "error", "Échec inconnu"))
             except Exception as mail_err:
                 error_detail = str(mail_err)
                 logger.error(f"Échec envoi relance abonnement {sub.id} à {recipient_email}: {mail_err}")
