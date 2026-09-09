@@ -657,10 +657,9 @@ class AudioStudioSubmitView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAudioUploader]
 
     def post(self, request):
-        from apps.catalog.models import Ouvrage, Discipline
+        from apps.catalog.models import Ouvrage, Discipline, OuvrageLanguageVersion
         from apps.audio.models import AudioTrack
         from decimal import Decimal
-        import json
 
         data = request.data
         is_attached = str(data.get("is_attached", "")).lower() in ["true", "1", "yes"]
@@ -701,9 +700,9 @@ class AudioStudioSubmitView(APIView):
                 status="published" if getattr(request.user, "role", "") in ["admin", "super_admin"] else "draft",
             )
 
-            cover_file = request.FILES.get("cover_image")
-            if cover_file:
-                ouvrage.cover_image = cover_file
+            cover_key = data.get("cover_r2_key")
+            if cover_key:
+                ouvrage.cover_image.name = cover_key
                 ouvrage.save(update_fields=["cover_image"])
 
             cat_name = data.get("category", "")
@@ -713,102 +712,63 @@ class AudioStudioSubmitView(APIView):
                     ouvrage.discipline = disc
                     ouvrage.save(update_fields=["discipline"])
 
-        # Sauvegarde des pistes Voix Homme & Voix Femme
         tracks_created = 0
-
         narration_language = data.get("narration_language", "fr") or "fr"
         language_version_id = data.get("language_version_id")
         language_version = None
         if language_version_id:
-            from apps.catalog.models import OuvrageLanguageVersion
             language_version = OuvrageLanguageVersion.objects.filter(id=language_version_id, ouvrage=ouvrage).first()
         elif narration_language and ouvrage:
-            from apps.catalog.models import OuvrageLanguageVersion
             language_version = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage, language__iexact=narration_language).first()
 
-        # 1. Livre complet Voix Homme
-        male_full_file = request.FILES.get("male_full_track")
-        if male_full_file:
-            male_full_duration = int(data.get("male_full_duration", 0))
-            AudioTrack.objects.filter(ouvrage=ouvrage, voice_gender="male", track_type="full").delete()
-            AudioTrack.objects.create(
+        def _attach_track(r2_key, voice_gender, track_type, chapter_number, order_index, title, duration, size_bytes):
+            nonlocal tracks_created
+            if not r2_key:
+                return
+            if track_type == "full":
+                AudioTrack.objects.filter(ouvrage=ouvrage, voice_gender=voice_gender, track_type="full").delete()
+            track = AudioTrack(
                 ouvrage=ouvrage,
                 language_version=language_version,
                 narration_language=narration_language,
-                voice_gender="male",
-                track_type="full",
-                chapter_number=0,
-                order_index=0,
-                title="Livre complet – Voix Homme",
-                audio_file=male_full_file,
-                duration_seconds=male_full_duration,
-                file_size_bytes=male_full_file.size,
+                voice_gender=voice_gender,
+                track_type=track_type,
+                chapter_number=chapter_number,
+                order_index=order_index,
+                title=title,
+                duration_seconds=int(duration or 0),
+                file_size_bytes=int(size_bytes or 0),
             )
+            track.audio_file.name = r2_key
+            track.save()
             tracks_created += 1
 
-        # 2. Livre complet Voix Femme
-        female_full_file = request.FILES.get("female_full_track")
-        if female_full_file:
-            female_full_duration = int(data.get("female_full_duration", 0))
-            AudioTrack.objects.filter(ouvrage=ouvrage, voice_gender="female", track_type="full").delete()
-            AudioTrack.objects.create(
-                ouvrage=ouvrage,
-                language_version=language_version,
-                narration_language=narration_language,
-                voice_gender="female",
-                track_type="full",
-                chapter_number=0,
-                order_index=0,
-                title="Livre complet – Voix Femme",
-                audio_file=female_full_file,
-                duration_seconds=female_full_duration,
-                file_size_bytes=female_full_file.size,
-            )
-            tracks_created += 1
+        _attach_track(
+            data.get("male_full_r2_key"), "male", "full", 0, 0,
+            "Livre complet – Voix Homme", data.get("male_full_duration"), data.get("male_full_size"),
+        )
+        _attach_track(
+            data.get("female_full_r2_key"), "female", "full", 0, 0,
+            "Livre complet – Voix Femme", data.get("female_full_duration"), data.get("female_full_size"),
+        )
 
-        # 3. Chapitres dynamiques Voix Homme
         male_chap_count = int(data.get("male_chapters_count", 0))
         for i in range(male_chap_count):
-            chap_file = request.FILES.get(f"male_chapter_{i}_file")
-            if chap_file:
-                chap_title = data.get(f"male_chapter_{i}_title", f"Chapitre {i + 1}").strip()
-                chap_dur = int(data.get(f"male_chapter_{i}_duration", 0))
-                AudioTrack.objects.create(
-                    ouvrage=ouvrage,
-                    language_version=language_version,
-                    narration_language=narration_language,
-                    voice_gender="male",
-                    track_type="chapter",
-                    chapter_number=i + 1,
-                    order_index=i + 1,
-                    title=chap_title,
-                    audio_file=chap_file,
-                    duration_seconds=chap_dur,
-                    file_size_bytes=chap_file.size,
-                )
-                tracks_created += 1
+            r2_key = data.get(f"male_chapter_{i}_r2_key")
+            _attach_track(
+                r2_key, "male", "chapter", i + 1, i + 1,
+                data.get(f"male_chapter_{i}_title", f"Chapitre {i + 1}").strip(),
+                data.get(f"male_chapter_{i}_duration"), data.get(f"male_chapter_{i}_size"),
+            )
 
-        # 4. Chapitres dynamiques Voix Femme
         female_chap_count = int(data.get("female_chapters_count", 0))
         for i in range(female_chap_count):
-            chap_file = request.FILES.get(f"female_chapter_{i}_file")
-            if chap_file:
-                chap_title = data.get(f"female_chapter_{i}_title", f"Chapitre {i + 1}").strip()
-                chap_dur = int(data.get(f"female_chapter_{i}_duration", 0))
-                AudioTrack.objects.create(
-                    ouvrage=ouvrage,
-                    language_version=language_version,
-                    narration_language=narration_language,
-                    voice_gender="female",
-                    track_type="chapter",
-                    chapter_number=i + 1,
-                    order_index=i + 1,
-                    title=chap_title,
-                    audio_file=chap_file,
-                    duration_seconds=chap_dur,
-                    file_size_bytes=chap_file.size,
-                )
-                tracks_created += 1
+            r2_key = data.get(f"female_chapter_{i}_r2_key")
+            _attach_track(
+                r2_key, "female", "chapter", i + 1, i + 1,
+                data.get(f"female_chapter_{i}_title", f"Chapitre {i + 1}").strip(),
+                data.get(f"female_chapter_{i}_duration"), data.get(f"female_chapter_{i}_size"),
+            )
 
         _alert_juriste_if_contract_missing_audio_rate(ouvrage)
 

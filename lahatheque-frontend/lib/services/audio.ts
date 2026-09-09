@@ -175,14 +175,66 @@ export async function getEligibleBooksForAttachment(searchQuery?: string): Promi
 }
 
 /**
- * Soumission complète du formulaire Studio Audio (métadonnées + fichiers audio double-voix).
+ * Téléverse un fichier directement vers Cloudflare R2 via URL pré-signée S3.
  */
-export async function submitAudioStudioForm(formData: FormData): Promise<{ success: boolean; data?: any; error?: string }> {
+export async function uploadFileDirectToR2(
+  file: File,
+  fileType: "audio" | "cover",
+  onProgress?: (percent: number) => void
+): Promise<{ r2_key: string }> {
+  const presignRes = await fetch("/api/bff/catalog/my-deposits/presigned-upload-url/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      filename: file.name,
+      content_type: file.type || (fileType === "cover" ? "image/jpeg" : "audio/mpeg"),
+      file_type: fileType,
+    }),
+  });
+  const presignData = await presignRes.json();
+  if (!presignData.success && !presignData.upload_url && !presignData.data?.upload_url) {
+    throw new Error(presignData.error || presignData.data?.message || "Impossible d'obtenir une URL de téléversement.");
+  }
+  const { upload_url, file_key, key } = presignData.data || presignData;
+  const targetUploadUrl = upload_url;
+  const targetKey = file_key || key;
+
+  if (!targetUploadUrl || !targetKey) {
+    throw new Error("URL ou clé de stockage manquante dans la réponse du serveur.");
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", targetUploadUrl, true);
+    xhr.setRequestHeader("Content-Type", file.type || (fileType === "cover" ? "image/jpeg" : "audio/mpeg"));
+    if (xhr.upload) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+    }
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Échec upload R2 (${xhr.status})`)));
+    xhr.onerror = () => reject(new Error("Erreur réseau pendant le téléversement direct vers le stockage."));
+    xhr.send(file);
+  });
+
+  return { r2_key: targetKey };
+}
+
+/**
+ * Soumission complète du formulaire Studio Audio (métadonnées + clés R2 déjà téléversées).
+ */
+export async function submitAudioStudioForm(
+  payload: Record<string, any>
+): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
     const res = await fetch("/api/bff/audio/studio/submit/", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: formData,
+      body: JSON.stringify(payload),
     });
     return await res.json();
   } catch (err) {
