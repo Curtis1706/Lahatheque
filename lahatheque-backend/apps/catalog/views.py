@@ -1,4 +1,5 @@
 import logging
+import hashlib
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.views import APIView
@@ -7,11 +8,29 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q
 from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 from django.conf import settings
+from django.core.cache import cache
 from .models import Ouvrage, Discipline, Domain, Country
-from .serializers import OuvrageReadSerializer, OuvrageCreateSerializer, DisciplineSerializer, DomainSerializer, CountrySerializer
+from .serializers import (
+    OuvrageReadSerializer,
+    OuvrageCreateSerializer,
+    MaquettisteCatalogListSerializer,
+    DisciplineSerializer,
+    DomainSerializer,
+    CountrySerializer,
+)
 from .permissions import IsLayoutArtistOrAbove, IsChiefLayoutOnly, IsManagerOrAdmin
 
 logger = logging.getLogger(__name__)
+
+# Durée de cache catalogue public (5 min) — suffisamment court pour refléter les publications
+CATALOG_CACHE_TTL = 300
+
+
+def _catalog_cache_key(prefix: str, query_params: dict) -> str:
+    """Génère une clé de cache déterministe à partir du préfixe et des paramètres de requête."""
+    sorted_params = sorted(query_params.items())
+    raw = f"{prefix}:{sorted_params}"
+    return "catalog:" + hashlib.md5(raw.encode()).hexdigest()
 
 
 class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -149,6 +168,26 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
         }
         order_tuple = ordering_map.get(ordering, ('-created_at', '-id'))
         return qs.order_by(*order_tuple)
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('all') == 'true' or self.request.query_params.get('no_page') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
+
+    def list(self, request, *args, **kwargs):
+        """Liste paginée avec cache côté serveur (5 min) pour un affichage instantané."""
+        cache_key = _catalog_cache_key('public_list', dict(request.query_params))
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.debug('[Catalog] Cache HIT : %s', cache_key)
+            return Response(cached)
+
+        response = super().list(request, *args, **kwargs)
+        # Ne mettre en cache que les réponses 200 sans authentification
+        if response.status_code == 200:
+            cache.set(cache_key, response.data, CATALOG_CACHE_TTL)
+            logger.debug('[Catalog] Cache SET : %s', cache_key)
+        return response
 
     def retrieve(self, request, *args, **kwargs):
         pk = kwargs.get('pk')
@@ -331,20 +370,31 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsLayoutArtistOrAbove]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['user_owned_ids'] = True
+        return ctx
+
     def get_queryset(self):
         """Le maquettiste voit ses propres dépôts, le Chef Maquettiste et les admins ont accès à tous les ouvrages."""
         user = self.request.user
         user_role = getattr(user, 'role', '')
-        is_chief_or_admin = user_role in ('chief_layout', 'admin', 'super_admin') or user.is_superuser or user.is_staff
+        active_roles = user.active_roles if isinstance(getattr(user, 'active_roles', None), list) else []
+        is_chief_or_admin = (
+            user_role in ('chief_layout', 'admin', 'super_admin')
+            or any(r in ('chief_layout', 'admin', 'super_admin') for r in active_roles)
+            or user.is_superuser
+            or user.is_staff
+        )
 
         if is_chief_or_admin and (self.request.query_params.get('all') == 'true' or self.action in ('retrieve', 'update', 'partial_update', 'destroy')):
             qs = Ouvrage.objects.all().select_related(
                 'publisher', 'discipline', 'institution', 'created_by'
-            ).prefetch_related('authors', 'language_versions', 'audio_tracks')
+            ).prefetch_related('authors', 'language_versions', 'audio_tracks', 'disciplines')
         else:
             qs = Ouvrage.objects.filter(
                 created_by=user
-            ).select_related('publisher', 'discipline', 'institution').prefetch_related('authors', 'language_versions', 'audio_tracks')
+            ).select_related('publisher', 'discipline', 'institution').prefetch_related('authors', 'language_versions', 'audio_tracks', 'disciplines')
 
         status_filter = self.request.query_params.get('status')
         if status_filter:
@@ -366,9 +416,38 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             return None
         return super().paginate_queryset(queryset)
 
+    def list(self, request, *args, **kwargs):
+        is_all = request.query_params.get('all') == 'true' or request.query_params.get('no_page') == 'true'
+        user = request.user
+        user_role = getattr(user, 'role', '')
+        active_roles = user.active_roles if isinstance(getattr(user, 'active_roles', None), list) else []
+        is_chief_or_admin = (
+            user_role in ('chief_layout', 'admin', 'super_admin')
+            or any(r in ('chief_layout', 'admin', 'super_admin') for r in active_roles)
+            or user.is_superuser
+            or user.is_staff
+        )
+
+        if is_all and is_chief_or_admin:
+            status_p = request.query_params.get('status', 'all')
+            discipline_p = request.query_params.get('discipline', 'all')
+            cache_key = f"chief_layout_catalog_all_{status_p}_{discipline_p}"
+            cached_data = cache.get(cache_key)
+            if cached_data is not None:
+                return Response(cached_data)
+
+            response = super().list(request, *args, **kwargs)
+            if response.status_code == 200:
+                cache.set(cache_key, response.data, 300)
+            return response
+
+        return super().list(request, *args, **kwargs)
+
     def get_serializer_class(self):
         if self.action == 'create':
             return OuvrageCreateSerializer
+        if self.action == 'list':
+            return MaquettisteCatalogListSerializer
         return OuvrageReadSerializer
 
     def create(self, request, *args, **kwargs):

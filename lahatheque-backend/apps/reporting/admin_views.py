@@ -12,6 +12,7 @@ from django.db import models
 from django.db.models import Sum, Count, Q
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
+from django.core.cache import cache
 from rest_framework import viewsets, status, permissions
 from rest_framework.views import APIView
 from rest_framework.decorators import action
@@ -411,6 +412,11 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
+        cache_key = "admin_catalog_pricing_all"
+        cached_results = cache.get(cache_key)
+        if cached_results is not None:
+            return Response({"success": True, "data": cached_results, "error": None})
+
         config = ConfigurationPlateformeGlobale.objects.first()
         def_num = float(config.prix_defaut_numerique_xof) if config else 3000.0
         def_pap = float(config.prix_defaut_papier_xof) if config else 5000.0
@@ -483,6 +489,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 ],
             })
 
+        cache.set(cache_key, results, 300)
         return Response({"success": True, "data": results, "error": None})
 
     def partial_update(self, request, pk=None):
@@ -511,6 +518,8 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 book.original_language = str(data['original_language'])[:10]
             book.save()
 
+            cache.delete("admin_catalog_pricing_all")
+
             if request.user and request.user.is_authenticated:
                 JournalAuditAdmin.objects.create(
                     administrateur=request.user,
@@ -532,6 +541,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 book.price_digital = config.prix_defaut_numerique_xof
                 book.price_paper = config.prix_defaut_papier_xof
                 book.save()
+            cache.delete("admin_catalog_pricing_all")
 
             JournalAuditAdmin.objects.create(
                 administrateur=request.user,

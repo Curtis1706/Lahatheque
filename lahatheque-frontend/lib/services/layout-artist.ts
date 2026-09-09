@@ -754,7 +754,7 @@ export async function getCatalogBooks(filters?: {
     credentials: "include",
   });
   if (!res.ok) {
-    const fallbackRes = await fetch("/api/bff/catalog/books/", {
+    const fallbackRes = await fetch("/api/bff/catalog/books/?all=true&no_page=true", {
       headers: { "Content-Type": "application/json" },
       credentials: "include",
     });

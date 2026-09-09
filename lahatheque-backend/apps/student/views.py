@@ -1,9 +1,11 @@
 """Vues pour l'Espace Client Lecteur / Étudiant."""
+import hashlib
 from typing import Any
 from datetime import timedelta, date
 
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
+from django.core.cache import cache
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -628,6 +630,16 @@ class StudentCatalogView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        user = request.user
+
+        # Cache par utilisateur + paramètres de requête (2 min — reflète les achats rapidement)
+        params_copy = dict(request.query_params)
+        raw_key = f"student_catalog:{user.pk}:{sorted(params_copy.items())}"
+        cache_key = "student:" + hashlib.md5(raw_key.encode()).hexdigest()
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         qs = (
             Ouvrage.objects
             .filter(status='published')
@@ -661,7 +673,6 @@ class StudentCatalogView(APIView):
         qs = qs.order_by('-created_at', '-id')
 
         # Calcul vectorisé / batch de l'accès utilisateur pour éviter 500+ requêtes SQL N+1
-        user = request.user
         user_owned_ids = set()
         user_audio_ids = set()
 
@@ -755,7 +766,7 @@ class StudentCatalogView(APIView):
                 'user_audio_ids': user_audio_ids,
             }
         )
-        return Response({
+        payload = {
             'success': True,
             'data': {
                 'books': serializer.data,
@@ -765,10 +776,14 @@ class StudentCatalogView(APIView):
                 'page_size': page_size,
             },
             'error': None,
-        })
+        }
+        # Mise en cache : invalide rapidement (2 min) pour refléter les achats
+        cache.set(cache_key, payload, 120)
+        return Response(payload)
 
 
 # ─── Profil Student ────────────────────────────────────────────────────────────
+
 
 class StudentProfileView(APIView):
     permission_classes = [IsAuthenticated]

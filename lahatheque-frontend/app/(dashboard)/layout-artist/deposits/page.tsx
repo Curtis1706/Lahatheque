@@ -245,9 +245,6 @@ export default function MaquettisteDepositsPage() {
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-background-secondary border border-border text-navy">
                           {row.classification.discipline || "Général"}
                         </span>
-                        <span className="text-[10px] text-foreground-muted font-mono">
-                          {row.files.format || "PDF"}
-                        </span>
                       </div>
                     </div>
                   </div>

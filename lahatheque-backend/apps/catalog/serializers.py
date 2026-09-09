@@ -140,17 +140,35 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
         return ""
 
     def get_is_owned(self, obj) -> bool:
+        cached = getattr(obj, '_cached_is_owned', None)
+        if cached is not None:
+            return cached
+
         request = self.context.get('request')
         if not request or not request.user or not request.user.is_authenticated:
+            obj._cached_is_owned = False
             return False
+
+        user = request.user
+        role = getattr(user, 'role', '')
+        if role in ('admin', 'super_admin', 'chief_layout', 'layout_artist', 'legal_reviewer') or user.is_superuser or user.is_staff:
+            obj._cached_is_owned = True
+            return True
+
         user_owned_ids = self.context.get('user_owned_ids')
         if user_owned_ids is not None:
             if user_owned_ids is True:
+                obj._cached_is_owned = True
                 return True
-            return str(obj.id) in user_owned_ids
+            res = str(obj.id) in user_owned_ids
+            obj._cached_is_owned = res
+            return res
+
         from apps.protection.access_service import AccessService
         access_info = AccessService.check_user_book_access(request.user, str(obj.id))
-        return bool(access_info.get("access_granted"))
+        res = bool(access_info.get("access_granted"))
+        obj._cached_is_owned = res
+        return res
 
     def get_has_digital_access(self, obj) -> bool:
         return self.get_is_owned(obj)
@@ -174,6 +192,83 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
 # Alias pour rétrocompatibilité
 OuvrageSerializer = OuvrageReadSerializer
 OuvrageBasicSerializer = OuvrageReadSerializer
+
+
+class MaquettisteCatalogListSerializer(serializers.ModelSerializer):
+    """Serializer ultra-léger et rapide pour la liste/DataTable du catalogue Maquettiste et Chef Maquettiste."""
+    discipline_name = serializers.SerializerMethodField()
+    publisher_name = serializers.SerializerMethodField()
+    institution_name = serializers.SerializerMethodField()
+    authors_names = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    created_by_id = serializers.SerializerMethodField()
+    has_audio = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Ouvrage
+        fields = [
+            'id', 'title', 'subtitle', 'isbn', 'language', 'country',
+            'cover_image', 'cover_url', 'file',
+            'publisher_name', 'institution_name', 'discipline_name', 'discipline_id',
+            'authors_names', 'created_by_name', 'created_by_id',
+            'price_digital', 'price_paper', 'price_audio',
+            'is_paper_available', 'has_audio_version', 'has_audio',
+            'format_type', 'status', 'created_at', 'updated_at',
+            'is_original', 'original_language', 'rejection_reason',
+        ]
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            full_name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+            return full_name or obj.created_by.email or "Maquettiste"
+        if obj.publisher:
+            return obj.publisher.company_name or "Éditeur"
+        return "Équipe Éditoriale LAHA"
+
+    def get_created_by_id(self, obj):
+        return str(obj.created_by.id) if obj.created_by else ""
+
+    def get_publisher_name(self, obj):
+        if getattr(obj, 'publisher_name', None):
+            return obj.publisher_name
+        if obj.publisher:
+            return obj.publisher.company_name or obj.publisher.name or ""
+        return ""
+
+    def get_institution_name(self, obj):
+        return obj.institution.name if obj.institution else ''
+
+    def get_discipline_name(self, obj):
+        if obj.discipline:
+            return obj.discipline.name
+        if obj.pk and hasattr(obj, 'disciplines'):
+            discs = getattr(obj, '_prefetched_objects_cache', {}).get('disciplines')
+            if discs:
+                return discs[0].name
+            discs_list = list(obj.disciplines.all())
+            if discs_list:
+                return discs_list[0].name
+        return ""
+
+    def get_authors_names(self, obj):
+        if obj.pk and hasattr(obj, 'authors'):
+            authors = getattr(obj, '_prefetched_objects_cache', {}).get('authors')
+            if authors is not None:
+                return ", ".join([f"{a.first_name} {a.last_name}".strip() for a in authors if f"{a.first_name} {a.last_name}".strip()])
+            authors_list = list(obj.authors.all())
+            if authors_list:
+                return ", ".join([f"{a.first_name} {a.last_name}".strip() for a in authors_list if f"{a.first_name} {a.last_name}".strip()])
+        return ""
+
+    def get_has_audio(self, obj) -> bool:
+        if bool(getattr(obj, 'has_audio_version', False)) or getattr(obj, 'format_type', '') == 'audio':
+            return True
+        if hasattr(obj, 'audio_tracks'):
+            tracks = getattr(obj, '_prefetched_objects_cache', {}).get('audio_tracks')
+            if tracks is not None:
+                return len(tracks) > 0
+            return obj.audio_tracks.exists()
+        return False
 
 
 class OuvrageCreateSerializer(serializers.Serializer):

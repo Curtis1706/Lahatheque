@@ -89,11 +89,6 @@ export default function ChiefLayoutCatalogPage() {
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-navy/10 text-navy">
                 Langue: {(row.metadata.language || "fr").toUpperCase()}
               </span>
-              {Boolean(row.files.format) && (
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-background-secondary text-foreground-muted border border-border uppercase">
-                  {row.files.format}
-                </span>
-              )}
             </div>
           </div>
         </div>

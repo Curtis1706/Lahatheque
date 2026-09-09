@@ -348,6 +348,18 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ── Configuration du Cache Haute Performance (Redis) ───────────────────────────
+# Cache distribué sur Redis DB 1 (isolation stricte vis-à-vis de Celery sur DB 0)
+REDIS_CACHE_URL = config('REDIS_CACHE_URL', default=REDIS_URL.rsplit('/', 1)[0] + '/1')
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_CACHE_URL,
+        'TIMEOUT': 300,  # 5 minutes
+        'KEY_PREFIX': 'lahatheque',
+    }
+}
+
 # Fonctionnalité désactivée conformément au CDC v3.2 (le Client souscrit directement aux
 # bouquets, section 8 — aucune validation d'affiliation universitaire n'est prévue). Le code
 # est conservé intact pour réactivation future si le besoin métier évolue.
