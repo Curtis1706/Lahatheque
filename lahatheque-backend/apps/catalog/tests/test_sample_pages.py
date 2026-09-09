@@ -117,3 +117,13 @@ class BookSampleStreamViewTestCase:
             assert response.status_code == 200
             assert response["Content-Type"] == "image/jpeg"
             assert len(response.content) > 0
+
+    def test_sample_generation_with_language_parameter(self):
+        self.client.force_authenticate(user=self.user)
+        pdf_bytes = self._generate_dummy_pdf(6)
+
+        with patch("apps.protection.source_adapter.DocumentSourceAdapter.get_document_bytes", return_value=pdf_bytes) as mock_get_bytes:
+            response = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/sample/?lang=fr")
+            assert response.status_code == 200
+            assert response["Content-Type"] == "application/pdf"
+            mock_get_bytes.assert_called_once_with("catalog_book", f"{self.ouvrage.id}:fr")

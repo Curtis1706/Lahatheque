@@ -236,10 +236,15 @@ Révoque immédiatement un jeton d'accès avant son expiration.
 #### `GET /api/v1/partner/catalog/`
 Recherche et consultation des ouvrages publiés du catalogue académique.
 
+> **Cache Redis** : Les réponses sont mises en cache côté serveur LAHAThèque avec un TTL de 15 minutes. Aucune configuration Redis n'est requise sur l'infrastructure du partenaire. Les temps de réponse sont de l'ordre de quelques millisecondes.
+
 * **Sécurité** : `Authorization: Bearer <token>`
 * **Paramètres URL** :
   - `q` (optionnel) : Recherche textuelle sur les titres
   - `discipline` (optionnel) : Filtrage par matière (ex: `Droit`, `Médecine`, `Économie`)
+  - `language` (optionnel) : Filtrage par langue disponible (ex: `fr`, `en`)
+  - `page` (optionnel) : Numéro de page pour la pagination (défaut : 1)
+  - `page_size` (optionnel) : Nombre d'ouvrages par page (défaut : tous)
 * **Réponse (200 OK)** :
 ```json
 {
@@ -298,11 +303,19 @@ Recherche et consultation des ouvrages publiés du catalogue académique.
       "status": "published",
       "price_digital": 5000.0,
       "price_paper": 8500.0,
+      "price_audio": 3000.0,
+      "has_audio": true,
+      "has_audio_version": true,
       "is_paper_available": true,
+      "is_owned": false,
+      "has_digital_access": false,
       "cover_url": "https://lahatheque.com/api/bff/catalog/books/e4a2c5b0-7d12-4e9a-9e11-8a9d12345678/cover/"
     }
   ]
 }
+```
+
+> **Note M2M** : En contexte Machine-to-Machine partenaire (aucun utilisateur Django authentifié), les champs `is_owned` et `has_digital_access` sont toujours `false`. Ils ne reflètent pas les droits d'un lecteur réel et ne déclenchent aucune vérification d'accès.
 ```
 
 #### `GET /api/v1/partner/catalog/{id}/`
@@ -425,6 +438,8 @@ Statistiques réelles de consultation pour l'institution rattachée au partenair
 
 ### 4.3 Moteur Liseuse & Sessions de Lecture Hébergées
 
+> **EPUB transparent** : Les ouvrages déposés en format EPUB sont automatiquement convertis en PDF vectoriel haute fidélité côté backend LAHAThèque et servis de manière identique aux PDF natifs. Aucune différence de comportement pour le partenaire.
+
 #### `POST /api/v1/reader/sessions/`
 Point d'entrée pour générer une session de lecture sécurisée. Supporte la sélection de langue initiale. Tout accès numérique confère automatiquement l'accès à l'ensemble des déclinaisons linguistiques disponibles de l'ouvrage sans surcoût.
 
@@ -462,10 +477,43 @@ Point d'entrée pour générer une session de lecture sécurisée. Supporte la s
 }
 ```
 
+#### `POST /api/v1/reader/sessions/validate-token/`
+Validation d'un token de session et récupération des données complètes de configuration de la liseuse. Appelé automatiquement par la page `/read/[token]`. Renvoie désormais les langues disponibles pour activer le sélecteur de langue multilingue dans la liseuse hébergée.
+
+* **Corps JSON** : `{ "token": "eyJ..." }`
+* **Réponse (200 OK)** :
+```json
+{
+  "success": true,
+  "data": {
+    "session_id": "...",
+    "partner_name": "LahaAcademia",
+    "source_type": "catalog_book",
+    "book": {
+      "id": "e4a2c5b0-...",
+      "title": "Characterization and Encapsulation of Natural Antioxidants",
+      "author": "Smith J., Doe A.",
+      "total_pages": 258,
+      "has_audio": false,
+      "language": "en",
+      "available_languages": ["en", "fr"]
+    },
+    "theme": {},
+    "permissions": {},
+    "last_page": 3,
+    "user": { "name": "...", "email": "...", "ip": "..." }
+  }
+}
+```
+
+> Le champ `available_languages` permet à la liseuse d'afficher le sélecteur `[FR] [EN]` dès l'ouverture, sans appel supplémentaire.
+
 #### `GET /api/v1/reader/sessions/stream/?lang={language_code}`
-Flux PDF binaire chiffré et filigrané dynamiquement à la volée. Supporte le streaming HTTP Range (206 Partial Content).
+Flux PDF binaire filigrané dynamiquement à la volée. Supporte le streaming HTTP Range (206 Partial Content).
+
+* **Résolution de langue en cascade** : `?lang=` (priorité) → `session.metadata['language']` → langue originale de l'ouvrage. Aucune erreur 400/404 si la langue demandée est indisponible : repli gracieux sur la version originale.
 * **Paramètres URL** :
-  - `token` (obligatoire) : Jeton de session de lecture
+  - `token` (obligatoire, via `X-Reader-Token`) : Jeton de session de lecture
   - `lang` (optionnel) : Code ISO de la langue désirée (ex: `fr`, `en`). Si omis, le flux renvoie la langue de session ou la langue originale.
 
 #### `POST /api/v1/reader/sessions/progress/`
@@ -533,6 +581,22 @@ Content-Type: application/json
 - `reader.progress.updated` : Progression de lecture actualisée.
 - `reader.quiz.completed` : Note et validation d'un quiz interactif.
 - `reader.session.finished` : Fermeture de session ou clic sur Quitter.
+
+### 5.3 Payload `reader.session.opened`
+
+```json
+{
+  "event": "reader.session.opened",
+  "session_id": "rs_a89f3c9e120d",
+  "external_user_ref": "STU-2026-994",
+  "book_id": "e4a2c5b0-7d12-4e9a-9e11-8a9d12345678",
+  "document_title": "Characterization and Encapsulation of Natural Antioxidants",
+  "language": "en",
+  "expires_at": "2026-09-09T20:00:00Z"
+}
+```
+
+> Le champ `language` indique la langue initiale de la session (celle passée à `POST /sessions/` ou la langue originale de l'ouvrage par défaut).
 
 ---
 

@@ -348,6 +348,12 @@ export default function DocumentReaderPage() {
     setCurrentLanguage(newLang);
     setCurrentPage(newPage0Based);
 
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('lang', newLang.toLowerCase());
+      window.history.replaceState({}, '', url.toString());
+    }
+
     const isSample = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'sample';
     const newStreamUrl = isSample
       ? `/api/bff/catalog/books/${id}/sample/?lang=${newLang}`

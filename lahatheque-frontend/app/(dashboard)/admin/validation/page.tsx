@@ -23,6 +23,8 @@ import {
   BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 
 export default function AdminValidationPage() {
   const [proofs, setProofs] = useState<AdminValidationProof[]>([]);
@@ -112,35 +114,66 @@ export default function AdminValidationPage() {
 
   const renderMobileCard = (row: AdminValidationProof) => (
     <div className="space-y-3 bg-background p-4 rounded-2xl border border-border">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h4 className="font-serif font-bold text-navy text-sm sm:text-base leading-snug">
-            {row.title}
-          </h4>
-          <p className="text-xs text-foreground-muted mt-0.5">
-            {row.author_name} • <span className="text-gold font-medium">{row.publisher_name}</span>
-          </p>
+      <div className="flex items-start gap-3">
+        <div className="shrink-0 pt-0.5">
+          <BookCover3D
+            title={row.title}
+            authors={row.authors || row.author_name}
+            discipline={row.discipline}
+            coverUrl={row.cover_image || row.cover_url}
+            size="xs"
+          />
         </div>
-        <StatusBadge
-          status={
-            row.status === "pending_admin_approval"
-              ? "in_review"
-              : row.status === "published"
-              ? "published"
-              : row.status === "rejected"
-              ? "rejected"
-              : "approved"
-          }
-        />
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="font-serif font-bold text-navy text-sm leading-snug line-clamp-2">
+              {row.title}
+            </h4>
+            <StatusBadge
+              status={
+                row.status === "pending_admin_approval"
+                  ? "in_review"
+                  : row.status === "published"
+                  ? "published"
+                  : row.status === "rejected"
+                  ? "rejected"
+                  : "approved"
+              }
+            />
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-foreground-muted flex-wrap">
+            <AuthorsDisplay
+              authors={row.authors}
+              fallbackName={row.author_name}
+              bookTitle={row.title}
+              maxVisible={2}
+              variant="inline"
+            />
+            <span className="text-border">•</span>
+            <span className="text-gold font-medium truncate max-w-[140px]">{row.publisher_name}</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+            <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-navy/10 text-navy font-semibold">
+              {row.discipline || "Général"}
+            </span>
+            {row.dewey_code && (
+              <span className="text-[10px] font-mono text-foreground-muted">
+                CDD: {row.dewey_code}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-xs">
         <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-navy/10 text-navy font-mono font-bold text-xs">
           {row.version || "v1.0"}
         </span>
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-background-secondary border border-border text-foreground font-semibold text-[11px] uppercase">
-          {row.format || "PDF"}
-        </span>
+        {row.page_count ? (
+          <span className="text-[11px] text-foreground-muted font-mono font-medium">
+            {row.page_count} p.
+          </span>
+        ) : null}
         {row.lcp_compliant ? (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px] font-semibold">
             <ShieldCheck className="w-3 h-3 text-emerald-600" />
@@ -151,9 +184,6 @@ export default function AdminValidationPage() {
             Standard
           </span>
         )}
-        <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-navy/5 text-navy font-medium ml-auto">
-          {row.discipline}
-        </span>
       </div>
 
       <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs">
@@ -208,26 +238,43 @@ export default function AdminValidationPage() {
     {
       key: "title",
       header: "Ouvrage & Discipline",
-      className: "min-w-[280px]",
+      className: "min-w-[360px]",
       cell: (row) => (
-        <div className="space-y-1 py-0.5">
-          <p className="font-serif font-bold text-xs sm:text-sm text-navy line-clamp-1">
-            {row.title}
-          </p>
-          <div className="flex items-center gap-2 text-[11px] text-foreground-muted">
-            <span className="font-medium text-foreground">{row.author_name || "Auteur non renseigné"}</span>
-            <span>•</span>
-            <span className="text-gold font-medium">{row.publisher_name || "Éditions LAHA"}</span>
+        <div className="flex items-start gap-3 py-1">
+          <div className="shrink-0 pt-0.5">
+            <BookCover3D
+              title={row.title}
+              authors={row.authors || row.author_name}
+              discipline={row.discipline}
+              coverUrl={row.cover_image || row.cover_url}
+              size="xs"
+            />
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-navy/10 text-navy font-semibold">
-              {row.discipline || "Général"}
-            </span>
-            {row.dewey_code && (
-              <span className="text-[10px] font-mono text-foreground-muted">
-                CDD: {row.dewey_code}
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="font-serif font-bold text-xs sm:text-sm text-navy line-clamp-2 leading-snug">
+              {row.title}
+            </p>
+            <div className="flex items-center gap-1.5 text-xs text-foreground-muted flex-wrap">
+              <AuthorsDisplay
+                authors={row.authors}
+                fallbackName={row.author_name}
+                bookTitle={row.title}
+                maxVisible={2}
+                variant="inline"
+              />
+              <span className="text-border">•</span>
+              <span className="text-gold font-medium truncate max-w-[150px]">{row.publisher_name || "Éditions LAHA"}</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-navy/10 text-navy font-semibold">
+                {row.discipline || "Général"}
               </span>
-            )}
+              {row.dewey_code && (
+                <span className="text-[10px] font-mono text-foreground-muted">
+                  CDD: {row.dewey_code}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       ),
@@ -235,19 +282,16 @@ export default function AdminValidationPage() {
     {
       key: "version",
       header: "Version & Format",
-      className: "min-w-[200px]",
+      className: "min-w-[180px]",
       cell: (row) => (
         <div className="space-y-1.5 py-0.5">
-          {/* Ligne 1 : Badges Version & Format */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-navy/10 text-navy font-mono text-xs font-bold border border-navy/15">
+          {/* Ligne 1 : Badges Version & Pages (sans badge PDF) */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-navy/10 text-navy font-mono text-xs font-bold border border-navy/15">
               {row.version || "v1.0"}
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-background-secondary border border-border text-foreground font-semibold text-[11px] uppercase tracking-wider">
-              {row.format || "PDF"}
-            </span>
             {row.page_count ? (
-              <span className="text-[11px] text-foreground-muted font-mono">
+              <span className="text-[11px] text-foreground-muted font-mono font-medium">
                 {row.page_count} p.
               </span>
             ) : null}
@@ -256,12 +300,12 @@ export default function AdminValidationPage() {
           {/* Ligne 2 : Statut Protection DRM */}
           <div>
             {row.lcp_compliant ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px] font-semibold whitespace-nowrap">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px] font-semibold whitespace-nowrap">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span>Conforme LCP DRM</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-500/10 text-slate-600 border border-slate-500/20 text-[10px] font-medium whitespace-nowrap">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-500/10 text-slate-600 border border-slate-500/20 text-[10px] font-medium whitespace-nowrap">
                 <ShieldCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>Protection Standard</span>
               </span>

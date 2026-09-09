@@ -226,7 +226,9 @@ class BookSampleStreamView(APIView):
     def get(self, request, book_id):
         import fitz
         from apps.protection.source_adapter import DocumentSourceAdapter, DocumentSourceError
-        from apps.catalog.models import Ouvrage
+        from apps.catalog.models import Ouvrage, OuvrageLanguageVersion
+
+        requested_lang = (request.query_params.get("lang") or request.query_params.get("language") or "").strip().lower()
 
         import uuid
         is_uuid = False
@@ -246,12 +248,33 @@ class BookSampleStreamView(APIView):
         except Exception:
             return JsonResponse({"success": False, "error": "Ouvrage introuvable."}, status=404)
 
+        source_ref = f"{ouvrage.id}:{requested_lang}" if requested_lang else str(ouvrage.id)
         try:
-            full_pdf_bytes = DocumentSourceAdapter.get_document_bytes("catalog_book", str(ouvrage.id))
+            full_pdf_bytes = DocumentSourceAdapter.get_document_bytes("catalog_book", source_ref)
         except DocumentSourceError as e:
             return JsonResponse({"success": False, "error": str(e)}, status=404)
 
         sample_pages = ouvrage.sample_pages_count
+        if requested_lang:
+            lang_ver = OuvrageLanguageVersion.objects.filter(
+                ouvrage=ouvrage, language__iexact=requested_lang
+            ).first()
+            if lang_ver and lang_ver.page_count > 0:
+                pc = lang_ver.page_count
+                if pc <= 10:
+                    sample_pages = min(5, pc)
+                elif pc <= 30:
+                    sample_pages = 5
+                elif pc <= 50:
+                    sample_pages = 7
+                elif pc <= 80:
+                    sample_pages = 10
+                elif pc <= 150:
+                    sample_pages = 12
+                elif pc <= 300:
+                    sample_pages = 15
+                else:
+                    sample_pages = 20
 
         try:
             src_doc = fitz.open(stream=full_pdf_bytes, filetype="pdf")
@@ -287,8 +310,9 @@ class BookSampleStreamView(APIView):
         except Exception as e:
             return JsonResponse({"success": False, "error": f"Impossible de générer l'extrait : {e}"}, status=500)
 
+        filename_suffix = f"-{requested_lang}" if requested_lang else ""
         response = HttpResponse(sample_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = f'inline; filename="extrait-{ouvrage.id}.pdf"'
+        response["Content-Disposition"] = f'inline; filename="extrait-{ouvrage.id}{filename_suffix}.pdf"'
         response["X-Sample-Pages"] = str(page_limit)
         response["X-Sample-Total-Pages"] = str(total_pages)
         response["Access-Control-Expose-Headers"] = "X-Sample-Pages, X-Sample-Total-Pages"

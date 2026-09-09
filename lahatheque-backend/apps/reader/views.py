@@ -366,6 +366,20 @@ class ReaderValidateTokenView(APIView):
         # le flux filigrané et tatoué (voir ReaderProtectedStreamView).
         doc_file_url = None
 
+        avail_langs = []
+        if session.ouvrage:
+            avail_langs = session.ouvrage.available_languages
+        elif isinstance(session.metadata, dict) and session.metadata.get('available_languages'):
+            avail_langs = session.metadata.get('available_languages')
+        if not avail_langs:
+            avail_langs = ["fr"]
+
+        selected_lang = (
+            (session.metadata.get('language') if isinstance(session.metadata, dict) else None)
+            or (session.ouvrage.original_language if session.ouvrage else "fr")
+            or "fr"
+        )
+
         response_data = {
             "session_id": str(session.id),
             "partner_name": session.partner.name,
@@ -380,6 +394,8 @@ class ReaderValidateTokenView(APIView):
                 "total_pages": total_pages_val,
                 "has_audio": bool(session.custom_audio_url or getattr(session.ouvrage, 'fichier_audio', None)),
                 "audio_url": session.custom_audio_url or (session.ouvrage.fichier_audio.url if session.ouvrage and hasattr(session.ouvrage, 'fichier_audio') and session.ouvrage.fichier_audio else None),
+                "language": selected_lang,
+                "available_languages": avail_langs,
             },
             "theme": session.theme,
             "quiz": session.quiz_config,

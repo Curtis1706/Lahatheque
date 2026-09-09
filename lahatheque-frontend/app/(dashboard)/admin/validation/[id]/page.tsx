@@ -12,6 +12,7 @@ import { AdminValidationProof } from "@/lib/types/admin";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { AISuggestionBadge } from "@/components/features/layout-artist/ai-suggestion-badge";
+import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 import { Modal } from "@/components/ui/modal";
 import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 import {
@@ -220,10 +221,17 @@ export default function AdminValidationDetailPage() {
             )}
           </div>
 
-          <div className="text-xs space-y-1 text-foreground-muted">
-            <p>
-              Auteur(s) : <strong className="text-foreground">{proof.author_name}</strong>
-            </p>
+          <div className="text-xs space-y-1.5 text-foreground-muted">
+            <div className="flex items-center justify-center md:justify-start gap-1.5 flex-wrap">
+              <span>Auteur(s) :</span>
+              <AuthorsDisplay
+                authors={proof.authors}
+                fallbackName={proof.author_name}
+                bookTitle={proof.title}
+                maxVisible={3}
+                variant="inline"
+              />
+            </div>
             <p>
               Maison d&apos;Édition : <strong className="text-gold">{proof.publisher_name}</strong>
             </p>
