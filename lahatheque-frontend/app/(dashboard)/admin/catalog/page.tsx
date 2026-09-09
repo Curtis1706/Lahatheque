@@ -27,13 +27,14 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { ViewToggle, ViewMode } from "@/components/features/student/view-toggle";
-import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
-import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
+// Mis en commentaire temporaire (réactivable sans réécriture) :
+// import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
+// import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
 import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
 
 export default function AdminCatalogPage() {
-  const { playBook } = useAudioPlayer();
+  // const { playBook } = useAudioPlayer();
   const [books, setBooks] = useState<AdminCatalogBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -52,8 +53,8 @@ export default function AdminCatalogPage() {
   const [editOriginalLanguage, setEditOriginalLanguage] = useState<string>("fr");
   const [saving, setSaving] = useState(false);
 
-  // State pour la gestion audio
-  const [audioManagingBook, setAudioManagingBook] = useState<AdminCatalogBook | null>(null);
+  // State pour la gestion audio (mis en commentaire temporaire)
+  // const [audioManagingBook, setAudioManagingBook] = useState<AdminCatalogBook | null>(null);
 
   // State pour la suppression
   const [deleteConfirmBook, setDeleteConfirmBook] = useState<AdminCatalogBook | null>(null);
@@ -254,9 +255,10 @@ export default function AdminCatalogPage() {
       header: "Actions",
       cell: (row) => (
         <div className="flex items-center gap-1.5 justify-end">
+          {/* Boutons audio mis en commentaire temporaire chez l'admin
           <button
             type="button"
-            onClick={() => playBook(row.id)}
+            onClick={() => {}}
             className="p-1.5 rounded-lg border border-gold/40 bg-gold/10 hover:bg-gold hover:text-navy text-gold transition-colors cursor-pointer"
             title="Écouter la piste audio (Privilège Administrateur)"
           >
@@ -264,12 +266,13 @@ export default function AdminCatalogPage() {
           </button>
           <button
             type="button"
-            onClick={() => setAudioManagingBook(row)}
+            onClick={() => {}}
             className="p-1.5 rounded-lg border border-border bg-background hover:bg-gold/15 text-foreground-muted hover:text-navy transition-colors cursor-pointer"
             title="Gérer / Remplacer la piste audio"
           >
             <RefreshCw className="w-3.5 h-3.5 text-gold" />
           </button>
+          */}
           <button
             type="button"
             onClick={() => handleOpenEditModal(row)}
@@ -278,6 +281,7 @@ export default function AdminCatalogPage() {
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
+          {/* Bouton de protection mis en commentaire temporaire dans les actions
           <Link
             href={`/admin/catalog/${row.id}/protection`}
             className="p-1.5 rounded-lg border border-border bg-background hover:bg-navy hover:text-white text-foreground-muted transition-colors"
@@ -285,25 +289,15 @@ export default function AdminCatalogPage() {
           >
             <Shield className="w-3.5 h-3.5" />
           </Link>
-          {((row as any).has_audio || (row as any).has_audio_version || (row as any).format_type === 'audio') && (row as any).is_digital_available === false ? (
-            <Link
-              href={`/listen/${row.id}`}
-              target="_blank"
-              className="p-1.5 rounded-lg border border-border bg-background hover:bg-gold hover:text-navy text-foreground-muted transition-colors cursor-pointer"
-              title="Aperçu dans le lecteur audio"
-            >
-              <Headphones className="w-3.5 h-3.5 text-gold" />
-            </Link>
-          ) : (
-            <Link
-              href={`/catalog/reader/${row.id}`}
-              target="_blank"
-              className="p-1.5 rounded-lg border border-border bg-background hover:bg-navy hover:text-white text-foreground-muted transition-colors cursor-pointer"
-              title="Aperçu dans la liseuse"
-            >
-              <Eye className="w-3.5 h-3.5" />
-            </Link>
-          )}
+          */}
+          <Link
+            href={`/catalog/reader/${row.id}`}
+            target="_blank"
+            className="p-1.5 rounded-lg border border-border bg-background hover:bg-navy hover:text-white text-foreground-muted transition-colors cursor-pointer"
+            title="Aperçu dans la liseuse"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </Link>
           <button
             type="button"
             onClick={() => setDeleteConfirmBook(row)}
@@ -453,15 +447,17 @@ export default function AdminCatalogPage() {
                       <span className="font-bold text-navy">{book.price_digital.toLocaleString("fr-FR")} FCFA</span>
                       <span className="text-[10px] text-foreground-muted uppercase font-bold">{book.protection_type || "LCP"}</span>
                     </div>
-                    <div className="flex items-center gap-2 pt-1 font-sans">
+                    <div className="flex items-center justify-between gap-2 pt-1 font-sans">
                       <button
                         type="button"
                         onClick={() => handleOpenEditModal(book)}
-                        className="p-2 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        className="flex-1 py-2 px-3 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer min-h-[36px] flex items-center justify-center gap-1.5"
                         title="Modifier l'ouvrage et ses tarifs"
                       >
                         <Pencil className="w-3.5 h-3.5 text-gold" />
+                        <span>Modifier</span>
                       </button>
+                      {/* Bouton de protection mis en commentaire temporaire en vue grille
                       <Link
                         href={`/admin/catalog/${book.id}/protection`}
                         className="flex-1 py-2 px-2 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy text-[11px] font-bold text-center transition-colors flex items-center justify-center gap-1 min-h-[36px]"
@@ -469,6 +465,8 @@ export default function AdminCatalogPage() {
                         <Shield className="w-3 h-3 text-gold" />
                         <span>Protection</span>
                       </Link>
+                      */}
+                      {/* Bouton audio alternatif mis en commentaire temporaire
                       {((book as any).has_audio || (book as any).has_audio_version || (book as any).format_type === 'audio') && (book as any).is_digital_available === false ? (
                         <Link
                           href={`/listen/${book.id}`}
@@ -478,16 +476,16 @@ export default function AdminCatalogPage() {
                         >
                           <Headphones className="w-3.5 h-3.5 text-gold" />
                         </Link>
-                      ) : (
-                        <Link
-                          href={`/catalog/reader/${book.id}`}
-                          target="_blank"
-                          className="p-2 rounded-xl bg-navy/10 hover:bg-navy hover:text-white text-navy transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
-                          title="Ouvrir dans le lecteur sécurisé"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </Link>
-                      )}
+                      ) : null}
+                      */}
+                      <Link
+                        href={`/catalog/reader/${book.id}`}
+                        target="_blank"
+                        className="p-2 rounded-xl bg-navy/10 hover:bg-navy hover:text-white text-navy transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+                        title="Ouvrir dans le lecteur sécurisé"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </Link>
                       <button
                         type="button"
                         onClick={() => setDeleteConfirmBook(book)}
@@ -732,7 +730,7 @@ export default function AdminCatalogPage() {
         </div>
       )}
 
-      {/* Modal de Gestion et Remplacement Audio */}
+      {/* Modal de Gestion et Remplacement Audio (mise en commentaire temporaire)
       {audioManagingBook && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-dark/80 animate-in fade-in">
           <div className="bg-background rounded-3xl border border-border p-6 max-w-xl w-full shadow-2xl space-y-4 animate-in zoom-in-95">
@@ -767,6 +765,7 @@ export default function AdminCatalogPage() {
           </div>
         </div>
       )}
+      */}
     </div>
   );
 }

@@ -306,7 +306,7 @@ export default function HomePage() {
                     <button 
                       type="button"
                       onClick={(e) => toggleFavorite(e, book.id)}
-                      className={`absolute top-2 right-2 w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center transition-colors z-10 shadow-xs cursor-pointer ${
+                      className={`absolute top-2 right-2 w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center transition-colors z-20 shadow-xs cursor-pointer ${
                         isFav ? "text-error border-error/40 bg-error/5" : "text-foreground-muted hover:text-error"
                       }`}
                       title={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
@@ -317,28 +317,18 @@ export default function HomePage() {
                     
                     <Link 
                       href={`/catalog/${bookSlug}`} 
-                      className="transition-transform group-hover:scale-105 duration-300 flex items-center justify-center w-full h-full"
+                      className="flex items-center justify-center w-full h-full py-1"
                     >
-                      {book.cover_url || book.cover_image ? (
-                        <div className="relative w-[120px] aspect-[2/3] rounded-r-md rounded-l-xs overflow-hidden shadow-md border-l-3 border-black/25 border-r border-t border-b border-border/70 group-hover:shadow-xl transition-shadow duration-300">
-                          <img
-                            src={book.cover_url || book.cover_image}
-                            alt={book.title}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        </div>
-                      ) : (
-                        <Book3D 
-                          title={book.title} 
-                          author={authorName}
-                          variant="lahatheque" 
-                          color={book.cover_color || "var(--navy)"} 
-                          textColor={book.cover_text_color || "var(--gold-light)"} 
-                          width={{ sm: 110, md: 120, lg: 125, xl: 115 }}
-                          textured
-                        />
-                      )}
+                      <Book3D 
+                        title={book.title} 
+                        author={authorName}
+                        coverUrl={book.cover_url || book.cover_image}
+                        variant="lahatheque" 
+                        color={book.cover_color || "var(--navy)"} 
+                        textColor={book.cover_text_color || "var(--gold-light)"} 
+                        width={{ sm: 110, md: 115, lg: 120, xl: 112 }}
+                        textured
+                      />
                     </Link>
                   </div>
 

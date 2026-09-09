@@ -902,7 +902,12 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                 clean_name = f"{base_part}{ext_part}"
 
                 unique_id = uuid.uuid4().hex[:12]
-                folder = 'covers' if file_type == 'cover' else 'books'
+                if file_type == 'cover':
+                    folder = 'covers'
+                elif file_type == 'audio':
+                    folder = 'audio'
+                else:
+                    folder = 'books'
                 key = f"{folder}/{unique_id}_{clean_name}"
 
                 s3_client = boto3.client(
@@ -919,7 +924,7 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                     Params={
                         'Bucket': bucket_name,
                         'Key': key,
-                        'ContentType': content_type or ('image/jpeg' if file_type == 'cover' else 'application/pdf')
+                        'ContentType': content_type or ('image/jpeg' if file_type == 'cover' else ('audio/mpeg' if file_type == 'audio' else 'application/pdf'))
                     },
                     ExpiresIn=3600
                 )
@@ -941,6 +946,7 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                         "upload_url": upload_url,
                         "download_url": download_url,
                         "file_key": key,
+                        "key": key,
                         "bucket": bucket_name
                     }
                 })

@@ -17,12 +17,12 @@ logger = logging.getLogger(__name__)
 class IsAudioUploader(BasePermission):
     """Autorise uniquement les maquettistes, éditeurs, juristes et administrateurs."""
     def has_permission(self, request, view):
-        return bool(
-            request.user and request.user.is_authenticated
-            and getattr(request.user, 'role', '') in [
-                'layout_artist', 'chief_layout', 'publisher', 'admin', 'super_admin'
-            ]
-        )
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        allowed = ['layout_artist', 'chief_layout', 'publisher', 'admin', 'super_admin']
+        active = user.active_roles if isinstance(getattr(user, 'active_roles', None), list) else []
+        return bool(getattr(user, 'role', '') in allowed or any(r in allowed for r in active) or user.is_superuser)
 
 
 class AudioTrackViewSet(viewsets.ModelViewSet):
@@ -657,10 +657,9 @@ class AudioStudioSubmitView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAudioUploader]
 
     def post(self, request):
-        from apps.catalog.models import Ouvrage, Discipline
+        from apps.catalog.models import Ouvrage, Discipline, OuvrageLanguageVersion
         from apps.audio.models import AudioTrack
         from decimal import Decimal
-        import json
 
         data = request.data
         is_attached = str(data.get("is_attached", "")).lower() in ["true", "1", "yes"]
@@ -671,6 +670,17 @@ class AudioStudioSubmitView(APIView):
         price_xof = Decimal(str(price_xof_val)) if price_xof_val else Decimal("2500.00")
         price_eur = Decimal(str(price_eur_val)) if price_eur_val else Decimal("3.80")
 
+        user = request.user
+        user_role = getattr(user, "role", "")
+        active_roles = user.active_roles if isinstance(getattr(user, "active_roles", None), list) else []
+        is_admin_or_super = (
+            user_role in ["admin", "super_admin"]
+            or any(r in ["admin", "super_admin"] for r in active_roles)
+            or user.is_superuser
+            or getattr(user, "is_staff", False)
+        )
+        target_audio_status = "published" if is_admin_or_super else "pending_layout_validation"
+
         ouvrage = None
         if is_attached and attached_book_id:
             try:
@@ -678,8 +688,12 @@ class AudioStudioSubmitView(APIView):
                 ouvrage.has_audio_version = True
                 ouvrage.price_audio = price_xof
                 ouvrage.price_audio_eur = price_eur
-                ouvrage.audio_status = "pending_layout_validation"
-                ouvrage.save(update_fields=["has_audio_version", "price_audio", "price_audio_eur", "audio_status"])
+                ouvrage.audio_status = target_audio_status
+                if is_admin_or_super:
+                    ouvrage.status = "published"
+                    ouvrage.save(update_fields=["has_audio_version", "price_audio", "price_audio_eur", "audio_status", "status"])
+                else:
+                    ouvrage.save(update_fields=["has_audio_version", "price_audio", "price_audio_eur", "audio_status"])
             except Ouvrage.DoesNotExist:
                 return Response({"success": False, "error": "Ouvrage de rattachement introuvable."}, status=404)
         else:
@@ -693,17 +707,17 @@ class AudioStudioSubmitView(APIView):
                 country=data.get("country", "BJ"),
                 format_type="audio",
                 has_audio_version=True,
-                audio_status="pending_layout_validation",
+                audio_status=target_audio_status,
                 price_digital=price_xof,
                 price_audio=price_xof,
                 price_audio_eur=price_eur,
                 created_by=request.user,
-                status="published" if getattr(request.user, "role", "") in ["admin", "super_admin"] else "draft",
+                status="published" if is_admin_or_super else "draft",
             )
 
-            cover_file = request.FILES.get("cover_image")
-            if cover_file:
-                ouvrage.cover_image = cover_file
+            cover_key = data.get("cover_r2_key")
+            if cover_key:
+                ouvrage.cover_image.name = cover_key
                 ouvrage.save(update_fields=["cover_image"])
 
             cat_name = data.get("category", "")
@@ -713,104 +727,71 @@ class AudioStudioSubmitView(APIView):
                     ouvrage.discipline = disc
                     ouvrage.save(update_fields=["discipline"])
 
-        # Sauvegarde des pistes Voix Homme & Voix Femme
         tracks_created = 0
-
         narration_language = data.get("narration_language", "fr") or "fr"
         language_version_id = data.get("language_version_id")
         language_version = None
         if language_version_id:
-            from apps.catalog.models import OuvrageLanguageVersion
             language_version = OuvrageLanguageVersion.objects.filter(id=language_version_id, ouvrage=ouvrage).first()
         elif narration_language and ouvrage:
-            from apps.catalog.models import OuvrageLanguageVersion
             language_version = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage, language__iexact=narration_language).first()
 
-        # 1. Livre complet Voix Homme
-        male_full_file = request.FILES.get("male_full_track")
-        if male_full_file:
-            male_full_duration = int(data.get("male_full_duration", 0))
-            AudioTrack.objects.filter(ouvrage=ouvrage, voice_gender="male", track_type="full").delete()
-            AudioTrack.objects.create(
+        def _attach_track(r2_key, voice_gender, track_type, chapter_number, order_index, title, duration, size_bytes):
+            nonlocal tracks_created
+            if not r2_key:
+                return
+            if track_type == "full":
+                AudioTrack.objects.filter(ouvrage=ouvrage, voice_gender=voice_gender, track_type="full").delete()
+            track = AudioTrack(
                 ouvrage=ouvrage,
                 language_version=language_version,
                 narration_language=narration_language,
-                voice_gender="male",
-                track_type="full",
-                chapter_number=0,
-                order_index=0,
-                title="Livre complet – Voix Homme",
-                audio_file=male_full_file,
-                duration_seconds=male_full_duration,
-                file_size_bytes=male_full_file.size,
+                voice_gender=voice_gender,
+                track_type=track_type,
+                chapter_number=chapter_number,
+                order_index=order_index,
+                title=title,
+                duration_seconds=int(duration or 0),
+                file_size_bytes=int(size_bytes or 0),
             )
+            track.audio_file.name = r2_key
+            track.save()
             tracks_created += 1
 
-        # 2. Livre complet Voix Femme
-        female_full_file = request.FILES.get("female_full_track")
-        if female_full_file:
-            female_full_duration = int(data.get("female_full_duration", 0))
-            AudioTrack.objects.filter(ouvrage=ouvrage, voice_gender="female", track_type="full").delete()
-            AudioTrack.objects.create(
-                ouvrage=ouvrage,
-                language_version=language_version,
-                narration_language=narration_language,
-                voice_gender="female",
-                track_type="full",
-                chapter_number=0,
-                order_index=0,
-                title="Livre complet – Voix Femme",
-                audio_file=female_full_file,
-                duration_seconds=female_full_duration,
-                file_size_bytes=female_full_file.size,
-            )
-            tracks_created += 1
+        _attach_track(
+            data.get("male_full_r2_key"), "male", "full", 0, 0,
+            "Livre complet – Voix Homme", data.get("male_full_duration"), data.get("male_full_size"),
+        )
+        _attach_track(
+            data.get("female_full_r2_key"), "female", "full", 0, 0,
+            "Livre complet – Voix Femme", data.get("female_full_duration"), data.get("female_full_size"),
+        )
 
-        # 3. Chapitres dynamiques Voix Homme
         male_chap_count = int(data.get("male_chapters_count", 0))
         for i in range(male_chap_count):
-            chap_file = request.FILES.get(f"male_chapter_{i}_file")
-            if chap_file:
-                chap_title = data.get(f"male_chapter_{i}_title", f"Chapitre {i + 1}").strip()
-                chap_dur = int(data.get(f"male_chapter_{i}_duration", 0))
-                AudioTrack.objects.create(
-                    ouvrage=ouvrage,
-                    language_version=language_version,
-                    narration_language=narration_language,
-                    voice_gender="male",
-                    track_type="chapter",
-                    chapter_number=i + 1,
-                    order_index=i + 1,
-                    title=chap_title,
-                    audio_file=chap_file,
-                    duration_seconds=chap_dur,
-                    file_size_bytes=chap_file.size,
-                )
-                tracks_created += 1
+            r2_key = data.get(f"male_chapter_{i}_r2_key")
+            _attach_track(
+                r2_key, "male", "chapter", i + 1, i + 1,
+                data.get(f"male_chapter_{i}_title", f"Chapitre {i + 1}").strip(),
+                data.get(f"male_chapter_{i}_duration"), data.get(f"male_chapter_{i}_size"),
+            )
 
-        # 4. Chapitres dynamiques Voix Femme
         female_chap_count = int(data.get("female_chapters_count", 0))
         for i in range(female_chap_count):
-            chap_file = request.FILES.get(f"female_chapter_{i}_file")
-            if chap_file:
-                chap_title = data.get(f"female_chapter_{i}_title", f"Chapitre {i + 1}").strip()
-                chap_dur = int(data.get(f"female_chapter_{i}_duration", 0))
-                AudioTrack.objects.create(
-                    ouvrage=ouvrage,
-                    language_version=language_version,
-                    narration_language=narration_language,
-                    voice_gender="female",
-                    track_type="chapter",
-                    chapter_number=i + 1,
-                    order_index=i + 1,
-                    title=chap_title,
-                    audio_file=chap_file,
-                    duration_seconds=chap_dur,
-                    file_size_bytes=chap_file.size,
-                )
-                tracks_created += 1
+            r2_key = data.get(f"female_chapter_{i}_r2_key")
+            _attach_track(
+                r2_key, "female", "chapter", i + 1, i + 1,
+                data.get(f"female_chapter_{i}_title", f"Chapitre {i + 1}").strip(),
+                data.get(f"female_chapter_{i}_duration"), data.get(f"female_chapter_{i}_size"),
+            )
 
         _alert_juriste_if_contract_missing_audio_rate(ouvrage)
+
+        success_msg = (
+            "Livre audio enregistré et publié avec succès au catalogue."
+            if is_admin_or_super
+            else "Livre audio enregistré avec succès et transmis pour validation."
+        )
 
         return Response({
             "success": True,
@@ -819,7 +800,7 @@ class AudioStudioSubmitView(APIView):
                 "title": ouvrage.title,
                 "audio_status": ouvrage.audio_status,
                 "tracks_created": tracks_created,
-                "message": "Livre audio enregistré avec succès."
+                "message": success_msg
             }
         })
 

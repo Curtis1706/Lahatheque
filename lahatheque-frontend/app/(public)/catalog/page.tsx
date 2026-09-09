@@ -516,26 +516,17 @@ function CatalogSearchInner() {
                           </div>
                         )}
 
-                        <Link href={`/catalog/${bookSlug}`} className="transition-transform group-hover:scale-105 duration-300 flex items-center justify-center">
-                          {book.cover_url || book.cover_image ? (
-                            <div className="relative w-[130px] aspect-[2/3] rounded-r-md rounded-l-sm overflow-hidden shadow-xl border-l-4 border-black/20 border-r border-t border-b border-border/60 group-hover:shadow-2xl transition-shadow duration-300">
-                              <img
-                                src={book.cover_url || book.cover_image}
-                                alt={book.title}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          ) : (
-                            <Book3D 
-                              title={book.title}
-                              author={authorName}
-                              variant="lahatheque"
-                              color={book.cover_color || "var(--navy)"}
-                              textColor={book.cover_text_color || "var(--gold)"}
-                              width={{ sm: 120, md: 130, lg: 135, xl: 130 }}
-                              textured
-                            />
-                          )}
+                        <Link href={`/catalog/${bookSlug}`} className="flex items-center justify-center py-2">
+                          <Book3D 
+                            title={book.title}
+                            author={authorName}
+                            coverUrl={book.cover_url || book.cover_image}
+                            variant="lahatheque"
+                            color={book.cover_color || "var(--navy)"}
+                            textColor={book.cover_text_color || "var(--gold)"}
+                            width={{ sm: 120, md: 125, lg: 130, xl: 125 }}
+                            textured
+                          />
                         </Link>
                       </div>
 

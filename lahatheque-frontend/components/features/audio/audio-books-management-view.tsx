@@ -319,12 +319,9 @@ export function AudioBooksManagementView({
       header: "Tarif",
       className: "min-w-[140px] whitespace-nowrap",
       cell: (book) => (
-        <div className="whitespace-nowrap font-mono space-y-0.5">
+        <div className="whitespace-nowrap font-mono">
           <span className="text-xs font-bold text-navy block whitespace-nowrap">
             {book.price_audio_xof.toLocaleString("fr-FR")} FCFA
-          </span>
-          <span className="text-[11px] text-foreground-muted block whitespace-nowrap font-sans">
-            ({book.price_audio_eur.toFixed(2)} €)
           </span>
         </div>
       ),

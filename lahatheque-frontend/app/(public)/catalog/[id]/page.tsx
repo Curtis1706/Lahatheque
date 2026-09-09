@@ -156,27 +156,16 @@ export default function BookDetailPage() {
           {/* Couverture / Aperçu Visuel 3D (Colonne Gauche) */}
           <div className="md:col-span-5 flex flex-col items-center justify-start space-y-5">
             <div className="relative group p-4 sm:p-6 bg-background rounded-2xl border border-border/80 shadow-xs flex items-center justify-center w-full max-w-[320px]">
-              {book.cover_url || book.cover_image ? (
-                <div className="relative w-[190px] sm:w-[220px] aspect-[2/3] rounded-r-xl rounded-l-xs overflow-hidden shadow-2xl border-l-4 border-black/30 border-r border-t border-b border-border/80 transition-transform duration-300 group-hover:scale-102">
-                  <img
-                    src={book.cover_url || book.cover_image}
-                    alt={book.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center py-2">
-                  <Book3D 
-                    title={book.title}
-                    author={authorsString}
-                    variant="lahatheque"
-                    color={book.cover_color || "var(--navy)"}
-                    textColor={book.cover_text_color || "var(--gold)"}
-                    width={{ sm: 180, md: 200, lg: 220, xl: 220 }}
-                    textured
-                  />
-                </div>
-              )}
+              <Book3D 
+                title={book.title}
+                author={authorsString}
+                coverUrl={book.cover_url || book.cover_image}
+                variant="lahatheque"
+                color={book.cover_color || "var(--navy)"}
+                textColor={book.cover_text_color || "var(--gold)"}
+                width={{ sm: 180, md: 200, lg: 210, xl: 210 }}
+                textured
+              />
             </div>
 
             {/* Badges de Confiance & Garantie */}

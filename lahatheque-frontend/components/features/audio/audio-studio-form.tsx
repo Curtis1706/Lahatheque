@@ -18,7 +18,7 @@ import {
 import { BookAttachmentSelector } from "./book-attachment-selector";
 import { VoiceTrackManager } from "./voice-track-manager";
 import { AudioStudioFormState, VoiceTrackGroup } from "@/lib/types/audio";
-import { submitAudioStudioForm } from "@/lib/services/audio";
+import { submitAudioStudioForm, uploadFileDirectToR2 } from "@/lib/services/audio";
 import { formatXofToEur } from "@/lib/config/audio-constants";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { CountryCombobox } from "@/components/features/catalog/country-combobox";
@@ -62,6 +62,8 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentUploadLabel, setCurrentUploadLabel] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -134,62 +136,143 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
     }
 
     setIsSubmitting(true);
+    setUploadProgress({});
+    setCurrentUploadLabel(null);
 
     try {
-      const formData = new FormData();
-      formData.append("is_attached", String(formState.is_attached));
-      if (formState.is_attached) {
-        formData.append("attached_book_id", formState.attached_book_id);
-      } else {
-        formData.append("title", formState.title);
-        formData.append("author", formState.author);
-        formData.append("country", formState.country);
-        formData.append("description", formState.description);
-        formData.append("category", formState.category);
-        formData.append("level", formState.level);
-        if (formState.cover_image) {
-          formData.append("cover_image", formState.cover_image);
-        }
+      const uploadedKeys: Record<string, string> = {};
+
+      const filesToUpload: Array<{ key: string; file: File; label: string; fileType: "audio" | "cover" }> = [];
+
+      // Couverture si livre autonome avec image
+      if (!formState.is_attached && formState.cover_image) {
+        filesToUpload.push({
+          key: "cover_r2_key",
+          file: formState.cover_image,
+          label: "Image de couverture",
+          fileType: "cover",
+        });
       }
 
-      formData.append("price_xof", String(formState.price_xof));
-      formData.append("price_eur", String(formState.price_eur));
-      formData.append("narration_language", formState.narration_language);
-      if (formState.language_version_id) {
-        formData.append("language_version_id", formState.language_version_id);
-      }
-
-      // Voix Homme
+      // Voix Homme — Livre complet
       if (formState.male_tracks.full_track.file) {
-        formData.append("male_full_track", formState.male_tracks.full_track.file);
-        formData.append("male_full_duration", String(formState.male_tracks.full_track.duration_seconds));
+        filesToUpload.push({
+          key: "male_full_r2_key",
+          file: formState.male_tracks.full_track.file,
+          label: "Voix Homme — Livre complet",
+          fileType: "audio",
+        });
       }
-      formData.append("male_chapters_count", String(formState.male_tracks.chapters.length));
+
+      // Voix Homme — Chapitres
       formState.male_tracks.chapters.forEach((chap, idx) => {
         if (chap.file) {
-          formData.append(`male_chapter_${idx}_file`, chap.file);
-          formData.append(`male_chapter_${idx}_title`, chap.title);
-          formData.append(`male_chapter_${idx}_duration`, String(chap.duration_seconds));
+          filesToUpload.push({
+            key: `male_chapter_${idx}_r2_key`,
+            file: chap.file,
+            label: `Voix Homme — ${chap.title || `Chapitre ${idx + 1}`}`,
+            fileType: "audio",
+          });
         }
       });
 
-      // Voix Femme
+      // Voix Femme — Livre complet
       if (formState.female_tracks.full_track.file) {
-        formData.append("female_full_track", formState.female_tracks.full_track.file);
-        formData.append("female_full_duration", String(formState.female_tracks.full_track.duration_seconds));
+        filesToUpload.push({
+          key: "female_full_r2_key",
+          file: formState.female_tracks.full_track.file,
+          label: "Voix Femme — Livre complet",
+          fileType: "audio",
+        });
       }
-      formData.append("female_chapters_count", String(formState.female_tracks.chapters.length));
+
+      // Voix Femme — Chapitres
       formState.female_tracks.chapters.forEach((chap, idx) => {
         if (chap.file) {
-          formData.append(`female_chapter_${idx}_file`, chap.file);
-          formData.append(`female_chapter_${idx}_title`, chap.title);
-          formData.append(`female_chapter_${idx}_duration`, String(chap.duration_seconds));
+          filesToUpload.push({
+            key: `female_chapter_${idx}_r2_key`,
+            file: chap.file,
+            label: `Voix Femme — ${chap.title || `Chapitre ${idx + 1}`}`,
+            fileType: "audio",
+          });
         }
       });
 
-      const res = await submitAudioStudioForm(formData);
+      // Téléversement séquentiel direct vers Cloudflare R2
+      for (const item of filesToUpload) {
+        setCurrentUploadLabel(item.label);
+        const result = await uploadFileDirectToR2(
+          item.file,
+          item.fileType,
+          (percent) => {
+            setUploadProgress((prev) => ({ ...prev, [item.key]: percent }));
+          }
+        );
+        uploadedKeys[item.key] = result.r2_key;
+      }
+
+      setCurrentUploadLabel("Finalisation de l'enregistrement...");
+
+      // Construction du payload JSON léger
+      const payload: Record<string, any> = {
+        is_attached: formState.is_attached,
+        price_xof: formState.price_xof,
+        price_eur: formState.price_eur,
+        narration_language: formState.narration_language,
+        ...uploadedKeys,
+      };
+
+      if (formState.is_attached) {
+        payload.attached_book_id = formState.attached_book_id;
+      } else {
+        payload.title = formState.title;
+        payload.author = formState.author;
+        payload.country = formState.country;
+        payload.description = formState.description;
+        payload.category = formState.category;
+        payload.level = formState.level;
+      }
+
+      if (formState.language_version_id) {
+        payload.language_version_id = formState.language_version_id;
+      }
+
+      // Métadonnées Voix Homme
+      if (formState.male_tracks.full_track.file) {
+        payload.male_full_duration = formState.male_tracks.full_track.duration_seconds;
+        payload.male_full_size = formState.male_tracks.full_track.file.size;
+      }
+      payload.male_chapters_count = formState.male_tracks.chapters.length;
+      formState.male_tracks.chapters.forEach((chap, idx) => {
+        payload[`male_chapter_${idx}_title`] = chap.title || `Chapitre ${idx + 1}`;
+        payload[`male_chapter_${idx}_duration`] = chap.duration_seconds;
+        if (chap.file) {
+          payload[`male_chapter_${idx}_size`] = chap.file.size;
+        }
+      });
+
+      // Métadonnées Voix Femme
+      if (formState.female_tracks.full_track.file) {
+        payload.female_full_duration = formState.female_tracks.full_track.duration_seconds;
+        payload.female_full_size = formState.female_tracks.full_track.file.size;
+      }
+      payload.female_chapters_count = formState.female_tracks.chapters.length;
+      formState.female_tracks.chapters.forEach((chap, idx) => {
+        payload[`female_chapter_${idx}_title`] = chap.title || `Chapitre ${idx + 1}`;
+        payload[`female_chapter_${idx}_duration`] = chap.duration_seconds;
+        if (chap.file) {
+          payload[`female_chapter_${idx}_size`] = chap.file.size;
+        }
+      });
+
+      const res = await submitAudioStudioForm(payload);
       if (res.success) {
-        setSuccessMessage("Le livre audio a été enregistré avec succès et transmis pour validation.");
+        setSuccessMessage(
+          res.data?.message ||
+          (role === "admin"
+            ? "Le livre audio a été enregistré et publié avec succès au catalogue."
+            : "Le livre audio a été enregistré avec succès et transmis pour validation.")
+        );
         setTimeout(() => {
           router.push(onSuccessRedirectPath);
         }, 1500);
@@ -200,6 +283,7 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
       setErrorMessage(err.message || "Erreur réseau lors de la communication avec le serveur.");
     } finally {
       setIsSubmitting(false);
+      setCurrentUploadLabel(null);
     }
   };
 
@@ -363,28 +447,16 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
                   Tarification du format audio
                 </label>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-semibold text-foreground-muted">Prix en FCFA (XOF)</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step={100}
-                      value={formState.price_xof}
-                      onChange={(e) => handlePriceXofChange(parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs sm:text-sm font-mono font-bold text-navy focus:outline-none focus:ring-2 focus:ring-navy"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-semibold text-foreground-muted">Équivalent EUR (€)</span>
-                    <input
-                      type="number"
-                      disabled
-                      value={formState.price_eur}
-                      className="w-full px-3 py-2 rounded-xl border border-border bg-background-secondary text-xs sm:text-sm font-mono font-bold text-foreground-muted cursor-not-allowed"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] font-semibold text-foreground-muted">Prix en FCFA (XOF)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={formState.price_xof}
+                    onChange={(e) => handlePriceXofChange(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs sm:text-sm font-mono font-bold text-navy focus:outline-none focus:ring-2 focus:ring-navy"
+                  />
                 </div>
               </div>
 
@@ -478,6 +550,17 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
             </span>
           </div>
 
+          {/* Progression d'envoi en cours */}
+          {isSubmitting && currentUploadLabel && (
+            <div className="p-3.5 rounded-2xl bg-navy/5 border border-gold/20 flex items-center justify-between text-xs text-navy">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Sparkles className="w-4 h-4 text-gold animate-spin shrink-0" />
+                <span className="truncate font-medium">{currentUploadLabel}</span>
+              </div>
+              <span className="text-foreground-muted font-mono font-bold shrink-0 ml-2">En cours...</span>
+            </div>
+          )}
+
           {/* Bouton de Soumission Principal */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
             <button
@@ -495,8 +578,12 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
             >
               {isSubmitting ? (
                 <>
-                  <Sparkles className="w-4 h-4 text-gold animate-spin" />
-                  <span>Enregistrement en cours...</span>
+                  <Sparkles className="w-4 h-4 text-gold animate-spin shrink-0" />
+                  <span>
+                    {currentUploadLabel
+                      ? `Téléversement : ${currentUploadLabel}...`
+                      : "Finalisation..."}
+                  </span>
                 </>
               ) : (
                 <>
