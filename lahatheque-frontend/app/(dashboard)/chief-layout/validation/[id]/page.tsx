@@ -32,6 +32,36 @@ import { AudioReplacementDropzone } from "@/components/features/layout-artist/au
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
+const AVAILABLE_LANGUAGES_LIST = [
+  { code: "fr", label: "Français (FR)" },
+  { code: "en", label: "Anglais (EN)" },
+  { code: "es", label: "Espagnol (ES)" },
+  { code: "pt", label: "Portugais (PT)" },
+  { code: "de", label: "Allemand (DE)" },
+  { code: "ar", label: "Arabe (AR)" },
+  { code: "zh", label: "Chinois (ZH)" },
+];
+
+const LANG_CODE_TO_LABEL: Record<string, string> = {
+  fr: "Français",
+  en: "Anglais",
+  es: "Espagnol",
+  pt: "Portugais",
+  de: "Allemand",
+  ar: "Arabe",
+  zh: "Chinois",
+};
+
+const LABEL_TO_LANG_CODE: Record<string, string> = {
+  "Français": "fr",
+  "Anglais": "en",
+  "Espagnol": "es",
+  "Portugais": "pt",
+  "Allemand": "de",
+  "Arabe": "ar",
+  "Chinois": "zh",
+};
+
 export default function ChefValidationDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -49,6 +79,7 @@ export default function ChefValidationDetailPage() {
 
   // Translation & Language Adjustment State
   const [isOriginal, setIsOriginal] = useState<boolean>(true);
+  const [originalLanguage, setOriginalLanguage] = useState<string>("fr");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("Français");
   const [allEligibleBooks, setAllEligibleBooks] = useState<any[]>([]);
   const [selectedParentBook, setSelectedParentBook] = useState<any | null>(null);
@@ -76,7 +107,9 @@ export default function ChefValidationDetailPage() {
           
           const isOrig = data.is_original !== false;
           setIsOriginal(isOrig);
-          setSelectedLanguage(data.metadata?.language || "Français");
+          const origLang = data.original_language || (data.metadata?.language ? LABEL_TO_LANG_CODE[data.metadata.language] : "fr") || "fr";
+          setOriginalLanguage(origLang);
+          setSelectedLanguage(data.metadata?.language || LANG_CODE_TO_LABEL[origLang] || "Français");
 
           if (!isOrig) {
             if (data.parent_ouvrage_id || data.parent_ouvrage_title) {
@@ -110,10 +143,10 @@ export default function ChefValidationDetailPage() {
       await updateDeposit(deposit.id, {
         metadata: {
           ...deposit.metadata,
-          language: selectedLanguage,
+          language: isOriginal ? (LANG_CODE_TO_LABEL[originalLanguage] || "Français") : selectedLanguage,
         },
         is_original: isOriginal,
-        original_language: isOriginal ? (selectedLanguage.toLowerCase().startsWith("en") ? "en" : "fr") : "fr",
+        original_language: isOriginal ? originalLanguage : (selectedParentBook?.original_language || "fr"),
         parent_ouvrage_id: !isOriginal && selectedParentBook ? String(selectedParentBook.id) : undefined,
       } as any);
 
@@ -422,20 +455,41 @@ export default function ChefValidationDetailPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-navy block mb-1.5">Langue de l&apos;épreuve</label>
-                <select
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground font-semibold focus:ring-2 focus:ring-navy min-h-[38px]"
-                >
-                  <option value="Français">Français</option>
-                  <option value="Anglais">Anglais</option>
-                  <option value="Portugais">Portugais</option>
-                  <option value="Espagnol">Espagnol</option>
-                  <option value="Arabe">Arabe</option>
-                  <option value="Fon">Fon</option>
-                  <option value="Yoruba">Yoruba</option>
-                </select>
+                <label className="text-[11px] font-bold text-navy block mb-1.5">
+                  {isOriginal ? "Langue originale de l&apos;ouvrage" : "Langue de cette version traduite"}
+                </label>
+                {isOriginal ? (
+                  <select
+                    value={originalLanguage}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setOriginalLanguage(code);
+                      setSelectedLanguage(LANG_CODE_TO_LABEL[code] || "Français");
+                    }}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground font-semibold focus:ring-2 focus:ring-navy min-h-[38px]"
+                  >
+                    {AVAILABLE_LANGUAGES_LIST.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={LABEL_TO_LANG_CODE[selectedLanguage] || "en"}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setSelectedLanguage(LANG_CODE_TO_LABEL[code] || "Anglais");
+                    }}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground font-semibold focus:ring-2 focus:ring-navy min-h-[38px]"
+                  >
+                    {AVAILABLE_LANGUAGES_LIST.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 

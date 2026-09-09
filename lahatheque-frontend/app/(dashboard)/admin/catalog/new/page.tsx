@@ -57,6 +57,26 @@ const AVAILABLE_LANGUAGES_LIST = [
   { code: "zh", label: "Chinois (ZH)" },
 ];
 
+const LANG_CODE_TO_LABEL: Record<string, string> = {
+  fr: "Français",
+  en: "Anglais",
+  es: "Espagnol",
+  pt: "Portugais",
+  de: "Allemand",
+  ar: "Arabe",
+  zh: "Chinois",
+};
+
+const LABEL_TO_LANG_CODE: Record<string, string> = {
+  "Français": "fr",
+  "Anglais": "en",
+  "Espagnol": "es",
+  "Portugais": "pt",
+  "Allemand": "de",
+  "Arabe": "ar",
+  "Chinois": "zh",
+};
+
 export interface InitialTranslationEntry {
   id: string;
   language: string;
@@ -231,6 +251,9 @@ export default function AdminNewProductPage() {
         setCategories(aiDiscs);
         setGenreCategory(aiDiscs[0] || matchedGenre.label);
         setLanguage(matchedLang);
+        const autoCode = LABEL_TO_LANG_CODE[matchedLang] || (result.data.language_code ? result.data.language_code.toLowerCase().slice(0, 2) : "fr");
+        setOriginalLanguage(autoCode);
+        setAddLangCode(autoCode === "fr" ? "en" : "fr");
         setCountry(matchedCountry);
         if (result.data.institution_suggestion) setUniversity(result.data.institution_suggestion);
         if (result.data.faculty_suggestion || matchedGenre.faculty)
@@ -265,6 +288,9 @@ export default function AdminNewProductPage() {
     setDeweyCode(aiResult.dewey_code || matchedGenre.dewey);
     setGenreCategory(matchedGenre.label);
     setLanguage(matchedLang);
+    const autoCode = LABEL_TO_LANG_CODE[matchedLang] || (aiResult.language_code ? aiResult.language_code.toLowerCase().slice(0, 2) : "fr");
+    setOriginalLanguage(autoCode);
+    setAddLangCode(autoCode === "fr" ? "en" : "fr");
     setCountry(matchedCountry);
     if (aiResult.institution_suggestion) setUniversity(aiResult.institution_suggestion);
     if (aiResult.faculty_suggestion || matchedGenre.faculty)
@@ -681,8 +707,95 @@ export default function AdminNewProductPage() {
                 </div>
               </div>
 
+              {isOriginal && (
+                <div className="pt-3 border-t border-border grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                  <div className="sm:col-span-6 space-y-0.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                        <Languages className="w-3.5 h-3.5 text-gold" />
+                        Langue originale de l&apos;ouvrage *
+                      </label>
+                      {aiResult?.language && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const matchedLang = matchLanguage(aiResult.language);
+                            const code = LABEL_TO_LANG_CODE[matchedLang] || "fr";
+                            setOriginalLanguage(code);
+                            setLanguage(matchedLang);
+                            if (code !== "fr") {
+                              setAddLangCode("fr");
+                            } else {
+                              setAddLangCode("en");
+                            }
+                          }}
+                          className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                          title={`Corriger avec la suggestion IA : ${matchLanguage(aiResult.language)}`}
+                        >
+                          <Wand2 className="w-2.5 h-2.5" />
+                          IA : {matchLanguage(aiResult.language)}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-foreground-muted">
+                      Définissez manuellement la langue réelle de l&apos;ouvrage ou corrigez celle détectée par l&apos;IA.
+                    </p>
+                  </div>
+                  <div className="sm:col-span-6">
+                    <select
+                      value={originalLanguage}
+                      onChange={(e) => {
+                        const newCode = e.target.value;
+                        setOriginalLanguage(newCode);
+                        setLanguage(LANG_CODE_TO_LABEL[newCode] || "Français");
+                        if (newCode !== "fr") {
+                          setAddLangCode("fr");
+                        } else {
+                          setAddLangCode("en");
+                        }
+                      }}
+                      className="w-full bg-background border border-border rounded-xl p-2.5 text-xs sm:text-sm text-foreground font-semibold focus:ring-2 focus:ring-navy min-h-[40px]"
+                    >
+                      {AVAILABLE_LANGUAGES_LIST.map((lang) => (
+                        <option key={lang.code} value={lang.code}>
+                          {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               {!isOriginal && (
-                <div className="pt-3 border-t border-border space-y-2">
+                <div className="pt-3 border-t border-border space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                    <div className="sm:col-span-6 space-y-0.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                        <Languages className="w-3.5 h-3.5 text-gold" />
+                        Langue de cette version traduite *
+                      </label>
+                      <p className="text-[11px] text-foreground-muted">
+                        Précisez la langue du document traduit que vous déposez.
+                      </p>
+                    </div>
+                    <div className="sm:col-span-6">
+                      <select
+                        value={LABEL_TO_LANG_CODE[language] || "fr"}
+                        onChange={(e) => {
+                          const newCode = e.target.value;
+                          setLanguage(LANG_CODE_TO_LABEL[newCode] || "Français");
+                        }}
+                        className="w-full bg-background border border-border rounded-xl p-2.5 text-xs sm:text-sm text-foreground font-semibold focus:ring-2 focus:ring-navy min-h-[40px]"
+                      >
+                        {AVAILABLE_LANGUAGES_LIST.map((lang) => (
+                          <option key={lang.code} value={lang.code}>
+                            {lang.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
                   <label className="text-xs font-bold uppercase tracking-wider text-navy block">
                     Sélectionner l&apos;ouvrage original de référence *
                   </label>
@@ -797,7 +910,9 @@ export default function AdminNewProductPage() {
                       onChange={(e) => setAddLangCode(e.target.value)}
                       className="w-full bg-background-secondary border border-border rounded-lg p-2 text-xs text-foreground min-h-[36px]"
                     >
-                      {AVAILABLE_LANGUAGES_LIST.filter((l) => l.code !== originalLanguage).map((lang) => (
+                      {AVAILABLE_LANGUAGES_LIST.filter(
+                        (l) => !translations.some((t) => t.language.toLowerCase() === l.code.toLowerCase())
+                      ).map((lang) => (
                         <option key={lang.code} value={lang.code}>
                           {lang.label}
                         </option>
@@ -1213,57 +1328,27 @@ export default function AdminNewProductPage() {
               </div>
             </div>
 
-            {/* Langue et Pays d'Ancrage */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Langue</label>
-                  {aiResult?.language && (
-                    <button
-                      type="button"
-                      onClick={() => setLanguage(matchLanguage(aiResult.language))}
-                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
-                      title={`Appliquer la langue IA : ${matchLanguage(aiResult.language)}`}
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      IA : {matchLanguage(aiResult.language)}
-                    </button>
-                  )}
-                </div>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                >
-                  {getLanguageOptions(aiResult?.language ? matchLanguage(aiResult.language) : null, language).map((lang, i) => (
-                    <option key={i} value={lang}>
-                      {lang}
-                    </option>
-                  ))}
-                </select>
+            {/* Pays d'Ancrage */}
+            <div className="space-y-1.5 max-w-md">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays d&apos;Ancrage</label>
+                {aiResult?.country && (
+                  <button
+                    type="button"
+                    onClick={() => setCountry(matchCountry(aiResult.country))}
+                    className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    title={`Appliquer le pays IA : ${matchCountry(aiResult.country)}`}
+                  >
+                    <Wand2 className="w-2.5 h-2.5" />
+                    IA : {matchCountry(aiResult.country)}
+                  </button>
+                )}
               </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays d&apos;Ancrage</label>
-                  {aiResult?.country && (
-                    <button
-                      type="button"
-                      onClick={() => setCountry(matchCountry(aiResult.country))}
-                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
-                      title={`Appliquer le pays IA : ${matchCountry(aiResult.country)}`}
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      IA : {matchCountry(aiResult.country)}
-                    </button>
-                  )}
-                </div>
-                <CountryCombobox
-                  value={country}
-                  onChange={(name, code) => setCountry(code || name)}
-                  placeholder="Sélectionner le pays..."
-                />
-              </div>
+              <CountryCombobox
+                value={country}
+                onChange={(name, code) => setCountry(code || name)}
+                placeholder="Sélectionner le pays..."
+              />
             </div>
           </div>
 

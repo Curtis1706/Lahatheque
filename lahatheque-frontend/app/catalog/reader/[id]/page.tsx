@@ -487,13 +487,7 @@ export default function DocumentReaderPage() {
     },
     sidebarTabs: (defaultTabs) => [
       defaultTabs[0], // Miniatures (Page Thumbnails)
-      defaultTabs[1], // Table des matières (Document Outline)
-      defaultTabs[2], // Pièces jointes (Attachments)
-      {
-        content: <NotesSidebar />,
-        icon: <Edit3 size={18} />,
-        title: 'Mes Annotations',
-      },
+      defaultTabs[1], // Table des matières (Document Outline / Plan)
     ],
     renderToolbar: (Toolbar: any) => (
       <Toolbar>

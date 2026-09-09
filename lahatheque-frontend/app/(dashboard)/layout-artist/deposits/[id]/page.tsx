@@ -57,6 +57,36 @@ import { AudioReplacementDropzone } from "@/components/features/layout-artist/au
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 
+const AVAILABLE_LANGUAGES_LIST = [
+  { code: "fr", label: "Français (FR)" },
+  { code: "en", label: "Anglais (EN)" },
+  { code: "es", label: "Espagnol (ES)" },
+  { code: "pt", label: "Portugais (PT)" },
+  { code: "de", label: "Allemand (DE)" },
+  { code: "ar", label: "Arabe (AR)" },
+  { code: "zh", label: "Chinois (ZH)" },
+];
+
+const LANG_CODE_TO_LABEL: Record<string, string> = {
+  fr: "Français",
+  en: "Anglais",
+  es: "Espagnol",
+  pt: "Portugais",
+  de: "Allemand",
+  ar: "Arabe",
+  zh: "Chinois",
+};
+
+const LABEL_TO_LANG_CODE: Record<string, string> = {
+  "Français": "fr",
+  "Anglais": "en",
+  "Espagnol": "es",
+  "Portugais": "pt",
+  "Allemand": "de",
+  "Arabe": "ar",
+  "Chinois": "zh",
+};
+
 export default function DepositDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -811,7 +841,7 @@ export default function DepositDetailPage() {
                 {isOriginal ? (
                   <div className="flex items-center gap-2 text-xs font-semibold text-navy">
                     <BookOpen className="w-4 h-4 text-gold" />
-                    <span>Œuvre Originale (Langue : {language || "Français"})</span>
+                    <span>Œuvre Originale (Langue : {LANG_CODE_TO_LABEL[originalLanguage] || language || "Français"})</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between gap-3">
@@ -850,7 +880,7 @@ export default function DepositDetailPage() {
                     type="button"
                     onClick={() => {
                       setIsOriginal(false);
-                      if (language.toLowerCase() === "français") {
+                      if (!language.toLowerCase().startsWith("en")) {
                         setLanguage("Anglais");
                       }
                     }}
@@ -865,9 +895,86 @@ export default function DepositDetailPage() {
                   </button>
                 </div>
 
-                {/* Sélecteur de l'ouvrage parent si traduction */}
+                {/* Sélecteur de langue originale si original */}
+                {isOriginal && (
+                  <div className="pt-3 border-t border-border grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                    <div className="sm:col-span-6 space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                          <Languages className="w-3.5 h-3.5 text-gold" />
+                          Langue originale de l&apos;ouvrage *
+                        </label>
+                        {aiResult?.language && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const matchedLang = aiResult.language;
+                              const code = LABEL_TO_LANG_CODE[matchedLang] || "fr";
+                              setOriginalLanguage(code);
+                              setLanguage(matchedLang);
+                            }}
+                            className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                            title={`Corriger avec la suggestion IA : ${aiResult.language}`}
+                          >
+                            <Wand2 className="w-2.5 h-2.5" />
+                            IA : {aiResult.language}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-foreground-muted">
+                        Définissez manuellement la langue réelle du fichier déposé ou appliquez la suggestion IA.
+                      </p>
+                    </div>
+                    <div className="sm:col-span-6">
+                      <select
+                        value={originalLanguage}
+                        onChange={(e) => {
+                          const newCode = e.target.value;
+                          setOriginalLanguage(newCode);
+                          setLanguage(LANG_CODE_TO_LABEL[newCode] || "Français");
+                        }}
+                        className="w-full bg-background border border-border rounded-xl p-2.5 text-xs sm:text-sm text-foreground font-semibold focus:ring-2 focus:ring-navy min-h-[40px]"
+                      >
+                        {AVAILABLE_LANGUAGES_LIST.map((lang) => (
+                          <option key={lang.code} value={lang.code}>
+                            {lang.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sélecteur de l'ouvrage parent et langue si traduction */}
                 {!isOriginal && (
-                  <div className="pt-3 border-t border-border space-y-2">
+                  <div className="pt-3 border-t border-border space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                      <div className="sm:col-span-6 space-y-0.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                          <Languages className="w-3.5 h-3.5 text-gold" />
+                          Langue de cette version traduite *
+                        </label>
+                        <p className="text-[11px] text-foreground-muted">
+                          Précisez la langue du document traduit que vous maquettez.
+                        </p>
+                      </div>
+                      <div className="sm:col-span-6">
+                        <select
+                          value={LABEL_TO_LANG_CODE[language] || "en"}
+                          onChange={(e) => {
+                            const newCode = e.target.value;
+                            setLanguage(LANG_CODE_TO_LABEL[newCode] || "Anglais");
+                          }}
+                          className="w-full bg-background border border-border rounded-xl p-2.5 text-xs sm:text-sm text-foreground font-semibold focus:ring-2 focus:ring-navy min-h-[40px]"
+                        >
+                          {AVAILABLE_LANGUAGES_LIST.map((lang) => (
+                            <option key={lang.code} value={lang.code}>
+                              {lang.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                     <label className="text-xs font-bold uppercase tracking-wider text-navy block">
                       Ouvrage original de référence *
                     </label>
@@ -1110,36 +1217,6 @@ export default function DepositDetailPage() {
                   onChange={(e) => setYear(Number(e.target.value))}
                   className={inputClass}
                 />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block font-semibold text-navy">Langue de rédaction</label>
-                  {isEditing && aiResult?.language && (
-                    <button
-                      type="button"
-                      onClick={() => setLanguage(aiResult.language)}
-                      className="text-[11px] font-bold text-gold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      IA : {aiResult.language}
-                    </button>
-                  )}
-                </div>
-                <select
-                  disabled={!isEditing}
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="Français">Français</option>
-                  <option value="Anglais">Anglais</option>
-                  <option value="Portugais">Portugais</option>
-                  <option value="Espagnol">Espagnol</option>
-                  <option value="Arabe">Arabe</option>
-                  <option value="Fon">Fon</option>
-                  <option value="Yoruba">Yoruba</option>
-                </select>
               </div>
             </div>
 
