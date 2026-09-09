@@ -1376,14 +1376,23 @@ class AdminValidationViewSet(viewsets.ViewSet):
         logger = logging.getLogger(__name__)
         try:
             from apps.catalog.models import Ouvrage
-            books = (
+            books_qs = (
                 Ouvrage.objects
                 .select_related('publisher', 'discipline', 'created_by', 'institution')
                 .prefetch_related('authors')
                 .all()
-                .order_by('-created_at', '-id')[:50]
+                .order_by('-created_at', '-id')
             )
-            results = [self._serialize_proof(b) for b in books]
+            limit_param = request.query_params.get('limit')
+            if limit_param:
+                try:
+                    limit_val = int(limit_param)
+                    if limit_val > 0:
+                        books_qs = books_qs[:limit_val]
+                except ValueError:
+                    pass
+
+            results = [self._serialize_proof(b) for b in books_qs]
             return Response({"success": True, "data": results, "error": None})
         except Exception as e:
             logger.error(f"[AdminValidationViewSet.list] Erreur : {e}", exc_info=True)
