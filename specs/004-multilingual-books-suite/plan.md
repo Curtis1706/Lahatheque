@@ -8,22 +8,24 @@
 
 ## Summary
 
-Modéliser le catalogue multilingue de LAHAThèque en découplant l'entité maîtresse `Ouvrage` de ses déclinaisons linguistiques (`OuvrageLanguageVersion`), ingérer et synchroniser automatiquement les 1 600+ ouvrages du bucket Cloudflare R2 (`laha-books-production`), convertir automatiquement et sans surcharge CPU les EPUBs en PDFs vectoriels haute fidélité (PyMuPDF + verrou Redis + cache R2), exposer une API REST partenaire ultra-rapide grâce au cache Redis serveur (sans dépendance Redis chez les partenaires), mettre à jour exhaustivement le guide officiel d'intégration [GUIDE_INTEGRATION_ACCES_MIXTE.md](../../GUIDE_INTEGRATION_ACCES_MIXTE.md) et les 3 SDKs, et offrir aux lecteurs un accès universel toutes langues avec un sélecteur de langue fluide dans la liseuse protégée par filigrane DRM.
+Modéliser le catalogue multilingue de LAHAThèque en découplant l'entité maîtresse `Ouvrage` de ses déclinaisons linguistiques (`OuvrageLanguageVersion`), ingérer et synchroniser automatiquement les 1 600+ ouvrages du bucket Cloudflare R2 (`laha-books-production`), convertir automatiquement et sans surcharge CPU les EPUBs en PDFs vectoriels haute fidélité (PyMuPDF + verrou Redis + cache R2), exposer une API REST partenaire ultra-rapide grâce au cache Redis serveur (sans dépendance Redis chez les partenaires), mettre à jour exhaustivement le guide officiel d'intégration [GUIDE_INTEGRATION_ACCES_MIXTE.md](../../GUIDE_INTEGRATION_ACCES_MIXTE.md) et les 3 SDKs, offrir aux lecteurs un accès universel toutes langues avec un sélecteur de langue fluide dans la liseuse protégée par filigrane DRM, et garantir une ouverture instantanée (< 400 ms) du mode immersion 3D (`FlipBookReader`) via virtualisation DOM, rendu prioritaire page 1-2 et cache navigateur local IndexedDB.
 
 ---
 
 ## Technical Context
 
 **Language/Version**: Python 3.10+ (Backend Django) / TypeScript 5.x (Frontend Next.js App Router)  
-**Primary Dependencies**: Django 5.x, Django REST Framework, PyMuPDF (fitz), boto3, redis-py, Next.js 14+, React 18, TailwindCSS, Lucide React, PDF.js  
+**Primary Dependencies**: Django 5.x, Django REST Framework, PyMuPDF (fitz), boto3, redis-py, Next.js 14+, React 18, TailwindCSS, Lucide React, PDF.js, react-pageflip  
 **Storage & Cache**:
 - PostgreSQL (Neon) avec contraintes d'intégrité et index UUID (`catalog_ouvrage_language_version`).
-- Redis (sur le serveur LAHAThèque) : verrou distribué anti-thundering herd pour conversion EPUB (`laha:epub_convert:<hash>`) et cache de catalogue partenaire (`partner:catalog:*`, TTL 15 min).
+- Redis (sur le serveur LAHAThèque) : verrou distribué anti-thundering herd pour conversion EPUB (`laha:epub_convert:<hash>`), cache de catalogue partenaire (`partner:catalog:*`, TTL 15 min), et métadonnées légères de structure PDF (< 1 Ko par livre). Aucun binaire PDF volumineux en RAM.
 - Cloudflare R2 : bucket `laha-books-production` en lecture seule (fichiers sources) et bucket `lahatheque` en écriture (PDFs convertis depuis EPUB `r2_key_pdf`, couvertures WebP, audio).
+- Navigateur Client : Cache local IndexedDB / CacheStorage pour la persistance des textures de pages déjà rendues du lecteur 3D.
 **Testing**: `python manage.py test` (Backend DRF), Vitest/Playwright (Frontend)  
 **Target Platform**: Serveurs Web Docker / Coolify sous reverse proxy Traefik, navigateurs desktop et mobiles  
 **Project Type**: Application Web complète (Backend Django REST API + Frontend Next.js SSR/CSR + Proxy BFF)  
 **Performance Goals**:
+- Ouverture du mode Immersion 3D < 400 ms (levée immédiate du spinner dès le rendu de la 1ère page).
 - Bascule de langue dans la liseuse < 1,5 seconde.
 - Latence endpoints catalogue partenaire < 20 ms grâce au cache Redis serveur LAHAThèque.
 - Streaming Range Requests 206 instantané avec filigrane nominatif dynamique.
@@ -145,7 +147,8 @@ lahatheque-frontend/
 - Définition du schéma relationnel et des contraintes dans [data-model.md](./data-model.md).
 - Rédaction des contrats d'API dans [contracts/catalog-reader-api.yaml](./contracts/catalog-reader-api.yaml).
 - Élaboration du guide d'exécution rapide dans [quickstart.md](./quickstart.md).
-- Validation de la checklist qualité des spécifications dans [checklists/requirements.md](./checklists/requirements.md) (25/25 items validés).
+- Architecture de performance immersion 3D (Rendu prioritaire page 1-2, virtualisation `react-pageflip`, IndexedDB).
+- Validation de la checklist qualité des spécifications dans [checklists/requirements.md](./checklists/requirements.md) (28/28 items validés).
 
 ### Phase 2 : Tâches d'Implémentation (Prochaine étape via `/speckit-tasks`)
-- Création du fichier `tasks.md` décomposant l'implémentation en lots de travail indépendants et parallélisables.
+- Création et mise à jour du fichier `tasks.md` décomposant l'implémentation en lots de travail indépendants et parallélisables.

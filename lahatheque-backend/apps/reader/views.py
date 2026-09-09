@@ -8,6 +8,7 @@ import logging
 from typing import Any, Dict, List
 import uuid
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -799,13 +800,34 @@ class ReaderProtectedStreamView(APIView):
 
     DEFAULT_CHUNK_SIZE = 256 * 1024
 
-    def get(self, request: Request) -> Response:
+    def head(self, request: Request) -> HttpResponse | Response:
+        """Répond aux requêtes HEAD pour négocier la taille totale et Accept-Ranges via Redis."""
+        session: Any = getattr(request, 'reader_session', None)
+        if session and getattr(session, 'ouvrage_id', None):
+            session_meta = session.metadata if isinstance(session.metadata, dict) else {}
+            requested_lang = (
+                request.query_params.get('lang')
+                or session_meta.get('language')
+                or (session.ouvrage.original_language if session.ouvrage else 'fr')
+            )
+            source_ref = f"{session.ouvrage_id}:{requested_lang}" if requested_lang else str(session.ouvrage_id)
+            cached_meta = cache.get(f"laha:stream_meta:{source_ref}")
+            if cached_meta and "total_size" in cached_meta:
+                response = HttpResponse(status=status.HTTP_200_OK, content_type="application/pdf")
+                response["Accept-Ranges"] = "bytes"
+                response["Content-Length"] = str(cached_meta["total_size"])
+                response["Cache-Control"] = "private, no-store, must-revalidate"
+                response["X-Content-Type-Options"] = "nosniff"
+                return response
+        return self.get(request)
+
+    def get(self, request: Request) -> HttpResponse | Response:
         from apps.protection.derived_materializer import DerivedMaterializer
         from apps.protection.models import ProtectionConfig, TraceAcces, GlobalDrmConfig
 
-        session: ReaderSession = request.reader_session
+        session: Any = getattr(request, 'reader_session', None)
 
-        if not session.is_valid:
+        if not session or not getattr(session, 'is_valid', False):
             return standard_response(
                 error="Session de lecture expirée ou révoquée.",
                 status_code=status.HTTP_403_FORBIDDEN
@@ -853,6 +875,8 @@ class ReaderProtectedStreamView(APIView):
                     user_info=user_info,
                     config=effective_config,
                 )
+                # Mise en cache Redis des métadonnées structurelles légères
+                cache.set(f"laha:stream_meta:{source_ref}", {"total_size": total_size}, 86400)
             elif session.source_type == "external_url" and session.custom_document_url:
                 partner_quotas = session.partner.quotas or {}
                 options = {

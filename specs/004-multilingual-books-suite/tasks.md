@@ -204,14 +204,34 @@
 
 ---
 
-## Phase 12: Polish & Validation Globale
+## Phase 12: User Story 10 - Accélération & Virtualisation du Mode Immersion 3D (Priority: P1) [FR-026, SC-007]
+
+**Goal**: Garantir une ouverture instantanée (< 400 ms) du mode immersion 3D (`FlipBookReader`) sans saturer le navigateur ni la mémoire vive du serveur : rendu prioritaire immédiat de la couverture/page 1, virtualisation DOM du composant `HTMLFlipBook`, persistance locale des textures dans IndexedDB (réouverture à 0 ms) et cache Redis pour les métadonnées de pagination.
+
+**Independent Test**:
+1. Ouvrir un ouvrage de 200+ pages en mode Immersion 3D et mesurer le temps avant affichage de la couverture (< 400 ms).
+2. Vérifier la fluidité du feuilletage et la faible consommation mémoire DOM (pages actives ± 2).
+3. Fermer et rouvrir le même livre : constater l'ouverture instantanée (0 ms) via le cache local IndexedDB.
+
+### Implementation for User Story 10
+- [X] T053 [P] [US10] Créer le service de cache local IndexedDB `ReaderPageCache` dans `lahatheque-frontend/lib/services/reader-cache.ts` avec opérations `getPageBlob` / `savePageBlob` indexées par `bookId:lang:page`
+- [X] T054 [US10] Découpler le cycle de chargement dans `lahatheque-frontend/components/library/FlipBook.tsx` : rendu prioritaire immédiat de la page visible initiale, levée de l'overlay "Préparation du livre 3D" sous 400 ms, et délégation du calcul des pages restantes en tâche de fond asynchrone
+- [X] T055 [US10] Implémenter la virtualisation et l'allègement DOM de `HTMLFlipBook` dans `lahatheque-frontend/components/library/FlipBook.tsx` pour ne charger les nœuds graphiques que sur la fenêtre active (page courante ± 2 pages)
+- [X] T056 [P] [US10] Ajouter la mise en cache Redis des métadonnées de structure PDF (`page_count`, `dimensions`, `aspect_ratio`) dans `lahatheque-backend/apps/catalog/stream_views.py` avec TTL de 24h
+- [X] T057 [US10] Valider l'expérience de lecture 3D sur desktop et mobile sans latence ni layout shift
+
+**Checkpoint**: User Story 10 opérationnelle — Ouverture 3D instantanée (< 400 ms), réouverture à 0 ms via IndexedDB et mémoire allégée.
+
+---
+
+## Phase 13: Polish & Validation Globale
 
 **Purpose**: Validation croisée, vérification de non-régression et conformité constitutionnelle
 
-- [ ] T049 [P] Mettre à jour la documentation d'API globale dans `DOCUMENTATION_API_LAHATHÈQUE.md`
-- [ ] T050 Valider le guide de démarrage rapide [quickstart.md](./quickstart.md) avec un test complet de bout en bout
-- [ ] T051 Vérification de l'interdiction stricte des émojis et respect des tokens de couleur sémantiques dans tous les composants modifiés
-- [ ] T052 Exécuter la suite complète de tests de non-régression backend (`python manage.py test`)
+- [X] T058 [P] Mettre à jour la documentation d'API globale dans `DOCUMENTATION_API_LAHATHÈQUE.md`
+- [X] T059 Valider le guide de démarrage rapide [quickstart.md](./quickstart.md) avec un test complet de bout en bout
+- [X] T060 Vérification de l'interdiction stricte des émojis et respect des tokens de couleur sémantiques dans tous les composants modifiés
+- [X] T061 Exécuter la suite complète de tests de non-régression backend (`python manage.py test`)
 
 ---
 
@@ -219,18 +239,17 @@
 
 ### Phase Dependencies
 - **Phases 1 & 2 (Setup & Foundational)** : Terminées.
-- **Phases 3 à 8 (US1 à US6)** : Socle multilingue, droits, liseuse interne et formulaires maquettistes terminés.
-- **Phase 9 (US7 - Haute Performance Redis & Streaming)** : Prête à être exécutée immédiatement.
-- **Phase 10 (US8 - Guide Accès Mixte)** : Dépend des spécifications finalisées de l'API partenaire (Phase 9).
-- **Phase 11 (US9 - Vitrine Publique)** : Validée.
-- **Phase 12 (Polish & Validation Globale)** : Exécution finale après Phase 9 et Phase 10.
+- **Phases 3 à 8 (US1 à US6)** : Socle multilingue, droits, liseuse interne et formulaires éditoriaux terminés.
+- **Phases 9 à 11 (US7 à US9)** : Performance catalogue Redis, guide partenaire et vitrine terminés.
+- **Phase 12 (US10 - Immersion 3D)** : Prête à être exécutée immédiatement sur `FlipBook.tsx`.
+- **Phase 13 (Polish & Validation Globale)** : Exécution finale après Phase 12.
 
 ---
 
 ## Implementation Strategy
 
-### Prochaine Étape Immédiate (Phase 9 & Phase 10)
-1. **Backend** : Implémentation du cache Redis, des filtres, de la pagination et du court-circuit M2M dans `PartnerCatalogListView` (`T038`, `T039`, `T040`).
-2. **Backend Streaming** : Implémentation de la cascade de langue `?lang=` dans `ReaderProtectedStreamView` (`T041`).
-3. **Documentation Partenaire** : Mise à jour exhaustive de `GUIDE_INTEGRATION_ACCES_MIXTE.md` et des 3 SDKs (`T043`, `T044`, `T045`, `T046`).
-4. **Validation** : Exécution des tests automatisés (`T042`, `T052`).
+### Prochaine Étape Immédiate (Phase 12 : Accélération Immersion 3D)
+1. **Frontend Cache** : Création du helper IndexedDB `reader-cache.ts` (`T053`).
+2. **Frontend FlipBook** : Découplage du rendu immédiat de la page 1 et virtualisation du FlipBook (`T054`, `T055`).
+3. **Backend Cache Métadonnées** : Cache Redis des métadonnées de dimensions/pages dans `stream_views.py` (`T056`).
+4. **Validation** : Test de bout en bout sous 400 ms (`T057`, `T059`).

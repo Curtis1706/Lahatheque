@@ -73,3 +73,9 @@
 ## 8. Interface d'Édition Admin & Comboboxes Normalisées
 
 - [X]  CHK026 La page d'édition complète (`/admin/catalog/[id]/edit`) et l'intégration des Comboboxes normalisées (`PublisherCombobox`, `DisciplineCombobox` multi-sélection, `AuthorCombobox`, `UniversityCombobox`, `CountryCombobox`) avec re-téléversement Cloudflare R2 et gestion multilingue sont-elles formellement spécifiées ? [FR-025]
+
+---
+
+## 9. Performance & Optimisation du Mode Immersion 3D
+
+- [X]  CHK027 L'ouverture instantanée du mode immersion 3D (< 400 ms) via virtualisation DOM de FlipBook, rendu prioritaire immédiat des 2 premières pages, cache navigateur IndexedDB et usage léger de Redis pour les métadonnées est-elle garantie sans surcharge RAM ? [FR-026, SC-007]

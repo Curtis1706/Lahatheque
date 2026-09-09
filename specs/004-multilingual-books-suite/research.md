@@ -236,3 +236,31 @@ Mise à jour complète de `GUIDE_INTEGRATION_ACCES_MIXTE.md` et de ses trois SDK
 - Explication transparente du cache Redis opéré par LAHAThèque.
 - Précision sur le streaming transparent des EPUBs convertis en PDF vectoriel côté serveur.
 - Payload enrichi avec `language` sur le Webhook `reader.session.opened`.
+
+---
+
+## 9. Performance & Optimisation du Mode Immersion 3D (FR-026, SC-007)
+
+### Problématique
+Lors de l'ouverture d'un livre en mode immersion 3D (`FlipBookReader`), l'écran restait bloqué plusieurs secondes (4 à 8s) sur le message "Préparation du livre 3D". L'analyse a identifié deux causes principales :
+1. **Frontend (cause majeure ~70%)** : `pdfjs-dist` rastérisait l'ensemble des pages de la fenêtre initiale avant de lever l'écran de chargement, et le composant `HTMLFlipBook` (`react-pageflip`) instancie l'intégralité des 100 à 500 pages du livre dans le DOM dès le premier rendu (`new Array(total).fill('')`), provoquant une saturation massive du thread graphique du navigateur.
+2. **Backend (serveur)** : La mise en cache en RAM Redis de gros binaires PDF (20 à 150 Mo) a été écartée car elle saturerait la mémoire vive du serveur Redis et risquerait de provoquer des crashs OOM.
+
+### Décisions d'Architecture
+
+1. **Rendu Immédiat Prioritaire (< 400 ms)** :
+   - Le lecteur 3D ne calcule et n'attend que la première page visible (couverture / page de garde).
+   - L'écran de chargement est levé immédiatement dès que la première page est prête, permettant une entrée en lecture quasi-instantanée sans bloquer l'utilisateur.
+   - Les pages suivantes sont calculées de manière asynchrone et incrémentale en arrière-plan.
+
+2. **Virtualisation DOM de `react-pageflip`** :
+   - Injection contrôlée des pages dans le DOM par fenêtrage : seules la double page active et les 4 pages adjacentes sont montées avec leur image haute résolution.
+   - Les pages distantes sont représentées par des conteneurs légers ou différées jusqu'à ce que le lecteur s'en approche.
+
+3. **Mise en Cache Navigateur (IndexedDB)** :
+   - Les blobs d'images de pages déjà calculées par `pdfjs-dist` sont mis en cache localement via IndexedDB dans le navigateur du lecteur.
+   - Toute réouverture d'un livre déjà consulté est ainsi instantanée (0 ms), sans recalcul de canvas.
+
+4. **Rôle Ciblé de Redis (Serveur)** :
+   - Redis stocke exclusivement les métadonnées de pagination et de structure (`page_count`, `dimensions`, `aspect_ratio`) avec une empreinte mémoire négligeable (< 1 Ko par livre).
+   - Aucun fichier binaire volumineux n'est stocké en RAM Redis ; le stockage des dérivés filigranés reste confié au disque NVMe sécurisé (`var/drm_cache/`).

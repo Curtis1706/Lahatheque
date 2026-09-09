@@ -106,3 +106,8 @@ Vérifier le code HTTP `206 Partial Content` et la présence du filigrane nomina
    - Ouvrir un ouvrage bilingue dans la liseuse.
    - Constater la présence du bouton `[FR] [EN]` dans la barre d'outils supérieure.
    - Cliquer sur `FR` : la liseuse bascule instantanément vers la traduction française à la page proportionnelle sans rechargement de page, avec le filigrane DRM actif.
+4. **Mode Immersion 3D (`FlipBookReader`)** :
+   - Basculer en mode Immersion 3D.
+   - Constater que la couverture et la page 1 s'affichent sous 400 ms (levée immédiate de l'écran "Préparation du livre 3D").
+   - Vérifier la fluidité du feuilletage 3D grâce à la virtualisation DOM et l'absence de blocage mémoire sur les livres à fort volume de pages.
+   - Fermer et rouvrir le même livre en mode 3D : constater l'ouverture instantanée (0 ms) grâce au cache navigateur local IndexedDB.
