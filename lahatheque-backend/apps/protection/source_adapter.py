@@ -97,6 +97,19 @@ class DocumentSourceAdapter:
         return None
 
     @classmethod
+    def _convert_epub_bytes_to_pdf(cls, epub_data: bytes) -> Optional[bytes]:
+        """Convertit un flux binaire EPUB en flux PDF vectoriel haute fidélité en mémoire vive via PyMuPDF."""
+        if not epub_data:
+            return None
+        try:
+            import fitz
+            with fitz.open(stream=epub_data, filetype="epub") as doc:
+                return doc.convert_to_pdf()
+        except Exception as e:
+            logger.error(f"Erreur conversion EPUB en PDF en mémoire: {e}")
+            return None
+
+    @classmethod
     def _fetch_catalog_book(cls, book_id: str) -> bytes:
         """Récupère le fichier d'un ouvrage du catalogue interne LAHAThèque ou d'un dépôt éditeur/manuscrit."""
         from apps.catalog.models import Ouvrage, OuvrageLanguageVersion
@@ -118,10 +131,17 @@ class DocumentSourceAdapter:
                 ouvrage_id=clean_book_id, language__iexact=requested_lang
             ).first()
 
-        if lang_version and lang_version.r2_key_pdf:
-            data = cls._fetch_r2_object(lang_version.r2_key_pdf)
-            if data:
-                return data
+        if lang_version:
+            if lang_version.r2_key_pdf:
+                data = cls._fetch_r2_object(lang_version.r2_key_pdf)
+                if data:
+                    return data
+            if lang_version.r2_key_epub:
+                epub_data = cls._fetch_r2_object(lang_version.r2_key_epub)
+                if epub_data:
+                    pdf_data = cls._convert_epub_bytes_to_pdf(epub_data)
+                    if pdf_data:
+                        return pdf_data
 
         ouvrage = None
         try:
@@ -136,25 +156,44 @@ class DocumentSourceAdapter:
                 lv = OuvrageLanguageVersion.objects.filter(
                     ouvrage=ouvrage, language__iexact=requested_lang
                 ).first()
-                if lv and lv.r2_key_pdf:
-                    data = cls._fetch_r2_object(lv.r2_key_pdf)
-                    if data:
-                        return data
+                if lv:
+                    if lv.r2_key_pdf:
+                        data = cls._fetch_r2_object(lv.r2_key_pdf)
+                        if data:
+                            return data
+                    if lv.r2_key_epub:
+                        epub_data = cls._fetch_r2_object(lv.r2_key_epub)
+                        if epub_data:
+                            pdf_data = cls._convert_epub_bytes_to_pdf(epub_data)
+                            if pdf_data:
+                                return pdf_data
 
             # Le champ fichier est 'file' sur le modèle Ouvrage
             if ouvrage.file:
                 try:
                     with ouvrage.file.open("rb") as f:
-                        return f.read()
+                        file_bytes = f.read()
+                        if str(ouvrage.file.name).lower().endswith(".epub"):
+                            pdf_data = cls._convert_epub_bytes_to_pdf(file_bytes)
+                            if pdf_data:
+                                return pdf_data
+                        return file_bytes
                 except Exception as e:
                     logger.error(f"Erreur lecture fichier ouvrage {book_id}: {e}")
 
             # Si le fichier local n'existe pas mais qu'une déclinaison R2 originale existe
             orig_lv = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage).order_by('-is_original').first()
-            if orig_lv and orig_lv.r2_key_pdf:
-                data = cls._fetch_r2_object(orig_lv.r2_key_pdf)
-                if data:
-                    return data
+            if orig_lv:
+                if orig_lv.r2_key_pdf:
+                    data = cls._fetch_r2_object(orig_lv.r2_key_pdf)
+                    if data:
+                        return data
+                if orig_lv.r2_key_epub:
+                    epub_data = cls._fetch_r2_object(orig_lv.r2_key_epub)
+                    if epub_data:
+                        pdf_data = cls._convert_epub_bytes_to_pdf(epub_data)
+                        if pdf_data:
+                            return pdf_data
 
             # Fallback fichier physique de test
             fallback_path = os.path.join(settings.BASE_DIR, "media", f"{clean_book_id}.pdf")

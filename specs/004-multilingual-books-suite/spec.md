@@ -25,6 +25,11 @@
 - Q: Comment gérer la couverture des versions traduites et l'absence d'images de couverture dédiées dans le bucket R2 ? → A: Option A avec extraction automatisée : les déclinaisons traduites héritent de la couverture de l'ouvrage maître par défaut avec possibilité de surcharge. Pour l'ingestion des 1 600+ livres R2, le script extrait automatiquement la première page du fichier original (`original.pdf` ou couverture intégrée EPUB) pour générer et rattacher l'image de couverture (`cover_url`).
 - Q: En cas d'échec d'extraction des métadonnées par l'IA sur certains PDF atypiques ou scannés lors de l'ingestion de masse, comment l'importateur doit-il réagir ? → A: Option A (Brouillon avec alerte de révision) : l'importateur reste non-bloquant et crée l'ouvrage avec le statut `draft`, un titre technique provisoire basé sur l'identifiant du dossier R2 (`books/<uuid>/`), et le place dans la file d'examen administratif/maquettiste pour saisie manuelle.
 
+### Session 2026-09-09
+
+- Q: Comment la plateforme LAHAThèque doit-elle traiter les fichiers EPUB pour les afficher dans les deux lecteurs (Immersion 3D et Lecteur Classique) ? → A: Option A — Pipeline de conversion automatisée backend EPUB → PDF paginé vectoriel haute résolution avec stockage sur Cloudflare R2 (`r2_key_pdf`). Les deux lecteurs (Immersion 3D et Lecteur Classique) restent ainsi 100% compatibles et fonctionnels de manière uniforme pour tous les ouvrages, sans nécessiter de moteur EPUB tiers côté client.
+- Q: Comment sécuriser la performance et la stabilité du serveur face à la conversion EPUB vers PDF lors de fortes charges ou de requêtes simultanées ? (FR-021) → A: Option A — Approche Hybride R2 + Verrou Redis : conversion protégée par verrou distribué Redis anti-thundering herd. Le PDF vectoriel converti est automatiquement persisté sur Cloudflare R2 (`r2_key_pdf`) dès la première génération, évitant tout recalcul ultérieur et servant les requêtes futures directement comme un PDF natif via CDN sans surcharge CPU.
+
 ---
 
 ## User Scenarios & Testing *(mandatory)*
@@ -110,8 +115,8 @@ En tant que lecteur/gestionnaire audio sur LAHAThèque, je souhaite que le ratta
 
 ## Edge Cases
 
-- **Asymétrie des formats disponibles entre langues** : Que se passe-t-il si un ouvrage dispose d'un PDF et d'un EPUB en anglais, mais uniquement d'un EPUB en français (comme pour 4 des 12 ouvrages R2 actuels) ?
-  *Comportement* : L'interface affiche clairement les formats disponibles par langue. Si le lecteur est dans le lecteur PDF et bascule vers le français qui n'existe qu'en EPUB, la liseuse bascule automatiquement sur le lecteur EPUB adapté avec un message informatif discret (« Passage au format EPUB français »).
+- **Asymétrie des formats disponibles entre langues (ouvrages avec EPUB uniquement)** : Que se passe-t-il si un ouvrage dispose d'un PDF et d'un EPUB en anglais, mais uniquement d'un EPUB en français (comme pour 4 des 12 ouvrages R2 actuels) ?
+  *Comportement* : Le backend convertit automatiquement l'EPUB en PDF vectoriel paginé haute définition et renseigne `r2_key_pdf` sur Cloudflare R2. Ainsi, les deux moteurs de lecture (Immersion 3D et Lecteur Classique) affichent l'ouvrage de manière 100% transparente et homogène dans toutes les langues, avec le feuilletage 3D et la protection DRM.
 - **Décalage de pagination entre version originale et traduction** : Les traductions françaises ont généralement 10 à 20% de mots en plus que l'anglais, changeant la pagination globale.
   *Comportement* : La bascule de langue utilise un calcul proportionnel basé sur le pourcentage d'avancement (`page_courante / total_pages`) plutôt qu'un numéro de page brut, assurant au lecteur de reprendre sa lecture dans le même chapitre/section.
 - **Ajout asynchrone d'une nouvelle traduction par le worker** : Si un livre est traduit plusieurs semaines après sa mise en ligne, comment le catalogue s'actualise-t-il ?
@@ -149,6 +154,7 @@ En tant que lecteur/gestionnaire audio sur LAHAThèque, je souhaite que le ratta
 - **FR-018**: Le studio audio (`/layout-artist/audio/new`) DOIT permettre de sélectionner la langue de narration lors du rattachement d'un livre audio à un ouvrage (`fr`, `en`...), et stocker les flux audio sous la déclinaison linguistique correspondante (`OuvrageLanguageVersion`), assurant ainsi la disponibilité des narrations audio par langue.
 - **FR-019**: La gestion des couvertures DOIT supporter l'héritage par défaut de la couverture originale vers toutes les versions linguistiques, avec possibilité de téléverser une couverture traduite personnalisée. Lors de l'ingestion des ouvrages R2, le pipeline DOIT extraire automatiquement la première page du document original (`original.pdf` ou première page EPUB) pour matérialiser l'image de couverture de l'ouvrage.
 - **FR-020**: En cas d'échec ou d'incapacité d'extraction des métadonnées par l'IA lors de l'ingestion de masse, le processus DOIT rester non-bloquant : l'ouvrage est automatiquement créé avec le statut `draft` et un identifiant provisoire, puis placé dans la file d'examen manuel pour régularisation sans bloquer la synchronisation du reste du catalogue.
+- **FR-021**: Pour tout ouvrage ou déclinaison linguistique disposant d'un format EPUB sans fichier PDF associé dans Cloudflare R2, le backend DOIT convertir automatiquement l'EPUB en PDF paginé vectoriel haute fidélité vers Cloudflare R2 et alimenter `r2_key_pdf` avec protection anti-embouteillage via verrou distribué Redis (anti-thundering herd). Une fois téléversé sur R2, le fichier PDF pré-généré est servi directement pour tous les accès futurs sans recalcul CPU, garantissant la performance, l'intégrité de la mémoire vive et la compatibilité native avec le Lecteur Immersion 3D et le Lecteur Classique.
 
 ---
 
@@ -170,6 +176,7 @@ En tant que lecteur/gestionnaire audio sur LAHAThèque, je souhaite que le ratta
 - **SC-003**: **0% d'ambiguïté logistique** : 100% des commandes de livres physiques comportent la langue exacte commandée sur le bordereau d'expédition.
 - **SC-004**: **0 friction tarifaire** : Aucun utilisateur n'est refacturé pour accéder à une version traduite d'un ouvrage numérique dont il détient déjà la licence.
 - **SC-005**: Le filigrane DRM de sécurité est apposé avec **100% de fiabilité** sur toutes les langues consultées.
+- **SC-006**: **0 surcharge CPU récurrente sur les EPUBs** : 100% des fichiers EPUB convertis en PDF sont persistés sur Cloudflare R2 dès leur première conversion ; le temps d'accès aux requêtes suivantes est inférieur à 100 ms via le cache R2.
 
 ---
 

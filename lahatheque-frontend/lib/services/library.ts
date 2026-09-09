@@ -16,6 +16,9 @@ export interface BookDetail {
   subject?: string;
   description?: string;
   progress?: { last_page: number };
+  language?: string;
+  available_languages?: string[];
+  languages?: any[];
 }
 
 export interface QuizQuestion {
@@ -66,6 +69,9 @@ export const libraryApi = {
             subject: ouvrage.collection_name || ouvrage.discipline_name || "Général",
             description: ouvrage.summary || "Ouvrage certifié LAHAThèque.",
             progress: reading_progress ? { last_page: reading_progress.current_page || 0 } : { last_page: 0 },
+            language: ouvrage.language || "fr",
+            available_languages: ouvrage.available_languages || (ouvrage.language ? [ouvrage.language] : ["fr"]),
+            languages: ouvrage.languages || [],
           };
         }
       }
@@ -92,6 +98,9 @@ export const libraryApi = {
             subject: book.collection_name || book.discipline_name || "Général",
             description: book.summary || "Ouvrage certifié LAHAThèque.",
             progress: { last_page: 0 },
+            language: book.language || "fr",
+            available_languages: book.available_languages || (book.language ? [book.language] : ["fr"]),
+            languages: book.languages || [],
           };
         }
       }
@@ -108,6 +117,9 @@ export const libraryApi = {
       category: "Académique",
       description: "Ouvrage et document numérique certifié LAHAThèque.",
       progress: { last_page: 0 },
+      language: "fr",
+      available_languages: ["fr"],
+      languages: [],
     };
   },
 
