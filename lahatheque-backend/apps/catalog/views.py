@@ -140,10 +140,13 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
                     Q(institution__short_name__iexact=inst_val)
                 )
 
-        # 6. Filtre langue
+        # 6. Filtre langue (langue originale ou déclinaison linguistique disponible)
         lang_val = self.request.query_params.get('language')
         if lang_val and lang_val.lower() != 'all':
-            qs = qs.filter(language__iexact=lang_val)
+            qs = qs.filter(
+                Q(language__iexact=lang_val) |
+                Q(language_versions__language__iexact=lang_val)
+            ).distinct()
 
         # 7. Filtre pays
         country_val = self.request.query_params.get('country')

@@ -15,77 +15,113 @@ import {
   BookOpen,
   CheckCircle
 } from "lucide-react";
-import { Book } from "@/components/ui/book";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { Book as Book3D } from "@/components/ui/book";
 import { CountingNumber } from "@/components/ui/counting-number";
 import { PanafricanPresenceSection } from "@/components/features/home/panafrican-presence-section";
 import { WhyChooseSection } from "@/components/features/home/why-choose-section";
 import { PartnerLogoMarquee } from "@/components/ui/partner-logo-marquee";
 import { SavoirAfriqueSection } from "@/components/features/about/savoir-afrique-section";
-
-const bestSellers = [
-  {
-    id: 1,
-    title: "Droit des obligations",
-    author: "Pr. M. N'DIA",
-    category: "Droit",
-    price: "15 000 FCFA",
-    color: "var(--navy)",
-    textColor: "var(--gold-light)",
-    tag: "Droit"
-  },
-  {
-    id: 2,
-    title: "Économie monétaire",
-    author: "Dr. K. YAO",
-    category: "Économie",
-    price: "13 000 FCFA",
-    color: "#F8F5EE",
-    textColor: "var(--navy)",
-    tag: "Économie"
-  },
-  {
-    id: 3,
-    title: "Comptabilité approfondie",
-    author: "Pr. E. TRAORÉ",
-    category: "Gestion",
-    price: "14 500 FCFA",
-    color: "var(--navy-hover)",
-    textColor: "var(--gold-light)",
-    tag: "Gestion"
-  },
-  {
-    id: 4,
-    title: "Droit constitutionnel",
-    author: "Pr. A. DIALLO",
-    category: "Droit",
-    price: "11 500 FCFA",
-    color: "#F8F5EE",
-    textColor: "var(--navy)",
-    tag: "Droit"
-  },
-  {
-    id: 5,
-    title: "Management stratégique",
-    author: "Dr. S. DIABY",
-    category: "Gestion",
-    price: "16 000 FCFA",
-    color: "var(--navy-dark)",
-    textColor: "var(--gold-light)",
-    tag: "Management"
-  },
-  {
-    id: 6,
-    title: "Finance d'entreprise",
-    author: "Pr. J. KOUADIO",
-    category: "Finance",
-    price: "13 500 FCFA",
-    color: "#F8F5EE",
-    textColor: "var(--gold-dark)",
-    tag: "Finance"
-  }
-];
+import { useCart } from "@/context/cart-context";
+import { searchCatalogBooks } from "@/lib/services/catalog";
+import { Book as CatalogBook } from "@/lib/types/catalog";
 
 export default function HomePage() {
+  const { addItem } = useCart();
+  const [newBooks, setNewBooks] = useState<CatalogBook[]>([]);
+  const [loadingBooks, setLoadingBooks] = useState(true);
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadNewBooks() {
+      setLoadingBooks(true);
+      try {
+        // Priorité aux ouvrages réels publiés disponibles en français
+        const frRes = await searchCatalogBooks({
+          language: "fr",
+          ordering: "-created_at",
+          page_size: 6,
+        });
+
+        let items = frRes?.results || [];
+
+        // Complétion automatique avec les autres nouveautés publiées si moins de 6
+        if (items.length < 6) {
+          const allRes = await searchCatalogBooks({
+            ordering: "-created_at",
+            page_size: 12,
+          });
+          const existingIds = new Set(items.map((b) => b.id));
+          for (const book of allRes?.results || []) {
+            if (!existingIds.has(book.id)) {
+              items.push(book);
+              existingIds.add(book.id);
+              if (items.length >= 6) break;
+            }
+          }
+        }
+
+        if (isMounted) {
+          setNewBooks(items.slice(0, 6));
+        }
+      } catch (err) {
+        console.error("Erreur chargement nouveautes catalogue:", err);
+      } finally {
+        if (isMounted) setLoadingBooks(false);
+      }
+    }
+    loadNewBooks();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleAddToCart = (e: React.MouseEvent, book: CatalogBook) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const authorName =
+      book.authors_details && book.authors_details.length > 0
+        ? book.authors_details.map((a) => `${a.first_name} ${a.last_name}`).join(", ")
+        : "Auteur certifié";
+
+    const selectedLang =
+      book.available_languages && book.available_languages.includes("fr")
+        ? "fr"
+        : book.language || "fr";
+
+    addItem(
+      {
+        bookId: book.id,
+        title: book.title,
+        author: authorName,
+        cover: book.cover_url || book.cover_image,
+        format: "digital",
+        price: book.price ? Number(book.price) : 2500,
+        quantity: 1,
+        selectedLanguage: selectedLang,
+      },
+      true
+    );
+
+    toast.success(`« ${book.title} » ajouté au panier`);
+  };
+
+  const toggleFavorite = (e: React.MouseEvent, bookId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFavorites((prev) => {
+      const next = !prev[bookId];
+      if (next) {
+        toast.success("Ouvrage ajouté à vos favoris");
+      } else {
+        toast.info("Ouvrage retiré de vos favoris");
+      }
+      return { ...prev, [bookId]: next };
+    });
+  };
   return (
     <div className="w-full">
       
@@ -186,59 +222,170 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Meilleures Ventes */}
+      {/* Nouveautés Réelles */}
       <section className="py-16 px-6 md:px-10 lg:px-12 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-end mb-8 gap-4">
-          <h2 className="font-serif text-2xl md:text-3xl font-bold text-navy">Nouveautés</h2>
-          <Link href="/catalog" className="text-sm font-medium text-foreground-muted hover:text-navy flex items-center gap-1 group transition-colors">
+          <div>
+            <h2 className="font-serif text-2xl md:text-3xl font-bold text-navy">Nouveautés</h2>
+            <p className="text-xs sm:text-sm text-foreground-muted mt-1">
+              Les dernières parutions académiques et ouvrages universitaires certifiés
+            </p>
+          </div>
+          <Link href="/catalog" className="text-sm font-medium text-foreground-muted hover:text-navy flex items-center gap-1 group transition-colors shrink-0">
             Voir tous les livres 
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-          {bestSellers.map((book) => (
-            <div 
-              key={book.id} 
-              className="group bg-background border border-border rounded-lg p-4 hover:shadow-[0_8px_30px_rgba(27,42,78,0.06)] transition-all duration-300 flex flex-col justify-between"
-            >
-              {/* 3D book cover */}
-              <div className="relative mb-4 flex-grow bg-background-secondary rounded flex items-center justify-center p-4 aspect-[2/3] overflow-visible">
-                <button className="absolute top-2 right-2 w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center text-foreground-muted hover:text-error transition-colors z-10 shadow-sm">
-                  <Heart className="w-4 h-4" />
-                </button>
-                
-                <Book 
-                  title={book.title} 
-                  author={book.author}
-                  variant="lahatheque" 
-                  color={book.color} 
-                  textColor={book.textColor} 
-                  width={{ sm: 120, md: 130, lg: 135, xl: 125 }}
-                  textured
-                />
-              </div>
-
-              <div className="mt-auto">
-                <span className="inline-block bg-navy-light text-navy text-[9px] font-semibold px-2 py-0.5 rounded-sm mb-2">
-                  {book.tag}
-                </span>
-                <h3 className="font-bold text-sm text-navy mb-1 line-clamp-2">
-                  {book.title}
-                </h3>
-                <p className="text-xs text-foreground-muted mb-3">
-                  {book.author}
-                </p>
-                <div className="flex items-center justify-between mt-2 pt-3 border-t border-border">
-                  <span className="text-sm font-bold text-navy">{book.price}</span>
-                  <button className="w-8 h-8 rounded bg-background-secondary hover:bg-gold hover:text-white text-gold transition-all duration-200 flex items-center justify-center shadow-sm">
-                    <ShoppingCart className="w-4 h-4" />
-                  </button>
+        {loadingBooks ? (
+          /* Squelette de chargement aux proportions exactes */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <div 
+                key={n} 
+                className="animate-pulse bg-background border border-border rounded-lg p-4 flex flex-col justify-between space-y-4"
+              >
+                <div className="relative mb-2 bg-background-secondary rounded flex items-center justify-center p-4 aspect-[2/3]">
+                  <div className="w-20 h-28 bg-border/60 rounded-md" />
+                </div>
+                <div className="space-y-2 mt-auto">
+                  <div className="h-3 bg-border/60 rounded w-1/3" />
+                  <div className="h-4 bg-border/60 rounded w-full" />
+                  <div className="h-3 bg-border/60 rounded w-1/2" />
+                  <div className="flex items-center justify-between pt-3 border-t border-border">
+                    <div className="h-4 bg-border/60 rounded w-14" />
+                    <div className="w-8 h-8 bg-border/60 rounded" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : newBooks.length === 0 ? (
+          <div className="text-center py-12 px-4 bg-background-secondary rounded-xl border border-border">
+            <BookOpen className="w-10 h-10 text-gold mx-auto mb-3 opacity-80" />
+            <h3 className="font-serif font-bold text-navy text-base mb-1">Catalogue en cours de synchronisation</h3>
+            <p className="text-xs text-foreground-muted max-w-sm mx-auto mb-4">
+              Les ouvrages universitaires publiés sont disponibles dans la section catalogue complet.
+            </p>
+            <Link
+              href="/catalog"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gold hover:bg-gold-dark text-white text-xs font-bold transition-colors"
+            >
+              <span>Accéder au catalogue</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+            {newBooks.map((book) => {
+              const bookSlug = book.slug || book.id;
+              const authorName =
+                book.authors_details && book.authors_details.length > 0
+                  ? book.authors_details.map((a) => `${a.first_name} ${a.last_name}`).join(", ")
+                  : "Auteur certifié";
+
+              const categoryName =
+                book.discipline_detail?.name || book.publisher_name || "Université";
+
+              const isMultilingual =
+                book.available_languages && book.available_languages.length > 1;
+
+              const langBadge = isMultilingual
+                ? "FR • EN"
+                : (book.language ? book.language.toUpperCase() : "FR");
+
+              const isFav = Boolean(favorites[book.id]);
+
+              return (
+                <article 
+                  key={book.id} 
+                  className="group bg-background border border-border rounded-lg p-4 hover:shadow-[0_8px_30px_rgba(27,42,78,0.06)] hover:border-gold/50 transition-all duration-300 flex flex-col justify-between"
+                >
+                  {/* Zone Couverture Cliquable vers /catalog/[slug_or_id] */}
+                  <div className="relative mb-4 flex-grow bg-background-secondary rounded flex items-center justify-center p-3 aspect-[2/3] overflow-visible">
+                    <button 
+                      type="button"
+                      onClick={(e) => toggleFavorite(e, book.id)}
+                      className={`absolute top-2 right-2 w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center transition-colors z-10 shadow-xs cursor-pointer ${
+                        isFav ? "text-error border-error/40 bg-error/5" : "text-foreground-muted hover:text-error"
+                      }`}
+                      title={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
+                      aria-label="Ajouter aux favoris"
+                    >
+                      <Heart className={`w-4 h-4 ${isFav ? "fill-current" : ""}`} />
+                    </button>
+                    
+                    <Link 
+                      href={`/catalog/${bookSlug}`} 
+                      className="transition-transform group-hover:scale-105 duration-300 flex items-center justify-center w-full h-full"
+                    >
+                      {book.cover_url || book.cover_image ? (
+                        <div className="relative w-[120px] aspect-[2/3] rounded-r-md rounded-l-xs overflow-hidden shadow-md border-l-3 border-black/25 border-r border-t border-b border-border/70 group-hover:shadow-xl transition-shadow duration-300">
+                          <img
+                            src={book.cover_url || book.cover_image}
+                            alt={book.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                      ) : (
+                        <Book3D 
+                          title={book.title} 
+                          author={authorName}
+                          variant="lahatheque" 
+                          color={book.cover_color || "var(--navy)"} 
+                          textColor={book.cover_text_color || "var(--gold-light)"} 
+                          width={{ sm: 110, md: 120, lg: 125, xl: 115 }}
+                          textured
+                        />
+                      )}
+                    </Link>
+                  </div>
+
+                  {/* Informations Livre */}
+                  <div className="mt-auto">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                      <span className="inline-block bg-navy-light text-navy text-[9px] font-semibold px-2 py-0.5 rounded-xs truncate max-w-[110px]">
+                        {categoryName}
+                      </span>
+                      <span className="inline-block bg-gold/10 text-gold border border-gold/30 text-[9px] font-bold px-1.5 py-0.5 rounded-xs">
+                        {langBadge}
+                      </span>
+                    </div>
+
+                    <h3 className="font-serif font-bold text-sm text-navy mb-1 line-clamp-2 leading-snug">
+                      <Link 
+                        href={`/catalog/${bookSlug}`}
+                        className="group-hover:text-gold transition-colors"
+                      >
+                        {book.title}
+                      </Link>
+                    </h3>
+
+                    <p className="text-xs text-foreground-muted mb-3 line-clamp-1">
+                      {authorName}
+                    </p>
+
+                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-border">
+                      <span className="text-xs sm:text-sm font-bold font-mono text-navy">
+                        {(book.price ? Number(book.price) : 2500).toLocaleString("fr-FR")} FCFA
+                      </span>
+                      <button 
+                        type="button"
+                        onClick={(e) => handleAddToCart(e, book)}
+                        className="w-8 h-8 rounded bg-background-secondary hover:bg-gold hover:text-white text-gold transition-all duration-200 flex items-center justify-center shadow-xs cursor-pointer shrink-0"
+                        title="Ajouter au panier (Licence numérique)"
+                        aria-label={`Ajouter ${book.title} au panier`}
+                      >
+                        <ShoppingCart className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* Bandeau Chiffres Clés */}
