@@ -173,7 +173,7 @@ class Ouvrage(models.Model):
     def available_languages(self) -> list[str]:
         """Retourne la liste des codes langues disponibles pour cet ouvrage."""
         if self.pk and hasattr(self, 'language_versions'):
-            langs = [str(l) for l in self.language_versions.values_list('language', flat=True)]
+            langs = [str(lv.language) for lv in self.language_versions.all() if getattr(lv, 'language', None)]
             if langs:
                 return sorted(list(set(langs)))
         return [str(self.language)] if self.language else ['fr']
@@ -183,9 +183,9 @@ class Ouvrage(models.Model):
         if hasattr(self, '_original_language_val') and self._original_language_val:
             return self._original_language_val
         if self.pk and hasattr(self, 'language_versions'):
-            orig = self.language_versions.filter(is_original=True).first()
-            if orig and orig.language:
-                return str(orig.language)
+            for lv in self.language_versions.all():
+                if lv.is_original and lv.language:
+                    return str(lv.language)
         return str(self.language or 'fr')
 
     @original_language.setter

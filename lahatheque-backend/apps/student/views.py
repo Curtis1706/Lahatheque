@@ -632,7 +632,7 @@ class StudentCatalogView(APIView):
             Ouvrage.objects
             .filter(status='published')
             .select_related('discipline', 'publisher', 'institution')
-            .prefetch_related('authors')
+            .prefetch_related('authors', 'language_versions', 'audio_tracks')
         )
 
         q = request.query_params.get('q', '').strip()
@@ -658,10 +658,79 @@ class StudentCatalogView(APIView):
         elif format_type and format_type != 'all':
             qs = qs.filter(format_type=format_type)
 
-        # Disciplines disponibles pour les filtres (toutes les disciplines du référentiel Admin)
+        qs = qs.order_by('-created_at', '-id')
+
+        # Calcul vectorisé / batch de l'accès utilisateur pour éviter 500+ requêtes SQL N+1
+        user = request.user
+        user_owned_ids = set()
+        user_audio_ids = set()
+
+        if user and user.is_authenticated:
+            platform_roles = ['admin', 'super_admin', 'chief_layout', 'layout_artist', 'legal_reviewer']
+            from django.conf import settings
+            is_platform_admin = (
+                user.is_superuser
+                or user.is_staff
+                or getattr(user, 'role', '') in platform_roles
+                or getattr(settings, 'DEV_UNLOCK_ALL_BOOKS', False)
+            )
+            if is_platform_admin:
+                user_owned_ids = True
+                user_audio_ids = True
+            else:
+                from apps.commerce.models import Subscription, LigneCommande, ClientBouquetSubscription
+                from apps.partners.models import StudentAffiliation, BouquetOffering
+                from django.utils import timezone as tz
+
+                has_sub = Subscription.objects.filter(user=user, is_active=True).exists()
+                if not has_sub:
+                    student_aff = StudentAffiliation.objects.filter(student=user, is_validated=True).select_related('institution').first()
+                    if student_aff and student_aff.institution:
+                        has_sub = Subscription.objects.filter(institution=student_aff.institution, is_active=True).exists()
+
+                if has_sub:
+                    user_owned_ids = True
+                else:
+                    owned_digital = set(
+                        str(bid) for bid in LigneCommande.objects.filter(
+                            commande__user=user,
+                            format_type='digital',
+                        ).filter(
+                            Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
+                        ).values_list('ouvrage_id', flat=True)
+                    )
+                    today = tz.now().date()
+                    client_subs = ClientBouquetSubscription.objects.filter(
+                        user=user, status="active", start_date__lte=today, end_date__gte=today
+                    )
+                    for csub in client_subs:
+                        try:
+                            offering = BouquetOffering.objects.get(id=csub.offering_id, is_active=True)
+                            owned_digital.update(str(bid) for bid in offering.get_books_queryset().values_list('id', flat=True))
+                        except Exception:
+                            pass
+                    user_owned_ids = owned_digital
+
+                user_audio_ids = set(
+                    str(bid) for bid in LigneCommande.objects.filter(
+                        commande__user=user,
+                        format_type='audio',
+                    ).filter(
+                        Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
+                    ).values_list('ouvrage_id', flat=True)
+                )
+
         disciplines = Discipline.objects.all().order_by('name').values('id', 'name')
 
-        serializer = OuvrageBasicSerializer(qs[:60], many=True, context={'request': request})
+        serializer = OuvrageBasicSerializer(
+            qs,
+            many=True,
+            context={
+                'request': request,
+                'user_owned_ids': user_owned_ids,
+                'user_audio_ids': user_audio_ids,
+            }
+        )
         return Response({
             'success': True,
             'data': {

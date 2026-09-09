@@ -420,7 +420,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             .select_related('publisher', 'discipline', 'institution')
             .prefetch_related('authors', 'language_versions', 'audio_tracks')
             .all()
-            .order_by('-created_at', '-id')[:100]
+            .order_by('-created_at', '-id')
         )
         results = []
         for b in books:

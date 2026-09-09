@@ -75,6 +75,11 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     def get_is_owned(self, obj) -> bool:
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
+            user_owned_ids = self.context.get('user_owned_ids')
+            if user_owned_ids is not None:
+                if user_owned_ids is True:
+                    return True
+                return str(obj.id) in user_owned_ids
             from apps.protection.access_service import AccessService
             access_info = AccessService.check_user_book_access(request.user, str(obj.id))
             return bool(access_info.get("access_granted"))
@@ -84,11 +89,23 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
         return self.get_is_owned(obj)
 
     def get_has_audio(self, obj) -> bool:
-        return bool(obj.has_audio_version or (hasattr(obj, 'audio_tracks') and obj.audio_tracks.exists()))
+        if bool(getattr(obj, 'has_audio_version', False)):
+            return True
+        if hasattr(obj, 'audio_tracks'):
+            tracks = getattr(obj, '_prefetched_objects_cache', {}).get('audio_tracks')
+            if tracks is not None:
+                return len(tracks) > 0
+            return obj.audio_tracks.exists()
+        return False
 
     def get_is_audio_owned(self, obj) -> bool:
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
+            user_audio_ids = self.context.get('user_audio_ids')
+            if user_audio_ids is not None:
+                if user_audio_ids is True:
+                    return True
+                return str(obj.id) in user_audio_ids
             from apps.commerce.models import LigneCommande
             from django.db.models import Q
             return LigneCommande.objects.filter(
