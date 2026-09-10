@@ -1,1 +1,2 @@
 -r requirements/production.txt
+django-redis>=5.4.0

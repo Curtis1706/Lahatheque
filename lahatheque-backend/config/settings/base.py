@@ -349,17 +349,26 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── Configuration du Cache Haute Performance ─────────────────────────────────
-# Cache en mémoire vive ultra-rapide (LocMemCache) : zéro dépendance réseau, zéro risque d'erreur 500
+# Utilise une base Redis distincte de celle de Celery pour éviter toute collision de clés
+# entre cache applicatif et broker/backend de tâches.
+_redis_cache_url = REDIS_URL.rsplit('/', 1)[0] + '/2' if '/' in REDIS_URL.rsplit('://', 1)[-1] else REDIS_URL + '/2'
+
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'lahatheque-catalog-cache',
-        'TIMEOUT': 300,  # 5 minutes
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': _redis_cache_url,
+        'TIMEOUT': 300,
         'OPTIONS': {
-            'MAX_ENTRIES': 2000,
-        }
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'IGNORE_EXCEPTIONS': True,
+        },
+        'KEY_PREFIX': 'lahatheque',
     }
 }
+
+# IGNORE_EXCEPTIONS=True : si Redis devient temporairement indisponible, Django se comporte
+# comme si le cache était vide plutôt que de renvoyer une erreur 500 — le site continue de
+# fonctionner, simplement sans l'accélération du cache.
 
 # Fonctionnalité désactivée conformément au CDC v3.2 (le Client souscrit directement aux
 # bouquets, section 8 — aucune validation d'affiliation universitaire n'est prévue). Le code
