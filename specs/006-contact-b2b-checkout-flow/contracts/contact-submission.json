@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ContactB2BSubmissionPayload",
+  "type": "object",
+  "required": ["name", "email", "role", "subject", "message"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 2,
+      "description": "Nom complet du demandeur"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Adresse e-mail valide du demandeur"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["university", "publisher", "wholesaler", "author", "other"],
+      "description": "Profil officiel aligné sur les rôles BD Django"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Objet de la demande synthétisant le profil et les besoins cochés"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 5,
+      "description": "Corps du message avec coordonnées, besoins sélectionnés et précisions libres"
+    }
+  },
+  "additionalProperties": false
+}

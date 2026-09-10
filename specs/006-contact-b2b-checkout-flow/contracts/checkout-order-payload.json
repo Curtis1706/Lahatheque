@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CheckoutOrderPayload",
+  "type": "object",
+  "required": ["items", "payment_provider"],
+  "properties": {
+    "payment_provider": {
+      "type": "string",
+      "enum": ["moneroo", "mock", "stripe"],
+      "description": "Fournisseur de paiement utilisé"
+    },
+    "shipping_address": {
+      "type": "string",
+      "description": "Adresse de livraison physique obligatoire si au moins un article papier"
+    },
+    "city": {
+      "type": "string",
+      "description": "Ville de livraison"
+    },
+    "country": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "Code ISO 2 lettres du pays (ex: BJ)"
+    },
+    "date_livraison_souhaitee": {
+      "type": "string",
+      "format": "date",
+      "description": "Date de réception souhaitée (optionnel)"
+    },
+    "plage_horaire_debut": {
+      "type": "string",
+      "format": "time",
+      "description": "Début du créneau horaire souhaité (optionnel)"
+    },
+    "plage_horaire_fin": {
+      "type": "string",
+      "format": "time",
+      "description": "Fin du créneau horaire souhaité (optionnel)"
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["ouvrage_id", "format_type", "quantity"],
+        "properties": {
+          "ouvrage_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identifiant UUID de l'ouvrage"
+          },
+          "format_type": {
+            "type": "string",
+            "enum": ["digital", "paper", "audio"],
+            "description": "Format choisi"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quantité commandée"
+          },
+          "selected_language": {
+            "type": "string",
+            "description": "Langue choisie (défaut fr)"
+          }
+        }
+      }
+    }
+  }
+}

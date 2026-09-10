@@ -25,7 +25,7 @@ app.conf.beat_schedule = {
     },
     'sync-r2-multilingual-books': {
         'task': 'apps.catalog.tasks.task_sync_r2_multilingual_books',
-        'schedule': crontab(minute='30', hour='*/3'),
+        'schedule': crontab(minute='0', hour='*/6'),
     },
 }
 

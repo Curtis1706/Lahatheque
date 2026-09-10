@@ -224,6 +224,9 @@ class CreateOrderView(APIView):
                     plage_horaire_fin=plage_fin,
                 )
 
+            logger.info(f"[Commerce] Commande #{commande.id} créée pour {request.user.email} - Total: {total_amount} XOF (Papier: {has_paper})")
+            print(f"[ORDER] Nouvelle commande #{commande.id} - {request.user.email} ({total_amount} XOF)")
+
             if is_credit_purchase:
                 from .services import fulfill_credit_order
                 fulfill_credit_order(commande)

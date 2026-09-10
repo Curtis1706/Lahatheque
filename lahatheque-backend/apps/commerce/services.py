@@ -18,7 +18,7 @@ def _unlock_order_content(commande):
     for ligne in lignes:
         ouvrage = ligne.ouvrage
 
-        if ligne.format_type in ('digital', 'pdf', 'epub'):
+        if ligne.format_type in ('digital', 'pdf', 'epub', 'audio'):
             ReadingProgress.objects.get_or_create(
                 user=commande.user,
                 ouvrage=ouvrage,

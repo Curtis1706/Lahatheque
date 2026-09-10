@@ -315,7 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (role: RegisterRole, userData: any): Promise<LoginResponse> => {
     try {
-      const endpoint = `/api/bff/auth/register/${role}/`
+      const endpoint = `/api/bff/auth/register/${role}`
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

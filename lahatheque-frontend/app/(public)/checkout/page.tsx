@@ -11,11 +11,15 @@ import {
   Lock, 
   ArrowLeft, 
   ShoppingBag, 
-  AlertCircle
+  AlertCircle,
+  Clock,
+  MapPin,
+  Phone
 } from "lucide-react";
 import { useCart } from "@/context/cart-context";
 import { useAuth } from "@/hooks/use-auth";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { CheckoutAuthPanel } from "@/components/checkout/checkout-auth-panel";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -26,6 +30,10 @@ export default function CheckoutPage() {
   const [shippingAddress, setShippingAddress] = useState("");
   const [city, setCity] = useState("Cotonou");
   const [country, setCountry] = useState("BJ");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [timeSlotStart, setTimeSlotStart] = useState("");
+  const [timeSlotEnd, setTimeSlotEnd] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderCompleted, setOrderCompleted] = useState<any | null>(null);
@@ -160,6 +168,7 @@ export default function CheckoutPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    const startTime = performance.now();
 
     if (hasPaperItem && !shippingAddress.trim()) {
       setError("Veuillez saisir votre adresse de livraison pour le livre papier.");
@@ -173,9 +182,12 @@ export default function CheckoutPage() {
 
     const payload = {
       payment_provider: paymentProvider,
-      shipping_address: shippingAddress,
-      city: city,
+      shipping_address: shippingAddress.trim() || undefined,
+      city: city.trim() || undefined,
       country: country,
+      date_livraison_souhaitee: deliveryDate || undefined,
+      plage_horaire_debut: timeSlotStart || undefined,
+      plage_horaire_fin: timeSlotEnd || undefined,
       items: items.map((item) => ({
         ouvrage_id: item.bookId,
         format_type: item.format,
@@ -184,7 +196,11 @@ export default function CheckoutPage() {
       })),
     };
 
-    const orderPromise = fetch("/api/bff/commerce/orders/", {
+    console.groupCollapsed(`[CHECKOUT FLOW] Passation commande [${new Date().toLocaleTimeString()}]`);
+    console.log("Payload commande:", payload);
+    console.log("Client connecté:", user?.email);
+
+    const orderPromise = fetch("/api/bff/commerce/orders", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -195,13 +211,19 @@ export default function CheckoutPage() {
 
     try {
       const [res] = await Promise.all([orderPromise, animationPromise]);
+      const elapsedMs = Math.round(performance.now() - startTime);
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Échec de la validation de la commande.");
+        console.error(`[CHECKOUT FLOW] Échec commande (${res.status}) après ${elapsedMs}ms:`, errData);
+        console.groupEnd();
+        throw new Error(errData.error || errData.detail || "Échec de la validation de la commande.");
       }
 
       const data = await res.json();
+      console.log(`[CHECKOUT FLOW] Commande validée avec succès en ${elapsedMs}ms:`, data);
+      console.groupEnd();
+
       await new Promise((r) => setTimeout(r, 350));
       setPaymentPhase("success");
       setOrderCompleted(data);
@@ -245,89 +267,168 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmitOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Options de Paiement et Livraison */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Utilisateur connecté */}
-            <div className="bg-background border border-border rounded-2xl p-5 space-y-3 shadow-sm">
-              <h2 className="text-xs font-bold text-navy uppercase tracking-wider">Identité du client</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <label className="text-foreground-muted block mb-1">Nom & Prénom</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={user ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email : "Invité"}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-background-secondary border border-border font-medium text-navy text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-foreground-muted block mb-1">Adresse Email</label>
-                  <input
-                    type="email"
-                    disabled
-                    value={user?.email || ""}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-background-secondary border border-border font-medium text-navy text-xs"
-                  />
-                </div>
-              </div>
+        {!user ? (
+          /* Option A : Panneau d'authentification direct sur la page */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              <CheckoutAuthPanel onAuthenticated={() => console.log("[CHECKOUT] Session client synchronisée")} />
             </div>
 
-            {/* Adresse de livraison (si format papier) */}
-            {hasPaperItem && (
-              <div className="bg-background border border-border rounded-2xl p-5 space-y-4 shadow-sm animate-in fade-in">
-                <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider">
-                  <Truck className="w-4 h-4 text-gold" />
-                  Adresse de Livraison (Livre Papier)
-                </div>
+            {/* Récapitulatif Panier Persistant à droite */}
+            <div className="bg-background border border-border rounded-2xl p-6 space-y-6 h-fit shadow-sm">
+              <h2 className="font-serif font-bold text-lg text-navy border-b border-border pb-3">
+                Votre Commande ({totalCount} article{totalCount > 1 ? "s" : ""})
+              </h2>
 
-                <div className="space-y-3 text-xs">
+              <div className="space-y-3 text-xs max-h-56 overflow-y-auto divide-y divide-border">
+                {items.map((item) => (
+                  <div key={item.id} className="pt-2.5 first:pt-0 flex justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-bold text-navy truncate">{item.title}</p>
+                      <p className="text-[10px] text-foreground-muted">
+                        {item.format === "digital" ? "Livre numérique" : item.format === "audio" ? "Livre audio" : `Livre papier${item.selectedLanguage ? ` (${item.selectedLanguage.toUpperCase()})` : ""}`} x {item.quantity}
+                      </p>
+                    </div>
+                    <span className="font-semibold text-navy shrink-0">
+                      {(item.price * item.quantity).toLocaleString("fr-FR")} FCFA
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-border pt-4 space-y-2 text-xs">
+                <div className="flex justify-between text-base font-bold text-navy">
+                  <span>Total à payer</span>
+                  <span className="text-gold-dark font-mono font-bold">{totalAmount.toLocaleString("fr-FR")} FCFA</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-background-secondary border border-border text-[11px] text-foreground-muted flex items-start gap-2">
+                <Lock className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+                <span>Identifiez-vous à gauche pour accéder à la sélection du paiement et enregistrer votre commande.</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Utilisateur Authentifié : Choix Livraison & Paiement */
+          <form onSubmit={handleSubmitOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Options de Paiement et Livraison */}
+            <div className="lg:col-span-2 space-y-6">
+              
+              {/* Utilisateur connecté */}
+              <div className="bg-background border border-border rounded-2xl p-5 space-y-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-bold text-navy uppercase tracking-wider">Identité du client</h2>
+                  <span className="text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded border border-success/20">Connecté</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div>
-                    <label className="text-foreground-muted block mb-1">Adresse complète de livraison *</label>
-                    <textarea
-                      required
-                      value={shippingAddress}
-                      onChange={(e) => setShippingAddress(e.target.value)}
-                      placeholder="Ex: Quartier Cadjehoun, Immeuble Laha, 2ème étage, Cotonou"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs focus:ring-1 focus:ring-gold outline-none"
-                      rows={3}
+                    <label className="text-foreground-muted block mb-1">Nom &amp; Prénom</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={`${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-background-secondary border border-border font-medium text-navy text-xs"
                     />
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    <div>
-                      <label className="text-foreground-muted block mb-1">Ville</label>
-                      <input
-                        type="text"
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-foreground-muted block mb-1">Pays</label>
-                      <select
-                        value={country}
-                        onChange={(e) => setCountry(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs"
-                      >
-                        <option value="BJ">Bénin (+229)</option>
-                        <option value="SN">Sénégal (+221)</option>
-                        <option value="CI">Côte d'Ivoire (+225)</option>
-                        <option value="TG">Togo (+228)</option>
-                        <option value="CM">Cameroun (+237)</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="text-foreground-muted block mb-1">Adresse Email</label>
+                    <input
+                      type="email"
+                      disabled
+                      value={user.email || ""}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-background-secondary border border-border font-medium text-navy text-xs"
+                    />
                   </div>
                 </div>
               </div>
-            )}
 
-            {/* Mode de Paiement */}
-            <div className="bg-background border border-border rounded-2xl p-5 space-y-4 shadow-sm">
-              <h2 className="text-xs font-bold text-navy uppercase tracking-wider">Mode de Paiement</h2>
+              {/* Adresse de livraison (si format papier) */}
+              {hasPaperItem && (
+                <div className="bg-background border border-border rounded-2xl p-5 space-y-4 shadow-sm animate-in fade-in">
+                  <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider">
+                    <Truck className="w-4 h-4 text-gold" />
+                    <span>Adresse de Livraison &amp; Créneau (Livre Papier)</span>
+                  </div>
+
+                  <div className="space-y-3.5 text-xs">
+                    <div>
+                      <label className="text-foreground-muted block mb-1">Adresse complète de livraison *</label>
+                      <textarea
+                        required
+                        value={shippingAddress}
+                        onChange={(e) => setShippingAddress(e.target.value)}
+                        placeholder="Ex: Quartier Cadjehoun, Rue 12.040, Immeuble Laha, 2ème étage, Cotonou"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs focus:ring-1 focus:ring-gold outline-none"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div>
+                        <label className="text-foreground-muted block mb-1">Ville *</label>
+                        <input
+                          type="text"
+                          required
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-foreground-muted block mb-1">Pays *</label>
+                        <select
+                          value={country}
+                          onChange={(e) => setCountry(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs"
+                        >
+                          <option value="BJ">Bénin (+229)</option>
+                          <option value="SN">Sénégal (+221)</option>
+                          <option value="CI">Côte d&apos;Ivoire (+225)</option>
+                          <option value="TG">Togo (+228)</option>
+                          <option value="CM">Cameroun (+237)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Date et créneau horaire souhaité */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border pt-3">
+                      <div>
+                        <label className="text-foreground-muted block mb-1">Date souhaitée</label>
+                        <input
+                          type="date"
+                          value={deliveryDate}
+                          onChange={(e) => setDeliveryDate(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl bg-background border border-border text-navy text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-foreground-muted block mb-1">Créneau début</label>
+                        <input
+                          type="time"
+                          value={timeSlotStart}
+                          onChange={(e) => setTimeSlotStart(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl bg-background border border-border text-navy text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-foreground-muted block mb-1">Créneau fin</label>
+                        <input
+                          type="time"
+                          value={timeSlotEnd}
+                          onChange={(e) => setTimeSlotEnd(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl bg-background border border-border text-navy text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Mode de Paiement */}
+              <div className="bg-background border border-border rounded-2xl p-5 space-y-4 shadow-sm">
+                <h2 className="text-xs font-bold text-navy uppercase tracking-wider">Mode de Paiement</h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 
@@ -445,8 +546,10 @@ export default function CheckoutPage() {
           </div>
 
         </form>
+        )}
 
       </div>
     </div>
   );
 }
+

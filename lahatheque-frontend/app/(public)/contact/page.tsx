@@ -2,15 +2,20 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Mail, ArrowRight } from "lucide-react";
+import { Mail, ArrowRight, CheckCircle2, HelpCircle } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { toast } from "sonner";
+import { 
+  CONTACT_APPLICANT_PROFILES, 
+  CONTACT_NEEDS_LIST, 
+  ContactApplicantRole 
+} from "@/lib/types/contact";
 
 function ContactFormContent() {
   const searchParams = useSearchParams();
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
   const [phone, setPhone] = useState("");
-  const [profil, setProfil] = useState("");
+  const [profil, setProfil] = useState<ContactApplicantRole | "">("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
@@ -19,7 +24,9 @@ function ContactFormContent() {
   useEffect(() => {
     const needParam = searchParams.get("need");
     if (needParam) {
-      const match = needsList.find(n => n.toLowerCase().includes(needParam.toLowerCase()) || needParam.toLowerCase().includes(n.toLowerCase()));
+      const match = CONTACT_NEEDS_LIST.find(
+        (n) => n.toLowerCase().includes(needParam.toLowerCase()) || needParam.toLowerCase().includes(n.toLowerCase())
+      );
       if (match && !selectedNeeds.includes(match)) {
         setSelectedNeeds([match]);
       }
@@ -36,28 +43,46 @@ function ContactFormContent() {
 
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const startTime = performance.now();
+
     if (!email.trim()) {
       toast.error("Veuillez saisir votre adresse e-mail.");
       return;
     }
 
+    if (!profil) {
+      toast.error("Veuillez sélectionner votre profil.");
+      return;
+    }
+
+    const payload = {
+      name: name.trim() || email.split("@")[0] || "Visiteur Contact",
+      email: email.trim(),
+      phone: phone.trim() || undefined,
+      role: profil,
+      selected_needs: selectedNeeds,
+      subject: `Demande de contact : ${profil.toUpperCase()} - ${selectedNeeds.length > 0 ? selectedNeeds.join(", ") : "Générale"}`,
+      message: `Profil: ${profil}\nTéléphone: ${phone || "Non renseigné"}\nBesoins sélectionnés: ${selectedNeeds.length > 0 ? selectedNeeds.join(", ") : "Générale"}\n\nMessage complémentaire:\n${message || "Aucun message spécifique."}`,
+    };
+
+    console.groupCollapsed(`[CONTACT FORM] Soumission démarrée [${new Date().toLocaleTimeString()}]`);
+    console.log("Payload:", payload);
+
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/bff/communications/contact/", {
+      const res = await fetch("/api/bff/communications/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim() || email.split("@")[0] || "Visiteur Contact",
-          email: email.trim(),
-          role: profil || "lecteur",
-          subject: `Demande de contact : ${profil || "Générale"} - ${selectedNeeds.length > 0 ? selectedNeeds.join(", ") : "Information"}`,
-          message: `Profil: ${profil || "Non spécifié"}\nTéléphone: ${phone || "Non renseigné"}\nBesoins sélectionnés: ${selectedNeeds.join(", ") || "Demande générale"}\n\nMessage additionnel: ${message || "Aucun message spécifique."}`,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
+      const elapsedMs = Math.round(performance.now() - startTime);
+      console.log(`[CONTACT FORM] Réponse reçue (${res.status}) en ${elapsedMs}ms:`, data);
+      console.groupEnd();
+
       if (res.ok && data.success) {
-        toast.success("Votre demande de contact a été transmise avec succès ! Notre équipe vous répondra sous 48h ouvrées.");
+        toast.success("Votre demande a été transmise avec succès ! Notre équipe vous répondra sous 48h ouvrées.");
         setEmail("");
         setName("");
         setPhone("");
@@ -67,30 +92,15 @@ function ContactFormContent() {
       } else {
         toast.error(data.error || "Une erreur est survenue lors de l'envoi de votre message.");
       }
-    } catch {
-      toast.success("Votre message a été enregistré avec succès.");
-      setEmail("");
-      setName("");
-      setPhone("");
-      setMessage("");
-      setSelectedNeeds([]);
+    } catch (err: any) {
+      const elapsedMs = Math.round(performance.now() - startTime);
+      console.error(`[CONTACT FORM] Erreur réseau après ${elapsedMs}ms:`, err);
+      console.groupEnd();
+      toast.error("Impossible de joindre le serveur. Veuillez vérifier votre connexion.");
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const needsList = [
-    "Impression des ouvrages",
-    "Sécurisation des contenus éditoriaux",
-    "Analyse par un comité de lecture",
-    "Montage éditorial des ouvrages",
-    "Diffusion à l'échelle internationale",
-    "Distribution à l'échelle internationale",
-    "Production de livres audio",
-    "Réalisation d'illustrations",
-    "Logiciel anti-plagiat",
-    "Autre"
-  ];
 
   return (
     <div className="w-full">
@@ -170,16 +180,15 @@ function ContactFormContent() {
                     className="w-full bg-background border border-border rounded text-sm p-3 focus:border-navy focus:ring-2 focus:ring-gold/30 outline-none transition-colors appearance-none pr-10 cursor-pointer" 
                     id="profil"
                     value={profil}
-                    onChange={(e) => setProfil(e.target.value)}
+                    onChange={(e) => setProfil(e.target.value as ContactApplicantRole)}
                     required
                   >
-                    <option value="" disabled>Sélectionner un profil</option>
-                    <option value="auteur">Auteur</option>
-                    <option value="editeur">Éditeur</option>
-                    <option value="diffuseur">Diffuseur</option>
-                    <option value="etablissement_public">Établissement public</option>
-                    <option value="etablissement_prive">Établissement privé</option>
-                    <option value="autre">Autre</option>
+                    <option value="" disabled>Sélectionner votre profil</option>
+                    {CONTACT_APPLICANT_PROFILES.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
                   </select>
                   <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-foreground-muted">
                     <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -189,23 +198,23 @@ function ContactFormContent() {
                 </div>
               </div>
 
-              {/* Besoins (Checkboxes) in Grid */}
+              {/* Besoins (Checkboxes / Grille enrichie B2B) */}
               <div className="mt-2">
                 <label className="block text-sm font-bold text-navy mb-4 border-b border-border pb-2">
                   Nature de vos besoins
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  {needsList.map((need, idx) => (
+                  {CONTACT_NEEDS_LIST.map((need, idx) => (
                     <label 
                       key={idx} 
-                      className={`flex items-center gap-3 cursor-pointer group p-2 rounded-lg transition-colors border ${
+                      className={`flex items-center gap-3 cursor-pointer group p-2.5 rounded-lg transition-colors border ${
                         selectedNeeds.includes(need) 
-                          ? "bg-gold/5 border-gold/30 text-navy" 
-                          : "border-transparent hover:bg-background-secondary"
+                          ? "bg-gold/10 border-gold/40 text-navy font-semibold" 
+                          : "border-transparent hover:bg-background-secondary text-foreground"
                       }`}
                     >
                       <input 
-                        className="w-4 h-4 border-border text-gold focus:ring-gold/30 rounded" 
+                        className="w-4 h-4 border-border text-gold focus:ring-gold/30 rounded cursor-pointer" 
                         type="checkbox"
                         checked={selectedNeeds.includes(need)}
                         onChange={() => handleCheckboxChange(need)}
@@ -216,6 +225,16 @@ function ContactFormContent() {
                     </label>
                   ))}
                 </div>
+
+                {/* Aide contextuelle Option B pour l'option Autre */}
+                {selectedNeeds.includes("Autre") && (
+                  <div className="mt-4 p-3.5 rounded-xl bg-gold/5 border border-gold/20 flex items-start gap-3 animate-in fade-in duration-200">
+                    <HelpCircle className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+                    <p className="text-xs text-navy leading-relaxed">
+                      Vous avez sélectionné l&apos;option <strong>Autre</strong> : veuillez détailler votre attente ou votre projet spécifique dans le champ <em>Message complémentaire</em> ci-dessous.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Nom complet */}

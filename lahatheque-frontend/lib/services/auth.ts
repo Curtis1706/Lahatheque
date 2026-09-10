@@ -97,23 +97,52 @@ export async function registerUser(
       body = JSON.stringify(payload);
     }
 
-    const res = await fetch('/api/bff/auth/register/', {
-      method: 'POST',
-      headers,
-      body,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+    let res: Response;
+    let endpointUsed = '/api/bff/auth/register';
+
+    try {
+      res = await fetch('/api/bff/auth/register', {
+        method: 'POST',
+        headers,
+        body,
+        signal: controller.signal,
+      });
+    } catch (fetchErr: any) {
+      if (fetchErr?.name === 'AbortError') {
+        clearTimeout(timeoutId);
+        throw new Error("Le serveur met trop de temps à répondre (timeout 35s). Veuillez réessayer.");
+      }
+      // Tentative de secours sur /api/auth/register si sans avatar (JSON direct)
+      if (!avatarFile) {
+        endpointUsed = '/api/auth/register';
+        console.warn(`[AUTH REGISTER FALLBACK] Basculement vers ${endpointUsed} suite à:`, fetchErr);
+        res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } else {
+        throw fetchErr;
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const data = await res.json().catch(() => ({}));
     const elapsed = Date.now() - startTime;
 
     if (!res.ok) {
       const errorMsg = extractAuthErrorMessage(data);
-      console.error(`[AUTH REGISTER FAILED] HTTP ${res.status} après ${elapsed}ms:`, { errorMsg, data });
+      console.error(`[AUTH REGISTER FAILED] HTTP ${res.status} via ${endpointUsed} après ${elapsed}ms:`, { errorMsg, data });
       console.groupEnd();
       return { success: false, error: errorMsg };
     }
 
-    console.log(`[AUTH REGISTER SUCCESS] Inscription réussie en ${elapsed}ms:`, data);
+    console.log(`[AUTH REGISTER SUCCESS] Inscription réussie via ${endpointUsed} en ${elapsed}ms:`, data);
     console.groupEnd();
     return {
       success: true,
@@ -123,7 +152,13 @@ export async function registerUser(
     const elapsed = Date.now() - startTime;
     console.error(`[AUTH REGISTER ERROR] Exception réseau après ${elapsed}ms:`, err);
     console.groupEnd();
-    return { success: false, error: 'Impossible de joindre le serveur. Vérifiez votre connexion Internet.' };
+    const isTimeout = err?.message?.includes('timeout') || err?.name === 'AbortError';
+    return { 
+      success: false, 
+      error: isTimeout 
+        ? "Le serveur met trop de temps à répondre. Vérifiez votre connexion et réessayez." 
+        : (err?.message || "Impossible de joindre le serveur. Vérifiez votre connexion Internet.") 
+    };
   }
 }
 
@@ -262,18 +297,27 @@ export async function requestOTP(
   channel: 'email' | 'sms' = 'email'
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const res = await fetch('/api/bff/auth/otp/request/', {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const res = await fetch('/api/bff/auth/otp/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, channel }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       return { success: false, error: extractAuthErrorMessage(data) };
     }
     return { success: true, message: data.message || 'Code envoyé avec succès.' };
-  } catch {
-    return { success: false, error: 'Erreur réseau lors de la demande de code OTP.' };
+  } catch (err: any) {
+    return { 
+      success: false, 
+      error: err?.name === 'AbortError' 
+        ? "Délai d'attente dépassé pour l'envoi de l'OTP. Réessayez." 
+        : 'Erreur réseau lors de la demande de code OTP.' 
+    };
   }
 }
 
@@ -282,18 +326,42 @@ export async function verifyOTP(
   code: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    const res = await fetch('/api/bff/auth/otp/verify/', {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const res = await fetch('/api/bff/auth/otp/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, code }),
       credentials: 'include',
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       return { success: false, error: extractAuthErrorMessage(data) };
     }
+
+    // Établissement automatique de la session HttpOnly et des cookies UI
+    const tokens = data?.data?.tokens || data?.tokens;
+    if (tokens?.access) {
+      try {
+        await fetch('/api/auth/session', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access: tokens.access, refresh: tokens.refresh }),
+        });
+      } catch (sessionErr) {
+        console.warn('[AUTH verifyOTP] Échec établissement session HttpOnly:', sessionErr);
+      }
+    }
+
     return { success: true, data: data.data || data };
-  } catch {
-    return { success: false, error: 'Erreur réseau lors de la vérification du code OTP.' };
+  } catch (err: any) {
+    return { 
+      success: false, 
+      error: err?.name === 'AbortError' 
+        ? "Délai d'attente dépassé pour la vérification du code. Réessayez." 
+        : 'Erreur réseau lors de la vérification du code OTP.' 
+    };
   }
 }
