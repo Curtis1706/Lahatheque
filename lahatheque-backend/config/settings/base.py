@@ -311,7 +311,6 @@ EMAIL_DOMAIN = config('EMAIL_DOMAIN', default='mail.lahalex.com')
 EMAIL_ENABLE_FALLBACK = config('EMAIL_ENABLE_FALLBACK', default=True, cast=bool)
 
 # Paramètres SMTP Standard (1 seule boîte mail pro configurée, ex: contact@mail.lahalex.com)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.hostinger.com')
 EMAIL_PORT = config('EMAIL_PORT', default=465, cast=int)
 EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=True, cast=bool)
@@ -323,6 +322,13 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=f"Lahatheque <{EMAIL_HOST_USER}>")
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 SUPPORT_EMAIL_RECIPIENTS = [EMAIL_HOST_USER]
+
+# Backend Django unifié : si EMAIL_PROVIDER est 'resend' et RESEND_API_KEY est défini,
+# tous les envois Django (send_mail, notifications, alertes Celery) passent par l'API REST HTTPS Resend.
+if EMAIL_PROVIDER.lower() == 'resend' and RESEND_API_KEY:
+    EMAIL_BACKEND = 'apps.communications.services.resend_backend.ResendEmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 # ── Internationalisation & Fuseau Horaire ─────────────────────────────────────
 LANGUAGE_CODE = 'fr-fr'
