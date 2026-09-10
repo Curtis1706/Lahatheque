@@ -20,6 +20,7 @@ from .university_views import (
     UniversityProfileView,
     ExportBouquetWordView,
     UniversityBouquetDistributionView,
+    BouquetRelevanceReportView,
 )
 from apps.reporting.admin_views import AdminBouquetOfferingsView
 
@@ -40,6 +41,9 @@ urlpatterns = [
     path('university/bouquets/<str:pk>/distribution/', UniversityBouquetDistributionView.as_view(), name='university-bouquet-distribution'),
     path('university/bouquets/<str:pk>/subscribe/', UniversityBouquetSubscribeView.as_view(), name='university-bouquet-subscribe'),
     path('university/bouquets/<str:pk>/export-word/', ExportBouquetWordView.as_view(), name='university-bouquet-export-word'),
+    path('university/bouquets/<str:bouquet_id>/relevance/', BouquetRelevanceReportView.as_view(), name='university-bouquet-relevance-report'),
+    path('bouquets/<uuid:bouquet_id>/relevance/', BouquetRelevanceReportView.as_view(), name='bouquet-relevance-report'),
+    path('bouquets/<str:bouquet_id>/relevance/', BouquetRelevanceReportView.as_view()),
     path('university/affiliations/', UniversityAffiliationsView.as_view(), name='university-affiliations-list'),
     path('university/affiliations/<str:pk>/', UniversityAffiliationActionView.as_view(), name='university-affiliation-action'),
     path('university/paper-orders/', UniversityPaperOrdersView.as_view(), name='university-paper-orders'),

@@ -27,6 +27,10 @@ import {
 } from "lucide-react";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { RecentAudioWidget } from "@/components/features/student/recent-audio-widget";
+import {
+  getPersonalizedRecommendations,
+  type RecommendedBook,
+} from "@/lib/services/catalog";
 
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
 
@@ -245,6 +249,7 @@ export default function StudentOverviewPage() {
   const [kpis, setKpis] = useState<StudentOverviewKPIs | null>(null);
   const [recentBooks, setRecentBooks] = useState<BookAPI[]>([]);
   const [historyStats, setHistoryStats] = useState<HistoryStatsAPI | null>(null);
+  const [recommendations, setRecommendations] = useState<RecommendedBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -253,14 +258,16 @@ export default function StudentOverviewPage() {
       try {
         setLoading(true);
         setError(null);
-        const [kpisData, booksData, statsData] = await Promise.all([
+        const [kpisData, booksData, statsData, recsData] = await Promise.all([
           getStudentOverview(),
           getStudentBooks(),
           getStudentHistoryStats(),
+          getPersonalizedRecommendations(),
         ]);
         setKpis(kpisData);
         setRecentBooks(booksData.slice(0, 3));
         setHistoryStats(statsData);
+        setRecommendations(recsData);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Erreur de chargement";
         if (msg !== "SESSION_EXPIRED") setError(msg);
@@ -505,6 +512,58 @@ export default function StudentOverviewPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Recommandé pour vous (Bibliothèque Intelligente) ── */}
+      {recommendations.length > 0 && (
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif font-bold text-navy text-lg flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-gold" />
+              Recommandé pour vous
+            </h2>
+            <Link
+              href="/student/catalog"
+              className="text-xs font-semibold text-navy hover:text-gold transition-colors inline-flex items-center gap-1"
+            >
+              Explorer le catalogue
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {recommendations.slice(0, 8).map((book) => (
+              <Link
+                key={book.id}
+                href={`/catalog/reader/${book.id}`}
+                className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center gap-3.5"
+              >
+                <BookCover
+                  book={{
+                    id: book.id,
+                    title: book.title,
+                    cover_url: book.cover_url || undefined,
+                    discipline: book.discipline || undefined,
+                  }}
+                  size="xs"
+                />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <span className="text-[10px] font-bold text-gold uppercase tracking-wider block truncate">
+                    {book.discipline || "Académique"}
+                  </span>
+                  <h3 className="font-serif font-bold text-navy text-xs sm:text-sm leading-tight line-clamp-2 group-hover:text-gold transition-colors">
+                    {book.title}
+                  </h3>
+                  {book.price_digital !== null && book.price_digital !== undefined && (
+                    <p className="text-[11px] font-mono font-semibold text-foreground-muted">
+                      {book.price_digital.toLocaleString("fr-FR")} XOF
+                    </p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

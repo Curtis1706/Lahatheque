@@ -200,3 +200,37 @@ export async function getBookById(id: string): Promise<Book | null> {
   }
   return null;
 }
+
+export interface RecommendedBook {
+  id: string;
+  title: string;
+  discipline: string | null;
+  cover_url: string | null;
+  price_digital: number | null;
+}
+
+/**
+ * Recommandations personnalisées basées sur l'historique réel (zéro appel IA à la demande)
+ */
+export async function getPersonalizedRecommendations(): Promise<RecommendedBook[]> {
+  try {
+    const isServer = typeof window === "undefined";
+    const url = isServer
+      ? `${getBaseApiUrl()}/v1/catalog/recommendations/`
+      : `/api/bff/catalog/recommendations/`;
+
+    const res = await fetch(url, {
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      return json.success && Array.isArray(json.data) ? json.data : [];
+    }
+  } catch (err) {
+    console.error("Erreur récupération recommandations personnalisées:", err);
+  }
+  return [];
+}
+

@@ -12,6 +12,7 @@ from .views import (
     AuthorSearchView,
     CreatorOptionsView,
     PublicInstitutionsListView,
+    PersonalizedRecommendationsView,
 )
 from .stream_views import (
     BookStreamView,
@@ -46,5 +47,7 @@ urlpatterns = [
     path('books/<str:book_id>/stream/status/', BookStreamStatusView.as_view(), name='book-stream-status'),
     path('books/<str:book_id>/sample/', BookSampleStreamView.as_view(), name='book-sample-stream'),
     path('books/<str:book_id>/cover/', BookCoverStreamView.as_view(), name='book-cover-stream'),
+    path('recommendations/', PersonalizedRecommendationsView.as_view(), name='catalog-recommendations'),
+    path('catalog/recommendations/', PersonalizedRecommendationsView.as_view()),
 ] + router.urls
 

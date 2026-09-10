@@ -93,6 +93,32 @@ export async function subscribeUniversityBouquet(bouquetId: string): Promise<boo
   return true;
 }
 
+export interface BouquetRelevanceReport {
+  bouquet_id: string;
+  bouquet_title?: string;
+  total_books: number;
+  matching_books: number;
+  relevance_percent: number;
+  matched_disciplines: string[];
+}
+
+export async function getBouquetRelevanceReport(bouquetId: string): Promise<BouquetRelevanceReport | null> {
+  try {
+    const res = await fetch(`/api/bff/university/bouquets/${bouquetId}/relevance/`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.success ? json.data : null;
+    }
+  } catch (err) {
+    console.error("Erreur récupération rapport de pertinence bouquet:", err);
+  }
+  return null;
+}
+
+
 // ─── Catalogue ───────────────────────────────────────────────────────────────
 
 export async function getUniversityCatalog(): Promise<UniversityBookCatalogItem[]> {

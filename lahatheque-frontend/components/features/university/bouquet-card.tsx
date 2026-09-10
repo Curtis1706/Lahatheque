@@ -14,10 +14,14 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { getInstitutionBouquetMetrics } from "@/lib/services/bouquet-distribution";
-import { toast } from "sonner";
-import { exportBouquetCatalogWord } from "@/lib/services/university";
+import {
+  exportBouquetCatalogWord,
+  getBouquetRelevanceReport,
+  type BouquetRelevanceReport,
+} from "@/lib/services/university";
 import type { UniversityBouquet } from "@/lib/types/university";
 import { InlineLoader } from "@/components/ui/page-loader";
+import { toast } from "sonner";
 
 interface BouquetCardProps {
   bouquet: UniversityBouquet;
@@ -27,6 +31,24 @@ interface BouquetCardProps {
 export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [relevance, setRelevance] = useState<BouquetRelevanceReport | null>(null);
+
+  const isActive = bouquet.is_subscribed ?? (bouquet.status === "active");
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const targetId = bouquet.offering_id || bouquet.id;
+    if (targetId && !isActive) {
+      getBouquetRelevanceReport(targetId)
+        .then((data) => {
+          if (isMounted) setRelevance(data);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [bouquet.id, bouquet.offering_id, isActive]);
 
   const metrics = getInstitutionBouquetMetrics(bouquet);
 
@@ -58,8 +80,6 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
       setExporting(false);
     }
   };
-
-  const isActive = bouquet.is_subscribed ?? (bouquet.status === "active");
 
   return (
     <div className="p-6 rounded-3xl bg-background border border-border flex flex-col justify-between gap-5 hover:border-gold/50 transition-all shadow-xs group">
@@ -185,6 +205,21 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Rapport de Pertinence des Bouquets (Section IA CDC) */}
+        {!isActive && relevance && relevance.total_books > 0 && (
+          <div className="p-3 rounded-xl bg-gold/5 border border-gold/20 space-y-1">
+            <p className="text-sm font-semibold text-navy">
+              {relevance.relevance_percent}% de ce bouquet correspond &agrave; vos disciplines enseign&eacute;es
+            </p>
+            <p className="text-xs text-foreground-muted">
+              {relevance.matching_books} sur {relevance.total_books} ouvrages
+              {relevance.matched_disciplines && relevance.matched_disciplines.length > 0 && (
+                <>, couvrant : {relevance.matched_disciplines.join(", ")}</>
+              )}
+            </p>
           </div>
         )}
       </div>

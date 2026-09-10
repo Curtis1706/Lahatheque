@@ -1080,3 +1080,69 @@ class AdminBouquetsDistributionListView(APIView):
 
         return Response({"success": True, "data": data})
 
+
+class BouquetRelevanceReportView(APIView):
+    """GET /api/v1/partners/university/bouquets/<id>/relevance/ - Rapport de pertinence du bouquet par rapport aux facultés."""
+    permission_classes = [permissions.IsAuthenticated, IsUniversityStaff]
+
+    def get(self, request, bouquet_id):
+        from apps.partners.models import BouquetOffering, Faculty
+
+        institution = get_user_institution(request.user)
+        if not institution:
+            return Response({"success": False, "error": "Aucun établissement rattaché à ce compte."}, status=403)
+
+        bouquet = BouquetOffering.objects.filter(id=bouquet_id).first()
+        if not bouquet:
+            sub = UniversityBouquetSubscription.objects.filter(id=bouquet_id).first()
+            if sub and sub.offering_id:
+                bouquet = BouquetOffering.objects.filter(id=sub.offering_id).first()
+
+        if not bouquet:
+            return Response({"success": False, "error": "Bouquet introuvable."}, status=404)
+
+        university_disciplines = set()
+        for faculty in Faculty.objects.filter(institution=institution):
+            for d in (faculty.disciplines or []):
+                if isinstance(d, str):
+                    university_disciplines.add(d.strip().lower())
+
+        books = list(bouquet.get_books_queryset(requesting_institution=institution).select_related('discipline'))
+        total_books = len(books)
+
+        if total_books == 0:
+            return Response({
+                "success": True,
+                "data": {
+                    "bouquet_id": str(bouquet.id),
+                    "bouquet_title": bouquet.title,
+                    "total_books": 0,
+                    "matching_books": 0,
+                    "relevance_percent": 0.0,
+                    "matched_disciplines": []
+                }
+            })
+
+        matching_books = 0
+        matched_disciplines = set()
+        for book in books:
+            book_discipline = (book.discipline.name.strip().lower() if book.discipline else None)
+            if book_discipline and book_discipline in university_disciplines:
+                matching_books += 1
+                matched_disciplines.add(book.discipline.name)
+
+        relevance_percent = round((matching_books / total_books) * 100, 1)
+
+        return Response({
+            "success": True,
+            "data": {
+                "bouquet_id": str(bouquet.id),
+                "bouquet_title": bouquet.title,
+                "total_books": total_books,
+                "matching_books": matching_books,
+                "relevance_percent": relevance_percent,
+                "matched_disciplines": sorted(matched_disciplines),
+            }
+        })
+
+

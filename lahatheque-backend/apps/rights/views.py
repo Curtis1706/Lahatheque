@@ -1983,20 +1983,6 @@ class LegalRoyaltiesBatchView(APIView):
                     "error": f"Ouvrage introuvable pour l'identifiant '{book_id}'."
                 }, status=404)
 
-        # Cas 2 : Clé de répartition multi-auteurs (doit sommer à 100%)
-        if len(beneficiaires) > 1:
-            total_percent = sum(float(b.get("pourcentage", 0)) for b in beneficiaires)
-            if abs(total_percent - 100.0) > 0.01:
-                return Response({
-                    "success": False,
-                    "error": f"La somme des pourcentages de droits doit être exactement de 100.00% (Somme actuelle : {total_percent:.2f}%)."
-                }, status=400)
-
-            return Response({
-                "success": True,
-                "message": "Clé de répartition multi-auteurs validée et enregistrée à 100.00%."
-            }, status=200)
-
         return Response({"success": False, "error": "Paramètres d'ajustement invalides."}, status=400)
 
 

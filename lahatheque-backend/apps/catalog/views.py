@@ -1631,7 +1631,77 @@ class PublicInstitutionsListView(APIView):
             }
             for i in institutions
         ]
-        return Response({"success": True, "data": data, "error": None})
+        return Response({
+            "success": True,
+            "data": data,
+            "error": None
+        })
+
+
+class PersonalizedRecommendationsView(APIView):
+    """GET /api/v1/catalog/recommendations/ - Recommandations basées sur l'historique réel."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Count
+        from apps.protection.models import TraceAcces
+        from apps.commerce.models import LigneCommande
+        from apps.catalog.models import Ouvrage
+
+        user = request.user
+
+        consulted_disciplines = list(
+            TraceAcces.objects.filter(user=user, ouvrage__isnull=False, ouvrage__discipline__isnull=False)
+            .values('ouvrage__discipline')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+            .values_list('ouvrage__discipline', flat=True)[:5]
+        )
+
+        purchased_disciplines = list(
+            LigneCommande.objects.filter(
+                commande__user=user, commande__statut_paiement='paid', ouvrage__isnull=False, ouvrage__discipline__isnull=False
+            )
+            .values('ouvrage__discipline')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+            .values_list('ouvrage__discipline', flat=True)[:5]
+        )
+
+        dominant_discipline_ids = [d for d in dict.fromkeys(consulted_disciplines + purchased_disciplines) if d is not None][:5]
+
+        already_seen_ids = set(
+            TraceAcces.objects.filter(user=user, ouvrage__isnull=False).values_list('ouvrage_id', flat=True)
+        ) | set(
+            LigneCommande.objects.filter(commande__user=user, ouvrage__isnull=False).values_list('ouvrage_id', flat=True)
+        )
+
+        if dominant_discipline_ids:
+            recommended = Ouvrage.objects.filter(
+                status='published',
+                discipline_id__in=dominant_discipline_ids,
+            ).exclude(id__in=already_seen_ids).select_related('discipline').order_by('-created_at')[:12]
+            reason = "based_on_history"
+            if not recommended.exists():
+                recommended = Ouvrage.objects.filter(
+                    status='published'
+                ).exclude(id__in=already_seen_ids).select_related('discipline').order_by('-created_at')[:12]
+                reason = "no_history_fallback"
+        else:
+            recommended = Ouvrage.objects.filter(
+                status='published'
+            ).exclude(id__in=already_seen_ids).select_related('discipline').order_by('-created_at')[:12]
+            reason = "no_history_fallback"
+
+        data = [{
+            "id": str(o.id),
+            "title": o.title,
+            "discipline": o.discipline.name if o.discipline else None,
+            "cover_url": o.cover_image.url if o.cover_image else None,
+            "price_digital": float(o.price_digital) if o.price_digital else None,
+        } for o in recommended]
+
+        return Response({"success": True, "data": data, "meta": {"reason": reason}})
 
 
 

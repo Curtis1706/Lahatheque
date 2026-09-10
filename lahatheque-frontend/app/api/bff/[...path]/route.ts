@@ -11,8 +11,9 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   const resolvedParams = await params
   const rawSubPath = (resolvedParams.path || []).join('/')
   const cleanSubPath = rawSubPath.replace(/^\/+|\/+$/g, '')
+  const djangoSubPath = cleanSubPath.startsWith('university/') ? `partners/${cleanSubPath}` : cleanSubPath
   const searchParams = request.nextUrl.search || ''
-  const targetUrl = `${DJANGO_API_URL}/v1/${cleanSubPath}/${searchParams}`
+  const targetUrl = `${DJANGO_API_URL}/v1/${djangoSubPath}/${searchParams}`
 
   const headers = new Headers()
   const contentType = request.headers.get('content-type')

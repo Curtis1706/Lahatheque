@@ -558,7 +558,7 @@ function CatalogSearchInner() {
               className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border-b border-border pb-4"
             >
               <div className="space-y-0.5">
-                <p className="text-foreground font-medium">
+                {/* <p className="text-foreground font-medium">
                   {totalCount > 0 ? (
                     <>
                       Affichage de <strong className="text-navy">{startItem}</strong> à{" "}
@@ -568,7 +568,7 @@ function CatalogSearchInner() {
                   ) : (
                     <span className="text-foreground-muted">0 ouvrage disponible</span>
                   )}
-                </p>
+                </p> */}
                 {hasActiveFilters && (
                   <div className="flex items-center gap-2 pt-0.5">
                     <span className="text-[11px] font-semibold text-gold bg-gold/10 px-2 py-0.5 rounded-full border border-gold/30">
