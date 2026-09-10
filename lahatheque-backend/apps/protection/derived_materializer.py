@@ -48,28 +48,17 @@ class DerivedMaterializer:
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     @classmethod
-    def get_or_create_derived(
+    def compute_user_cache_key(
         cls,
-        source_type: str,
         source_reference: str,
         user_info: Dict[str, Any],
-        config: Optional[Any] = None,
-        options: Optional[Dict[str, Any]] = None
-    ) -> Tuple[bytes, int]:
+        config: Optional[Any] = None
+    ) -> str:
         """
-        Récupère le dérivé PDF filigrané depuis le cache chiffré, ou le génère si absent/expiré.
-
-        Args:
-            source_type: 'catalog_book', 'external_url', 'direct_upload', ou 'local_path'.
-            source_reference: Identifiant ou URL du document source.
-            user_info: Métadonnées de l'utilisateur (nom, email, ip, user_id).
-            config: Instance ProtectionConfig, GlobalDrmConfig ou configuration dictionnaire.
-            options: Paramètres optionnels de téléchargement ou téléversement.
-
-        Returns:
-            Tuple[bytes, int]: (Octets clairs du PDF filigrané prêt pour le streaming, taille totale en octets).
+        Calcule de manière centralisée la clé SHA-256 unique du dérivé pour un utilisateur et un document.
+        Garantit une identité stricte de clé entre BookStreamView, BookStreamInitiateView et BookStreamStatusView.
         """
-        from .models import DerivedCacheRegistry, GlobalDrmConfig
+        from .models import GlobalDrmConfig
 
         global_config = config if config is not None else GlobalDrmConfig.get_singleton()
         effective_cfg = global_config
@@ -104,7 +93,7 @@ class DerivedMaterializer:
         except (ValueError, TypeError):
             opacity = 0.50
 
-        cache_key = cls.compute_cache_key(
+        return cls.compute_cache_key(
             source_id=source_reference,
             user_id=user_id,
             config_version=config_version,
@@ -114,6 +103,43 @@ class DerivedMaterializer:
             watermark_position=position,
             watermark_opacity=opacity,
             is_partner=is_partner_session
+        )
+
+    @classmethod
+    def get_or_create_derived(
+        cls,
+        source_type: str,
+        source_reference: str,
+        user_info: Dict[str, Any],
+        config: Optional[Any] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Tuple[bytes, int]:
+        """
+        Récupère le dérivé PDF filigrané depuis le cache chiffré, ou le génère si absent/expiré.
+
+        Args:
+            source_type: 'catalog_book', 'external_url', 'direct_upload', ou 'local_path'.
+            source_reference: Identifiant ou URL du document source.
+            user_info: Métadonnées de l'utilisateur (nom, email, ip, user_id).
+            config: Instance ProtectionConfig, GlobalDrmConfig ou configuration dictionnaire.
+            options: Paramètres optionnels de téléchargement ou téléversement.
+
+        Returns:
+            Tuple[bytes, int]: (Octets clairs du PDF filigrané prêt pour le streaming, taille totale en octets).
+        """
+        from .models import DerivedCacheRegistry, GlobalDrmConfig
+
+        global_config = config if config is not None else GlobalDrmConfig.get_singleton()
+        effective_cfg = global_config
+
+        user_id = str(user_info.get("user_id") or "anonymous")
+        config_version = getattr(global_config, "config_version", 1)
+        profil = getattr(global_config, "profil_default", "standard")
+
+        cache_key = cls.compute_user_cache_key(
+            source_reference=source_reference,
+            user_info=user_info,
+            config=effective_cfg
         )
 
         cache_dir = cls._get_cache_dir()
@@ -128,29 +154,47 @@ class DerivedMaterializer:
         if cached_bytes is not None:
             return cached_bytes, len(cached_bytes)
 
-        # 2. Récupération de la source via l'adaptateur universel
-        raw_source_bytes = DocumentSourceAdapter.get_document_bytes(
-            source_type=source_type,
-            source_reference=source_reference,
-            options=options
-        )
+        # 2. Verrou distribué anti-emballement — même motif que _convert_epub_and_persist
+        lock_key = f"laha:derived_gen:{hashlib.sha256(cache_key.encode()).hexdigest()[:32]}"
+        redis_client = DocumentSourceAdapter._get_redis_client()
 
-        # 3. Application du filigrane PyMuPDF
-        watermarked_bytes = WatermarkEngine.apply_watermark(
-            pdf_bytes=raw_source_bytes,
-            user_info=user_info,
-            config=config
-        )
-
-        # 4. Stockage direct des octets déchiffrés dans Redis
-        try:
-            django_cache.set(
-                redis_cache_key,
-                watermarked_bytes,
-                timeout=int(os.environ.get('DRM_DERIVED_CACHE_TTL_SECONDS', 3600))
+        def _do_generate() -> bytes:
+            raw_source_bytes = DocumentSourceAdapter.get_document_bytes(
+                source_type=source_type,
+                source_reference=source_reference,
+                options=options
             )
-        except Exception as e:
-            logger.error(f"Impossible d'écrire le cache dérivé dans Redis: {e}")
+            watermarked = WatermarkEngine.apply_watermark(
+                pdf_bytes=raw_source_bytes,
+                user_info=user_info,
+                config=config
+            )
+            try:
+                django_cache.set(
+                    redis_cache_key,
+                    watermarked,
+                    timeout=int(os.environ.get('DRM_DERIVED_CACHE_TTL_SECONDS', 3600))
+                )
+            except Exception as e:
+                logger.error(f"Impossible d'écrire le cache dérivé dans Redis: {e}")
+            return watermarked
+
+        if redis_client is None:
+            watermarked_bytes = _do_generate()
+        else:
+            lock = redis_client.lock(lock_key, timeout=120, blocking_timeout=125)
+            acquired = lock.acquire(blocking=True)
+            try:
+                cached_bytes = django_cache.get(redis_cache_key)
+                if cached_bytes is not None:
+                    return cached_bytes, len(cached_bytes)
+                watermarked_bytes = _do_generate()
+            finally:
+                if acquired:
+                    try:
+                        lock.release()
+                    except Exception:
+                        pass
 
         # 5. Enregistrement dans le registre de base de données pour suivi administratif
         now = timezone.now()

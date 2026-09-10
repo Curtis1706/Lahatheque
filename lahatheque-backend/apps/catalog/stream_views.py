@@ -466,3 +466,104 @@ class BookCoverStreamView(APIView):
         return response
 
 
+class BookStreamInitiateView(APIView):
+    """
+    POST /api/v1/catalog/books/<id>/stream/initiate/
+    Déclenche la préparation asynchrone du dérivé en tâche de fond si absent du cache.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, book_id):
+        from rest_framework.response import Response
+        from apps.protection.derived_materializer import DerivedMaterializer
+        from apps.protection.models import GlobalDrmConfig
+        from django.core.cache import cache as django_cache
+
+        requested_lang = request.query_params.get("lang") or request.query_params.get("language")
+
+        access_result = AccessService.check_user_book_access(request.user, book_id, language=requested_lang)
+        if not access_result.get("access_granted"):
+            return JsonResponse({
+                "success": False,
+                "data": {},
+                "error": access_result.get("error", "Accès non autorisé à cet ouvrage.")
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        source_ref = f"{book_id}:{requested_lang}" if requested_lang else str(book_id)
+
+        ip = request.META.get("HTTP_X_FORWARDED_FOR")
+        if ip:
+            ip = ip.split(",")[0].strip()
+        else:
+            ip = request.META.get("REMOTE_ADDR", "127.0.0.1")
+
+        user_info = {
+            "nom": request.user.get_full_name() or request.user.username,
+            "email": request.user.email,
+            "ip": ip,
+            "user_id": str(request.user.id),
+            "device_fingerprint": request.headers.get("X-Device-Fingerprint", ""),
+            "title": "",
+            "id": book_id,
+            "is_partner": False,
+        }
+
+        global_config = GlobalDrmConfig.get_singleton()
+        cache_key = DerivedMaterializer.compute_user_cache_key(
+            source_reference=source_ref,
+            user_info=user_info,
+            config=global_config
+        )
+        redis_cache_key = f"drm_derived:{cache_key}"
+
+        if django_cache.get(redis_cache_key) is not None:
+            return Response({"success": True, "data": {"status": "ready"}})
+
+        from apps.protection.tasks import prepare_derived_document_task
+        try:
+            prepare_derived_document_task.delay("catalog_book", source_ref, user_info, {})
+        except Exception:
+            import threading
+            threading.Thread(
+                target=prepare_derived_document_task,
+                args=("catalog_book", source_ref, user_info, {}),
+                daemon=True
+            ).start()
+
+        return Response({"success": True, "data": {"status": "preparing"}})
+
+
+class BookStreamStatusView(APIView):
+    """
+    GET /api/v1/catalog/books/<id>/stream/status/
+    Interroge le cache pour vérifier si le dérivé est prêt.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, book_id):
+        from rest_framework.response import Response
+        from apps.protection.derived_materializer import DerivedMaterializer
+        from apps.protection.models import GlobalDrmConfig
+        from django.core.cache import cache as django_cache
+
+        requested_lang = request.query_params.get("lang") or request.query_params.get("language")
+        source_ref = f"{book_id}:{requested_lang}" if requested_lang else str(book_id)
+
+        user_info = {
+            "user_id": str(request.user.id),
+            "is_partner": False,
+        }
+
+        global_config = GlobalDrmConfig.get_singleton()
+        cache_key = DerivedMaterializer.compute_user_cache_key(
+            source_reference=source_ref,
+            user_info=user_info,
+            config=global_config
+        )
+        redis_cache_key = f"drm_derived:{cache_key}"
+
+        is_ready = django_cache.get(redis_cache_key) is not None
+        return Response({"success": True, "data": {"status": "ready" if is_ready else "preparing"}})
+
+
+

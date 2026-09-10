@@ -67,6 +67,18 @@ export default function BookDetailPage() {
     };
   }, [id]);
 
+  // Déclenchement de la préparation asynchrone du document dès la consultation de la fiche
+  useEffect(() => {
+    if (book?.id) {
+      const bookLang = book.language || '';
+      const query = bookLang ? `?lang=${encodeURIComponent(bookLang)}` : '';
+      fetch(`/api/bff/catalog/books/${book.id}/stream/initiate/${query}`, {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => {});
+    }
+  }, [book?.id, book?.language]);
+
   if (loading) {
     return (
       <div className="min-h-[70vh] bg-background text-foreground flex flex-col items-center justify-center space-y-4">

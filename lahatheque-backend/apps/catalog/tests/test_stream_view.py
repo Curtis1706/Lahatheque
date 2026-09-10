@@ -140,3 +140,149 @@ class TestBookStreamView:
         )
         assert data2 == watermarked_pdf
         assert size2 == len(watermarked_pdf)
+
+    def test_initiate_and_status_endpoints(self, monkeypatch):
+        """Valide Fiche 3 (endpoints /stream/initiate/ et /stream/status/)."""
+        from apps.protection.derived_materializer import DerivedMaterializer
+        from apps.protection.source_adapter import DocumentSourceAdapter
+        from apps.protection.watermark import WatermarkEngine
+        from django.core.cache import cache
+
+        cache.clear()
+        self.user.is_staff = True
+        self.user.save()
+        self.client.force_authenticate(user=self.user)
+
+        raw_pdf = b"%PDF-1.4 raw bytes"
+        watermarked_pdf = b"%PDF-1.4 prepared bytes"
+        monkeypatch.setattr(DocumentSourceAdapter, "get_document_bytes", lambda **kwargs: raw_pdf)
+        monkeypatch.setattr(WatermarkEngine, "apply_watermark", lambda **kwargs: watermarked_pdf)
+
+        initiate_url = reverse("catalog:book-stream-initiate", kwargs={"book_id": str(self.ouvrage.id)})
+        status_url = reverse("catalog:book-stream-status", kwargs={"book_id": str(self.ouvrage.id)})
+
+        # 1. Status avant préparation : preparing
+        res_status_1 = self.client.get(status_url)
+        assert res_status_1.status_code == 200
+        assert res_status_1.data["data"]["status"] == "preparing"
+
+        # 2. Appel initiate : déclenche la préparation
+        res_init = self.client.post(initiate_url)
+        assert res_init.status_code == 200
+        assert res_init.data["data"]["status"] in ("preparing", "ready")
+
+        # Simuler dérivé mis en cache
+        user_info = {"user_id": str(self.user.id), "is_partner": False}
+        cache_key = DerivedMaterializer.compute_user_cache_key(
+            source_reference=str(self.ouvrage.id),
+            user_info=user_info
+        )
+        cache.set(f"drm_derived:{cache_key}", watermarked_pdf, timeout=3600)
+
+        # 3. Status après mise en cache : ready
+        res_status_2 = self.client.get(status_url)
+        assert res_status_2.status_code == 200
+        assert res_status_2.data["data"]["status"] == "ready"
+
+        # 4. Initiate si déjà en cache : retourne ready immédiatement
+        res_init_2 = self.client.post(initiate_url)
+        assert res_init_2.status_code == 200
+        assert res_init_2.data["data"]["status"] == "ready"
+
+    def test_compute_user_cache_key_unification(self):
+        """Valide que compute_user_cache_key produit strictement la même clé pour tous les composants."""
+        from apps.protection.derived_materializer import DerivedMaterializer
+        from apps.protection.models import GlobalDrmConfig
+
+        config = GlobalDrmConfig.get_singleton()
+        user_info_stream = {
+            "nom": "User Test",
+            "email": "user@test.bj",
+            "ip": "127.0.0.1",
+            "user_id": str(self.user.id),
+            "device_fingerprint": "fp123",
+            "title": "Test Book",
+            "id": str(self.ouvrage.id),
+            "is_partner": False,
+        }
+        user_info_status = {
+            "user_id": str(self.user.id),
+            "is_partner": False,
+        }
+
+        key_stream = DerivedMaterializer.compute_user_cache_key(str(self.ouvrage.id), user_info_stream, config)
+        key_status = DerivedMaterializer.compute_user_cache_key(str(self.ouvrage.id), user_info_status, config)
+
+        assert key_stream == key_status
+
+    def test_derived_materializer_distributed_lock_anti_stampede(self, monkeypatch):
+        """Prouve que sous le verrou distribué, deux appels concurrents ne génèrent qu'une seule fois."""
+        from apps.protection.derived_materializer import DerivedMaterializer
+        from apps.protection.source_adapter import DocumentSourceAdapter
+        from apps.protection.watermark import WatermarkEngine
+        from apps.protection.models import GlobalDrmConfig, DerivedCacheRegistry
+        from django.core.cache import cache
+        import threading
+        import time
+
+        cache.clear()
+        config = GlobalDrmConfig.get_singleton()
+        monkeypatch.setattr(DerivedCacheRegistry.objects, "update_or_create", lambda **kwargs: (None, True))
+
+        shared_lock = threading.Lock()
+        class MockRedisLock:
+            def acquire(self, blocking=True):
+                return shared_lock.acquire(blocking=blocking)
+            def release(self):
+                shared_lock.release()
+
+        class MockRedisClient:
+            def lock(self, name, timeout=120, blocking_timeout=125):
+                return MockRedisLock()
+
+        monkeypatch.setattr(DocumentSourceAdapter, "_get_redis_client", lambda: MockRedisClient())
+
+        generation_count = 0
+        lock_counter = threading.Lock()
+
+        raw_pdf = b"%PDF-1.4 raw bytes"
+        watermarked_pdf = b"%PDF-1.4 lock test bytes"
+
+        def mock_apply(**kwargs):
+            nonlocal generation_count
+            with lock_counter:
+                generation_count += 1
+            time.sleep(0.05)
+            return watermarked_pdf
+
+        monkeypatch.setattr(DocumentSourceAdapter, "get_document_bytes", lambda **kwargs: raw_pdf)
+        monkeypatch.setattr(WatermarkEngine, "apply_watermark", mock_apply)
+
+        user_info = {"user_id": str(self.user.id), "is_partner": False}
+
+        results = []
+        def call_materializer():
+            res, size = DerivedMaterializer.get_or_create_derived(
+                source_type="catalog_book",
+                source_reference=str(self.ouvrage.id),
+                user_info=user_info,
+                config=config
+            )
+            results.append((res, size))
+
+        t1 = threading.Thread(target=call_materializer)
+        t2 = threading.Thread(target=call_materializer)
+
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert len(results) == 2
+        for res, size in results:
+            assert res == watermarked_pdf
+            assert size == len(watermarked_pdf)
+
+        assert generation_count == 1
+
+

@@ -13,7 +13,13 @@ from .views import (
     CreatorOptionsView,
     PublicInstitutionsListView,
 )
-from .stream_views import BookStreamView, BookSampleStreamView, BookCoverStreamView
+from .stream_views import (
+    BookStreamView,
+    BookStreamInitiateView,
+    BookStreamStatusView,
+    BookSampleStreamView,
+    BookCoverStreamView,
+)
 
 app_name = 'catalog'
 
@@ -36,6 +42,8 @@ urlpatterns = [
     path('authors/search/', AuthorSearchView.as_view(), name='author-search'),
     path('onix/import/', ONIXImportView.as_view(), name='onix-import'),
     path('books/<str:book_id>/stream/', BookStreamView.as_view(), name='book-stream'),
+    path('books/<str:book_id>/stream/initiate/', BookStreamInitiateView.as_view(), name='book-stream-initiate'),
+    path('books/<str:book_id>/stream/status/', BookStreamStatusView.as_view(), name='book-stream-status'),
     path('books/<str:book_id>/sample/', BookSampleStreamView.as_view(), name='book-sample-stream'),
     path('books/<str:book_id>/cover/', BookCoverStreamView.as_view(), name='book-cover-stream'),
 ] + router.urls

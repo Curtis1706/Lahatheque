@@ -247,6 +247,8 @@ export default function DocumentReaderPage() {
   const [isPdfLoading, setIsPdfLoading] = useState(false)
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
   const [drmSettings, setDrmSettings] = useState<any>(null)
+  const [bookLanguageResolved, setBookLanguageResolved] = useState(false)
+  const [preparationLabel, setPreparationLabel] = useState<string>('Préparation de votre salle de lecture')
 
   const {
     isAudioPlaying,
@@ -666,9 +668,43 @@ export default function DocumentReaderPage() {
         const urlLang = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null;
         const initialLang = (urlLang || (data as any)?.language || "fr").toLowerCase();
         const langQuery = initialLang ? `?lang=${encodeURIComponent(initialLang)}` : '';
+        setBookLanguageResolved(true);
+
+        // Attente active et vérification du statut du document préparé (Fiches 1 & 4)
+        const waitForDocumentReady = async (bookId: string, lang: string): Promise<void> => {
+          if (isSampleMode || (data && data.file && !data.file.startsWith('/api/')) || id === 'lesson_pdf') {
+            return;
+          }
+          const maxAttempts = 30;
+          for (let i = 0; i < maxAttempts; i++) {
+            try {
+              const res = await fetch(`/api/bff/catalog/books/${bookId}/stream/status/?lang=${encodeURIComponent(lang)}`, {
+                credentials: "include",
+              });
+              if (res.ok) {
+                const statusJson = await res.json();
+                if (statusJson?.data?.status === "ready") return;
+              }
+            } catch {
+              // Ignore erreur réseau transitoire
+            }
+
+            if (i === 0) {
+              fetch(`/api/bff/catalog/books/${bookId}/stream/initiate/?lang=${encodeURIComponent(lang)}`, {
+                method: "POST",
+                credentials: "include",
+              }).catch(() => {});
+            }
+
+            setPreparationLabel(`Préparation du document sécurisé... (${i + 1}/${maxAttempts})`);
+            await new Promise((r) => setTimeout(r, 1500));
+          }
+        };
+
+        await waitForDocumentReady(id as string, initialLang);
 
         // --- CHARGEMENT PROGRESSIF HAUTE PERFORMANCE (STREAMING HTTP 206) ---
-        // Transmet directement l'URL de streaming au lecteur sans télécharger tout le fichier à l'avance
+        // Transmet directement l'URL de streaming au lecteur une fois le document prêt et la langue déterminée
         const targetStreamUrl = isSampleMode
           ? `/api/bff/catalog/books/${id}/sample/${langQuery}`
           : ((data && data.file && !data.file.startsWith('/api/')) ? data.file : (id === 'lesson_pdf' ? '' : `/api/bff/catalog/books/${id}/stream/${langQuery}`));
@@ -841,10 +877,10 @@ export default function DocumentReaderPage() {
     }
   }
 
-  if (isLoading || !book || isPdfLoading) {
+  if (isLoading || !book || isPdfLoading || !bookLanguageResolved) {
     return (
       <div className="h-screen bg-background flex flex-col items-center justify-center">
-        <PageLoader label={isPdfLoading ? 'Chargement sécurisé du document' : 'Préparation de votre salle de lecture'} />
+        <PageLoader label={isPdfLoading ? 'Chargement sécurisé du document' : (preparationLabel || 'Préparation de votre salle de lecture')} />
       </div>
     )
   }
@@ -897,7 +933,7 @@ export default function DocumentReaderPage() {
     const parsedDrmOpacity = drmSettings?.watermark_opacity != null ? parseFloat(String(drmSettings.watermark_opacity)) : 0.20;
     const safeDrmOpacity = !isNaN(parsedDrmOpacity) ? parsedDrmOpacity : 0.20;
     const currentPosition = drmSettings?.watermark_position || "diagonal";
-    const streamPdfUrl = rawPdfData || (id === 'lesson_pdf' ? book.file : isSampleMode ? `/api/bff/catalog/books/${id}/sample/` : `/api/bff/catalog/books/${id}/stream/`);
+    const streamPdfUrl = rawPdfData || (id === 'lesson_pdf' ? book.file : isSampleMode ? `/api/bff/catalog/books/${id}/sample/` : null);
 
     return (
       <>
@@ -1146,7 +1182,7 @@ export default function DocumentReaderPage() {
             );
           }
 
-          const streamPdfUrl = rawPdfData || (id === 'lesson_pdf' ? book.file : `/api/bff/catalog/books/${id}/stream/`);
+          const streamPdfUrl = rawPdfData || (id === 'lesson_pdf' ? book.file : null);
 
           const parsedDrmOpacity = drmSettings?.watermark_opacity != null ? parseFloat(String(drmSettings.watermark_opacity)) : 0.20;
           const safeDrmOpacity = !isNaN(parsedDrmOpacity) ? parsedDrmOpacity : 0.20;
