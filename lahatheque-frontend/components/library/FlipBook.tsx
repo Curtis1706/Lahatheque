@@ -15,20 +15,6 @@ import { ReaderLanguageSelector } from '@/components/features/reader/reader-lang
 
 // Types
 import { Annotation } from './flipbook/types';
-import { readerPageCache } from '@/lib/services/reader-cache';
-
-// Singleton pour le chargement de PDF.js (évite la réévaluation dynamique à chaque montage)
-let pdfjsPromise: Promise<any> | null = null;
-const getPdfJs = () => {
-  if (!pdfjsPromise) {
-    pdfjsPromise = (async () => {
-      const pdfjs = await import('pdfjs-dist/legacy/build/pdf.js' as any);
-      pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-      return pdfjs;
-    })();
-  }
-  return pdfjsPromise;
-};
 
 const PAGE_RENDER_WINDOW = 4;
 
@@ -385,7 +371,8 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
     const loadPdf = async () => {
       setIsLoading(true);
       try {
-        const pdfjs = await getPdfJs();
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.js' as any);
+        pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
         let pdfSource: any;
         if (typeof fileUrl === 'string') {
@@ -419,11 +406,6 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
 
         const renderPage = async (idx: number): Promise<string> => {
           try {
-            // 1. Consultation prioritaire du cache local IndexedDB (0 ms)
-            const cachedUrl = await readerPageCache.getPageBlobUrl(bookId, currentLanguage || 'default', idx);
-            if (cachedUrl) return cachedUrl;
-
-            // 2. Rastérisation PDF.js si absent du cache
             const page = await pdf.getPage(idx + 1);
             const viewport = page.getViewport({ scale: 1.5 });
             const canvas = document.createElement('canvas');
@@ -433,13 +415,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             canvas.width = viewport.width;
             await page.render({ canvasContext: ctx, viewport }).promise;
             page.cleanup();
-
-            const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.88));
-            if (!blob) return '';
-
-            // Sauvegarde asynchrone dans IndexedDB sans bloquer
-            readerPageCache.savePageBlob(bookId, currentLanguage || 'default', idx, blob, viewport.width, viewport.height).catch(() => {});
-            return URL.createObjectURL(blob);
+            return new Promise<string>(res => canvas.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.9));
           } catch (e) {
             console.warn(`[FlipBook] Erreur rendu page ${idx + 1}:`, e);
             return '';
@@ -457,7 +433,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
         // Libération immédiate du chargement pour affichage instantané (< 400ms)
         setIsLoading(false);
 
-        // Préchargement asynchrone des autres pages de la fenêtre initiale en tâche de fond
+        // Préchargement asynchrone des autres pages de la fenêtre initiale
         for (let i = initialWindow.start + 1; i <= initialWindow.end; i++) {
           if (isCancelled) return;
           const url = await renderPage(i);
@@ -473,31 +449,17 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [fileUrl, bookId, hideQuiz, isSample, currentLanguage]);
+  }, [fileUrl, bookId, hideQuiz, isSample]);
 
   // ── Lazy load nearby pages ──
   useEffect(() => {
     if (!numPages || pages.length === 0 || !pdfInstance.current) return;
-    let isCancelled = false;
-
     const load = async () => {
       const { start, end } = getPageRenderWindow(currentPage, numPages);
       for (let i = start; i <= end; i++) {
-        if (isCancelled) return;
         if (pages[i] || renderingIndices.current.has(i)) continue;
         try {
           renderingIndices.current.add(i);
-
-          // 1. Consultation préalable du cache IndexedDB
-          const cachedUrl = await readerPageCache.getPageBlobUrl(bookId, currentLanguage || 'default', i);
-          if (cachedUrl) {
-            if (!isCancelled) {
-              setPages(prev => { if (prev[i]) return prev; const next = [...prev]; next[i] = cachedUrl; return next; });
-            }
-            continue;
-          }
-
-          // 2. Rastérisation PDF.js si non présent
           const page = await pdfInstance.current.getPage(i + 1);
           const viewport = page.getViewport({ scale: 1.5 });
           const canvas = document.createElement('canvas');
@@ -508,14 +470,8 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             await page.render({ canvasContext: ctx, viewport }).promise;
             page.cleanup();
 
-            const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.88));
-            if (blob) {
-              const url = URL.createObjectURL(blob);
-              readerPageCache.savePageBlob(bookId, currentLanguage || 'default', i, blob, viewport.width, viewport.height).catch(() => {});
-              if (!isCancelled) {
-                setPages(prev => { if (prev[i]) return prev; const next = [...prev]; next[i] = url; return next; });
-              }
-            }
+            const url = await new Promise<string>(res => canvas.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.9));
+            setPages(prev => { if (prev[i]) return prev; const next = [...prev]; next[i] = url; return next; });
           }
         } catch (e) {
           console.warn(`[FlipBook] Lazy load error on page ${i + 1}:`, e);
@@ -525,11 +481,7 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
       }
     };
     load();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [currentPage, numPages, pages, bookId, currentLanguage]);
+  }, [currentPage, numPages, pages, bookId]);
 
   const hasTriggeredLastPage = useRef(false);
 
@@ -762,39 +714,32 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
               showPageCorners={false}
               disableFlipByClick={true}
             >
-              {pages.map((pageSrc, i) => {
-                // Fenêtrage DOM : Seules les pages dans la fenêtre active (±4 pages de la page courante) ou la couverture sont montées en image
-                const isWithinWindow = Math.abs(i - currentPage) <= 4 || i === 0 || i === pages.length - 1;
-
-                return (
-                  <Page
-                    key={i}
-                    pageNumber={i + 1}
-                    watermarkPosition={watermarkPosition}
-                    watermarkOpacity={watermarkOpacity}
-                    watermarkLahaText={watermarkLahaText}
-                    watermarkLahaSubtext={watermarkLahaSubtext}
-                    watermarkMode={watermarkMode}
-                    watermarkUser={watermarkUser}
-                  >
-                    {isWithinWindow && pageSrc ? (
-                      <img
-                        src={pageSrc}
-                        alt={`Page ${i + 1}`}
-                        className="w-full h-full object-cover"
-                        loading="eager"
-                        draggable={false}
-                      />
-                    ) : isWithinWindow ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-background space-y-2 text-gold">
-                        <InlineLoader size={24} />
-                      </div>
-                    ) : (
-                      <div className="w-full h-full bg-background select-none" />
-                    )}
-                  </Page>
-                );
-              })}
+              {pages.map((pageSrc, i) => (
+                <Page
+                  key={i}
+                  pageNumber={i + 1}
+                  watermarkPosition={watermarkPosition}
+                  watermarkOpacity={watermarkOpacity}
+                  watermarkLahaText={watermarkLahaText}
+                  watermarkLahaSubtext={watermarkLahaSubtext}
+                  watermarkMode={watermarkMode}
+                  watermarkUser={watermarkUser}
+                >
+                  {pageSrc ? (
+                    <img
+                      src={pageSrc}
+                      alt={`Page ${i + 1}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      draggable={false}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-background space-y-2 text-gold">
+                      <InlineLoader size={24} />
+                    </div>
+                  )}
+                </Page>
+              ))}
             </HTMLFlipBook>
           </div>
 

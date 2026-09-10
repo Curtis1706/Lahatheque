@@ -214,13 +214,11 @@
 3. Fermer et rouvrir le même livre : constater l'ouverture instantanée (0 ms) via le cache local IndexedDB.
 
 ### Implementation for User Story 10
-- [X] T053 [P] [US10] Créer le service de cache local IndexedDB `ReaderPageCache` dans `lahatheque-frontend/lib/services/reader-cache.ts` avec opérations `getPageBlob` / `savePageBlob` indexées par `bookId:lang:page`
-- [X] T054 [US10] Découpler le cycle de chargement dans `lahatheque-frontend/components/library/FlipBook.tsx` : rendu prioritaire immédiat de la page visible initiale, levée de l'overlay "Préparation du livre 3D" sous 400 ms, et délégation du calcul des pages restantes en tâche de fond asynchrone
-- [X] T055 [US10] Implémenter la virtualisation et l'allègement DOM de `HTMLFlipBook` dans `lahatheque-frontend/components/library/FlipBook.tsx` pour ne charger les nœuds graphiques que sur la fenêtre active (page courante ± 2 pages)
-- [X] T056 [P] [US10] Ajouter la mise en cache Redis des métadonnées de structure PDF (`page_count`, `dimensions`, `aspect_ratio`) dans `lahatheque-backend/apps/catalog/stream_views.py` avec TTL de 24h
-- [X] T057 [US10] Valider l'expérience de lecture 3D sur desktop et mobile sans latence ni layout shift
-
-**Checkpoint**: User Story 10 opérationnelle — Ouverture 3D instantanée (< 400 ms), réouverture à 0 ms via IndexedDB et mémoire allégée.
+- [ ] T053 [P] [US10] Créer le service de cache local IndexedDB `ReaderPageCache` dans `lahatheque-frontend/lib/services/reader-cache.ts` avec opérations `getPageBlob` / `savePageBlob` indexées par `bookId:lang:page`
+- [ ] T054 [US10] Découpler le cycle de chargement dans `lahatheque-frontend/components/library/FlipBook.tsx` : rendu prioritaire immédiat de la page visible initiale, levée de l'overlay "Préparation du livre 3D" sous 400 ms, et délégation du calcul des pages restantes en tâche de fond asynchrone
+- [ ] T055 [US10] Implémenter la virtualisation et l'allègement DOM de `HTMLFlipBook` dans `lahatheque-frontend/components/library/FlipBook.tsx` pour ne charger les nœuds graphiques que sur la fenêtre active (page courante ± 2 pages)
+- [ ] T056 [P] [US10] Ajouter la mise en cache Redis des métadonnées de structure PDF (`page_count`, `dimensions`, `aspect_ratio`) dans `lahatheque-backend/apps/catalog/stream_views.py` avec TTL de 24h
+- [ ] T057 [US10] Valider l'expérience de lecture 3D sur desktop et mobile sans latence ni layout shift
 
 ---
 
@@ -228,10 +226,10 @@
 
 **Purpose**: Validation croisée, vérification de non-régression et conformité constitutionnelle
 
-- [X] T058 [P] Mettre à jour la documentation d'API globale dans `DOCUMENTATION_API_LAHATHÈQUE.md`
-- [X] T059 Valider le guide de démarrage rapide [quickstart.md](./quickstart.md) avec un test complet de bout en bout
-- [X] T060 Vérification de l'interdiction stricte des émojis et respect des tokens de couleur sémantiques dans tous les composants modifiés
-- [X] T061 Exécuter la suite complète de tests de non-régression backend (`python manage.py test`)
+- [ ] T058 [P] Mettre à jour la documentation d'API globale dans `DOCUMENTATION_API_LAHATHÈQUE.md`
+- [ ] T059 Valider le guide de démarrage rapide [quickstart.md](./quickstart.md) avec un test complet de bout en bout
+- [ ] T060 Vérification de l'interdiction stricte des émojis et respect des tokens de couleur sémantiques dans tous les composants modifiés
+- [ ] T061 Exécuter la suite complète de tests de non-régression backend (`python manage.py test`)
 
 ---
 

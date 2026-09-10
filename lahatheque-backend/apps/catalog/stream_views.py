@@ -18,11 +18,10 @@ from apps.protection.access_service import AccessService
 from apps.protection.derived_materializer import DerivedMaterializer
 from apps.protection.models import ProtectionConfig, TraceAcces
 
-import logging
-from django.core.cache import cache
-from rest_framework.renderers import BaseRenderer, JSONRenderer
+logger = logging.getLogger(__name__)
 
-PDF_STREAM_META_TTL = 86400  # 24 heures de TTL pour les métadonnées de structure PDF
+
+from rest_framework.renderers import BaseRenderer, JSONRenderer
 
 class PassthroughStreamRenderer(BaseRenderer):
     """Renderer universel autorisant le streaming binaire PDF, audio et vidéo."""
@@ -44,23 +43,6 @@ class BookStreamView(APIView):
 
     # Taille standard d'un bloc de streaming: 256 Kio
     DEFAULT_CHUNK_SIZE = 256 * 1024
-
-    def head(self, request, book_id):
-        """Répond aux requêtes HEAD pour négocier la taille totale et Accept-Ranges via Redis."""
-        requested_lang = request.query_params.get("lang") or request.query_params.get("language")
-        source_ref = f"{book_id}:{requested_lang}" if requested_lang else str(book_id)
-        cache_key = f"laha:stream_meta:{source_ref}"
-        cached_meta = cache.get(cache_key)
-
-        if cached_meta and "total_size" in cached_meta:
-            response = HttpResponse(status=status.HTTP_200_OK, content_type="application/pdf")
-            response["Accept-Ranges"] = "bytes"
-            response["Content-Length"] = str(cached_meta["total_size"])
-            response["Cache-Control"] = "private, no-store, must-revalidate"
-            response["X-Content-Type-Options"] = "nosniff"
-            return response
-
-        return self.get(request, book_id)
 
     def get(self, request, book_id):
         requested_lang = request.query_params.get("lang") or request.query_params.get("language")
@@ -140,8 +122,6 @@ class BookStreamView(APIView):
                 user_info=user_info,
                 config=effective_config
             )
-            # Mise en cache Redis des métadonnées structurelles légères
-            cache.set(f"laha:stream_meta:{source_ref}", {"total_size": total_size}, PDF_STREAM_META_TTL)
         except Exception as e:
             logger.error(f"Erreur matérialisation dérivé ({book_id}): {e}")
             return JsonResponse({
