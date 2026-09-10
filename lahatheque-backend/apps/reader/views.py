@@ -178,6 +178,33 @@ class ReaderSessionViewSet(ViewSet):
         except Exception as wh_err:
             logger.warning(f"Erreur déclenchement webhook session.opened: {wh_err}")
 
+        # 6. Pré-chauffe asynchrone Celery du dérivé filigrané pour les partenaires
+        try:
+            from apps.protection.tasks import prepare_derived_document_task
+
+            ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "127.0.0.1")).split(",")[0].strip()
+            doc_title = session.ouvrage.titre if session.ouvrage else (session.custom_document_title or "Document")
+            prewarm_user_info = {
+                "nom": end_user.display_name or end_user.external_ref,
+                "email": end_user.email or "",
+                "ip": ip,
+                "user_id": f"partner:{partner.id}:{end_user.external_ref}",
+                "title": doc_title,
+                "id": str(session.ouvrage_id) if session.ouvrage_id else str(session.id),
+                "is_partner": True,
+            }
+
+            prewarm_source_ref = None
+            if session.source_type == "catalog_book" and session.ouvrage_id:
+                prewarm_source_ref = f"{session.ouvrage_id}:{req_lang}" if req_lang else str(session.ouvrage_id)
+            elif session.source_type == "external_url" and session.custom_document_url:
+                prewarm_source_ref = session.custom_document_url
+
+            if prewarm_source_ref:
+                prepare_derived_document_task.delay(session.source_type, prewarm_source_ref, prewarm_user_info, {})
+        except Exception as prewarm_err:
+            logger.warning(f"Erreur pré-chauffe Celery pour session {session.id}: {prewarm_err}")
+
         total_pages_val = (
             session.ouvrage.nombre_pages
             if (session.ouvrage and hasattr(session.ouvrage, 'nombre_pages') and session.ouvrage.nombre_pages)

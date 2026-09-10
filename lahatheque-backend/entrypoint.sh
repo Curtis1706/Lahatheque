@@ -3,6 +3,12 @@ set -e
 
 echo "==> [LAHAThèque Backend] Démarrage du conteneur..."
 
+# Si le conteneur est configuré avec le rôle Celery
+if [ "$CONTAINER_ROLE" = "celery" ] || [ "$CELERY_WORKER" = "true" ]; then
+    echo "==> [LAHAThèque Backend] Lancement du Celery Worker + Beat..."
+    exec celery -A config worker -B -l info --concurrency=2
+fi
+
 # Si la commande principale est gunicorn ou le serveur web, on applique les migrations et collectstatic
 if [ "$1" = "gunicorn" ] || [ "$1" = "web" ]; then
     echo "==> Application des migrations Django..."

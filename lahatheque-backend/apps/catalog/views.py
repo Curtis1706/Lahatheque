@@ -202,7 +202,9 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """Liste paginée avec cache côté serveur (5 min) pour un affichage instantané."""
-        cache_key = _catalog_cache_key('public_list', dict(request.query_params))
+        is_auth = bool(request.user and request.user.is_authenticated)
+        prefix = f"user_{request.user.id}" if is_auth else "public_anon"
+        cache_key = _catalog_cache_key(prefix, dict(request.query_params))
         try:
             cached = cache.get(cache_key)
             if cached is not None:

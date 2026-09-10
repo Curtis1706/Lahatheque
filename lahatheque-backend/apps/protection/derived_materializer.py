@@ -173,7 +173,7 @@ class DerivedMaterializer:
                 django_cache.set(
                     redis_cache_key,
                     watermarked,
-                    timeout=int(os.environ.get('DRM_DERIVED_CACHE_TTL_SECONDS', 3600))
+                    timeout=int(os.environ.get('DRM_DERIVED_CACHE_TTL_SECONDS', 7200))
                 )
             except Exception as e:
                 logger.error(f"Impossible d'écrire le cache dérivé dans Redis: {e}")

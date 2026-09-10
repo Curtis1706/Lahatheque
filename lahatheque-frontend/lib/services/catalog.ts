@@ -100,7 +100,7 @@ export async function searchCatalogBooks(filters: SearchFilters): Promise<Pagina
 
     const res = await fetch(url, {
       credentials: "include",
-      cache: "no-store",
+      ...(isServer ? { next: { revalidate: 60 } } : { cache: "no-store" }),
     });
 
     if (res.ok) {
