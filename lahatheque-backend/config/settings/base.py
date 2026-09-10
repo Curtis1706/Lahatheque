@@ -338,11 +338,11 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
-CELERY_BROKER_CONNECTION_TIMEOUT = 1.0  # Max 1s de connexion au broker
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = False
+CELERY_BROKER_CONNECTION_TIMEOUT = 10.0  # 10s pour autoriser la résolution DNS et l'établissement réseau
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BROKER_TRANSPORT_OPTIONS = {
-    'socket_timeout': 1.0,
-    'socket_connect_timeout': 1.0,
+    'socket_timeout': 10.0,
+    'socket_connect_timeout': 10.0,
     'visibility_timeout': 3600,
 }
 
@@ -353,11 +353,25 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # entre cache applicatif et broker/backend de tâches.
 _redis_cache_url = REDIS_URL.rsplit('/', 1)[0] + '/2' if '/' in REDIS_URL.rsplit('://', 1)[-1] else REDIS_URL + '/2'
 
+try:
+    import django_redis  # noqa: F401
+    _cache_backend = 'django_redis.cache.RedisCache'
+    _cache_options = {
+        'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        'IGNORE_EXCEPTIONS': True,
+        'SOCKET_CONNECT_TIMEOUT': 3,
+        'SOCKET_TIMEOUT': 3,
+    }
+except ImportError:
+    _cache_backend = 'django.core.cache.backends.redis.RedisCache'
+    _cache_options = {}
+
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'BACKEND': _cache_backend,
         'LOCATION': _redis_cache_url,
         'TIMEOUT': 300,
+        'OPTIONS': _cache_options,
         'KEY_PREFIX': 'lahatheque',
     }
 }
