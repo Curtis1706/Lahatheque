@@ -37,20 +37,27 @@ class MockPaymentProvider(PaymentProvider):
 
 class MonerooPaymentProvider(PaymentProvider):
     def initiate_payment(self, amount, currency, description, customer_email, customer_name, return_url, metadata=None):
+        from .moneroo_client import client
         try:
-            from .moneroo_client import client
             res = client.initialize_payment(amount, currency, description, customer_email, customer_name, return_url, metadata)
-            return {
-                'checkout_url': res.get('checkout_url'),
-                'payment_id': res.get('moneroo_id'),
-                'status': 'pending',
-                'provider': 'moneroo'
-            }
         except Exception as err:
-            logger.warning(f"[MonerooPaymentProvider] Erreur Moneroo API ({err}) — bascule sur MockPaymentProvider pour les tests.")
-            return MockPaymentProvider().initiate_payment(
-                amount, currency, description, customer_email, customer_name, return_url, metadata
-            )
+            logger.error(f"[MonerooPaymentProvider] Échec réel de l'appel à l'API Moneroo: {err}")
+            raise
+
+        moneroo_id = res.get('moneroo_id') or res.get('id') or res.get('data', {}).get('id')
+        checkout_url = res.get('checkout_url') or res.get('data', {}).get('checkout_url')
+
+        if not checkout_url:
+            logger.error(f"[MonerooPaymentProvider] Réponse Moneroo sans checkout_url exploitable: {res}")
+            raise ValueError("Moneroo n'a pas renvoyé d'URL de paiement valide.")
+
+        return {
+            'checkout_url': checkout_url,
+            'payment_id': moneroo_id,
+            'moneroo_id': moneroo_id,
+            'status': 'pending',
+            'provider': 'moneroo'
+        }
 
     def get_status(self, payment_id: str):
         from .moneroo_client import client
@@ -73,11 +80,20 @@ class StripePaymentProvider(PaymentProvider):
 
 def get_payment_provider(provider_type: str = 'mock') -> PaymentProvider:
     from django.conf import settings
-    # En mode DEBUG ou tests locaux, utiliser le MockPaymentProvider
-    if getattr(settings, 'DEBUG', False) or getattr(settings, 'PAYMENT_PROVIDER_TYPE', 'mock') == 'mock':
+
+    is_debug = getattr(settings, 'DEBUG', False)
+    active_type = getattr(settings, 'PAYMENT_PROVIDER_TYPE', 'mock')
+
+    if not is_debug and active_type == 'mock':
+        logger.critical(
+            "[SÉCURITÉ PAIEMENT] PAYMENT_PROVIDER_TYPE non configuré en production "
+            "(DEBUG=False) — les paiements seraient traités par le fournisseur fictif. "
+            "Vérifier immédiatement la variable d'environnement PAYMENT_PROVIDER_TYPE."
+        )
+
+    if is_debug or active_type == 'mock':
         return MockPaymentProvider()
 
-    active_type = getattr(settings, 'PAYMENT_PROVIDER_TYPE', provider_type)
     if active_type == 'moneroo':
         return MonerooPaymentProvider()
     elif active_type == 'stripe':
