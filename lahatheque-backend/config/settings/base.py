@@ -248,7 +248,12 @@ LCP_SERVER_URL = config('LCP_SERVER_URL', default='http://localhost:8989')
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
 
 # Passerelles de Paiement
+PAYMENT_PROVIDER_TYPE = config('PAYMENT_PROVIDER_TYPE', default='mock')
 MONEROO_API_KEY = config('MONEROO_API_KEY', default='')
+MONEROO_SECRET_KEY = config('MONEROO_SECRET_KEY', default=MONEROO_API_KEY)
+MONEROO_PUBLIC_KEY = config('MONEROO_PUBLIC_KEY', default='')
+MONEROO_API_BASE_URL = config('MONEROO_API_BASE_URL', default='https://api.moneroo.io/v1')
+MONEROO_WEBHOOK_SECRET = config('MONEROO_WEBHOOK_SECRET', default='')
 STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
 

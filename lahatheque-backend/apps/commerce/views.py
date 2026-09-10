@@ -5,6 +5,7 @@ from rest_framework import status
 from apps.accounts.permissions import IsAdminOrSuperAdmin
 from django.db import transaction
 from decimal import Decimal
+import logging
 
 from .models import Currency, Order, LigneCommande, PhysicalDelivery, PaymentTransaction, SubscriptionPlan, Subscription
 from .serializers import OrderSerializer, CreateOrderSerializer, SubscriptionPlanSerializer
@@ -13,6 +14,9 @@ from apps.catalog.models import Ouvrage
 
 from django.conf import settings
 from urllib.parse import urlparse
+
+logger = logging.getLogger('commerce.views')
+
 
 def get_frontend_base_url(request) -> str:
     """Détermine dynamiquement l'URL de base du frontend (lahatheque.com, www.lahatheque.com, localhost)."""
@@ -245,20 +249,32 @@ class CreateOrderView(APIView):
             provider = get_payment_provider(provider_name)
             frontend_base = get_frontend_base_url(request)
             return_url = validated.get('return_url') or f"{frontend_base}/student/orders"
-            payment_res = provider.initiate_payment(
-                amount=total_amount,
-                currency=currency.code,
-                description=f"Commande LAHAThèque #{commande.id}",
-                customer_email=request.user.email,
-                customer_name=f"{request.user.first_name} {request.user.last_name}",
-                return_url=return_url
-            ) or {}
+            try:
+                payment_res = provider.initiate_payment(
+                    amount=total_amount,
+                    currency=currency.code,
+                    description=f"Commande LAHAThèque #{commande.id}",
+                    customer_email=request.user.email,
+                    customer_name=f"{request.user.first_name} {request.user.last_name}",
+                    return_url=return_url
+                ) or {}
+            except Exception as payment_err:
+                logger.error(f"Échec initialisation paiement pour la commande {commande.id}: {payment_err}")
+                try:
+                    commande.delete()
+                except Exception:
+                    pass
+                return Response({
+                    "success": False,
+                    "error": "Impossible d'initialiser le paiement pour le moment. Veuillez réessayer dans quelques instants."
+                }, status=status.HTTP_502_BAD_GATEWAY)
 
             tx = PaymentTransaction.objects.create(
                 user=request.user,
                 amount=total_amount,
                 currency=currency,
-                status=payment_res.get('status', 'pending')
+                status=payment_res.get('status', 'pending'),
+                moneroo_id=payment_res.get('moneroo_id') or payment_res.get('payment_id'),
             )
             commande.payment_transaction = tx
             commande.save(update_fields=['payment_transaction'])
