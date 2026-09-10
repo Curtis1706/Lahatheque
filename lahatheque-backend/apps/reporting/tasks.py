@@ -20,13 +20,14 @@ def _get_platform_config() -> ConfigurationPlateformeGlobale:
 @shared_task(bind=True, max_retries=3)
 def send_email_task(self, recipient_list, subject, html_content, from_email=None):
     """
-    Tâche Celery pour envoyer des emails transactionnels (SMTP Hostinger / Brevo).
+    Tâche Celery pour envoyer des emails transactionnels et alertes système.
+    Passe par la façade EmailService (avec support Resend API et failover SMTP unifié).
     """
     if not recipient_list:
         logger.warning("send_email_task: Liste de destinataires vide.")
         return False
 
-    sender = from_email or getattr(settings, 'DEFAULT_FROM_EMAIL', 'LAHATHEQUE <contact@lahacademia.com>')
+    sender = from_email or getattr(settings, 'DEFAULT_FROM_EMAIL', 'Lahatheque <contact@mail.lahalex.com>')
     success = True
     
     if isinstance(recipient_list, str):
@@ -34,15 +35,24 @@ def send_email_task(self, recipient_list, subject, html_content, from_email=None
         
     for recipient in recipient_list:
         try:
-            msg = EmailMultiAlternatives(
+            from apps.communications.services.email_service import EmailService
+            result = EmailService.send(
+                email_type="system_alert",
+                to_email=recipient,
                 subject=subject,
-                body=html_content,
+                template_name="emails/admin/custom_message.html",
+                context={
+                    "body_text": html_content,
+                    "message_body": html_content,
+                    "custom_subject": subject,
+                },
                 from_email=sender,
-                to=[recipient],
             )
-            msg.attach_alternative(html_content, "text/html")
-            msg.send(fail_silently=False)
-            logger.info(f"Email envoyé avec succès à {recipient}: {subject}")
+            if result.success:
+                logger.info(f"Email envoyé avec succès à {recipient} via {result.provider}: {subject}")
+            else:
+                logger.error(f"Échec de l'envoi d'email à {recipient}: {result.error}")
+                success = False
         except Exception as exc:
             logger.error(f"Erreur lors de l'envoi d'email à {recipient}: {exc}")
             success = False
@@ -56,7 +66,7 @@ def task_scan_and_send_deposit_reminders():
     Scan des dépôts de maquettes en attente ou incomplets depuis plus de N jours.
     """
     config = _get_platform_config()
-    cutoff_date = timezone.now() - timedelta(days=int(config.delai_relance_depots_jours or 7))
+    cutoff_date = timezone.now() - timedelta(days=int(getattr(config, 'delai_relance_depots_jours', 7) or 7))
     results = {"processed": 0, "sent": 0, "errors": 0}
 
     try:
@@ -649,14 +659,20 @@ def check_and_generate_stock_notifications(user=None, force_email=False):
                 f"Cordialement,\n"
                 f"Système Logistique LAHAThèque"
             )
-            sender = getattr(settings, 'DEFAULT_FROM_EMAIL', 'LAHATHEQUE <contact@lahacademia.com>')
+            sender = getattr(settings, 'DEFAULT_FROM_EMAIL', 'Lahatheque <contact@mail.lahalex.com>')
             try:
-                send_mail(
+                from apps.communications.services.email_service import EmailService
+                EmailService.send(
+                    email_type="stock_alert",
+                    to_email=list(set(email_destinataires)),
                     subject=email_subject,
-                    message=email_body,
+                    template_name="emails/admin/custom_message.html",
+                    context={
+                        "body_text": email_body,
+                        "message_body": email_body,
+                        "custom_subject": email_subject,
+                    },
                     from_email=sender,
-                    recipient_list=list(set(email_destinataires)),
-                    fail_silently=True,
                 )
             except Exception as mail_err:
                 logger.warning(f"Erreur envoi email alerte stock: {mail_err}")

@@ -17,6 +17,7 @@
 - Q: Comment adapter l'expérience de la liseuse 3D sur smartphone (< 768px) ? → A: Affichage 1 page (portrait fluide, tactile ≥ 44px) avec gestuelle swipe sur mobile, et double-page 3D immersive sur desktop et tablette.
 - Q: Comment gérer la mémoire vive du navigateur sur les livres volumineux (100+ pages) ? → A: Fenêtre glissante LRU bornée à 10 pages en RAM. Dès qu'une page sort du rayon de consultation (±5 pages de la position courante), sa ressource mémoire est libérée avec `URL.revokeObjectURL(url)`. L'empreinte mémoire reste plafonnée sous 30 Mo quel que soit le nombre de pages (100, 500, 1000).
 - Q: Quelle durée de rétention (TTL) pour le cache Redis sur le serveur ? → A: Expiration automatique (TTL) de 2 heures (7200 secondes) pour les dérivés filigranés dans Redis. Suffisant pour une session de lecture continue sans encombrer la RAM du serveur à long terme.
+- Q: Comment structurer la page d'inscription /register ? → A: Formulaire multi-step en 3 étapes avec stepper horizontal épuré et ligne dorée de progression (Framer Motion) : Étape 1 (Choix Profil Lecteur/Auteur & Avatar optionnel) → Étape 2 (Prénom, Nom & Téléphone avec indicatif pays) → Étape 3 (Email & Mot de passe sécurisé). Conservation stricte de tous les champs existants, design tokens sans hex codé en dur, zéro mock et zéro emoji.
 
 ---
 

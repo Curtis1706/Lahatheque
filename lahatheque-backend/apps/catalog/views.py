@@ -487,6 +487,23 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
             return MaquettisteCatalogListSerializer
         return OuvrageReadSerializer
 
+    @action(detail=False, methods=['post', 'get'], url_path='sync-r2', permission_classes=[permissions.IsAdminUser])
+    def sync_r2(self, request):
+        """
+        Déclenche la synchronisation immédiate des ouvrages R2 en tâche de fond Celery.
+        Accessible via POST ou GET /api/v1/catalog/books/sync-r2/ par un administrateur.
+        """
+        from .tasks import task_sync_r2_multilingual_books
+        task = task_sync_r2_multilingual_books.delay()
+        return Response({
+            "success": True,
+            "data": {
+                "task_id": str(task.id),
+                "message": "Synchronisation R2 déclenchée avec succès en tâche de fond Celery."
+            },
+            "error": None
+        }, status=status.HTTP_202_ACCEPTED)
+
     def create(self, request, *args, **kwargs):
         """Dépôt d'une nouvelle maquette par un maquettiste ou publication directe par le Chef Maquettiste."""
         requested_status = request.data.get('status', 'draft')

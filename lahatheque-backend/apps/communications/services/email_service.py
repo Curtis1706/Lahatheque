@@ -44,7 +44,7 @@ class EmailService:
         primary = primary_provider_name.lower()
         if primary == "resend":
             return SmtpEmailProvider()
-        elif primary == "smtp":
+        elif primary in ("smtp", "hostinger"):
             return ResendEmailProvider()
         return None
 
