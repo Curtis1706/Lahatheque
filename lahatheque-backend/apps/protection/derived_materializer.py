@@ -71,8 +71,8 @@ class DerivedMaterializer:
         """
         from .models import DerivedCacheRegistry, GlobalDrmConfig
 
-        global_config = GlobalDrmConfig.get_singleton()
-        effective_cfg = config or global_config
+        global_config = config if config is not None else GlobalDrmConfig.get_singleton()
+        effective_cfg = global_config
 
         is_partner_session = bool(user_info.get("is_partner", False))
         user_id = str(user_info.get("user_id") or "anonymous")
@@ -119,18 +119,14 @@ class DerivedMaterializer:
         cache_dir = cls._get_cache_dir()
         cache_file_path = os.path.join(cache_dir, f"{cache_key}.enc")
 
-        # 1. Vérification dans le registre et sur le disque
-        now = timezone.now()
-        entry = DerivedCacheRegistry.objects.filter(cache_key=cache_key, expires_at__gt=now).first()
+        # 1. Vérification dans le cache Redis partagé
+        from django.core.cache import cache as django_cache
 
-        if entry and os.path.exists(cache_file_path):
-            try:
-                with open(cache_file_path, "rb") as f:
-                    encrypted_data = f.read()
-                clean_bytes = EncryptionService.decrypt(encrypted_data)
-                return clean_bytes, len(clean_bytes)
-            except Exception as e:
-                logger.warning(f"Erreur lecture cache dérivé ({cache_key}), re-génération: {e}")
+        redis_cache_key = f"drm_derived:{cache_key}"
+
+        cached_bytes = django_cache.get(redis_cache_key)
+        if cached_bytes is not None:
+            return cached_bytes, len(cached_bytes)
 
         # 2. Récupération de la source via l'adaptateur universel
         raw_source_bytes = DocumentSourceAdapter.get_document_bytes(
@@ -146,29 +142,35 @@ class DerivedMaterializer:
             config=config
         )
 
-        # 4. Chiffrement et persistance dans le cache éphémère
-        encrypted_bytes = EncryptionService.encrypt(watermarked_bytes)
+        # 4. Stockage direct des octets déchiffrés dans Redis
         try:
-            with open(cache_file_path, "wb") as f:
-                f.write(encrypted_bytes)
+            django_cache.set(
+                redis_cache_key,
+                watermarked_bytes,
+                timeout=int(os.environ.get('DRM_DERIVED_CACHE_TTL_SECONDS', 3600))
+            )
         except Exception as e:
-            logger.error(f"Impossible d'écrire le cache dérivé sur disque: {e}")
+            logger.error(f"Impossible d'écrire le cache dérivé dans Redis: {e}")
 
-        # 5. Enregistrement dans le registre de base de données
+        # 5. Enregistrement dans le registre de base de données pour suivi administratif
+        now = timezone.now()
         ttl_hours = getattr(settings, "DRM_DERIVED_CACHE_TTL_HOURS", 24)
         expires_at = now + timedelta(hours=ttl_hours)
 
-        DerivedCacheRegistry.objects.update_or_create(
-            cache_key=cache_key,
-            defaults={
-                "source_identifier": source_reference[:255],
-                "user_identifier": user_id[:128],
-                "file_path": cache_file_path,
-                "file_size": len(watermarked_bytes),
-                "config_version": config_version,
-                "profil": profil,
-                "expires_at": expires_at,
-            }
-        )
+        try:
+            DerivedCacheRegistry.objects.update_or_create(
+                cache_key=cache_key,
+                defaults={
+                    "source_identifier": source_reference[:255],
+                    "user_identifier": user_id[:128],
+                    "file_path": cache_file_path,
+                    "file_size": len(watermarked_bytes),
+                    "config_version": config_version,
+                    "profil": profil,
+                    "expires_at": expires_at,
+                }
+            )
+        except Exception as reg_err:
+            logger.warning(f"Erreur enregistrement DerivedCacheRegistry: {reg_err}")
 
         return watermarked_bytes, len(watermarked_bytes)

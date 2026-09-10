@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const DJANGO_API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api').replace(/\/$/, '');
 
 /**
@@ -64,8 +67,7 @@ export async function GET(
       const contentLength = backendRes.headers.get('content-length');
       if (contentLength) responseHeaders.set('Content-Length', contentLength);
 
-      const arrayBuffer = await backendRes.arrayBuffer();
-      return new NextResponse(Buffer.from(arrayBuffer), {
+      return new NextResponse(backendRes.body, {
         status: backendRes.status,
         headers: responseHeaders,
       });

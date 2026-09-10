@@ -47,50 +47,69 @@ class BookStreamView(APIView):
     def get(self, request, book_id):
         requested_lang = request.query_params.get("lang") or request.query_params.get("language")
 
-        # 1. Vérification des droits d'accès utilisateur avec support multilingue
-        access_result = AccessService.check_user_book_access(request.user, book_id, language=requested_lang)
-        if not access_result.get("access_granted"):
-            return JsonResponse({
-                "success": False,
-                "data": {},
-                "error": access_result.get("error", "Accès non autorisé à cet ouvrage.")
-            }, status=status.HTTP_403_FORBIDDEN)
+        # Fiche X2 : Session cache pour éviter de ré-exécuter les vérifications de droits et résolutions à chaque fragment Range 206
+        from django.core.cache import cache as django_cache
 
-        ouvrage = None
-        try:
-            ouvrage = Ouvrage.objects.filter(id=book_id).first()
-        except Exception:
-            # Si book_id n'est pas un UUID valide (ex: slug ou ISBN), tenter une recherche par ISBN
-            ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
+        session_cache_key = f"reader_session:{request.user.id}:{book_id}:{requested_lang or ''}"
+        cached_session = django_cache.get(session_cache_key)
 
         deposit = None
         sub = None
 
-        if not ouvrage:
-            from apps.publishers_portal.models import PublisherBookDeposit
-            try:
-                deposit = PublisherBookDeposit.objects.filter(id=book_id).first()
-            except Exception:
-                deposit = PublisherBookDeposit.objects.filter(isbn_digital=book_id).first()
-
-            if not deposit:
-                from apps.rights.models import AuthorManuscriptSubmission
-                try:
-                    sub = AuthorManuscriptSubmission.objects.filter(id=book_id).first()
-                except Exception:
-                    sub = None
-
-            if not deposit and not sub:
+        if cached_session:
+            access_result = cached_session["access_result"]
+            ouvrage = cached_session["ouvrage"]
+            deposit = cached_session.get("deposit")
+            sub = cached_session.get("sub")
+            effective_config = cached_session["effective_config"]
+        else:
+            # 1. Vérification des droits d'accès utilisateur avec support multilingue
+            access_result = AccessService.check_user_book_access(request.user, book_id, language=requested_lang)
+            if not access_result.get("access_granted"):
                 return JsonResponse({
                     "success": False,
                     "data": {},
-                    "error": "Ouvrage ou document introuvable dans le catalogue."
-                }, status=status.HTTP_404_NOT_FOUND)
+                    "error": access_result.get("error", "Accès non autorisé à cet ouvrage.")
+                }, status=status.HTTP_403_FORBIDDEN)
 
-        # 2. Récupération de la configuration DRM globale de l'administrateur
-        from apps.protection.models import GlobalDrmConfig
-        global_drm = GlobalDrmConfig.get_singleton()
-        effective_config = global_drm
+            try:
+                ouvrage = Ouvrage.objects.filter(id=book_id).first()
+            except Exception:
+                # Si book_id n'est pas un UUID valide (ex: slug ou ISBN), tenter une recherche par ISBN
+                ouvrage = Ouvrage.objects.filter(isbn=book_id).first()
+
+            if not ouvrage:
+                from apps.publishers_portal.models import PublisherBookDeposit
+                try:
+                    deposit = PublisherBookDeposit.objects.filter(id=book_id).first()
+                except Exception:
+                    deposit = PublisherBookDeposit.objects.filter(isbn_digital=book_id).first()
+
+                if not deposit:
+                    from apps.rights.models import AuthorManuscriptSubmission
+                    try:
+                        sub = AuthorManuscriptSubmission.objects.filter(id=book_id).first()
+                    except Exception:
+                        sub = None
+
+                if not deposit and not sub:
+                    return JsonResponse({
+                        "success": False,
+                        "data": {},
+                        "error": "Ouvrage ou document introuvable dans le catalogue."
+                    }, status=status.HTTP_404_NOT_FOUND)
+
+            # 2. Récupération de la configuration DRM globale de l'administrateur
+            from apps.protection.models import GlobalDrmConfig
+            effective_config = GlobalDrmConfig.get_singleton()
+
+            django_cache.set(session_cache_key, {
+                "access_result": access_result,
+                "ouvrage": ouvrage,
+                "deposit": deposit,
+                "sub": sub,
+                "effective_config": effective_config,
+            }, timeout=300)
 
         # 3. Préparation des métadonnées utilisateur
         ip = request.META.get("HTTP_X_FORWARDED_FOR")
@@ -153,32 +172,35 @@ class BookStreamView(APIView):
         chunk_data = pdf_bytes[start_byte : end_byte + 1]
         chunk_length = len(chunk_data)
 
-        # 6. Journalisation légale immuable dans TraceAcces
-        try:
-            bouquet_sub_id = access_result.get("bouquet_subscription_id")
-            institution_obj = None
-            bouquet_sub_obj = None
+        # 6. Journalisation légale immuable dans TraceAcces (Fiche X3: 1 entrée par session de 5 minutes)
+        trace_throttle_key = f"trace_logged:{request.user.id}:{book_id}"
+        if not django_cache.get(trace_throttle_key):
+            try:
+                bouquet_sub_id = access_result.get("bouquet_subscription_id")
+                institution_obj = None
+                bouquet_sub_obj = None
 
-            if bouquet_sub_id:
-                from apps.partners.models import UniversityBouquetSubscription
-                bouquet_sub_obj = UniversityBouquetSubscription.objects.filter(id=bouquet_sub_id).first()
-                if bouquet_sub_obj:
-                    institution_obj = bouquet_sub_obj.institution
+                if bouquet_sub_id:
+                    from apps.partners.models import UniversityBouquetSubscription
+                    bouquet_sub_obj = UniversityBouquetSubscription.objects.filter(id=bouquet_sub_id).first()
+                    if bouquet_sub_obj:
+                        institution_obj = bouquet_sub_obj.institution
 
-            TraceAcces.objects.create(
-                user=request.user,
-                ouvrage=ouvrage,
-                document_title=doc_title,
-                ip_address=ip,
-                country=request.headers.get("CF-IPCountry", ""),
-                user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
-                device_fingerprint=user_info["device_fingerprint"][:255],
-                access_type="read_chunk",
-                institution=institution_obj,
-                bouquet_subscription=bouquet_sub_obj,
-            )
-        except Exception as log_err:
-            logger.warning(f"Erreur enregistrement TraceAcces: {log_err}")
+                TraceAcces.objects.create(
+                    user=request.user,
+                    ouvrage=ouvrage,
+                    document_title=doc_title,
+                    ip_address=ip,
+                    country=request.headers.get("CF-IPCountry", ""),
+                    user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
+                    device_fingerprint=user_info["device_fingerprint"][:255],
+                    access_type="read_chunk",
+                    institution=institution_obj,
+                    bouquet_subscription=bouquet_sub_obj,
+                )
+                django_cache.set(trace_throttle_key, True, timeout=300)
+            except Exception as log_err:
+                logger.warning(f"Erreur enregistrement TraceAcces: {log_err}")
 
         # 7. Réponse HTTP 206 Partial Content avec en-têtes de sécurité
         response = HttpResponse(chunk_data, status=status.HTTP_206_PARTIAL_CONTENT, content_type="application/pdf")
