@@ -355,13 +355,9 @@ _redis_cache_url = REDIS_URL.rsplit('/', 1)[0] + '/2' if '/' in REDIS_URL.rsplit
 
 CACHES = {
     'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
         'LOCATION': _redis_cache_url,
         'TIMEOUT': 300,
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'IGNORE_EXCEPTIONS': True,
-        },
         'KEY_PREFIX': 'lahatheque',
     }
 }
