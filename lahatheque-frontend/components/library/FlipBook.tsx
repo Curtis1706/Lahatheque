@@ -16,7 +16,8 @@ import { ReaderLanguageSelector } from '@/components/features/reader/reader-lang
 // Types
 import { Annotation } from './flipbook/types';
 
-const PAGE_RENDER_WINDOW = 4;
+const PAGE_RENDER_WINDOW = 6;
+const MAX_CACHED_PAGES = 10;
 
 const getPageRenderWindow = (pageIndex: number, totalPages: number) => {
   const maxStart = Math.max(totalPages - PAGE_RENDER_WINDOW, 0);
@@ -307,14 +308,49 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
 
   const pdfInstance       = useRef<any>(null);
   const renderingIndices  = useRef<Set<number>>(new Set());
+  const pageCache         = useRef<Map<number, string>>(new Map());
   const bookRef           = useRef<any>(null);
   const [dimensions, setDimensions] = useState({ width: 450, height: 636 });
+
+  const renderPage = useCallback(async (pdf: any, idx: number): Promise<string> => {
+    if (pageCache.current.has(idx)) {
+      return pageCache.current.get(idx)!;
+    }
+    try {
+      const page = await pdf.getPage(idx + 1);
+      const isSmall = typeof window !== 'undefined' && window.innerWidth < 768;
+      const targetScale = isSmall ? 1.25 : 1.5;
+      const viewport = page.getViewport({ scale: targetScale });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return '';
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      page.cleanup();
+
+      const blobUrl = await new Promise<string>(res =>
+        canvas.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.82)
+      );
+      if (blobUrl) {
+        pageCache.current.set(idx, blobUrl);
+      }
+      return blobUrl;
+    } catch (e) {
+      console.warn(`[FlipBook] Erreur rendu page ${idx + 1}:`, e);
+      return '';
+    }
+  }, []);
+
+  const [isDetectedMobile, setIsDetectedMobile] = useState(false);
+  const effectiveIsMobile = isMobile || isDetectedMobile;
 
   // ── Responsive dimensions ──
   useEffect(() => {
     const update = () => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
+      setIsDetectedMobile(vw < 768);
       
       if (vw < 768) {
         const w = vw - 32;
@@ -404,40 +440,44 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
         setPages(new Array(total).fill(''));
         onDocumentLoadRef.current?.(total);
 
-        const renderPage = async (idx: number): Promise<string> => {
-          try {
-            const page = await pdf.getPage(idx + 1);
-            const viewport = page.getViewport({ scale: 1.5 });
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            if (!ctx) return '';
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            await page.render({ canvasContext: ctx, viewport }).promise;
-            page.cleanup();
-            return new Promise<string>(res => canvas.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.9));
-          } catch (e) {
-            console.warn(`[FlipBook] Erreur rendu page ${idx + 1}:`, e);
-            return '';
-          }
-        };
-
         const initialWindow = getPageRenderWindow(initialPageRef.current, total);
         
-        // Rendu prioritaire de la première page visible
-        const firstPageUrl = await renderPage(initialWindow.start);
+        // Rendu parallèle immédiat des pages de la double-page visible de départ
+        const initialIndices = [initialWindow.start];
+        if (!isMobile && initialWindow.start + 1 <= initialWindow.end) {
+          initialIndices.push(initialWindow.start + 1);
+        }
+
+        const initialUrls = await Promise.all(initialIndices.map(i => renderPage(pdf, i)));
         if (isCancelled) return;
 
-        setPages(prev => { const next = [...prev]; next[initialWindow.start] = firstPageUrl; return next; });
+        setPages(prev => {
+          const next = [...prev];
+          initialIndices.forEach((idx, pos) => {
+            next[idx] = initialUrls[pos];
+          });
+          return next;
+        });
         
-        // Libération immédiate du chargement pour affichage instantané (< 400ms)
+        // Libération instantanée de l'overlay de chargement
         setIsLoading(false);
 
-        // Préchargement asynchrone des autres pages de la fenêtre initiale
-        for (let i = initialWindow.start + 1; i <= initialWindow.end; i++) {
-          if (isCancelled) return;
-          const url = await renderPage(i);
-          setPages(prev => { const next = [...prev]; next[i] = url; return next; });
+        // Préchargement asynchrone non-bloquant des pages adjacentes
+        const remainingIndices: number[] = [];
+        for (let i = initialWindow.start + initialIndices.length; i <= initialWindow.end; i++) {
+          remainingIndices.push(i);
+        }
+        if (remainingIndices.length > 0) {
+          Promise.all(remainingIndices.map(async i => {
+            if (isCancelled) return;
+            const url = await renderPage(pdf, i);
+            setPages(prev => {
+              if (prev[i]) return prev;
+              const next = [...prev];
+              next[i] = url;
+              return next;
+            });
+          })).catch(() => {});
         }
       } catch (err) {
         console.error('[FlipBook] PDF load error:', err);
@@ -449,39 +489,81 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [fileUrl, bookId, hideQuiz, isSample]);
+  }, [fileUrl, bookId, hideQuiz, isSample, isMobile, renderPage]);
 
-  // ── Lazy load nearby pages ──
+  // ── Lazy load nearby pages avec cache et traitement parallèle ──
   useEffect(() => {
     if (!numPages || pages.length === 0 || !pdfInstance.current) return;
     const load = async () => {
       const { start, end } = getPageRenderWindow(currentPage, numPages);
+      const toRender: number[] = [];
       for (let i = start; i <= end; i++) {
-        if (pages[i] || renderingIndices.current.has(i)) continue;
+        if (!pages[i] && !renderingIndices.current.has(i)) {
+          toRender.push(i);
+        }
+      }
+      if (toRender.length === 0) return;
+
+      await Promise.all(toRender.map(async i => {
         try {
           renderingIndices.current.add(i);
-          const page = await pdfInstance.current.getPage(i + 1);
-          const viewport = page.getViewport({ scale: 1.5 });
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          if (ctx) {
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            await page.render({ canvasContext: ctx, viewport }).promise;
-            page.cleanup();
-
-            const url = await new Promise<string>(res => canvas.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.9));
-            setPages(prev => { if (prev[i]) return prev; const next = [...prev]; next[i] = url; return next; });
+          const url = await renderPage(pdfInstance.current, i);
+          if (url) {
+            setPages(prev => {
+              if (prev[i]) return prev;
+              const next = [...prev];
+              next[i] = url;
+              return next;
+            });
           }
-        } catch (e) {
-          console.warn(`[FlipBook] Lazy load error on page ${i + 1}:`, e);
         } finally {
           renderingIndices.current.delete(i);
         }
-      }
+      }));
     };
     load();
-  }, [currentPage, numPages, pages, bookId]);
+  }, [currentPage, numPages, pages, bookId, renderPage]);
+
+  // ── Nettoyage LRU strict de la mémoire vive (plafond < 30 Mo de RAM) ──
+  useEffect(() => {
+    if (!pageCache.current || pageCache.current.size <= MAX_CACHED_PAGES) return;
+    const evictRadius = Math.floor(MAX_CACHED_PAGES / 2);
+    const keysToEvict: number[] = [];
+
+    pageCache.current.forEach((url, pageIdx) => {
+      if (Math.abs(pageIdx - currentPage) > evictRadius) {
+        keysToEvict.push(pageIdx);
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // Ignore
+        }
+      }
+    });
+
+    if (keysToEvict.length > 0) {
+      keysToEvict.forEach(k => pageCache.current.delete(k));
+      setPages(prev => {
+        const next = [...prev];
+        keysToEvict.forEach(k => {
+          next[k] = '';
+        });
+        return next;
+      });
+    }
+  }, [currentPage]);
+
+  // ── Libération totale de tous les Blob URLs à la fermeture de la liseuse ──
+  useEffect(() => {
+    return () => {
+      pageCache.current.forEach(url => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
+      });
+      pageCache.current.clear();
+    };
+  }, []);
 
   const hasTriggeredLastPage = useRef(false);
 
@@ -677,12 +759,12 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             className={cn(
               "absolute z-[600] p-3 rounded-full bg-navy border border-gold/30 text-gold transition-all duration-300 shadow-xl cursor-pointer min-h-[44px] min-w-[44px]",
               "hover:bg-navy hover:scale-110 active:scale-95 disabled:opacity-0 disabled:pointer-events-none",
-              isMobile 
+              effectiveIsMobile 
                 ? "fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 opacity-100" 
                 : "opacity-0 group-hover:opacity-100 -left-20"
             )}
           >
-            <ChevronLeft size={isMobile ? 20 : 28} />
+            <ChevronLeft size={effectiveIsMobile ? 20 : 28} />
           </button>
 
           <div className="relative shadow-2xl rounded-2xl overflow-hidden border border-navy-hover">
@@ -703,14 +785,14 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
               ref={bookRef}
               style={{ backgroundColor: 'transparent' }}
               startPage={effectiveInitialPage}
-              drawShadow={!isMobile}
-              flippingTime={isMobile ? 400 : 700}
-              usePortrait={isMobile}
+              drawShadow={!effectiveIsMobile}
+              flippingTime={effectiveIsMobile ? 400 : 700}
+              usePortrait={effectiveIsMobile}
               startZIndex={0}
               autoSize={true}
               clickEventForward={false}
               useMouseEvents={false}
-              swipeDistance={isMobile ? 30 : 0}
+              swipeDistance={effectiveIsMobile ? 30 : 0}
               showPageCorners={false}
               disableFlipByClick={true}
             >
@@ -750,12 +832,12 @@ export const FlipBookReader: React.FC<FlipBookProps> = ({
             className={cn(
               "absolute z-[600] p-3 rounded-full bg-navy border border-gold/30 text-gold transition-all duration-300 shadow-xl cursor-pointer min-h-[44px] min-w-[44px]",
               "hover:bg-navy hover:scale-110 active:scale-95 disabled:opacity-0 disabled:pointer-events-none",
-              isMobile 
+              effectiveIsMobile 
                 ? "fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 opacity-100" 
                 : "opacity-0 group-hover:opacity-100 -right-20"
             )}
           >
-            <ChevronRight size={isMobile ? 20 : 28} />
+            <ChevronRight size={effectiveIsMobile ? 20 : 28} />
           </button>
         </div>
       </main>

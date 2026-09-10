@@ -1,4 +1,4 @@
-﻿# Feature Specification: Responsivité Mobile Complète des Pages Publiques
+# Feature Specification: Responsivité Mobile Complète des Pages Publiques
 
 **Feature Branch**: `005-public-pages-mobile-responsiveness`
 
@@ -13,6 +13,10 @@
 ### Session 2026-09-10
 
 - Q: Comment gérer les sections animées / composants graphiques complexes (SVG animé `SavoirAfriqueSection`) sur mobile ? → A: Adaptation mobile-first obligatoire. Le diagramme SVG animé bascule vers une version simplifiée empilée verticalement sur mobile (< 768px). Aucune section ne peut être masquée — tout le contenu reste accessible.
+- Q: Quelle stratégie d'accélération adopter pour le mode immersion 3D (liseuse FlipBook) ? → A: Approche hybride : Optimisation immédiate du frontend (rendu parallèle du spread initial via `Promise.all` + compression canvas JPEG 0.8 + cache mémoire client des pages générées) couplée à la pré-chauffe des dérivés filigranés par Celery dans Redis pour les partenaires et utilisateurs internes.
+- Q: Comment adapter l'expérience de la liseuse 3D sur smartphone (< 768px) ? → A: Affichage 1 page (portrait fluide, tactile ≥ 44px) avec gestuelle swipe sur mobile, et double-page 3D immersive sur desktop et tablette.
+- Q: Comment gérer la mémoire vive du navigateur sur les livres volumineux (100+ pages) ? → A: Fenêtre glissante LRU bornée à 10 pages en RAM. Dès qu'une page sort du rayon de consultation (±5 pages de la position courante), sa ressource mémoire est libérée avec `URL.revokeObjectURL(url)`. L'empreinte mémoire reste plafonnée sous 30 Mo quel que soit le nombre de pages (100, 500, 1000).
+- Q: Quelle durée de rétention (TTL) pour le cache Redis sur le serveur ? → A: Expiration automatique (TTL) de 2 heures (7200 secondes) pour les dérivés filigranés dans Redis. Suffisant pour une session de lecture continue sans encombrer la RAM du serveur à long terme.
 
 ---
 
