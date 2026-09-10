@@ -70,6 +70,11 @@ export interface UniversityBookCatalogItem {
   original_language?: string;
   available_languages?: string[];
   is_original?: boolean;
+  has_audio?: boolean;
+  has_audio_version?: boolean;
+  format_type?: string;
+  is_paper_available?: boolean;
+  price_audio?: number | null;
 }
 
 export interface UniversityPaperOrderItem {

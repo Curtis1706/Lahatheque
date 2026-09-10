@@ -6,11 +6,11 @@ logger = logging.getLogger('payments.provider')
 
 class PaymentProvider(ABC):
     @abstractmethod
-    def initiate_payment(self, amount, currency, description, customer_email, customer_name, return_url, metadata=None):
+    def initiate_payment(self, amount, currency, description, customer_email, customer_name, return_url, metadata=None) -> dict:
         pass
 
     @abstractmethod
-    def get_status(self, payment_id: str):
+    def get_status(self, payment_id: str) -> dict | None:
         pass
 
 class MockPaymentProvider(PaymentProvider):
@@ -83,6 +83,14 @@ def get_payment_provider(provider_type: str = 'mock') -> PaymentProvider:
 
     is_debug = getattr(settings, 'DEBUG', False)
     active_type = getattr(settings, 'PAYMENT_PROVIDER_TYPE', 'mock')
+
+    # Si un provider spécifique est expressément demandé (ex: simulateur de test ou stripe)
+    if provider_type == 'mock':
+        return MockPaymentProvider()
+    elif provider_type == 'stripe':
+        return StripePaymentProvider()
+    elif provider_type == 'moneroo':
+        return MonerooPaymentProvider()
 
     if not is_debug and active_type == 'mock':
         logger.critical(

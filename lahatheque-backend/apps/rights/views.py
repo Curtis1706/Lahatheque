@@ -2780,6 +2780,7 @@ class LegalRelancesListView(APIView):
                     phone=client_phone,
                     role='student',
                     is_active=True,
+                    is_verified=True,
                 )
                 user.set_unusable_password()
                 user.save()

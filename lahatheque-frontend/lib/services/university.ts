@@ -168,6 +168,11 @@ export async function getUniversityCatalog(): Promise<UniversityBookCatalogItem[
       cover_url: b.cover_image || b.cover_url || "",
       consultations_count: Number(b.consultations_count || b.total_reads || b.views_count || 0),
       stock_paper_available: Number(b.stock_paper_available || 100),
+      has_audio: Boolean(b.has_audio_version || b.has_audio || b.price_audio || b.format_type === "audio"),
+      has_audio_version: Boolean(b.has_audio_version),
+      format_type: b.format_type || "pdf",
+      is_paper_available: b.is_paper_available !== false,
+      price_audio: Number(b.price_audio) || null,
     };
   });
 }

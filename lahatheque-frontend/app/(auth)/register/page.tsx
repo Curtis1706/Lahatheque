@@ -17,17 +17,21 @@ import {
   AlertCircle,
   Handshake,
   ShieldCheck,
-  Check
+  Check,
+  RotateCcw,
+  MessageSquare,
+  KeyRound,
 } from "lucide-react";
-import { registerUser } from "@/lib/services/auth";
+import { registerUser, requestOTP, verifyOTP } from "@/lib/services/auth";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { OTPInput } from "@/components/ui/otp-input";
 import { cn } from "@/lib/utils";
 
 export default function RegisterPage() {
   const router = useRouter();
 
-  // Étape courante (1: Profil & Avatar, 2: Identité & Téléphone, 3: Email & Mot de passe)
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  // Étape courante (1: Profil & Avatar, 2: Identité & Téléphone, 3: Email & Mot de passe, 4: Vérification OTP)
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Rôles en auto-inscription directe selon Cahier des Charges v3.2 : Lecteur ou Auteur
   const [role, setRole] = useState<"student" | "author">("student");
@@ -45,6 +49,20 @@ export default function RegisterPage() {
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+
+  // États du flux de vérification OTP
+  const [otpCode, setOtpCode] = useState<string[]>(["", "", "", "", "", ""]);
+  const [otpChannel, setOtpChannel] = useState<"email" | "sms">("email");
+  const [resendCooldown, setResendCooldown] = useState<number>(0);
+  const [otpVerifying, setOtpVerifying] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,8 +102,8 @@ export default function RegisterPage() {
 
   const handlePrevStep = () => {
     setError("");
-    if (step > 1) {
-      setStep((prev) => (prev - 1) as 1 | 2 | 3);
+    if (step > 1 && step < 4) {
+      setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4);
     }
   };
 
@@ -106,32 +124,123 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      const cleanPhone = formData.phone && formData.phone.trim() !== "+229" && formData.phone.trim().length > 4
+        ? formData.phone.trim().replace(/\s+/g, '')
+        : undefined;
+
       const res = await registerUser({
         email: formData.email.trim(),
         password: formData.password,
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
-        phone: formData.phone || undefined,
+        phone: cleanPhone,
         country: formData.country,
         role: role
       }, avatarFile);
 
       if (res.success) {
-        setSuccess("Compte créé avec succès ! Redirection en cours...");
+        setSuccess("Compte initialisé ! Un code de vérification vient d'être envoyé par e-mail.");
+        setStep(4);
+        setResendCooldown(60);
+      } else {
+        setError(res.error || "Erreur lors de l'inscription.");
+      }
+    } catch (err: any) {
+      console.error("[REGISTER FORM ERROR]", err);
+      setError("Une erreur inattendue est survenue.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const fullCode = otpCode.join("").trim();
+    if (fullCode.length !== 6) {
+      setError("Veuillez saisir les 6 chiffres du code de vérification.");
+      return;
+    }
+    setError("");
+    setSuccess("");
+    setOtpVerifying(true);
+
+    try {
+      const res = await verifyOTP(formData.email.trim(), fullCode);
+      if (res.success) {
+        setSuccess("Compte validé avec succès ! Accès en cours...");
         setTimeout(() => {
           if (role === "author") {
             router.push("/author");
           } else {
             router.push("/student");
           }
-        }, 1500);
+        }, 1200);
       } else {
-        setError(res.error || "Erreur lors de l'inscription.");
+        setError(res.error || "Code de vérification invalide ou expiré.");
       }
-    } catch {
-      setError("Une erreur inattendue est survenue.");
+    } catch (err) {
+      console.error("[OTP VERIFY ERROR]", err);
+      setError("Erreur réseau lors de la validation du code.");
     } finally {
-      setLoading(false);
+      setOtpVerifying(false);
+    }
+  };
+
+  const handleResendOtp = async (channel: "email" | "sms") => {
+    if (resendCooldown > 0) return;
+    setError("");
+    setSuccess("");
+    setOtpChannel(channel);
+    try {
+      const cleanPhone = formData.phone && formData.phone.trim() !== "+229" && formData.phone.trim().length > 4
+        ? formData.phone.trim().replace(/\s+/g, '')
+        : undefined;
+
+      if (channel === "sms" && !cleanPhone) {
+        setError("Aucun numéro de téléphone valide n'a été fourni lors de l'inscription pour le SMS.");
+        return;
+      }
+
+      const targetIdentifier = (channel === "sms" && cleanPhone) ? cleanPhone : formData.email;
+      const res = await requestOTP(targetIdentifier.trim(), channel);
+      if (res.success) {
+        setSuccess(`Un nouveau code vous a été envoyé par ${channel === "email" ? "e-mail" : "SMS"}.`);
+        setResendCooldown(60);
+      } else {
+        setError(res.error || "Impossible de renvoyer le code.");
+      }
+    } catch (err) {
+      console.error("[OTP RESEND ERROR]", err);
+      setError("Erreur lors du renvoi du code.");
+    }
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) {
+      const digits = value.replace(/\D/g, "").slice(0, 6).split("");
+      if (digits.length > 0) {
+        const next = [...otpCode];
+        digits.forEach((char, idx) => {
+          if (idx < 6) next[idx] = char;
+        });
+        setOtpCode(next);
+        const nextFocus = Math.min(digits.length, 5);
+        document.getElementById(`otp-digit-${nextFocus}`)?.focus();
+        return;
+      }
+    }
+    const digit = value.replace(/\D/g, "");
+    const next = [...otpCode];
+    next[index] = digit;
+    setOtpCode(next);
+    if (digit && index < 5) {
+      document.getElementById(`otp-digit-${index + 1}`)?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otpCode[index] && index > 0) {
+      document.getElementById(`otp-digit-${index - 1}`)?.focus();
     }
   };
 
@@ -139,6 +248,7 @@ export default function RegisterPage() {
     { num: 1, title: "Profil", icon: UserCheck },
     { num: 2, title: "Identité", icon: User },
     { num: 3, title: "Sécurité", icon: ShieldCheck },
+    { num: 4, title: "Vérification", icon: KeyRound },
   ];
 
   return (
@@ -496,6 +606,121 @@ export default function RegisterPage() {
                     {loading ? "Création en cours..." : `Créer mon compte ${role === "author" ? "Auteur" : "Lecteur"}`}
                     <ArrowRight className="w-4 h-4 text-gold" />
                   </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── Étape 4 : Vérification OTP ─────────── */}
+            {step === 4 && (
+              <motion.div
+                key="step4"
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 15 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-5"
+              >
+                <div className="text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-navy/5 border border-gold/20 flex items-center justify-center mx-auto text-navy">
+                    <KeyRound className="w-6 h-6 text-gold" />
+                  </div>
+                  <h2 className="text-lg font-serif font-bold text-navy">
+                    Vérification de Sécurité
+                  </h2>
+                  <p className="text-xs text-foreground-muted max-w-sm mx-auto">
+                    Saisissez le code à 6 chiffres envoyé à <strong className="text-navy">{formData.email}</strong> pour valider votre compte.
+                  </p>
+                </div>
+
+                {/* Sélecteur de canal (Email Resend vs SMS) */}
+                <div className="flex items-center justify-center gap-2 p-1 bg-background-secondary rounded-xl border border-border max-w-xs mx-auto">
+                  <button
+                    type="button"
+                    onClick={() => handleResendOtp("email")}
+                    disabled={resendCooldown > 0}
+                    className={cn(
+                      "flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all min-h-[36px]",
+                      otpChannel === "email"
+                        ? "bg-navy text-white shadow-sm"
+                        : "text-foreground-muted hover:text-navy cursor-pointer"
+                    )}
+                  >
+                    <Mail className="w-3.5 h-3.5 text-gold" />
+                    E-mail
+                  </button>
+                  {formData.phone && formData.phone.trim() !== "+229" && formData.phone.trim().length > 4 && (
+                    <button
+                      type="button"
+                      onClick={() => handleResendOtp("sms")}
+                      disabled={resendCooldown > 0}
+                      className={cn(
+                        "flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all min-h-[36px]",
+                        otpChannel === "sms"
+                          ? "bg-navy text-white shadow-sm"
+                          : "text-foreground-muted hover:text-navy cursor-pointer"
+                      )}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-gold" />
+                      SMS
+                    </button>
+                  )}
+                </div>
+
+                {/* Saisie des 6 chiffres via composant 21st.dev */}
+                <div className="py-2">
+                  <OTPInput
+                    value={otpCode}
+                    onChange={setOtpCode}
+                    onComplete={() => handleVerifyOtp()}
+                    disabled={otpVerifying}
+                    separator={true}
+                  />
+                </div>
+
+                {/* Bouton de validation OTP */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleVerifyOtp()}
+                    disabled={otpVerifying || otpCode.join("").length !== 6}
+                    className="w-full py-3.5 px-4 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs sm:text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px] disabled:opacity-50"
+                  >
+                    {otpVerifying ? "Vérification en cours..." : "Valider mon compte"}
+                    <ArrowRight className="w-4 h-4 text-gold" />
+                  </button>
+                </div>
+
+                {/* Renvoi de code avec décompte */}
+                <div className="text-center pt-1">
+                  {resendCooldown > 0 ? (
+                    <p className="text-xs text-foreground-muted font-mono">
+                      Renvoyer un nouveau code dans <span className="font-bold text-navy">{resendCooldown}s</span>
+                    </p>
+                  ) : (
+                    <div className="flex items-center justify-center gap-3 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => handleResendOtp("email")}
+                        className="text-navy hover:text-gold font-bold underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3 text-gold" />
+                        Renvoyer par e-mail
+                      </button>
+                      {formData.phone && formData.phone.trim() !== "+229" && formData.phone.trim().length > 4 && (
+                        <>
+                          <span className="text-border">•</span>
+                          <button
+                            type="button"
+                            onClick={() => handleResendOtp("sms")}
+                            className="text-navy hover:text-gold font-bold underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <MessageSquare className="w-3 h-3 text-gold" />
+                            Renvoyer par SMS
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

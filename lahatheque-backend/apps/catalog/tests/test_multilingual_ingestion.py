@@ -1,5 +1,6 @@
 """
 Tests unitaires de l'ingestion multilingue et d'idempotence (Option A).
+Valide la qualification linguistique, l'idempotence, la détection différentielle et la protection OpenAI.
 """
 import uuid
 from unittest.mock import MagicMock, patch
@@ -95,3 +96,97 @@ class MultilingualIngestionTestCase(TestCase):
 
         self.assertEqual(Ouvrage.objects.filter(id=uuid.UUID(self.test_uuid)).count(), 1)
         self.assertEqual(OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage).count(), 2)
+
+    def test_analyze_differential_skips_existing_books(self):
+        """
+        Vérifie que l'analyse différentielle ignore les livres déjà présents et complets en base,
+        identifie les nouveaux livres pour l'IA, et gère les nouvelles traductions sans IA.
+        """
+        # 1. Créer un ouvrage existant complet en base avec versions EN et FR
+        existing_uuid = str(uuid.uuid4())
+        ouvrage = Ouvrage.objects.create(
+            id=uuid.UUID(existing_uuid),
+            title="Manuel de Cardiologie",
+            page_count=200,
+            status="published",
+            discipline=self.discipline,
+        )
+        OuvrageLanguageVersion.objects.create(
+            ouvrage=ouvrage,
+            language="en",
+            is_original=True,
+            title="Manuel de Cardiologie",
+            r2_key_pdf=f"books/{existing_uuid}/EN/original.pdf",
+            translation_status="ready",
+        )
+        OuvrageLanguageVersion.objects.create(
+            ouvrage=ouvrage,
+            language="fr",
+            is_original=False,
+            title="Manuel de Cardiologie",
+            r2_key_pdf=f"books/{existing_uuid}/FR/translated.pdf",
+            translation_status="ready",
+        )
+
+        # 2. Créer un ouvrage existant mais qui n'a QUE la version EN (la version FR va arriver sur R2)
+        partial_uuid = str(uuid.uuid4())
+        ouvrage_partial = Ouvrage.objects.create(
+            id=uuid.UUID(partial_uuid),
+            title="Neurologie Clinique",
+            page_count=180,
+            status="published",
+            discipline=self.discipline,
+        )
+        OuvrageLanguageVersion.objects.create(
+            ouvrage=ouvrage_partial,
+            language="en",
+            is_original=True,
+            title="Neurologie Clinique",
+            r2_key_pdf=f"books/{partial_uuid}/EN/original.pdf",
+            translation_status="ready",
+        )
+
+        # 3. Un tout nouvel UUID jamais vu en base
+        new_uuid = str(uuid.uuid4())
+
+        grouped_books = {
+            existing_uuid: {
+                "en_pdf": f"books/{existing_uuid}/EN/original.pdf",
+                "fr_pdf": f"books/{existing_uuid}/FR/translated.pdf",
+            },
+            partial_uuid: {
+                "en_pdf": f"books/{partial_uuid}/EN/original.pdf",
+                "fr_pdf": f"books/{partial_uuid}/FR/translated.pdf",  # NOUVEAU fichier FR !
+            },
+            new_uuid: {
+                "en_pdf": f"books/{new_uuid}/EN/original.pdf",
+            },
+        }
+
+        already_synced, to_sync_translations, to_ingest_new = self.command._analyze_differential(
+            grouped_books=grouped_books,
+            force_reanalyze=False,
+        )
+
+        # Vérifications
+        self.assertIn(existing_uuid, already_synced)
+        self.assertIn(partial_uuid, to_sync_translations)
+        self.assertIn(new_uuid, to_ingest_new)
+
+        # Synchroniser la traduction pour l'ouvrage partiel
+        self.command._sync_translations_for_existing_book(
+            book_uuid_str=partial_uuid,
+            diff_info=to_sync_translations[partial_uuid],
+            dry_run=False,
+        )
+
+        # La version FR doit maintenant être présente en base
+        self.assertTrue(
+            OuvrageLanguageVersion.objects.filter(
+                ouvrage=ouvrage_partial, language="fr"
+            ).exists()
+        )
+        fr_ver = OuvrageLanguageVersion.objects.get(
+            ouvrage=ouvrage_partial, language="fr"
+        )
+        self.assertEqual(fr_ver.r2_key_pdf, f"books/{partial_uuid}/FR/translated.pdf")

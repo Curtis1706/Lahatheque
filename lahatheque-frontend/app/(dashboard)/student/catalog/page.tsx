@@ -32,6 +32,7 @@ import { ViewToggle, type ViewMode } from "@/components/features/student/view-to
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { CATALOG_LANGUAGE_OPTIONS } from "@/lib/constants/catalog-languages";
+import { FormatFilterTabs } from "@/components/features/catalog/format-filter-tabs";
 
 // ─── Skeletons ────────────────────────────────────────────────────────────────
 
@@ -416,6 +417,7 @@ export default function StudentCatalogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState("all");
   const [selectedLanguage, setSelectedLanguage] = useState("all");
+  const [selectedFormat, setSelectedFormat] = useState("all");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
@@ -443,7 +445,7 @@ export default function StudentCatalogPage() {
       const data = await getStudentCatalog(
         debouncedQ || undefined,
         selectedDiscipline !== "all" ? selectedDiscipline : undefined,
-        undefined,
+        selectedFormat !== "all" ? selectedFormat : undefined,
         currentPage,
         pageSize,
         selectedLanguage !== "all" ? selectedLanguage : undefined
@@ -456,7 +458,7 @@ export default function StudentCatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQ, selectedDiscipline, selectedLanguage, currentPage, pageSize]);
+  }, [debouncedQ, selectedDiscipline, selectedFormat, selectedLanguage, currentPage, pageSize]);
 
   useEffect(() => {
     loadCatalog();
@@ -514,6 +516,7 @@ export default function StudentCatalogPage() {
     setSearchQuery("");
     setSelectedDiscipline("all");
     setSelectedLanguage("all");
+    setSelectedFormat("all");
     setCurrentPage(1);
     toast.info("Filtres réinitialisés");
   };
@@ -563,6 +566,17 @@ export default function StudentCatalogPage() {
           {error}
         </div>
       )}
+
+      {/* ── Onglets de Sélection de Format ─────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+        <FormatFilterTabs
+          value={selectedFormat}
+          onChange={(val) => {
+            setSelectedFormat(val);
+            setCurrentPage(1);
+          }}
+        />
+      </div>
 
       {/* ── Barre de Recherche & Combobox Discipline Ergonomique ─────────────── */}
       <div className="p-4 sm:p-5 rounded-3xl bg-background border border-border shadow-xs">
@@ -623,7 +637,7 @@ export default function StudentCatalogPage() {
           </div>
 
           {/* Bouton Réinitialiser si filtre actif */}
-          {(searchQuery || selectedDiscipline !== "all" || selectedLanguage !== "all") && (
+          {(searchQuery || selectedDiscipline !== "all" || selectedLanguage !== "all" || selectedFormat !== "all") && (
             <button
               type="button"
               onClick={handleResetFilters}

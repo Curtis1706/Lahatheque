@@ -32,6 +32,7 @@ import { getWholesalerBooks } from "@/lib/services/wholesaler";
 import type { WholesalerBookItem, WholesalerCartItem } from "@/lib/types/wholesaler";
 import { toast } from "sonner";
 import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
+import { FormatFilterTabs } from "@/components/features/catalog/format-filter-tabs";
 
 export default function WholesalerCatalogPage() {
   const router = useRouter();
@@ -42,6 +43,7 @@ export default function WholesalerCatalogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [languageFilter, setLanguageFilter] = useState("all");
+  const [formatFilter, setFormatFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // Panier grossiste state
@@ -80,6 +82,21 @@ export default function WholesalerCatalogPage() {
     return books.filter((b) => {
       if (disciplineFilter !== "all" && b.discipline !== disciplineFilter) return false;
       if (!matchesLanguageFilter(b, languageFilter)) return false;
+      if (formatFilter !== "all") {
+        if (formatFilter === "audio") {
+          const hasAudio = Boolean(
+            (b as any).has_audio ||
+            (b as any).has_audio_version ||
+            (b as any).price_audio ||
+            (b as any).format_type === "audio"
+          );
+          if (!hasAudio) return false;
+        } else if (formatFilter === "paper") {
+          if ((b as any).is_paper_available === false && !b.isbn_print) return false;
+        } else if (formatFilter === "digital") {
+          if ((b as any).format_type === "audio") return false;
+        }
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = b.title.toLowerCase().includes(q);
@@ -91,7 +108,7 @@ export default function WholesalerCatalogPage() {
       }
       return true;
     });
-  }, [books, searchQuery, disciplineFilter, languageFilter]);
+  }, [books, searchQuery, disciplineFilter, languageFilter, formatFilter]);
 
   const handleAddToCart = (book: WholesalerBookItem) => {
     setCart((prev) => {
@@ -294,6 +311,14 @@ export default function WholesalerCatalogPage() {
         </button>
       </div>
 
+      {/* Onglets de sélection de formats */}
+      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+        <FormatFilterTabs
+          value={formatFilter}
+          onChange={(val) => setFormatFilter(val)}
+        />
+      </div>
+
       {/* Barre de Recherche, Filtre Discipline & Sélecteur Grille / Tableau */}
       <div className="p-4 rounded-3xl bg-background border border-border flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
         {/* Recherche et Filtre par Discipline */}
@@ -349,13 +374,14 @@ export default function WholesalerCatalogPage() {
             </select>
           </div>
 
-          {(disciplineFilter !== "all" || languageFilter !== "all" || searchQuery) && (
+          {(disciplineFilter !== "all" || languageFilter !== "all" || formatFilter !== "all" || searchQuery) && (
             <button
               type="button"
               onClick={() => {
                 setSearchQuery("");
                 setDisciplineFilter("all");
                 setLanguageFilter("all");
+                setFormatFilter("all");
               }}
               className="px-3 py-2 text-xs text-foreground-muted hover:text-error transition-colors flex items-center gap-1 cursor-pointer shrink-0"
               title="Réinitialiser les filtres"

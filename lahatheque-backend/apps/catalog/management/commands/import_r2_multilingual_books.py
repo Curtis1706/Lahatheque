@@ -1,16 +1,19 @@
 """
-Commande Django d'ingestion et de synchronisation des ouvrages multilingues
+Commande Django d'ingestion et de synchronisation différentielle des ouvrages multilingues
 depuis le bucket Cloudflare R2 (laha-books-production).
 
-Fonctionnalites :
-- Analyse de l'arborescence books/<uuid>/
-- Qualification bilingue selon l'Option A (EN/ -> Original, FR/ -> Traduction)
-- Echantillonnage PyMuPDF (15 premieres et 15 dernieres pages)
-- Extraction documentaire IA (titre, sous-titre, auteur, discipline, code Dewey, resume 512 car.)
-- Generation automatique de la couverture WebP (premiere page du PDF original)
-- Creation de l'Ouvrage maitre et des enregistrements OuvrageLanguageVersion
-- Configuration de la redevance par defaut de 5%
-- Traitement resilient non-bloquant avec statut 'draft' en cas d'anomalie
+Fonctionnalites et Optimisations :
+- Analyse DIFFERENTIELLE prealable contre la base de donnees PostgreSQL.
+- Seuls les NOUVEAUX ouvrages (absents de la DB) declenchent l'analyse IA OpenAI (gpt-4o-mini).
+- Les ouvrages deja presents en base sont automatiquement ignores (0 consommation de tokens IA).
+- Si une nouvelle traduction (FR/EN) ou un nouveau fichier arrive pour un livre existant,
+  seul l'enregistrement OuvrageLanguageVersion est mis a jour SANS AUCUN APPEL A L'IA.
+- Qualification bilingue selon l'Option A (EN/ -> Original, FR/ -> Traduction).
+- Echantillonnage PyMuPDF (15 premieres et 15 dernieres pages).
+- Generation automatique de la couverture WebP pour les nouveaux livres.
+- Creation de l'Ouvrage maitre et des enregistrements OuvrageLanguageVersion.
+- Configuration de la redevance par defaut de 5% (RoyaltyRate).
+- Traitement resilient non-bloquant avec logs clairs sans aucun emoji.
 """
 
 import io
@@ -20,7 +23,7 @@ import os
 import re
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import boto3
 from botocore.config import Config
@@ -45,7 +48,10 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Ingere et synchronise les ouvrages bilingues depuis le bucket Cloudflare R2."
+    help = (
+        "Ingere et synchronise les ouvrages bilingues depuis le bucket Cloudflare R2 "
+        "en effectuant une analyse differentielle prealable pour preserver la cle OpenAI."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -65,6 +71,11 @@ class Command(BaseCommand):
             help="Ignore la generation et le televersement de couverture.",
         )
         parser.add_argument(
+            "--force-reanalyze",
+            action="store_true",
+            help="Force la re-analyse IA meme si le livre existe deja en base (a utiliser avec prudence).",
+        )
+        parser.add_argument(
             "--inventory-file",
             type=str,
             default="",
@@ -74,42 +85,21 @@ class Command(BaseCommand):
             "--checkpoint-file",
             type=str,
             default="import_r2_checkpoint.json",
-            help="Fichier de checkpoint pour reprendre l'import apres une coupure (defaut: import_r2_checkpoint.json).",
+            help="Fichier de checkpoint optionnel (defaut: import_r2_checkpoint.json).",
         )
 
     def handle(self, *args, **options):
         limit = options.get("limit")
         dry_run = options.get("dry_run", False)
         skip_cover = options.get("skip_cover", False)
+        force_reanalyze = options.get("force_reanalyze", False)
         inventory_file = options.get("inventory_file", "")
         checkpoint_file = options.get("checkpoint_file", "import_r2_checkpoint.json")
 
-        # --- Chargement du checkpoint (reprise apres coupure) ---
-        checkpoint_path = Path(checkpoint_file)
-        processed_uuids: set = set()
-        if checkpoint_path.exists() and not dry_run:
-            try:
-                with open(checkpoint_path, "r", encoding="utf-8") as f:
-                    processed_uuids = set(json.load(f).get("processed", []))
-                self.stdout.write(
-                    self.style.NOTICE(
-                        f"[Import R2] Reprise depuis checkpoint : {len(processed_uuids)} ouvrages deja traites, ignores."
-                    )
-                )
-            except Exception as e:
-                logger.warning(f"[Import R2] Impossible de lire le checkpoint {checkpoint_path}: {e}")
-
-        def _save_checkpoint():
-            if not dry_run:
-                try:
-                    with open(checkpoint_path, "w", encoding="utf-8") as f:
-                        json.dump({"processed": list(processed_uuids)}, f)
-                except Exception as e:
-                    logger.warning(f"[Import R2] Impossible d'ecrire le checkpoint: {e}")
-
         self.stdout.write(
             self.style.NOTICE(
-                f"[Import R2] Demarrage de l'ingestion multilingue (limit={limit}, dry_run={dry_run})"
+                f"[Import R2] Demarrage de la synchronisation differentielle multilingue "
+                f"(limit={limit}, dry_run={dry_run}, force_reanalyze={force_reanalyze})"
             )
         )
 
@@ -124,62 +114,288 @@ class Command(BaseCommand):
             limit=limit,
         )
 
-        total_to_process = len(grouped_books)
+        total_inventoried = len(grouped_books)
         self.stdout.write(
-            self.style.SUCCESS(
-                f"[Import R2] {total_to_process} ouvrages regroupes a traiter."
+            self.style.NOTICE(
+                f"[Import R2] {total_inventoried} ouvrages detectes dans l'inventaire R2."
             )
         )
 
-        success_count = 0
-        error_count = 0
+        # 2. ANALYSE DIFFERENTIELLE : Comparaison avec l'etat reel en base de donnees
+        already_synced, to_sync_translations, to_ingest_new = self._analyze_differential(
+            grouped_books=grouped_books,
+            force_reanalyze=force_reanalyze,
+        )
 
-        for index, (book_uuid_str, book_data) in enumerate(grouped_books.items(), start=1):
-            # Sauter les ouvrages deja traites (reprise apres coupure)
-            if book_uuid_str in processed_uuids:
-                self.stdout.write(
-                    f"[{index}/{total_to_process}] UUID {book_uuid_str} deja traite, ignore."
+        self.stdout.write("=" * 65)
+        self.stdout.write("[Import R2 ANALYSE DIFFERENTIELLE PREALABLE]")
+        self.stdout.write(f"  - Total ouvrages inventories sur R2         : {total_inventoried}")
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"  - Ouvrages deja en base et a jour (ignores)   : {len(already_synced)} (0 appel IA)"
+            )
+        )
+        self.stdout.write(
+            self.style.WARNING(
+                f"  - Ouvrages avec traductions a synchroniser    : {len(to_sync_translations)} (0 appel IA)"
+            )
+        )
+        self.stdout.write(
+            self.style.NOTICE(
+                f"  - Nouveaux ouvrages a ingerer                 : {len(to_ingest_new)} (Analyse IA requise)"
+            )
+        )
+        self.stdout.write("=" * 65)
+
+        # Si aucun nouveau livre et aucune traduction a matcher, terminer immediatement
+        if not to_sync_translations and not to_ingest_new:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "[Import R2] Catalogue parfaitement synchronise avec la base de donnees. "
+                    "Aucune action requise, aucun token OpenAI consomme."
                 )
-                success_count += 1
+            )
+            return
+
+        # 3. Traitement des nouvelles traductions pour les livres existants (0 APPEL IA)
+        translations_success = 0
+        translations_errors = 0
+        if to_sync_translations:
+            self.stdout.write(
+                self.style.NOTICE(
+                    f"\n[Import R2] Debut de la synchronisation de {len(to_sync_translations)} traductions "
+                    f"pour ouvrages existants (sans appel IA)..."
+                )
+            )
+            for idx, (b_uuid, diff_info) in enumerate(to_sync_translations.items(), start=1):
+                try:
+                    self._sync_translations_for_existing_book(
+                        book_uuid_str=b_uuid,
+                        diff_info=diff_info,
+                        dry_run=dry_run,
+                    )
+                    translations_success += 1
+                except Exception as e:
+                    translations_errors += 1
+                    logger.error(
+                        f"[Import R2 ERREUR] Echec synchro traduction pour {b_uuid}: {e}",
+                        exc_info=True,
+                    )
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"[Import R2 ERREUR] Echec synchro traduction pour {b_uuid}: {e}"
+                        )
+                    )
+
+        # 4. Traitement des NOUVEAUX ouvrages absents de la base (Analyse IA)
+        new_books_success = 0
+        new_books_errors = 0
+        if to_ingest_new:
+            self.stdout.write(
+                self.style.NOTICE(
+                    f"\n[Import R2] Debut de l'ingestion de {len(to_ingest_new)} nouveaux ouvrages..."
+                )
+            )
+            total_new = len(to_ingest_new)
+            for idx, b_uuid in enumerate(to_ingest_new, start=1):
+                b_data = grouped_books[b_uuid]
+                self.stdout.write(
+                    f"\n--- [{idx}/{total_new}] Ingestion nouveau livre UUID: {b_uuid} ---"
+                )
+                try:
+                    self._process_single_book(
+                        book_uuid_str=b_uuid,
+                        book_data=b_data,
+                        s3=s3,
+                        bucket_name=bucket_name,
+                        dry_run=dry_run,
+                        skip_cover=skip_cover,
+                    )
+                    new_books_success += 1
+                except Exception as e:
+                    new_books_errors += 1
+                    logger.error(
+                        f"[Import R2 ERREUR] Echec ingestion pour {b_uuid}: {e}",
+                        exc_info=True,
+                    )
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"[Import R2 ERREUR] Echec pour {b_uuid}: {e}"
+                        )
+                    )
+
+        self.stdout.write("\n" + "=" * 65)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"[Import R2 TERMINE] Resultat de la synchronisation differentielle :\n"
+                f"  - Ouvrages deja a jour ignores          : {len(already_synced)}\n"
+                f"  - Traductions synchronisees (sans IA)   : {translations_success} succes, {translations_errors} erreurs\n"
+                f"  - Nouveaux ouvrages ingeres (avec IA)   : {new_books_success} succes, {new_books_errors} erreurs"
+            )
+        )
+
+    def _analyze_differential(
+        self,
+        grouped_books: Dict[str, Dict[str, Any]],
+        force_reanalyze: bool = False,
+    ) -> Tuple[List[str], Dict[str, Dict[str, Any]], List[str]]:
+        """
+        Compare en une seule passe memoire l'inventaire R2 avec les enregistrements PostgreSQL.
+        Retourne :
+        1. already_synced : liste des UUIDs deja complets et a jour en base.
+        2. to_sync_translations : dict des UUIDs existants ayant une nouvelle langue ou un fichier complete.
+        3. to_ingest_new : liste des UUIDs totalement absents de la base (nouveaux livres).
+        """
+        # 1. Ensemble de tous les UUIDs d'ouvrages presents en base
+        existing_ouvrage_ids: Set[str] = set(
+            str(uid).lower()
+            for uid in Ouvrage.objects.values_list("id", flat=True)
+        )
+
+        # 2. Cartographie des versions linguistiques existantes par ouvrage
+        existing_versions: Dict[str, Dict[str, Dict[str, str]]] = {}
+        for item in OuvrageLanguageVersion.objects.values(
+            "ouvrage_id", "language", "r2_key_pdf", "r2_key_epub"
+        ):
+            b_id = str(item["ouvrage_id"]).lower()
+            if b_id not in existing_versions:
+                existing_versions[b_id] = {}
+            existing_versions[b_id][item["language"]] = {
+                "r2_key_pdf": item["r2_key_pdf"] or "",
+                "r2_key_epub": item["r2_key_epub"] or "",
+            }
+
+        already_synced: List[str] = []
+        to_sync_translations: Dict[str, Dict[str, Any]] = {}
+        to_ingest_new: List[str] = []
+
+        for book_uuid_str, book_data in grouped_books.items():
+            uuid_key = book_uuid_str.lower()
+
+            # Si re-analyse forcee demandee explicitement par l'administrateur
+            if force_reanalyze:
+                to_ingest_new.append(book_uuid_str)
                 continue
 
+            # Cas A : L'ouvrage n'existe pas du tout en base -> Nouveau livre
+            if uuid_key not in existing_ouvrage_ids:
+                to_ingest_new.append(book_uuid_str)
+                continue
+
+            # Cas B : L'ouvrage existe deja en base -> Verifier s'il a de nouveaux fichiers / langues
+            db_versions = existing_versions.get(uuid_key, {})
+            en_pdf = book_data.get("en_pdf") or ""
+            en_epub = book_data.get("en_epub") or ""
+            fr_pdf = book_data.get("fr_pdf") or ""
+            fr_epub = book_data.get("fr_epub") or ""
+
+            has_new_en = False
+            if en_pdf or en_epub:
+                if "en" not in db_versions:
+                    has_new_en = True
+                else:
+                    curr_en = db_versions["en"]
+                    if en_pdf and not curr_en.get("r2_key_pdf"):
+                        has_new_en = True
+                    if en_epub and not curr_en.get("r2_key_epub"):
+                        has_new_en = True
+
+            has_new_fr = False
+            if fr_pdf or fr_epub:
+                if "fr" not in db_versions:
+                    has_new_fr = True
+                else:
+                    curr_fr = db_versions["fr"]
+                    if fr_pdf and not curr_fr.get("r2_key_pdf"):
+                        has_new_fr = True
+                    if fr_epub and not curr_fr.get("r2_key_epub"):
+                        has_new_fr = True
+
+            if has_new_en or has_new_fr:
+                to_sync_translations[book_uuid_str] = {
+                    "has_new_en": has_new_en,
+                    "has_new_fr": has_new_fr,
+                    "book_data": book_data,
+                }
+            else:
+                already_synced.append(book_uuid_str)
+
+        return already_synced, to_sync_translations, to_ingest_new
+
+    def _sync_translations_for_existing_book(
+        self,
+        book_uuid_str: str,
+        diff_info: Dict[str, Any],
+        dry_run: bool = False,
+    ) -> None:
+        """
+        Rattache ou met a jour les versions linguistiques pour un ouvrage deja existant
+        SANS AUCUN APPEL A L'IA OPENAI.
+        """
+        book_uuid = uuid.UUID(book_uuid_str)
+        ouvrage = Ouvrage.objects.filter(id=book_uuid).first()
+        if not ouvrage:
+            return
+
+        book_data = diff_info.get("book_data", {})
+        en_pdf_key = book_data.get("en_pdf") or ""
+        fr_pdf_key = book_data.get("fr_pdf") or ""
+        en_epub_key = book_data.get("en_epub") or ""
+        fr_epub_key = book_data.get("fr_epub") or ""
+
+        if dry_run:
             self.stdout.write(
-                f"\n--- [{index}/{total_to_process}] Traitement de l'ouvrage UUID: {book_uuid_str} ---"
-            )
-            try:
-                self._process_single_book(
-                    book_uuid_str=book_uuid_str,
-                    book_data=book_data,
-                    s3=s3,
-                    bucket_name=bucket_name,
-                    dry_run=dry_run,
-                    skip_cover=skip_cover,
+                self.style.NOTICE(
+                    f"[Import R2 DRY-RUN] Mise a jour des traductions simulee pour '{ouvrage.title}' "
+                    f"(UUID: {book_uuid_str})."
                 )
-                success_count += 1
-                processed_uuids.add(book_uuid_str)
-                _save_checkpoint()  # Ecriture immediate apres chaque succes
-            except Exception as e:
-                error_count += 1
-                logger.error(
-                    f"[Import R2 ERREUR] Echec du traitement pour {book_uuid_str}: {e}",
-                    exc_info=True,
+            )
+            return
+
+        cover_url = getattr(ouvrage, "cover_url", "")
+
+        with transaction.atomic():
+            if diff_info.get("has_new_en") and (en_pdf_key or en_epub_key):
+                OuvrageLanguageVersion.objects.update_or_create(
+                    ouvrage=ouvrage,
+                    language="en",
+                    defaults={
+                        "is_original": True,
+                        "title": ouvrage.title,
+                        "summary": ouvrage.summary,
+                        "r2_key_pdf": en_pdf_key,
+                        "r2_key_epub": en_epub_key,
+                        "cover_url": cover_url,
+                        "page_count": ouvrage.page_count,
+                        "is_paper_available": True,
+                        "paper_stock": 50,
+                        "translation_status": "ready",
+                    },
                 )
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"[Import R2 ERREUR] Echec pour {book_uuid_str}: {e}"
-                    )
+                    f"[Import R2 SYNCHRO] Version [EN] associee a l'ouvrage existant '{ouvrage.title}' (0 appel IA)."
                 )
 
-        self.stdout.write("\n" + "=" * 60)
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"[Import R2 TERMINE] Traitement acheve : {success_count} succes, {error_count} erreurs."
-            )
-        )
-        if checkpoint_path.exists() and not dry_run and error_count == 0:
-            checkpoint_path.unlink(missing_ok=True)
-            self.stdout.write("[Import R2] Checkpoint supprime (run complet reussi).")
-
+            if diff_info.get("has_new_fr") and (fr_pdf_key or fr_epub_key):
+                OuvrageLanguageVersion.objects.update_or_create(
+                    ouvrage=ouvrage,
+                    language="fr",
+                    defaults={
+                        "is_original": False if en_pdf_key else True,
+                        "title": ouvrage.title,
+                        "summary": ouvrage.summary,
+                        "r2_key_pdf": fr_pdf_key,
+                        "r2_key_epub": fr_epub_key,
+                        "cover_url": cover_url,
+                        "page_count": ouvrage.page_count,
+                        "is_paper_available": True,
+                        "paper_stock": 50,
+                        "translation_status": "ready",
+                    },
+                )
+                self.stdout.write(
+                    f"[Import R2 SYNCHRO] Version [FR] associee a l'ouvrage existant '{ouvrage.title}' (0 appel IA)."
+                )
 
     def _collect_books_from_inventory_or_r2(
         self,
@@ -280,7 +496,8 @@ class Command(BaseCommand):
         skip_cover: bool,
     ) -> None:
         """
-        Traite un ouvrage bilingue de maniere atomique et resiliente avec logs d'etapes.
+        Traite un NOUVEL ouvrage de maniere atomique et resiliente avec logs d'etapes.
+        Effectue l'echantillonnage, l'analyse IA OpenAI et la creation de l'Ouvrage maitre.
         """
         book_uuid = uuid.UUID(book_uuid_str)
         en_pdf_key = book_data.get("en_pdf")
