@@ -215,8 +215,8 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-background text-foreground py-6 sm:py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
         
         {/* En-tête */}
         <div className="flex items-center justify-between border-b border-border pb-6">
@@ -296,7 +296,7 @@ export default function CheckoutPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <label className="text-foreground-muted block mb-1">Ville</label>
                       <input
@@ -438,7 +438,7 @@ export default function CheckoutPage() {
               ) : (
                 <>
                   <Lock className="w-4 h-4" />
-                  Confirmer et Payér ({totalAmount.toLocaleString("fr-FR")} FCFA)
+                  Confirmer et Payer ({totalAmount.toLocaleString("fr-FR")} FCFA)
                 </>
               )}
             </button>

@@ -208,7 +208,7 @@ export default function PrestationsPage() {
     <div className="min-h-screen bg-background text-foreground font-sans">
       
       {/* 1. Hero Section */}
-      <section className="relative bg-background-secondary border-b border-border py-16 md:py-24 overflow-hidden">
+      <section className="relative bg-background-secondary border-b border-border py-10 sm:py-16 md:py-24 overflow-hidden">
         <div className="absolute inset-0 opacity-5 pointer-events-none" style={{
           backgroundImage: "radial-gradient(var(--navy) 1px, transparent 1px)",
           backgroundSize: "20px 20px"
@@ -220,18 +220,18 @@ export default function PrestationsPage() {
             Expertise &amp; Ingénierie Éditoriale
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-navy tracking-tight max-w-4xl mx-auto">
+          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-serif font-bold text-navy tracking-tight max-w-4xl mx-auto">
             Nos Prestations &amp; Solutions Éditoriales
           </h1>
 
-          <p className="text-sm sm:text-base text-foreground-muted max-w-3xl mx-auto leading-relaxed">
+          <p className="text-xs sm:text-base text-foreground-muted max-w-3xl mx-auto leading-relaxed">
             De la numérisation patrimoniale haute fidélité à l'impression industrielle et la distribution internationale, découvrez l'ensemble de notre chaîne de valeur dédiée aux auteurs, universités et institutions.
           </p>
         </div>
       </section>
 
       {/* 2. Filtres par Catégorie */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-12 pb-6">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-6 sm:pt-10 pb-6">
         <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 border-b border-border pb-6">
           {categories.map((cat) => (
             <button
@@ -250,7 +250,7 @@ export default function PrestationsPage() {
       </section>
 
       {/* 3. Grille des Prestations */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-8">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-6 sm:py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 items-stretch">
           {filteredPrestations.map((item) => {
             const Icon = item.icon;
@@ -259,7 +259,7 @@ export default function PrestationsPage() {
             return (
               <div
                 key={item.id}
-                className={`flex flex-col justify-between rounded-2xl p-6 sm:p-7 transition-all duration-200 group relative ${
+                className={`flex flex-col justify-between rounded-2xl p-5 sm:p-7 transition-all duration-200 group relative ${
                   isPopular 
                     ? "bg-background border-2 border-gold shadow-md ring-1 ring-gold/20" 
                     : "bg-background border border-border hover:border-gold/40 shadow-xs hover:shadow-md"
@@ -268,8 +268,8 @@ export default function PrestationsPage() {
                 {/* Popular Ribbon / Badge en haut à droite */}
                 {isPopular && (
                   <div className="absolute -top-3 right-6">
-                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider bg-gold text-white px-3 py-1 rounded-full shadow-sm">
-                      <Sparkles className="w-3 h-3 text-white" />
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider bg-gold text-navy px-3 py-1 rounded-full shadow-sm">
+                      <Sparkles className="w-3 h-3 text-navy" />
                       Le plus populaire
                     </span>
                   </div>

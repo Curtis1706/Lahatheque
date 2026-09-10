@@ -219,7 +219,7 @@ export default function CartPage() {
               <div className="space-y-3 pt-2">
                 <Link
                   href="/checkout"
-                  className="w-full py-3.5 rounded-xl bg-navy hover:bg-navy-dark text-white font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer text-center"
+                  className="w-full min-h-[44px] py-3.5 rounded-xl bg-navy hover:bg-navy-dark text-white font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer text-center"
                 >
                   Passer au paiement
                   <ArrowRight className="w-4 h-4 text-gold" />
@@ -227,7 +227,7 @@ export default function CartPage() {
 
                 <Link
                   href="/catalog"
-                  className="w-full py-3 rounded-xl border border-navy text-navy hover:bg-navy/5 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer text-center"
+                  className="w-full min-h-[44px] py-3 rounded-xl border border-navy text-navy hover:bg-navy/5 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer text-center"
                 >
                   Continuer mes achats
                 </Link>

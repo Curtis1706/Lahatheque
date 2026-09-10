@@ -89,6 +89,18 @@ function CatalogSearchInner() {
     }
   }, [urlQuery]);
 
+  // Bloquer le défilement arrière quand les filtres mobiles sont ouverts
+  useEffect(() => {
+    if (showMobileFilters) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showMobileFilters]);
+
   // Réinitialiser à la page 1 lorsque les filtres changent
   const handleFilterChange = (setter: (val: any) => void, val: any) => {
     setter(val);
@@ -202,23 +214,208 @@ function CatalogSearchInner() {
             />
           </div>
 
-          {/* Filtre Mobile Toggle */}
+          {/* Filtre Mobile Toggle Button */}
           <div className="md:hidden w-full">
             <button
-              onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-background-secondary text-navy font-bold text-sm w-full justify-center shadow-xs"
+              type="button"
+              onClick={() => setShowMobileFilters(true)}
+              className="flex items-center justify-between px-4 py-3 rounded-xl border border-border bg-background-secondary text-navy font-bold text-sm w-full shadow-xs active:scale-[0.99] transition-all cursor-pointer"
             >
-              <Filter className="w-4 h-4 text-gold" />
-              {showMobileFilters ? "Masquer les filtres" : "Afficher les filtres & Auteurs"}
+              <span className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gold" />
+                <span>Filtres &amp; Recherche</span>
+              </span>
+              {hasActiveFilters ? (
+                <span className="bg-gold text-navy text-[11px] font-bold px-2 py-0.5 rounded-full font-mono">
+                  Actifs
+                </span>
+              ) : (
+                <span className="text-xs text-foreground-muted font-normal">
+                  Affiner
+                </span>
+              )}
             </button>
           </div>
         </div>
 
+        {/* Modal / Drawer Filtres Mobile */}
+        {showMobileFilters && (
+          <div className="fixed inset-0 z-50 md:hidden flex justify-end">
+            {/* Backdrop sombre */}
+            <div
+              onClick={() => setShowMobileFilters(false)}
+              className="fixed inset-0 bg-navy/60 backdrop-blur-xs transition-opacity"
+              aria-hidden="true"
+            />
+
+            {/* Panneau latéral mobile */}
+            <div className="relative w-full max-w-sm bg-background-secondary h-[100dvh] shadow-2xl border-l border-border flex flex-col z-10 overflow-hidden">
+              {/* Header */}
+              <div className="p-4 border-b border-border flex items-center justify-between bg-background shrink-0">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-gold" />
+                  <h2 className="font-serif font-bold text-navy text-base">
+                    Filtres &amp; Recherche
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMobileFilters(false)}
+                  className="p-2 rounded-xl text-foreground-muted hover:text-navy hover:bg-background-secondary transition-colors cursor-pointer"
+                  aria-label="Fermer les filtres"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Corps scrollable */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                {/* Filtre par Auteur */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5 text-gold" />
+                    Recherche par Auteur
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Ex: Kouassi, Yao, Traoré..."
+                      value={authorQuery}
+                      onChange={(e) => handleFilterChange(setAuthorQuery, e.target.value)}
+                      className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none placeholder:text-foreground-muted/60"
+                    />
+                    {authorQuery && (
+                      <button 
+                        onClick={() => handleFilterChange(setAuthorQuery, "")} 
+                        className="absolute right-2.5 top-2.5 text-foreground-muted hover:text-navy cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Filtre Université / Établissement Partenaire */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-gold" />
+                    Université / Établissement
+                  </label>
+                  <select
+                    value={selectedInstitution}
+                    onChange={(e) => handleFilterChange(setSelectedInstitution, e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
+                  >
+                    <option value="">Toutes les universités</option>
+                    {institutions.map((inst) => (
+                      <option key={inst.id} value={inst.code}>
+                        {inst.name} ({inst.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Filtre Année de Publication */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-gold" />
+                    Année de Publication
+                  </label>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => handleFilterChange(setSelectedYear, e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
+                  >
+                    <option value="">Toutes les années</option>
+                    {PUBLICATION_YEARS.map((year) => (
+                      <option key={year} value={year.toString()}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Filtre Discipline Académique */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                    <GraduationCap className="w-3.5 h-3.5 text-gold" />
+                    Discipline Universitaire
+                  </label>
+                  <DisciplineCombobox
+                    value={selectedDiscipline}
+                    onChange={(val) => handleFilterChange(setSelectedDiscipline, val)}
+                    includeAllOption={true}
+                    placeholder="Toutes les disciplines..."
+                    searchPlaceholder="Rechercher parmi les disciplines..."
+                  />
+                </div>
+
+                {/* Filtre Format */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5 text-gold" />
+                    Format de Diffusion
+                  </label>
+                  <select
+                    value={selectedFormat}
+                    onChange={(e) => handleFilterChange(setSelectedFormat, e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
+                  >
+                    <option value="">Tous les formats</option>
+                    <option value="digital">Livre numérique</option>
+                    <option value="paper">Livre papier</option>
+                    <option value="audio">Livre audio</option>
+                  </select>
+                </div>
+
+                {/* Filtre Langue */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                    <Languages className="w-3.5 h-3.5 text-gold" />
+                    Langue de Publication
+                  </label>
+                  <select
+                    value={selectedLanguage}
+                    onChange={(e) => handleFilterChange(setSelectedLanguage, e.target.value === "all" ? "" : e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none cursor-pointer"
+                  >
+                    {CATALOG_LANGUAGE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value === "all" ? "" : opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Footer sticky */}
+              <div className="p-4 border-t border-border bg-background flex items-center gap-3 shrink-0">
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="flex-1 py-3 rounded-xl border border-border bg-background-secondary hover:bg-navy/5 text-navy font-bold text-xs transition-all text-center cursor-pointer"
+                  >
+                    Réinitialiser
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowMobileFilters(false)}
+                  className="flex-1 py-3 rounded-xl bg-navy hover:bg-navy-dark text-white font-bold text-xs transition-all text-center cursor-pointer shadow-md"
+                >
+                  Voir les résultats ({totalCount})
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Grille principale Layout (Filtres + Résultats) */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           
-          {/* Panneau de Filtres (Sidebar) */}
-          <aside className={`md:col-span-4 lg:col-span-3 space-y-6 bg-background-secondary p-6 rounded-2xl border border-border sticky top-24 ${showMobileFilters ? "block" : "hidden md:block"}`}>
+          {/* Panneau de Filtres Desktop (Sidebar) */}
+          <aside className="hidden md:block md:col-span-4 lg:col-span-3 space-y-6 bg-background-secondary p-6 rounded-2xl border border-border sticky top-24">
             <div className="flex items-center justify-between border-b border-border pb-4">
               <h2 className="font-serif font-bold text-navy text-base flex items-center gap-2">
                 <Filter className="w-4 h-4 text-gold" />
@@ -583,13 +780,13 @@ function CatalogSearchInner() {
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-2 shrink-0">
                             {/* Bouton Extrait intelligent : modale de choix si les 2 formats existent, sinon action directe */}
                             {hasAudio && hasDigital ? (
                               <button
                                 type="button"
                                 onClick={() => setSelectedSampleBook(book)}
-                                className="px-2.5 py-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                                className="min-h-[38px] px-3 py-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
                                 title="Choisir le format d'extrait (Lire ou Écouter)"
                               >
                                 <Headphones className="w-3.5 h-3.5 text-gold shrink-0" />
@@ -598,16 +795,16 @@ function CatalogSearchInner() {
                             ) : hasAudio ? (
                               <Link
                                 href={`/preview/${bookSlug}`}
-                                className="px-2.5 py-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                                className="min-h-[38px] px-3 py-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
                                 title="Écouter l'extrait audio gratuit"
                               >
                                 <Headphones className="w-3.5 h-3.5 text-gold shrink-0" />
-                                <span>Extrait audio</span>
+                                <span>Extrait</span>
                               </Link>
                             ) : (
                               <Link
                                 href={`/catalog/reader/${book.id}?mode=sample`}
-                                className="px-2.5 py-2 rounded-xl border border-border bg-background-secondary hover:bg-navy/5 text-navy text-xs font-semibold transition-colors cursor-pointer"
+                                className="min-h-[38px] px-3 py-2 rounded-xl border border-border bg-background-secondary hover:bg-navy/5 text-navy text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center"
                                 title="Feuilleter l'extrait"
                               >
                                 Extrait
@@ -616,7 +813,7 @@ function CatalogSearchInner() {
 
                             <Link
                               href={`/catalog/${bookSlug}`}
-                              className="px-3 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-all flex items-center gap-1 shadow-xs shrink-0"
+                              className="min-h-[38px] px-3.5 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs shrink-0"
                             >
                               <span>Détails</span>
                               <ArrowRight className="w-3.5 h-3.5 text-gold" />

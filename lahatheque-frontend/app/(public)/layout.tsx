@@ -1,19 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
   Menu, 
   X, 
-  ChevronDown, 
   Search, 
   User, 
-  ShoppingCart, 
-  Globe, 
-  BookOpen, 
-  HelpCircle,
-  Mail
+  ShoppingCart,
+  ArrowRight
 } from "lucide-react";
 import { HeaderSearchBar } from "@/components/features/search/header-search-bar";
 import { useCart } from "@/context/cart-context";
@@ -25,8 +21,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useAuth();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { totalCount, toggleDrawer } = useCart();
 
   useEffect(() => {
@@ -52,13 +48,28 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     }
   }, [user, loading, router]);
 
-  const toggleDropdown = (name: string) => {
-    if (activeDropdown === name) {
-      setActiveDropdown(null);
+  // Fermeture par Escape + verrouillage du scroll body
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsDrawerOpen(false);
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (isDrawerOpen || isSearchOpen) {
+      document.body.style.overflow = "hidden";
     } else {
-      setActiveDropdown(name);
+      document.body.style.overflow = "";
     }
-  };
+    return () => { document.body.style.overflow = ""; };
+  }, [isDrawerOpen, isSearchOpen]);
+
+  const closeDrawer = useCallback(() => setIsDrawerOpen(false), []);
 
   // Si l'utilisateur est connecté, bloquer l'accès aux pages publiques et afficher un écran de transition
   if (user) {
@@ -74,83 +85,84 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200 overflow-x-hidden">
       
       {/* TopNavBar */}
       <header className="bg-background border-b border-border sticky top-0 z-50 transition-all duration-300">
-        <div className="flex justify-between items-center w-full px-4 sm:px-6 md:px-10 lg:px-12 xl:px-16 2xl:px-24 py-4 max-w-[1920px] mx-auto">
-          
+        <div className="flex justify-between items-center w-full px-4 sm:px-6 md:px-10 lg:px-12 xl:px-16 2xl:px-24 py-3 md:py-4 max-w-[1920px] mx-auto">
+
           {/* 1. Brand Logo (Left) */}
-          <Link href="/" className="block w-36 md:w-44 shrink-0">
+          <Link href="/" className="block w-28 sm:w-36 md:w-40 shrink-0">
             <img src="/logo.jpg" alt="LAHATHÈQUE" className="w-full h-auto object-contain" />
           </Link>
-          
-          {/* 2. Desktop Navigation (Centered) */}
-          <nav className="hidden lg:flex items-center justify-center gap-5 xl:gap-8 px-4">
-            <Link 
-              href="/" 
-              className={pathname === "/" 
-                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap" 
-                : "text-foreground hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
+
+          {/* 2. Desktop Navigation (Centered) — hidden on mobile/tablet */}
+          <nav className="hidden lg:flex items-center justify-center gap-5 xl:gap-8 px-4" aria-label="Navigation principale">
+            <Link
+              href="/"
+              className={pathname === "/"
+                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap"
+                : "text-foreground [@media(hover:hover)]:hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
               }
             >
               Accueil
             </Link>
-            
-            <Link 
-              href="/about" 
-              className={pathname === "/about" 
-                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap" 
-                : "text-foreground hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
+
+            <Link
+              href="/about"
+              className={pathname === "/about"
+                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap"
+                : "text-foreground [@media(hover:hover)]:hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
               }
             >
               À propos
             </Link>
 
-            <Link 
-              href="/authors" 
-              className={pathname.startsWith("/authors") 
-                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap" 
-                : "text-foreground hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
+            <Link
+              href="/authors"
+              className={pathname.startsWith("/authors")
+                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap"
+                : "text-foreground [@media(hover:hover)]:hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
               }
             >
               Auteur
             </Link>
 
-            <Link 
-              href="/partners" 
-              className={pathname.startsWith("/partners") 
-                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap" 
-                : "text-foreground hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
+            <Link
+              href="/partners"
+              className={pathname.startsWith("/partners")
+                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap"
+                : "text-foreground [@media(hover:hover)]:hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
               }
             >
               Partenariat
             </Link>
 
-            <Link 
-              href="/prestations" 
-              className={pathname.startsWith("/prestations") 
-                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap" 
-                : "text-foreground hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
+            <Link
+              href="/prestations"
+              className={pathname.startsWith("/prestations")
+                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap"
+                : "text-foreground [@media(hover:hover)]:hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
               }
             >
               Nos prestations
             </Link>
 
-            <Link 
-              href="/subscriptions" 
-              className={pathname.startsWith("/subscriptions") 
-                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap" 
-                : "text-foreground hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
+            <Link
+              href="/subscriptions"
+              className={pathname.startsWith("/subscriptions")
+                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap"
+                : "text-foreground [@media(hover:hover)]:hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
               }
             >
               Nos offres
             </Link>
-            <Link 
-              href="/catalog" 
-              className={pathname.startsWith("/catalog") 
-                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap" 
-                : "text-foreground hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
+
+            <Link
+              href="/catalog"
+              className={pathname.startsWith("/catalog")
+                ? "text-navy font-bold border-b-2 border-gold font-sans text-sm py-2 whitespace-nowrap"
+                : "text-foreground [@media(hover:hover)]:hover:text-gold transition-colors duration-200 text-sm py-2 font-medium whitespace-nowrap"
               }
             >
               Catalogue
@@ -158,140 +170,161 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           </nav>
 
           {/* 3. Actions & Search (Right) */}
-          <div className="flex items-center gap-3 xl:gap-4 shrink-0">
-            {/* Search Bar avec autocomplétion et aperçu direct */}
+          <div className="flex items-center gap-1 sm:gap-2 xl:gap-4 shrink-0">
+            {/* Desktop Search Bar */}
             <div className="hidden md:block w-48 xl:w-72">
               <HeaderSearchBar placeholder="Rechercher..." />
             </div>
 
-            {/* Connexion Link */}
-            <Link href="/login" className="hidden lg:flex items-center gap-2 text-foreground hover:text-navy font-medium text-sm whitespace-nowrap">
+            {/* Desktop Connexion Link */}
+            <Link
+              href="/login"
+              className="hidden lg:flex items-center gap-2 text-foreground [@media(hover:hover)]:hover:text-navy font-medium text-sm whitespace-nowrap"
+            >
               <User className="w-5 h-5 text-gold" /> Connexion
             </Link>
 
+            {/* Mobile Search Icon — opens overlay */}
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              className="flex md:hidden p-3 text-foreground transition-colors cursor-pointer"
+              aria-label="Rechercher"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+
             {/* Cart Icon & Trigger */}
-            <button 
+            <button
               type="button"
               onClick={toggleDrawer}
-              className="relative p-2 text-foreground hover:text-navy transition-colors shrink-0 cursor-pointer" 
+              className="relative p-3 text-foreground [@media(hover:hover)]:hover:text-navy transition-colors shrink-0 cursor-pointer"
               aria-label="Panier d'achat"
             >
-              <ShoppingCart className="w-6 h-6" />
+              <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" />
               {totalCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-gold text-navy text-[11px] font-bold font-mono min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center shadow-md">
+                <span className="absolute top-1 right-1 bg-gold text-navy text-[10px] font-bold font-mono min-w-[18px] h-[18px] px-0.5 rounded-full flex items-center justify-center shadow-md">
                   {totalCount}
                 </span>
               )}
             </button>
 
-            {/* Mobile Menu Button */}
+            {/* Mobile Hamburger Button */}
             <button
               type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 text-foreground hover:text-navy transition-colors cursor-pointer"
-              aria-label="Menu principal"
+              onClick={() => setIsDrawerOpen(true)}
+              className="lg:hidden p-3 text-foreground transition-colors cursor-pointer"
+              aria-label="Ouvrir le menu"
+              aria-expanded={isDrawerOpen}
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              <Menu className="w-5 h-5" />
             </button>
           </div>
         </div>
-
-        {/* Mobile Nav Menu Dropdown */}
-        {mobileMenuOpen && (
-          <div className="lg:hidden bg-background border-b border-border px-6 py-4 animate-in slide-in-from-top-2 duration-200">
-            <div className="space-y-3">
-              <div className="pb-2">
-                <HeaderSearchBar placeholder="Rechercher..." />
-              </div>
-
-              <Link 
-                href="/" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={pathname === "/" 
-                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-                }
-              >
-                Accueil
-              </Link>
-              
-              <Link 
-                href="/about" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={pathname === "/about" 
-                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-                }
-              >
-                À propos
-              </Link>
-
-              <Link 
-                href="/authors" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={pathname.startsWith("/authors") 
-                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-                }
-              >
-                Auteur
-              </Link>
-
-              <Link 
-                href="/partners" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={pathname.startsWith("/partners") 
-                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-                }
-              >
-                Partenariat
-              </Link>
-
-              <Link 
-                href="/prestations" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={pathname.startsWith("/prestations") 
-                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-                }
-              >
-                Nos prestations
-              </Link>
-
-              <Link 
-                href="/subscriptions" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={pathname.startsWith("/subscriptions") 
-                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-                }
-              >
-                Nos offres
-              </Link>
-
-              <Link 
-                href="/catalog" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={pathname.startsWith("/catalog") 
-                  ? "block font-bold text-navy py-2 border-b border-border text-sm" 
-                  : "block font-medium text-foreground hover:text-gold py-2 border-b border-border/50 text-sm"
-                }
-              >
-                Catalogue
-              </Link>
-
-              <Link 
-                href="/login" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 font-medium py-2.5 text-sm text-navy pt-3 border-t border-border"
-              >
-                <User className="w-4 h-4 text-gold" /> Se connecter
-              </Link>
-            </div>
-          </div>
-        )}
       </header>
+
+      {/* ── Mobile Navigation Drawer ── */}
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 z-[60] lg:hidden transition-opacity duration-300 ${
+          isDrawerOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        aria-hidden="true"
+      >
+        <div
+          className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+          onClick={closeDrawer}
+        />
+        {/* Drawer Panel */}
+        <nav
+          className={`absolute top-0 right-0 h-full w-72 max-w-[85vw] bg-background shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
+            isDrawerOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+          aria-label="Menu mobile"
+        >
+          {/* Drawer Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+            <Link href="/" onClick={closeDrawer} className="block w-28">
+              <img src="/logo.jpg" alt="LAHATHÈQUE" className="w-full h-auto object-contain" />
+            </Link>
+            <button
+              type="button"
+              onClick={closeDrawer}
+              className="p-2 text-foreground-muted transition-colors"
+              aria-label="Fermer le menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Drawer Links */}
+          <div className="flex-1 overflow-y-auto py-2">
+            {[
+              { href: "/", label: "Accueil", active: pathname === "/" },
+              { href: "/catalog", label: "Catalogue", active: pathname.startsWith("/catalog") },
+              { href: "/about", label: "À propos", active: pathname === "/about" },
+              { href: "/authors", label: "Auteur", active: pathname.startsWith("/authors") },
+              { href: "/partners", label: "Partenariat", active: pathname.startsWith("/partners") },
+              { href: "/subscriptions", label: "Nos offres", active: pathname.startsWith("/subscriptions") },
+              { href: "/prestations", label: "Nos prestations", active: pathname.startsWith("/prestations") },
+              { href: "/contact", label: "Contact", active: pathname === "/contact" },
+            ].map(({ href, label, active }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={closeDrawer}
+                className={`flex items-center justify-between px-5 py-3.5 text-sm font-medium border-b border-border/40 transition-colors ${
+                  active
+                    ? "text-navy font-bold bg-gold/5"
+                    : "text-foreground"
+                }`}
+              >
+                <span>{label}</span>
+                {active && <ArrowRight className="w-4 h-4 text-gold" />}
+              </Link>
+            ))}
+          </div>
+
+          {/* Drawer Footer — Connexion */}
+          <div className="shrink-0 p-4 border-t border-border">
+            <Link
+              href="/login"
+              onClick={closeDrawer}
+              className="flex items-center justify-center gap-2 w-full py-3 bg-navy text-white rounded font-medium text-sm transition-colors"
+            >
+              <User className="w-4 h-4" />
+              Se connecter
+            </Link>
+          </div>
+        </nav>
+      </div>
+
+      {/* ── Mobile Search Overlay ── */}
+      <div
+        className={`fixed inset-0 z-[70] transition-opacity duration-200 ${
+          isSearchOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="absolute inset-0 bg-background flex flex-col">
+          {/* Search Overlay Header */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+            <Search className="w-5 h-5 text-foreground-muted shrink-0" />
+            <div className="flex-1">
+              <HeaderSearchBar
+                placeholder="Rechercher un ouvrage, un auteur..."
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(false)}
+              className="p-2 text-foreground-muted shrink-0"
+              aria-label="Fermer la recherche"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content Area */}
       <main className="flex-grow">
