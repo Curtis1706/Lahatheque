@@ -62,10 +62,13 @@ export async function GET(request: NextRequest) {
     });
 
     const data = await backendRes.json();
+    const isPublic = !accessToken && !authHeader;
     return NextResponse.json(data, {
       status: backendRes.status,
       headers: {
-        "cache-control": "private, no-cache, no-store, must-revalidate",
+        "cache-control": isPublic
+          ? "public, s-maxage=60, stale-while-revalidate=300"
+          : "private, no-cache, no-store, must-revalidate",
       },
     });
   } catch (error: any) {
