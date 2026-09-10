@@ -2,7 +2,7 @@
 
 import React from "react";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
-import { Eye, Tag, Sparkles } from "lucide-react";
+import { Eye, Tag, Sparkles, Headphones } from "lucide-react";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 
 interface VitrinePreviewCardProps {
@@ -44,9 +44,27 @@ export function VitrinePreviewCard({ deposit, className }: VitrinePreviewCardPro
 
         {/* Détails publics */}
         <div className="space-y-3 flex-1 min-w-0">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-white text-[11px] font-medium border border-white/20">
-            <Tag className="w-3 h-3 text-gold" />
-            {deposit.classification.discipline}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-navy-hover text-white text-[11px] font-medium border border-navy-hover">
+              <Tag className="w-3 h-3 text-gold" />
+              {deposit.classification.discipline || "Général"}
+            </div>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+              deposit.is_original !== false ? "bg-navy-dark text-white border border-navy-hover" : "bg-gold/20 text-gold border border-gold/30"
+            }`}>
+              {deposit.is_original !== false ? "Édition originale" : "Version traduite"} [{((deposit.original_language || deposit.metadata.language || "fr") as string).slice(0, 2).toUpperCase()}]
+            </span>
+            {deposit.parent_ouvrage_title && (
+              <span className="text-[10px] text-white/70 truncate max-w-[180px]" title={`Lié à : ${deposit.parent_ouvrage_title}`}>
+                • Lié à : {deposit.parent_ouvrage_title}
+              </span>
+            )}
+            {(deposit.has_audio_version || deposit.has_audio || deposit.price_audio) && (
+              <span className="text-[10px] text-gold font-bold flex items-center gap-1">
+                <Headphones className="w-3 h-3 text-gold" />
+                Audio
+              </span>
+            )}
           </div>
 
           <h3 className="font-serif font-bold text-lg sm:text-xl text-white leading-snug">

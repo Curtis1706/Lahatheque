@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
-import { getAdminCatalog, updateBookPricing, deleteAdminCatalogBook } from "@/lib/services/admin";
+import { getAdminCatalog, deleteAdminCatalogBook } from "@/lib/services/admin";
 import { AdminCatalogBook } from "@/lib/types/admin";
 import { 
   BookOpen, 
@@ -14,14 +14,10 @@ import {
   Shield, 
   Eye, 
   Pencil, 
-  X, 
-  Save, 
-  CheckCircle2, 
   Trash2, 
   PlusCircle,
   Headphones,
-  RefreshCw,
-  Languages,
+  Languages, 
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -41,21 +37,6 @@ export default function AdminCatalogPage() {
   const [gridLanguage, setGridLanguage] = useState<string>("all");
   const [gridSearch, setGridSearch] = useState<string>("");
 
-  // State pour la modale d'édition
-  const [editingBook, setEditingBook] = useState<AdminCatalogBook | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editPriceDigital, setEditPriceDigital] = useState<number>(5000);
-  const [editPricePaper, setEditPricePaper] = useState<number>(7500);
-  const [editPriceAudio, setEditPriceAudio] = useState<number>(3500);
-  const [editHasAudioVersion, setEditHasAudioVersion] = useState<boolean>(false);
-  const [editStatus, setEditStatus] = useState<AdminCatalogBook["status"]>("published");
-  const [editIsOriginal, setEditIsOriginal] = useState<boolean>(true);
-  const [editOriginalLanguage, setEditOriginalLanguage] = useState<string>("fr");
-  const [saving, setSaving] = useState(false);
-
-  // State pour la gestion audio (mis en commentaire temporaire)
-  // const [audioManagingBook, setAudioManagingBook] = useState<AdminCatalogBook | null>(null);
-
   // State pour la suppression
   const [deleteConfirmBook, setDeleteConfirmBook] = useState<AdminCatalogBook | null>(null);
 
@@ -73,62 +54,6 @@ export default function AdminCatalogPage() {
     }
     loadCatalog();
   }, []);
-
-  const handleOpenEditModal = (book: AdminCatalogBook) => {
-    setEditingBook(book);
-    setEditTitle(book.title);
-    setEditPriceDigital(book.price_digital);
-    setEditPricePaper(book.price_paper);
-    setEditPriceAudio(book.price_audio || 3500);
-    setEditHasAudioVersion(Boolean(book.has_audio_version || book.has_audio));
-    setEditStatus(book.status);
-    setEditIsOriginal(book.is_original !== false);
-    setEditOriginalLanguage(book.original_language || book.language || "fr");
-  };
-
-  const handleSaveBook = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingBook) return;
-
-    setSaving(true);
-    try {
-      await updateBookPricing(editingBook.id, {
-        title: editTitle,
-        price_digital: editPriceDigital,
-        price_paper: editPricePaper,
-        price_audio: editHasAudioVersion ? editPriceAudio : undefined,
-        has_audio_version: editHasAudioVersion,
-        status: editStatus,
-        is_original: editIsOriginal,
-        original_language: editOriginalLanguage,
-      });
-
-      toast.success("Ouvrage et tarifs mis à jour avec succès !");
-      setBooks((prev) =>
-        prev.map((b) =>
-          b.id === editingBook.id
-            ? {
-                ...b,
-                title: editTitle,
-                price_digital: editPriceDigital,
-                price_paper: editPricePaper,
-                price_audio: editHasAudioVersion ? editPriceAudio : undefined,
-                has_audio_version: editHasAudioVersion,
-                has_audio: editHasAudioVersion || b.has_audio,
-                status: editStatus,
-                is_original: editIsOriginal,
-                original_language: editOriginalLanguage,
-              }
-            : b
-        )
-      );
-      setEditingBook(null);
-    } catch (err: any) {
-      toast.error(err.message || "Erreur réseau lors de la modification.");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleDeleteBook = async () => {
     if (!deleteConfirmBook) return;
@@ -237,20 +162,6 @@ export default function AdminCatalogPage() {
       cell: (row) => <StatusBadge status={row.status} />,
     },
     {
-      key: "protection_type",
-      header: "DRM / Protection",
-      cell: (row) => (
-        <Link
-          href={`/admin/catalog/${row.id}/protection`}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-navy/10 hover:bg-navy hover:text-white text-navy font-semibold text-[11px] font-mono uppercase transition-all group"
-          title="Configurer les règles de protection pour cet ouvrage"
-        >
-          <Shield className="w-3 h-3 text-gold group-hover:text-gold" />
-          <span>{row.protection_type || "LCP"}</span>
-        </Link>
-      ),
-    },
-    {
       key: "id",
       header: "Actions",
       cell: (row) => (
@@ -273,14 +184,13 @@ export default function AdminCatalogPage() {
             <RefreshCw className="w-3.5 h-3.5 text-gold" />
           </button>
           */}
-          <button
-            type="button"
-            onClick={() => handleOpenEditModal(row)}
+          <Link
+            href={`/admin/catalog/${row.id}/edit`}
             className="p-1.5 rounded-lg border border-border bg-background hover:bg-gold hover:text-navy text-foreground-muted transition-colors cursor-pointer"
-            title="Modifier le prix ou statut"
+            title="Modifier l'ouvrage et ses déclinaisons"
           >
             <Pencil className="w-3.5 h-3.5" />
-          </button>
+          </Link>
           {/* Bouton de protection mis en commentaire temporaire dans les actions
           <Link
             href={`/admin/catalog/${row.id}/protection`}
@@ -448,15 +358,14 @@ export default function AdminCatalogPage() {
                       <span className="text-[10px] text-foreground-muted uppercase font-bold">{book.protection_type || "LCP"}</span>
                     </div>
                     <div className="flex items-center justify-between gap-2 pt-1 font-sans">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditModal(book)}
+                      <Link
+                        href={`/admin/catalog/${book.id}/edit`}
                         className="flex-1 py-2 px-3 rounded-xl bg-gold/10 hover:bg-gold/20 text-navy text-xs font-semibold transition-colors cursor-pointer min-h-[36px] flex items-center justify-center gap-1.5"
-                        title="Modifier l'ouvrage et ses tarifs"
+                        title="Modifier l'ouvrage et ses déclinaisons"
                       >
                         <Pencil className="w-3.5 h-3.5 text-gold" />
                         <span>Modifier</span>
-                      </button>
+                      </Link>
                       {/* Bouton de protection mis en commentaire temporaire en vue grille
                       <Link
                         href={`/admin/catalog/${book.id}/protection`}
@@ -523,175 +432,6 @@ export default function AdminCatalogPage() {
         />
       )}
 
-      {/* Modale d'Édition Rapide */}
-      {editingBook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-in fade-in">
-          <div className="bg-background rounded-3xl border border-border p-6 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-gold/10 text-gold">
-                  <Pencil className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-serif font-bold text-navy text-base">Modifier l&apos;Ouvrage</h3>
-                  <p className="text-[11px] text-foreground-muted">Édition des métadonnées et tarifs catalogue</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingBook(null)}
-                className="p-1 text-foreground-muted hover:text-navy rounded-lg hover:bg-background-secondary transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveBook} className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="font-bold text-navy">Titre de l&apos;Ouvrage</label>
-                <input
-                  type="text"
-                  required
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full bg-background-secondary border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="font-bold text-navy">Prix Numérique (FCFA)</label>
-                  <input
-                    type="number"
-                    step="500"
-                    required
-                    value={editPriceDigital}
-                    onChange={(e) => setEditPriceDigital(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-background-secondary border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-bold text-navy">Prix Papier (FCFA)</label>
-                  <input
-                    type="number"
-                    step="500"
-                    required
-                    value={editPricePaper}
-                    onChange={(e) => setEditPricePaper(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-background-secondary border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Option Version Livre Audio */}
-              <div className="p-3.5 rounded-2xl bg-background-secondary border border-border space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-navy flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editHasAudioVersion}
-                      onChange={(e) => setEditHasAudioVersion(e.target.checked)}
-                      className="w-4 h-4 rounded border-border text-navy focus:ring-navy cursor-pointer"
-                    />
-                    <span>Version Livre Audio Active</span>
-                  </label>
-                  <span className="text-[10px] text-gold font-bold">Cloudflare Stream</span>
-                </div>
-
-                {editHasAudioVersion && (
-                  <div className="space-y-1 pt-1">
-                    <label className="text-[11px] font-bold text-navy uppercase tracking-wider">
-                      Prix Audio Streaming (FCFA)
-                    </label>
-                    <input
-                      type="number"
-                      step="500"
-                      value={editPriceAudio}
-                      onChange={(e) => setEditPriceAudio(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground font-mono font-bold focus:ring-2 focus:ring-navy"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Déclinaison linguistique & Édition Originale */}
-              <div className="p-3.5 rounded-2xl bg-background-secondary border border-border space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-navy flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editIsOriginal}
-                      onChange={(e) => setEditIsOriginal(e.target.checked)}
-                      className="w-4 h-4 rounded border-border text-navy focus:ring-navy cursor-pointer"
-                    />
-                    <span>Édition Originale de Référence</span>
-                  </label>
-                  <span className="text-[10px] text-gold font-bold uppercase">
-                    {editIsOriginal ? "Original" : "Traduction"}
-                  </span>
-                </div>
-
-                <div className="space-y-1 pt-1">
-                  <label className="text-[11px] font-bold text-navy uppercase tracking-wider flex items-center gap-1">
-                    <Languages className="w-3.5 h-3.5 text-gold" />
-                    Langue du Texte
-                  </label>
-                  <select
-                    value={editOriginalLanguage}
-                    onChange={(e) => setEditOriginalLanguage(e.target.value)}
-                    className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground focus:ring-2 focus:ring-navy"
-                  >
-                    <option value="fr">Français (FR)</option>
-                    <option value="en">Anglais (EN)</option>
-                    <option value="es">Espagnol (ES)</option>
-                    <option value="pt">Portugais (PT)</option>
-                    <option value="de">Allemand (DE)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-navy">Statut de Publication</label>
-                <select
-                  value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value as AdminCatalogBook["status"])}
-                  className="w-full bg-background-secondary border border-border rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-navy"
-                >
-                  <option value="published">Publié (En ligne)</option>
-                  <option value="draft">Brouillon</option>
-                  <option value="submitted">En Soumission</option>
-                  <option value="archived">Archivé</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-border">
-                <button
-                  type="button"
-                  onClick={() => setEditingBook(null)}
-                  className="px-4 py-2.5 rounded-xl border border-border text-foreground font-semibold hover:bg-background-secondary transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white font-bold transition-colors flex items-center gap-2 shadow-sm"
-                >
-                  {saving ? (
-                    <InlineLoader size={16} />
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 text-gold" />
-                      <span>Enregistrer</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Modal Confirmation de Retrait d'un Ouvrage du Catalogue */}
       {deleteConfirmBook && (

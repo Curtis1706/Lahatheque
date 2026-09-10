@@ -153,12 +153,19 @@ export async function verifyAudioSecurityLock(
 }
 
 /**
- * Récupère les ouvrages du catalogue éligibles pour un rattachement de livre audio.
+ * Récupère les ouvrages du catalogue éligibles pour un rattachement de livre audio avec pagination.
  */
-export async function getEligibleBooksForAttachment(searchQuery?: string): Promise<any[]> {
+export async function getEligibleBooksForAttachment(
+  searchQuery?: string,
+  page: number = 1,
+  pageSize: number = 50
+): Promise<{ books: any[]; total: number; hasNext: boolean }> {
   try {
     const params = new URLSearchParams();
     if (searchQuery) params.set("q", searchQuery);
+    params.set("page", String(page));
+    params.set("page_size", String(pageSize));
+
     const res = await fetch(`/api/bff/audio/eligible-books/?${params.toString()}`, {
       method: "GET",
       credentials: "include",
@@ -166,12 +173,15 @@ export async function getEligibleBooksForAttachment(searchQuery?: string): Promi
     });
     if (res.ok) {
       const json = await res.json();
-      return json.data || json.results || json || [];
+      const list = json.data || json.results || (Array.isArray(json) ? json : []);
+      const total = json.pagination?.total ?? list.length;
+      const hasNext = Boolean(json.pagination?.has_next);
+      return { books: list, total, hasNext };
     }
   } catch (err) {
     console.error("Erreur récupération livres éligibles:", err);
   }
-  return [];
+  return { books: [], total: 0, hasNext: false };
 }
 
 /**

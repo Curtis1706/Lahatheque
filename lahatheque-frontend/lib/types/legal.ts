@@ -383,6 +383,13 @@ export interface PendingPublicationBook {
   has_active_contract: boolean;
   cover_url?: string | null;
   created_at?: string | null;
+  language?: string;
+  is_original?: boolean;
+  original_language?: string;
+  parent_ouvrage_title?: string;
+  available_languages?: string[];
+  has_audio_version?: boolean;
+  price_audio?: number | null;
 }
 
 

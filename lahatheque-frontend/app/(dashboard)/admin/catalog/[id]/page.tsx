@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Shield, Tag, Eye, ShoppingBag, Download, Headphones } from "lucide-react";
+import { ArrowLeft, BookOpen, Shield, Tag, Eye, ShoppingBag, Download, Headphones, Pencil, Languages } from "lucide-react";
 import { getAdminCatalog } from "@/lib/services/admin";
 import { AdminCatalogBook } from "@/lib/types/admin";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -38,14 +38,23 @@ export default function AdminBookDetailPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
           <div>
             <span className="text-[11px] font-mono text-gold uppercase tracking-wider font-semibold">
-              ISBN: {book.isbn}
+              ISBN: {book.isbn || "Non renseigné"}
             </span>
             <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy mt-0.5">{book.title}</h1>
             <p className="text-xs text-foreground-muted">
               Par {Array.isArray(book.authors) && book.authors.length > 0 ? book.authors.join(", ") : (book.author_name || "Auteur non renseigné")} • Éditeur : {book.publisher_name}
             </p>
           </div>
-          <StatusBadge status={book.status} />
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/admin/catalog/${book.id}/edit`}
+              className="px-4 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+            >
+              <Pencil className="w-3.5 h-3.5 text-gold" />
+              <span>Modifier l&apos;Ouvrage</span>
+            </Link>
+            <StatusBadge status={book.status} />
+          </div>
         </div>
       </div>
 
@@ -126,6 +135,56 @@ export default function AdminBookDetailPage() {
               <span className="text-foreground-muted">Interdite</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Déclinaisons Multilingues */}
+      <div className="p-5 rounded-2xl bg-background-secondary border border-border space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-sm text-navy flex items-center gap-2">
+            <Languages className="w-4 h-4 text-gold" />
+            Déclinaisons Linguistiques & Traductions ({book.available_languages?.length || 1})
+          </h3>
+          <Link
+            href={`/admin/catalog/${book.id}/edit`}
+            className="text-xs font-bold text-gold hover:text-navy transition-colors flex items-center gap-1"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            <span>Gérer les déclinaisons</span>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {(book.languages && book.languages.length > 0
+            ? book.languages
+            : (book.available_languages || [book.language || "fr"]).map(l => ({
+                language: l,
+                is_original: l === (book.original_language || book.language || "fr"),
+                title: book.title,
+                page_count: book.page_count,
+              }))
+          ).map((lv: any) => (
+            <div
+              key={lv.language || lv.language_code}
+              className="p-3.5 rounded-xl bg-background border border-border space-y-2 flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <span className="px-2 py-0.5 rounded-md bg-navy text-gold text-xs font-bold uppercase">
+                  {(lv.language || lv.language_code).toUpperCase()}
+                </span>
+                <span className="text-[10px] text-foreground-muted font-semibold">
+                  {lv.is_original ? "Original" : "Traduction"}
+                </span>
+              </div>
+              <p className="text-xs font-medium text-navy truncate">
+                {lv.title || book.title}
+              </p>
+              <div className="text-[11px] text-foreground-muted flex items-center justify-between pt-1 border-t border-border">
+                <span>{lv.page_count || book.page_count || 0} pages</span>
+                <span className="font-medium text-success capitalize">{lv.translation_status || "Prêt"}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

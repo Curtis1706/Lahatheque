@@ -538,17 +538,11 @@ export default function HostedReaderPage() {
     </div>
   );
 
-  // Configuration des onglets latéraux (Miniatures, Signets, Pièces Jointes, et Annotations !)
+  // Configuration des onglets latéraux (Miniatures, Table des matières / Signets)
   const defaultLayoutPluginInstance = defaultLayoutPlugin({
     sidebarTabs: (defaultTabs) => [
       defaultTabs[0], // Miniatures (Page Thumbnails)
       defaultTabs[1], // Table des matières (Document Outline / Bookmarks)
-      defaultTabs[2], // Pièces jointes (Attachments)
-      {
-        content: <NotesSidebar />,
-        icon: <Edit3 size={17} />,
-        title: "Mes Annotations",
-      },
     ],
     renderToolbar: (Toolbar: any) => (
       <Toolbar>

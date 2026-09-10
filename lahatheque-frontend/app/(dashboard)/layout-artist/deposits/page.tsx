@@ -245,6 +245,22 @@ export default function MaquettisteDepositsPage() {
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-background-secondary border border-border text-navy">
                           {row.classification.discipline || "Général"}
                         </span>
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                          row.is_original !== false ? "bg-navy/10 text-navy" : "bg-gold/20 text-gold"
+                        }`}>
+                          {row.is_original !== false ? "Original" : "Traduction"} [{((row.original_language || row.metadata.language || "fr") as string).slice(0, 2).toUpperCase()}]
+                        </span>
+                        {row.parent_ouvrage_title && (
+                          <span className="text-[10px] text-foreground-muted truncate max-w-[130px]" title={`Lié à : ${row.parent_ouvrage_title}`}>
+                            • {row.parent_ouvrage_title}
+                          </span>
+                        )}
+                        {(row.has_audio_version || (row as any).has_audio || (row as any).price_audio) && (
+                          <span className="text-[10px] text-gold font-bold flex items-center gap-1">
+                            <Headphones className="w-3 h-3 text-gold" />
+                            Audio
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -354,6 +370,24 @@ export default function MaquettisteDepositsPage() {
                             <p className="text-[11px] text-foreground-muted font-mono mt-0.5 truncate">
                               {row.metadata.authors.join(", ") || "Auteur"} • {row.metadata.publication_year}
                             </p>
+                            <div className="flex flex-wrap items-center gap-1 pt-1">
+                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                                row.is_original !== false ? "bg-navy/10 text-navy" : "bg-gold/20 text-gold"
+                              }`}>
+                                {row.is_original !== false ? "Original" : "Traduction"} [{((row.original_language || row.metadata.language || "fr") as string).slice(0, 2).toUpperCase()}]
+                              </span>
+                              {row.parent_ouvrage_title && (
+                                <span className="text-[10px] text-foreground-muted truncate max-w-[120px]" title={`Lié à : ${row.parent_ouvrage_title}`}>
+                                  • {row.parent_ouvrage_title}
+                                </span>
+                              )}
+                              {(row.has_audio_version || (row as any).has_audio || (row as any).price_audio) && (
+                                <span className="text-[10px] text-gold font-bold flex items-center gap-1">
+                                  <Headphones className="w-3 h-3 text-gold" />
+                                  Audio
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>

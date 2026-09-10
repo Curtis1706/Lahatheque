@@ -57,6 +57,37 @@ import { getDisciplines, type DisciplineItem } from "@/lib/services/classificati
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { PublisherCombobox } from "@/components/features/catalog/publisher-combobox";
 import { UniversityCombobox } from "@/components/features/catalog/university-combobox";
+import { CountryCombobox } from "@/components/features/catalog/country-combobox";
+
+const AVAILABLE_LANGUAGES_LIST = [
+  { code: "fr", label: "Français (FR)" },
+  { code: "en", label: "Anglais (EN)" },
+  { code: "es", label: "Espagnol (ES)" },
+  { code: "pt", label: "Portugais (PT)" },
+  { code: "de", label: "Allemand (DE)" },
+  { code: "ar", label: "Arabe (AR)" },
+  { code: "zh", label: "Chinois (ZH)" },
+];
+
+const LANG_CODE_TO_LABEL: Record<string, string> = {
+  fr: "Français",
+  en: "Anglais",
+  es: "Espagnol",
+  pt: "Portugais",
+  de: "Allemand",
+  ar: "Arabe",
+  zh: "Chinois",
+};
+
+const LABEL_TO_LANG_CODE: Record<string, string> = {
+  "Français": "fr",
+  "Anglais": "en",
+  "Espagnol": "es",
+  "Portugais": "pt",
+  "Allemand": "de",
+  "Arabe": "ar",
+  "Chinois": "zh",
+};
 
 export default function NewDepositPage() {
   const router = useRouter();
@@ -91,6 +122,7 @@ export default function NewDepositPage() {
 
   // Metadata State
   const [isOriginal, setIsOriginal] = useState(true);
+  const [originalLanguage, setOriginalLanguage] = useState("fr");
   const [selectedParentBook, setSelectedParentBook] = useState<any | null>(null);
   const [allEligibleBooks, setAllEligibleBooks] = useState<any[]>([]);
   const [parentBookSearch, setParentBookSearch] = useState("");
@@ -149,7 +181,7 @@ export default function NewDepositPage() {
     });
 
     // Préchargement des ouvrages éligibles pour rattachement de traduction
-    fetch("/api/bff/audio/eligible-books/", { credentials: "include" })
+    fetch("/api/bff/audio/eligible-books/?limit=all", { credentials: "include" })
       .then((res) => res.json())
       .then((json) => {
         setAllEligibleBooks(json.data || json.results || []);
@@ -371,7 +403,7 @@ export default function NewDepositPage() {
           pre_edition_dossier_id: selectedPreEdition?.id,
           authors_emails: authorsEmailsStr,
           is_original: isOriginal,
-          original_language: isOriginal ? (language.toLowerCase().startsWith("en") ? "en" : "fr") : (selectedParentBook?.language || "fr"),
+          original_language: isOriginal ? originalLanguage : (selectedParentBook?.original_language || selectedParentBook?.language || "fr"),
           parent_ouvrage_id: !isOriginal && selectedParentBook ? selectedParentBook.id : undefined,
         }
       );
@@ -452,7 +484,7 @@ export default function NewDepositPage() {
           pre_edition_dossier_id: selectedPreEdition?.id,
           authors_emails: authorsEmailsStr,
           is_original: isOriginal,
-          original_language: isOriginal ? (language.toLowerCase().startsWith("en") ? "en" : "fr") : (selectedParentBook?.language || "fr"),
+          original_language: isOriginal ? originalLanguage : (selectedParentBook?.original_language || selectedParentBook?.language || "fr"),
           parent_ouvrage_id: !isOriginal && selectedParentBook ? selectedParentBook.id : undefined,
           onUploadProgress: (percent) => {
             setUploadProgress(percent);
@@ -877,9 +909,86 @@ export default function NewDepositPage() {
                 </button>
               </div>
 
-              {/* Sélecteur de l'ouvrage parent si traduction */}
+              {/* Sélecteur de langue originale si original */}
+              {isOriginal && (
+                <div className="pt-3 border-t border-border grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                  <div className="sm:col-span-6 space-y-0.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                        <Languages className="w-3.5 h-3.5 text-gold" />
+                        Langue originale de l&apos;ouvrage *
+                      </label>
+                      {aiResult?.language && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const matchedLang = matchLanguage(aiResult.language);
+                            const code = LABEL_TO_LANG_CODE[matchedLang] || "fr";
+                            setOriginalLanguage(code);
+                            setLanguage(matchedLang);
+                          }}
+                          className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                          title={`Corriger avec la suggestion IA : ${matchLanguage(aiResult.language)}`}
+                        >
+                          <Wand2 className="w-2.5 h-2.5" />
+                          IA : {matchLanguage(aiResult.language)}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-foreground-muted">
+                      Définissez manuellement la langue réelle du fichier déposé ou appliquez la suggestion IA.
+                    </p>
+                  </div>
+                  <div className="sm:col-span-6">
+                    <select
+                      value={originalLanguage}
+                      onChange={(e) => {
+                        const newCode = e.target.value;
+                        setOriginalLanguage(newCode);
+                        setLanguage(LANG_CODE_TO_LABEL[newCode] || "Français");
+                      }}
+                      className="w-full bg-background border border-border rounded-xl p-2.5 text-xs sm:text-sm text-foreground font-semibold focus:ring-2 focus:ring-navy min-h-[40px]"
+                    >
+                      {AVAILABLE_LANGUAGES_LIST.map((lang) => (
+                        <option key={lang.code} value={lang.code}>
+                          {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Sélecteur de l'ouvrage parent et langue si traduction */}
               {!isOriginal && (
-                <div className="pt-3 border-t border-border space-y-2">
+                <div className="pt-3 border-t border-border space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                    <div className="sm:col-span-6 space-y-0.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
+                        <Languages className="w-3.5 h-3.5 text-gold" />
+                        Langue de cette version traduite *
+                      </label>
+                      <p className="text-[11px] text-foreground-muted">
+                        Précisez la langue du document traduit que vous déposez.
+                      </p>
+                    </div>
+                    <div className="sm:col-span-6">
+                      <select
+                        value={LABEL_TO_LANG_CODE[language] || "en"}
+                        onChange={(e) => {
+                          const newCode = e.target.value;
+                          setLanguage(LANG_CODE_TO_LABEL[newCode] || "Anglais");
+                        }}
+                        className="w-full bg-background border border-border rounded-xl p-2.5 text-xs sm:text-sm text-foreground font-semibold focus:ring-2 focus:ring-navy min-h-[40px]"
+                      >
+                        {AVAILABLE_LANGUAGES_LIST.map((lang) => (
+                          <option key={lang.code} value={lang.code}>
+                            {lang.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                   <label className="text-xs font-bold uppercase tracking-wider text-navy block">
                     Sélectionner l'ouvrage original de référence *
                   </label>
@@ -1448,63 +1557,27 @@ export default function NewDepositPage() {
               </div>
             </div>
 
-            {/* Langue & Pays d'Ancrage */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Langue</label>
-                  {aiResult?.language && (
-                    <button
-                      type="button"
-                      onClick={() => setLanguage(matchLanguage(aiResult.language))}
-                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
-                      title={`Appliquer la langue IA : ${matchLanguage(aiResult.language)}`}
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      IA : {matchLanguage(aiResult.language)}
-                    </button>
-                  )}
-                </div>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                >
-                  {getLanguageOptions(aiResult?.language ? matchLanguage(aiResult.language) : null, language).map((lang, i) => (
-                    <option key={i} value={lang}>
-                      {lang}
-                    </option>
-                  ))}
-                </select>
+            {/* Pays d'Ancrage */}
+            <div className="space-y-1.5 max-w-md">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays d&apos;Ancrage</label>
+                {aiResult?.country && (
+                  <button
+                    type="button"
+                    onClick={() => setCountry(matchCountry(aiResult.country))}
+                    className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    title={`Appliquer le pays IA : ${matchCountry(aiResult.country)}`}
+                  >
+                    <Wand2 className="w-2.5 h-2.5" />
+                    IA : {matchCountry(aiResult.country)}
+                  </button>
+                )}
               </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Pays d&apos;Ancrage</label>
-                  {aiResult?.country && (
-                    <button
-                      type="button"
-                      onClick={() => setCountry(matchCountry(aiResult.country))}
-                      className="text-[10px] font-bold text-gold hover:underline inline-flex items-center gap-1 cursor-pointer"
-                      title={`Appliquer le pays IA : ${matchCountry(aiResult.country)}`}
-                    >
-                      <Wand2 className="w-2.5 h-2.5" />
-                      IA : {matchCountry(aiResult.country)}
-                    </button>
-                  )}
-                </div>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
-                >
-                  {getCountryOptions(aiResult?.country ? matchCountry(aiResult.country) : null, country).map((c, i) => (
-                    <option key={i} value={c.code}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CountryCombobox
+                value={country}
+                onChange={(name, code) => setCountry(code || name)}
+                placeholder="Sélectionner le pays..."
+              />
             </div>
           </div>
 

@@ -97,6 +97,7 @@ function mapBackendToDeposit(b: any, fallbackUserId?: string): LayoutDeposit {
     pre_edition_dossier: b.pre_edition_dossier || null,
     is_original: b.is_original ?? true,
     original_language: b.original_language || "fr",
+    parent_ouvrage_id: b.parent_ouvrage?.id ? String(b.parent_ouvrage.id) : (b.parent_ouvrage_id ? String(b.parent_ouvrage_id) : undefined),
     parent_ouvrage_title: b.parent_ouvrage?.title || b.parent_ouvrage_title || undefined,
     available_languages: b.available_languages || [],
   };
@@ -580,6 +581,9 @@ export async function updateDeposit(
     if (updates.has_audio_version !== undefined) formData.append("has_audio_version", String(updates.has_audio_version));
     if (updates.is_paper_available !== undefined) formData.append("is_paper_available", String(updates.is_paper_available));
     if (updates.files?.format) formData.append("format_type", updates.files.format.toLowerCase());
+    if (updates.is_original !== undefined) formData.append("is_original", String(updates.is_original));
+    if (updates.original_language !== undefined) formData.append("original_language", updates.original_language);
+    if ((updates as any).parent_ouvrage_id !== undefined) formData.append("parent_ouvrage_id", String((updates as any).parent_ouvrage_id));
 
     if (bookFile) formData.append("book_file", bookFile);
     if (coverFile) formData.append("cover_image", coverFile);
@@ -625,6 +629,9 @@ export async function updateDeposit(
   if (updates.has_audio_version !== undefined) payload.has_audio_version = updates.has_audio_version;
   if (updates.is_paper_available !== undefined) payload.is_paper_available = updates.is_paper_available;
   if (updates.files?.format) payload.format_type = updates.files.format.toLowerCase();
+  if (updates.is_original !== undefined) payload.is_original = updates.is_original;
+  if (updates.original_language !== undefined) payload.original_language = updates.original_language;
+  if ((updates as any).parent_ouvrage_id !== undefined) payload.parent_ouvrage_id = (updates as any).parent_ouvrage_id;
 
   const res = await fetch(`/api/bff/catalog/my-deposits/${id}/`, {
     method: "PATCH",

@@ -67,3 +67,15 @@
 - [X]  CHK023 La mise à jour exhaustive et obligatoire du document `GUIDE_INTEGRATION_ACCES_MIXTE.md` et de ses trois SDKs (Python, TypeScript, PHP) est-elle spécifiée ? [FR-024]
 - [X]  CHK024 Le chargement rapide sans limitation arbitraire du catalogue partenaire via cache Redis serveur LAHAThèque et préchargement relationnel est-il formalisé ? [FR-015, FR-024]
 - [X]  CHK025 La résolution dynamique en cascade de la langue sur le streaming de session partenaire (`?lang=`) avec repli transparent sans rupture est-elle actée ? [FR-009, FR-024]
+
+---
+
+## 8. Interface d'Édition Admin & Comboboxes Normalisées
+
+- [X]  CHK026 La page d'édition complète (`/admin/catalog/[id]/edit`) et l'intégration des Comboboxes normalisées (`PublisherCombobox`, `DisciplineCombobox` multi-sélection, `AuthorCombobox`, `UniversityCombobox`, `CountryCombobox`) avec re-téléversement Cloudflare R2 et gestion multilingue sont-elles formellement spécifiées ? [FR-025]
+
+---
+
+## 9. Performance & Optimisation du Mode Immersion 3D
+
+- [X]  CHK027 L'ouverture instantanée du mode immersion 3D (< 400 ms) via virtualisation DOM de FlipBook, rendu prioritaire immédiat des 2 premières pages, cache navigateur IndexedDB et usage léger de Redis pour les métadonnées est-elle garantie sans surcharge RAM ? [FR-026, SC-007]

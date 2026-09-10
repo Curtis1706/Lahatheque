@@ -289,30 +289,48 @@ export async function getAdminCatalog(): Promise<AdminCatalogBook[]> {
   return [];
 }
 
-export async function updateBookPricing(
+export async function getAdminCatalogBook(bookId: string): Promise<AdminCatalogBook | null> {
+  try {
+    const res = await fetch(`/api/bff/admin/catalog/pricing/${bookId}/`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data || null;
+  } catch (err) {
+    console.error("Erreur récupération ouvrage:", err);
+    return null;
+  }
+}
+
+export async function updateAdminBook(
   bookId: string,
-  pricing: { 
-    price_digital?: number; 
-    price_paper?: number; 
-    price_audio?: number; 
-    has_audio_version?: boolean; 
-    title?: string; 
-    status?: string;
-    is_original?: boolean;
-    original_language?: string;
+  payload: Partial<AdminCatalogBook> & {
+    cover_key?: string;
+    file_key?: string;
+    deleted_languages?: string[];
   }
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   const res = await fetch(`/api/bff/admin/catalog/pricing/${bookId}/`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(pricing),
+    body: JSON.stringify(payload),
   });
   if (res.ok) {
     const data = await res.json();
     return { success: true, message: data.message || 'Ouvrage mis à jour avec succès.' };
   }
-  const errData = await res.json();
-  return { success: false, error: errData.error || 'Erreur mise à jour prix.' };
+  const errData = await res.json().catch(() => ({}));
+  return { success: false, error: errData.error || 'Erreur mise à jour ouvrage.' };
+}
+
+export async function updateBookPricing(
+  bookId: string,
+  pricing: Partial<AdminCatalogBook> & {
+    cover_key?: string;
+    file_key?: string;
+    deleted_languages?: string[];
+  }
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  return updateAdminBook(bookId, pricing);
 }
 
 export async function resetBookPricing(bookId: string): Promise<{ success: boolean; message?: string; error?: string }> {
