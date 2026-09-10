@@ -312,10 +312,6 @@ export function SavoirAfriqueSection() {
           >
             {/* Contrôles tactiles mobiles pour explorer le schéma en vue normale ou agrandie */}
             <div className="flex sm:hidden items-center justify-between px-3.5 py-2 bg-background border-b border-border text-[11px] text-foreground-muted">
-              <span className="flex items-center gap-1.5 font-medium">
-                <Sparkles className="w-3.5 h-3.5 text-gold" />
-                <span>Schéma interactif animé</span>
-              </span>
               <button
                 type="button"
                 onClick={() => {
