@@ -134,6 +134,26 @@ class UniversityKpisView(APIView):
                 for item in faculty_distrib:
                     item["percent"] = round((item["consultations"] / total_disc_c) * 100, 1)
 
+        total_ca = statements.aggregate(s=Sum('total_sales_catalog'))['s'] or Decimal('0.00')
+        total_university_share = statements.aggregate(s=Sum('net_royalty_amount'))['s'] or Decimal('0.00')
+        total_laha_share = total_ca - total_university_share
+
+        if total_ca > 0:
+            university_share_percent = round(float(total_university_share / total_ca) * 100, 1)
+            laha_share_percent = round(100 - university_share_percent, 1)
+        else:
+            university_share_percent = 0.0
+            laha_share_percent = 0.0
+
+        revenue_split = {
+            "total_ca": float(total_ca),
+            "university_amount": float(total_university_share),
+            "university_percent": university_share_percent,
+            "laha_amount": float(total_laha_share),
+            "laha_percent": laha_share_percent,
+            "currency": "XOF",
+        }
+
         return Response({
             "success": True,
             "data": {
@@ -148,6 +168,7 @@ class UniversityKpisView(APIView):
                 "consultations_trend_percent": 14.2,
                 "top_disciplines": top_disc,
                 "faculty_distribution": faculty_distrib,
+                "revenue_split": revenue_split,
             },
             "error": None
         })

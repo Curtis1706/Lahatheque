@@ -795,7 +795,7 @@ class AuthorSubmissionsView(APIView):
 
 class LegalKpisView(APIView):
     """GET /api/v1/rights/legal/kpis/ - Métriques réelles et timeline glissante pour le Juriste."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request):
         now = timezone.now()
@@ -883,7 +883,7 @@ def map_db_type_to_frontend(db_type):
 
 class LegalContractsListView(APIView):
     """GET/POST /api/v1/rights/legal/contracts/ - GED et Recherche plein texte des contrats."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
@@ -1244,7 +1244,7 @@ class LegalContractsListView(APIView):
 
 class LegalContractsFormOptionsView(APIView):
     """GET /api/v1/rights/legal/contracts/form-options/ - Options réelles de liaison en BD."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request):
         from apps.catalog.models import Ouvrage
@@ -1341,7 +1341,7 @@ class LegalContractsFormOptionsView(APIView):
 
 class LegalContractDetailView(APIView):
     """GET/PATCH/POST /api/v1/rights/legal/contracts/<id>/"""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request, id):
         from apps.commerce.models import LigneCommande
@@ -1709,7 +1709,7 @@ class ContractReindexView(APIView):
     POST /api/v1/rights/legal/contracts/<uuid:id>/reindex/
     Déclenche manuellement la réindexation et l'analyse OCR d'un contrat en tâche de fond.
     """
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def post(self, request, id):
         try:
@@ -1744,7 +1744,7 @@ class ContractReindexAllView(APIView):
     Lance la réindexation OCR en tâche de fond pour tous les contrats existants
     ayant un fichier mais dont le texte est incomplet (< 50 car.) ou en statut failed.
     """
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def post(self, request):
         from apps.rights.tasks.ocr_tasks import trigger_contract_ocr
@@ -1779,7 +1779,7 @@ class ContractReindexAllView(APIView):
 
 class LegalRoyaltiesListView(APIView):
     """GET/POST/PATCH /api/v1/rights/legal/royalties/ - Clés de répartition des droits par ouvrage."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request):
         ouvrages = Ouvrage.objects.all().prefetch_related('authors', 'repartitions_droits', 'author_rights')
@@ -1859,7 +1859,7 @@ class LegalRoyaltiesListView(APIView):
 
 class LegalRoyaltiesBatchView(APIView):
     """POST /api/v1/rights/legal/royalties/batch/ - Ajustement de taux de redevance & validation 100%."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def post(self, request):
         book_id = request.data.get("book_id")
@@ -1988,7 +1988,7 @@ class LegalRoyaltiesBatchView(APIView):
 
 class LegalAiSuggestionsListView(APIView):
     """GET /api/v1/rights/legal/ai-suggestions/ - Propositions d'extraction IA de droits réelles."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request):
         qs = AIRoyaltySuggestion.objects.filter(is_validated=False).select_related('contrat', 'ouvrage').prefetch_related('ouvrage__authors').order_by('-created_at')
@@ -2047,7 +2047,7 @@ class LegalAiSuggestionsListView(APIView):
 
 class LegalAiSuggestionDecisionView(APIView):
     """POST /api/v1/rights/legal/ai-suggestions/<id>/decide/"""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def post(self, request, id):
         decision = request.data.get("decision", "approve")
@@ -2196,7 +2196,7 @@ class LegalAiSuggestionDecisionView(APIView):
 
 class LegalUniversityRoyaltiesListView(APIView):
     """GET /api/v1/rights/legal/royalties/universities/ - Redevances universités réelles."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request):
         from apps.partners.models import Institution
@@ -2241,7 +2241,7 @@ class LegalUniversityRoyaltiesListView(APIView):
 
 class LegalPublisherRoyaltiesListView(APIView):
     """GET/PATCH /api/v1/rights/legal/royalties/publishers/ - Redevances éditeurs tiers réels."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request):
         from apps.publishers_portal.models import Publisher
@@ -2298,7 +2298,7 @@ class LegalPublisherRoyaltiesListView(APIView):
 
 class LegalPreEditionsListView(APIView):
     """GET/POST /api/v1/rights/legal/pre-editions/ - Dossiers de pré-édition RÉELS avec filtres."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request):
         qs = PreEditionDossier.objects.all().select_related('contrat', 'auteur_user').order_by('-created_at')
@@ -2392,7 +2392,7 @@ class LegalPreEditionsListView(APIView):
 
 class LegalPreEditionDetailView(APIView):
     """GET/PATCH/DELETE /api/v1/rights/legal/pre-editions/<id>/ - Gestion individuelle d'un dossier de pré-édition."""
-    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole]
+    permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request, pk):
         dossier = PreEditionDossier.objects.filter(id=pk).select_related('contrat', 'auteur_user').first()

@@ -18,6 +18,9 @@ import {
   Filter,
   Check,
   BookOpen,
+  Warehouse,
+  Building2,
+  Package,
 } from "lucide-react";
 import { toast } from "sonner";
 import { OrderCreateForm } from "@/components/student/OrderCreateForm";
@@ -401,6 +404,56 @@ export default function AdminOrdersPage() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* ── Accès Rapide Files Opérationnelles (Gestionnaire) ───────────── */}
+      <div className="flex flex-wrap items-center gap-2 p-3 bg-background-secondary rounded-2xl border border-border">
+        <span className="text-[11px] font-bold text-navy uppercase tracking-wider flex items-center gap-1.5 mr-1">
+          <Truck className="w-3.5 h-3.5 text-gold" />
+          Files Logistique :
+        </span>
+        <Link
+          href="/manager"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background hover:bg-background-secondary border border-border text-navy text-xs font-semibold hover:border-gold hover:text-gold transition-colors min-h-[36px]"
+        >
+          <Warehouse className="w-3.5 h-3.5 text-gold" />
+          <span>Vue Gestionnaire</span>
+        </Link>
+        <Link
+          href="/manager/delivery"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background hover:bg-background-secondary border border-border text-navy text-xs font-semibold hover:border-gold hover:text-gold transition-colors min-h-[36px]"
+        >
+          <Package className="w-3.5 h-3.5 text-gold" />
+          <span>À expédier</span>
+        </Link>
+        <Link
+          href="/manager/delivery/in-transit"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background hover:bg-background-secondary border border-border text-navy text-xs font-semibold hover:border-gold hover:text-gold transition-colors min-h-[36px]"
+        >
+          <Truck className="w-3.5 h-3.5 text-gold" />
+          <span>En transit</span>
+        </Link>
+        <Link
+          href="/manager/delivery/delivered"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background hover:bg-background-secondary border border-border text-navy text-xs font-semibold hover:border-gold hover:text-gold transition-colors min-h-[36px]"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 text-gold" />
+          <span>Livrées</span>
+        </Link>
+        <Link
+          href="/manager/delivery/institutional"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background hover:bg-background-secondary border border-border text-navy text-xs font-semibold hover:border-gold hover:text-gold transition-colors min-h-[36px]"
+        >
+          <Building2 className="w-3.5 h-3.5 text-gold" />
+          <span>Institutionnelles</span>
+        </Link>
+        <Link
+          href="/manager/stock/alerts"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background hover:bg-background-secondary border border-border text-navy text-xs font-semibold hover:border-gold hover:text-gold transition-colors min-h-[36px]"
+        >
+          <AlertCircle className="w-3.5 h-3.5 text-gold" />
+          <span>Alertes de Rupture</span>
+        </Link>
       </div>
 
       {/* ── Section 1 — Création Manuelle de Commande pour un Client ─────── */}

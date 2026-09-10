@@ -1,3 +1,12 @@
+export interface UniversityRevenueSplit {
+  total_ca: number;
+  university_amount: number;
+  university_percent: number;
+  laha_amount: number;
+  laha_percent: number;
+  currency: string;
+}
+
 export interface UniversityKpis {
   institution_id?: string;
   institution_name?: string;
@@ -11,6 +20,7 @@ export interface UniversityKpis {
   top_disciplines: { discipline: string; consultations: number; percent: number }[];
   faculty_distribution: { code: string; name: string; consultations: number; percent: number; color: string }[];
   consultations_trend_percent: number;
+  revenue_split?: UniversityRevenueSplit;
 }
 
 export interface UniversityFacultyData {

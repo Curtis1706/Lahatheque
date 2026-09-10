@@ -18,6 +18,7 @@ import {
   ShoppingBag,
   Sparkles,
 } from "lucide-react";
+import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from "recharts";
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
 import { FacultyStatsChart } from "@/components/features/university/faculty-stats-chart";
 import { BouquetCard } from "@/components/features/university/bouquet-card";
@@ -97,6 +98,19 @@ export default function UniversityOverviewPage() {
       </div>
     );
   }
+
+  const splitData = kpis?.revenue_split
+    ? [
+        {
+          name: `Votre établissement (${kpis.revenue_split.university_percent}%)`,
+          value: kpis.revenue_split.university_amount,
+        },
+        {
+          name: `LAHAThèque (${kpis.revenue_split.laha_percent}%)`,
+          value: kpis.revenue_split.laha_amount,
+        },
+      ]
+    : [];
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-8 max-w-7xl mx-auto">
@@ -194,13 +208,48 @@ export default function UniversityOverviewPage() {
         />
       </div>
 
-      {/* Graphique Donut par Faculté (Masqué à la demande client) */}
-      {/*
-      <FacultyStatsChart
-        facultyDistribution={kpis.faculty_distribution}
-        totalConsultations={kpis.monthly_consultations_count}
-      />
-      */}
+      {/* Répartition des Revenus (Transparence Université / LAHAThèque - Section 11 CDC) */}
+      {kpis?.revenue_split && kpis.revenue_split.total_ca > 0 && (
+        <div className="p-4 sm:p-6 rounded-2xl border border-border bg-background-secondary shadow-xs">
+          <h3 className="text-sm font-bold text-navy uppercase tracking-wider mb-1">
+            Répartition des Revenus
+          </h3>
+          <p className="text-[11px] text-foreground-muted mb-3">
+            Transparence sur la répartition entre votre établissement et LAHAThèque.
+          </p>
+          <div className="w-full h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={splitData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label
+                >
+                  <Cell fill="var(--navy)" />
+                  <Cell fill="var(--gold)" />
+                </Pie>
+                <Tooltip formatter={(value: any) => `${Number(value || 0).toLocaleString("fr-FR")} FCFA`} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {kpis?.revenue_split?.total_ca === 0 && (
+        <div className="p-4 rounded-2xl border border-border bg-background-secondary">
+          <h3 className="text-sm font-bold text-navy uppercase tracking-wider mb-1">
+            Répartition des Revenus
+          </h3>
+          <p className="text-xs text-foreground-muted italic">
+            Aucune donnée de répartition disponible pour l&apos;instant — apparaîtra après le premier relevé de redevances généré pour votre établissement.
+          </p>
+        </div>
+      )}
 
 
 

@@ -334,18 +334,6 @@ export function DashboardSidebar() {
               { label: "Manuscrits Reçus (Public)", href: "/admin/manuscript-leads", icon: <Mail className="size-4" /> },
               { label: "Manuscrits à Préparer", href: "/admin/manuscript-submissions", icon: <FileCheck className="size-4" /> },
               { label: "Dépôts Éditeurs Tiers", href: "/admin/publisher-deposits", icon: <BookOpen className="size-4" /> },
-              { label: "Contrats & Droits d'Auteur", href: "/admin/contracts", icon: <Scale className="size-4" /> },
-              {
-                label: "Stock Physique & Hubs",
-                href: "/admin/stock",
-                icon: <Boxes className="size-4" />,
-                sublinks: [
-                  { label: "Vue Stock & Hubs", href: "/admin/stock", icon: <Boxes className="size-3.5" /> },
-                  { label: "Flux & Pertes", href: "/admin/stock/movements", icon: <TrendingDown className="size-3.5" /> },
-                  { label: "Entrepôts Régionaux", href: "/admin/stock/warehouses", icon: <Building2 className="size-3.5" /> },
-                ],
-              },
-              { label: "Gestion des commandes", href: "/admin/orders", icon: <PackageCheck className="size-4" /> },
               {
                 label: "Gestion des Finances",
                 href: "/admin/finance",
@@ -388,6 +376,67 @@ export function DashboardSidebar() {
                   { label: "Gestion des guides", href: "/admin/guides", icon: <Edit2 className="size-3.5" /> },
                 ],
               },
+            ],
+          },
+          {
+            groupLabel: "Gestion Opérationnelle & Logistique",
+            items: [
+              { label: "Vue d'ensemble Gestionnaire", href: "/manager", icon: <Warehouse className="size-4" /> },
+              {
+                label: "Gestion des Commandes",
+                href: "/admin/orders",
+                icon: <Truck className="size-4" />,
+                sublinks: [
+                  { label: "Toutes les Commandes", href: "/admin/orders", icon: <PackageCheck className="size-3.5" /> },
+                  { label: "À expédier", href: "/manager/delivery", icon: <Package className="size-3.5" /> },
+                  { label: "En transit", href: "/manager/delivery/in-transit", icon: <Truck className="size-3.5" /> },
+                  { label: "Livrées", href: "/manager/delivery/delivered", icon: <CheckSquare className="size-3.5" /> },
+                  { label: "Commandes Institutionnelles", href: "/manager/delivery/institutional", icon: <Building2 className="size-3.5" /> },
+                ],
+              },
+              {
+                label: "Stock Physique & Hubs",
+                href: "/admin/stock",
+                icon: <Boxes className="size-4" />,
+                sublinks: [
+                  { label: "Vue Stock & Hubs", href: "/admin/stock", icon: <Boxes className="size-3.5" /> },
+                  { label: "Flux & Pertes", href: "/admin/stock/movements", icon: <TrendingDown className="size-3.5" /> },
+                  { label: "Alertes de Rupture", href: "/manager/stock/alerts", icon: <AlertTriangle className="size-3.5" /> },
+                  { label: "Entrepôts Régionaux", href: "/admin/stock/warehouses", icon: <Building2 className="size-3.5" /> },
+                ],
+              },
+              { label: "Coordination des Ruptures", href: "/manager/coordination", icon: <ArrowUpCircle className="size-4" /> },
+              { label: "Finances & Flux Logistique", href: "/manager/finance", icon: <Wallet className="size-4" /> },
+              { label: "Rapports & Exports Logistique", href: "/manager/reports", icon: <FileBarChart className="size-4" /> },
+            ],
+          },
+          {
+            groupLabel: "Affaires Juridiques & Contrats",
+            items: [
+              { label: "Publication en Attente", href: "/legal-reviewer/publication-en-attente", icon: <BookOpenCheck className="size-4" /> },
+              {
+                label: "Contrats Légaux",
+                href: "/legal-reviewer/contracts",
+                icon: <ShieldCheck className="size-4" />,
+                sublinks: [
+                  { label: "Base Documentaire & GED", href: "/legal-reviewer/contracts", icon: <ShieldCheck className="size-3.5" /> },
+                  { label: "Nouveau Contrat", href: "/legal-reviewer/contracts/new", icon: <PlusCircle className="size-3.5" /> },
+                  { label: "Arbitrage Dérogatoire", href: "/admin/contracts", icon: <Scale className="size-3.5" /> },
+                ],
+              },
+              { label: "Droits d'Auteur", href: "/legal-reviewer/royalties", icon: <Percent className="size-4" /> },
+              {
+                label: "Pré-éditions",
+                href: "/legal-reviewer/pre-editions",
+                icon: <PenTool className="size-4" />,
+                sublinks: [
+                  { label: "Dossiers de Pré-édition", href: "/legal-reviewer/pre-editions", icon: <PenTool className="size-3.5" /> },
+                  { label: "Nouveau Dossier", href: "/legal-reviewer/pre-editions", icon: <PlusCircle className="size-3.5" /> },
+                ],
+              },
+              { label: "Redevances Partenaires", href: "/legal-reviewer/redevances", icon: <DollarSign className="size-4" /> },
+              { label: "Relances & Impayés", href: "/legal-reviewer/relances", icon: <BellRing className="size-4" /> },
+              { label: "Validation Livres Audio", href: "/legal-reviewer/audio", icon: <Headphones className="size-4" /> },
             ],
           },
         ];

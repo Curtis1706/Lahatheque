@@ -1,5 +1,6 @@
 import type {
   UniversityKpis,
+  UniversityRevenueSplit,
   UniversityFacultyData,
   UniversityBouquet,
   UniversityBookCatalogItem,
@@ -9,6 +10,8 @@ import type {
   UniversityRoyaltiesDetailData,
   UniversityProfileData,
 } from "../types/university";
+
+export type { UniversityRevenueSplit };
 
 const BFF = "/api/bff/partners/university";
 

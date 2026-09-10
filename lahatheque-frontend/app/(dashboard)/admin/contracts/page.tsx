@@ -30,6 +30,9 @@ import {
   RotateCw,
   ShieldCheck,
   Tag,
+  PlusCircle,
+  BookOpenCheck,
+  PenTool,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -326,7 +329,7 @@ export default function AdminContractsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={loadData}
@@ -337,11 +340,32 @@ export default function AdminContractsPage() {
             <RotateCw className={`w-4 h-4 text-navy ${loading ? "animate-spin" : ""}`} />
           </button>
           <Link
-            href="/admin/royalties"
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-background border border-border text-navy text-xs font-semibold hover:border-gold hover:text-gold transition-colors min-h-[42px]"
+            href="/legal-reviewer/contracts"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs font-semibold hover:border-gold hover:text-gold transition-colors min-h-[42px]"
           >
-            <Coins className="w-4 h-4 text-gold" />
-            <span>Gestion des Redevances</span>
+            <ShieldCheck className="w-4 h-4 text-gold" />
+            <span>Base GED &amp; OCR</span>
+          </Link>
+          <Link
+            href="/legal-reviewer/publication-en-attente"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs font-semibold hover:border-gold hover:text-gold transition-colors min-h-[42px]"
+          >
+            <BookOpenCheck className="w-4 h-4 text-gold" />
+            <span>Publications en Attente</span>
+          </Link>
+          <Link
+            href="/legal-reviewer/pre-editions"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs font-semibold hover:border-gold hover:text-gold transition-colors min-h-[42px]"
+          >
+            <PenTool className="w-4 h-4 text-gold" />
+            <span>Pré-éditions</span>
+          </Link>
+          <Link
+            href="/legal-reviewer/contracts/new"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors min-h-[42px] shadow-xs"
+          >
+            <PlusCircle className="w-4 h-4 text-gold" />
+            <span>Nouveau Contrat</span>
           </Link>
         </div>
       </div>

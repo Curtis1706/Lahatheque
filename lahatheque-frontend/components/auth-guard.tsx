@@ -25,6 +25,8 @@ function resolveAuthorization(
   allowedRoles: AppRole[]
 ): boolean {
   if (allowedRoles.length === 0) return true
+  // Admin et Super Admin disposent d'un accès universel à tous les espaces du dashboard
+  if (effectiveRole === 'admin' || effectiveRole === 'super_admin') return true
   if (allowedRoles.includes(effectiveRole as AppRole)) return true
   // Cas spécial : grossiste (wholesaler <-> super_client)
   if (allowedRoles.includes('wholesaler') && effectiveRole === 'super_client') return true
