@@ -668,10 +668,16 @@ class StudentCatalogView(APIView):
                 qs = qs.filter(Q(discipline__name__iexact=discipline_id) | Q(discipline__name__icontains=discipline_id))
 
         format_type = request.query_params.get('format')
-        if format_type == 'audio':
-            qs = qs.filter(Q(format_type='audio') | Q(has_audio_version=True) | Q(audio_tracks__isnull=False)).distinct()
-        elif format_type and format_type != 'all':
-            qs = qs.filter(format_type=format_type)
+        if format_type and format_type != 'all':
+            f = format_type.lower().strip()
+            if f in ('audio', 'audio_all', 'livres_audio'):
+                qs = qs.filter(Q(format_type='audio') | Q(has_audio_version=True) | Q(audio_tracks__isnull=False)).distinct()
+            elif f in ('digital', 'numerique'):
+                qs = qs.filter(format_type__in=['pdf', 'epub'])
+            elif f in ('paper', 'papier'):
+                qs = qs.filter(is_paper_available=True)
+            else:
+                qs = qs.filter(format_type=f)
 
         language = request.query_params.get('language')
         if language and language != 'all':

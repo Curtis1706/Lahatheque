@@ -26,6 +26,7 @@ import { BookSampleModal } from "@/components/features/student/book-sample-modal
 import { AuthorCatalogOrderModal } from "@/components/features/author/author-catalog-order-modal";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { CATALOG_LANGUAGE_OPTIONS } from "@/lib/constants/catalog-languages";
+import { FormatFilterTabs } from "@/components/features/catalog/format-filter-tabs";
 
 function SkeletonBook() {
   return (
@@ -236,6 +237,7 @@ export default function AuthorCatalogPage() {
   const [search, setSearch] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState<string>("all");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
+  const [selectedFormat, setSelectedFormat] = useState<string>("all");
 
   const [sampleBook, setSampleBook] = useState<BookAPI | null>(null);
   const [orderModalBook, setOrderModalBook] = useState<BookAPI | null>(null);
@@ -247,7 +249,7 @@ export default function AuthorCatalogPage() {
         getStudentCatalog(
           search.trim() || undefined,
           selectedDiscipline !== "all" ? selectedDiscipline : undefined,
-          undefined,
+          selectedFormat !== "all" ? selectedFormat : undefined,
           undefined,
           undefined,
           selectedLanguage !== "all" ? selectedLanguage : undefined
@@ -263,7 +265,7 @@ export default function AuthorCatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDiscipline, selectedLanguage, search]);
+  }, [selectedDiscipline, selectedFormat, selectedLanguage, search]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -332,6 +334,14 @@ export default function AuthorCatalogPage() {
         </div>
       </div>
 
+      {/* Onglets de formats d'acquisition */}
+      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+        <FormatFilterTabs
+          value={selectedFormat}
+          onChange={(val) => setSelectedFormat(val)}
+        />
+      </div>
+
       {/* Barre de Recherche & Filtres */}
       <div className="p-4 rounded-3xl bg-background border border-border flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -372,13 +382,14 @@ export default function AuthorCatalogPage() {
           </select>
         </div>
 
-        {(search || selectedDiscipline !== "all" || selectedLanguage !== "all") && (
+        {(search || selectedDiscipline !== "all" || selectedLanguage !== "all" || selectedFormat !== "all") && (
           <button
             type="button"
             onClick={() => {
               setSearch("");
               setSelectedDiscipline("all");
               setSelectedLanguage("all");
+              setSelectedFormat("all");
             }}
             className="px-4 py-2 text-xs font-semibold text-gold hover:text-gold-dark transition-colors shrink-0 flex items-center justify-center cursor-pointer min-h-[44px]"
           >

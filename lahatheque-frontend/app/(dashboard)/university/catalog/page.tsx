@@ -16,9 +16,25 @@ import { getUniversityCatalog } from "@/lib/services/university";
 import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import type { UniversityBookCatalogItem } from "@/lib/types/university";
 import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
+import { FormatFilterTabs } from "@/components/features/catalog/format-filter-tabs";
+
+function matchesFormatFilter(book: UniversityBookCatalogItem, format: string): boolean {
+  if (!format || format === "all") return true;
+  if (format === "audio") {
+    return Boolean(book.has_audio || book.has_audio_version || book.price_audio || book.format_type === "audio");
+  }
+  if (format === "paper") {
+    return Boolean(book.is_paper_available);
+  }
+  if (format === "digital") {
+    return book.format_type === "pdf" || book.format_type === "epub" || (book as any).is_digital_available !== false;
+  }
+  return true;
+}
 
 export default function UniversityCatalogPage() {
   const [books, setBooks] = useState<UniversityBookCatalogItem[]>([]);
+  const [selectedFormat, setSelectedFormat] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [selectedBook, setSelectedBook] = useState<UniversityBookCatalogItem | null>(null);
   const { disciplineNames } = useDisciplines();
@@ -160,6 +176,10 @@ export default function UniversityCatalogPage() {
     },
   ];
 
+  const filteredBooks = useMemo(() => {
+    return books.filter((b) => matchesFormatFilter(b, selectedFormat));
+  }, [books, selectedFormat]);
+
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
       {/* Breadcrumb */}
@@ -197,9 +217,17 @@ export default function UniversityCatalogPage() {
         </Link>
       </div>
 
+      {/* Onglets de filtrage par format */}
+      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+        <FormatFilterTabs
+          value={selectedFormat}
+          onChange={setSelectedFormat}
+        />
+      </div>
+
       {/* Table DataTable 21st.dev paginée avec recherche et filtre par discipline intégrés */}
       <DataTable
-        data={books}
+        data={filteredBooks}
         columns={columns}
         rowKey="id"
         loading={loading}

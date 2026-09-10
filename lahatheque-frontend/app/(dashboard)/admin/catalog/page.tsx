@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
@@ -28,12 +28,28 @@ import { ViewToggle, ViewMode } from "@/components/features/student/view-toggle"
 // import { AudioReplacementDropzone } from "@/components/features/layout-artist/audio-replacement-dropzone";
 import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
+import { FormatFilterTabs } from "@/components/features/catalog/format-filter-tabs";
+
+function matchesFormatFilter(book: AdminCatalogBook, format: string): boolean {
+  if (!format || format === "all") return true;
+  if (format === "audio") {
+    return Boolean(book.has_audio_version || (book as any).has_audio || (book as any).price_audio || book.format_type === "audio");
+  }
+  if (format === "paper") {
+    return Boolean(book.is_paper_available);
+  }
+  if (format === "digital") {
+    return book.format_type === "pdf" || book.format_type === "epub" || (book as any).is_digital_available !== false;
+  }
+  return true;
+}
 
 export default function AdminCatalogPage() {
   // const { playBook } = useAudioPlayer();
   const [books, setBooks] = useState<AdminCatalogBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [selectedFormat, setSelectedFormat] = useState<string>("all");
   const [gridLanguage, setGridLanguage] = useState<string>("all");
   const [gridSearch, setGridSearch] = useState<string>("");
 
@@ -221,16 +237,22 @@ export default function AdminCatalogPage() {
     },
   ];
 
-  const displayedGridBooks = books.filter((book) => {
-    const matchesLang = matchesLanguageFilter(book, gridLanguage);
-    const q = gridSearch.trim().toLowerCase();
-    const matchesSearch =
-      !q ||
-      book.title.toLowerCase().includes(q) ||
-      (book.author_name && book.author_name.toLowerCase().includes(q)) ||
-      (Array.isArray(book.authors) && book.authors.some((a) => a.toLowerCase().includes(q)));
-    return matchesLang && matchesSearch;
-  });
+  const filteredBooks = useMemo(() => {
+    return books.filter((book) => matchesFormatFilter(book, selectedFormat));
+  }, [books, selectedFormat]);
+
+  const displayedGridBooks = useMemo(() => {
+    return filteredBooks.filter((book) => {
+      const matchesLang = matchesLanguageFilter(book, gridLanguage);
+      const q = gridSearch.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        book.title.toLowerCase().includes(q) ||
+        (book.author_name && book.author_name.toLowerCase().includes(q)) ||
+        (Array.isArray(book.authors) && book.authors.some((a) => a.toLowerCase().includes(q)));
+      return matchesLang && matchesSearch;
+    });
+  }, [filteredBooks, gridLanguage, gridSearch]);
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto space-y-6">
@@ -277,6 +299,14 @@ export default function AdminCatalogPage() {
             Historique Prix
           </Link>
         </div>
+      </div>
+
+      {/* Onglets de filtrage par format */}
+      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+        <FormatFilterTabs
+          value={selectedFormat}
+          onChange={setSelectedFormat}
+        />
       </div>
 
       {/* Mode de vue conditionnel (Grille / Liste) */}
@@ -412,7 +442,7 @@ export default function AdminCatalogPage() {
         </div>
       ) : (
         <DataTable
-          data={books}
+          data={filteredBooks}
           columns={columns}
           rowKey="id"
           loading={loading}
@@ -420,6 +450,7 @@ export default function AdminCatalogPage() {
           filterOptions={[
             { value: "all", label: "Tous les Statuts" },
             { value: "published", label: "Publiés" },
+            { value: "pending_legal_approval", label: "Attente Juridique" },
             { value: "submitted", label: "En Soumission" },
             { value: "draft", label: "Brouillons" },
             { value: "archived", label: "Archivés" },

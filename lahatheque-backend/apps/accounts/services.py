@@ -411,8 +411,37 @@ def send_otp(identifier: str, channel: str = 'sms') -> None:
         except Exception as mail_err:
             logger.error(f"accounts/send_otp: Échec d'envoi de l'e-mail OTP à {user.email}: {mail_err}")
     elif channel == 'sms':
-        # Logging & dispatch SMS
-        logger.info(f"[SMS OTP] Code {code} préparé pour le mobile {user.phone or identifier}")
+        phone_target = getattr(user, 'phone', None) or identifier
+        if phone_target:
+            from apps.communications.services.sms_service import send_sms_via_fastermessage
+            sms_text = f"Votre code de verification LAHATheque est : {code}. Valable 15 minutes."
+            sms_res = send_sms_via_fastermessage(phone_number=phone_target, message=sms_text)
+            if not sms_res.get("success"):
+                logger.warning(
+                    f"accounts/send_otp: Échec envoi SMS FasterMessage ({sms_res.get('error')}) "
+                    f"pour {phone_target}. Déclenchement automatique du repli e-mail vers {user.email}..."
+                )
+                try:
+                    from apps.communications.services.email_service import send_transactional_email
+                    recipient_name = f"{user.first_name} {user.last_name}".strip() or user.username
+                    send_transactional_email(
+                        email_type="verification_otp",
+                        to_email=user.email,
+                        subject=f"Votre code de vérification LAHAThèque : {code}",
+                        template_name="emails/accounts/verification_otp.html",
+                        context={
+                            "otp_code": code,
+                            "valid_minutes": 15,
+                            "recipient_name": recipient_name,
+                        },
+                        recipient_name=recipient_name,
+                        async_send=True,
+                    )
+                    logger.info(f"accounts/send_otp: Repli e-mail expédié avec succès à {user.email}")
+                except Exception as fb_err:
+                    logger.error(f"accounts/send_otp: Échec du repli e-mail de secours: {fb_err}")
+        else:
+            logger.warning(f"[SMS OTP] Aucun numéro de téléphone disponible pour {user.email}")
 
 
 def verify_otp(identifier: str, code: str) -> dict:

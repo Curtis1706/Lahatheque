@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { getPublisherBooks } from "@/lib/services/publisher";
 import type { PublisherBook } from "@/lib/types/publisher";
 import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
+import { FormatFilterTabs } from "@/components/features/catalog/format-filter-tabs";
 
 export default function PublisherCatalogPage() {
   const [books, setBooks] = useState<PublisherBook[]>([]);
@@ -16,6 +17,7 @@ export default function PublisherCatalogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [languageFilter, setLanguageFilter] = useState("all");
+  const [formatFilter, setFormatFilter] = useState("all");
 
   useEffect(() => {
     async function loadData() {
@@ -31,6 +33,21 @@ export default function PublisherCatalogPage() {
     return books.filter((b) => {
       if (statusFilter !== "all" && b.status !== statusFilter) return false;
       if (!matchesLanguageFilter(b, languageFilter)) return false;
+      if (formatFilter !== "all") {
+        if (formatFilter === "audio") {
+          const hasAudio = Boolean(
+            (b as any).has_audio ||
+            (b as any).has_audio_version ||
+            (b as any).price_audio ||
+            (b as any).format_type === "audio"
+          );
+          if (!hasAudio) return false;
+        } else if (formatFilter === "paper") {
+          if ((b as any).is_paper_available === false && !b.isbn_print) return false;
+        } else if (formatFilter === "digital") {
+          if ((b as any).format_type === "audio") return false;
+        }
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = b.title.toLowerCase().includes(q);
@@ -40,7 +57,7 @@ export default function PublisherCatalogPage() {
       }
       return true;
     });
-  }, [books, searchQuery, statusFilter, languageFilter]);
+  }, [books, searchQuery, statusFilter, languageFilter, formatFilter]);
 
   const columns: DataTableColumn<PublisherBook>[] = [
     {
@@ -179,6 +196,14 @@ export default function PublisherCatalogPage() {
             Nouveau Dépôt Web
           </Link>
         </div>
+      </div>
+
+      {/* Onglets de filtrage par format */}
+      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+        <FormatFilterTabs
+          value={formatFilter}
+          onChange={(val) => setFormatFilter(val)}
+        />
       </div>
 
       {/* Filtres & Recherche */}

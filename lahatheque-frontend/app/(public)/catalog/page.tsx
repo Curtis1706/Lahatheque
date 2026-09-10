@@ -30,6 +30,7 @@ import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-m
 import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 import { Pagination } from "@/components/ui/pagination";
 import { CATALOG_LANGUAGE_OPTIONS } from "@/lib/constants/catalog-languages";
+import { FormatFilterTabs } from "@/components/features/catalog/format-filter-tabs";
 
 // Liste dynamique des années de publication : de l'année en cours jusqu'à 1950
 const CURRENT_YEAR = new Date().getFullYear();
@@ -552,6 +553,15 @@ function CatalogSearchInner() {
           {/* Liste des Ouvrages */}
           <main className="md:col-span-8 lg:col-span-9 space-y-6">
             
+            {/* Onglets d'accès rapide aux Formats (Tous, Numérique, Audio, Papier) */}
+            <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+              <FormatFilterTabs
+                value={selectedFormat}
+                onChange={(fmt) => handleFilterChange(setSelectedFormat, fmt)}
+                emptyValueAsAll={true}
+              />
+            </div>
+
             {/* Barre de compteur de résultats et options de tri (Norme e-commerce & bibliothèques) */}
             <div 
               ref={resultsTopRef}

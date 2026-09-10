@@ -25,10 +25,26 @@ import { getCatalogBooks } from "@/lib/services/layout-artist";
 import type { LayoutDeposit } from "@/lib/types/layout-artist";
 import { toast } from "sonner";
 import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
+import { FormatFilterTabs } from "@/components/features/catalog/format-filter-tabs";
+
+function matchesFormatFilter(book: LayoutDeposit, format: string): boolean {
+  if (!format || format === "all") return true;
+  if (format === "audio") {
+    return Boolean(book.has_audio_version || (book as any).has_audio || book.price_audio);
+  }
+  if (format === "paper") {
+    return Boolean(book.is_paper_available);
+  }
+  if (format === "digital") {
+    return (book as any).format_type !== "audio";
+  }
+  return true;
+}
 
 export default function ChiefLayoutCatalogPage() {
   const { playBook } = useAudioPlayer();
   const [books, setBooks] = useState<LayoutDeposit[]>([]);
+  const [selectedFormat, setSelectedFormat] = useState<string>("all");
   const [loading, setLoading] = useState(true);
 
   // Modale d'édition
@@ -209,6 +225,10 @@ export default function ChiefLayoutCatalogPage() {
     },
   ];
 
+  const filteredBooks = useMemo(() => {
+    return books.filter((b) => matchesFormatFilter(b, selectedFormat));
+  }, [books, selectedFormat]);
+
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto animate-in fade-in duration-300">
       {/* Breadcrumb */}
@@ -290,9 +310,17 @@ export default function ChiefLayoutCatalogPage() {
         </div>
       </div>
 
+      {/* Onglets de filtrage par format */}
+      <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+        <FormatFilterTabs
+          value={selectedFormat}
+          onChange={setSelectedFormat}
+        />
+      </div>
+
       {/* DataTable Professionnel des Ouvrages */}
       <DataTable
-        data={books}
+        data={filteredBooks}
         columns={columns}
         rowKey="id"
         loading={loading}

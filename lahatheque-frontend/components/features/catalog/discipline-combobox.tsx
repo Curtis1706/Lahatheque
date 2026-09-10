@@ -82,11 +82,10 @@ export function DisciplineCombobox({
     return list;
   }, [rawList, includeAllOption, allOptionLabel, multiple, values]);
 
-  // Gestion du mode multiple
+  // Gestion du mode multiple ou simple
   const handleSelectOption = (selectedValue: string) => {
-    if (!selectedValue) return;
-
     if (multiple && onValuesChange) {
+      if (!selectedValue) return;
       if (values.includes(selectedValue)) {
         // Déjà sélectionné : le retirer (toggle)
         onValuesChange(values.filter((v) => v !== selectedValue));

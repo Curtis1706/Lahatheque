@@ -16,6 +16,7 @@
 - Q: Quelle est l'adresse email exacte du 3ème administrateur pour la réception des alertes internes ? → A: `alhtdharry7@gmail.com` (correction de la faute de frappe initiale `alhtd7@gmail.com`).
 - Q: Comment l'étape d'identification client doit-elle s'afficher au checkout et comment sont traités les différents formats ? → A: Option A (Panneau intégré direct sur `/checkout` avec 2 onglets "Connexion" et "Inscription", panier récapitulatif visible en continu). Les informations de livraison papier sont sauvegardées dans `PhysicalDelivery` et notifient la logistique, tandis que les formats numériques et audio sont immédiatement déverrouillés dans `ReadingProgress` pour la bibliothèque du client (`/student/books`).
 - Q: Comment le demandeur doit-il préciser son besoin lorsqu'il coche l'option "Autre" ? → A: Option B (Aucun champ d'input supplémentaire ; un court texte d'aide invite simplement l'utilisateur à expliciter son besoin dans la zone "Message complémentaire" en bas de formulaire, garantissant une interface épurée).
+- Q: Quelles pages de catalogue doivent intégrer le filtre par format (Livre numérique, Livre papier, Livre audio) ? → A: Rendre le filtrage par format (numérique, audio, papier) 100% fonctionnel sur le catalogue public (`/catalog`), et intégrer le filtre de format sur l'ensemble des pages catalogues des dashboards (`/student/catalog`, etc.).
 
 ---
 
