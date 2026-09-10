@@ -1,9 +1,11 @@
 <!--
 Sync Impact Report:
-- Version change: 1.3.0 -> 1.4.0
+- Version change: 1.4.0 -> 1.5.0
 - List of modified principles:
-  - XII. Workflow Obligatoire de Conception d'Écrans (/build-lahatheque-screen) et Protocole Multi-Clés 21st.dev (NON-NÉGOCIABLE) -> Suppression définitive de toute tolérance pour les données mockées. Remplacement de l'étape 3 par l'obligation absolue de données réelles typées connectées aux endpoints Django via BFF (Interdiction Totale et Définitive des Mocks).
-- Added principles & sections: Aucun
+  - XI. Traçabilité, Observabilité, Console Logs Systématiques et Journalisation Granulaire (NON-NÉGOCIABLE) : Renforcement strict de l'obligation de placer des console logs détaillés (payloads sanitisés, horodatage, timings en ms, étapes claires) sur chaque action, service, mutation et formulaire frontend pour une détection instantanée et ultra-précise des bugs dans la console du navigateur.
+  - Section Governance : Réaffirmation formelle de l'obligation absolue de suivre l'intégralité des règles du projet (AGENTS.md, rules/, Constitution) sans aucune dérogation possible.
+- Added principles & sections:
+  - XIII. Persistance Mémoire Obligatoire et Continuité d'Agent (NON-NÉGOCIABLE) : Obligation absolue de consigner et détailler systématiquement chaque avancement, décision technique, état d'implémentation et directive dans un fichier mémoire persistant (.specify/memory/project_memory.md). Ce fichier doit être impérativement et systématiquement lu au début de chaque session ou après chaque compaction d'historique pour garantir une continuité parfaite sans aucune perte de contexte.
 - Removed sections: Aucun
 - Follow-up TODOs: Aucun
 -->
@@ -63,10 +65,11 @@ Tout le code source produit doit être richement commenté, avec des docstrings 
 ### X. Interdiction Absolue de Tout Émoji
 Aucun émoji n'est toléré dans le code source, les commentaires, les docstrings, les fichiers de règles, les réponses d'API, les tableaux de bord, les modales, le chat ou la documentation technique. Utiliser exclusivement les icônes vectorielles Lucide React (`lucide-react`) ou de la typographie textuelle soignée.
 
-### XI. Traçabilité, Observabilité et Journalisation Granulaire (NON-NÉGOCIABLE)
-- Chaque traitement asynchrone (OCR, encodage audio, indexation, notifications, imports de masse) doit émettre des logs balisés étape par étape (`[NomModule ETAPE X/Y]`), permettant un diagnostic sans ambiguïté dans les logs Docker / Coolify.
-- Zéro action silencieuse côté frontend : toute interaction utilisateur asynchrone (recherche anti-rebond, réindexation, mutation) doit être tracée dans la console navigateur (`[NomComposant]`) et pourvue d'un feedback visuel immédiat (toast, loader, mise à jour optimiste).
-- En cas d'erreur ou d'échec, persister explicitement la cause de l'erreur dans l'entité de base de données correspondante et consigner l'exception avec trace complète (`exc_info=True`).
+### XI. Traçabilité, Observabilité, Console Logs Systématiques et Journalisation Granulaire (NON-NÉGOCIABLE)
+- **Console Logs Frontend Systématiques & Précis** : Tout composant, service API (`lib/services/`), hook ou formulaire client doit systématiquement insérer des console logs structurés (`console.groupCollapsed` / `console.log` / `console.error`) balisés par module (ex: `[AUTH REGISTER]`, `[PROFILE UPDATE]`, `[READER STREAM]`). Chaque log doit comporter l'horodatage, les données envoyées (avec sanitisation stricte des mots de passe), le temps d'exécution en millisecondes et les détails exhaustifs des réponses d'erreur pour permettre un diagnostic instantané et ultra-précis dans la console du navigateur.
+- **Journalisation Backend Granulaire** : Chaque traitement asynchrone (OCR, encodage audio, indexation, notifications, imports de masse, envoi d'emails) doit émettre des logs balisés étape par étape (`[NomModule ETAPE X/Y]`), permettant un diagnostic sans ambiguïté dans les logs Docker / Coolify.
+- **Zéro Action Silencieuse** : Toute interaction utilisateur asynchrone (recherche anti-rebond, réindexation, mutation, soumission de formulaire) doit être tracée dans la console navigateur et pourvue d'un feedback visuel immédiat (toast, loader, mise à jour optimiste).
+- **Consignation Complète des Exceptions** : En cas d'erreur ou d'échec, persister explicitement la cause de l'erreur dans l'entité de base de données correspondante et consigner l'exception avec trace complète (`exc_info=True`).
 
 ### XII. Workflow Obligatoire de Conception d'Écrans (/build-lahatheque-screen) et Protocole Multi-Clés 21st.dev (NON-NÉGOCIABLE)
 Tout écran, page, modale ou tableau de bord construit sur LAHAThèque doit suivre obligatoirement et séquentiellement les 8 étapes du workflow `/build-lahatheque-screen` :
@@ -85,6 +88,11 @@ Tout écran, page, modale ou tableau de bord construit sur LAHAThèque doit suiv
 6. **Étape 6 — UX Writing Fonctionnel** : Français direct, concis, voix active, boutons de 1 à 3 mots action-first, statuts traduits en français humain (jamais de snake_case brut).
 7. **Étape 7 — Implémentation Modulaire et Connexion Réelle** : TypeScript strict, HTML5 sémantique, ARIA, logique déportée dans des hooks et composants UI réutilisables. Connexion directe aux services API connectés au backend Django via BFF.
 8. **Étape 8 — Validation par la Checklist Finale** : Contrôle obligatoire des 12 critères d'acceptation de l'écran avant toute clôture de tâche.
+
+### XIII. Persistance Mémoire Obligatoire et Continuité d'Agent (NON-NÉGOCIABLE)
+- **Consignation Exhaustive dans le Fichier Mémoire** : Tout ce qui est entrepris, réalisé, validé ou décidé sur le projet doit être consigné de façon exhaustive, détaillée et structurée dans le fichier mémoire persistant du projet (`.specify/memory/project_memory.md`).
+- **Lecture Systématique Obligatoire au Démarrage** : Ce fichier mémoire doit être impérativement lu et chargé au début de chaque session ou après toute compaction/perte d'historique de conversation de l'agent.
+- **Garantie Zéro Perte de Contexte** : L'agent IA ne doit jamais démarrer ou reprendre un travail sans avoir au préalable rechargé la mémoire du projet, assurant ainsi une continuité parfaite des décisions techniques, des règles métier et de l'état des chantiers en cours, même en cas de réinitialisation complète de l'historique de chat.
 
 ---
 
@@ -108,6 +116,6 @@ Tout écran, page, modale ou tableau de bord construit sur LAHAThèque doit suiv
 
 ## Governance
 
-Cette Constitution fait foi sur l'ensemble du projet LAHAThèque et prime sur toute décision locale. Tout code produit doit être audité et validé conformément à ces 12 principes fondamentaux. Toute modification ou amendement requiert une revue de conformité et un incrément sémantique de version.
+Cette Constitution fait foi sur l'ensemble du projet LAHAThèque et prime sur toute décision locale. Tout code produit doit être audité et validé conformément à ces **13 principes fondamentaux**. L'ensemble des règles du projet documentées dans `AGENTS.md`, dans les fichiers de règles (`.agents/rules/`) et dans cette Constitution doivent être strictement et scrupuleusement respectées en toutes circonstances, sans aucune exception ni compromis. Toute modification ou amendement requiert une revue de conformité et un incrément sémantique de version.
 
-**Version**: 1.4.0 | **Ratified**: 2026-08-18 | **Last Amended**: 2026-09-08
+**Version**: 1.5.0 | **Ratified**: 2026-08-18 | **Last Amended**: 2026-09-10

@@ -6,7 +6,16 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
-from .services import login as service_login, _register_user, _build_user_payload
+from .services import (
+    login as service_login, 
+    _register_user, 
+    _build_user_payload,
+    send_otp,
+    verify_otp,
+    OTPInvalid,
+    OTPExpired,
+    OTPRateLimited
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +39,51 @@ class LoginView(APIView):
 
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def post(self, request):
+        logger.info(
+            f"[REGISTER REQUEST RECEIVED] email={request.data.get('email')} "
+            f"role={request.data.get('role')} has_files={bool(request.FILES)}"
+        )
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            error_messages = []
+            for field, errs in serializer.errors.items():
+                field_label = {
+                    "email": "Email",
+                    "password": "Mot de passe",
+                    "phone": "Téléphone",
+                    "first_name": "Prénom",
+                    "last_name": "Nom",
+                    "avatar": "Photo de profil",
+                }.get(field, field)
+                err_text = ", ".join(str(e) for e in errs) if isinstance(errs, list) else str(errs)
+                error_messages.append(f"{field_label} : {err_text}")
+            formatted_error = " ; ".join(error_messages)
+            logger.warning(f"[REGISTER VALIDATION ERROR] {formatted_error} | Data: {request.data}")
+            return Response({
+                "success": False,
+                "error": formatted_error,
+                "errors": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             role = serializer.validated_data.get('role', 'student')
             avatar_file = request.FILES.get('avatar', serializer.validated_data.get('avatar', None))
             res = _register_user(role_code=role, data=serializer.validated_data, avatar_file=avatar_file)
-            return Response(res, status=status.HTTP_201_CREATED)
+            logger.info(f"[REGISTER SUCCESS] user={res.get('user', {}).get('email')} role={role}")
+            return Response({
+                "success": True,
+                "data": res,
+                "message": "Compte créé avec succès."
+            }, status=status.HTTP_201_CREATED)
         except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            logger.warning(f"[REGISTER VALUE ERROR] {e}")
+            return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"error": f"Erreur d'inscription : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.exception(f"[REGISTER UNEXPECTED ERROR] {e}")
+            return Response({"success": False, "error": f"Erreur d'inscription : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -187,14 +226,62 @@ class MFAVerifyView(APIView):
         return Response({"detail": "MFA verify stub"})
 
 class OTPRequestView(APIView):
+    """
+    POST /api/v1/accounts/otp/request/
+    Body: {"identifier": "user@example.com", "channel": "email" | "sms"}
+    """
     permission_classes = [permissions.AllowAny]
+
     def post(self, request):
-        return Response({"detail": "OTP request stub"})
+        identifier = request.data.get("identifier", "").strip().lower()
+        channel = request.data.get("channel", "email").strip().lower()
+        if not identifier:
+            return Response({"success": False, "error": "Identifiant (email ou téléphone) requis."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            send_otp(identifier=identifier, channel=channel)
+            channel_label = "e-mail" if channel == "email" else "SMS"
+            return Response({
+                "success": True,
+                "message": f"Un code de vérification à 6 chiffres a été envoyé par {channel_label}."
+            }, status=status.HTTP_200_OK)
+        except OTPRateLimited as e:
+            return Response({"success": False, "error": str(e)}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        except Exception as e:
+            logger.error(f"Erreur OTPRequestView pour {identifier}: {e}")
+            return Response({"success": False, "error": "Impossible d'envoyer le code OTP. Réessayez dans un instant."}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class OTPVerifyView(APIView):
+    """
+    POST /api/v1/accounts/otp/verify/
+    Body: {"identifier": "user@example.com", "code": "123456"}
+    """
     permission_classes = [permissions.AllowAny]
+
     def post(self, request):
-        return Response({"detail": "OTP verify stub"})
+        identifier = request.data.get("identifier", "").strip().lower()
+        code = request.data.get("code", "").strip()
+
+        logger.info(f"[OTP VERIFY REQUEST RECEIVED] identifier={identifier} code_len={len(code)}")
+
+        if not identifier or not code:
+            return Response({"success": False, "error": "Identifiant et code à 6 chiffres requis."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            res = verify_otp(identifier=identifier, code=code)
+            logger.info(f"[OTP VERIFY SUCCESS] identifier={identifier} marked is_verified=True")
+            return Response({
+                "success": True,
+                "data": res,
+                "message": "Votre compte a été vérifié avec succès !"
+            }, status=status.HTTP_200_OK)
+        except (OTPInvalid, OTPExpired) as e:
+            return Response({"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Erreur OTPVerifyView pour {identifier}: {e}")
+            return Response({"success": False, "error": "Erreur lors de la validation du code OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class ForgotPasswordRequestView(APIView):

@@ -18,6 +18,8 @@
 - Q: Comment gérer la mémoire vive du navigateur sur les livres volumineux (100+ pages) ? → A: Fenêtre glissante LRU bornée à 10 pages en RAM. Dès qu'une page sort du rayon de consultation (±5 pages de la position courante), sa ressource mémoire est libérée avec `URL.revokeObjectURL(url)`. L'empreinte mémoire reste plafonnée sous 30 Mo quel que soit le nombre de pages (100, 500, 1000).
 - Q: Quelle durée de rétention (TTL) pour le cache Redis sur le serveur ? → A: Expiration automatique (TTL) de 2 heures (7200 secondes) pour les dérivés filigranés dans Redis. Suffisant pour une session de lecture continue sans encombrer la RAM du serveur à long terme.
 - Q: Comment structurer la page d'inscription /register ? → A: Formulaire multi-step en 3 étapes avec stepper horizontal épuré et ligne dorée de progression (Framer Motion) : Étape 1 (Choix Profil Lecteur/Auteur & Avatar optionnel) → Étape 2 (Prénom, Nom & Téléphone avec indicatif pays) → Étape 3 (Email & Mot de passe sécurisé). Conservation stricte de tous les champs existants, design tokens sans hex codé en dur, zéro mock et zéro emoji.
+- Q: Dès que l'utilisateur valide avec succès son code OTP lors de l'inscription, quel parcours doit-il suivre, et la connexion exige-t-elle un OTP ? → A: Option A validée : Connexion automatique et redirection directe vers le dashboard correspondant (/student pour lecteur, /author pour auteur). La connexion (/login) ne doit JAMAIS exiger d'OTP (authentification classique mot de passe/JWT directe). Tous les comptes existants en base sont considérés comme vérifiés.
+- Q: Les comptes créés par un administrateur exigent-ils un code OTP ? → A: Non. Tout compte créé par un administrateur (via le tableau de bord d'administration ou l'assistant d'administration `admin_create_user_wizard`) est automatiquement marqué vérifié (`is_verified = True`) et ne demande aucun code OTP.
 
 ---
 
@@ -129,6 +131,7 @@ En tant que visiteur mobile, je veux que tous les composants UI réutilisables (
 - **FR-013**: `PartnerLogoMarquee`, `CountingNumber`, `PanafricanPresenceSection`, `WhyChooseSection` DOIVENT être validés sans débordement horizontal ni espace blanc excessif sur mobile.
 - **FR-014**: Les effets `:hover` DOIVENT être conditionnés à `@media (hover: hover)`.
 - **FR-015**: Les éléments utilisant `100vh` DOIVENT utiliser `100dvh` pour les interfaces mobiles.
+- **FR-016**: Le flux d'inscription (`/register`) valide l'OTP avec connexion automatique immédiate vers le tableau de bord (`/student` ou `/author`). La connexion (`/login`) reste directe par mot de passe et ne DOIT JAMAIS demander d'OTP. Les comptes créés par l'administrateur sont automatiquement vérifiés (`is_verified = True`) sans aucun OTP. Tous les utilisateurs existants en base sont considérés comme vérifiés.
 
 ### Key Entities
 

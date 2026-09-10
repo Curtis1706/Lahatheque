@@ -14,6 +14,7 @@ Design decisions :
   - Emails asynchrones via Celery / logging en dev
 """
 import logging
+import re
 import secrets
 import string
 from datetime import timedelta
@@ -65,18 +66,28 @@ class OTPRateLimited(Exception):
 
 def _find_user(identifier: str) -> Optional[Any]:
     """
-    Trouve un utilisateur par email, téléphone ou username.
+    Trouve un utilisateur par email, téléphone ou username avec normalisation robuste.
     Ordre : email → phone → username.
     """
+    if not identifier or not isinstance(identifier, str):
+        return None
+
+    identifier = identifier.strip()
+
     if '@' in identifier:
         return User.objects.filter(email__iexact=identifier).first()
 
     phone_chars = set('0123456789+- ()')
-    if all(c in phone_chars for c in identifier):
-        user = User.objects.filter(phone=identifier).first()
-        if not user and not identifier.startswith('+'):
-            user = User.objects.filter(phone=f"+{identifier}").first()
-        return user
+    if any(c.isdigit() for c in identifier) and all(c in phone_chars for c in identifier):
+        clean_phone = re.sub(r'[\s\-\(\)]', '', identifier)
+        user = (
+            User.objects.filter(phone=clean_phone).first()
+            or User.objects.filter(phone=f"+{clean_phone}").first()
+            or User.objects.filter(phone=clean_phone.lstrip('+')).first()
+            or User.objects.filter(phone=identifier).first()
+        )
+        if user:
+            return user
 
     return User.objects.filter(username__iexact=identifier).first()
 
@@ -340,7 +351,7 @@ def send_otp(identifier: str, channel: str = 'sms') -> None:
     Génère et envoie un OTP à l'utilisateur.
     channel : 'sms' | 'phone' (alias de sms) | 'email' | 'whatsapp'
     
-    Lève OTPRateLimited si envoi trop fréquent (< 60s).
+    Lève OTPRateLimited si envoi trop fréquent (< 30s).
     Atomique: évite les race conditions.
     """
     if channel == 'phone':
@@ -352,42 +363,62 @@ def send_otp(identifier: str, channel: str = 'sms') -> None:
         logger.info(f"accounts/send_otp: identifiant introuvable '{identifier}' — silently ignored")
         return
 
-    # Rate limiting simple : 1 OTP par minute par channel
+    # Rate limiting doux : 30 secondes entre deux envois
     last_otp = OTP.objects.filter(
         user=user, channel=channel, is_verified=False
     ).order_by('-created_at').first()
 
-    if last_otp and (timezone.now() - last_otp.created_at).total_seconds() < 60:
-        raise OTPRateLimited("Veuillez attendre 60 secondes avant de demander un nouvel OTP.")
+    if last_otp and (timezone.now() - last_otp.created_at).total_seconds() < 30:
+        raise OTPRateLimited("Veuillez attendre 30 secondes avant de demander un nouvel envoi.")
 
     # Générer un code à 6 chiffres
     code = ''.join(secrets.choice(string.digits) for _ in range(6))
 
-    # Transaction atomique pour éviter les race conditions
+    # Sauvegarder le nouvel OTP (valable 15 minutes pour absorber toute latence réseau)
     try:
         with transaction.atomic():
-            # Révoquer les anciens OTP non vérifiés
-            OTP.objects.filter(user=user, channel=channel, is_verified=False).delete()
-
-            # Sauvegarder le nouvel OTP
+            # Conserver la validité des codes récents (15 min) pour que l'utilisateur
+            # qui reçoit le premier email avec quelques secondes de décalage puisse le valider sans échec
             OTP.objects.create(
                 user=user,
                 code=code,
                 channel=channel,
-                expires_at=timezone.now() + timedelta(minutes=5)
+                expires_at=timezone.now() + timedelta(minutes=15)
             )
     except Exception as e:
         logger.error(f"accounts/send_otp: Erreur transaction pour {user.email}: {e}")
         raise
 
-    # Envoi / log de l'OTP
-    logger.info(f"[DEV OTP] Code OTP généré pour {user.email} ({channel}) : {code}")
+    # Expédition de l'OTP selon le canal choisi
+    if channel == 'email':
+        try:
+            from apps.communications.services.email_service import send_transactional_email
+            recipient_name = f"{user.first_name} {user.last_name}".strip() or user.username
+            send_transactional_email(
+                email_type="verification_otp",
+                to_email=user.email,
+                subject=f"Votre code de vérification LAHAThèque : {code}",
+                template_name="emails/accounts/verification_otp.html",
+                context={
+                    "otp_code": code,
+                    "valid_minutes": 15,
+                    "recipient_name": recipient_name,
+                },
+                recipient_name=recipient_name,
+                async_send=True,
+            )
+            logger.info(f"accounts/send_otp: OTP envoyé par e-mail via Resend à {user.email} (code généré avec succès)")
+        except Exception as mail_err:
+            logger.error(f"accounts/send_otp: Échec d'envoi de l'e-mail OTP à {user.email}: {mail_err}")
+    elif channel == 'sms':
+        # Logging & dispatch SMS
+        logger.info(f"[SMS OTP] Code {code} préparé pour le mobile {user.phone or identifier}")
 
 
 def verify_otp(identifier: str, code: str) -> dict:
     """
     Vérifie le code OTP.
-    Si valide → marque l'utilisateur comme is_verified=True et retourne JWT.
+    Si valide → consomme tous les OTPs actifs de l'utilisateur, marque is_verified=True et retourne JWT.
     
     Lève OTPInvalid ou OTPExpired.
     """
@@ -404,27 +435,33 @@ def verify_otp(identifier: str, code: str) -> dict:
         logger.warning(f"OTP verification failed: user {identifier} not found")
         raise OTPInvalid("Utilisateur introuvable.")
 
-    # 3. Chercher l'OTP en BD
-    otp = OTP.objects.filter(user=user, code=code, is_verified=False).first()
+    # 3. Chercher l'OTP actif (non expiré, non vérifié)
+    now = timezone.now()
+    otp = OTP.objects.filter(
+        user=user, 
+        code=code, 
+        is_verified=False,
+        expires_at__gt=now
+    ).order_by('-created_at').first()
 
     if otp is None:
+        # Diagnostic précis : code expiré ou mauvais code
+        expired_otp = OTP.objects.filter(user=user, code=code, is_verified=False).first()
+        if expired_otp and expired_otp.is_expired():
+            logger.warning(f"OTP verification failed: expired code for {user.email}")
+            raise OTPExpired("Ce code de vérification a expiré. Veuillez en demander un nouveau.")
+
         logger.warning(f"OTP verification failed: invalid code for {user.email} ({code})")
-        raise OTPInvalid("Code OTP invalide.")
+        raise OTPInvalid("Code de vérification incorrect. Veuillez vérifier les 6 chiffres.")
 
-    # 4. Vérifier l'expiration
-    if otp.is_expired():
-        logger.warning(f"OTP verification failed: expired code for {user.email}")
-        raise OTPExpired("Code OTP expiré. Veuillez en demander un nouveau.")
-
-    # 5. Marquer comme vérifié et mettre à jour l'utilisateur
-    otp.is_verified = True
-    otp.save(update_fields=['is_verified'])
-
-    user.is_verified = True
-    user.save(update_fields=['is_verified'])
+    # 4. Succès : marquer tous les OTPs de cet utilisateur comme consommés
+    with transaction.atomic():
+        OTP.objects.filter(user=user).update(is_verified=True)
+        user.is_verified = True
+        user.save(update_fields=['is_verified'])
 
     tokens = _generate_jwt(user)
-    logger.info(f"OTP verification successful for {user.email}")
+    logger.info(f"OTP verification successful for {user.email} (user marked is_verified=True)")
     return {'tokens': tokens, 'user': _build_user_payload(user)}
 
 
@@ -528,7 +565,9 @@ def _register_user(role_code: str, data: dict, avatar_file=None) -> dict:
         raise ValueError("Cet email est déjà utilisé.")
     
     phone = str(data.get('phone', '')).strip().replace(" ", "")
-    if phone and User.objects.filter(phone=phone, is_active=True).exists():
+    if len(phone) <= 4 or phone in ('+229', '+', ''):
+        phone = ''
+    elif User.objects.filter(phone=phone, is_active=True).exists():
         raise ValueError("Ce numéro de téléphone est déjà associé à un autre compte.")
 
     password = data.get('password', '')
@@ -555,17 +594,28 @@ def _register_user(role_code: str, data: dict, avatar_file=None) -> dict:
                 country=country,
                 pen_name=pen_name,
                 bio=bio,
-                is_verified=True if getattr(settings, 'DEBUG', False) else False,
+                is_verified=False,
             )
 
             if avatar_file:
-                user.avatar = avatar_file
-                user.save(update_fields=['avatar'])
+                try:
+                    user.avatar = avatar_file
+                    user.save(update_fields=['avatar'])
+                except Exception as avatar_err:
+                    logger.warning(f"accounts/_register_user: Stockage distant avatar échoué, essai repli local: {avatar_err}")
+                    try:
+                        from django.core.files.storage import FileSystemStorage
+                        local_fs = FileSystemStorage()
+                        saved_rel = local_fs.save(f"avatars/{avatar_file.name}", avatar_file)
+                        user.avatar.name = saved_rel
+                        user.save(update_fields=['avatar'])
+                    except Exception as local_err:
+                        logger.error(f"accounts/_register_user: Repli local avatar impossible: {local_err}")
 
             try:
                 send_otp(email, channel='email')
             except Exception as otp_err:
-                logger.info(f"accounts/_register_user: OTP log/send skipped: {otp_err}")
+                logger.warning(f"accounts/_register_user: Échec de l'envoi OTP initial: {otp_err}")
 
             logger.info(f"User registered: {email} ({role_code})")
     except Exception as e:
@@ -573,7 +623,7 @@ def _register_user(role_code: str, data: dict, avatar_file=None) -> dict:
         raise
 
     tokens = _generate_jwt(user)
-    return {'tokens': tokens, 'user': _build_user_payload(user)}
+    return {'tokens': tokens, 'user': _build_user_payload(user), 'requires_otp': True}
 
 
 def register_teacher(data: dict) -> dict:
