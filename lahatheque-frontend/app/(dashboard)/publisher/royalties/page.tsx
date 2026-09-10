@@ -599,7 +599,7 @@ export default function PublisherRoyaltiesPage() {
             <span className="text-[10px] text-white/60 font-bold uppercase block">Taux Contractuel Convenu</span>
             <span className="font-bold text-gold text-2xl font-mono">{kpis?.contractualRoyaltyRate ?? 22}%</span>
             <span className="text-[9px] text-white/50 flex items-center gap-1 mt-0.5">
-              <Lock className="w-3 h-3 text-gold" /> (Lecture seule — Stipulé au contrat)
+              <Lock className="w-3 h-3 text-gold" /> Non modifiable &bull; Stipul&eacute; au contrat sign&eacute;
             </span>
           </div>
         </div>
