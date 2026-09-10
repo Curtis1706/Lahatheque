@@ -16,6 +16,7 @@ import { WhyChooseSection } from "@/components/features/home/why-choose-section"
 import { PartnerLogoMarquee } from "@/components/ui/partner-logo-marquee";
 import { SavoirAfriqueSection } from "@/components/features/about/savoir-afrique-section";
 import { FeaturedBooksSection } from "@/components/features/home/featured-books-section";
+import { NewsletterForm } from "@/components/features/home/newsletter-form";
 import { searchCatalogBooks } from "@/lib/services/catalog";
 import { Book as CatalogBook } from "@/lib/types/catalog";
 
@@ -376,20 +377,7 @@ export default async function HomePage() {
             <h3 className="font-serif text-xl font-bold mb-2">Restez informé</h3>
             <p className="text-sm text-white/70">Recevez nos dernières nouveautés et actualités directement dans votre boîte mail.</p>
           </div>
-          <form className="flex flex-col sm:flex-row w-full md:w-auto gap-2" onSubmit={(e) => e.preventDefault()}>
-            <input
-              className="w-full sm:w-72 md:w-80 h-12 px-4 rounded bg-navy-hover border border-border text-white placeholder:text-white/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold text-sm"
-              placeholder="Votre adresse email"
-              type="email"
-              required
-            />
-            <button
-              className="h-12 px-6 rounded bg-gold text-white font-bold text-sm [@media(hover:hover)]:hover:bg-gold-dark transition-colors whitespace-nowrap"
-              type="submit"
-            >
-              S&apos;abonner
-            </button>
-          </form>
+          <NewsletterForm />
         </div>
       </section>
 
