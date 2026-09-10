@@ -18,7 +18,7 @@ import {
   ShoppingBag,
   Sparkles,
 } from "lucide-react";
-import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from "recharts";
+import { DonutChart, type DonutChartSegment } from "@/components/ui/donut-chart";
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
 import { FacultyStatsChart } from "@/components/features/university/faculty-stats-chart";
 import { BouquetCard } from "@/components/features/university/bouquet-card";
@@ -99,15 +99,19 @@ export default function UniversityOverviewPage() {
     );
   }
 
-  const splitData = kpis?.revenue_split
+  const donutSegments: DonutChartSegment[] = kpis?.revenue_split
     ? [
         {
-          name: `Votre établissement (${kpis.revenue_split.university_percent}%)`,
+          label: `Votre établissement (${kpis.revenue_split.university_percent}%)`,
           value: kpis.revenue_split.university_amount,
+          color: "var(--navy)",
+          percentage: kpis.revenue_split.university_percent,
         },
         {
-          name: `LAHAThèque (${kpis.revenue_split.laha_percent}%)`,
+          label: `LAHAThèque (${kpis.revenue_split.laha_percent}%)`,
           value: kpis.revenue_split.laha_amount,
+          color: "var(--gold)",
+          percentage: kpis.revenue_split.laha_percent,
         },
       ]
     : [];
@@ -210,32 +214,77 @@ export default function UniversityOverviewPage() {
 
       {/* Répartition des Revenus (Transparence Université / LAHAThèque - Section 11 CDC) */}
       {kpis?.revenue_split && kpis.revenue_split.total_ca > 0 && (
-        <div className="p-4 sm:p-6 rounded-2xl border border-border bg-background-secondary shadow-xs">
-          <h3 className="text-sm font-bold text-navy uppercase tracking-wider mb-1">
-            Répartition des Revenus
-          </h3>
-          <p className="text-[11px] text-foreground-muted mb-3">
-            Transparence sur la répartition entre votre établissement et LAHAThèque.
-          </p>
-          <div className="w-full h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={splitData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  label
-                >
-                  <Cell fill="var(--navy)" />
-                  <Cell fill="var(--gold)" />
-                </Pie>
-                <Tooltip formatter={(value: any) => `${Number(value || 0).toLocaleString("fr-FR")} FCFA`} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+        <div className="p-5 sm:p-6 rounded-2xl border border-border bg-background-secondary shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
+            <div>
+              <h3 className="text-sm font-bold text-navy uppercase tracking-wider mb-0.5">
+                Répartition des Revenus
+              </h3>
+              <p className="text-[11px] text-foreground-muted">
+                Transparence sur la répartition entre votre établissement et LAHAThèque.
+              </p>
+            </div>
+            <div className="text-left sm:text-right">
+              <span className="text-[11px] text-foreground-muted block">CA Total des Ventes</span>
+              <p className="text-sm font-bold font-mono text-navy">
+                {kpis.revenue_split.total_ca.toLocaleString("fr-FR")} {kpis.revenue_split.currency || "XOF"}
+              </p>
+            </div>
+          </div>
+
+          <div className="my-6 flex flex-col md:flex-row items-center justify-around gap-6">
+            <DonutChart
+              data={donutSegments}
+              size={190}
+              strokeWidth={22}
+              centerContent={
+                <div className="text-center">
+                  <p className="text-base sm:text-lg font-bold text-navy font-mono">
+                    {kpis.revenue_split.total_ca.toLocaleString("fr-FR")}
+                  </p>
+                  <p className="text-[10px] text-foreground-muted font-medium">FCFA Total</p>
+                </div>
+              }
+            />
+
+            {/* Légende interactive conforme à la charte */}
+            <div className="w-full md:w-auto space-y-3">
+              <div className="flex items-center justify-between gap-6 p-3.5 rounded-xl bg-background border border-border min-w-[280px]">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-3.5 h-3.5 rounded-full bg-navy shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-navy">Votre établissement</p>
+                    <p className="text-[10px] text-foreground-muted">Redevance reversée</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-bold font-mono text-navy block">
+                    {kpis.revenue_split.university_amount.toLocaleString("fr-FR")} FCFA
+                  </span>
+                  <p className="text-[10px] font-bold text-navy/70">
+                    {kpis.revenue_split.university_percent} %
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-6 p-3.5 rounded-xl bg-background border border-border min-w-[280px]">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-3.5 h-3.5 rounded-full bg-gold shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-navy">LAHAThèque</p>
+                    <p className="text-[10px] text-foreground-muted">Plateforme &amp; infrastructure</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-bold font-mono text-gold block">
+                    {kpis.revenue_split.laha_amount.toLocaleString("fr-FR")} FCFA
+                  </span>
+                  <p className="text-[10px] font-bold text-gold/80">
+                    {kpis.revenue_split.laha_percent} %
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
