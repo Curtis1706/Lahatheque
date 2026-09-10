@@ -60,7 +60,7 @@ export function CartDrawer() {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 280 }}
-            className="relative w-full max-w-md bg-background h-full shadow-2xl border-l border-border flex flex-col z-10 overflow-hidden"
+            className="relative w-full max-w-md bg-background h-[100dvh] shadow-2xl border-l border-border flex flex-col z-10 overflow-hidden"
           >
             {/* En-tête du Panneau */}
             <div className="px-6 py-5 border-b border-border flex items-center justify-between bg-background">
@@ -204,7 +204,7 @@ export function CartDrawer() {
 
             {/* Pied du Panneau (Total & CTA) */}
             {items.length > 0 && (
-              <div className="p-6 border-t border-border bg-background-secondary space-y-4">
+              <div className="p-4 sm:p-6 border-t border-border bg-background-secondary space-y-3 sm:space-y-4 shrink-0">
                 <div className="flex items-baseline justify-between">
                   <span className="text-xs font-bold text-foreground">
                     {totalCount} {totalCount > 1 ? "articles" : "article"}

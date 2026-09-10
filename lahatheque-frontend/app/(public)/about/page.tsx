@@ -181,8 +181,8 @@ export default function AboutPage() {
         <SavoirAfriqueSection />
 
         {/* 4. NOTRE ENGAGEMENT POUR L'AVENIR */}
-        <section className="bg-navy text-white rounded-3xl p-8 sm:p-12 lg:p-16 border border-navy-hover shadow-xl">
-          <div className="max-w-4xl mx-auto text-center space-y-10">
+        <section className="bg-navy text-white rounded-2xl sm:rounded-3xl p-6 sm:p-12 lg:p-16 border border-navy-hover shadow-xl">
+          <div className="max-w-4xl mx-auto text-center space-y-8 sm:space-y-10">
             
             <div className="space-y-4">
               <span className="text-xs font-bold text-gold uppercase tracking-widest">
@@ -197,19 +197,19 @@ export default function AboutPage() {
               Grâce à nos technologies de protection et notre modèle équitable, nous unissons auteurs, universités, éditeurs et lecteurs pour diffuser le savoir au-delà des contraintes géographiques.
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-              <div className="flex flex-col items-center gap-3 bg-navy-dark border border-navy-hover p-6 rounded-2xl shadow-sm">
-                <Sparkles className="w-8 h-8 text-gold" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 pt-2 sm:pt-4">
+              <div className="flex flex-col items-center gap-3 bg-navy-dark border border-navy-hover p-5 sm:p-6 rounded-2xl shadow-sm">
+                <Sparkles className="w-7 h-7 text-gold" />
                 <h4 className="font-serif font-bold text-sm text-white">Diffuser les vocations</h4>
                 <p className="text-[11px] text-white/70">Inspirer la prochaine génération de leaders africains.</p>
               </div>
-              <div className="flex flex-col items-center gap-3 bg-navy-dark border border-navy-hover p-6 rounded-2xl shadow-sm">
-                <Book className="w-8 h-8 text-gold" />
+              <div className="flex flex-col items-center gap-3 bg-navy-dark border border-navy-hover p-5 sm:p-6 rounded-2xl shadow-sm">
+                <Book className="w-7 h-7 text-gold" />
                 <h4 className="font-serif font-bold text-sm text-white">Diffuser les savoirs</h4>
                 <p className="text-[11px] text-white/70">Valoriser la recherche et l'édition universitaire.</p>
               </div>
-              <div className="flex flex-col items-center gap-3 bg-navy-dark border border-navy-hover p-6 rounded-2xl shadow-sm">
-                <Sun className="w-8 h-8 text-gold" />
+              <div className="flex flex-col items-center gap-3 bg-navy-dark border border-navy-hover p-5 sm:p-6 rounded-2xl shadow-sm">
+                <Sun className="w-7 h-7 text-gold" />
                 <h4 className="font-serif font-bold text-sm text-white">Diffuser l'avenir</h4>
                 <p className="text-[11px] text-white/70">Connecter les universités aux standards mondiaux.</p>
               </div>
@@ -219,7 +219,7 @@ export default function AboutPage() {
         </section>
 
         {/* 5. BANDEAU NEWSLETTER */}
-        <section className="bg-background-secondary rounded-2xl border border-border py-8 px-6 sm:px-10">
+        <section className="bg-background-secondary rounded-2xl border border-border py-6 sm:py-8 px-4 sm:px-10">
           <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3 text-center sm:text-left">
               <Mail className="w-6 h-6 text-gold shrink-0 hidden sm:block" />
@@ -232,15 +232,15 @@ export default function AboutPage() {
                 </p>
               </div>
             </div>
-            <form onSubmit={(e) => e.preventDefault()} className="flex w-full sm:w-auto gap-2">
+            <form onSubmit={(e) => e.preventDefault()} className="flex flex-col sm:flex-row w-full sm:w-auto gap-2.5">
               <input 
                 type="email" 
                 placeholder="Votre adresse e-mail" 
-                className="px-4 py-2.5 rounded-xl border border-border bg-background text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none w-full sm:w-64" 
+                className="px-4 py-2.5 min-h-[44px] rounded-xl border border-border bg-background text-xs sm:text-sm focus:ring-2 focus:ring-navy focus:outline-none w-full sm:w-64" 
               />
               <button 
                 type="submit" 
-                className="px-6 py-2.5 rounded-xl bg-gold hover:bg-gold-light text-navy font-sans font-bold text-xs sm:text-sm transition-colors whitespace-nowrap cursor-pointer shadow-sm"
+                className="px-6 py-2.5 min-h-[44px] rounded-xl bg-gold hover:bg-gold-light text-navy font-sans font-bold text-xs sm:text-sm transition-colors whitespace-nowrap cursor-pointer shadow-sm active:scale-98"
               >
                 S'abonner
               </button>

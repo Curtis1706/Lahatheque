@@ -420,7 +420,7 @@ export function Modal({
           animate="open"
           exit="gone"
           variants={{ closed: {}, open: {}, gone: {} }}
-          className="fixed inset-0 z-50 grid place-items-center p-4 sm:p-6"
+          className="fixed inset-0 z-50 grid place-items-center p-3 sm:p-6"
         >
           <motion.div
             aria-hidden="true"
@@ -433,20 +433,20 @@ export function Modal({
             aria-describedby={description ? descriptionId : undefined}
             variants={variants.panel}
             style={{ maxWidth, maxHeight }}
-            className={`relative flex w-full flex-col overflow-hidden rounded-[14px] border border-border bg-background shadow-lg outline-none ${className}`}
+            className={`relative flex w-full flex-col overflow-hidden rounded-2xl sm:rounded-[14px] border border-border bg-background shadow-lg outline-none max-h-[90dvh] ${className}`}
           >
-            <div className="flex shrink-0 items-start gap-3 px-6 pb-3 pt-6 border-b border-border/50">
+            <div className="flex shrink-0 items-start gap-3 px-4 sm:px-6 pb-3 pt-4 sm:pt-6 border-b border-border/50">
               <div className="min-w-0 flex-1">
                 <h2
                   id={titleId}
-                  className="font-serif text-lg font-bold text-navy"
+                  className="font-serif text-base sm:text-lg font-bold text-navy"
                 >
                   {title}
                 </h2>
                 {description ? (
                   <p
                     id={descriptionId}
-                    className="mt-1 text-[13px] leading-relaxed text-foreground-muted"
+                    className="mt-1 text-xs sm:text-[13px] leading-relaxed text-foreground-muted"
                   >
                     {description}
                   </p>
@@ -458,7 +458,7 @@ export function Modal({
                   type="button"
                   onClick={onClose}
                   aria-label={closeLabel}
-                  className="-mr-2 -mt-2 grid size-8 shrink-0 place-items-center rounded-lg text-foreground-muted outline-none transition-colors duration-150 hover:bg-background-secondary hover:text-navy focus-visible:bg-navy/10 focus-visible:text-navy focus-visible:shadow-[inset_0_0_0_1px_navy]"
+                  className="-mr-1 -mt-1 sm:-mr-2 sm:-mt-2 grid size-9 sm:size-8 shrink-0 place-items-center rounded-lg text-foreground-muted outline-none transition-colors duration-150 hover:bg-background-secondary hover:text-navy focus-visible:bg-navy/10 focus-visible:text-navy focus-visible:shadow-[inset_0_0_0_1px_navy] cursor-pointer"
                 >
                   {CLOSE_ICON}
                 </button>
@@ -466,13 +466,13 @@ export function Modal({
             </div>
 
             {children ? (
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 text-sm leading-relaxed text-foreground">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 text-xs sm:text-sm leading-relaxed text-foreground">
                 {children}
               </div>
             ) : null}
 
             {footer ? (
-              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-6 py-4 bg-background-secondary/50">
+              <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3 border-t border-border px-4 sm:px-6 py-3 sm:py-4 bg-background-secondary/50">
                 {footer}
               </div>
             ) : null}

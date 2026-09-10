@@ -96,26 +96,26 @@ function ContactFormContent() {
     <div className="w-full">
       
       {/* Header Section with Pattern */}
-      <section className="relative bg-background-secondary border-b border-border py-16 md:py-24 overflow-hidden">
+      <section className="relative bg-background-secondary border-b border-border py-10 sm:py-16 md:py-24 overflow-hidden">
         {/* Subtle grid pattern using CSS instead of image */}
         <div className="absolute inset-0 opacity-5" style={{
           backgroundImage: "radial-gradient(var(--navy) 1px, transparent 1px)",
           backgroundSize: "20px 20px"
         }} />
         
-        <div className="relative max-w-7xl mx-auto px-6 md:px-12 text-center">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 md:px-12 text-center">
           <p className="text-xs font-bold text-gold uppercase tracking-[0.2em] mb-4">
             Contactez-nous
           </p>
-          <h1 className="font-serif text-3xl md:text-5xl text-navy font-bold max-w-4xl mx-auto leading-tight">
+          <h1 className="font-serif text-2xl sm:text-3xl md:text-5xl text-navy font-bold max-w-4xl mx-auto leading-tight">
             Suivez-nous, contactez-nous pour plus d'informations
           </h1>
         </div>
       </section>
 
       {/* Split Layout Section */}
-      <section className="max-w-7xl mx-auto px-6 md:px-12 py-16 md:py-24">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 py-10 sm:py-16 md:py-24">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
           
           {/* Left Column: Info Block */}
           <div className="lg:col-span-5 flex flex-col gap-8 lg:sticky lg:top-32">
@@ -153,7 +153,7 @@ function ContactFormContent() {
           </div>
 
           {/* Right Column: Elevated Form (Without gradient banner) */}
-          <div className="lg:col-span-7 bg-background p-6 md:p-10 rounded-2xl shadow-lg border border-border relative">
+          <div className="lg:col-span-7 bg-background p-4 sm:p-8 md:p-10 rounded-2xl shadow-lg border border-border relative">
             <h3 className="font-serif text-lg md:text-xl font-bold text-navy mb-8">
               N'hésitez pas à remplir le formulaire de contact ci-dessous.
             </h3>
@@ -194,7 +194,7 @@ function ContactFormContent() {
                 <label className="block text-sm font-bold text-navy mb-4 border-b border-border pb-2">
                   Nature de vos besoins
                 </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {needsList.map((need, idx) => (
                     <label 
                       key={idx} 
@@ -228,47 +228,67 @@ function ContactFormContent() {
                   id="name" 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex : Firinze DOSSOU" 
-                  type="text"
+                  placeholder="Votre nom complet"
                 />
               </div>
 
-              {/* Téléphone */}
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-navy">
-                  Numéro de téléphone *
-                </label>
-                <PhoneInput
-                  value={phone}
-                  onChange={setPhone}
-                  className="bg-background min-h-[46px]"
-                />
+              {/* Email & Phone in 2 columns */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-bold text-navy" htmlFor="email">
+                    Adresse e-mail *
+                  </label>
+                  <input 
+                    className="w-full bg-background border border-border rounded text-sm p-3 focus:border-navy focus:ring-2 focus:ring-gold/30 outline-none transition-all" 
+                    id="email" 
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="exemple@domaine.com"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-bold text-navy" htmlFor="phone">
+                    Numéro de téléphone
+                  </label>
+                  <PhoneInput 
+                    value={phone}
+                    onChange={setPhone}
+                    placeholder="Votre numéro"
+                  />
+                </div>
               </div>
 
-              {/* Email */}
+              {/* Message */}
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-navy" htmlFor="email">
-                  E-mail *
+                <label className="text-sm font-bold text-navy" htmlFor="message">
+                  Message complémentaire
                 </label>
-                <input 
+                <textarea 
                   className="w-full bg-background border border-border rounded text-sm p-3 focus:border-navy focus:ring-2 focus:ring-gold/30 outline-none transition-all" 
-                  id="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="votre@email.com" 
-                  required 
-                  type="email"
+                  id="message" 
+                  rows={4}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Précisez votre demande ou vos attentes..."
                 />
               </div>
 
               {/* Submit Button */}
               <button 
-                className="mt-6 bg-navy hover:bg-navy-hover text-white font-bold text-sm py-4 px-8 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg w-full md:w-auto md:self-start cursor-pointer disabled:opacity-50" 
                 type="submit"
                 disabled={isSubmitting}
+                className="w-full min-h-[44px] bg-navy hover:bg-navy-dark text-white font-bold text-sm py-4 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <span>{isSubmitting ? "Envoi en cours..." : "Contactez-nous dès maintenant"}</span>
-                <ArrowRight className="w-4 h-4 text-gold" />
+                {isSubmitting ? (
+                  <span>Transmission en cours...</span>
+                ) : (
+                  <>
+                    <span>Envoyer ma demande</span>
+                    <ArrowRight className="w-4 h-4 text-gold" />
+                  </>
+                )}
               </button>
 
             </form>
@@ -278,23 +298,26 @@ function ContactFormContent() {
       </section>
 
       {/* Newsletter Section */}
-      <section className="bg-background-secondary border-t border-border py-16 px-6 md:px-12">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="md:w-1/2">
-            <h3 className="font-serif text-2xl font-bold text-navy mb-2">
+      <section className="bg-background-secondary border-t border-border py-10 sm:py-16 px-4 sm:px-6 md:px-12">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-8">
+          <div className="md:w-1/2 text-center md:text-left">
+            <h3 className="font-serif text-xl sm:text-2xl font-bold text-navy mb-2">
               Abonnez-vous à notre newsletter
             </h3>
-            <p className="text-sm text-foreground-muted">
+            <p className="text-xs sm:text-sm text-foreground-muted">
               Restez informé de nos dernières publications et actualités.
             </p>
           </div>
-          <div className="w-full md:w-1/2 flex flex-col sm:flex-row gap-3" onSubmit={(e) => e.preventDefault()}>
+          <div className="w-full md:w-1/2 flex flex-col sm:flex-row gap-2.5">
             <input 
-              className="flex-grow bg-background border border-border rounded-md py-3 px-4 focus:border-navy focus:ring-2 focus:ring-gold/30 outline-none text-sm" 
+              className="flex-grow min-h-[44px] bg-background border border-border rounded-xl py-3 px-4 focus:border-navy focus:ring-2 focus:ring-gold/30 outline-none text-xs sm:text-sm" 
               placeholder="Votre adresse e-mail" 
               type="email"
             />
-            <button className="bg-gold hover:bg-gold-dark text-white font-bold text-sm px-8 py-3 rounded-md transition-colors whitespace-nowrap shadow-sm">
+            <button 
+              type="button" 
+              className="min-h-[44px] bg-gold hover:bg-gold-dark text-navy font-bold text-xs sm:text-sm px-6 py-3 rounded-xl transition-colors whitespace-nowrap shadow-sm cursor-pointer active:scale-98"
+            >
               S'abonner
             </button>
           </div>

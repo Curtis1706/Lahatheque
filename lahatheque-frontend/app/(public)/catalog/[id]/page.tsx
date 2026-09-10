@@ -163,7 +163,7 @@ export default function BookDetailPage() {
         </nav>
 
         {/* 2. Carte Principale de la Fiche Ouvrage */}
-        <div className="bg-background-secondary rounded-3xl border border-border overflow-hidden p-6 sm:p-8 lg:p-10 grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 shadow-xs">
+        <div className="bg-background-secondary rounded-2xl sm:rounded-3xl border border-border overflow-hidden p-4 sm:p-8 lg:p-10 grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8 lg:gap-12 shadow-xs">
           
           {/* Couverture / Aperçu Visuel 3D (Colonne Gauche) */}
           <div className="md:col-span-5 flex flex-col items-center justify-start space-y-5">

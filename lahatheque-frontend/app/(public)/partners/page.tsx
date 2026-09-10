@@ -204,8 +204,8 @@ export default function PartnersPublicPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground py-12 md:py-16">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 space-y-16">
+    <div className="min-h-screen bg-background text-foreground py-8 sm:py-12 md:py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 sm:space-y-16">
         
         {/* Hero Section Centré */}
         <div className="text-center max-w-3xl mx-auto space-y-4">
@@ -254,7 +254,7 @@ export default function PartnersPublicPage() {
         <div className="space-y-12 animate-in fade-in duration-300">
           
           {/* Bannière Présentation Profil */}
-          <div className="bg-background-secondary rounded-3xl border border-border p-8 sm:p-10 space-y-6 max-w-5xl mx-auto shadow-sm">
+          <div className="bg-background-secondary rounded-2xl sm:rounded-3xl border border-border p-5 sm:p-8 md:p-10 space-y-6 max-w-5xl mx-auto shadow-sm">
             <div className="space-y-3">
               <span className="text-[10px] uppercase font-bold text-gold bg-gold/10 px-3 py-1 rounded-full border border-gold/20">
                 {currentProfile.badge}

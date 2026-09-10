@@ -38,10 +38,10 @@ const arcs: Arc[] = ALL_NODES.filter((c) => !("hub" in c && c.hub)).map((c) => (
 
 export function PanafricanPresenceSection() {
   return (
-    <section className="py-20 px-6 md:px-10 bg-navy text-white relative overflow-hidden">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+    <section className="py-12 sm:py-16 lg:py-20 px-6 md:px-10 bg-navy text-white relative overflow-hidden">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 items-center">
         {/* Colonne Gauche — Argumentaire */}
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/15 text-gold text-xs font-bold uppercase tracking-wider mb-4">
               <Sparkles className="w-3.5 h-3.5" />

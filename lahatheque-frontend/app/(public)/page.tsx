@@ -125,11 +125,11 @@ export default function HomePage() {
   return (
     <div className="w-full">
       
-      {/* Hero Section Full Width */}
-      <section className="relative pt-4 pb-0 sm:pt-6 md:pt-8 lg:pt-6 xl:pt-10 overflow-hidden bg-background w-full">
-        <div className="w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center lg:items-end">
-          
-          <div className="z-10 text-center lg:text-left lg:col-span-5 px-6 sm:px-10 lg:pl-12 xl:pl-16 2xl:pl-24 lg:pr-4 pb-6 lg:pb-10 xl:pb-16">
+      {/* Hero Section */}
+      <section className="relative bg-background overflow-hidden py-8 sm:py-12 lg:py-16 xl:py-20">
+        <div className="w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8 items-center lg:items-end">
+
+          <div className="z-10 text-center lg:text-left lg:col-span-5 px-6 sm:px-10 lg:pl-12 xl:pl-16 2xl:pl-24 lg:pr-4 pb-4 sm:pb-6 lg:pb-10 xl:pb-16">
             <p className="text-[11px] sm:text-xs md:text-sm font-bold text-gold uppercase tracking-widest mb-3 sm:mb-4 font-sans">
               LA CONNAISSANCE À PORTÉE DE MAIN
             </p>
@@ -138,22 +138,22 @@ export default function HomePage() {
               <span className="text-gold">Transformez demain.</span>
             </h1>
             <p className="text-xs sm:text-sm md:text-base text-foreground-muted mb-6 max-w-xl mx-auto lg:mx-0 font-sans leading-relaxed">
-              Lahathèque est votre bibliothèque universitaire en ligne. Des milliers d'ouvrages, de ressources et d'auteurs africains à portée de clic.
+              Lahathèque est votre bibliothèque universitaire en ligne. Des milliers d&apos;ouvrages, de ressources et d&apos;auteurs africains à portée de clic.
             </p>
-            
-            <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-3.5">
-              <Link 
-                href="/submit" 
-                className="bg-gold hover:bg-gold-dark text-white px-7 py-3 rounded font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 group shadow-sm"
+
+            <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-3">
+              <Link
+                href="/submit"
+                className="bg-gold hover:bg-gold-dark text-white px-6 py-3 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group shadow-sm"
               >
-                Déposer un ouvrage 
+                Déposer un ouvrage
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <Link 
-                href="/catalog?categories=all" 
-                className="bg-transparent border border-border hover:border-gold text-foreground px-7 py-3 rounded font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 group"
+              <Link
+                href="/catalog?categories=all"
+                className="bg-transparent border border-border hover:border-gold text-foreground px-6 py-3 rounded font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 group"
               >
-                Explorer les catégories 
+                Explorer les catégories
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
@@ -167,7 +167,7 @@ export default function HomePage() {
                 width={1600}
                 height={1000}
                 priority
-                className="w-full h-auto max-h-[380px] sm:max-h-[440px] md:max-h-[500px] lg:max-h-[520px] xl:max-h-[620px] 2xl:max-h-[720px] object-contain object-bottom lg:object-right-bottom block"
+                className="w-full h-auto max-h-[220px] sm:max-h-[340px] md:max-h-[460px] lg:max-h-[520px] xl:max-h-[620px] 2xl:max-h-[720px] object-contain object-bottom lg:object-right-bottom block"
               />
             </div>
           </div>
@@ -238,27 +238,44 @@ export default function HomePage() {
         </div>
 
         {loadingBooks ? (
-          /* Squelette de chargement aux proportions exactes */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div 
-                key={n} 
-                className="animate-pulse bg-background border border-border rounded-lg p-4 flex flex-col justify-between space-y-4"
-              >
-                <div className="relative mb-2 bg-background-secondary rounded flex items-center justify-center p-4 aspect-[2/3]">
-                  <div className="w-20 h-28 bg-border/60 rounded-md" />
-                </div>
-                <div className="space-y-2 mt-auto">
-                  <div className="h-3 bg-border/60 rounded w-1/3" />
-                  <div className="h-4 bg-border/60 rounded w-full" />
-                  <div className="h-3 bg-border/60 rounded w-1/2" />
-                  <div className="flex items-center justify-between pt-3 border-t border-border">
-                    <div className="h-4 bg-border/60 rounded w-14" />
-                    <div className="w-8 h-8 bg-border/60 rounded" />
+          /* Squelette de chargement — mode horizontal sur mobile */
+          <div>
+            {/* Mobile: horizontal skeletons */}
+            <div className="flex flex-col gap-3 sm:hidden">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="animate-pulse bg-background border border-border rounded-lg p-3 flex flex-row gap-3 h-28">
+                  <div className="w-[80px] shrink-0 bg-background-secondary rounded" />
+                  <div className="flex-1 space-y-2 py-1">
+                    <div className="h-3 bg-border/60 rounded w-1/3" />
+                    <div className="h-4 bg-border/60 rounded w-4/5" />
+                    <div className="h-3 bg-border/60 rounded w-1/2" />
+                    <div className="h-6 bg-border/60 rounded w-full mt-auto" />
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            {/* sm+: grid portrait skeletons */}
+            <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div
+                  key={n}
+                  className="animate-pulse bg-background border border-border rounded-lg p-4 flex flex-col justify-between space-y-4"
+                >
+                  <div className="relative mb-2 bg-background-secondary rounded flex items-center justify-center p-4 aspect-[2/3]">
+                    <div className="w-20 h-28 bg-border/60 rounded-md" />
+                  </div>
+                  <div className="space-y-2 mt-auto">
+                    <div className="h-3 bg-border/60 rounded w-1/3" />
+                    <div className="h-4 bg-border/60 rounded w-full" />
+                    <div className="h-3 bg-border/60 rounded w-1/2" />
+                    <div className="flex items-center justify-between pt-3 border-t border-border">
+                      <div className="h-4 bg-border/60 rounded w-14" />
+                      <div className="w-8 h-8 bg-border/60 rounded" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : newBooks.length === 0 ? (
           <div className="text-center py-12 px-4 bg-background-secondary rounded-xl border border-border">
@@ -276,135 +293,198 @@ export default function HomePage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            {newBooks.map((book) => {
-              const bookSlug = book.slug || book.id;
-              const authorName =
-                book.authors_details && book.authors_details.length > 0
-                  ? book.authors_details.map((a) => `${a.first_name} ${a.last_name}`).join(", ")
-                  : "Auteur certifié";
+          <>
+            {/* Mobile — cartes horizontales (image à gauche, infos à droite) */}
+            <div className="flex flex-col gap-3 sm:hidden">
+              {newBooks.map((book) => {
+                const bookSlug = book.slug || book.id;
+                const authorName =
+                  book.authors_details && book.authors_details.length > 0
+                    ? book.authors_details.map((a) => `${a.first_name} ${a.last_name}`).join(", ")
+                    : "Auteur certifié";
+                const categoryName =
+                  book.discipline_detail?.name || book.publisher_name || "Université";
+                const isFav = Boolean(favorites[book.id]);
 
-              const categoryName =
-                book.discipline_detail?.name || book.publisher_name || "Université";
-
-              const isMultilingual =
-                book.available_languages && book.available_languages.length > 1;
-
-              const langBadge = isMultilingual
-                ? "FR • EN"
-                : (book.language ? book.language.toUpperCase() : "FR");
-
-              const isFav = Boolean(favorites[book.id]);
-
-              return (
-                <article 
-                  key={book.id} 
-                  className="group bg-background border border-border rounded-lg p-4 hover:shadow-[0_8px_30px_rgba(27,42,78,0.06)] hover:border-gold/50 transition-all duration-300 flex flex-col justify-between"
-                >
-                  {/* Zone Couverture Cliquable vers /catalog/[slug_or_id] */}
-                  <div className="relative mb-4 flex-grow bg-background-secondary rounded flex items-center justify-center p-3 aspect-[2/3] overflow-visible">
-                    <button 
-                      type="button"
-                      onClick={(e) => toggleFavorite(e, book.id)}
-                      className={`absolute top-2 right-2 w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center transition-colors z-20 shadow-xs cursor-pointer ${
-                        isFav ? "text-error border-error/40 bg-error/5" : "text-foreground-muted hover:text-error"
-                      }`}
-                      title={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
-                      aria-label="Ajouter aux favoris"
+                return (
+                  <article
+                    key={book.id}
+                    className="group bg-background border border-border rounded-lg p-3 flex flex-row gap-3 h-28 overflow-hidden"
+                  >
+                    {/* Couverture à gauche */}
+                    <Link
+                      href={`/catalog/${bookSlug}`}
+                      className="relative shrink-0 w-[72px] h-full bg-background-secondary rounded flex items-center justify-center overflow-hidden"
                     >
-                      <Heart className={`w-4 h-4 ${isFav ? "fill-current" : ""}`} />
-                    </button>
-                    
-                    <Link 
-                      href={`/catalog/${bookSlug}`} 
-                      className="flex items-center justify-center w-full h-full py-1"
-                    >
-                      <Book3D 
-                        title={book.title} 
+                      <Book3D
+                        title={book.title}
                         author={authorName}
                         coverUrl={book.cover_url || book.cover_image}
-                        variant="lahatheque" 
-                        color={book.cover_color || "var(--navy)"} 
-                        textColor={book.cover_text_color || "var(--gold-light)"} 
-                        width={{ sm: 110, md: 115, lg: 120, xl: 112 }}
+                        variant="lahatheque"
+                        color={book.cover_color || "var(--navy)"}
+                        textColor={book.cover_text_color || "var(--gold-light)"}
+                        width={{ sm: 55, md: 55, lg: 55, xl: 55 }}
                         textured
                       />
                     </Link>
-                  </div>
 
-                  {/* Informations Livre */}
-                  <div className="mt-auto">
-                    <div className="flex items-center gap-1.5 flex-wrap mb-2">
-                      <span className="inline-block bg-navy-light text-navy text-[9px] font-semibold px-2 py-0.5 rounded-xs truncate max-w-[110px]">
-                        {categoryName}
-                      </span>
-                      <span className="inline-block bg-gold/10 text-gold border border-gold/30 text-[9px] font-bold px-1.5 py-0.5 rounded-xs">
-                        {langBadge}
-                      </span>
+                    {/* Infos à droite */}
+                    <div className="flex flex-col justify-between flex-1 min-w-0 py-0.5">
+                      <div className="min-w-0">
+                        <span className="inline-block bg-navy-light text-navy text-[9px] font-semibold px-1.5 py-0.5 rounded-xs truncate max-w-full mb-1">
+                          {categoryName}
+                        </span>
+                        <h3 className="font-serif font-bold text-xs text-navy line-clamp-2 leading-snug">
+                          <Link href={`/catalog/${bookSlug}`} className="group-hover:text-gold transition-colors">
+                            {book.title}
+                          </Link>
+                        </h3>
+                        <p className="text-[10px] text-foreground-muted mt-0.5 line-clamp-1">{authorName}</p>
+                      </div>
+                      <div className="flex items-center justify-between pt-1.5 border-t border-border mt-1">
+                        <span className="text-xs font-bold font-mono text-navy">
+                          {(book.price ? Number(book.price) : 2500).toLocaleString("fr-FR")} FCFA
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => handleAddToCart(e, book)}
+                          className="w-9 h-9 rounded bg-background-secondary text-gold flex items-center justify-center shrink-0 cursor-pointer"
+                          aria-label={`Ajouter ${book.title} au panier`}
+                        >
+                          <ShoppingCart className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
+                  </article>
+                );
+              })}
+            </div>
 
-                    <h3 className="font-serif font-bold text-sm text-navy mb-1 line-clamp-2 leading-snug">
-                      <Link 
-                        href={`/catalog/${bookSlug}`}
-                        className="group-hover:text-gold transition-colors"
-                      >
-                        {book.title}
-                      </Link>
-                    </h3>
+            {/* sm+ — grille portrait */}
+            <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {newBooks.map((book) => {
+                const bookSlug = book.slug || book.id;
+                const authorName =
+                  book.authors_details && book.authors_details.length > 0
+                    ? book.authors_details.map((a) => `${a.first_name} ${a.last_name}`).join(", ")
+                    : "Auteur certifié";
+                const categoryName =
+                  book.discipline_detail?.name || book.publisher_name || "Université";
+                const isMultilingual =
+                  book.available_languages && book.available_languages.length > 1;
+                const langBadge = isMultilingual
+                  ? "FR • EN"
+                  : (book.language ? book.language.toUpperCase() : "FR");
+                const isFav = Boolean(favorites[book.id]);
 
-                    <p className="text-xs text-foreground-muted mb-3 line-clamp-1">
-                      {authorName}
-                    </p>
-
-                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-border">
-                      <span className="text-xs sm:text-sm font-bold font-mono text-navy">
-                        {(book.price ? Number(book.price) : 2500).toLocaleString("fr-FR")} FCFA
-                      </span>
-                      <button 
+                return (
+                  <article
+                    key={book.id}
+                    className="group bg-background border border-border rounded-lg p-4 [@media(hover:hover)]:hover:shadow-[0_8px_30px_rgba(27,42,78,0.06)] [@media(hover:hover)]:hover:border-gold/50 transition-all duration-300 flex flex-col justify-between"
+                  >
+                    <div className="relative mb-4 flex-grow bg-background-secondary rounded flex items-center justify-center p-3 aspect-[2/3] overflow-visible">
+                      <button
                         type="button"
-                        onClick={(e) => handleAddToCart(e, book)}
-                        className="w-8 h-8 rounded bg-background-secondary hover:bg-gold hover:text-white text-gold transition-all duration-200 flex items-center justify-center shadow-xs cursor-pointer shrink-0"
-                        title="Ajouter au panier (Licence numérique)"
-                        aria-label={`Ajouter ${book.title} au panier`}
+                        onClick={(e) => toggleFavorite(e, book.id)}
+                        className={`absolute top-2 right-2 w-9 h-9 rounded-full bg-background border border-border flex items-center justify-center transition-colors z-20 shadow-xs cursor-pointer ${
+                          isFav ? "text-error border-error/40 bg-error/5" : "text-foreground-muted"
+                        }`}
+                        title={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
+                        aria-label="Ajouter aux favoris"
                       >
-                        <ShoppingCart className="w-4 h-4" />
+                        <Heart className={`w-4 h-4 ${isFav ? "fill-current" : ""}`} />
                       </button>
+
+                      <Link
+                        href={`/catalog/${bookSlug}`}
+                        className="flex items-center justify-center w-full h-full py-1"
+                      >
+                        <Book3D
+                          title={book.title}
+                          author={authorName}
+                          coverUrl={book.cover_url || book.cover_image}
+                          variant="lahatheque"
+                          color={book.cover_color || "var(--navy)"}
+                          textColor={book.cover_text_color || "var(--gold-light)"}
+                          width={{ sm: 100, md: 110, lg: 120, xl: 120 }}
+                          textured
+                        />
+                      </Link>
                     </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+
+                    <div className="mt-auto">
+                      <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                        <span className="inline-block bg-navy-light text-navy text-[9px] font-semibold px-2 py-0.5 rounded-xs truncate max-w-[110px]">
+                          {categoryName}
+                        </span>
+                        <span className="inline-block bg-gold/10 text-gold border border-gold/30 text-[9px] font-bold px-1.5 py-0.5 rounded-xs">
+                          {langBadge}
+                        </span>
+                      </div>
+
+                      <h3 className="font-serif font-bold text-sm text-navy mb-1 line-clamp-2 leading-snug">
+                        <Link
+                          href={`/catalog/${bookSlug}`}
+                          className="group-hover:text-gold transition-colors"
+                        >
+                          {book.title}
+                        </Link>
+                      </h3>
+
+                      <p className="text-xs text-foreground-muted mb-3 line-clamp-1">
+                        {authorName}
+                      </p>
+
+                      <div className="flex items-center justify-between mt-2 pt-3 border-t border-border">
+                        <span className="text-xs sm:text-sm font-bold font-mono text-navy">
+                          {(book.price ? Number(book.price) : 2500).toLocaleString("fr-FR")} FCFA
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => handleAddToCart(e, book)}
+                          className="w-9 h-9 rounded bg-background-secondary text-gold transition-all duration-200 flex items-center justify-center shadow-xs cursor-pointer shrink-0"
+                          title="Ajouter au panier (Licence numérique)"
+                          aria-label={`Ajouter ${book.title} au panier`}
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </>
         )}
       </section>
 
       {/* Bandeau Chiffres Clés */}
-      <section className="bg-navy py-12 px-6 md:px-10 text-white text-center">
-        <div className="max-w-7xl mx-auto mb-8">
-          <h2 className="font-serif text-2xl md:text-3xl font-bold mb-2">Spécialiste du contenu éducatif</h2>
-          <p className="text-sm text-white/80 font-sans">Le plus grand catalogue d'ouvrages universitaires africains</p>
+      <section className="bg-navy py-10 sm:py-12 px-6 md:px-10 text-white text-center">
+        <div className="max-w-7xl mx-auto mb-6 sm:mb-8">
+          <h2 className="font-serif text-xl sm:text-2xl md:text-3xl font-bold mb-2">Spécialiste du contenu éducatif</h2>
+          <p className="text-xs sm:text-sm text-white/80 font-sans">Le plus grand catalogue d&apos;ouvrages universitaires africains</p>
         </div>
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
+        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
           <div>
-            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+            <span className="block text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-1.5 tracking-tight">
               +<CountingNumber target={20000} />
             </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Ouvrages disponibles</span>
           </div>
           <div>
-            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+            <span className="block text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-1.5 tracking-tight">
               +<CountingNumber target={47000} />
             </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Étudiants inscrits</span>
           </div>
           <div>
-            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+            <span className="block text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-1.5 tracking-tight">
               +<CountingNumber target={64} />
             </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Partenaires institutionnels</span>
           </div>
           <div>
-            <span className="block text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-2 tracking-tight">
+            <span className="block text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-gold font-bold mb-1.5 tracking-tight">
               +<CountingNumber target={73} />
             </span>
             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-white/70">Éditeurs africains</span>
@@ -590,24 +670,24 @@ export default function HomePage() {
       </section>
 
       {/* Newsletter */}
-      <section className="py-16 px-6 md:px-10 bg-navy text-white">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
-          <div>
+      <section className="py-12 sm:py-16 px-6 md:px-10 bg-navy text-white">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
+          <div className="text-center md:text-left">
             <h3 className="font-serif text-xl font-bold mb-2">Restez informé</h3>
             <p className="text-sm text-white/70">Recevez nos dernières nouveautés et actualités directement dans votre boîte mail.</p>
           </div>
-          <form className="flex w-full md:w-auto gap-2" onSubmit={(e) => e.preventDefault()}>
-            <input 
-              className="w-full md:w-80 h-12 px-4 rounded bg-navy-hover border border-border text-white placeholder:text-white/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold text-sm" 
-              placeholder="Votre adresse email" 
+          <form className="flex flex-col sm:flex-row w-full md:w-auto gap-2" onSubmit={(e) => e.preventDefault()}>
+            <input
+              className="w-full sm:w-72 md:w-80 h-12 px-4 rounded bg-navy-hover border border-border text-white placeholder:text-white/50 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold text-sm"
+              placeholder="Votre adresse email"
               type="email"
               required
             />
-            <button 
-              className="h-12 px-6 rounded bg-gold text-white font-bold text-sm hover:bg-gold-dark transition-colors whitespace-nowrap" 
+            <button
+              className="h-12 px-6 rounded bg-gold text-white font-bold text-sm [@media(hover:hover)]:hover:bg-gold-dark transition-colors whitespace-nowrap"
               type="submit"
             >
-              S'abonner
+              S&apos;abonner
             </button>
           </form>
         </div>

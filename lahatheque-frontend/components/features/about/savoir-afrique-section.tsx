@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
+import { Globe, ArrowRight, BookOpen } from "lucide-react";
 
 // Constantes géométriques et coordonnées du schéma (format 1600x700 compact & équilibré)
 const W = 1600;
@@ -289,51 +290,119 @@ export function SavoirAfriqueSection() {
     return pkts;
   }, [T]);
 
-  return (
-    <section className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 overflow-hidden">
-      <div className="w-full space-y-8 sm:space-y-12">
-        {/* En-tête de section */}
-        <div className="text-center max-w-3xl mx-auto space-y-2.5">
+  // Composant version mobile statique
+  function MobileSavoirAfriqueView() {
+    return (
+      <div className="block md:hidden">
+        {/* Titre */}
+        <div className="text-center max-w-3xl mx-auto space-y-2.5 mb-8">
           <span className="inline-block text-xs font-bold tracking-[0.2em] uppercase text-gold">
             NOTRE VISION
           </span>
-          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-navy leading-tight">
-            Du savoir que l’on reçoit au savoir que l’on partage
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-navy leading-tight">
+            Du savoir que l&apos;on reçoit au savoir que l&apos;on partage
           </h2>
         </div>
 
-        {/* Scène Blueprint Interactive responsive */}
-        <figure
-          className="relative w-full max-w-6xl mx-auto border border-border rounded-3xl bg-[#F5F6F8] shadow-sm overflow-hidden mb-8 sm:mb-10"
-          style={{ marginLeft: "auto", marginRight: "auto" }}
-        >
-          <div
-            className="relative w-full"
-            style={{
-              paddingBottom: "43.75%", // Ratio 1600x700
-              minHeight: "360px",
-            }}
+        {/* Réseau panafricain simplifié */}
+        <div className="bg-background-secondary rounded-2xl border border-border p-5 mb-6">
+          {/* Centre : LAHAThèque */}
+          <div className="flex items-center justify-center mb-5">
+            <div className="flex items-center gap-3 bg-navy text-white px-4 py-3 rounded-xl shadow-md">
+              <BookOpen className="w-5 h-5 text-gold shrink-0" />
+              <div>
+                <p className="font-serif font-bold text-sm leading-tight">LAHAThèque</p>
+                <p className="text-[10px] text-white/70 font-mono uppercase tracking-wider">Hub Afrique</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Régions sources */}
+          <div className="grid grid-cols-1 gap-2.5">
+            {[
+              { label: "Europe", desc: "Savoirs importés et partenariats académiques" },
+              { label: "Amérique du Nord", desc: "Ressources universitaires francophones" },
+              { label: "Asie", desc: "Recherche scientifique et technologique" },
+              { label: "Moyen-Orient", desc: "Patrimoine de connaissance arabo-africain" },
+              { label: "Amérique Latine", desc: "Littérature et sciences humaines" },
+              { label: "Océanie", desc: "Recherche environnementale et biodiversité" },
+            ].map(({ label, desc }) => (
+              <div
+                key={label}
+                className="flex items-center gap-3 bg-background rounded-xl border border-border px-4 py-3"
+              >
+                <Globe className="w-4 h-4 text-gold shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-serif font-bold text-xs text-navy">{label}</p>
+                  <p className="text-[10px] text-foreground-muted leading-snug truncate">{desc}</p>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-gold/60 shrink-0 ml-auto" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Texte narratif */}
+        <div className="space-y-3">
+          <div className="p-4 rounded-xl border border-border bg-background">
+            <p className="text-xs text-foreground-muted leading-relaxed font-sans">
+              Pendant longtemps, une grande partie des connaissances consommées sur notre continent
+              a été importée d&apos;autres horizons. Aujourd&apos;hui, nous souhaitons contribuer à changer
+              cette dynamique : produire, valoriser et transmettre un savoir issu de notre intelligence.
+            </p>
+          </div>
+          <div className="p-4 rounded-xl border border-navy bg-navy text-white">
+            <p className="font-serif font-bold text-sm leading-snug">
+              Parce que l&apos;Afrique ne doit pas seulement être une destination du savoir :{" "}
+              <span className="text-gold">elle peut aussi en devenir une source.</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <section className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 overflow-hidden">
+      <div className="w-full space-y-8 sm:space-y-12">
+        <MobileSavoirAfriqueView />
+
+        {/* ── Version Desktop (≥ md) : SVG animé ── */}
+        <div className="hidden md:block">
+          {/* En-tête de section */}
+          <div className="text-center max-w-3xl mx-auto space-y-2.5">
+            <span className="inline-block text-xs font-bold tracking-[0.2em] uppercase text-gold">
+              NOTRE VISION
+            </span>
+            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-navy leading-tight">
+              Du savoir que l’on reçoit au savoir que l’on partage
+            </h2>
+          </div>
+
+          {/* Scène Blueprint Interactive responsive */}
+          <figure
+            className="relative w-full max-w-6xl mx-auto border border-border rounded-3xl bg-[#F5F6F8] shadow-sm overflow-hidden mb-8 sm:mb-10"
+            style={{ marginLeft: "auto", marginRight: "auto" }}
           >
             <div
-              className="absolute top-0 left-0 w-[1600px] h-[700px] origin-top-left pointer-events-none select-none"
-              style={{
-                transform: `scale(var(--scale, 1))`,
-                width: `${W}px`,
-                height: `${H}px`,
-              }}
-              ref={(el) => {
-                if (!el) return;
-                const updateScale = () => {
-                  if (!el.parentElement) return;
-                  const parentWidth = el.parentElement.clientWidth;
-                  const scale = parentWidth / W;
-                  el.style.transform = `scale(${scale})`;
-                };
-                updateScale();
-                window.addEventListener("resize", updateScale);
-              }}
+              className="relative w-full"
+              style={{ paddingBottom: "43.75%" }}
             >
-              {/* Grille technique blueprint */}
+              <div
+                className="absolute top-0 left-0 origin-top-left pointer-events-none select-none"
+                style={{ width: `${W}px`, height: `${H}px` }}
+                ref={(el) => {
+                  if (!el) return;
+                  const updateScale = () => {
+                    if (!el.parentElement) return;
+                    const parentWidth = el.parentElement.clientWidth;
+                    const scale = parentWidth / W;
+                    el.style.transform = `scale(${scale})`;
+                  };
+                  updateScale();
+                  window.addEventListener("resize", updateScale);
+                }}
+              >
               <svg
                 width={W}
                 height={H}
@@ -681,6 +750,7 @@ export function SavoirAfriqueSection() {
             </div>
           </div>
         </div>
+        </div>{/* fin hidden md:block */}
       </div>
     </section>
   );

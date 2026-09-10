@@ -66,7 +66,7 @@ export function PartnerLogoMarquee({
 
   return (
     <section className={`py-12 md:py-16 overflow-hidden bg-background-secondary border-y border-border ${className}`}>
-      <div className="max-w-7xl mx-auto px-6 sm:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8">
         
         {/* Header optionnel */}
         {showSectionHeader && (
