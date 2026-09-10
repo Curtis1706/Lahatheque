@@ -26,6 +26,12 @@ class Subscription(models.Model):
     expires_at = models.DateTimeField()
     is_active = models.BooleanField(default=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'is_active']),
+            models.Index(fields=['institution', 'is_active']),
+        ]
+
 class PaymentTransaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     moneroo_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
@@ -103,6 +109,9 @@ class Order(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['statut_paiement', 'is_credit_purchase']),
+        ]
 
 class LigneCommande(models.Model):
     FORMAT_CHOICES = [
@@ -122,6 +131,11 @@ class LigneCommande(models.Model):
     )
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     quantity = models.IntegerField(default=1)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['ouvrage', 'format_type']),
+        ]
 
 class PhysicalDelivery(models.Model):
     STATUS_CHOICES = [
@@ -469,3 +483,6 @@ class ClientBouquetSubscription(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=['user', 'status', 'start_date', 'end_date']),
+        ]
