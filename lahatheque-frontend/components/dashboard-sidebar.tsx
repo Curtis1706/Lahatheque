@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { formatRoleLabel } from "@/lib/types/admin";
 import {
   AnimatedSidebar,
   AnimatedSidebarHeader,
@@ -127,7 +128,7 @@ export function DashboardSidebar() {
               { label: "Vue d'ensemble", href: "/wholesaler", icon: <LayoutDashboard className="size-4" /> },
               { label: "Catalogue & Tarifs Gros", href: "/wholesaler/catalog", icon: <BookOpen className="size-4" /> },
               {
-                label: "Commandes Groupées",
+                label: "Commandes",
                 href: "/wholesaler/orders",
                 icon: <PackageCheck className="size-4" />,
                 sublinks: [
@@ -463,6 +464,44 @@ export function DashboardSidebar() {
     }
   };
 
+  const getHeaderRoleBadge = () => {
+    switch (user?.role as string | undefined) {
+      case "author":
+        return "Auteur";
+      case "publisher":
+        return "Éditeur Tiers";
+      case "wholesaler":
+      case "super_client":
+        return "Grossiste";
+      case "university":
+        return "Université";
+      case "student":
+        return "Lecteur";
+      case "teacher":
+        return "Enseignant";
+      case "parent":
+        return "Parent";
+      case "manager":
+        return "Gestionnaire Stock";
+      case "legal_reviewer":
+        return "Juriste";
+      case "chief_layout":
+        return "Chef Maquettiste";
+      case "layout_artist":
+        return "Maquettiste";
+      case "coordination_manager":
+        return "Coordination";
+      case "partner_api":
+        return "Partenaire API";
+      case "admin":
+        return "Administrateur";
+      case "super_admin":
+        return "Super Admin";
+      default:
+        return user?.role ? formatRoleLabel(user.role) : "Espace Numérique";
+    }
+  };
+
   // Synchronise l'ouverture des sous-menus selon la route courante
   useEffect(() => {
     let matched = false;
@@ -529,11 +568,9 @@ export function DashboardSidebar() {
               <span className="font-serif font-bold text-sm tracking-wide text-white block truncate">
                 LAHA<span className="text-gold">Thèque</span>
               </span>
-              {user?.role !== "student" && (
-                <span className="text-[10px] text-white/50 block font-mono truncate uppercase">
-                  {user?.role ? user.role.replace("_", " ") : "Espace Numérique"}
-                </span>
-              )}
+              <span className="text-[10px] text-white/50 block font-mono truncate uppercase tracking-wider">
+                {getHeaderRoleBadge()}
+              </span>
             </div>
           </Link>
 

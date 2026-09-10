@@ -108,7 +108,7 @@ export default function NewWholesalerOrderPage() {
     setSubmitting(true);
     try {
       const newOrder = await createWholesalerOrder(cartItems, deliveryAddress, contactPhone);
-      toast.success(`Commande groupée ${newOrder.reference || newOrder.id} transmise avec succès !`);
+      toast.success(`Commande ${newOrder.reference || newOrder.id} transmise avec succès !`);
       router.push(`/wholesaler/orders/${newOrder.id}`);
     } catch {
       toast.error("Une erreur est survenue lors de la transmission de la commande.");
@@ -135,7 +135,7 @@ export default function NewWholesalerOrderPage() {
           Retour au Catalogue Grossiste
         </Link>
         <h1 className="font-serif text-2xl font-bold text-navy">
-          Validation &amp; Soumission de Commande Groupée
+          Validation &amp; Soumission de Commande
         </h1>
         <p className="text-xs text-foreground-muted mt-1">
           Sélectionnez les ouvrages du catalogue réel, ajustez les quantités (licences numériques + papier) et vos coordonnées de livraison.
@@ -277,7 +277,7 @@ export default function NewWholesalerOrderPage() {
                   <span className="font-mono font-bold">{totalPrintSubtotal.toLocaleString("fr-FR")} XOF</span>
                 </div>
                 <div className="flex justify-between text-sm font-bold pt-2 border-t border-navy/20">
-                  <span className="text-navy">Total Général Commande Groupée :</span>
+                  <span className="text-navy">Total Général de la Commande :</span>
                   <span className="font-mono text-gold text-base">{totalAmount.toLocaleString("fr-FR")} XOF</span>
                 </div>
               </div>
@@ -329,7 +329,7 @@ export default function NewWholesalerOrderPage() {
                 ) : (
                   <>
                     <Send className="w-4 h-4 text-gold" />
-                    Soumettre la Commande Groupée
+                    Soumettre la Commande
                   </>
                 )}
               </button>

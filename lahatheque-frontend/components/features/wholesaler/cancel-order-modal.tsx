@@ -46,14 +46,14 @@ export function CancelOrderModal({
       title={
         <div className="flex items-center gap-2 text-rose-600 font-serif font-bold text-base">
           <AlertTriangle className="w-5 h-5" />
-          Demande d&apos;Annulation de Commande Groupée
+          Demande d&apos;Annulation de Commande
         </div>
       }
       maxWidth={480}
     >
       <form onSubmit={handleSubmit} className="space-y-4 pt-2">
         <p className="text-xs text-foreground-muted leading-relaxed">
-          Vous êtes sur le point de demander l&apos;annulation de la commande groupée{" "}
+          Vous êtes sur le point de demander l&apos;annulation de la commande{" "}
           <span className="font-bold text-navy font-mono">{orderReference || orderId}</span>.
         </p>
 

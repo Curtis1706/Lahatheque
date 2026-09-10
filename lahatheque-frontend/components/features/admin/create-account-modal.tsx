@@ -24,7 +24,7 @@ const ROLE_OPTIONS: { role: AdminRole; label: string; desc: string }[] = [
   { role: "chief_layout", label: "Chef Maquettiste", desc: "Validation des épreuves et publication officielle" },
   { role: "manager", label: "Gestionnaire Stock & Livraison", desc: "Stock papier physique et suivi des livraisons" },
   { role: "legal_reviewer", label: "Juriste", desc: "Validation des contrats, droits d'auteur et impayés" },
-  { role: "wholesaler", label: "Grossiste", desc: "Achats en gros à tarifs dégressifs et commandes groupées" },
+  { role: "wholesaler", label: "Grossiste", desc: "Achats et commandes à tarifs dégressifs grossiste" },
 ];
 
 const normalizeAdminRole = (r?: string): AdminRole => {

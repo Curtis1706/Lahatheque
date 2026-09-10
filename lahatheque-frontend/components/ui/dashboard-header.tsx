@@ -116,7 +116,7 @@ export function DashboardHeader() {
     if (path === "/student") return { section: "Espace Lecteur", title: "Mon Espace Lecteur" };
 
     if (path.startsWith("/wholesaler/catalog")) return { section: "Espace Grossiste", title: "Catalogue & Achat Gros" };
-    if (path.startsWith("/wholesaler/orders")) return { section: "Espace Grossiste", title: "Commandes Groupées" };
+    if (path.startsWith("/wholesaler/orders")) return { section: "Espace Grossiste", title: "Commandes" };
     if (path.startsWith("/wholesaler/notifications")) return { section: "Espace Grossiste", title: "Nouveautés & Ventes" };
     if (path.startsWith("/wholesaler/profile")) return { section: "Espace Grossiste", title: "Profil & Facturation B2B" };
     if (path === "/wholesaler") return { section: "Espace Grossiste", title: "Vue d'ensemble Grossiste" };

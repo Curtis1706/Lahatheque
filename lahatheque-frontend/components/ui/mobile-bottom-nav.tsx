@@ -231,7 +231,7 @@ export function MobileBottomNav() {
         return [
           { label: "Espace Grossiste", href: "/wholesaler", icon: <LayoutDashboard className="w-4 h-4" /> },
           { label: "Catalogue & Prix Gros", href: "/wholesaler/catalog", icon: <BookOpen className="w-4 h-4" /> },
-          { label: "Commandes Groupées", href: "/wholesaler/orders", icon: <PackageCheck className="w-4 h-4" /> },
+          { label: "Commandes", href: "/wholesaler/orders", icon: <PackageCheck className="w-4 h-4" /> },
           { label: "Nouvelle Commande", href: "/wholesaler/orders/new", icon: <PenTool className="w-4 h-4" /> },
           { label: "Nouveautés & Ventes", href: "/wholesaler/notifications", icon: <BellRing className="w-4 h-4" /> },
           { label: "Profil & Facturation", href: "/wholesaler/profile", icon: <UserIcon className="w-4 h-4" /> },
@@ -461,7 +461,7 @@ export function MobileBottomNav() {
               {/* Dynamic Navigation Links in Sheet with Active Highlight */}
               <div className="space-y-3">
                 <p className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
-                  Menu &amp; Navigation Rôle ({user?.role || "standard"})
+                  Menu &amp; Navigation ({getRoleBadgeLabel()})
                 </p>
                 <div className="grid grid-cols-2 gap-2.5">
                   {drawerLinks.map((link) => {

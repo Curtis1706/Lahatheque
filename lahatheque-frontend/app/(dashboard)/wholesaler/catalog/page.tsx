@@ -130,7 +130,7 @@ export default function WholesalerCatalogPage() {
 
   const handleRemoveItem = (bookId: string) => {
     setCart((prev) => prev.filter((item) => item.book_id !== bookId));
-    toast.info("Titre retiré du panier groupé.");
+    toast.info("Titre retiré du panier.");
   };
 
   const totalCartCount = cart.length;
@@ -285,7 +285,7 @@ export default function WholesalerCatalogPage() {
           className="px-4 py-2.5 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-xs relative self-start sm:self-center min-h-[44px] cursor-pointer"
         >
           <ShoppingCart className="w-4 h-4 text-gold" />
-          <span>Panier Commande Groupée</span>
+          <span>Panier Commande</span>
           {totalCartCount > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-gold text-navy font-mono font-bold text-[10px]">
               {totalCartCount}

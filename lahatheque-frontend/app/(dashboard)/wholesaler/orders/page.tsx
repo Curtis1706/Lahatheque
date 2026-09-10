@@ -136,7 +136,7 @@ export default function WholesalerOrdersListPage() {
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/wholesaler" className="hover:text-navy">Vue d&apos;ensemble</Link>
         <span>/</span>
-        <span className="text-navy font-semibold">Commandes Groupées</span>
+        <span className="text-navy font-semibold">Commandes</span>
       </div>
 
       {/* Header */}
@@ -151,10 +151,10 @@ export default function WholesalerOrdersListPage() {
             Historique &amp; Suivi des Achats en Gros
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Commandes Groupées B2B
+            Commandes B2B
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Consultez le statut de vos commandes groupées, téléchargez vos factures proforma et suivez la livraison des cartons.
+            Consultez le statut de vos commandes, téléchargez vos factures proforma et suivez la livraison des cartons.
           </p>
         </div>
 
@@ -163,7 +163,7 @@ export default function WholesalerOrdersListPage() {
           className="px-4 py-2.5 rounded-xl bg-navy text-white font-bold text-xs hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
         >
           <PlusCircle className="w-4 h-4 text-gold" />
-          Nouvelle Commande Groupée
+          Nouvelle Commande
         </Link>
       </div>
 
@@ -195,7 +195,7 @@ export default function WholesalerOrdersListPage() {
           columns={columns}
           rowKey="id"
           loading={loading}
-          emptyMessage="Aucune commande groupée passée pour le moment."
+          emptyMessage="Aucune commande passée pour le moment."
           onRowClick={(row) => { router.push(`/wholesaler/orders/${row.id}`); }}
           pageSize={10}
         />

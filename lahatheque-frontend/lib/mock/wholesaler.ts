@@ -118,7 +118,7 @@ export const mockWholesalerOrders: WholesalerOrder[] = [
       },
     ],
     timeline: [
-      { step: "Commande soumise", date: "10/08/2025 09:30", description: "Dépôt de la commande groupée", done: true },
+      { step: "Commande soumise", date: "10/08/2025 09:30", description: "Dépôt de la commande", done: true },
       { step: "Validation Administrateur", date: "10/08/2025 11:15", description: "Paiement validé par LAHA Éditions", done: true },
       { step: "Préparation & Expédition", date: "11/08/2025 14:00", description: "Sortie d'entrepôt et mise à disposition des clés", done: true },
       { step: "Livraison Finale", date: "-", description: "Réception physique et activation totale", done: false },
@@ -163,7 +163,7 @@ export const mockWholesalerOrders: WholesalerOrder[] = [
       },
     ],
     timeline: [
-      { step: "Commande soumise", date: "22/07/2025 14:15", description: "Dépôt de la commande groupée", done: true },
+      { step: "Commande soumise", date: "22/07/2025 14:15", description: "Dépôt de la commande", done: true },
       { step: "Validation Administrateur", date: "22/07/2025 15:00", description: "Validation immédiate", done: true },
       { step: "Préparation & Expédition", date: "23/07/2025 09:00", description: "Expédition confirmée", done: true },
       { step: "Livraison Finale", date: "24/07/2025 16:30", description: "Réception confirmée par le grossiste", done: true },

@@ -126,7 +126,7 @@ export default function WholesalerOrderDetailPage() {
             <StatusBadge status={order.status} />
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy mt-1 leading-snug">
-            Commande Groupée — {order.company_name}
+            Commande — {order.company_name}
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
             Déposée le {new Date(order.created_at).toLocaleString("fr-FR")}

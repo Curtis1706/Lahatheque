@@ -3,14 +3,14 @@
 {% block title %}Bon de Commande B2B #{{ order_number }} • LAHAThèque Grossiste{% endblock %}
 {% block badge_header %}Espace Grossiste • Proforma Jointe{% endblock %}
 
-{% block email_title %}Validation de votre Commande Groupée{% endblock %}
+{% block email_title %}Validation de votre Commande B2B{% endblock %}
 
 {% block email_content %}
 <p style="margin: 0 0 16px 0; font-size: 15px;">
     Bonjour <strong>{{ recipient_name|default:"Partenaire Grossiste" }}</strong>,
 </p>
 <p style="margin: 0 0 24px 0; line-height: 1.65;">
-    Votre commande groupée <strong>N° {{ order_number }}</strong> a bien été enregistrée par la direction commerciale LAHAThèque. 
+    Votre commande <strong>N° {{ order_number }}</strong> a bien été enregistrée par la direction commerciale LAHAThèque. 
     {% if is_credit %}
     Cette commande est soumise aux conditions de crédit commercial (Échéance : {{ payment_due_date|default:"Net 30 jours" }}).
     {% else %}

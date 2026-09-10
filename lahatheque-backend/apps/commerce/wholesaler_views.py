@@ -223,7 +223,7 @@ class WholesalerOrdersListView(APIView):
                 "returned_at": ord_obj.returned_at.isoformat() if hasattr(ord_obj.returned_at, "isoformat") else (str(ord_obj.returned_at) if ord_obj.returned_at else None),
                 "return_reason": ord_obj.return_reason,
                 "timeline": [
-                    {"step": "Commande transmise", "date": ord_obj.created_at.strftime("%d/%m/%Y"), "description": "Dépôt de la commande groupée", "done": True},
+                    {"step": "Commande transmise", "date": ord_obj.created_at.strftime("%d/%m/%Y"), "description": "Dépôt de la commande", "done": True},
                     {"step": "Validation & Proforma", "date": "-", "description": "Émission du devis proforma B2B", "done": ord_obj.status in ["validated", "processing", "delivered"]},
                     {"step": "Préparation & Expédition", "date": "-", "description": "Traitement entrepôt et transporteur", "done": ord_obj.status in ["processing", "delivered"]},
                     {"step": "Livraison & Licences", "date": "-", "description": "Livraison physique & activation des clés", "done": ord_obj.status == "delivered"},
@@ -453,7 +453,7 @@ class WholesalerOrderDetailView(APIView):
                     "returned_at": ord_obj.returned_at.isoformat() if hasattr(ord_obj.returned_at, "isoformat") else (str(ord_obj.returned_at) if ord_obj.returned_at else None),
                     "return_reason": ord_obj.return_reason,
                     "timeline": [
-                        {"step": "Commande transmise", "date": ord_obj.created_at.strftime("%d/%m/%Y"), "description": "Dépôt de la commande groupée", "done": True},
+                        {"step": "Commande transmise", "date": ord_obj.created_at.strftime("%d/%m/%Y"), "description": "Dépôt de la commande", "done": True},
                         {"step": "Validation & Proforma", "date": "-", "description": "Émission du devis proforma B2B", "done": ord_obj.status in ["validated", "processing", "delivered"]},
                         {"step": "Préparation & Expédition", "date": "-", "description": "Traitement entrepôt et transporteur", "done": ord_obj.status in ["processing", "delivered"]},
                         {"step": "Livraison & Licences", "date": "-", "description": "Livraison physique & activation des clés", "done": ord_obj.status == "delivered"},

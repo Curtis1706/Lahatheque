@@ -52,7 +52,7 @@ export function WholesaleCartDrawer({
               <ShoppingCart className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-serif font-bold text-base">Panier Commande Groupée</h3>
+              <h3 className="font-serif font-bold text-base">Panier Commande</h3>
               <p className="text-xs text-navy-light">{items.length} titre(s) sélectionné(s)</p>
             </div>
           </div>
@@ -207,7 +207,7 @@ export function WholesaleCartDrawer({
                 <span className="font-mono font-bold text-navy">{totalPrintSubtotal.toLocaleString("fr-FR")} XOF</span>
               </div>
               <div className="flex items-center justify-between text-sm font-bold pt-1">
-                <span className="text-navy">Total Commande Groupée :</span>
+                <span className="text-navy">Total Commande :</span>
                 <span className="font-mono text-gold text-base">{totalAmount.toLocaleString("fr-FR")} XOF</span>
               </div>
             </div>
@@ -220,7 +220,7 @@ export function WholesaleCartDrawer({
               }}
               className="w-full py-3 rounded-xl bg-navy text-white font-bold text-xs hover:bg-navy-hover transition-colors flex items-center justify-center gap-2 shadow-xs min-h-[44px]"
             >
-              <span>Valider la Commande Groupée</span>
+              <span>Valider la Commande</span>
               <ArrowRight className="w-4 h-4 text-gold" />
             </button>
           </div>

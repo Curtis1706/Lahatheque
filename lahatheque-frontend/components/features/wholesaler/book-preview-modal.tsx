@@ -132,7 +132,7 @@ export function BookPreviewModal({
                 <BookOpen className="w-10 h-10 text-gold mx-auto mb-2" />
                 <p className="font-serif font-bold text-navy text-sm">Visionneuse d&apos;Extrait LAHAThèque</p>
                 <p className="text-xs text-foreground-muted max-w-sm mt-1">
-                  Feuilletez les premières pages de l&apos;ouvrage pour évaluer le contenu avant votre commande groupée.
+                  Feuilletez les premières pages de l&apos;ouvrage pour évaluer le contenu avant votre commande.
                 </p>
               </div>
             </div>
@@ -158,7 +158,7 @@ export function BookPreviewModal({
                 }}
                 className="px-3.5 py-2.5 rounded-xl border border-border text-xs font-bold text-navy hover:border-gold transition-colors cursor-pointer"
               >
-                + Panier Groupé
+                + Panier
               </button>
             )}
             <button

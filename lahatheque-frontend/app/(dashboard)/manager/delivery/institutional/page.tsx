@@ -78,7 +78,7 @@ export default function InstitutionalDeliveriesPage() {
             Commandes Institutionnelles &amp; Gros
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Préparez et expédiez les commandes papier groupées passées par les universités partenaires et les grossistes agréés.
+            Préparez et expédiez les commandes papier passées par les universités partenaires et les grossistes agréés.
           </p>
         </div>
       </div>

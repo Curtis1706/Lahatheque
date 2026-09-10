@@ -20,7 +20,7 @@ export function OrderTimeline({ status, timeline, className }: OrderTimelineProp
     <div className={`p-6 rounded-3xl bg-background border border-border space-y-6 shadow-xs ${className}`}>
       <div className="flex items-center justify-between border-b border-border pb-4">
         <div>
-          <h3 className="font-serif font-bold text-navy text-base">Suivi Chronologique de la Commande Groupée</h3>
+          <h3 className="font-serif font-bold text-navy text-base">Suivi Chronologique de la Commande</h3>
           <p className="text-xs text-foreground-muted">Étape de traitement entrepôt et activation des clés</p>
         </div>
 

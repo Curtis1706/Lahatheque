@@ -18,6 +18,7 @@ export type AdminRole =
 export const ADMIN_ROLE_LABELS: Record<string, string> = {
   student: "Client / Lecteur",
   teacher: "Enseignant",
+  parent: "Parent d'élève",
   author: "Auteur",
   publisher: "Éditeur Tiers",
   university: "Université / Établissement",
@@ -27,6 +28,7 @@ export const ADMIN_ROLE_LABELS: Record<string, string> = {
   coordination_manager: "Gestionnaire Coordination",
   legal_reviewer: "Juriste / Relecteur",
   wholesaler: "Grossiste Commercial",
+  super_client: "Grossiste Commercial",
   commercial_wholesaler: "Grossiste Commercial",
   partner_api: "Partenaire API",
   admin: "Administrateur",

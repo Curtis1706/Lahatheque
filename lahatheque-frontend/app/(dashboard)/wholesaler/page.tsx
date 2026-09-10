@@ -74,7 +74,7 @@ export default function WholesalerOverviewPage() {
             Bienvenue, {user?.first_name || "Librairie Partenaire"}
           </h1>
           <p className="text-xs sm:text-sm text-navy-light mt-1">
-            Passez vos commandes groupées de licences numériques et d&apos;exemplaires papier à tarif grossiste préférentiel.
+            Passez vos commandes de licences numériques et d&apos;exemplaires papier à tarif grossiste préférentiel.
           </p>
         </div>
 
@@ -91,7 +91,7 @@ export default function WholesalerOverviewPage() {
             className="px-4 py-2.5 rounded-2xl bg-gold text-navy font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-2 shadow-sm min-h-[44px]"
           >
             <PlusCircle className="w-4 h-4" />
-            Nouvelle Commande Groupée
+            Nouvelle Commande
           </Link>
         </div>
       </div>
@@ -156,7 +156,7 @@ export default function WholesalerOverviewPage() {
         <div className="pb-3 border-b border-border flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold font-serif text-navy">Accès Rapide & Gestion des Achats</h2>
-            <p className="text-[11px] text-foreground-muted mt-0.5">Commandes groupées, nouveautés du catalogue et facturation</p>
+            <p className="text-[11px] text-foreground-muted mt-0.5">Commandes, nouveautés du catalogue et facturation</p>
           </div>
           <Link
             href="/wholesaler/orders"
@@ -176,7 +176,7 @@ export default function WholesalerOverviewPage() {
               primary: true,
             },
             {
-              label: "Nouvelle Commande Groupée",
+              label: "Nouvelle Commande",
               desc: "Valider votre panier mixte (numérique + papier)",
               icon: PlusCircle,
               href: "/wholesaler/orders/new",
