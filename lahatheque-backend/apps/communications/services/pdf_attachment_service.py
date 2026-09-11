@@ -130,7 +130,7 @@ class PdfAttachmentService:
         # 4. Boîte de Synthèse Totale
         current_y += 16
         page.draw_rect(fitz.Rect(280, current_y, 555, current_y + 36), color=navy, fill=navy)
-        label_total = "TOTAL NET ACQUITTÉ :" if is_paid else "TOTAL NET À PAYER :"
+        label_total = "TOTAL PAYÉ :" if is_paid else "TOTAL NET À PAYER :"
         page.insert_text(fitz.Point(295, current_y + 23), label_total, fontsize=10.5, fontname="helv", color=(1, 1, 1))
         
         formatted_total = f"{total_amount:,.0f} {currency}".replace(",", " ")
@@ -140,9 +140,12 @@ class PdfAttachmentService:
         # 5. Tampon & Certification de Paiement
         tampon_y = current_y + 55
         page.draw_rect(fitz.Rect(40, tampon_y, 320, tampon_y + 65), color=gold, fill=light_gray)
-        page.insert_text(fitz.Point(55, tampon_y + 22), "CERTIFICATION ÉLECTRONIQUE LAHATHÈQUE", fontsize=8.5, fontname="helv", color=navy)
-        page.insert_text(fitz.Point(55, tampon_y + 38), f"Document scellé cryptographiquement le {date_str}", fontsize=7.5, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(55, tampon_y + 52), f"Réf Sécurité : {order_num}-SEC-2026", fontsize=7.5, fontname="helv", color=gold)
+        page.insert_text(fitz.Point(55, tampon_y + 20), "CERTIFICATION ÉLECTRONIQUE LAHATHÈQUE", fontsize=8.5, fontname="helv", color=navy)
+        page.insert_text(fitz.Point(55, tampon_y + 34), f"Document scellé cryptographiquement le {date_str}", fontsize=7.5, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(55, tampon_y + 46), f"Réf Sécurité : {order_num}-SEC-2026", fontsize=7.5, fontname="helv", color=gold)
+        if is_paid:
+            page.draw_rect(fitz.Rect(240, tampon_y + 12, 305, tampon_y + 36), color=gold, fill=navy)
+            page.insert_text(fitz.Point(252, tampon_y + 28), "PAYÉ", fontsize=11, fontname="helv", color=gold)
 
         # 6. Pied de page Légal
         footer_y = 800

@@ -46,13 +46,10 @@ function RecentBookCard({ book }: { book: BookAPI }) {
   const { playBook } = useAudioPlayer();
   const authorName =
     book.authors?.map((a) => a.full_name).join(", ") || "Auteur inconnu";
-  const hasAudio = Boolean(
-    (book as any).has_audio_version ||
-    (book as any).price_audio ||
-    (book as any).format === "audio" ||
-    (book as any).format_type === "audio"
+  const isAudioOwned = Boolean(
+    book.is_audio_owned || (book as any).has_audio_access
   );
-  const isAudioOnly = hasAudio && (book as any).is_digital_available === false;
+  const isAudioOnly = isAudioOwned && (book as any).is_digital_available === false;
   const primaryHref = isAudioOnly ? `/listen/${book.id}` : `/catalog/reader/${book.id}`;
 
   return (
@@ -66,7 +63,7 @@ function RecentBookCard({ book }: { book: BookAPI }) {
           <p className="text-[11px] font-bold text-gold uppercase tracking-wider">
             {book.discipline_name || "Académique"}
           </p>
-          {hasAudio && (
+          {isAudioOwned && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-gold/15 text-navy border border-gold/30">
               <Headphones className="w-2.5 h-2.5 text-gold" />
               Audio
@@ -102,7 +99,7 @@ function RecentBookCard({ book }: { book: BookAPI }) {
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
-        {hasAudio && (
+        {isAudioOwned && (
           <button
             type="button"
             onClick={() => playBook(book.id)}
@@ -136,13 +133,11 @@ function ReadingHeroCard({
   const { playBook } = useAudioPlayer();
 
   if (currentReading) {
-    const hasAudio = Boolean(
-      (currentReading.ouvrage as any).has_audio_version ||
-      (currentReading.ouvrage as any).price_audio ||
-      (currentReading.ouvrage as any).format === "audio" ||
-      (currentReading.ouvrage as any).format_type === "audio"
+    const isAudioOwned = Boolean(
+      (currentReading.ouvrage as any).is_audio_owned ||
+      (currentReading.ouvrage as any).has_audio_access
     );
-    const isAudioOnly = hasAudio && (currentReading.ouvrage as any).is_digital_available === false;
+    const isAudioOnly = isAudioOwned && (currentReading.ouvrage as any).is_digital_available === false;
     const heroHref = isAudioOnly ? `/listen/${currentReading.ouvrage.id}` : `/catalog/reader/${currentReading.ouvrage.id}`;
 
     return (
@@ -173,7 +168,7 @@ function ReadingHeroCard({
         </div>
 
         <div className="flex items-center gap-3 shrink-0 flex-wrap">
-          {hasAudio && !isAudioOnly && (
+          {isAudioOwned && !isAudioOnly && (
             <button
               type="button"
               onClick={() => playBook(currentReading.ouvrage.id)}

@@ -31,17 +31,26 @@ def process_moneroo_webhook(event_id: str, event_type: str, payload: dict) -> We
         
     try:
         # Extraire l'ID de transaction (moneroo_id ou fallback metadata tx_id)
-        moneroo_id = payload.get('data', {}).get('id')
-        tx_id = payload.get('data', {}).get('metadata', {}).get('transaction_id')
+        moneroo_id = (
+            payload.get('data', {}).get('id')
+            if isinstance(payload.get('data'), dict)
+            else None
+        ) or payload.get('id') or payload.get('payment_id') or payload.get('paymentId')
+
+        tx_id = (
+            payload.get('data', {}).get('metadata', {}).get('transaction_id')
+            if isinstance(payload.get('data'), dict) and isinstance(payload.get('data', {}).get('metadata'), dict)
+            else None
+        ) or payload.get('metadata', {}).get('transaction_id') if isinstance(payload.get('metadata'), dict) else None
         
         # 2. Verrouillage Pessimiste de la Transaction
-        # On cherche par moneroo_id d'abord
-        payment_tx = PaymentTransaction.objects.select_for_update().filter(moneroo_id=moneroo_id).first()
+        payment_tx = None
+        if moneroo_id:
+            payment_tx = PaymentTransaction.objects.select_for_update().filter(moneroo_id=moneroo_id).first()
         if not payment_tx and tx_id:
             payment_tx = PaymentTransaction.objects.select_for_update().filter(id=tx_id).first()
             
         if not payment_tx:
-            # Transaction inconnue de notre côté, on log mais on marque webhook comme FAILED (ou PROCESSED pour ignorer)
             raise ValueError(f"Transaction introuvable pour moneroo_id={moneroo_id} et tx_id={tx_id}")
 
         if payment_tx.status in [PaymentTransaction.Status.SUCCESS, PaymentTransaction.Status.FAILED, PaymentTransaction.Status.CANCELLED]:
@@ -52,16 +61,17 @@ def process_moneroo_webhook(event_id: str, event_type: str, payload: dict) -> We
             return webhook
 
         # 3. Dispatch
-        if event_type == 'payment.success':
+        clean_event = str(event_type).lower().replace(':', '.')
+        if clean_event in ['payment.success', 'payment.completed', 'payment.paid']:
             payment_tx.status = PaymentTransaction.Status.SUCCESS
-            payment_tx.webhook_payload = payload
-            payment_tx.save(update_fields=['status', 'webhook_payload', 'updated_at'])
+            payment_tx.raw_webhook_payload = payload
+            payment_tx.save(update_fields=['status', 'raw_webhook_payload'])
             handle_payment_success(payment_tx)
             
-        elif event_type in ['payment.failed', 'payment.cancelled']:
+        elif clean_event in ['payment.failed', 'payment.cancelled', 'payment.rejected']:
             payment_tx.status = PaymentTransaction.Status.FAILED
-            payment_tx.webhook_payload = payload
-            payment_tx.save(update_fields=['status', 'webhook_payload', 'updated_at'])
+            payment_tx.raw_webhook_payload = payload
+            payment_tx.save(update_fields=['status', 'raw_webhook_payload'])
             handle_payment_failure(payment_tx)
         else:
             logger.warning(f"Event type non géré: {event_type}")

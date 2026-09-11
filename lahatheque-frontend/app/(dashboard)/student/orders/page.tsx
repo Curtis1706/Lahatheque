@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useCallback, useEffect, useState, useMemo } from "react";
+import React, { Suspense, useCallback, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   PackageCheck,
   ArrowLeft,
@@ -13,12 +14,16 @@ import {
   Eye,
   X,
   BookOpen,
+  RefreshCw,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getStudentOrders,
+  verifyOrderPayment,
   type OrderAPI,
 } from "@/lib/services/student";
+import { retryOrderPayment } from "@/lib/services/commerce-orders";
 import OrderCreateForm from "@/components/student/OrderCreateForm";
 import { BookCover } from "@/components/features/student/book-cover";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
@@ -78,15 +83,19 @@ interface OrderTableRow extends OrderAPI {
   book_title_summary: string;
 }
 
-// ─── Page Principale ──────────────────────────────────────────────────────────
-
-export default function StudentOrdersPage() {
+function StudentOrdersContent() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<OrderAPI[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedOrderModal, setSelectedOrderModal] = useState<OrderTableRow | null>(null);
+  const [verifyingOrderId, setVerifyingOrderId] = useState<string | null>(null);
+  const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null);
+
+  const paymentIdParam = searchParams.get("paymentId") || searchParams.get("payment_id");
+  const orderIdParam = searchParams.get("order_id") || searchParams.get("orderId");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -103,9 +112,79 @@ export default function StudentOrdersPage() {
     }
   }, []);
 
+  const handleVerifyOrder = useCallback(
+    async (orderId?: string, paymentId?: string) => {
+      if (orderId) setVerifyingOrderId(orderId);
+      toast.info("Vérification du règlement auprès de la passerelle en cours...");
+      try {
+        const res = await verifyOrderPayment({ orderId, paymentId });
+        if (res.success && res.data?.status === "paid") {
+          toast.success("Paiement validé avec succès. Vos ouvrages numériques sont accessibles dans votre bibliothèque.");
+          await loadData();
+        } else if (res.success && res.data?.status === "pending") {
+          toast.info("Paiement en attente de confirmation par l'opérateur.");
+        } else {
+          toast.error(res.error || "Paiement non confirmé.");
+        }
+      } catch {
+        toast.error("Impossible de joindre le serveur de vérification.");
+      } finally {
+        setVerifyingOrderId(null);
+      }
+    },
+    [loadData]
+  );
+
+  const handleRetryPayment = useCallback(
+    async (orderId: string) => {
+      setRetryingOrderId(orderId);
+      toast.info("Génération de la session de paiement sécurisé...");
+      try {
+        const res = await retryOrderPayment(orderId);
+        if (res.already_paid) {
+          toast.success("Cette commande est déjà validée !");
+          await loadData();
+        } else if (res.checkout_url) {
+          toast.success("Redirection vers la passerelle sécurisée...");
+          window.location.href = res.checkout_url;
+        } else {
+          toast.error("Impossible d'obtenir le lien de règlement.");
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Erreur lors de la relance du paiement.");
+      } finally {
+        setRetryingOrderId(null);
+      }
+    },
+    [loadData]
+  );
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Détection automatique du retour Moneroo (paymentId dans l'URL)
+  useEffect(() => {
+    if (paymentIdParam) {
+      handleVerifyOrder(undefined, paymentIdParam).then(() => {
+        window.history.replaceState({}, "", "/student/orders");
+      });
+    }
+  }, [paymentIdParam, handleVerifyOrder]);
+
+  // Détection du lien de relance panier abandonné (order_id dans l'URL)
+  useEffect(() => {
+    if (orderIdParam && orders.length > 0) {
+      const match = orders.find((o) => o.id === orderIdParam);
+      if (match) {
+        setSelectedOrderModal({
+          ...match,
+          order_reference: `#${String(match.id).slice(0, 8).toUpperCase()}`,
+          book_title_summary: match.lignes.map((l) => l.ouvrage_title).join(", "),
+        });
+      }
+    }
+  }, [orderIdParam, orders]);
 
   // Fermeture de la modale avec la touche Échap
   useEffect(() => {
@@ -175,6 +254,7 @@ export default function StudentOrdersPage() {
           formatPrice(Number(l.unit_price) * l.quantity),
         ]),
         totalAmount: formatPrice(order.total_amount),
+        totalLabel: order.statut_paiement === "paid" ? "TOTAL PAYÉ :" : "TOTAL NET À PAYER :",
         totalNotes: `Facture acquittée (${order.statut_paiement_display || "Payé"}). Conforme à la législation fiscale UEMOA en vigueur.`,
         filename: `facture_LAHA_${orderRef.replace("#", "")}.pdf`,
       });
@@ -299,6 +379,36 @@ export default function StudentOrdersPage() {
       className: "text-right",
       cell: (row) => (
         <div className="flex items-center justify-end gap-2">
+          {(row.statut_paiement === "pending" || row.statut_paiement === "abandoned") && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRetryPayment(row.id);
+              }}
+              disabled={retryingOrderId === row.id}
+              className="px-2.5 py-1.5 rounded-xl border border-gold bg-gold hover:bg-gold-hover text-navy text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              title="Finaliser le paiement de cette commande via Moneroo"
+            >
+              <CreditCard className={`w-3.5 h-3.5 text-navy ${retryingOrderId === row.id ? "animate-pulse" : ""}`} />
+              <span>Payer</span>
+            </button>
+          )}
+          {row.statut_paiement === "pending" && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleVerifyOrder(row.id);
+              }}
+              disabled={verifyingOrderId === row.id}
+              className="px-2.5 py-1.5 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold hover:text-white text-gold text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              title="Vérifier l'état du paiement auprès de la passerelle"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${verifyingOrderId === row.id ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Vérifier</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={(e) => {
@@ -364,10 +474,40 @@ export default function StudentOrdersPage() {
         </div>
 
         <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
-          <span className="text-xs font-bold text-navy flex items-center gap-1.5">
-            <Eye className="w-3.5 h-3.5 text-gold" />
-            <span>Voir détails</span>
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-navy flex items-center gap-1.5">
+              <Eye className="w-3.5 h-3.5 text-gold" />
+              <span>Voir détails</span>
+            </span>
+            {(row.statut_paiement === "pending" || row.statut_paiement === "abandoned") && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRetryPayment(row.id);
+                }}
+                disabled={retryingOrderId === row.id}
+                className="px-2.5 py-1 rounded-lg border border-gold bg-gold hover:bg-gold-hover text-navy text-[11px] font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              >
+                <CreditCard className={`w-3 h-3 text-navy ${retryingOrderId === row.id ? "animate-pulse" : ""}`} />
+                <span>Payer</span>
+              </button>
+            )}
+            {row.statut_paiement === "pending" && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleVerifyOrder(row.id);
+                }}
+                disabled={verifyingOrderId === row.id}
+                className="px-2 py-1 rounded-lg border border-gold/40 bg-gold/10 text-gold text-[11px] font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3 h-3 ${verifyingOrderId === row.id ? "animate-spin" : ""}`} />
+                <span>Vérifier</span>
+              </button>
+            )}
+          </div>
 
           <button
             type="button"
@@ -679,15 +819,32 @@ export default function StudentOrdersPage() {
             </div>
 
             {/* Actions footer */}
-            <div className="flex items-center justify-between gap-3 pt-2">
-              <button
-                type="button"
-                onClick={(e) => handleDownloadInvoice(selectedOrderModal, e)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-navy/20 bg-background hover:bg-background-secondary text-navy text-xs font-bold transition-colors shadow-xs cursor-pointer min-h-[44px]"
-              >
-                <Download className="w-4 h-4 text-gold" />
-                <span>Télécharger le reçu PDF</span>
-              </button>
+            <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => handleDownloadInvoice(selectedOrderModal, e)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-navy/20 bg-background hover:bg-background-secondary text-navy text-xs font-bold transition-colors shadow-xs cursor-pointer min-h-[44px]"
+                >
+                  <Download className="w-4 h-4 text-gold" />
+                  <span>Télécharger le reçu PDF</span>
+                </button>
+
+                {selectedOrderModal.statut_paiement === "pending" && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handleVerifyOrder(selectedOrderModal.id);
+                      setSelectedOrderModal(null);
+                    }}
+                    disabled={verifyingOrderId === selectedOrderModal.id}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold hover:text-white text-gold text-xs font-bold transition-colors shadow-xs cursor-pointer min-h-[44px] disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${verifyingOrderId === selectedOrderModal.id ? "animate-spin" : ""}`} />
+                    <span>Vérifier le paiement</span>
+                  </button>
+                )}
+              </div>
 
               <button
                 type="button"
@@ -701,5 +858,24 @@ export default function StudentOrdersPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function StudentOrdersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto min-w-0 pr-14 sm:pr-8">
+          <div className="h-10 w-48 rounded-2xl bg-background border border-border animate-pulse" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="h-28 rounded-3xl bg-background border border-border animate-pulse" />
+            <div className="h-28 rounded-3xl bg-background border border-border animate-pulse" />
+            <div className="h-28 rounded-3xl bg-background border border-border animate-pulse" />
+          </div>
+        </div>
+      }
+    >
+      <StudentOrdersContent />
+    </Suspense>
   );
 }

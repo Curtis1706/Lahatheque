@@ -159,6 +159,27 @@ class StudentBooksView(APIView):
         if favorites_only:
             qs = qs.filter(is_favorite=True)
 
+        user_audio_ids = set()
+        platform_roles = ['admin', 'super_admin', 'chief_layout', 'layout_artist', 'legal_reviewer']
+        from django.conf import settings
+        is_platform_admin = (
+            user.is_superuser
+            or user.is_staff
+            or getattr(user, 'role', '') in platform_roles
+            or getattr(settings, 'DEV_UNLOCK_ALL_BOOKS', False)
+        )
+        if is_platform_admin:
+            user_audio_ids = True
+        else:
+            user_audio_ids = set(
+                str(bid) for bid in LigneCommande.objects.filter(
+                    commande__user=user,
+                    format_type='audio',
+                ).filter(
+                    Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
+                ).values_list('ouvrage_id', flat=True)
+            )
+
         data = []
         for progress in qs:
             access_info = AccessService.check_user_book_access(user, str(progress.ouvrage.id))
@@ -169,9 +190,18 @@ class StudentBooksView(APIView):
             if progress_pct == 0 and progress.total_pages > 0 and progress.current_page > 0:
                 progress_pct = min(100, max(1, round((progress.current_page / progress.total_pages) * 100)))
 
-            ouvrage_data = OuvrageBasicSerializer(progress.ouvrage, context={'request': request}).data
+            ouvrage_data = OuvrageBasicSerializer(
+                progress.ouvrage,
+                context={'request': request, 'user_audio_ids': user_audio_ids}
+            ).data
+
+            book_id_str = str(progress.ouvrage.id)
+            has_audio_access = (user_audio_ids is True) or (book_id_str in user_audio_ids)
+
             data.append({
                 **ouvrage_data,
+                'is_audio_owned': has_audio_access,
+                'has_audio_access': has_audio_access,
                 'progress_percent': progress_pct,
                 'current_page': progress.current_page,
                 'last_read_chapter': progress.last_read_chapter,
@@ -476,11 +506,40 @@ class StudentOrdersView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from apps.commerce.services import reconcile_moneroo_payment
+        user = request.user
+
+        # 1. Réconciliation prioritaire si paymentId ou order_id est fourni en paramètre URL
+        payment_id = request.query_params.get('paymentId') or request.query_params.get('payment_id')
+        req_order_id = request.query_params.get('order_id')
+        if payment_id or req_order_id:
+            try:
+                reconcile_moneroo_payment(moneroo_id=payment_id, order_id=req_order_id, user=user)
+            except Exception:
+                pass
+
+        # 2. Auto-réconciliation proactive des commandes récentes en attente avec transaction Moneroo
+        recent_pending_orders = (
+            Order.objects
+            .filter(
+                user=user,
+                statut_paiement='pending',
+                payment_transaction__moneroo_id__isnull=False,
+                created_at__gte=timezone.now() - timedelta(hours=48)
+            )
+            .select_related('payment_transaction')[:3]
+        )
+        for po in recent_pending_orders:
+            try:
+                reconcile_moneroo_payment(moneroo_id=po.payment_transaction.moneroo_id, order_id=str(po.id), user=user)
+            except Exception:
+                pass
+
         orders = (
             Order.objects
-            .filter(user=request.user)
+            .filter(user=user)
             .prefetch_related('lignes', 'lignes__ouvrage')
-            .select_related('livraison', 'currency')
+            .select_related('livraison', 'currency', 'payment_transaction')
             .order_by('-created_at')
         )
         serializer = OrderStudentSerializer(orders, many=True)

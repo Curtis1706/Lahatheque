@@ -47,6 +47,60 @@ class PayoutRequest(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 ```
 
+### `apps.commerce.models.Order` (Cycle de vie complet & Console Admin)
+```python
+class Order(models.Model):
+    STATUT_PAIEMENT_CHOICES = (
+        ('pending', 'En attente'),
+        ('paid', 'Payé'),
+        ('credit', 'Achat à crédit'),
+        ('failed', 'Échoué'),
+        ('cancelled', 'Annulé'),
+        ('abandoned', 'Panier abandonné'),
+        ('refunded', 'Remboursé'),
+    )
+    STATUT_COMMANDE_CHOICES = (
+        ('pending', 'En attente'),
+        ('processing', 'En traitement'),
+        ('completed', 'Terminée'),
+        ('cancelled', 'Annulée'),
+    )
+    MODE_PAIEMENT_CHOICES = (
+        ('mobile_money', 'Mobile Money en ligne (Moneroo)'),
+        ('momo_direct', 'Mobile Money direct (Transfert flotte)'),
+        ('cash', 'Espèces au comptoir'),
+        ('bank_transfer', 'Virement bancaire'),
+        ('check', 'Chèque bancaire'),
+        ('credit', 'Dépôt / Achat à crédit'),
+    )
+
+    # Identifiants & Acteurs
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
+    numero_commande = models.CharField(max_length=50, unique=True, blank=True, null=True)
+
+    # Statuts & Finances
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    currency = models.ForeignKey(Currency, on_delete=models.SET_NULL, null=True, blank=True)
+    statut_paiement = models.CharField(max_length=20, choices=STATUT_PAIEMENT_CHOICES, default='pending')
+    statut_commande = models.CharField(max_length=20, choices=STATUT_COMMANDE_CHOICES, default='pending')
+    mode_paiement = models.CharField(max_length=30, choices=MODE_PAIEMENT_CHOICES, default='mobile_money')
+
+    # Achat à crédit / Dépôt
+    is_credit_purchase = models.BooleanField(default=False)
+    credit_due_date = models.DateField(blank=True, null=True)
+    credit_granted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_orders_granted')
+
+    # Rapprochement & Audit
+    payment_transaction = models.ForeignKey(PaymentTransaction, on_delete=models.SET_NULL, null=True, blank=True)
+    manual_payment_confirmed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='manual_orders_confirmed')
+    manual_payment_reference = models.CharField(max_length=150, blank=True, default='')
+    abandoned_at = models.DateTimeField(blank=True, null=True)
+    last_reminder_sent_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+```
+
 ---
 
 ## 2. DTO & Interfaces TypeScript Frontend
@@ -80,14 +134,40 @@ export interface AdminSaleOrder {
   buyer_name: string;
   buyer_email: string;
   buyer_role: 'student' | 'author' | 'university' | 'wholesaler' | 'client';
-  created_at: string;
   payment_method: string;
-  payment_status: 'paid' | 'pending' | 'failed' | 'refunded';
+  payment_status: OrderPaymentStatus;
   gross_amount: number;
   discount_total: number;
   net_amount_paid: number;
   items_count: number;
   items: AdminSaleOrderItem[];
+}
+
+export type OrderPaymentStatus = 'paid' | 'pending' | 'credit' | 'failed' | 'cancelled' | 'abandoned' | 'refunded';
+export type OrderStatus = 'pending' | 'processing' | 'completed' | 'cancelled';
+
+export interface AdminOrderRow {
+  id: string;
+  order_reference: string;
+  customer_id: string;
+  customer_name: string;
+  customer_email: string;
+  customer_role: string;
+  channel: SaleChannel;
+  total_amount: number;
+  statut_paiement: OrderPaymentStatus;
+  statut_paiement_display: string;
+  statut_commande: OrderStatus;
+  statut_commande_display: string;
+  mode_paiement: string;
+  mode_paiement_display: string;
+  is_credit_purchase: boolean;
+  credit_due_date?: string | null;
+  items_count: number;
+  items: AdminSaleOrderItem[];
+  moneroo_id?: string | null;
+  created_at: string;
+  abandoned_at?: string | null;
 }
 
 // =========================================================================

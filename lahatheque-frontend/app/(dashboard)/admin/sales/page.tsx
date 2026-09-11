@@ -14,7 +14,21 @@ import {
   AdminSalesConsolidatedResponse,
   AdminKpi,
 } from "@/lib/types/admin";
-import { Download, Clock, Filter, ShoppingBag, BookOpen, Layers, CheckCircle2 } from "lucide-react";
+import {
+  Download,
+  Clock,
+  Filter,
+  ShoppingBag,
+  BookOpen,
+  Layers,
+  CheckCircle2,
+  FileSpreadsheet,
+  FileText,
+  ChevronDown,
+  AlertCircle,
+  XCircle,
+  RotateCcw,
+} from "lucide-react";
 import { toast } from "sonner";
 import { generateCsvExport } from "@/lib/services/export-service";
 import { OrderItemsAccordionRow } from "@/components/features/admin/order-items-accordion-row";
@@ -26,6 +40,7 @@ export default function AdminSalesPage() {
 
   // Filtres
   const [selectedChannel, setSelectedChannel] = useState<string>("all");
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string>("all");
   const [timeSlot, setTimeSlot] = useState<TimeSlotFilter | null>(null);
   const [period, setPeriod] = useState<Period>("1m");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -36,6 +51,7 @@ export default function AdminSalesPage() {
       const [data, kpisRes] = await Promise.all([
         getAdminConsolidatedSales({
           channel: selectedChannel !== "all" ? selectedChannel : undefined,
+          payment_status: selectedPaymentStatus !== "all" ? selectedPaymentStatus : undefined,
           period: period || undefined,
           time_slot: timeSlot && timeSlot.id !== "all" ? timeSlot.id : undefined,
           q: searchQuery || undefined,
@@ -49,7 +65,7 @@ export default function AdminSalesPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedChannel, period, timeSlot, searchQuery]);
+  }, [selectedChannel, selectedPaymentStatus, period, timeSlot, searchQuery]);
 
   useEffect(() => {
     loadConsolidatedSales();
@@ -200,24 +216,75 @@ export default function AdminSalesPage() {
     {
       key: "net_amount_paid",
       header: "Montant Net Réglé",
-      cell: (row) => (
-        <span className="font-mono text-xs font-bold text-navy">
-          {row.net_amount_paid.toLocaleString("fr-FR")} FCFA
-        </span>
-      ),
+      cell: (row) => {
+        const isPaid = row.payment_status === "paid" || row.net_amount_paid > 0;
+        return (
+          <div>
+            <span className="font-mono text-xs font-bold text-navy block">
+              {isPaid
+                ? `${row.net_amount_paid.toLocaleString("fr-FR")} FCFA`
+                : `${(row.gross_amount || 0).toLocaleString("fr-FR")} FCFA`}
+            </span>
+            {!isPaid && (
+              <span className="text-[10px] text-foreground-muted block">
+                Non encaissé
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "payment_method",
-      header: "Règlement",
-      cell: (row) => (
-        <div className="text-xs font-poppins">
-          <span className="text-foreground">{row.payment_method}</span>
-          <div className="flex items-center gap-1 text-[11px] text-foreground-muted mt-0.5">
-            <CheckCircle2 className="w-3 h-3 text-gold" />
-            <span>Payé</span>
+      header: "Règlement & Statut",
+      cell: (row) => {
+        const isPaid = row.payment_status === "paid";
+        const isAbandoned = row.payment_status === "abandoned";
+        const isCredit = row.payment_status === "credit";
+        const isFailed = row.payment_status === "failed";
+        const isCancelled = row.payment_status === "cancelled";
+
+        return (
+          <div className="text-xs font-poppins space-y-1">
+            <span className="text-foreground font-medium block">
+              {row.payment_method}
+            </span>
+            <div>
+              {isPaid ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/15 text-navy border border-gold/30">
+                  <CheckCircle2 className="w-3 h-3 text-gold" />
+                  <span>Payé</span>
+                </span>
+              ) : isAbandoned ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-error/10 text-error border border-error/30">
+                  <RotateCcw className="w-3 h-3 text-error" />
+                  <span>Panier abandonné</span>
+                </span>
+              ) : isCredit ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-info/10 text-info border border-info/30">
+                  <Clock className="w-3 h-3 text-info" />
+                  <span>À crédit</span>
+                </span>
+              ) : isFailed ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-error/10 text-error border border-error/30">
+                  <XCircle className="w-3 h-3 text-error" />
+                  <span>Échoué</span>
+                </span>
+              ) : isCancelled ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-background-secondary text-foreground-muted border border-border">
+                  <XCircle className="w-3 h-3 text-foreground-muted" />
+                  <span>Annulé</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-warning/10 text-warning border border-warning/30">
+                  <Clock className="w-3 h-3 text-warning" />
+                  <span>En attente</span>
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "created_at",
@@ -288,7 +355,17 @@ export default function AdminSalesPage() {
     });
 
     generateCsvExport(exportRows, filename);
-    toast.success("Journal détaillé des ventes consolidées exporté avec succès !");
+    toast.success("Bordereau récapitulatif des ventes consolidées exporté avec succès !");
+  };
+
+  const [showLedgerMenu, setShowLedgerMenu] = useState(false);
+
+  const handleDownloadLedger = (format: "xlsx" | "pdf" | "csv") => {
+    setShowLedgerMenu(false);
+    const periodParam = period === "1m" ? "month" : period === "1y" ? "year" : "all";
+    const downloadUrl = `/api/bff/reporting/admin/accounting-ledger/export/?format=${format}&period=${periodParam}`;
+    window.open(downloadUrl, "_blank");
+    toast.success(`Génération du Grand Livre Comptable (${format.toUpperCase()}) en cours...`);
   };
 
   return (
@@ -304,14 +381,65 @@ export default function AdminSalesPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleExportCsv}
-          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-xs shrink-0 cursor-pointer min-h-[44px] font-poppins"
-        >
-          <Download className="w-4 h-4 text-gold" />
-          Exporter le Journal ({salesData?.total_orders_count || 0})
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Menu déroulant Grand Livre Comptable */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowLedgerMenu(!showLedgerMenu)}
+              className="px-4 py-2.5 rounded-xl bg-gold text-navy text-xs font-semibold hover:bg-gold-hover transition-colors flex items-center gap-2 shadow-xs shrink-0 cursor-pointer min-h-[44px] font-poppins"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-navy" />
+              <span>Grand Livre Comptable</span>
+              <ChevronDown className="w-3.5 h-3.5 text-navy" />
+            </button>
+
+            {showLedgerMenu && (
+              <div
+                className="absolute right-0 mt-1 w-56 bg-background border border-border rounded-xl shadow-xl z-20 py-1.5 animate-in fade-in zoom-in-95 duration-150"
+                onMouseLeave={() => setShowLedgerMenu(false)}
+              >
+                <div className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
+                  Format du Grand Livre
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadLedger("xlsx")}
+                  className="w-full text-left px-3 py-2 text-xs text-foreground hover:bg-background-secondary flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  <span>Format Excel (.xlsx)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadLedger("pdf")}
+                  className="w-full text-left px-3 py-2 text-xs text-foreground hover:bg-background-secondary flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 text-rose-600" />
+                  <span>Format PDF Officiel (.pdf)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadLedger("csv")}
+                  className="w-full text-left px-3 py-2 text-xs text-foreground hover:bg-background-secondary flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-navy" />
+                  <span>Format Tableur CSV (.csv)</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Bouton Bordereau Récapitulatif */}
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors flex items-center gap-2 shadow-xs shrink-0 cursor-pointer min-h-[44px] font-poppins"
+          >
+            <Download className="w-4 h-4 text-gold" />
+            <span>Bordereau Récapitulatif ({salesData?.total_orders_count || 0})</span>
+          </button>
+        </div>
       </div>
 
       {/* Graphique et récapitulatif consolidé */}
@@ -349,6 +477,31 @@ export default function AdminSalesPage() {
                   selectedChannel === tab.id
                     ? "bg-navy text-white shadow-xs"
                     : "text-foreground-muted hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Onglets des statuts de commande & paiement */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs font-poppins">
+            {[
+              { id: "all", label: "Toutes les commandes" },
+              { id: "paid", label: "Payées" },
+              { id: "credit", label: "À crédit" },
+              { id: "pending", label: "En attente" },
+              { id: "abandoned", label: "Paniers abandonnés" },
+              { id: "failed", label: "Échouées / Annulées" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSelectedPaymentStatus(tab.id)}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                  selectedPaymentStatus === tab.id
+                    ? "bg-gold text-navy font-bold shadow-xs"
+                    : "bg-background-secondary text-foreground-muted hover:text-foreground border border-border"
                 }`}
               >
                 {tab.label}

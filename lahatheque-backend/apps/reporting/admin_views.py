@@ -727,17 +727,29 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             # Synchronisation des déclinaisons linguistiques (OuvrageLanguageVersion)
             from apps.catalog.models import OuvrageLanguageVersion
             if 'languages' in data and isinstance(data['languages'], list):
+                has_any_paper_set = any(bool(lv.get('is_paper_available', False)) for lv in data['languages'])
                 for lv_data in data['languages']:
                     lang_code = (lv_data.get('language') or lv_data.get('language_code') or '').strip().lower()
                     if not lang_code:
                         continue
                     is_orig = bool(lv_data.get('is_original', False))
+                    lv_paper = bool(lv_data.get('is_paper_available', False))
+                    # Si l'ouvrage maître est disponible en papier, assurer qu'au moins la version originale est activée
+                    if book.is_paper_available and (is_orig or not has_any_paper_set):
+                        lv_paper = True
+                    elif not book.is_paper_available:
+                        lv_paper = False
+
+                    lv_stock = int(lv_data.get('paper_stock', 0))
+                    if lv_paper and lv_stock <= 0:
+                        lv_stock = getattr(book, 'paper_stock', 15) or 15
+
                     defaults = {
                         'title': lv_data.get('title') or book.title,
                         'summary': lv_data.get('summary', '') or book.summary,
                         'is_original': is_orig,
-                        'is_paper_available': bool(lv_data.get('is_paper_available', False)),
-                        'paper_stock': int(lv_data.get('paper_stock', 0)),
+                        'is_paper_available': lv_paper,
+                        'paper_stock': lv_stock,
                         'translation_status': lv_data.get('translation_status', 'ready'),
                     }
                     if lv_data.get('r2_key_pdf'):
@@ -757,6 +769,30 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                         language=lang_code,
                         defaults=defaults
                     )
+            elif 'is_paper_available' in data:
+                # Si les déclinaisons linguistiques ne sont pas modifiées dans la requête mais que le flag papier a changé
+                if book.is_paper_available:
+                    orig_lvs = OuvrageLanguageVersion.objects.filter(ouvrage=book)
+                    if orig_lvs.exists():
+                        for ol in orig_lvs:
+                            if ol.is_original:
+                                ol.is_paper_available = True
+                                if ol.paper_stock <= 0:
+                                    ol.paper_stock = 15
+                                ol.save(update_fields=['is_paper_available', 'paper_stock'])
+                    else:
+                        OuvrageLanguageVersion.objects.create(
+                            ouvrage=book,
+                            language=book.language or 'fr',
+                            title=book.title,
+                            summary=book.summary or '',
+                            is_original=True,
+                            is_paper_available=True,
+                            paper_stock=15,
+                            translation_status='ready'
+                        )
+                else:
+                    OuvrageLanguageVersion.objects.filter(ouvrage=book).update(is_paper_available=False)
 
             if 'deleted_languages' in data and isinstance(data['deleted_languages'], list):
                 for del_code in data['deleted_languages']:
@@ -2659,6 +2695,7 @@ class AdminSalesListAPIView(APIView):
         from django.utils.dateparse import parse_date
 
         channel_filter = request.GET.get('channel', 'all')
+        payment_status_filter = request.GET.get('payment_status', 'all').strip().lower()
         period_filter = request.GET.get('period', 'all')
         time_slot = request.GET.get('time_slot')
         query = request.GET.get('q', '').strip().lower()
@@ -2699,11 +2736,14 @@ class AdminSalesListAPIView(APIView):
 
         # 1. B2C / Commandes unitaires (Order)
         if channel_filter in ['all', 'b2c_individual']:
-            qs_orders = Order.objects.filter(statut_paiement='paid').select_related('user').prefetch_related(
+            qs_orders = Order.objects.all().select_related('user').prefetch_related(
                 'lignes__ouvrage__authors',
                 'lignes__ouvrage__institution',
                 'lignes__ouvrage__publisher'
             )
+            if payment_status_filter and payment_status_filter != 'all':
+                qs_orders = qs_orders.filter(statut_paiement=payment_status_filter)
+
             if filter_start:
                 qs_orders = qs_orders.filter(created_at__gte=filter_start)
             if filter_end:
@@ -2746,6 +2786,11 @@ class AdminSalesListAPIView(APIView):
                         "subtotal": float(l.unit_price or 0) * (l.quantity or 1),
                     })
 
+                status_raw = o.statut_paiement or 'pending'
+                status_display = o.get_statut_paiement_display() if hasattr(o, 'get_statut_paiement_display') else status_raw
+                is_paid = (status_raw == 'paid')
+                net_paid = float(o.total_amount or 0) if is_paid else 0.0
+
                 orders_list.append({
                     "id": f"ord-{str(o.id)[:8]}",
                     "order_reference": ref,
@@ -2756,16 +2801,18 @@ class AdminSalesListAPIView(APIView):
                     "buyer_role": buyer_role if buyer_role in ['student', 'author', 'university', 'wholesaler'] else 'client',
                     "created_at": o.created_at.isoformat() if o.created_at else None,
                     "payment_method": o.get_mode_paiement_display() if hasattr(o, 'get_mode_paiement_display') else (o.mode_paiement or "Mobile Money"),
-                    "payment_status": "paid",
+                    "payment_status": status_raw,
+                    "payment_status_display": status_display,
+                    "is_paid": is_paid,
                     "gross_amount": float(o.total_amount or 0),
                     "discount_total": 0.0,
-                    "net_amount_paid": float(o.total_amount or 0),
+                    "net_amount_paid": net_paid,
                     "items_count": len(items),
                     "items": items,
                 })
 
         # 2. B2B Universités (UniversityPaperOrder)
-        if channel_filter in ['all', 'b2b_university']:
+        if channel_filter in ['all', 'b2b_university'] and payment_status_filter in ['all', 'paid']:
             qs_univ = UniversityPaperOrder.objects.exclude(status='cancelled').select_related('institution', 'institution__user')
             if filter_start:
                 qs_univ = qs_univ.filter(created_at__gte=filter_start)
@@ -2837,7 +2884,7 @@ class AdminSalesListAPIView(APIView):
                 })
 
         # 3. B2B Grossistes (WholesaleOrder)
-        if channel_filter in ['all', 'b2b_wholesale']:
+        if channel_filter in ['all', 'b2b_wholesale'] and payment_status_filter in ['all', 'paid']:
             qs_ws = WholesaleOrder.objects.exclude(status=WholesaleOrderStatus.CANCELLED).select_related('user').prefetch_related(
                 'items__book__authors',
                 'items__book__institution',
@@ -3166,6 +3213,8 @@ class AdminGlobalFinanceView(APIView):
 
         orders_paid = Order.objects.filter(statut_paiement='paid')
         orders_credit_outstanding = Order.objects.filter(is_credit_purchase=True, statut_paiement='pending')
+        orders_abandoned = Order.objects.filter(statut_paiement='abandoned')
+        orders_failed = Order.objects.filter(statut_paiement='failed')
         univ_orders = UniversityPaperOrder.objects.exclude(status='cancelled')
         wholesale_orders = WholesaleOrder.objects.exclude(status='cancelled')
         subscriptions_active = Subscription.objects.filter(is_active=True)
@@ -3191,6 +3240,9 @@ class AdminGlobalFinanceView(APIView):
         net_retained = max(0.0, total_platform_revenue - total_royalties_generated)
         avg_commission = round((net_retained / total_platform_revenue * 100), 1) if total_platform_revenue > 0 else 85.0
 
+        abandoned_total = float(orders_abandoned.aggregate(t=Sum('total_amount'))['t'] or 0)
+        failed_total = float(orders_failed.aggregate(t=Sum('total_amount'))['t'] or 0)
+
         return Response({
             "success": True,
             "data": {
@@ -3203,6 +3255,13 @@ class AdminGlobalFinanceView(APIView):
                 "credit": {
                     "outstanding_total": float(orders_credit_outstanding.aggregate(t=Sum('total_amount'))['t'] or 0),
                     "outstanding_count": orders_credit_outstanding.count(),
+                },
+                "abandoned_loss": {
+                    "abandoned_total": abandoned_total,
+                    "abandoned_count": orders_abandoned.count(),
+                    "failed_total": failed_total,
+                    "failed_count": orders_failed.count(),
+                    "total_opportunity_loss": abandoned_total + failed_total,
                 },
                 "subscriptions": {"active_count": subscriptions_active.count()},
                 "author_payouts": {
@@ -4147,6 +4206,356 @@ class AdminBouquetDistributionView(APIView):
         target = offering if offering else sub
         data = compute_bouquet_distribution_payload(target)
         return Response({"success": True, "data": data, "error": None})
+
+
+class AccountingLedgerExportView(APIView):
+    """
+    GET /api/v1/admin/accounting-ledger/export/?format=csv|xlsx|pdf&period=all|today|week|month|quarter|year
+    Exporte le Grand Livre Comptable consolidé multi-flux de LAHAThèque v3.2.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        import io
+        from apps.commerce.models import WholesaleOrder, WholesaleOrderStatus
+        from apps.partners.models import UniversityPaperOrder
+
+        fmt = request.query_params.get('format', 'xlsx').lower()
+        period = request.query_params.get('period', 'month')
+
+        now = timezone.now()
+        if period == 'today':
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == 'week':
+            start_date = now - timedelta(days=7)
+        elif period == 'month':
+            start_date = now - timedelta(days=30)
+        elif period == 'quarter':
+            start_date = now - timedelta(days=90)
+        elif period == 'year':
+            start_date = now - timedelta(days=365)
+        else:
+            start_date = None
+
+        records = []
+
+        # A. Commandes B2C
+        orders_qs = Order.objects.select_related('user', 'currency').prefetch_related('lignes__ouvrage').filter(
+            Q(statut_paiement='paid') | Q(is_credit_purchase=True)
+        )
+        if start_date:
+            orders_qs = orders_qs.filter(created_at__gte=start_date)
+
+        for o in orders_qs:
+            gross = float(o.total_amount)
+            fee = round(gross * 0.02, 2) if o.mode_paiement in ('mobile_money', 'carte') and o.statut_paiement == 'paid' else 0.0
+            net = round(gross - fee, 2)
+            royalty = round(gross * 0.70, 2) if o.statut_paiement == 'paid' else 0.0
+            margin = round(net - royalty, 2)
+
+            books_str = ", ".join([l.ouvrage.titre for l in o.lignes.all() if l.ouvrage]) or "Ouvrages numériques"
+            buyer_name = o.user.get_full_name() if o.user else "Client"
+            if not buyer_name.strip() and o.user:
+                buyer_name = o.user.email
+
+            records.append({
+                "date": o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else "",
+                "reference": f"CMD-{str(o.id)[:8].upper()}",
+                "channel": "B2C Particulier",
+                "client": f"{buyer_name} ({o.user.email if o.user else ''})",
+                "books": books_str,
+                "payment_method": o.get_mode_paiement_display(),
+                "status": "Encaissé" if o.statut_paiement == 'paid' else "Créance (Achat à crédit)",
+                "gross_amount": gross,
+                "gateway_fee": fee,
+                "net_amount": net,
+                "royalties_due": royalty,
+                "platform_margin": margin,
+            })
+
+        # B. Commandes B2B Grossistes
+        wo_qs = WholesaleOrder.objects.exclude(status=WholesaleOrderStatus.CANCELLED).select_related('user').prefetch_related('items__book')
+        if start_date:
+            wo_qs = wo_qs.filter(created_at__gte=start_date)
+
+        for wo in wo_qs:
+            gross = float(wo.total_amount)
+            fee = 0.0
+            net = gross
+            royalty = round(gross * 0.15, 2)
+            margin = round(net - royalty, 2)
+            books_str = ", ".join([it.title or (it.book.titre if it.book else "") for it in wo.items.all() if it.title or it.book]) or "Tirages papier B2B"
+
+            records.append({
+                "date": wo.created_at.strftime('%Y-%m-%d %H:%M') if wo.created_at else "",
+                "reference": wo.reference or f"WHL-{str(wo.id)[:8].upper()}",
+                "channel": "B2B Grossiste",
+                "client": f"{wo.company_name} ({wo.user.email if wo.user else ''})",
+                "books": books_str,
+                "payment_method": "Facturation B2B / Virement",
+                "status": "Encaissé" if wo.status == WholesaleOrderStatus.DELIVERED else "En cours de livraison",
+                "gross_amount": gross,
+                "gateway_fee": fee,
+                "net_amount": net,
+                "royalties_due": royalty,
+                "platform_margin": margin,
+            })
+
+        # C. Commandes B2B Universités
+        uo_qs = UniversityPaperOrder.objects.exclude(status='cancelled').select_related('institution').prefetch_related('items__book')
+        if start_date:
+            uo_qs = uo_qs.filter(created_at__gte=start_date)
+
+        for uo in uo_qs:
+            gross = float(uo.total_amount)
+            fee = 0.0
+            net = gross
+            royalty = round(gross * 0.15, 2)
+            margin = round(net - royalty, 2)
+            inst_name = uo.institution.name if uo.institution else "Établissement Universitaire"
+            books_str = ", ".join([it.book.titre for it in uo.items.all() if it.book]) or "Ouvrages universitaires"
+
+            records.append({
+                "date": uo.created_at.strftime('%Y-%m-%d %H:%M') if uo.created_at else "",
+                "reference": f"UNIV-{str(uo.id)[:8].upper()}",
+                "channel": "B2B Université",
+                "client": inst_name,
+                "books": books_str,
+                "payment_method": "Convention Universitaire / Virement",
+                "status": "Encaissé" if uo.status == 'delivered' else "En traitement",
+                "gross_amount": gross,
+                "gateway_fee": fee,
+                "net_amount": net,
+                "royalties_due": royalty,
+                "platform_margin": margin,
+            })
+
+        records.sort(key=lambda r: r['date'], reverse=True)
+
+        total_gross = sum(r['gross_amount'] for r in records)
+        total_fee = sum(r['gateway_fee'] for r in records)
+        total_net = sum(r['net_amount'] for r in records)
+        total_royalties = sum(r['royalties_due'] for r in records)
+        total_margin = sum(r['platform_margin'] for r in records)
+
+        period_tag = now.strftime('%Y%m%d')
+
+        if fmt == 'csv':
+            response = HttpResponse(content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = f'attachment; filename="grand_livre_lahatheque_{period_tag}.csv"'
+            response.write('\ufeff'.encode('utf-8'))
+
+            writer = csv.writer(response, delimiter=';')
+            writer.writerow([
+                'Date', 'Référence', 'Canal', 'Client / Établissement', 'Ouvrage(s)',
+                'Mode Règlement', 'Statut Comptable', 'Montant Brut (XOF)',
+                'Frais Passerelle (XOF)', 'Montant Net (XOF)', 'Redevances Estimées (XOF)',
+                'Marge Nette Plateforme (XOF)'
+            ])
+            for r in records:
+                writer.writerow([
+                    r['date'], r['reference'], r['channel'], r['client'], r['books'],
+                    r['payment_method'], r['status'], f"{r['gross_amount']:.2f}",
+                    f"{r['gateway_fee']:.2f}", f"{r['net_amount']:.2f}",
+                    f"{r['royalties_due']:.2f}", f"{r['platform_margin']:.2f}"
+                ])
+            writer.writerow([
+                'TOTAL CONSOLIDÉ', '', '', '', '', '', '',
+                f"{total_gross:.2f}", f"{total_fee:.2f}", f"{total_net:.2f}",
+                f"{total_royalties:.2f}", f"{total_margin:.2f}"
+            ])
+            return response
+
+        elif fmt == 'xlsx':
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Grand Livre Comptable"
+
+            ws.append(["LAHATHÈQUE — GRAND LIVRE COMPTABLE CONSOLIDÉ"])
+            ws.append([f"Période d'exportation : {period.upper()} | Date d'extraction : {now.strftime('%d/%m/%Y %H:%M')}"])
+            ws.append([])
+
+            title_cell = ws.cell(row=1, column=1)
+            title_cell.font = Font(name="Calibri", size=14, bold=True, color="1B2A4E")
+
+            headers = [
+                'Date', 'Référence', 'Canal', 'Client / Établissement', 'Ouvrage(s)',
+                'Mode Règlement', 'Statut Comptable', 'Montant Brut (XOF)',
+                'Frais Passerelle (XOF)', 'Montant Net (XOF)', 'Redevances Estimées (XOF)',
+                'Marge Nette Plateforme (XOF)'
+            ]
+            ws.append(headers)
+            header_row_idx = 4
+
+            header_fill = PatternFill(start_color="1B2A4E", end_color="1B2A4E", fill_type="solid")
+            header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+
+            for col_idx in range(1, len(headers) + 1):
+                c = ws.cell(row=header_row_idx, column=col_idx)
+                c.fill = header_fill
+                c.font = header_font
+                c.alignment = Alignment(horizontal="center", vertical="center")
+
+            thin_border = Border(
+                left=Side(style='thin', color='E2E8F0'),
+                right=Side(style='thin', color='E2E8F0'),
+                top=Side(style='thin', color='E2E8F0'),
+                bottom=Side(style='thin', color='E2E8F0')
+            )
+
+            current_r = 5
+            for r in records:
+                row_data = [
+                    r['date'], r['reference'], r['channel'], r['client'], r['books'],
+                    r['payment_method'], r['status'], r['gross_amount'],
+                    r['gateway_fee'], r['net_amount'], r['royalties_due'], r['platform_margin']
+                ]
+                ws.append(row_data)
+                for col_idx in range(1, len(row_data) + 1):
+                    cell = ws.cell(row=current_r, column=col_idx)
+                    cell.border = thin_border
+                    if col_idx >= 8:
+                        cell.number_format = '#,##0.00'
+                        cell.alignment = Alignment(horizontal="right")
+                current_r += 1
+
+            tot_row = [
+                'TOTAL', '', '', '', '', '', '',
+                total_gross, total_fee, total_net, total_royalties, total_margin
+            ]
+            ws.append(tot_row)
+            tot_fill = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+            for col_idx in range(1, len(tot_row) + 1):
+                c = ws.cell(row=current_r, column=col_idx)
+                c.font = Font(name="Calibri", size=11, bold=True, color="0F1A33")
+                c.fill = tot_fill
+                c.border = thin_border
+                if col_idx >= 8:
+                    c.number_format = '#,##0.00'
+                    c.alignment = Alignment(horizontal="right")
+
+            for col in ws.columns:
+                max_len = 0
+                col_letter = get_column_letter(col[0].column)
+                for cell in col:
+                    if cell.row > 2 and cell.value:
+                        max_len = max(max_len, len(str(cell.value)))
+                ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+            output = io.BytesIO()
+            wb.save(output)
+            output.seek(0)
+
+            response = HttpResponse(
+                output.getvalue(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = f'attachment; filename="grand_livre_lahatheque_{period_tag}.xlsx"'
+            return response
+
+        elif fmt == 'pdf':
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter, landscape
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=landscape(letter),
+                rightMargin=20,
+                leftMargin=20,
+                topMargin=25,
+                bottomMargin=25
+            )
+            elements = []
+            styles = getSampleStyleSheet()
+
+            title_style = ParagraphStyle(
+                name='DocTitle',
+                parent=styles['Heading1'],
+                fontSize=16,
+                leading=20,
+                textColor=colors.HexColor('#1B2A4E'),
+                fontName='Helvetica-Bold'
+            )
+            meta_style = ParagraphStyle(
+                name='DocMeta',
+                parent=styles['Normal'],
+                fontSize=9,
+                leading=12,
+                textColor=colors.HexColor('#64748B'),
+            )
+            cell_style = ParagraphStyle(
+                name='CellText',
+                parent=styles['Normal'],
+                fontSize=7,
+                leading=9,
+            )
+
+            elements.append(Paragraph("LAHATHÈQUE — GRAND LIVRE COMPTABLE OFFICIEL", title_style))
+            elements.append(Paragraph(f"Période : {period.upper()} | Date d'extraction : {now.strftime('%d/%m/%Y %H:%M')} | Monnaie : XOF", meta_style))
+            elements.append(Spacer(1, 15))
+
+            table_data = [[
+                "Date", "Réf.", "Canal", "Client", "Mode", "Statut",
+                "Brut", "Frais", "Net Encaissé", "Redevances", "Marge Nette"
+            ]]
+
+            for r in records:
+                table_data.append([
+                    r['date'][:10],
+                    r['reference'],
+                    r['channel'],
+                    Paragraph(r['client'][:30], cell_style),
+                    r['payment_method'][:12],
+                    r['status'][:12],
+                    f"{r['gross_amount']:,.0f}".replace(',', ' '),
+                    f"{r['gateway_fee']:,.0f}".replace(',', ' '),
+                    f"{r['net_amount']:,.0f}".replace(',', ' '),
+                    f"{r['royalties_due']:,.0f}".replace(',', ' '),
+                    f"{r['platform_margin']:,.0f}".replace(',', ' '),
+                ])
+
+            table_data.append([
+                "TOTAL", "", "", "", "", "",
+                f"{total_gross:,.0f}".replace(',', ' '),
+                f"{total_fee:,.0f}".replace(',', ' '),
+                f"{total_net:,.0f}".replace(',', ' '),
+                f"{total_royalties:,.0f}".replace(',', ' '),
+                f"{total_margin:,.0f}".replace(',', ' '),
+            ])
+
+            t = Table(table_data, colWidths=[55, 65, 75, 120, 65, 75, 55, 45, 65, 65, 65])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1B2A4E')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                ('TOPPADDING', (0, 0), (-1, 0), 6),
+                ('ALIGN', (6, 0), (-1, -1), 'RIGHT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#F1F5F9')),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            elements.append(t)
+
+            doc.build(elements)
+            buffer.seek(0)
+
+            response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="grand_livre_lahatheque_{period_tag}.pdf"'
+            return response
+
+        return Response({"success": False, "error": f"Format '{fmt}' non supporté. Choisissez entre xlsx, csv ou pdf."}, status=400)
+
 
 
 

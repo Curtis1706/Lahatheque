@@ -73,23 +73,46 @@ export function OrderItemsAccordionRow({
         {order.items.map((item: AdminSaleOrderItem, index: number) => (
           <div
             key={item.id || index}
-            className="p-2.5 rounded-lg border border-border/60 bg-background-secondary/30 space-y-1.5 text-xs font-poppins"
+            className="p-2.5 rounded-lg border border-border/60 bg-background-secondary/30 space-y-2 text-xs font-poppins"
           >
-            <div className="flex items-start justify-between gap-2">
-              <p className="font-medium text-foreground line-clamp-2">
-                {item.book_title}
-              </p>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-navy/5 text-navy border border-navy/10 flex-shrink-0">
-                {getFormatIcon(item.format)}
-                {getFormatLabel(item.format)}
-              </span>
+            <div className="flex items-start gap-2.5">
+              {/* Couverture Mobile */}
+              <div className="w-9 h-12 rounded-md overflow-hidden bg-navy/5 border border-border flex-shrink-0 flex items-center justify-center">
+                {item.cover_url ? (
+                  <img
+                    src={item.cover_url}
+                    alt={item.book_title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <BookOpen className="w-4 h-4 text-gold/70" />
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-1.5">
+                  <p className="font-medium text-foreground line-clamp-2">
+                    {item.book_title}
+                  </p>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-navy/5 text-navy border border-navy/10 flex-shrink-0">
+                    {getFormatIcon(item.format)}
+                    {getFormatLabel(item.format)}
+                  </span>
+                </div>
+                {item.author_display && (
+                  <p className="text-[10px] text-foreground-muted line-clamp-1 mt-0.5">
+                    {item.author_display}
+                  </p>
+                )}
+                {item.isbn && (
+                  <p className="text-[10px] text-foreground-muted font-mono mt-0.5">
+                    ISBN : {item.isbn}
+                  </p>
+                )}
+              </div>
             </div>
-            {item.isbn && (
-              <p className="text-[10px] text-foreground-muted font-mono">
-                ISBN : {item.isbn}
-              </p>
-            )}
-            <div className="flex items-center justify-between text-[11px] text-foreground-muted pt-1 border-t border-border/40">
+
+            <div className="flex items-center justify-between text-[11px] text-foreground-muted pt-1.5 border-t border-border/40">
               <span>
                 Qté : <strong className="text-foreground font-mono">{item.quantity}</strong> × {item.unit_price.toLocaleString("fr-FR")} FCFA
               </span>
@@ -117,14 +140,36 @@ export function OrderItemsAccordionRow({
             {order.items.map((item: AdminSaleOrderItem, index: number) => (
               <tr key={item.id || index} className="hover:bg-background-secondary/20 transition-colors">
                 <td className="py-2.5 pr-3">
-                  <p className="font-medium text-foreground">
-                    {item.book_title}
-                  </p>
-                  {item.isbn && (
-                    <p className="text-[10px] text-foreground-muted font-mono">
-                      ISBN : {item.isbn}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {/* Couverture Desktop */}
+                    <div className="w-10 h-14 rounded-md overflow-hidden bg-navy/5 border border-border flex-shrink-0 flex items-center justify-center shadow-xs">
+                      {item.cover_url ? (
+                        <img
+                          src={item.cover_url}
+                          alt={item.book_title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <BookOpen className="w-4 h-4 text-gold/70" />
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground line-clamp-1">
+                        {item.book_title}
+                      </p>
+                      {item.author_display && (
+                        <p className="text-[11px] text-foreground-muted line-clamp-1">
+                          {item.author_display}
+                        </p>
+                      )}
+                      {item.isbn && (
+                        <p className="text-[10px] text-foreground-muted font-mono">
+                          ISBN : {item.isbn}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </td>
                 <td className="py-2.5 pr-3 whitespace-nowrap">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-navy/5 text-navy border border-navy/10">

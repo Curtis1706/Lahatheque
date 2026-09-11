@@ -87,6 +87,19 @@
 
 ---
 
+## Phase 7: Correctifs Filtre Papier, Disponibilité & Redirection Checkout (FR-011 à FR-014)
+
+**Purpose**: Résolution des anomalies de disponibilité papier, saisie du téléphone de livraison et fluidité de la redirection post-connexion
+
+- [X] T027 [P] [US2] Restreindre le filtrage `format=paper` et combinaisons papier (`pack_complet`, `paper_audio`, `paper_digital`) dans `lahatheque-backend/apps/catalog/views.py` strictement à `is_paper_available=True` de l'ouvrage maître
+- [X] T028 [P] [US2] Corriger `lahatheque-frontend/components/catalog/book-action-buttons.tsx` pour afficher et rendre sélectionnable l'option "Livre papier" dès lors que `book.is_paper_available=True`, avec sélection de langue et repli gracieux de stock
+- [X] T029 [US2] Dans `lahatheque-frontend/app/(auth)/login/page.tsx`, prendre en compte le paramètre d'URL `?redirect=` pour renvoyer directement vers `/checkout` dès la connexion réussie avec indicateur de transition éliminant tout écran blanc
+- [X] T030 [US2] Dans `lahatheque-frontend/app/(public)/checkout/page.tsx`, ajouter le champ obligatoire du numéro de téléphone de contact pour la livraison physique et l'intégrer au payload
+- [X] T031 [US2] Dans `lahatheque-backend/apps/commerce/serializers.py`, étendre les choix autorisés de `payment_provider` dans `CreateOrderSerializer` pour inclure `'mock'` et `'stripe'`
+- [X] T032 Valider l'intégrité globale avec `python manage.py check` et `npx tsc --noEmit` sans aucune erreur
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

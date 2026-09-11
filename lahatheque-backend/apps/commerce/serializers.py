@@ -66,7 +66,7 @@ class CreateOrderItemSerializer(serializers.Serializer):
 
 class CreateOrderSerializer(serializers.Serializer):
     items = CreateOrderItemSerializer(many=True)
-    payment_provider = serializers.ChoiceField(choices=['moneroo', 'manual'], default='moneroo')
+    payment_provider = serializers.ChoiceField(choices=['moneroo', 'manual', 'mock', 'stripe'], default='moneroo')
     type_commande = serializers.ChoiceField(
         choices=['rentree_scolaire', 'personnel', 'institutionnel'], default='personnel'
     )
@@ -76,6 +76,8 @@ class CreateOrderSerializer(serializers.Serializer):
     shipping_address = serializers.CharField(required=False, allow_blank=True, default='')
     city = serializers.CharField(required=False, allow_blank=True, default='')
     country = serializers.CharField(required=False, allow_blank=True, default='BJ')
+    phone = serializers.CharField(required=False, allow_blank=True, default='')
+    recipient_phone = serializers.CharField(required=False, allow_blank=True, default='')
     date_livraison_souhaitee = serializers.DateField(required=False, allow_null=True, default=None)
     plage_horaire_debut = serializers.TimeField(required=False, allow_null=True, default=None)
     plage_horaire_fin = serializers.TimeField(required=False, allow_null=True, default=None)

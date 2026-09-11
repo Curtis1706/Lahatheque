@@ -357,6 +357,8 @@ export async function generateOfficialPdf(rawOptions: PdfDocumentOptions): Promi
         ? "TOTAL DES REDEVANCES :"
         : options.docType === "RAPPORT_FINANCIER"
         ? "TOTAL CONSOLIDÉ :"
+        : options.docType === "FACTURE"
+        ? "TOTAL PAYÉ :"
         : "TOTAL NET À PAYER :";
 
     const label = options.totalLabel || defaultLabel;

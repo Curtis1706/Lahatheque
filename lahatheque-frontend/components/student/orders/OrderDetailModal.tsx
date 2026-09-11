@@ -65,6 +65,7 @@ export function OrderDetailModal({ order, isOpen, onClose }: OrderDetailModalPro
           `${(Number(l.unit_price) * l.quantity).toLocaleString("fr-FR")} FCFA`,
         ]),
         totalAmount: `${totalNumber.toLocaleString("fr-FR")} FCFA`,
+        totalLabel: order.statut_paiement === "paid" ? "TOTAL PAYÉ :" : "TOTAL NET À PAYER :",
         totalNotes: "Facture et reçu de paiement certifiés LAHAThèque. Conforme aux normes UEMOA.",
         filename: `facture_LAHA_${orderRef.replace("#", "")}.pdf`,
       });

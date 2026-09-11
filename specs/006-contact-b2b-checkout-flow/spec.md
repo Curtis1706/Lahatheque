@@ -12,6 +12,11 @@
 
 ## Clarifications
 
+### Session 2026-09-11
+- Q: Comment la disponibilité du format papier doit-elle être déterminée et filtrée entre l'ouvrage maître et ses déclinaisons linguistiques ? → A: Option A (L'ouvrage maître avec `is_paper_available=True` pilote la disponibilité papier globale. Le catalogue filtre strictement sur `is_paper_available=True` sans se fier à `price_paper`, et la page détail active l'achat papier avec repli de stock si la version linguistique n'a pas de stock dédié).
+- Q: À quel moment et sous quelle modalité les coordonnées de livraison papier (adresse et téléphone) doivent-elles être saisies et persistées dans le tunnel d'achat ? → A: Option A (Saisie sur `/checkout` dès que l'acheteur est authentifié, pré-remplissage des champs profil connus, validation obligatoire de l'adresse et du téléphone de livraison, et persistance immédiate dans `PhysicalDelivery` lié à `Order`). La page `/login` MUST respecter le paramètre `?redirect=` pour renvoyer directement vers `/checkout` sans écran blanc ni détour forcé vers l'accueil/dashboard.
+- Q: Comment l'administrateur doit-il enregistrer et distinguer un client externe de passage en boutique par rapport à un utilisateur inscrit sur la plateforme ? → A: Option A (Bascule « Client existant » via Combobox de recherche rapide / « Client comptoir externe » avec saisie directe du nom, prénom, téléphone obligatoire et email optionnel, avec persistance directe sur `Order` sans créer de compte utilisateur).
+
 ### Session 2026-09-10
 - Q: Quelle est l'adresse email exacte du 3ème administrateur pour la réception des alertes internes ? → A: `alhtdharry7@gmail.com` (correction de la faute de frappe initiale `alhtd7@gmail.com`).
 - Q: Comment l'étape d'identification client doit-elle s'afficher au checkout et comment sont traités les différents formats ? → A: Option A (Panneau intégré direct sur `/checkout` avec 2 onglets "Connexion" et "Inscription", panier récapitulatif visible en continu). Les informations de livraison papier sont sauvegardées dans `PhysicalDelivery` et notifient la logistique, tandis que les formats numériques et audio sont immédiatement déverrouillés dans `ReadingProgress` pour la bibliothèque du client (`/student/books`).
@@ -163,6 +168,12 @@ Ouvrir les DevTools Console lors de la soumission de contact ou du checkout. Vé
 - **FR-008**: La création de compte client depuis le tunnel de commande MUST attribuer le rôle `student` (Client / Lecteur standard) et connecter automatiquement l'utilisateur à l'issue de la validation OTP sans passer par `/login`.
 - **FR-009**: Après identification réussie au checkout, le système MUST préserver l'intégralité du panier et afficher immédiatement l'étape de sélection de paiement et de renseignement de l'adresse de livraison.
 - **FR-010**: Les flux de contact et de commande MUST comporter des `console.log` détaillés et balisés (`[CONTACT FORM]`, `[CHECKOUT FLOW]`) pour une observabilité totale.
+- **FR-011**: Le filtrage du format papier sur le catalogue public (`/catalog`) et les dashboards MUST se baser exclusivement sur le flag `is_paper_available=True` de l'ouvrage maître, sans recourir à la condition `price_paper > 0` qui est renseignée par défaut sur tous les livres.
+- **FR-012**: Sur la page de détail d'un ouvrage (`/catalog/[slug]`), l'option de commande papier MUST être active et sélectionnable dès lors que `is_paper_available=True` sur l'ouvrage maître, avec repli de stock gracieux si la déclinaison linguistique spécifique n'a pas de stock dédié.
+- **FR-013**: La page de connexion générale (`/login`) MUST vérifier la présence du paramètre `?redirect=` et rediriger immédiatement l'utilisateur vers cette URL cible (notamment `/checkout`) dès la connexion réussie, en conservant le panier intact.
+- **FR-014**: Pour tout achat incluant un livre papier, le formulaire de livraison MUST exiger et persister l'adresse complète, la ville, le pays et le numéro de téléphone de contact pour le livreur dans `PhysicalDelivery`.
+- **FR-015**: Dans le formulaire de passation de commande par l'administrateur (`/admin/orders`), l'étape d'identification client MUST proposer une Combobox searchable fluide remplaçant la liste statique encombrante pour sélectionner rapidement un client inscrit.
+- **FR-016**: Le formulaire de commande administrateur MUST proposer un mode alternatif « Client comptoir externe » permettant de renseigner le nom complet, le numéro de téléphone (obligatoire) et l'e-mail (optionnel) d'un client de passage en boutique physique, et persister la commande avec `user=null` sans exiger la création d'un compte utilisateur.
 
 ### Key Entities
 

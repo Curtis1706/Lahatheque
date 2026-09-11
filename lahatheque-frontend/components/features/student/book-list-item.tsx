@@ -8,15 +8,12 @@ import {
   ArrowUpRight,
   CheckCircle2,
   BookOpen,
-  Eye,
   ShoppingBag,
   Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClientBookAccess } from "@/lib/types/student";
 import { BookCover } from "./book-cover";
-import { BookSampleModal } from "./book-sample-modal";
-import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-modal";
 import { PaperOrderModal } from "./paper-order-modal";
 import { createOrder } from "@/lib/services/commerce-orders";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
@@ -30,25 +27,11 @@ interface BookListItemProps {
 
 export function BookListItem({ book, onToggleFavorite, className }: BookListItemProps) {
   const { playBook } = useAudioPlayer();
-  const [showSample, setShowSample] = useState(false);
-  const [showSampleChoice, setShowSampleChoice] = useState(false);
   const [showPaperModal, setShowPaperModal] = useState(false);
   const [isFav, setIsFav] = useState(book.is_favorite);
 
-  const hasAudio = Boolean(
-    book.has_audio_version ||
-    (book as any).price_audio ||
-    (book as any).format === "audio" ||
-    (book as any).format_type === "audio"
-  );
-
-  const handleExtractClick = () => {
-    if (hasAudio) {
-      setShowSampleChoice(true);
-    } else {
-      setShowSample(true);
-    }
-  };
+  const isAudioOwned = Boolean(book.is_audio_owned || (book as any).has_audio_access);
+  const isDigitalOwned = Boolean(book.is_owned || book.has_digital_access || book.progress_percent !== undefined);
 
   const handleFavoriteClick = async () => {
     const nextFav = !isFav;
@@ -112,9 +95,25 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
 
           <div className="space-y-1 min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gold px-2.5 py-0.5 rounded-md bg-navy/5 border border-gold/30 shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gold px-2.5 py-0.5 rounded-md bg-gold/10 border border-gold/25 shrink-0">
                 {disciplineName}
               </span>
+              {isAudioOwned && isDigitalOwned ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gold px-2 py-0.5 rounded-md bg-gold/15 border border-gold/30">
+                  <Headphones className="w-3 h-3 text-gold" />
+                  Num. &amp; Audio
+                </span>
+              ) : isAudioOwned ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gold px-2 py-0.5 rounded-md bg-gold/15 border border-gold/30">
+                  <Headphones className="w-3 h-3 text-gold" />
+                  Livre Audio
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-navy px-2 py-0.5 rounded-md bg-navy/5 border border-border">
+                  <BookOpen className="w-3 h-3 text-gold" />
+                  Numérique
+                </span>
+              )}
               {book.institution_name && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-navy font-medium bg-background-secondary px-2 py-0.5 rounded-md border border-border truncate max-w-[200px]">
                   <CheckCircle2 className="w-3 h-3 text-gold shrink-0" />
@@ -171,15 +170,6 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
             <Bookmark className={cn("w-4 h-4", isFav && "fill-current")} />
           </button>
 
-          <button
-            type="button"
-            onClick={handleExtractClick}
-            title="Consulter l'extrait"
-            className="p-2 rounded-xl border border-border text-foreground-muted hover:text-navy transition-colors cursor-pointer"
-          >
-            <Eye className="w-4 h-4 text-gold" />
-          </button>
-
           {(book.has_paper_version || (book.paper_price && book.paper_price > 0)) && (
             <button
               type="button"
@@ -194,12 +184,13 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
           <Link
             href={`/student/catalog/${book.id}`}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-background-secondary hover:bg-navy/10 text-navy text-xs font-semibold border border-border transition-all min-h-[40px]"
+            title="Consulter la fiche détaillée"
           >
             <BookOpen className="w-3.5 h-3.5 text-gold" />
-            Détails
+            <span>Détails</span>
           </Link>
 
-          {(book.has_audio_version || (book as any).price_audio || (book as any).format === "audio" || (book as any).format_type === "audio") && (
+          {isAudioOwned && (
             <button
               type="button"
               onClick={() => playBook(book.id)}
@@ -214,24 +205,13 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
           <Link
             href={`/catalog/reader/${book.id}`}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[40px]"
+            title="Lire dans la Liseuse"
           >
-            Lire
+            <span>Lire</span>
             <ArrowUpRight className="w-3.5 h-3.5 text-gold" />
           </Link>
         </div>
       </motion.div>
-
-      <BookSampleModal
-        book={book}
-        isOpen={showSample}
-        onClose={() => setShowSample(false)}
-      />
-
-      <SampleChoiceModal
-        book={book}
-        isOpen={showSampleChoice}
-        onClose={() => setShowSampleChoice(false)}
-      />
 
       <PaperOrderModal
         book={book}

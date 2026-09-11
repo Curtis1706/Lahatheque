@@ -9,6 +9,11 @@ from .views import (
     SubscriptionCancelView,
     ClientBouquetListView,
     ClientBouquetSubscribeView,
+    VerifyOrderPaymentView,
+    OrderRetryPaymentView,
+    AdminOrdersListView,
+    AdminOrderRemindView,
+    AdminOrderConfirmPaymentView,
 )
 from .webhooks import MonerooWebhookView
 from .manager_views import (
@@ -45,10 +50,16 @@ from .wholesaler_views import (
 app_name = 'commerce'
 
 urlpatterns = [
+    path('admin/orders/', AdminOrdersListView.as_view(), name='admin-orders-list'),
+    path('admin/orders/<uuid:order_id>/confirm-payment/', AdminOrderConfirmPaymentView.as_view(), name='admin-order-confirm-payment'),
+    path('orders/<uuid:order_id>/remind-abandoned/', AdminOrderRemindView.as_view(), name='admin-order-remind-abandoned'),
     path('orders/', CreateOrderView.as_view(), name='commerce-orders-create'),
+    path('orders/<uuid:order_id>/initiate-payment/', OrderRetryPaymentView.as_view(), name='commerce-order-initiate-payment'),
     path('admin/orders/create-for-client/', AdminCreateOrderView.as_view(), name='admin-create-order-for-client'),
     path('orders/my/', OrderListView.as_view(), name='commerce-orders-list'),
     path('orders/<uuid:order_id>/', OrderDetailView.as_view(), name='commerce-orders-detail'),
+    path('orders/<uuid:order_id>/verify-payment/', VerifyOrderPaymentView.as_view(), name='commerce-order-verify-payment'),
+    path('payments/verify/', VerifyOrderPaymentView.as_view(), name='commerce-payment-verify'),
     path('subscriptions/plans/', SubscriptionPlanListView.as_view(), name='commerce-subscriptions-plans'),
     path('subscriptions/subscribe/', SubscribeView.as_view(), name='commerce-subscriptions-subscribe'),
     path('subscriptions/<uuid:sub_id>/cancel/', SubscriptionCancelView.as_view(), name='commerce-subscriptions-cancel'),

@@ -56,6 +56,12 @@ function LoginContent() {
       const result: LoginResponse = await login(loginIdentity, formData.password);
       
       if (result.success) {
+        const redirectUrl = searchParams.get("redirect");
+        if (redirectUrl && redirectUrl.startsWith("/") && !redirectUrl.startsWith("//")) {
+          router.push(redirectUrl);
+          return;
+        }
+
         const role = result.user?.role as any;
         if (role === "admin" || role === "super_admin") {
           router.push("/admin");
@@ -80,6 +86,7 @@ function LoginContent() {
         } else {
           router.push("/student");
         }
+        return;
       } else {
         setError(result.error || "Identifiants invalides");
       }

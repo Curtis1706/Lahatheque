@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
@@ -38,11 +38,32 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [orderCompleted, setOrderCompleted] = useState<any | null>(null);
 
+  useEffect(() => {
+    if (user && !recipientPhone) {
+      const userPhone = (user as any).phone || (user as any).phone_number;
+      if (userPhone) {
+        setRecipientPhone(userPhone);
+      }
+    }
+  }, [user]);
+
+  const hasPaperItem = items.some((i) => i.format === "paper");
+
+  useEffect(() => {
+    console.groupCollapsed(`[CHECKOUT SESSION] État de session [${new Date().toLocaleTimeString()}]`);
+    console.log("Statut utilisateur:", user ? `Connecté (${user.email})` : "Visiteur anonyme (invité)");
+    console.log("Contenu panier:", {
+      nombreArticles: totalCount,
+      montantTotal: totalAmount,
+      contientPapier: hasPaperItem,
+      articles: items.map((i) => ({ titre: i.title, format: i.format, prix: i.price, quantite: i.quantity, langue: i.selectedLanguage })),
+    });
+    console.groupEnd();
+  }, [user, totalCount, totalAmount, hasPaperItem]);
+
   const [paymentPhase, setPaymentPhase] = useState<"idle" | "countdown" | "success">("idle");
   const [countdownAmount, setCountdownAmount] = useState<number>(0);
   const [progressPct, setProgressPct] = useState<number>(0);
-
-  const hasPaperItem = items.some((i) => i.format === "paper");
 
   function runCountdownAnimation(startAmount: number, durationMs: number): Promise<void> {
     return new Promise((resolve) => {
@@ -175,6 +196,11 @@ export default function CheckoutPage() {
       setLoading(false);
       return;
     }
+    if (hasPaperItem && !recipientPhone.trim()) {
+      setError("Veuillez saisir un numéro de téléphone de contact pour la livraison du livre papier.");
+      setLoading(false);
+      return;
+    }
 
     setPaymentPhase("countdown");
     setCountdownAmount(totalAmount);
@@ -185,6 +211,8 @@ export default function CheckoutPage() {
       shipping_address: shippingAddress.trim() || undefined,
       city: city.trim() || undefined,
       country: country,
+      phone: recipientPhone.trim() || undefined,
+      recipient_phone: recipientPhone.trim() || undefined,
       date_livraison_souhaitee: deliveryDate || undefined,
       plage_horaire_debut: timeSlotStart || undefined,
       plage_horaire_fin: timeSlotEnd || undefined,
@@ -365,7 +393,7 @@ export default function CheckoutPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                       <div>
                         <label className="text-foreground-muted block mb-1">Ville *</label>
                         <input
@@ -389,6 +417,17 @@ export default function CheckoutPage() {
                           <option value="TG">Togo (+228)</option>
                           <option value="CM">Cameroun (+237)</option>
                         </select>
+                      </div>
+                      <div>
+                        <label className="text-foreground-muted block mb-1">Téléphone de livraison *</label>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="Ex: +229 97 00 00 00"
+                          value={recipientPhone}
+                          onChange={(e) => setRecipientPhone(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs"
+                        />
                       </div>
                     </div>
 

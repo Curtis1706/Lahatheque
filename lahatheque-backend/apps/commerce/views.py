@@ -49,6 +49,7 @@ class CreateOrderView(APIView):
         shipping_address = validated.get('shipping_address', '')
         city = validated.get('city', '')
         country = validated.get('country', 'BJ')
+        phone = validated.get('recipient_phone') or validated.get('phone') or ''
         date_livraison = validated.get('date_livraison_souhaitee')
         plage_debut = validated.get('plage_horaire_debut')
         plage_fin = validated.get('plage_horaire_fin')
@@ -213,9 +214,14 @@ class CreateOrderView(APIView):
                 )
 
             if has_paper and shipping_address:
+                formatted_address = (
+                    f"{shipping_address.strip()}\nTél destinataire : {phone.strip()}"
+                    if phone.strip() and "Tél" not in shipping_address and "tel" not in shipping_address.lower()
+                    else shipping_address.strip()
+                )
                 PhysicalDelivery.objects.create(
                     commande=commande,
-                    shipping_address=shipping_address,
+                    shipping_address=formatted_address,
                     city=city,
                     country=country,
                     statut='en_preparation',
@@ -223,6 +229,12 @@ class CreateOrderView(APIView):
                     plage_horaire_debut=plage_debut,
                     plage_horaire_fin=plage_fin,
                 )
+                if phone and not getattr(request.user, 'phone_number', None):
+                    try:
+                        request.user.phone_number = phone.strip()
+                        request.user.save(update_fields=['phone_number'])
+                    except Exception:
+                        pass
 
             logger.info(f"[Commerce] Commande #{commande.id} créée pour {request.user.email} - Total: {total_amount} XOF (Papier: {has_paper})")
             print(f"[ORDER] Nouvelle commande #{commande.id} - {request.user.email} ({total_amount} XOF)")
@@ -314,6 +326,90 @@ class CreateOrderView(APIView):
             'total_amount': str(total_amount),
             'order': OrderSerializer(commande).data
         }, status=status.HTTP_201_CREATED)
+
+
+class OrderRetryPaymentView(APIView):
+    """
+    POST /api/v1/commerce/orders/<uuid:order_id>/initiate-payment/
+    Permet à un client (ou un administrateur) de relancer la session de paiement en ligne pour une commande existante
+    en attente (pending) ou abandonnée (abandoned).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        try:
+            commande = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"success": False, "data": None, "error": "Commande introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Vérification d'autorisation (propriétaire de la commande ou admin)
+        if commande.user != request.user and getattr(request.user, 'role', '') not in ['admin', 'super_admin']:
+            return Response({"success": False, "data": None, "error": "Action non autorisée sur cette commande."}, status=status.HTTP_403_FORBIDDEN)
+
+        if commande.statut_paiement == 'paid':
+            return Response({
+                "success": True,
+                "data": {
+                    "order_id": str(commande.id),
+                    "already_paid": True,
+                    "status": "paid",
+                },
+                "message": "Cette commande est déjà réglée.",
+                "error": None
+            }, status=status.HTTP_200_OK)
+
+        provider_name = 'moneroo'
+        provider = get_payment_provider(provider_name)
+        frontend_base = get_frontend_base_url(request)
+        return_url = request.data.get('return_url') or f"{frontend_base}/student/orders"
+
+        total_amount = commande.total_amount
+        currency_code = commande.currency.code if hasattr(commande.currency, 'code') else "XOF"
+        full_name = f"{commande.user.first_name or ''} {commande.user.last_name or ''}".strip() or str(commande.user.email)
+
+        try:
+            payment_res = provider.initiate_payment(
+                amount=total_amount,
+                currency=currency_code,
+                description=f"Règlement Commande LAHAThèque #{str(commande.id)[:8].upper()}",
+                customer_email=commande.user.email,
+                customer_name=full_name,
+                return_url=return_url
+            ) or {}
+        except Exception as payment_err:
+            logger.error(f"Échec réinitialisation paiement commande {commande.id}: {payment_err}")
+            return Response({
+                "success": False,
+                "data": None,
+                "error": "Impossible d'initialiser le paiement pour le moment. Veuillez réessayer dans quelques instants."
+            }, status=status.HTTP_502_BAD_GATEWAY)
+
+        tx = PaymentTransaction.objects.create(
+            user=commande.user,
+            amount=total_amount,
+            currency=commande.currency,
+            status=payment_res.get('status', 'pending'),
+            moneroo_id=payment_res.get('moneroo_id') or payment_res.get('payment_id'),
+        )
+        commande.payment_transaction = tx
+        if commande.statut_paiement == 'abandoned':
+            commande.statut_paiement = 'pending'
+            commande.save(update_fields=['payment_transaction', 'statut_paiement'])
+        else:
+            commande.save(update_fields=['payment_transaction'])
+
+        return Response({
+            "success": True,
+            "data": {
+                "order_id": str(commande.id),
+                "checkout_url": payment_res.get('checkout_url'),
+                "payment_id": payment_res.get('moneroo_id') or payment_res.get('payment_id'),
+                "status": payment_res.get('status', 'pending'),
+                "total_amount": str(total_amount),
+            },
+            "message": "Session de paiement initialisée avec succès.",
+            "error": None
+        }, status=status.HTTP_200_OK)
 
 
 class AdminCreateOrderView(CreateOrderView):
@@ -548,4 +644,294 @@ class ClientBouquetSubscribeView(APIView):
             "message": f"Souscription au bouquet « {offering.title} » confirmée.",
             "data": {"id": str(sub.id), "end_date": str(sub.end_date)}
         }, status=201)
+
+
+class VerifyOrderPaymentView(APIView):
+    """
+    POST /api/v1/commerce/orders/<uuid:order_id>/verify-payment/
+    POST /api/v1/commerce/payments/verify/
+    Vérifie l'état d'un paiement directement auprès de la passerelle Moneroo,
+    met à jour la commande en base, et débloque immédiatement les accès aux ouvrages.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id=None):
+        target_order_id = order_id or request.data.get('order_id')
+        moneroo_id = (
+            request.data.get('moneroo_id')
+            or request.data.get('paymentId')
+            or request.data.get('payment_id')
+            or request.query_params.get('paymentId')
+            or request.query_params.get('payment_id')
+        )
+
+        from .services import reconcile_moneroo_payment
+        res = reconcile_moneroo_payment(
+            moneroo_id=moneroo_id,
+            order_id=str(target_order_id) if target_order_id else None,
+            user=request.user
+        )
+
+        if res.get('success'):
+            return Response({
+                'success': True,
+                'data': res,
+                'error': None,
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            'success': False,
+            'error': res.get('error') or 'Vérification du paiement impossible.',
+            'data': res,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminOrdersListView(APIView):
+    """
+    GET /api/v1/commerce/admin/orders/
+    Liste exhaustive de toutes les commandes et tentatives avec filtres multi-critères,
+    recherche textuelle et indicateurs clés financiers consolidés.
+    """
+    permission_classes = [IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from django.db.models import Q, Sum
+        from django.utils import timezone
+        from datetime import timedelta
+
+        statut = request.query_params.get('statut_paiement', 'all')
+        period = request.query_params.get('period', 'all')
+        search_query = request.query_params.get('q', '').strip()
+
+        qs = Order.objects.select_related(
+            'user', 'currency', 'payment_transaction', 'manual_payment_confirmed_by'
+        ).prefetch_related(
+            'lignes__ouvrage'
+        ).all()
+
+        now = timezone.now()
+        if period == 'today':
+            qs = qs.filter(created_at__date=now.date())
+        elif period == 'week':
+            qs = qs.filter(created_at__gte=now - timedelta(days=7))
+        elif period == 'month':
+            qs = qs.filter(created_at__gte=now - timedelta(days=30))
+        elif period == 'year':
+            qs = qs.filter(created_at__gte=now - timedelta(days=365))
+
+        base_period_qs = qs
+
+        total_orders_count = base_period_qs.count()
+        paid_count = base_period_qs.filter(statut_paiement='paid').count()
+        pending_count = base_period_qs.filter(statut_paiement='pending').count()
+        credit_count = base_period_qs.filter(Q(statut_paiement='credit') | Q(is_credit_purchase=True)).count()
+        abandoned_count = base_period_qs.filter(statut_paiement='abandoned').count()
+        failed_count = base_period_qs.filter(statut_paiement='failed').count()
+        cancelled_count = base_period_qs.filter(statut_paiement='cancelled').count()
+
+        total_paid_amount = base_period_qs.filter(statut_paiement='paid').aggregate(total=Sum('total_amount'))['total'] or 0
+        total_credit_amount = base_period_qs.filter(Q(statut_paiement='credit') | Q(is_credit_purchase=True)).aggregate(total=Sum('total_amount'))['total'] or 0
+        potential_abandoned_loss = base_period_qs.filter(statut_paiement='abandoned').aggregate(total=Sum('total_amount'))['total'] or 0
+
+        if statut == 'credit':
+            qs = qs.filter(Q(statut_paiement='credit') | Q(is_credit_purchase=True))
+        elif statut and statut != 'all':
+            qs = qs.filter(statut_paiement=statut)
+
+        if search_query:
+            qs = qs.filter(
+                Q(id__icontains=search_query) |
+                Q(user__email__icontains=search_query) |
+                Q(user__first_name__icontains=search_query) |
+                Q(user__last_name__icontains=search_query) |
+                Q(manual_payment_reference__icontains=search_query) |
+                Q(payment_transaction__moneroo_id__icontains=search_query) |
+                Q(lignes__ouvrage__titre__icontains=search_query)
+            ).distinct()
+
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except ValueError:
+            page = 1
+        try:
+            page_size = min(100, max(1, int(request.query_params.get('page_size', 20))))
+        except ValueError:
+            page_size = 20
+
+        total_filtered = qs.count()
+        total_pages = max(1, (total_filtered + page_size - 1) // page_size)
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+
+        orders_slice = qs[start_idx:end_idx]
+
+        orders_data = []
+        for o in orders_slice:
+            cust_name = o.user.get_full_name() if o.user else "Client inconnu"
+            if not cust_name.strip() and o.user:
+                cust_name = o.user.email.split('@')[0]
+
+            moneroo_id = None
+            if o.payment_transaction and o.payment_transaction.moneroo_id:
+                moneroo_id = o.payment_transaction.moneroo_id
+
+            items_data = []
+            for item in o.lignes.all():
+                book_title = item.ouvrage.titre if item.ouvrage else "Ouvrage"
+                items_data.append({
+                    "id": str(item.id),
+                    "book_id": str(item.ouvrage_id) if item.ouvrage_id else None,
+                    "book_title": book_title,
+                    "format": item.format_type,
+                    "quantity": item.quantity,
+                    "unit_price": float(item.unit_price),
+                    "total_price": float(item.unit_price * item.quantity),
+                })
+
+            orders_data.append({
+                "id": str(o.id),
+                "numero_commande": f"CMD-{str(o.id)[:8].upper()}",
+                "order_reference": f"#{str(o.id)[:8].upper()}",
+                "customer_id": str(o.user_id) if o.user_id else "",
+                "customer_name": cust_name,
+                "customer_email": o.user.email if o.user else "",
+                "customer_role": getattr(o.user, 'role', 'reader') if o.user else 'reader',
+                "total_amount": float(o.total_amount),
+                "currency": o.currency.code if o.currency else "XOF",
+                "statut_paiement": o.statut_paiement,
+                "statut_paiement_display": o.get_statut_paiement_display(),
+                "statut_commande": o.statut_commande,
+                "statut_commande_display": o.get_statut_commande_display(),
+                "mode_paiement": o.mode_paiement,
+                "mode_paiement_display": o.get_mode_paiement_display(),
+                "is_credit_purchase": o.is_credit_purchase,
+                "credit_due_date": o.credit_due_date.isoformat() if o.credit_due_date else None,
+                "moneroo_id": moneroo_id,
+                "manual_payment_reference": o.manual_payment_reference,
+                "manual_payment_confirmed_by": o.manual_payment_confirmed_by.email if o.manual_payment_confirmed_by else None,
+                "created_at": o.created_at.isoformat() if o.created_at else None,
+                "abandoned_at": o.abandoned_at.isoformat() if o.abandoned_at else None,
+                "last_reminder_sent_at": o.last_reminder_sent_at.isoformat() if o.last_reminder_sent_at else None,
+                "items_count": len(items_data),
+                "items": items_data,
+            })
+
+        return Response({
+            "success": True,
+            "data": {
+                "kpis": {
+                    "total_orders_count": total_orders_count,
+                    "paid_count": paid_count,
+                    "pending_count": pending_count,
+                    "credit_count": credit_count,
+                    "abandoned_count": abandoned_count,
+                    "failed_count": failed_count,
+                    "cancelled_count": cancelled_count,
+                    "total_paid_amount": float(total_paid_amount),
+                    "total_credit_amount": float(total_credit_amount),
+                    "potential_abandoned_loss": float(potential_abandoned_loss),
+                },
+                "orders": orders_data,
+                "total": total_filtered,
+                "current_page": page,
+                "total_pages": total_pages,
+            },
+            "error": None,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminOrderRemindView(APIView):
+    """
+    POST /api/v1/commerce/orders/<uuid:order_id>/remind-abandoned/
+    Relance par notification et email un client dont la commande est en panier abandonné ou en attente.
+    """
+    permission_classes = [IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def post(self, request, order_id):
+        from django.utils import timezone
+        from apps.reporting.services import notify_user
+        from apps.reporting.models import Notification
+
+        try:
+            order = Order.objects.select_related('user', 'currency').get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"success": False, "data": None, "error": "Commande introuvable."}, status=404)
+
+        if order.statut_paiement == 'paid':
+            return Response({"success": False, "data": None, "error": "Cette commande est déjà réglée."}, status=400)
+
+        now = timezone.now()
+        order.last_reminder_sent_at = now
+        order.save(update_fields=['last_reminder_sent_at'])
+
+        user_email = order.user.email if order.user else "le client"
+        order_ref = f"#{str(order.id)[:8].upper()}"
+        amount_fmt = f"{order.total_amount:,.0f} {order.currency.code if order.currency else 'FCFA'}".replace(',', ' ')
+
+        if order.user:
+            try:
+                notify_user(
+                    user=order.user,
+                    notification_type=Notification.NotificationType.SYSTEM,
+                    title="Votre panier vous attend",
+                    message=f"Votre commande {order_ref} d'un montant de {amount_fmt} est en attente. Vous pouvez la finaliser en un clic sur votre espace personnel.",
+                    action_url=f"/student/orders?order_id={str(order.id)}",
+                )
+            except Exception as e:
+                logger.warning(f"Notification in-app de relance non envoyée: {e}")
+
+        logger.info(f"[Admin Commerce] Email de relance consigné pour la commande {order_ref} à {user_email} par {request.user.email}")
+
+        return Response({
+            "success": True,
+            "data": {
+                "order_id": str(order.id),
+                "recipient_email": user_email,
+                "last_reminder_sent_at": now.isoformat(),
+            },
+            "message": f"Email de relance envoyé avec succès à {user_email}.",
+            "error": None,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminOrderConfirmPaymentView(APIView):
+    """
+    POST /api/v1/commerce/admin/orders/<uuid:order_id>/confirm-payment/
+    Confirmation manuelle administrative d'une commande (Espèces, MoMo direct, Virement, Chèque).
+    """
+    permission_classes = [IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def post(self, request, order_id):
+        from .services import confirm_manual_payment
+
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"success": False, "data": None, "error": "Commande introuvable."}, status=404)
+
+        if order.statut_paiement == 'paid':
+            return Response({"success": False, "data": None, "error": "Cette commande est déjà marquée comme payée."}, status=400)
+
+        mode_paiement = request.data.get('mode_paiement', 'especes')
+        reference_paiement = request.data.get('reference_paiement', '').strip()
+
+        confirm_manual_payment(
+            order,
+            confirmed_by_user=request.user,
+            mode_paiement=mode_paiement,
+            reference=reference_paiement
+        )
+
+        return Response({
+            "success": True,
+            "data": {
+                "id": str(order.id),
+                "statut_paiement": "paid",
+                "mode_paiement": order.mode_paiement,
+                "manual_payment_reference": order.manual_payment_reference,
+            },
+            "message": f"Paiement de la commande #{str(order.id)[:8].upper()} validé manuellement avec succès.",
+            "error": None,
+        }, status=status.HTTP_200_OK)
+
 
