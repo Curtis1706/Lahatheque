@@ -254,6 +254,26 @@ class StockOuvrage(models.Model):
             return "low_stock"
         return "in_stock"
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        try:
+            from django.core.cache import cache
+            cache.delete(f"real_paper_stock_{self.ouvrage_id}")
+            cache.delete("admin_catalog_pricing_all")
+        except Exception:
+            pass
+
+    def delete(self, *args, **kwargs):
+        ouvrage_id = self.ouvrage_id
+        res = super().delete(*args, **kwargs)
+        try:
+            from django.core.cache import cache
+            cache.delete(f"real_paper_stock_{ouvrage_id}")
+            cache.delete("admin_catalog_pricing_all")
+        except Exception:
+            pass
+        return res
+
 
 class MouvementStock(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -524,14 +544,41 @@ class ClientBouquetSubscription(models.Model):
 def get_real_paper_stock(ouvrage_id) -> int:
     """
     Retourne le stock papier réellement disponible pour un ouvrage, agrégé sur tous les
-    entrepôts. Source unique de vérité.
+    entrepôts. Source unique de vérité avec mise en cache mémoire et Redis pour éliminer
+    les requêtes N+1 répétées.
     """
+    if hasattr(ouvrage_id, '_cached_real_stock'):
+        return ouvrage_id._cached_real_stock
+
+    actual_id = getattr(ouvrage_id, 'id', ouvrage_id)
+    if not actual_id:
+        return 0
+
+    from django.core.cache import cache
+    cache_key = f"real_paper_stock_{actual_id}"
+    try:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            if hasattr(ouvrage_id, '__dict__'):
+                ouvrage_id._cached_real_stock = cached
+            return cached
+    except Exception:
+        pass
+
     from django.db.models import Sum, F
 
-    result = StockOuvrage.objects.filter(ouvrage_id=ouvrage_id).aggregate(
+    result = StockOuvrage.objects.filter(ouvrage_id=actual_id).aggregate(
         total=Sum(F('quantite_reelle') - F('quantite_reservee'))
     )
-    return max(0, result['total'] or 0)
+    val = max(0, result['total'] or 0)
+    try:
+        cache.set(cache_key, val, 60)
+    except Exception:
+        pass
+
+    if hasattr(ouvrage_id, '__dict__'):
+        ouvrage_id._cached_real_stock = val
+    return val
 
 
 def is_really_available_paper(ouvrage) -> bool:
@@ -541,6 +588,5 @@ def is_really_available_paper(ouvrage) -> bool:
     """
     if not getattr(ouvrage, 'is_paper_available', False):
         return False
-    book_id = getattr(ouvrage, 'id', ouvrage)
-    return get_real_paper_stock(book_id) > 0
+    return get_real_paper_stock(ouvrage) > 0
 

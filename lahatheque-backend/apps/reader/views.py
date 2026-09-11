@@ -1104,11 +1104,25 @@ class PartnerCatalogListView(APIView):
             start = (page_num_int - 1) * page_size_int
             end = start + page_size_int
             qs = qs[start:end]
+        elif request.query_params.get('all') != 'true':
+            page_size_int = 50
+            page_num_int = 1
+            qs = qs[:page_size_int]
+
+        from apps.commerce.models import StockOuvrage
+        from django.db.models import Sum, F
+        stock_data = (
+            StockOuvrage.objects
+            .filter(ouvrage__in=qs)
+            .values('ouvrage_id')
+            .annotate(total=Sum(F('quantite_reelle') - F('quantite_reservee')))
+        )
+        stock_map = {item['ouvrage_id']: max(0, item['total'] or 0) for item in stock_data}
 
         serializer = OuvrageBasicSerializer(
             qs,
             many=True,
-            context={'request': request, 'is_partner_context': True}
+            context={'request': request, 'is_partner_context': True, 'stock_map': stock_map}
         )
         response_data = {
             "success": True,

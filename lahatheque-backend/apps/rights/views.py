@@ -9,6 +9,7 @@ from django.db.models import Sum, Count, Q, F
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from django.core.cache import cache
 logger = logging.getLogger(__name__)
 from rest_framework import status, permissions
 from rest_framework.renderers import BaseRenderer, JSONRenderer
@@ -1253,17 +1254,19 @@ class LegalContractsFormOptionsView(APIView):
         from apps.publishers_portal.models import Publisher
         from .models import PreEditionDossier
 
-        # 1. Ouvrages réels du catalogue
-        ouvrages_qs = Ouvrage.objects.all().prefetch_related('authors', 'audio_tracks')
+        # 1. Ouvrages réels du catalogue (avec prefetch complet pour éviter les requêtes N+1)
+        ouvrages_qs = Ouvrage.objects.all().prefetch_related('authors__user', 'audio_tracks')
         ouvrages = []
         for b in ouvrages_qs:
+            authors_all = list(b.authors.all())
             authors_names = [
                 a.user.get_full_name() if (a.user and a.user.get_full_name()) else f"{a.first_name} {a.last_name}".strip()
-                for a in b.authors.all()
+                for a in authors_all
             ]
             cover_url = ""
             if b.cover_image:
                 cover_url = b.cover_image.url if hasattr(b.cover_image, 'url') else str(b.cover_image)
+            tracks_list = list(b.audio_tracks.all())
             ouvrages.append({
                 "id": str(b.id),
                 "title": b.title or b.titre,
@@ -1271,9 +1274,9 @@ class LegalContractsFormOptionsView(APIView):
                 "status": b.status,
                 "cover_url": cover_url,
                 "authors": authors_names or ["Auteur Principal"],
-                "author_user_ids": [str(a.user_id) for a in b.authors.all() if a.user_id],
+                "author_user_ids": [str(a.user_id) for a in authors_all if a.user_id],
                 "is_paper_available": bool(b.is_paper_available),
-                "has_audio_tracks": bool(b.audio_tracks.exists() or getattr(b, 'has_audio_version', False)),
+                "has_audio_tracks": bool(len(tracks_list) > 0 or getattr(b, 'has_audio_version', False)),
                 "price_digital": float(b.price_digital) if b.price_digital is not None else None,
                 "price_paper": float(b.price_paper) if (b.is_paper_available and b.price_paper is not None) else None,
                 "price_audio": float(b.price_audio) if (getattr(b, 'has_audio_version', False) and getattr(b, 'price_audio', None) is not None) else None,
@@ -1782,22 +1785,43 @@ class LegalRoyaltiesListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsLegalReviewerRole | IsAdminOrSuperAdmin]
 
     def get(self, request):
-        ouvrages = Ouvrage.objects.all().prefetch_related('authors', 'repartitions_droits', 'author_rights')
+        cache_key = "legal_royalties_list_all"
+        try:
+            cached_data = cache.get(cache_key)
+            if cached_data is not None:
+                return Response({"success": True, "data": cached_data})
+        except Exception:
+            pass
+
+        ouvrages = (
+            Ouvrage.objects
+            .select_related('institution')
+            .prefetch_related('authors__user', 'repartitions_droits__beneficiaire', 'author_rights')
+            .all()
+            .order_by('-created_at', '-id')
+        )
+
+        # Pré-chargement global des taux et répartitions en 3 requêtes (évite plus de 10 000 requêtes N+1)
+        rate_map = {r.ouvrage_id: r for r in RoyaltyRate.objects.all()}
+        author_right_map = {ar.ouvrage_id: ar for ar in AuthorRight.objects.all()}
+        repart_map = {rd.ouvrage_id: rd for rd in RepartitionDroits.objects.all()}
+
         repartitions = []
 
         for b in ouvrages:
+            authors_all = list(b.authors.all())
             authors_list = []
-            for a in b.authors.all():
+            for a in authors_all:
                 name = a.user.get_full_name() if (a.user and a.user.get_full_name()) else f"{a.first_name} {a.last_name}".strip()
                 if name:
                     authors_list.append(name)
             if not authors_list:
                 authors_list = ["Auteur LAHA"]
 
-            # Trouver le taux auteur (taux de redevance par format ou defaut 5%)
-            rate_obj = RoyaltyRate.objects.filter(ouvrage=b).first()
-            author_right = AuthorRight.objects.filter(ouvrage=b).first()
-            repart_obj = RepartitionDroits.objects.filter(ouvrage=b).first()
+            # Trouver le taux auteur en O(1) depuis les tables de hachage
+            rate_obj = rate_map.get(b.id)
+            author_right = author_right_map.get(b.id)
+            repart_obj = repart_map.get(b.id)
 
             if repart_obj and repart_obj.taux_numerique is not None:
                 current_rate = float(repart_obj.taux_numerique)
@@ -1818,11 +1842,14 @@ class LegalRoyaltiesListView(APIView):
 
             univ_share = float(rate_obj.university_share_percent) if (rate_obj and rate_obj.university_share_percent is not None) else None
 
+            first_author = authors_all[0] if authors_all else None
+            author_id = str(first_author.user_id) if (first_author and first_author.user_id) else None
+
             repartitions.append({
                 "id": str(b.id),
                 "book_id": str(b.id),
                 "book_title": b.titre,
-                "author_id": str(b.authors.first().user_id) if (b.authors.exists() and b.authors.first().user_id) else None,
+                "author_id": author_id,
                 "author_name": authors_list[0] if authors_list else "Auteur Principal",
                 "author_role": "Auteur Principal",
                 "author_share_percent": current_rate,
@@ -1847,6 +1874,11 @@ class LegalRoyaltiesListView(APIView):
                 "isbn": b.isbn or "",
                 "notes": f"Droits validés à {current_rate}% pour {b.titre}."
             })
+
+        try:
+            cache.set(cache_key, repartitions, 300)
+        except Exception:
+            pass
 
         return Response({"success": True, "data": repartitions})
 
@@ -1966,6 +1998,11 @@ class LegalRoyaltiesBatchView(APIView):
                                 **repart_defaults,
                             }
                         )
+
+                    try:
+                        cache.delete("legal_royalties_list_all")
+                    except Exception:
+                        pass
 
                 return Response({
                     "success": True,
@@ -3338,17 +3375,21 @@ class LegalRedevancesStatementView(APIView):
         if not recipient_email:
             return Response({"success": False, "error": f"Aucune adresse e-mail valide configurée pour {entity_name}."}, status=400)
 
-        # Calcul des ventes et redevances livre par livre avec resolve_applied_rate (Correction Critique)
+        # Calcul des ventes et redevances livre par livre avec agrégation en 1 seule requête SQL
         total_gross = 0.0
         total_net = 0.0
         sales_breakdown = []
 
-        for book in ouvrages:
-            lignes = LigneCommande.objects.filter(ouvrage=book, commande__statut_paiement='paid')
-            if start_date and end_date:
-                lignes = lignes.filter(commande__created_at__date__gte=start_date, commande__created_at__date__lte=end_date)
+        all_lignes = LigneCommande.objects.filter(ouvrage__in=ouvrages, commande__statut_paiement='paid')
+        if start_date and end_date:
+            all_lignes = all_lignes.filter(commande__created_at__date__gte=start_date, commande__created_at__date__lte=end_date)
+        gross_by_book = {
+            item['ouvrage_id']: float(item['s'] or 0.0)
+            for item in all_lignes.values('ouvrage_id').annotate(s=Sum(F('unit_price') * F('quantity')))
+        }
 
-            book_gross = float(lignes.aggregate(s=Sum(F('unit_price') * F('quantity')))['s'] or 0.0)
+        for book in ouvrages:
+            book_gross = gross_by_book.get(book.id, 0.0)
             applied_rate = resolve_applied_rate(book, entity_type=entity_type, institution=institution, publisher=publisher)
             book_net = (book_gross * applied_rate) / 100.0
 
@@ -4027,10 +4068,13 @@ class LegalPendingPublicationListView(APIView):
         from apps.rights.models import ContratLegal
 
         ouvrages = Ouvrage.objects.filter(status='pending_legal_approval').select_related('discipline').prefetch_related('authors', 'language_versions')
+        active_contract_book_ids = set(
+            ContratLegal.objects.filter(ouvrage__in=ouvrages, status='active').values_list('ouvrage_id', flat=True)
+        )
 
         data = []
         for o in ouvrages:
-            has_contract = ContratLegal.objects.filter(ouvrage=o, status='active').exists()
+            has_contract = o.id in active_contract_book_ids
             lang_versions = list(o.language_versions.all())
             is_orig = True
             orig_lang = o.language or 'fr'

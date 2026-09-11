@@ -943,7 +943,9 @@ class StudentCatalogView(APIView):
         page_param = request.query_params.get('page')
         page_size_param = request.query_params.get('page_size')
 
-        if page_param is not None or page_size_param is not None:
+        is_all = request.query_params.get('all') == 'true' or request.query_params.get('no_page') == 'true'
+
+        if not is_all or page_param is not None or page_size_param is not None:
             try:
                 page = max(1, int(page_param or 1))
             except (ValueError, TypeError):
@@ -963,6 +965,17 @@ class StudentCatalogView(APIView):
             total_pages = 1
             books_slice = qs
 
+        # Pré-chargement des stocks en 1 seule requête SQL groupée pour le slice
+        from apps.commerce.models import StockOuvrage
+        from django.db.models import Sum, F
+        stock_data = (
+            StockOuvrage.objects
+            .filter(ouvrage__in=books_slice)
+            .values('ouvrage_id')
+            .annotate(total=Sum(F('quantite_reelle') - F('quantite_reservee')))
+        )
+        stock_map = {item['ouvrage_id']: max(0, item['total'] or 0) for item in stock_data}
+
         serializer = OuvrageBasicSerializer(
             books_slice,
             many=True,
@@ -970,6 +983,7 @@ class StudentCatalogView(APIView):
                 'request': request,
                 'user_owned_ids': user_owned_ids,
                 'user_audio_ids': user_audio_ids,
+                'stock_map': stock_map,
             }
         )
         payload = {

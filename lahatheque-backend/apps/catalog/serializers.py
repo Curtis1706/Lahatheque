@@ -60,9 +60,17 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
         return obj.available_languages
 
     def get_languages(self, obj):
-        from apps.commerce.models import get_real_paper_stock, is_really_available_paper
-        real_stock = get_real_paper_stock(obj.id)
-        is_paper_dispo = is_really_available_paper(obj)
+        stock_map = self.context.get('stock_map')
+        if stock_map is not None:
+            real_stock = stock_map.get(obj.id, 0)
+        elif hasattr(obj, '_cached_real_stock'):
+            real_stock = obj._cached_real_stock
+        else:
+            from apps.commerce.models import get_real_paper_stock
+            real_stock = get_real_paper_stock(obj)
+            obj._cached_real_stock = real_stock
+
+        is_paper_dispo = bool(getattr(obj, 'is_paper_available', False) and real_stock > 0)
 
         versions = list(obj.language_versions.all()) if hasattr(obj, 'language_versions') else []
         if not versions:

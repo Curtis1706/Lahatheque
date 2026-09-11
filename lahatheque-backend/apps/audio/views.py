@@ -865,18 +865,19 @@ class AudioManagementListView(APIView):
         status_filter = request.query_params.get("status")
         qs = Ouvrage.objects.filter(
             Q(has_audio_version=True) | Q(format_type="audio") | Q(audio_tracks__isnull=False)
-        ).distinct().order_by("-updated_at")
+        ).select_related("discipline").prefetch_related("authors", "audio_tracks").distinct().order_by("-updated_at")
 
         if status_filter and status_filter != "all":
             qs = qs.filter(audio_status=status_filter)
 
         results = []
         for b in qs:
-            tracks = b.audio_tracks.all()
-            has_male = tracks.filter(voice_gender="male").exists()
-            has_female = tracks.filter(voice_gender="female").exists()
-            total_dur = sum(t.duration_seconds for t in tracks)
-            authors_str = ", ".join([f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]) if b.authors.exists() else (b.publisher_name or "Auteur LAHA")
+            tracks = list(b.audio_tracks.all())
+            has_male = any(getattr(t, "voice_gender", None) == "male" for t in tracks)
+            has_female = any(getattr(t, "voice_gender", None) == "female" for t in tracks)
+            total_dur = sum(getattr(t, "duration_seconds", 0) or 0 for t in tracks)
+            authors_list = [f"{a.first_name} {a.last_name}".strip() for a in b.authors.all()]
+            authors_str = ", ".join(authors_list) if authors_list else (b.publisher_name or "Auteur LAHA")
 
             results.append({
                 "id": str(b.id),
@@ -891,7 +892,7 @@ class AudioManagementListView(APIView):
                 "has_male_voice": has_male,
                 "has_female_voice": has_female,
                 "total_duration_seconds": total_dur,
-                "total_tracks_count": tracks.count(),
+                "total_tracks_count": len(tracks),
                 "created_at": b.created_at.isoformat() if b.created_at else "",
                 "rejection_reason": getattr(b, "rejection_reason", "") or "",
             })

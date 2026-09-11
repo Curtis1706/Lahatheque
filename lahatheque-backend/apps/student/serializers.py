@@ -146,22 +146,32 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             return compute_role_price(obj, "author", user=request.user)["audio_price"]
         return None
 
+    def _get_real_stock(self, obj) -> int:
+        stock_map = self.context.get('stock_map')
+        if stock_map is not None:
+            return stock_map.get(obj.id, 0)
+        if hasattr(obj, '_cached_real_stock'):
+            return obj._cached_real_stock
+        from apps.commerce.models import get_real_paper_stock
+        stock = get_real_paper_stock(obj)
+        obj._cached_real_stock = stock
+        return stock
+
     def get_is_paper_available(self, obj) -> bool:
-        from apps.commerce.models import is_really_available_paper
-        return is_really_available_paper(obj)
+        if not getattr(obj, 'is_paper_available', False):
+            return False
+        return self._get_real_stock(obj) > 0
 
     def get_paper_stock(self, obj) -> int:
-        from apps.commerce.models import get_real_paper_stock
-        return get_real_paper_stock(obj.id)
+        return self._get_real_stock(obj)
 
     def get_available_languages(self, obj) -> list:
         return obj.available_languages
 
     def get_languages(self, obj) -> list:
         if hasattr(obj, 'language_versions'):
-            from apps.commerce.models import get_real_paper_stock, is_really_available_paper
-            real_stock = get_real_paper_stock(obj.id)
-            is_paper_dispo = is_really_available_paper(obj)
+            real_stock = self._get_real_stock(obj)
+            is_paper_dispo = bool(getattr(obj, 'is_paper_available', False) and real_stock > 0)
             return [
                 {
                     "id": str(lv.id),

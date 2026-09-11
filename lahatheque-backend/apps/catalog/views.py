@@ -1179,7 +1179,7 @@ class ChiefLayoutValidationViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         qs = Ouvrage.objects.all().select_related(
             'publisher', 'discipline', 'institution', 'created_by'
-        ).prefetch_related('authors')
+        ).prefetch_related('authors', 'language_versions', 'audio_tracks', 'disciplines')
 
         status_filter = self.request.query_params.get('status')
         if status_filter:
