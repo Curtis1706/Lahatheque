@@ -100,22 +100,18 @@ export default function AdminForensicPage() {
     }
 
     setIsAnalyzing(true);
-    setAnalysisStep("Transmission du fichier sécurisé vers le serveur backend...");
+    setAnalysisStep("Transmission du document suspect vers le serveur...");
     const timer1 = setTimeout(() => {
-      setAnalysisStep("Traitement de l'image & extraction OCR Tesseract en cours...");
-    }, 1500);
+      setAnalysisStep("Analyse approfondie par vision IA et décodage de filigrane...");
+    }, 1200);
     const timer2 = setTimeout(() => {
-      setAnalysisStep("Analyse approfondie par vision et décodage de filigrane...");
-    }, 5000);
-    const timer3 = setTimeout(() => {
       setAnalysisStep("Corrélation croisée avec la base des comptes et traces de lecture...");
-    }, 14000);
+    }, 3500);
 
     try {
       const res = await analyzeForensicEvidence(selectedFile, notes);
       clearTimeout(timer1);
       clearTimeout(timer2);
-      clearTimeout(timer3);
       setAnalysisResult(res);
       if (res.status === "identified") {
         toast.success("Analyse terminée : Lecteur source formellement identifié.");
@@ -128,7 +124,6 @@ export default function AdminForensicPage() {
     } catch (err: any) {
       clearTimeout(timer1);
       clearTimeout(timer2);
-      clearTimeout(timer3);
       toast.error(err.message || "Échec de l'analyse forensique.");
     } finally {
       setIsAnalyzing(false);
