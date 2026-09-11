@@ -186,7 +186,14 @@ class StudentBooksView(APIView):
             elif f in ('digital', 'numerique'):
                 qs = qs.filter(ouvrage__format_type__in=['pdf', 'epub'])
             elif f in ('paper', 'papier'):
-                qs = qs.filter(ouvrage__is_paper_available=True)
+                from django.db.models import Sum, F
+                from apps.commerce.models import StockOuvrage
+
+                ouvrages_avec_stock_reel = StockOuvrage.objects.values('ouvrage_id').annotate(
+                    total_dispo=Sum(F('quantite_reelle') - F('quantite_reservee'))
+                ).filter(total_dispo__gt=0).values_list('ouvrage_id', flat=True)
+
+                qs = qs.filter(ouvrage__is_paper_available=True, ouvrage_id__in=ouvrages_avec_stock_reel)
             else:
                 qs = qs.filter(ouvrage__format_type=f)
         if favorites_only:
@@ -831,7 +838,14 @@ class StudentCatalogView(APIView):
             elif f in ('digital', 'numerique'):
                 qs = qs.filter(format_type__in=['pdf', 'epub'])
             elif f in ('paper', 'papier'):
-                qs = qs.filter(is_paper_available=True)
+                from django.db.models import Sum, F
+                from apps.commerce.models import StockOuvrage
+
+                ouvrages_avec_stock_reel = StockOuvrage.objects.values('ouvrage_id').annotate(
+                    total_dispo=Sum(F('quantite_reelle') - F('quantite_reservee'))
+                ).filter(total_dispo__gt=0).values_list('ouvrage_id', flat=True)
+
+                qs = qs.filter(is_paper_available=True, id__in=ouvrages_avec_stock_reel)
             else:
                 qs = qs.filter(format_type=f)
 

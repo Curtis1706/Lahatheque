@@ -33,6 +33,8 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
     author_discounted_digital_price = serializers.SerializerMethodField()
     author_discounted_paper_price = serializers.SerializerMethodField()
     author_discounted_audio_price = serializers.SerializerMethodField()
+    is_paper_available = serializers.SerializerMethodField()
+    paper_stock = serializers.SerializerMethodField()
     available_languages = serializers.SerializerMethodField()
     languages = serializers.SerializerMethodField()
 
@@ -43,7 +45,7 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             'discipline_name', 'publisher_name', 'institution_name',
             'country', 'format_type', 'page_count', 'sample_pages_count', 'publication_date',
             'language', 'summary', 'status', 'price_digital', 'price_paper',
-            'is_paper_available', 'cover_url', 'is_owned', 'has_digital_access',
+            'is_paper_available', 'paper_stock', 'cover_url', 'is_owned', 'has_digital_access',
             'has_audio_version', 'price_audio', 'has_audio', 'is_audio_owned',
             'author_discounted_digital_price', 'author_discounted_paper_price', 'author_discounted_audio_price',
             'available_languages', 'languages',
@@ -144,11 +146,22 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
             return compute_role_price(obj, "author", user=request.user)["audio_price"]
         return None
 
+    def get_is_paper_available(self, obj) -> bool:
+        from apps.commerce.models import is_really_available_paper
+        return is_really_available_paper(obj)
+
+    def get_paper_stock(self, obj) -> int:
+        from apps.commerce.models import get_real_paper_stock
+        return get_real_paper_stock(obj.id)
+
     def get_available_languages(self, obj) -> list:
         return obj.available_languages
 
     def get_languages(self, obj) -> list:
         if hasattr(obj, 'language_versions'):
+            from apps.commerce.models import get_real_paper_stock, is_really_available_paper
+            real_stock = get_real_paper_stock(obj.id)
+            is_paper_dispo = is_really_available_paper(obj)
             return [
                 {
                     "id": str(lv.id),
@@ -160,8 +173,8 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
                     "r2_key_epub": lv.r2_key_epub,
                     "cover_url": lv.cover_url or obj.cover_url,
                     "page_count": lv.page_count,
-                    "is_paper_available": lv.is_paper_available,
-                    "paper_stock": lv.paper_stock,
+                    "is_paper_available": is_paper_dispo,
+                    "paper_stock": real_stock,
                     "translation_status": lv.translation_status,
                 }
                 for lv in obj.language_versions.all()

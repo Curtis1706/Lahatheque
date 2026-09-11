@@ -96,10 +96,20 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
                 Q(authors__last_name__icontains=author)
             ).distinct()
 
-        # 3. Filtre format et combinaisons
+            # 3. Filtre format et combinaisons
         format_val = self.request.query_params.get('book_format') or self.request.query_params.get('format')
         if format_val and format_val.lower() != 'all':
             f = format_val.lower()
+            if any(p in f for p in ('paper', 'papier', 'pack_complet', 'all_three')):
+                from django.db.models import Sum, F
+                from apps.commerce.models import StockOuvrage
+
+                ouvrages_avec_stock_reel = StockOuvrage.objects.values('ouvrage_id').annotate(
+                    total_dispo=Sum(F('quantite_reelle') - F('quantite_reservee'))
+                ).filter(total_dispo__gt=0).values_list('ouvrage_id', flat=True)
+            else:
+                ouvrages_avec_stock_reel = None
+
             if f in ('audio', 'audio_all', 'livres_audio'):
                 # Tout ouvrage disposant d'une version audio (rattachée ou autonome)
                 qs = qs.filter(Q(has_audio_version=True) | Q(format_type='audio') | Q(audio_tracks__isnull=False)).distinct()
@@ -114,7 +124,7 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
                 # Ouvrages disposant des 3 formats : Papier, Numérique ET Audio
                 qs = qs.filter(
                     (Q(has_audio_version=True) | Q(audio_tracks__isnull=False)) &
-                    Q(is_paper_available=True) &
+                    Q(is_paper_available=True, id__in=ouvrages_avec_stock_reel) &
                     Q(format_type__in=['pdf', 'epub'])
                 ).distinct()
             elif f in ('digital_audio', 'numerique_audio'):
@@ -127,18 +137,18 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
                 # Ouvrages disposant de Papier ET Audio
                 qs = qs.filter(
                     (Q(has_audio_version=True) | Q(audio_tracks__isnull=False)) &
-                    Q(is_paper_available=True)
+                    Q(is_paper_available=True, id__in=ouvrages_avec_stock_reel)
                 ).distinct()
             elif f in ('paper_digital', 'papier_numerique'):
                 # Ouvrages disposant de Papier ET Numérique
                 qs = qs.filter(
-                    Q(is_paper_available=True) &
+                    Q(is_paper_available=True, id__in=ouvrages_avec_stock_reel) &
                     Q(format_type__in=['pdf', 'epub'])
                 ).distinct()
             elif f in ('digital', 'numerique'):
                 qs = qs.filter(format_type__in=['pdf', 'epub'])
             elif f in ('paper', 'papier'):
-                qs = qs.filter(is_paper_available=True)
+                qs = qs.filter(is_paper_available=True, id__in=ouvrages_avec_stock_reel)
             else:
                 qs = qs.filter(format_type=f)
 

@@ -113,7 +113,7 @@ class CreateOrderView(APIView):
 
             selected_language = item.get('selected_language') or 'fr'
 
-            # Vérification du stock disponible pour le format papier, agrégé sur tous les entrepôts et versions linguistiques
+            # Vérification du stock disponible pour le format papier, basé uniquement sur StockOuvrage
             if format_type == 'paper':
                 has_paper = True
 
@@ -121,29 +121,6 @@ class CreateOrderView(APIView):
                     return Response({
                         'error': f"« {ouvrage.title} » n'est pas disponible en version papier."
                     }, status=status.HTTP_400_BAD_REQUEST)
-
-                from apps.catalog.models import OuvrageLanguageVersion
-                lang_ver = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage, language__iexact=selected_language).first()
-                if lang_ver:
-                    # Si l'ouvrage maître est configuré comme disponible en papier, la version linguistique hérite de cette disponibilité
-                    if not lang_ver.is_paper_available and getattr(ouvrage, 'is_paper_available', False):
-                        lang_ver.is_paper_available = True
-                        lang_ver.save(update_fields=['is_paper_available'])
-
-                    if not lang_ver.is_paper_available:
-                        return Response({
-                            'error': f"L'édition {selected_language.upper()} de « {ouvrage.title} » n'est pas disponible en version papier."
-                        }, status=status.HTTP_400_BAD_REQUEST)
-
-                    # Si un stock linguistique dédié est configuré, on contrôle ce stock réel
-                    if lang_ver.paper_stock > 0:
-                        if lang_ver.paper_stock < quantity:
-                            return Response({
-                                'error': f"Stock insuffisant pour l'édition {selected_language.upper()} de « {ouvrage.title} » "
-                                         f"(disponible : {lang_ver.paper_stock}, demandé : {quantity})."
-                            }, status=status.HTTP_400_BAD_REQUEST)
-                        lang_ver.paper_stock -= quantity
-                        lang_ver.save(update_fields=['paper_stock'])
 
                 from django.db.models import Sum, F
                 from apps.commerce.models import StockOuvrage
@@ -157,7 +134,7 @@ class CreateOrderView(APIView):
                         (s.quantite_reelle - s.quantite_reservee) for s in stocks_locked
                     )
 
-                    if stocks_locked and total_disponible < quantity:
+                    if total_disponible < quantity:
                         return Response({
                             'error': f"Stock insuffisant pour '{ouvrage.title}' en format Papier "
                                      f"(disponible : {total_disponible}, demandé : {quantity})."
@@ -292,20 +269,12 @@ class CreateOrderView(APIView):
             logger.error(f"Échec initialisation paiement pour la commande {commande.id}: {payment_err}")
 
             from apps.commerce.models import StockOuvrage
-            from apps.catalog.models import OuvrageLanguageVersion
             from django.db.models import F
 
             for ligne_annulee in LigneCommande.objects.filter(commande=commande, format_type__in=('paper', 'papier')):
                 StockOuvrage.objects.filter(
                     ouvrage=ligne_annulee.ouvrage, quantite_reservee__gte=ligne_annulee.quantity
                 ).update(quantite_reservee=F('quantite_reservee') - ligne_annulee.quantity)
-
-                lang_ver_annulee = OuvrageLanguageVersion.objects.filter(
-                    ouvrage=ligne_annulee.ouvrage, language__iexact=(ligne_annulee.selected_language or 'fr')
-                ).first()
-                if lang_ver_annulee and lang_ver_annulee.paper_stock >= 0:
-                    lang_ver_annulee.paper_stock = F('paper_stock') + ligne_annulee.quantity
-                    lang_ver_annulee.save(update_fields=['paper_stock'])
 
             commande.delete()
             return Response({

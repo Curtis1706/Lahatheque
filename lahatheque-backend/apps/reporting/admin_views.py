@@ -26,7 +26,14 @@ from apps.reporting.models import (
 )
 from apps.reporting.tasks import run_all_automated_reminders
 from apps.catalog.models import Ouvrage
-from apps.commerce.models import Order, LigneCommande, PaymentTransaction, Subscription
+from apps.commerce.models import (
+    Order,
+    LigneCommande,
+    PaymentTransaction,
+    Subscription,
+    get_real_paper_stock,
+    is_really_available_paper,
+)
 from apps.accounts.models import User
 from apps.rights.models import PayoutRequest
 from apps.accounts.permissions import IsAdminOrSuperAdmin
@@ -466,8 +473,8 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "summary": b.summary or "",
                 "publication_year": b.publication_date.year if b.publication_date else (b.created_at.year if b.created_at else 2026),
                 "page_count": b.page_count or 0,
-                "is_paper_available": bool(getattr(b, 'is_paper_available', False)),
-                "paper_stock": getattr(b, 'paper_stock', 0) or 0,
+                "is_paper_available": is_really_available_paper(b),
+                "paper_stock": get_real_paper_stock(b.id),
                 "protection_type": b.protection_type or 'lcp',
                 "format_type": b.format_type or 'pdf',
                 "file_url": b.file.url if b.file else "",
@@ -500,8 +507,8 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                         "r2_key_pdf": lv.r2_key_pdf or "",
                         "r2_key_epub": lv.r2_key_epub or "",
                         "cover_url": lv.cover_url or "",
-                        "is_paper_available": bool(lv.is_paper_available),
-                        "paper_stock": lv.paper_stock or 0,
+                        "is_paper_available": is_really_available_paper(b),
+                        "paper_stock": get_real_paper_stock(b.id),
                         "translation_status": lv.translation_status or 'ready',
                     }
                     for lv in lang_versions
@@ -562,8 +569,8 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "summary": b.summary or "",
                 "publication_year": b.publication_date.year if b.publication_date else (b.created_at.year if b.created_at else 2026),
                 "page_count": b.page_count or 0,
-                "is_paper_available": bool(getattr(b, 'is_paper_available', False)),
-                "paper_stock": getattr(b, 'paper_stock', 0) or 0,
+                "is_paper_available": is_really_available_paper(b),
+                "paper_stock": get_real_paper_stock(b.id),
                 "protection_type": b.protection_type or 'lcp',
                 "format_type": b.format_type or 'pdf',
                 "file_url": b.file.url if b.file else "",
@@ -599,8 +606,8 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                         "r2_key_pdf": lv.r2_key_pdf or "",
                         "r2_key_epub": lv.r2_key_epub or "",
                         "cover_url": lv.cover_url or "",
-                        "is_paper_available": bool(lv.is_paper_available),
-                        "paper_stock": lv.paper_stock or 0,
+                        "is_paper_available": is_really_available_paper(b),
+                        "paper_stock": get_real_paper_stock(b.id),
                         "translation_status": lv.translation_status or 'ready',
                     }
                     for lv in lang_versions

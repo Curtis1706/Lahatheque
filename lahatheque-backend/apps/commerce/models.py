@@ -517,3 +517,30 @@ class ClientBouquetSubscription(models.Model):
         indexes = [
             models.Index(fields=['user', 'status', 'start_date', 'end_date']),
         ]
+
+
+# ─── Fonctions centrales de calcul du stock physique réel ─────────────────────
+
+def get_real_paper_stock(ouvrage_id) -> int:
+    """
+    Retourne le stock papier réellement disponible pour un ouvrage, agrégé sur tous les
+    entrepôts. Source unique de vérité.
+    """
+    from django.db.models import Sum, F
+
+    result = StockOuvrage.objects.filter(ouvrage_id=ouvrage_id).aggregate(
+        total=Sum(F('quantite_reelle') - F('quantite_reservee'))
+    )
+    return max(0, result['total'] or 0)
+
+
+def is_really_available_paper(ouvrage) -> bool:
+    """
+    Un livre est réellement disponible en papier si son édition papier est activée
+    éditorialement ET qu'il existe réellement du stock physique.
+    """
+    if not getattr(ouvrage, 'is_paper_available', False):
+        return False
+    book_id = getattr(ouvrage, 'id', ouvrage)
+    return get_real_paper_stock(book_id) > 0
+

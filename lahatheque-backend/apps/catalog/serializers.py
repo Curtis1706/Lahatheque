@@ -60,6 +60,10 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
         return obj.available_languages
 
     def get_languages(self, obj):
+        from apps.commerce.models import get_real_paper_stock, is_really_available_paper
+        real_stock = get_real_paper_stock(obj.id)
+        is_paper_dispo = is_really_available_paper(obj)
+
         versions = list(obj.language_versions.all()) if hasattr(obj, 'language_versions') else []
         if not versions:
             cover = getattr(obj, 'cover_url', None) or (obj.cover_image.url if (obj.cover_image and hasattr(obj.cover_image, 'url')) else None)
@@ -73,8 +77,8 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
                 "r2_key_pdf": getattr(obj, 'r2_key', '') or file_key,
                 "cover_url": cover,
                 "page_count": getattr(obj, "page_count", 0) or getattr(obj, "total_pages", 0) or 0,
-                "is_paper_available": getattr(obj, "is_paper_available", False),
-                "paper_stock": getattr(obj, "stock_disponible", 0) or 0,
+                "is_paper_available": is_paper_dispo,
+                "paper_stock": real_stock,
                 "translation_status": "ready",
             }]
         return [
@@ -87,8 +91,8 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
                 "r2_key_pdf": v.r2_key_pdf,
                 "cover_url": v.cover_url or getattr(obj, 'cover_url', None) or (obj.cover_image.url if (obj.cover_image and hasattr(obj.cover_image, 'url')) else None),
                 "page_count": v.page_count,
-                "is_paper_available": v.is_paper_available,
-                "paper_stock": v.paper_stock,
+                "is_paper_available": is_paper_dispo,
+                "paper_stock": real_stock,
                 "translation_status": v.translation_status,
             }
             for v in versions
