@@ -140,11 +140,11 @@ export default function DepositDetailPage() {
 
   // Form State - Format & Tarification
   const [format, setFormat] = useState<"PDF" | "EPUB" | "AUDIO" | "PAPIER">("PDF");
-  const [priceDigital, setPriceDigital] = useState(5000);
+  const [priceDigital, setPriceDigital] = useState<number | string>(5000);
   const [isPaperAvailable, setIsPaperAvailable] = useState(false);
-  const [pricePaper, setPricePaper] = useState(7500);
+  const [pricePaper, setPricePaper] = useState<number | string>(7500);
   const [hasAudioVersion, setHasAudioVersion] = useState(false);
-  const [priceAudio, setPriceAudio] = useState(3500);
+  const [priceAudio, setPriceAudio] = useState<number | string>(3500);
 
   // Fichiers de remplacement
   const [newBookFile, setNewBookFile] = useState<File | null>(null);
@@ -221,11 +221,11 @@ export default function DepositDetailPage() {
           setTargetAudience(data.classification.target_audience || "");
 
           setFormat(data.files.format || "PDF");
-          setPriceDigital(data.default_price || 5000);
+          setPriceDigital(data.default_price !== undefined && data.default_price !== null ? data.default_price : 5000);
           setIsPaperAvailable(Boolean(data.is_paper_available));
-          setPricePaper(data.admin_price || 7500);
+          setPricePaper(data.admin_price !== undefined && data.admin_price !== null ? data.admin_price : 7500);
           setHasAudioVersion(Boolean(data.has_audio_version || data.has_audio));
-          setPriceAudio(data.price_audio || 3500);
+          setPriceAudio(data.price_audio !== undefined && data.price_audio !== null ? data.price_audio : 3500);
 
           if (data.pre_edition_dossier?.id) {
             setSelectedPreEditionId(String(data.pre_edition_dossier.id));
@@ -433,9 +433,9 @@ export default function DepositDetailPage() {
             ...deposit.files,
             format,
           },
-          default_price: Number(priceDigital),
-          admin_price: Number(pricePaper),
-          price_audio: hasAudioVersion ? Number(priceAudio) : undefined,
+          default_price: Number(priceDigital) >= 0 ? Number(priceDigital) : 0,
+          admin_price: Number(pricePaper) >= 0 ? Number(pricePaper) : 0,
+          price_audio: hasAudioVersion && Number(priceAudio) >= 0 ? Number(priceAudio) : undefined,
           has_audio_version: hasAudioVersion,
           is_paper_available: isPaperAvailable,
           is_original: isOriginal,
@@ -1500,9 +1500,9 @@ export default function DepositDetailPage() {
                   type="number"
                   disabled={!isEditing}
                   value={priceDigital}
-                  onChange={(e) => setPriceDigital(Number(e.target.value))}
+                  onChange={(e) => setPriceDigital(e.target.value === "" ? "" : Number(e.target.value))}
                   min={0}
-                  step={500}
+                  step="any"
                   className={inputClass}
                 />
               </div>
@@ -1530,9 +1530,9 @@ export default function DepositDetailPage() {
                     type="number"
                     disabled={!isEditing}
                     value={pricePaper}
-                    onChange={(e) => setPricePaper(Number(e.target.value))}
+                    onChange={(e) => setPricePaper(e.target.value === "" ? "" : Number(e.target.value))}
                     min={0}
-                    step={500}
+                    step="any"
                     className={`w-full max-w-xs ${inputClass}`}
                   />
                 </div>
@@ -1562,9 +1562,9 @@ export default function DepositDetailPage() {
                     type="number"
                     disabled={!isEditing}
                     value={priceAudio}
-                    onChange={(e) => setPriceAudio(Number(e.target.value))}
+                    onChange={(e) => setPriceAudio(e.target.value === "" ? "" : Number(e.target.value))}
                     min={0}
-                    step={500}
+                    step="any"
                     className={`w-full max-w-xs ${inputClass}`}
                   />
                 </div>

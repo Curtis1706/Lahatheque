@@ -302,6 +302,7 @@ export async function getStockAlerts(): Promise<StockAlert[]> {
       alert_type: (a.statut === "out_of_stock" ? "out_of_stock" : "low_stock") as StockAlert["alert_type"],
       triggered_at: a.last_restock_at ?? new Date().toISOString(),
       escalation_status: (a.escalation_status ?? "not_escalated") as StockAlert["escalation_status"],
+      is_paper_available: Boolean(a.is_paper_available),
     }));
   } catch {
     return [];
@@ -476,6 +477,7 @@ export async function getEscalatedOutages(): Promise<EscalatedOutage[]> {
     const list = Array.isArray(raw) ? raw : (raw as any)?.results || (raw as any)?.data || [];
     return list.map((a: any) => ({
       id: a.id,
+      stock_id: a.stock_id || "",
       book_id: a.book_id || a.stock_id || a.id,
       book_title: a.book_title ?? a.title ?? "",
       isbn: a.isbn ?? "",
@@ -489,9 +491,42 @@ export async function getEscalatedOutages(): Promise<EscalatedOutage[]> {
       admin_status: (a.admin_status ?? "reported") as EscalatedOutage["admin_status"],
       impact_description: a.impact_description || "Rupture signalée pour réapprovisionnement urgent.",
       reported_by: a.reported_by ?? "Gestionnaire",
+      current_quantity: a.current_quantity ?? 0,
+      seuil_alerte: a.seuil_alerte ?? 0,
+      is_paper_available: a.is_paper_available ?? false,
+      admin_note: a.admin_note || "",
     }));
   } catch {
     return [];
+  }
+}
+
+/** Arbitre une rupture escaladée côté Administrateur. */
+export async function arbitrateEscalation(payload: {
+  id?: string;
+  movement_id?: string;
+  stock_id?: string;
+  admin_status: EscalatedOutage["admin_status"];
+  admin_note?: string;
+  restock_quantity?: number;
+  is_paper_available?: boolean;
+  reference_document?: string;
+}): Promise<any> {
+  return await bffPatch("/stock/escalate/", payload);
+}
+
+/** Active ou suspend la disponibilité de la version papier sur le catalogue public. */
+export async function toggleBookPaperAvailability(bookId: string, isPaperAvailable: boolean): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/bff/catalog/books/${bookId}/`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_paper_available: isPaperAvailable }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -500,6 +535,7 @@ export async function escalateToAdmin(alertId: string, impactDescription: string
   const res = await bffPost<any>("/stock/escalate/", { stock_id: alertId, impact_description: impactDescription });
   return {
     id: res?.id || alertId,
+    stock_id: res?.stock_id || alertId,
     book_id: res?.book_id || alertId,
     book_title: res?.book_title || "Ouvrage",
     isbn: res?.isbn || "—",
@@ -513,6 +549,10 @@ export async function escalateToAdmin(alertId: string, impactDescription: string
     admin_status: (res?.admin_status ?? "reported") as EscalatedOutage["admin_status"],
     impact_description: res?.impact_description || impactDescription,
     reported_by: res?.reported_by || "Gestionnaire",
+    current_quantity: res?.current_quantity ?? 0,
+    seuil_alerte: res?.seuil_alerte ?? 0,
+    is_paper_available: res?.is_paper_available ?? false,
+    admin_note: res?.admin_note || "",
   };
 }
 

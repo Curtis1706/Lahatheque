@@ -37,15 +37,15 @@ export default function AdminPricingCascadePage() {
   const [savingGlobal, setSavingGlobal] = useState(false);
 
   // Valeurs de cascade par défaut
-  const [defaultDigitalPrice, setDefaultDigitalPrice] = useState(3000);
-  const [defaultPaperPrice, setDefaultPaperPrice] = useState(5000);
-  const [defaultAudioPrice, setDefaultAudioPrice] = useState(2500);
+  const [defaultDigitalPrice, setDefaultDigitalPrice] = useState<number | string>(3000);
+  const [defaultPaperPrice, setDefaultPaperPrice] = useState<number | string>(5000);
+  const [defaultAudioPrice, setDefaultAudioPrice] = useState<number | string>(2500);
 
   // Modale d'édition d'un tarif spécifique d'un ouvrage
   const [editingBook, setEditingBook] = useState<AdminCatalogBook | null>(null);
-  const [customDigitalPrice, setCustomDigitalPrice] = useState<number>(3000);
-  const [customPaperPrice, setCustomPaperPrice] = useState<number>(5000);
-  const [customAudioPrice, setCustomAudioPrice] = useState<number>(2500);
+  const [customDigitalPrice, setCustomDigitalPrice] = useState<number | string>(3000);
+  const [customPaperPrice, setCustomPaperPrice] = useState<number | string>(5000);
+  const [customAudioPrice, setCustomAudioPrice] = useState<number | string>(2500);
   const [customHasAudio, setCustomHasAudio] = useState<boolean>(false);
   const [savingBookPricing, setSavingBookPricing] = useState(false);
 
@@ -117,9 +117,9 @@ export default function AdminPricingCascadePage() {
     setSavingGlobal(true);
     try {
       const res = await updateGlobalPricingConfig({
-        prix_defaut_numerique_xof: defaultDigitalPrice,
-        prix_defaut_papier_xof: defaultPaperPrice,
-        prix_defaut_audio_xof: defaultAudioPrice,
+        prix_defaut_numerique_xof: Number(defaultDigitalPrice) >= 0 ? Number(defaultDigitalPrice) : 0,
+        prix_defaut_papier_xof: Number(defaultPaperPrice) >= 0 ? Number(defaultPaperPrice) : 0,
+        prix_defaut_audio_xof: Number(defaultAudioPrice) >= 0 ? Number(defaultAudioPrice) : 0,
       });
       if (res.success) {
         toast.success("Cascade tarifaire publique enregistrée avec succès !");
@@ -170,9 +170,9 @@ export default function AdminPricingCascadePage() {
 
   const handleOpenEditBook = (book: AdminCatalogBook) => {
     setEditingBook(book);
-    setCustomDigitalPrice(book.price_digital || defaultDigitalPrice);
-    setCustomPaperPrice(book.price_paper || defaultPaperPrice);
-    setCustomAudioPrice(book.price_audio || defaultAudioPrice);
+    setCustomDigitalPrice(book.price_digital !== undefined && book.price_digital !== null ? book.price_digital : defaultDigitalPrice);
+    setCustomPaperPrice(book.price_paper !== undefined && book.price_paper !== null ? book.price_paper : defaultPaperPrice);
+    setCustomAudioPrice(book.price_audio !== undefined && book.price_audio !== null ? book.price_audio : defaultAudioPrice);
     setCustomHasAudio(Boolean(book.has_audio_version || book.has_audio));
   };
 
@@ -180,11 +180,14 @@ export default function AdminPricingCascadePage() {
     e.preventDefault();
     if (!editingBook) return;
     setSavingBookPricing(true);
+    const digitalVal = Number(customDigitalPrice) >= 0 ? Number(customDigitalPrice) : 0;
+    const paperVal = Number(customPaperPrice) >= 0 ? Number(customPaperPrice) : 0;
+    const audioVal = customHasAudio && Number(customAudioPrice) >= 0 ? Number(customAudioPrice) : undefined;
     try {
       const res = await updateBookPricing(editingBook.id, {
-        price_digital: customDigitalPrice,
-        price_paper: customPaperPrice,
-        price_audio: customHasAudio ? customAudioPrice : undefined,
+        price_digital: digitalVal,
+        price_paper: paperVal,
+        price_audio: audioVal,
         has_audio_version: customHasAudio,
       });
       if (res.success) {
@@ -194,9 +197,9 @@ export default function AdminPricingCascadePage() {
             b.id === editingBook.id
               ? {
                   ...b,
-                  price_digital: customDigitalPrice,
-                  price_paper: customPaperPrice,
-                  price_audio: customHasAudio ? customAudioPrice : undefined,
+                  price_digital: digitalVal,
+                  price_paper: paperVal,
+                  price_audio: audioVal,
                   has_audio_version: customHasAudio,
                   has_audio: customHasAudio || b.has_audio,
                 }
@@ -224,8 +227,8 @@ export default function AdminPricingCascadePage() {
             b.id === book.id
               ? {
                   ...b,
-                  price_digital: defaultDigitalPrice,
-                  price_paper: defaultPaperPrice,
+                  price_digital: Number(defaultDigitalPrice) || 0,
+                  price_paper: Number(defaultPaperPrice) || 0,
                 }
               : b
           )
@@ -300,8 +303,8 @@ export default function AdminPricingCascadePage() {
           key: "multi_roles",
           header: "Grille Multi-Rôles (Prix Nets Remisés)",
           cell: (row: AdminCatalogBook) => {
-            const dig = row.price_digital || defaultDigitalPrice;
-            const pap = row.price_paper || defaultPaperPrice;
+            const dig = Number(row.price_digital !== undefined && row.price_digital !== null ? row.price_digital : defaultDigitalPrice) || 0;
+            const pap = Number(row.price_paper !== undefined && row.price_paper !== null ? row.price_paper : defaultPaperPrice) || 0;
 
             const authorPap = Math.round(pap * (1 - authorPaperDiscount / 100));
             const wholesalePap = Math.round(pap * (1 - wholesalePaperDiscount / 100));
@@ -461,10 +464,10 @@ export default function AdminPricingCascadePage() {
         key: "net_price",
         header: `Tarif Net Facturé (${profileConfig?.title})`,
         cell: (row: AdminCatalogBook) => {
-          const dig = row.price_digital || defaultDigitalPrice;
-          const pap = row.price_paper || defaultPaperPrice;
+          const dig = Number(row.price_digital !== undefined && row.price_digital !== null ? row.price_digital : defaultDigitalPrice) || 0;
+          const pap = Number(row.price_paper !== undefined && row.price_paper !== null ? row.price_paper : defaultPaperPrice) || 0;
           const hasAud = Boolean(row.has_audio_version || row.has_audio);
-          const aud = row.price_audio || defaultAudioPrice;
+          const aud = Number(row.price_audio !== undefined && row.price_audio !== null ? row.price_audio : defaultAudioPrice) || 0;
           const netDig = Math.round(dig * (1 - (profileConfig?.digDiscount || 0) / 100));
           const netPap = Math.round(pap * (1 - (profileConfig?.papDiscount || 0) / 100));
           const netAud = Math.round(aud * (1 - (profileConfig?.audioDiscount || 0) / 100));
@@ -493,7 +496,7 @@ export default function AdminPricingCascadePage() {
         key: "saving",
         header: "Remise & Économie",
         cell: (row: AdminCatalogBook) => {
-          const pap = row.price_paper || defaultPaperPrice;
+          const pap = Number(row.price_paper !== undefined && row.price_paper !== null ? row.price_paper : defaultPaperPrice) || 0;
           const discountPct = profileConfig?.papDiscount || 0;
           const economie = Math.round((pap * discountPct) / 100);
 
@@ -590,10 +593,10 @@ export default function AdminPricingCascadePage() {
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <input
                     type="number"
-                    min="500"
-                    step="100"
+                    min="0"
+                    step="any"
                     value={defaultDigitalPrice}
-                    onChange={(e) => setDefaultDigitalPrice(Number(e.target.value))}
+                    onChange={(e) => setDefaultDigitalPrice(e.target.value === "" ? "" : Number(e.target.value))}
                     className="w-full p-2 text-xs font-mono font-bold rounded-lg bg-background border border-border text-navy focus:border-gold focus:outline-none"
                     required
                   />
@@ -606,10 +609,10 @@ export default function AdminPricingCascadePage() {
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <input
                     type="number"
-                    min="1000"
-                    step="100"
+                    min="0"
+                    step="any"
                     value={defaultPaperPrice}
-                    onChange={(e) => setDefaultPaperPrice(Number(e.target.value))}
+                    onChange={(e) => setDefaultPaperPrice(e.target.value === "" ? "" : Number(e.target.value))}
                     className="w-full p-2 text-xs font-mono font-bold rounded-lg bg-background border border-border text-navy focus:border-gold focus:outline-none"
                     required
                   />
@@ -689,8 +692,8 @@ export default function AdminPricingCascadePage() {
           </div>
 
           <div className="p-2 rounded-xl bg-gold/10 text-gold text-[10px] font-bold text-center border border-gold/20 space-y-0.5">
-            <div>Papier (-{authorPaperDiscount}%) : {(defaultPaperPrice * (1 - authorPaperDiscount / 100)).toLocaleString("fr-FR")} XOF</div>
-            <div>Audio (-{authorAudioDiscount}%) : {(defaultAudioPrice * (1 - authorAudioDiscount / 100)).toLocaleString("fr-FR")} XOF</div>
+            <div>Papier (-{authorPaperDiscount}%) : {(Number(defaultPaperPrice) * (1 - authorPaperDiscount / 100)).toLocaleString("fr-FR")} XOF</div>
+            <div>Audio (-{authorAudioDiscount}%) : {(Number(defaultAudioPrice) * (1 - authorAudioDiscount / 100)).toLocaleString("fr-FR")} XOF</div>
           </div>
         </div>
 
@@ -739,7 +742,7 @@ export default function AdminPricingCascadePage() {
           </div>
 
           <div className="p-2 rounded-xl bg-emerald-50 text-emerald-800 text-[10px] font-bold text-center border border-emerald-200">
-            Ex: Papier à {(defaultPaperPrice * (1 - wholesalePaperDiscount / 100)).toLocaleString("fr-FR")} XOF
+            Ex: Papier à {(Number(defaultPaperPrice) * (1 - wholesalePaperDiscount / 100)).toLocaleString("fr-FR")} XOF
           </div>
         </div>
 
@@ -880,10 +883,10 @@ export default function AdminPricingCascadePage() {
                 </label>
                 <input
                   type="number"
-                  min="500"
-                  step="100"
+                  min="0"
+                  step="any"
                   value={customDigitalPrice}
-                  onChange={(e) => setCustomDigitalPrice(Number(e.target.value))}
+                  onChange={(e) => setCustomDigitalPrice(e.target.value === "" ? "" : Number(e.target.value))}
                   className="w-full mt-1.5 p-2.5 text-xs font-mono font-bold rounded-xl bg-background border border-border text-navy focus:border-gold focus:outline-none"
                   required
                 />
@@ -894,10 +897,10 @@ export default function AdminPricingCascadePage() {
                 </label>
                 <input
                   type="number"
-                  min="1000"
-                  step="100"
+                  min="0"
+                  step="any"
                   value={customPaperPrice}
-                  onChange={(e) => setCustomPaperPrice(Number(e.target.value))}
+                  onChange={(e) => setCustomPaperPrice(e.target.value === "" ? "" : Number(e.target.value))}
                   className="w-full mt-1.5 p-2.5 text-xs font-mono font-bold rounded-xl bg-background border border-border text-navy focus:border-gold focus:outline-none"
                   required
                 />
@@ -914,11 +917,11 @@ export default function AdminPricingCascadePage() {
                 </label>
                 <input
                   type="number"
-                  min="500"
-                  step="100"
+                  min="0"
+                  step="any"
                   disabled={!customHasAudio}
                   value={customAudioPrice}
-                  onChange={(e) => setCustomAudioPrice(Number(e.target.value))}
+                  onChange={(e) => setCustomAudioPrice(e.target.value === "" ? "" : Number(e.target.value))}
                   className={`w-full mt-1.5 p-2.5 text-xs font-mono font-bold rounded-xl bg-background border border-border text-navy focus:border-gold focus:outline-none ${
                     !customHasAudio ? "opacity-50" : ""
                   }`}
@@ -936,19 +939,19 @@ export default function AdminPricingCascadePage() {
                 <div className="p-2 rounded-xl bg-background border border-border">
                   <span className="text-foreground-muted block font-semibold">Auteur</span>
                   <span className="font-bold text-gold text-xs">
-                    {Math.round(customPaperPrice * (1 - authorPaperDiscount / 100)).toLocaleString("fr-FR")} XOF
+                    {Math.round(Number(customPaperPrice) * (1 - authorPaperDiscount / 100)).toLocaleString("fr-FR")} XOF
                   </span>
                 </div>
                 <div className="p-2 rounded-xl bg-background border border-border">
                   <span className="text-foreground-muted block font-semibold">Grossiste</span>
                   <span className="font-bold text-navy text-xs">
-                    {Math.round(customPaperPrice * (1 - wholesalePaperDiscount / 100)).toLocaleString("fr-FR")} XOF
+                    {Math.round(Number(customPaperPrice) * (1 - wholesalePaperDiscount / 100)).toLocaleString("fr-FR")} XOF
                   </span>
                 </div>
                 <div className="p-2 rounded-xl bg-background border border-border">
                   <span className="text-foreground-muted block font-semibold">Université</span>
                   <span className="font-bold text-navy text-xs">
-                    {Math.round(customPaperPrice * (1 - universityPaperDiscount / 100)).toLocaleString("fr-FR")} XOF
+                    {Math.round(Number(customPaperPrice) * (1 - universityPaperDiscount / 100)).toLocaleString("fr-FR")} XOF
                   </span>
                 </div>
               </div>

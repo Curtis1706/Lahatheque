@@ -791,7 +791,7 @@ export default function AdminBouquetsPage() {
                     type="number"
                     required
                     min={0}
-                    step={1000}
+                    step="any"
                     value={annualPrice}
                     onChange={(e) => setAnnualPrice(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-mono font-bold focus:outline-none focus:border-gold min-h-[44px]"

@@ -452,9 +452,9 @@ export function AudioStudioForm({ role, onSuccessRedirectPath }: AudioStudioForm
                   <input
                     type="number"
                     min={0}
-                    step={100}
+                    step="any"
                     value={formState.price_xof}
-                    onChange={(e) => handlePriceXofChange(parseInt(e.target.value) || 0)}
+                    onChange={(e) => handlePriceXofChange(e.target.value === "" ? 0 : Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs sm:text-sm font-mono font-bold text-navy focus:outline-none focus:ring-2 focus:ring-navy"
                   />
                 </div>

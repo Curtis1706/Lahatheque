@@ -359,8 +359,8 @@ export function CreateDebtForm({ onSuccess, onCancel, reminderConfig }: CreateDe
                 <input
                   id={`${formId}-amount`}
                   type="number"
-                  min="100"
-                  step="500"
+                  min="0"
+                  step="any"
                   value={amount}
                   onChange={(e) => setAmount(Math.max(0, parseInt(e.target.value) || 0))}
                   className="w-full pl-9 pr-14 py-2.5 text-xs font-mono font-bold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"

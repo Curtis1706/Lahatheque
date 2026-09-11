@@ -89,6 +89,7 @@ export interface StockAlert {
   alert_type: AlertType;
   triggered_at: string;
   escalation_status: EscalationStatus;
+  is_paper_available?: boolean;
 }
 
 // ─── Commandes Physiques (vue Gestionnaire) ───────────────────────────────────
@@ -144,10 +145,11 @@ export interface ManagerOrder {
 
 // ─── Ruptures remontées à l'Admin ─────────────────────────────────────────────
 
-export type AdminOutageStatus = "reported" | "acknowledged" | "resolved";
+export type AdminOutageStatus = "reported" | "acknowledged" | "in_reprint" | "resolved";
 
 export interface EscalatedOutage {
   id: string;
+  stock_id?: string;
   book_id: string;
   book_title: string;
   isbn: string;
@@ -161,6 +163,10 @@ export interface EscalatedOutage {
   admin_status: AdminOutageStatus;
   impact_description: string;
   reported_by: string;
+  current_quantity?: number;
+  seuil_alerte?: number;
+  is_paper_available?: boolean;
+  admin_note?: string;
 }
 
 // ─── KPI Vue d'ensemble ───────────────────────────────────────────────────────

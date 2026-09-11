@@ -116,13 +116,13 @@ export function ManuscriptPrepList({ role = "chief_layout" }: ManuscriptPrepList
       errors.discipline = "Veuillez sélectionner une discipline académique.";
     }
     const numPrice = parseFloat(formData.priceDigital);
-    if (isNaN(numPrice) || numPrice <= 0) {
-      errors.priceDigital = "Le prix numérique doit être supérieur à 0 XOF.";
+    if (isNaN(numPrice) || numPrice < 0) {
+      errors.priceDigital = "Le prix numérique doit être un montant valide (≥ 0 XOF).";
     }
     if (formData.isPaperAvailable) {
       const paperPrice = parseFloat(formData.pricePaper);
-      if (isNaN(paperPrice) || paperPrice <= 0) {
-        errors.pricePaper = "Le prix papier doit être supérieur à 0 XOF.";
+      if (isNaN(paperPrice) || paperPrice < 0) {
+        errors.pricePaper = "Le prix papier doit être un montant valide (≥ 0 XOF).";
       }
     }
     setFormErrors(errors);
@@ -530,7 +530,7 @@ export function ManuscriptPrepList({ role = "chief_layout" }: ManuscriptPrepList
                 <input
                   type="number"
                   min="0"
-                  step="500"
+                  step="any"
                   value={formData.priceDigital}
                   onChange={(e) => setFormData({ ...formData, priceDigital: e.target.value })}
                   placeholder="5000"
@@ -569,7 +569,7 @@ export function ManuscriptPrepList({ role = "chief_layout" }: ManuscriptPrepList
                   <input
                     type="number"
                     min="0"
-                    step="500"
+                    step="any"
                     value={formData.pricePaper}
                     onChange={(e) => setFormData({ ...formData, pricePaper: e.target.value })}
                     placeholder="7500"

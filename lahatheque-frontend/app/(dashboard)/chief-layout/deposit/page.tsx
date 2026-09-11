@@ -127,9 +127,9 @@ export default function ChiefLayoutDepositPage() {
   const [language, setLanguage] = useState("Français");
   const [summary, setSummary] = useState("");
   const [isbn, setIsbn] = useState("");
-  const [priceDigital, setPriceDigital] = useState(5000);
+  const [priceDigital, setPriceDigital] = useState<number | string>(5000);
   const [isPaperAvailable, setIsPaperAvailable] = useState(false);
-  const [pricePaper, setPricePaper] = useState(7500);
+  const [pricePaper, setPricePaper] = useState<number | string>(7500);
 
   // Authors State (Searchable Combobox & Tags)
   const [authorSearch, setAuthorSearch] = useState("");
@@ -404,8 +404,8 @@ export default function ChiefLayoutDepositPage() {
             cover_url: coverPreview,
           },
           status: "draft",
-          default_price: priceDigital,
-          admin_price: isPaperAvailable ? pricePaper : 0,
+          default_price: Number(priceDigital) >= 0 ? Number(priceDigital) : 0,
+          admin_price: isPaperAvailable ? (Number(pricePaper) >= 0 ? Number(pricePaper) : 0) : 0,
           price_audio: parsedAudioPrice,
           has_audio_version: Boolean(audioFile),
           is_paper_available: isPaperAvailable,
@@ -493,8 +493,8 @@ export default function ChiefLayoutDepositPage() {
             cover_url: coverPreview,
           },
           status: "pending_validation",
-          default_price: priceDigital,
-          admin_price: isPaperAvailable ? pricePaper : 0,
+          default_price: Number(priceDigital) >= 0 ? Number(priceDigital) : 0,
+          admin_price: isPaperAvailable ? (Number(pricePaper) >= 0 ? Number(pricePaper) : 0) : 0,
           price_audio: parsedAudioPrice,
           has_audio_version: Boolean(audioFile),
           is_paper_available: isPaperAvailable,
@@ -1336,9 +1336,10 @@ export default function ChiefLayoutDepositPage() {
                   </label>
                   <input
                     type="number"
-                    step="500"
+                    min={0}
+                    step="any"
                     value={priceDigital}
-                    onChange={(e) => setPriceDigital(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setPriceDigital(e.target.value === "" ? "" : Number(e.target.value))}
                     className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px]"
                   />
                 </div>
@@ -1353,10 +1354,11 @@ export default function ChiefLayoutDepositPage() {
                   </label>
                   <input
                     type="number"
-                    step="500"
+                    min={0}
+                    step="any"
                     disabled={!isPaperAvailable}
                     value={pricePaper}
-                    onChange={(e) => setPricePaper(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setPricePaper(e.target.value === "" ? "" : Number(e.target.value))}
                     className={`w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm text-foreground focus:ring-2 focus:ring-navy min-h-[44px] ${
                       !isPaperAvailable ? "opacity-40 cursor-not-allowed bg-background-secondary" : ""
                     }`}

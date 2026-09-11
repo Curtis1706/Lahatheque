@@ -79,6 +79,7 @@ const statusConfig: Record<string, { style: string; defaultLabel: string; defaul
   escalated: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Signalée", defaultIcon: ArrowUpCircle },
   reported: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Signalée", defaultIcon: ArrowUpCircle },
   acknowledged: { style: "bg-info/10 text-info border-info/20", defaultLabel: "Prise en compte", defaultIcon: CheckCircle2 },
+  in_reprint: { style: "bg-info/10 text-info border-info/20", defaultLabel: "En réimpression", defaultIcon: Clock },
   resolved: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Résolue", defaultIcon: CheckCircle2 },
 
   // ─── Statuts Mouvements Stock ───────────────────────────────────────────────

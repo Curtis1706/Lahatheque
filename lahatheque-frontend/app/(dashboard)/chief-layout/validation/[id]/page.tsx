@@ -73,8 +73,8 @@ export default function ChefValidationDetailPage() {
   const [validating, setValidating] = useState(false);
   const [revisionModalOpen, setRevisionModalOpen] = useState(false);
   const [showXmlNotice, setShowXmlNotice] = useState(false);
-  const [priceDigital, setPriceDigital] = useState<number>(5000);
-  const [pricePaper, setPricePaper] = useState<number>(7500);
+  const [priceDigital, setPriceDigital] = useState<number | string>(5000);
+  const [pricePaper, setPricePaper] = useState<number | string>(7500);
   const [isPaperAvailable, setIsPaperAvailable] = useState(false);
 
   // Translation & Language Adjustment State
@@ -102,7 +102,8 @@ export default function ChefValidationDetailPage() {
         setAllEligibleBooks(eligibleList);
 
         if (data) {
-          if (data.default_price) setPriceDigital(data.default_price);
+          if (data.default_price !== undefined && data.default_price !== null) setPriceDigital(data.default_price);
+          if (data.admin_price !== undefined && data.admin_price !== null) setPricePaper(data.admin_price);
           if (data.is_paper_available !== undefined) setIsPaperAvailable(data.is_paper_available);
           
           const isOrig = data.is_original !== false;
@@ -153,8 +154,8 @@ export default function ChefValidationDetailPage() {
       const success = await validateDeposit(
         deposit.id,
         undefined,
-        priceDigital,
-        isPaperAvailable ? pricePaper : 0,
+        Number(priceDigital) >= 0 ? Number(priceDigital) : 0,
+        isPaperAvailable ? (Number(pricePaper) >= 0 ? Number(pricePaper) : 0) : 0,
         isPaperAvailable
       );
       if (success) {
@@ -597,9 +598,10 @@ export default function ChefValidationDetailPage() {
               <label className="text-[11px] font-bold text-navy uppercase tracking-wider">Prix Numérique (FCFA)</label>
               <input
                 type="number"
-                step="500"
+                min={0}
+                step="any"
                 value={priceDigital}
-                onChange={(e) => setPriceDigital(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setPriceDigital(e.target.value === "" ? "" : Number(e.target.value))}
                 className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground font-bold focus:ring-2 focus:ring-navy min-h-[40px]"
               />
             </div>
@@ -612,10 +614,11 @@ export default function ChefValidationDetailPage() {
               </label>
               <input
                 type="number"
-                step="500"
+                min={0}
+                step="any"
                 disabled={!isPaperAvailable}
                 value={isPaperAvailable ? pricePaper : 0}
-                onChange={(e) => setPricePaper(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setPricePaper(e.target.value === "" ? "" : Number(e.target.value))}
                 className={`w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground font-bold focus:ring-2 focus:ring-navy min-h-[40px] transition-opacity ${
                   !isPaperAvailable ? "opacity-40 cursor-not-allowed bg-background-secondary" : ""
                 }`}
