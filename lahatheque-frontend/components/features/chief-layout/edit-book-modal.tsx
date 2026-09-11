@@ -56,11 +56,17 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
   const [year, setYear] = useState(book.metadata.publication_year || 2026);
 
   // Pricing & Formats
-  const [priceDigital, setPriceDigital] = useState(book.default_price || 5000);
+  const [priceDigital, setPriceDigital] = useState<number | string>(
+    book.default_price !== undefined && book.default_price !== null ? book.default_price : 5000
+  );
   const [isPaperAvailable, setIsPaperAvailable] = useState(Boolean(book.is_paper_available));
-  const [pricePaper, setPricePaper] = useState(book.admin_price || 7500);
+  const [pricePaper, setPricePaper] = useState<number | string>(
+    book.admin_price !== undefined && book.admin_price !== null ? book.admin_price : 7500
+  );
   const [hasAudioVersion, setHasAudioVersion] = useState(Boolean(book.has_audio_version || book.has_audio));
-  const [priceAudio, setPriceAudio] = useState(book.price_audio || 3500);
+  const [priceAudio, setPriceAudio] = useState<number | string>(
+    book.price_audio !== undefined && book.price_audio !== null ? book.price_audio : 3500
+  );
 
   // Classification
   const { disciplines: realDisciplines, loading: disciplinesLoading } = useDisciplines();
@@ -163,9 +169,9 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
             discipline,
             source: "manual",
           },
-          default_price: priceDigital,
-          admin_price: isPaperAvailable ? pricePaper : 0,
-          price_audio: hasAudioVersion ? priceAudio : undefined,
+          default_price: Number(priceDigital) >= 0 ? Number(priceDigital) : 0,
+          admin_price: isPaperAvailable ? (Number(pricePaper) >= 0 ? Number(pricePaper) : 0) : 0,
+          price_audio: hasAudioVersion && Number(priceAudio) >= 0 ? Number(priceAudio) : undefined,
           has_audio_version: hasAudioVersion,
           is_paper_available: isPaperAvailable,
         },
@@ -465,10 +471,11 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                     </label>
                     <input
                       type="number"
-                      step="500"
+                      min={0}
+                      step="any"
                       required
                       value={priceDigital}
-                      onChange={(e) => setPriceDigital(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setPriceDigital(e.target.value === "" ? "" : Number(e.target.value))}
                       className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm font-mono text-navy font-bold focus:ring-2 focus:ring-navy min-h-[44px]"
                     />
                     <p className="text-[11px] text-foreground-muted">
@@ -488,10 +495,11 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                     </label>
                     <input
                       type="number"
-                      step="500"
+                      min={0}
+                      step="any"
                       disabled={!isPaperAvailable}
                       value={pricePaper}
-                      onChange={(e) => setPricePaper(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setPricePaper(e.target.value === "" ? "" : Number(e.target.value))}
                       className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm font-mono text-navy font-bold focus:ring-2 focus:ring-navy min-h-[44px]"
                     />
                     <p className="text-[11px] text-foreground-muted">
@@ -575,10 +583,11 @@ export function EditBookModal({ book, isOpen, onClose, onSaved }: EditBookModalP
                         </label>
                         <input
                           type="number"
-                          step="500"
+                          min={0}
+                          step="any"
                           required={hasAudioVersion}
                           value={priceAudio}
-                          onChange={(e) => setPriceAudio(parseFloat(e.target.value) || 0)}
+                          onChange={(e) => setPriceAudio(e.target.value === "" ? "" : Number(e.target.value))}
                           className="w-full bg-background border border-border rounded-xl p-3 text-xs sm:text-sm font-mono text-navy font-bold focus:ring-2 focus:ring-navy min-h-[44px]"
                         />
                         <p className="text-[11px] text-foreground-muted">

@@ -485,6 +485,7 @@ class StockAlertsView(APIView):
                     "quantite_disponible": s.quantite_disponible,
                     "seuil_alerte": s.seuil_alerte,
                     "statut": s.statut,
+                    "is_paper_available": bool(s.ouvrage.is_paper_available) if s.ouvrage else False,
                     "escalation_status": "escalated" if s.id in escalated_stock_ids else "not_escalated",
                     "last_restock_at": s.last_restock_at.isoformat() if s.last_restock_at else None,
                 })
@@ -997,7 +998,31 @@ class StockEscalateView(APIView):
             ouvrage = s.ouvrage if (s and s.ouvrage) else None
             entrepot = s.entrepot if (s and s.entrepot) else None
             authors = [f"{a.first_name} {a.last_name}".strip() for a in ouvrage.authors.all()] if (ouvrage and hasattr(ouvrage, 'authors')) else []
-            impact = m.motif.replace("[ESCALADE ADMIN]", "").strip()
+
+            raw_motif = m.motif or ""
+            admin_status = "reported"
+            admin_note = ""
+
+            if "[STATUS:" in raw_motif:
+                try:
+                    admin_status = raw_motif.split("[STATUS:")[1].split("]")[0].strip()
+                except Exception:
+                    pass
+            elif s and s.quantite_disponible > s.seuil_alerte:
+                admin_status = "resolved"
+
+            if "[ADMIN_NOTE:" in raw_motif:
+                try:
+                    admin_note = raw_motif.split("[ADMIN_NOTE:")[1].split("]")[0].strip()
+                except Exception:
+                    pass
+
+            clean_impact = raw_motif.replace("[ESCALADE ADMIN]", "")
+            if "[STATUS:" in clean_impact:
+                clean_impact = clean_impact.split("[STATUS:")[0]
+            if "[ADMIN_NOTE:" in clean_impact:
+                clean_impact = clean_impact.split("[ADMIN_NOTE:")[0]
+            impact = clean_impact.strip()
 
             data.append({
                 "id": str(m.id),
@@ -1012,7 +1037,11 @@ class StockEscalateView(APIView):
                 "warehouse_nom": entrepot.nom if entrepot else "—",
                 "pays": entrepot.pays if entrepot else "—",
                 "reported_at": m.created_at.isoformat(),
-                "admin_status": "reported",
+                "admin_status": admin_status or "reported",
+                "admin_note": admin_note,
+                "current_quantity": s.quantite_disponible if s else 0,
+                "seuil_alerte": s.seuil_alerte if s else 0,
+                "is_paper_available": bool(ouvrage.is_paper_available) if ouvrage else False,
                 "impact_description": impact or "Rupture signalée pour réapprovisionnement urgent.",
                 "reported_by": m.auteur.get_full_name() if m.auteur else "Gestionnaire",
             })
@@ -1080,6 +1109,106 @@ class StockEscalateView(APIView):
             "reported_by": request.user.get_full_name() or "Gestionnaire",
         }
         return Response({"success": True, "data": data, "error": None})
+
+    @transaction.atomic
+    def patch(self, request):
+        if not _is_manager_or_admin(request.user):
+            return Response({"success": False, "data": None, "error": "Accès refusé."}, status=403)
+
+        escalation_id = request.data.get("id") or request.data.get("movement_id")
+        stock_id = request.data.get("stock_id")
+        admin_status = request.data.get("admin_status", "acknowledged")
+        admin_note = request.data.get("admin_note", "").strip()
+        restock_quantity = request.data.get("restock_quantity")
+        is_paper_available = request.data.get("is_paper_available")
+
+        if not escalation_id and not stock_id:
+            return Response({"success": False, "data": None, "error": "id ou stock_id est requis."}, status=400)
+
+        m = None
+        if escalation_id:
+            try:
+                m = MouvementStock.objects.select_for_update().select_related("stock__ouvrage", "stock__entrepot", "auteur").get(pk=escalation_id)
+            except MouvementStock.DoesNotExist:
+                return Response({"success": False, "data": None, "error": "Signalement introuvable."}, status=404)
+        elif stock_id:
+            m = MouvementStock.objects.filter(stock_id=stock_id, motif__startswith="[ESCALADE ADMIN]").order_by("-created_at").first()
+
+        s = m.stock if m else None
+        if not s and stock_id:
+            try:
+                s = StockOuvrage.objects.get(pk=stock_id)
+            except StockOuvrage.DoesNotExist:
+                return Response({"success": False, "data": None, "error": "Stock introuvable."}, status=404)
+
+        # 1. Réapprovisionnement immédiat si demandé
+        if restock_quantity:
+            try:
+                qty = int(restock_quantity)
+                if qty > 0 and s:
+                    s.quantite_reelle = F("quantite_reelle") + qty
+                    s.last_restock_at = timezone.now()
+                    s.save(update_fields=["quantite_reelle", "last_restock_at"])
+                    ref = request.data.get("reference_document") or f"ARBITRAGE-ADMIN-{str(s.id)[:8].upper()}"
+                    MouvementStock.objects.create(
+                        stock=s,
+                        type_mouvement="restock",
+                        quantite=qty,
+                        reference_document=ref,
+                        motif=f"Réassort suite arbitrage admin : {admin_note or 'Tirage/réassort exécuté'}",
+                        auteur=request.user,
+                    )
+                    s.refresh_from_db()
+                    admin_status = "resolved"
+            except (ValueError, TypeError):
+                pass
+
+        # 2. Mise à jour de la disponibilité vitrine papier si demandée
+        target_ouvrage = s.ouvrage if (s and s.ouvrage) else None
+        if target_ouvrage and is_paper_available is not None:
+            target_ouvrage.is_paper_available = bool(is_paper_available)
+            target_ouvrage.save(update_fields=["is_paper_available"])
+
+        # 3. Mise à jour du motif d'escalade avec les métadonnées d'arbitrage
+        if m:
+            clean_base = m.motif
+            if "[STATUS:" in clean_base:
+                clean_base = clean_base.split("[STATUS:")[0].strip()
+            if "[ADMIN_NOTE:" in clean_base:
+                clean_base = clean_base.split("[ADMIN_NOTE:")[0].strip()
+            new_motif = f"{clean_base} [STATUS:{admin_status}]"
+            if admin_note:
+                new_motif += f" [ADMIN_NOTE:{admin_note}]"
+            m.motif = new_motif
+            m.save(update_fields=["motif"])
+
+            # Notification en retour pour le gestionnaire qui a remonté l'alerte
+            if m.auteur and m.auteur != request.user:
+                try:
+                    from apps.reporting.models import Notification
+                    from apps.reporting.services import notify_user
+                    notify_user(
+                        user=m.auteur,
+                        notification_type=Notification.NotificationType.SYSTEM,
+                        title=f"Arbitrage Admin : {target_ouvrage.title if target_ouvrage else 'Stock'}",
+                        message=f"L'administrateur a arbitré votre signalement (Statut : {admin_status}). {admin_note or ''}",
+                        action_url="/manager/coordination",
+                        resource_id=f"arbitrate_{m.id}",
+                    )
+                except Exception as notif_err:
+                    logger.warning(f"Notification retour arbitrage: {notif_err}")
+
+        return Response({
+            "success": True,
+            "data": {
+                "id": str(m.id) if m else "",
+                "admin_status": admin_status,
+                "admin_note": admin_note,
+                "quantite_disponible": s.quantite_disponible if s else 0,
+                "is_paper_available": bool(target_ouvrage.is_paper_available) if target_ouvrage else False,
+            },
+            "error": None
+        })
 
 
 class ManagerReportExportView(APIView):

@@ -394,7 +394,9 @@ export function DashboardSidebar() {
                   { label: "Entrepôts Régionaux", href: "/admin/stock/warehouses", icon: <Building2 className="size-3.5" /> },
                 ],
               },
-              { label: "Coordination des Ruptures", href: "/manager/coordination", icon: <ArrowUpCircle className="size-4" /> },
+              { label: "Coordination des Ruptures", href: "/admin/coordination", icon: <ArrowUpCircle className="size-4" /> },
+              { label: "Finances & Flux Logistique", href: "/manager/finance", icon: <Wallet className="size-4" /> },
+              { label: "Rapports & Exports Logistique", href: "/manager/reports", icon: <FileBarChart className="size-4" /> },
             ],
           },
           {

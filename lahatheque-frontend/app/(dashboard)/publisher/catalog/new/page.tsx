@@ -221,7 +221,7 @@ export default function NewPublisherBookPage() {
   const authorDropdownRef = useRef<HTMLDivElement>(null);
 
   // Modèle Commercial (Étape 4)
-  const [price, setPrice] = useState(10000);
+  const [price, setPrice] = useState<number | string>(10000);
   const [currency, setCurrency] = useState("XOF");
   const [salesModel, setSalesModel] = useState<SalesModel>("purchase");
   const [territories, setTerritories] = useState("Bénin, Togo, Côte d'Ivoire, Sénégal");
@@ -457,7 +457,7 @@ export default function NewPublisherBookPage() {
           language,
           keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
           target_audience: targetAudience,
-          price,
+          price: Number(price) >= 0 ? Number(price) : 0,
           currency,
           sales_model: salesModel,
           allowed_territories: territories.split(",").map((t) => t.trim()).filter(Boolean),
@@ -1090,9 +1090,9 @@ export default function NewPublisherBookPage() {
                   <input
                     type="number"
                     value={price}
-                    onChange={(e) => setPrice(Number(e.target.value))}
+                    onChange={(e) => setPrice(e.target.value === "" ? "" : Number(e.target.value))}
                     min={0}
-                    step={500}
+                    step="any"
                     className="w-full pl-3.5 pr-16 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-bold min-h-[44px]"
                   />
                   <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-foreground-muted">

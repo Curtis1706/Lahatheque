@@ -90,9 +90,9 @@ export default function AdminBookEditPage() {
   const [existingFileUrl, setExistingFileUrl] = useState<string>("");
 
   // Pricing & DRM
-  const [priceDigital, setPriceDigital] = useState<number>(5000);
-  const [pricePaper, setPricePaper] = useState<number>(7500);
-  const [priceAudio, setPriceAudio] = useState<number>(3500);
+  const [priceDigital, setPriceDigital] = useState<number | string>(5000);
+  const [pricePaper, setPricePaper] = useState<number | string>(7500);
+  const [priceAudio, setPriceAudio] = useState<number | string>(3500);
   const [hasAudioVersion, setHasAudioVersion] = useState<boolean>(false);
   const [isPaperAvailable, setIsPaperAvailable] = useState<boolean>(false);
   const [paperStock, setPaperStock] = useState<number>(0);
@@ -162,9 +162,9 @@ export default function AdminBookEditPage() {
 
         setCoverPreview(b.cover_url || b.cover_image || "");
         setExistingFileUrl(b.file_url || "");
-        setPriceDigital(b.price_digital || 5000);
-        setPricePaper(b.price_paper || 7500);
-        setPriceAudio(b.price_audio || 3500);
+        setPriceDigital(b.price_digital !== undefined && b.price_digital !== null ? b.price_digital : 5000);
+        setPricePaper(b.price_paper !== undefined && b.price_paper !== null ? b.price_paper : 7500);
+        setPriceAudio(b.price_audio !== undefined && b.price_audio !== null ? b.price_audio : 3500);
         setHasAudioVersion(Boolean(b.has_audio_version || b.has_audio));
         setIsPaperAvailable(Boolean(b.is_paper_available));
         setPaperStock(b.paper_stock || 0);
@@ -340,9 +340,9 @@ export default function AdminBookEditPage() {
         page_count: pageCount,
         status: status,
         authors: authors,
-        price_digital: priceDigital,
-        price_paper: pricePaper,
-        price_audio: hasAudioVersion ? priceAudio : undefined,
+        price_digital: Number(priceDigital) >= 0 ? Number(priceDigital) : 0,
+        price_paper: Number(pricePaper) >= 0 ? Number(pricePaper) : 0,
+        price_audio: hasAudioVersion ? (Number(priceAudio) >= 0 ? Number(priceAudio) : 0) : undefined,
         has_audio_version: hasAudioVersion,
         is_paper_available: isPaperAvailable,
         paper_stock: paperStock,
@@ -1068,9 +1068,9 @@ export default function AdminBookEditPage() {
                   type="number"
                   required
                   min={0}
-                  step={100}
+                  step="any"
                   value={priceDigital}
-                  onChange={(e) => setPriceDigital(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setPriceDigital(e.target.value === "" ? "" : Number(e.target.value))}
                   className="w-full bg-background border border-border rounded-xl p-3 text-sm font-semibold text-foreground focus:ring-2 focus:ring-navy focus:outline-hidden"
                 />
                 <p className="text-[11px] text-foreground-muted">
@@ -1086,9 +1086,9 @@ export default function AdminBookEditPage() {
                 <input
                   type="number"
                   min={0}
-                  step={100}
+                  step="any"
                   value={pricePaper}
-                  onChange={(e) => setPricePaper(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setPricePaper(e.target.value === "" ? "" : Number(e.target.value))}
                   className="w-full bg-background border border-border rounded-xl p-3 text-sm font-semibold text-foreground focus:ring-2 focus:ring-navy focus:outline-hidden"
                 />
                 <div className="flex items-center gap-2 pt-1">
@@ -1134,9 +1134,9 @@ export default function AdminBookEditPage() {
                     <input
                       type="number"
                       min={0}
-                      step={100}
+                      step="any"
                       value={priceAudio}
-                      onChange={(e) => setPriceAudio(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setPriceAudio(e.target.value === "" ? "" : Number(e.target.value))}
                       className="w-full bg-background border border-border rounded-xl p-2.5 text-xs font-semibold text-foreground"
                     />
                   </div>

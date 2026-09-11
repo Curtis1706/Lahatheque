@@ -92,7 +92,7 @@ export function DebtReminderConfigModal({
                   <input
                     type="number"
                     min="0"
-                    step="5000"
+                    step="any"
                     value={minAmountThreshold}
                     onChange={(e) => setMinAmountThreshold(parseInt(e.target.value) || 0)}
                     className="w-full px-3.5 py-2.5 text-xs font-mono font-bold rounded-xl border border-border bg-background-secondary focus:outline-none focus:border-gold text-navy min-h-[44px]"

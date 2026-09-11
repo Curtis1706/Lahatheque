@@ -2,19 +2,29 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowUpCircle, AlertTriangle, Warehouse } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { getEscalatedOutages, getStockAlerts, escalateToAdmin } from "@/lib/services/manager";
 import { EscalateModal } from "@/components/features/manager/escalate-modal";
+import { useAuth } from "@/hooks/use-auth";
 import type { EscalatedOutage, StockAlert } from "@/lib/types/manager";
 
 export default function CoordinationPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [outages, setOutages] = useState<EscalatedOutage[]>([]);
   const [alerts, setAlerts] = useState<StockAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [escalateTarget, setEscalateTarget] = useState<StockAlert | null>(null);
+
+  useEffect(() => {
+    if (user && (user.role === "admin" || user.role === "super_admin")) {
+      router.replace("/admin/coordination");
+    }
+  }, [user, router]);
 
   const loadData = async () => {
     setLoading(true);

@@ -34,11 +34,11 @@ export default function AdminSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   // 1. Cascade Tarifaire & Abonnements
-  const [prixNumXof, setPrixNumXof] = useState(3000);
-  const [prixPapierXof, setPrixPapierXof] = useState(5000);
-  const [prixAudioXof, setPrixAudioXof] = useState(2500);
-  const [prixPassMensuelXof, setPrixPassMensuelXof] = useState(4500);
-  const [prixPassAnnuelXof, setPrixPassAnnuelXof] = useState(45000);
+  const [prixNumXof, setPrixNumXof] = useState<number | string>(3000);
+  const [prixPapierXof, setPrixPapierXof] = useState<number | string>(5000);
+  const [prixAudioXof, setPrixAudioXof] = useState<number | string>(2500);
+  const [prixPassMensuelXof, setPrixPassMensuelXof] = useState<number | string>(4500);
+  const [prixPassAnnuelXof, setPrixPassAnnuelXof] = useState<number | string>(45000);
   const [defaultCurrency, setDefaultCurrency] = useState("XOF");
 
   // 2. DRM & Protection LCP
@@ -247,10 +247,10 @@ export default function AdminSettingsPage() {
                 <div className="relative">
                   <input
                     type="number"
-                    min={500}
-                    step={100}
+                    min={0}
+                    step="any"
                     value={prixNumXof}
-                    onChange={(e) => setPrixNumXof(Number(e.target.value))}
+                    onChange={(e) => setPrixNumXof(e.target.value === "" ? "" : Number(e.target.value))}
                     className="w-full p-2.5 pr-14 text-xs font-mono font-bold rounded-xl bg-background border border-border focus:border-gold focus:outline-none min-h-[40px]"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-foreground-muted">FCFA</span>
@@ -263,10 +263,10 @@ export default function AdminSettingsPage() {
                 <div className="relative">
                   <input
                     type="number"
-                    min={1000}
-                    step={100}
+                    min={0}
+                    step="any"
                     value={prixPapierXof}
-                    onChange={(e) => setPrixPapierXof(Number(e.target.value))}
+                    onChange={(e) => setPrixPapierXof(e.target.value === "" ? "" : Number(e.target.value))}
                     className="w-full p-2.5 pr-14 text-xs font-mono font-bold rounded-xl bg-background border border-border focus:border-gold focus:outline-none min-h-[40px]"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-foreground-muted">FCFA</span>
@@ -279,10 +279,10 @@ export default function AdminSettingsPage() {
                 <div className="relative">
                   <input
                     type="number"
-                    min={500}
-                    step={100}
+                    min={0}
+                    step="any"
                     value={prixAudioXof}
-                    onChange={(e) => setPrixAudioXof(Number(e.target.value))}
+                    onChange={(e) => setPrixAudioXof(e.target.value === "" ? "" : Number(e.target.value))}
                     className="w-full p-2.5 pr-14 text-xs font-mono font-bold rounded-xl bg-background border border-border focus:border-gold focus:outline-none min-h-[40px]"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-foreground-muted">FCFA</span>
@@ -295,10 +295,10 @@ export default function AdminSettingsPage() {
                 <div className="relative">
                   <input
                     type="number"
-                    min={1000}
-                    step={500}
+                    min={0}
+                    step="any"
                     value={prixPassMensuelXof}
-                    onChange={(e) => setPrixPassMensuelXof(Number(e.target.value))}
+                    onChange={(e) => setPrixPassMensuelXof(e.target.value === "" ? "" : Number(e.target.value))}
                     className="w-full p-2.5 pr-14 text-xs font-mono font-bold rounded-xl bg-background border border-border focus:border-gold focus:outline-none min-h-[40px]"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-foreground-muted">FCFA</span>
@@ -311,10 +311,10 @@ export default function AdminSettingsPage() {
                 <div className="relative">
                   <input
                     type="number"
-                    min={10000}
-                    step={1000}
+                    min={0}
+                    step="any"
                     value={prixPassAnnuelXof}
-                    onChange={(e) => setPrixPassAnnuelXof(Number(e.target.value))}
+                    onChange={(e) => setPrixPassAnnuelXof(e.target.value === "" ? "" : Number(e.target.value))}
                     className="w-full p-2.5 pr-14 text-xs font-mono font-bold rounded-xl bg-background border border-border focus:border-gold focus:outline-none min-h-[40px]"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-foreground-muted">FCFA</span>
