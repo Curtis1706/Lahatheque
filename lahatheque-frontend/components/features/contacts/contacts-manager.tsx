@@ -12,9 +12,6 @@ import {
   batchDeleteContacts,
   exportContactsCsv,
 } from "@/lib/services/contacts";
-import { withDemoFallback } from "@/lib/utils/with-demo-fallback";
-import { DemoDataBanner } from "@/components/ui/demo-data-banner";
-import { mockContactsResponse } from "@/lib/mock/contacts";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { AddEditContactModal } from "./add-edit-contact-modal";
 import { ImportContactsModal } from "./import-contacts-modal";
@@ -65,7 +62,6 @@ export function ContactsManager({
     authors_publishers_count: 0,
     total_emails_sent: 0,
   });
-  const [isDemoData, setIsDemoData] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Filtre source (Tous / Inscrits plateforme / Externes)
@@ -87,13 +83,14 @@ export function ContactsManager({
   const loadContactsData = async () => {
     setLoading(true);
     try {
-      const result = await withDemoFallback(
-        () => getContacts(),
-        mockContactsResponse
-      );
-      setContacts(result.data.contacts);
-      setKpis(result.data.kpis);
-      setIsDemoData(result.isDemoData);
+      const res = await getContacts();
+      setContacts(res.contacts || []);
+      setKpis(res.kpis || {
+        total_contacts: 0,
+        university_count: 0,
+        authors_publishers_count: 0,
+        total_emails_sent: 0,
+      });
     } catch (err) {
       console.error("Erreur chargement contacts:", err);
     } finally {
@@ -677,11 +674,6 @@ export function ContactsManager({
         </div>
       </div>
 
-      {/* 4. Repli Démonstration */}
-      {isDemoData && (
-        <DemoDataBanner message="Affichage des contacts de démonstration. Le serveur backend n'est pas encore joint ou aucune donnée réelle n'est présente." />
-      )}
-
       {/* 5. Barre d'actions groupées si éléments sélectionnés */}
       {selectedIds.length > 0 && (
         <div className="p-3 rounded-2xl bg-navy/5 dark:bg-navy-light/10 border border-navy/20 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
@@ -781,8 +773,8 @@ export function ContactsManager({
         mobileCard={renderMobileCard}
         loading={loading}
         skeletonRows={5}
-        pageSize={10}
-        pageSizeOptions={[10, 20, 50]}
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
         headerActions={
           <button
             type="button"

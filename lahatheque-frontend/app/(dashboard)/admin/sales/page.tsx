@@ -380,6 +380,8 @@ export default function AdminSalesPage() {
           columns={columns}
           rowKey="id"
           loading={loading}
+          pageSize={20}
+          pageSizeOptions={[10, 20, 50, 100]}
           searchPlaceholder="Rechercher par référence, acheteur, livre..."
           emptyMessage="Aucune commande enregistrée correspondant aux critères sélectionnés."
           renderExpandedRow={(order: AdminSaleOrder) => (

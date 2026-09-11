@@ -12,8 +12,14 @@ export type ItemFormat = 'digital' | 'paper' | 'audio' | 'bouquet';
 
 export interface AdminSaleOrderItem {
   id: string;
+  book_id?: string;
   book_title: string;
   isbn?: string;
+  cover_url?: string;
+  author_names?: string[];
+  author_display?: string;
+  institution_name?: string;
+  publisher_name?: string;
   format: ItemFormat;
   quantity: number;
   unit_price: number;
@@ -48,6 +54,8 @@ export interface AdminSalesConsolidatedResponse {
     b2b_wholesale: { amount: number; orders_count: number; percentage: number };
   };
   orders: AdminSaleOrder[];
+  available_institutions?: string[];
+  available_publishers?: string[];
 }
 
 // -------------------------------------------------------------------------

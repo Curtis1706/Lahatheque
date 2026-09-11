@@ -223,6 +223,8 @@ export default function AdminStockMovementsPage() {
           rowKey="id"
           loading={loading}
           emptyMessage="Aucun mouvement de stock enregistré pour le moment."
+          pageSize={20}
+          pageSizeOptions={[10, 20, 50, 100]}
         />
       </div>
     </div>

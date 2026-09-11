@@ -581,7 +581,8 @@ export default function AdminFinancePage() {
           data={filteredPartners}
           columns={columns}
           rowKey="partner_id"
-          pageSize={10}
+          pageSize={20}
+          pageSizeOptions={[10, 20, 50, 100]}
           searchable={false}
           loading={loading}
           emptyMessage="Aucun ayant-droit ou partenaire trouvé correspondant aux critères."

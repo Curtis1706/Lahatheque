@@ -46,7 +46,7 @@ export default function AdminHostedSessionsPage() {
 
   // États de Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   const loadSessions = async () => {
     try {
@@ -538,7 +538,7 @@ export default function AdminHostedSessionsPage() {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 mr-2">
               <span className="text-foreground-muted text-[11px]">Par page :</span>
-              {[5, 10, 20].map((size) => (
+              {[10, 20, 50, 100].map((size) => (
                 <button
                   key={size}
                   onClick={() => {

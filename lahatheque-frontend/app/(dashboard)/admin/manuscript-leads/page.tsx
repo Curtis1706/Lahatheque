@@ -450,8 +450,8 @@ export default function AdminManuscriptLeadsPage() {
         loading={loading}
         searchable={true}
         searchPlaceholder="Rechercher par titre, auteur, email, genre, pays..."
-        pageSize={10}
-        pageSizeOptions={[10, 20, 50]}
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
         emptyMessage="Aucune proposition de manuscrit trouvée dans cette sélection."
         emptyState={
           <div className="p-12 text-center space-y-3">

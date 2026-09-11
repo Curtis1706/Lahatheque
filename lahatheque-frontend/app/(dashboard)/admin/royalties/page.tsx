@@ -409,6 +409,8 @@ export default function AdminRoyaltiesManagementPage() {
           columns={partnerColumns}
           rowKey="partner_id"
           loading={loading}
+          pageSize={20}
+          pageSizeOptions={[10, 20, 50, 100]}
           searchPlaceholder="Rechercher un partenaire, un contrat..."
           filterKey="partner_type"
           filterPlaceholder="Filtrer par type de partenaire"

@@ -594,7 +594,7 @@ export default function PublisherRoyaltiesPage() {
           </p>
         </div>
 
-        <div className="bg-navy-dark p-4 rounded-2xl border border-gold/30 flex items-center gap-4 shrink-0">
+   {/*      <div className="bg-navy-dark p-4 rounded-2xl border border-gold/30 flex items-center gap-4 shrink-0">
           <div>
             <span className="text-[10px] text-white/60 font-bold uppercase block">Taux Contractuel Convenu</span>
             <span className="font-bold text-gold text-2xl font-mono">{kpis?.contractualRoyaltyRate ?? 22}%</span>
@@ -602,7 +602,7 @@ export default function PublisherRoyaltiesPage() {
               <Lock className="w-3 h-3 text-gold" /> Non modifiable &bull; Stipul&eacute; au contrat sign&eacute;
             </span>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Pédagogie : Régime de Liquidation Trimestrielle des Éditeurs */}
