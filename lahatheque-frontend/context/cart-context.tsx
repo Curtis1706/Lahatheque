@@ -35,7 +35,21 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("laha_cart");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          console.log(`[CART PERSISTENCE] Panier initialisé depuis le stockage local (${parsed.length} article(s))`);
+          return parsed;
+        }
+      } catch (e) {
+        console.error("[CART PERSISTENCE] Erreur de lecture initiale du panier", e);
+      }
+    }
+    return [];
+  });
   const [loaded, setLoaded] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -43,10 +57,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       const saved = localStorage.getItem("laha_cart");
       if (saved) {
-        setItems(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setItems(parsed);
+        console.log(`[CART PERSISTENCE] Panier rechargé depuis le stockage local (${parsed.length} article(s), total: ${parsed.reduce((a: number, b: any) => a + (b.price * b.quantity), 0)} FCFA)`);
+      } else {
+        console.log("[CART PERSISTENCE] Aucun panier préexistant dans le stockage local.");
       }
     } catch (e) {
-      console.error("Failed to load cart from localStorage", e);
+      console.error("[CART PERSISTENCE] Erreur de lecture du panier dans localStorage", e);
     } finally {
       setLoaded(true);
     }
@@ -56,8 +74,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (loaded) {
       try {
         localStorage.setItem("laha_cart", JSON.stringify(items));
+        console.log(`[CART PERSISTENCE] Panier synchronisé dans le stockage local (${items.length} article(s), total: ${items.reduce((a, b) => a + (b.price * b.quantity), 0)} FCFA)`);
       } catch (e) {
-        console.error("Failed to save cart to localStorage", e);
+        console.error("[CART PERSISTENCE] Erreur de sauvegarde du panier dans localStorage", e);
       }
     }
   }, [items, loaded]);
@@ -69,6 +88,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addItem = (newItem: Omit<CartItem, "id">, autoOpenDrawer: boolean = true) => {
     const suffix = newItem.selectedLanguage ? `_${newItem.selectedLanguage}` : "";
     const itemId = `${newItem.bookId}_${newItem.format}${suffix}`;
+    console.log(`[CART ACTION] Ajout article: "${newItem.title}" | Format: ${newItem.format} | Langue: ${newItem.selectedLanguage || "défaut"} | Prix: ${newItem.price} FCFA | Quantité: ${newItem.quantity || 1}`);
     setItems((prev) => {
       const existing = prev.find((i) => i.id === itemId);
       if (existing) {
@@ -87,10 +107,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeItem = (id: string) => {
+    console.log(`[CART ACTION] Suppression article id: ${id}`);
     setItems((prev) => prev.filter((i) => i.id !== id));
   };
 
   const updateQuantity = (id: string, delta: number) => {
+    console.log(`[CART ACTION] Mise à jour quantité id: ${id} (delta: ${delta > 0 ? `+${delta}` : delta})`);
     setItems((prev) =>
       prev
         .map((i) => {
@@ -105,6 +127,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearCart = () => {
+    console.log("[CART ACTION] Vidage intégral du panier (après finalisation de commande).");
     setItems([]);
   };
 

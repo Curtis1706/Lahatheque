@@ -28,6 +28,7 @@ from apps.reporting.admin_views import (
     AdminBouquetOfferingsView,
     AdminBouquetOfferingDetailView,
     AdminBouquetDistributionView,
+    AccountingLedgerExportView,
 )
 from apps.partners.university_views import AdminBouquetsDistributionListView
 from apps.accounts.admin_views import AdminUserManagementViewSet
@@ -46,6 +47,7 @@ urlpatterns = [
     path('stats/panoramic/', AdminPanoramicStatsAPIView.as_view(), name='admin-panoramic-stats'),
     path('settings/global/', AdminGlobalSettingsAPIView.as_view(), name='admin-global-settings'),
     path('reports/export/', AdminReportExportAPIView.as_view(), name='admin-report-export'),
+    path('accounting-ledger/export/', AccountingLedgerExportView.as_view(), name='admin-accounting-ledger-export'),
     path('sales/', AdminSalesListAPIView.as_view(), name='admin-sales-list'),
     path('sales/by-country/', AdminSalesByCountryAPIView.as_view(), name='admin-sales-by-country'),
     path('subscriptions/', AdminSubscriptionsListAPIView.as_view(), name='admin-subscriptions-list'),

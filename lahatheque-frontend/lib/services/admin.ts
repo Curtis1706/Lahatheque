@@ -27,6 +27,10 @@ import {
   AdminPayoutKpis,
   AdminPayoutsListResponse,
   AdminPartnerRoyaltySummary,
+  AdminOrder,
+  AdminOrdersKpis,
+  AdminOrdersResponse,
+  AdminOrderPaymentStatus,
 } from "@/lib/types/admin";
 
 // =========================================================================
@@ -467,6 +471,7 @@ export async function getAdminSales(): Promise<AdminSale[]> {
 
 export async function getAdminConsolidatedSales(params?: {
   channel?: string;
+  payment_status?: string;
   period?: string;
   time_slot?: string;
   q?: string;
@@ -478,6 +483,7 @@ export async function getAdminConsolidatedSales(params?: {
 }): Promise<AdminSalesConsolidatedResponse> {
   const query = new URLSearchParams();
   if (params?.channel && params.channel !== 'all') query.set('channel', params.channel);
+  if (params?.payment_status && params.payment_status !== 'all') query.set('payment_status', params.payment_status);
   if (params?.period && params.period !== 'all') query.set('period', params.period);
   if (params?.time_slot && params.time_slot !== 'all') query.set('time_slot', params.time_slot);
   if (params?.q) query.set('q', params.q);
@@ -1123,6 +1129,13 @@ export interface AdminGlobalFinance {
     commission_rate_avg: number;
     net_retained_platform: number;
   };
+  abandoned_loss?: {
+    abandoned_total: number;
+    abandoned_count: number;
+    failed_total: number;
+    failed_count: number;
+    total_opportunity_loss: number;
+  };
 }
 
 export interface AuthorRoyaltyReportLine {
@@ -1410,10 +1423,17 @@ export async function searchClients(query: string, role?: string) {
 }
 
 export async function adminCreateOrderForClient(payload: {
-  client_id: string;
+  client_id?: string;
+  is_pos_order?: boolean;
+  guest_name?: string;
+  guest_phone?: string;
+  guest_email?: string;
+  is_immediate_handover?: boolean;
+  statut_paiement?: string;
   items: Array<{ ouvrage_id: string; format_type: string; quantity: number }>;
   shipping_address?: string;
   mode_paiement?: string;
+  payment_method?: string;
   type_commande?: string;
   date_livraison_souhaitee?: string;
   plage_horaire_debut?: string;
@@ -1442,5 +1462,125 @@ export async function getAdminBouquetsDistribution() {
   const json = await res.json();
   return json.data || [];
 }
+
+// =========================================================================
+// GESTION GLOBALE DES COMMANDES, PANIERS ABANDONNÉS & CONSOLE D'ACTIONS (ADMIN)
+// =========================================================================
+
+export async function getAdminOrders(params?: {
+  statut_paiement?: AdminOrderPaymentStatus | string;
+  period?: 'all' | 'today' | 'week' | 'month' | 'year' | string;
+  q?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<AdminOrdersResponse> {
+  const query = new URLSearchParams();
+  if (params?.statut_paiement && params.statut_paiement !== 'all') {
+    query.set('statut_paiement', params.statut_paiement);
+  }
+  if (params?.period && params.period !== 'all') {
+    query.set('period', params.period);
+  }
+  if (params?.q) {
+    query.set('q', params.q);
+  }
+  if (params?.page) {
+    query.set('page', String(params.page));
+  }
+  if (params?.page_size) {
+    query.set('page_size', String(params.page_size));
+  }
+
+  const qs = query.toString();
+  const url = `/api/bff/commerce/admin/orders/${qs ? `?${qs}` : ''}`;
+  const res = await fetch(url, { credentials: 'include', cache: 'no-store' });
+  if (!res.ok) {
+    throw new Error(`Erreur lors de la récupération des commandes admin (${res.status})`);
+  }
+  const json = await res.json();
+  return json.data || {
+    kpis: {
+      total_orders_count: 0,
+      paid_count: 0,
+      pending_count: 0,
+      credit_count: 0,
+      abandoned_count: 0,
+      failed_count: 0,
+      cancelled_count: 0,
+      total_paid_amount: 0,
+      total_credit_amount: 0,
+      potential_abandoned_loss: 0,
+    },
+    orders: [],
+    total: 0,
+    current_page: 1,
+    total_pages: 1,
+  };
+}
+
+export async function confirmManualOrderPayment(
+  orderId: string,
+  payload: {
+    mode_paiement: string;
+    reference_paiement?: string;
+  }
+): Promise<{ success: boolean; message?: string; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/commerce/admin/orders/${orderId}/confirm-payment/`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok || json.success === false) {
+      return { success: false, error: json.error || 'Erreur lors de la validation du paiement.' };
+    }
+    return { success: true, message: json.message, data: json.data };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Erreur réseau lors de la validation du paiement.' };
+  }
+}
+
+export async function verifyOnlineOrderPayment(
+  orderId: string,
+  monerooId?: string
+): Promise<{ success: boolean; message?: string; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/commerce/orders/${orderId}/verify-payment/`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId, moneroo_id: monerooId }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.success === false) {
+      return { success: false, error: json.error || 'Paiement non confirmé par la passerelle.' };
+    }
+    return { success: true, message: json.message || 'Paiement vérifié avec succès.', data: json.data };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Erreur réseau lors de la vérification du paiement.' };
+  }
+}
+
+export async function remindAbandonedOrder(
+  orderId: string
+): Promise<{ success: boolean; message?: string; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/commerce/orders/${orderId}/remind-abandoned/`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const json = await res.json();
+    if (!res.ok || json.success === false) {
+      return { success: false, error: json.error || "Impossible d'envoyer la relance." };
+    }
+    return { success: true, message: json.message || 'Relance envoyée avec succès.', data: json.data };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur réseau lors de l'envoi de la relance." };
+  }
+}
+
 
 

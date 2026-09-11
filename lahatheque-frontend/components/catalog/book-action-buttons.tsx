@@ -35,6 +35,7 @@ interface BookActionButtonsProps {
     country?: string;
     level?: string;
     price?: number;
+    price_digital?: number;
     price_paper?: number;
     price_audio?: number;
     price_audio_eur?: number;
@@ -78,10 +79,12 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
   const currentLangVer = book.languages?.find(
     (l) => l.language.toLowerCase() === paperLanguage.toLowerCase()
   );
-  const stockPaper = currentLangVer != null ? currentLangVer.paper_stock : (book.stock_disponible ?? 15);
-  const isPaperAvailable = currentLangVer != null 
-    ? (currentLangVer.is_paper_available && book.is_paper_available !== false) 
-    : (book.is_paper_available !== false);
+  const isMasterPaperAvailable = book.is_paper_available === true;
+  const langStock = currentLangVer?.paper_stock ?? 0;
+  const stockPaper = isMasterPaperAvailable && langStock <= 0 
+    ? (book.stock_disponible && book.stock_disponible > 0 ? book.stock_disponible : 15)
+    : (currentLangVer != null ? currentLangVer.paper_stock : (book.stock_disponible ?? 15));
+  const isPaperAvailable = isMasterPaperAvailable || (currentLangVer?.is_paper_available === true) || (book.is_paper_available !== false && (book.stock_disponible ?? 0) > 0);
 
   const isAudioAvailable = Boolean(book.has_audio_version || book.has_audio || book.format_type === "audio");
   const isDigitalAvailable = book.is_digital_available !== false && book.format_type !== "audio";
@@ -96,9 +99,20 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
   const [addedAnimation, setAddedAnimation] = useState<boolean>(false);
   const [showSampleModal, setShowSampleModal] = useState<boolean>(false);
 
-  const priceDigital = book.price || 2500;
-  const pricePaper = book.price_paper || (book.price ? Math.round(book.price * 1.3) : 3500);
-  const priceAudio = book.price_audio || 2500;
+  const rawDigital = book.price_digital ?? book.price;
+  const priceDigital = rawDigital !== undefined && rawDigital !== null && !isNaN(Number(rawDigital))
+    ? Number(rawDigital)
+    : 2500;
+
+  const rawPaper = book.price_paper;
+  const pricePaper = rawPaper !== undefined && rawPaper !== null && !isNaN(Number(rawPaper))
+    ? Number(rawPaper)
+    : (priceDigital > 0 ? Math.round(priceDigital * 1.3) : 3500);
+
+  const rawAudio = book.price_audio;
+  const priceAudio = rawAudio !== undefined && rawAudio !== null && !isNaN(Number(rawAudio))
+    ? Number(rawAudio)
+    : 2500;
 
   // Calcul du montant total cumulé
   const totalAmount = 
@@ -344,7 +358,8 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
               {availableLangs.map((lang) => {
                 const langVer = book.languages?.find((l) => l.language.toLowerCase() === lang.toLowerCase());
                 const langStock = langVer ? langVer.paper_stock : stockPaper;
-                const isLangAvailable = langVer ? (langVer.is_paper_available && langStock > 0) : stockPaper > 0;
+                const effectiveStock = langStock > 0 ? langStock : (isMasterPaperAvailable ? stockPaper : 0);
+                const isLangAvailable = isMasterPaperAvailable || (langVer ? (langVer.is_paper_available && langStock > 0) : stockPaper > 0);
                 const isSelected = paperLanguage.toLowerCase() === lang.toLowerCase();
                 const label = lang.toUpperCase() === "FR" ? "Français" : lang.toUpperCase() === "EN" ? "Anglais" : lang.toUpperCase();
 
@@ -367,7 +382,7 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
                     <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${
                       isSelected ? "bg-white/20 text-white" : "bg-background text-foreground-muted border border-border"
                     }`}>
-                      {isLangAvailable ? `Stock : ${langStock}` : "Rupture"}
+                      {isLangAvailable ? `Stock : ${effectiveStock}` : "Rupture"}
                     </span>
                   </button>
                 );

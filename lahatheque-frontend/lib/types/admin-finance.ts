@@ -32,12 +32,18 @@ export interface AdminSaleOrder {
   order_reference: string;
   channel: SaleChannel;
   channel_label: string;
+  is_pos_order?: boolean;
+  guest_name?: string | null;
+  guest_phone?: string | null;
+  guest_email?: string | null;
   buyer_name: string;
   buyer_email: string;
   buyer_role: 'student' | 'author' | 'university' | 'wholesaler' | 'client';
   created_at: string;
   payment_method: string;
-  payment_status: 'paid' | 'pending' | 'failed' | 'refunded';
+  payment_status: 'paid' | 'pending' | 'failed' | 'refunded' | 'abandoned' | 'credit' | 'cancelled';
+  payment_status_display?: string;
+  is_paid?: boolean;
   gross_amount: number;
   discount_total: number;
   net_amount_paid: number;
@@ -126,3 +132,81 @@ export interface AdminPartnerRoyaltySummary {
   balance_outstanding: number;
   books: AdminPartnerBookDetail[];
 }
+
+// -------------------------------------------------------------------------
+// Supervision & Cycle de Vie des Commandes (/admin/orders)
+// -------------------------------------------------------------------------
+
+export type AdminOrderPaymentStatus =
+  | 'all'
+  | 'paid'
+  | 'pending'
+  | 'credit'
+  | 'abandoned'
+  | 'failed'
+  | 'cancelled';
+
+export interface AdminOrderItemDetail {
+  id: string;
+  book_id?: string | null;
+  book_title: string;
+  format: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
+export interface AdminOrder {
+  id: string;
+  numero_commande: string;
+  order_reference: string;
+  customer_id: string;
+  customer_name: string;
+  customer_email: string;
+  customer_role: string;
+  is_pos_order?: boolean;
+  guest_name?: string | null;
+  guest_phone?: string | null;
+  guest_email?: string | null;
+  is_immediate_handover?: boolean;
+  total_amount: number;
+  currency: string;
+  statut_paiement: 'paid' | 'pending' | 'credit' | 'abandoned' | 'failed' | 'cancelled' | string;
+  statut_paiement_display: string;
+  statut_commande: string;
+  statut_commande_display: string;
+  mode_paiement: string;
+  mode_paiement_display: string;
+  is_credit_purchase: boolean;
+  credit_due_date?: string | null;
+  moneroo_id?: string | null;
+  manual_payment_reference?: string;
+  manual_payment_confirmed_by?: string | null;
+  created_at: string;
+  abandoned_at?: string | null;
+  last_reminder_sent_at?: string | null;
+  items_count: number;
+  items: AdminOrderItemDetail[];
+}
+
+export interface AdminOrdersKpis {
+  total_orders_count: number;
+  paid_count: number;
+  pending_count: number;
+  credit_count: number;
+  abandoned_count: number;
+  failed_count: number;
+  cancelled_count: number;
+  total_paid_amount: number;
+  total_credit_amount: number;
+  potential_abandoned_loss: number;
+}
+
+export interface AdminOrdersResponse {
+  kpis: AdminOrdersKpis;
+  orders: AdminOrder[];
+  total: number;
+  current_page: number;
+  total_pages: number;
+}
+

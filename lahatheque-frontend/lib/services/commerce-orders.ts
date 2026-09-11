@@ -50,7 +50,7 @@ export async function createOrder(payload: OrderCreatePayload): Promise<OrderCre
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || "Échec de la création de la commande.");
+    throw new Error(errData.error || errData.detail || errData.message || "Échec de la création de la commande.");
   }
 
   const data = await res.json();
@@ -66,3 +66,26 @@ export async function createOrder(payload: OrderCreatePayload): Promise<OrderCre
     payment_url: inner.checkout_url || inner.payment_url,
   };
 }
+
+export async function retryOrderPayment(orderId: string): Promise<{ checkout_url?: string; status?: string; already_paid?: boolean }> {
+  const res = await fetch(`/api/bff/commerce/orders/${orderId}/initiate-payment/`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || "Impossible d'initialiser le paiement.");
+  }
+
+  const json = await res.json();
+  const inner = json.data || json;
+  return {
+    checkout_url: inner.checkout_url,
+    status: inner.status,
+    already_paid: inner.already_paid,
+  };
+}
+

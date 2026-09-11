@@ -353,10 +353,16 @@ export default function BookDetailPage() {
 
                   <div className="pt-3 border-t border-border/60 text-center">
                     <div className="font-bold text-xs font-mono text-navy">
-                      {(item.price || 2500).toLocaleString("fr-FR")} F CFA
+                      {((item.price_digital !== undefined && item.price_digital !== null)
+                        ? Number(item.price_digital)
+                        : (item.price !== undefined && item.price !== null ? Number(item.price) : 2500)
+                      ).toLocaleString("fr-FR")} F CFA
                     </div>
                     <div className="text-[10px] text-foreground-muted font-mono">
-                      ≈ {formatEur(item.price || 2500)} €
+                      ≈ {formatEur((item.price_digital !== undefined && item.price_digital !== null)
+                        ? Number(item.price_digital)
+                        : (item.price !== undefined && item.price !== null ? Number(item.price) : 2500)
+                      )} €
                     </div>
                   </div>
                 </Link>

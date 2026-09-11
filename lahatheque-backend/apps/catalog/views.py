@@ -26,10 +26,31 @@ logger = logging.getLogger(__name__)
 CATALOG_CACHE_TTL = 300
 
 
+def invalidate_catalog_cache():
+    """Invalide immédiatement tous les caches du catalogue public et de tarification."""
+    try:
+        current_v = cache.get("catalog_cache_version") or 1
+        cache.set("catalog_cache_version", current_v + 1, 86400 * 30)
+    except Exception:
+        pass
+    try:
+        cache.clear()
+    except Exception:
+        pass
+    try:
+        cache.delete("admin_catalog_pricing_all")
+    except Exception:
+        pass
+
+
 def _catalog_cache_key(prefix: str, query_params: dict) -> str:
-    """Génère une clé de cache déterministe à partir du préfixe et des paramètres de requête."""
+    """Génère une clé de cache déterministe à partir du préfixe, de la version et des paramètres."""
+    try:
+        version = cache.get("catalog_cache_version") or 1
+    except Exception:
+        version = 1
     sorted_params = sorted(query_params.items())
-    raw = f"{prefix}:{sorted_params}"
+    raw = f"{prefix}:v{version}:{sorted_params}"
     return "catalog:" + hashlib.md5(raw.encode()).hexdigest()
 
 
@@ -93,7 +114,7 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
                 # Ouvrages disposant des 3 formats : Papier, Numérique ET Audio
                 qs = qs.filter(
                     (Q(has_audio_version=True) | Q(audio_tracks__isnull=False)) &
-                    (Q(is_paper_available=True) | Q(price_paper__gt=0)) &
+                    Q(is_paper_available=True) &
                     Q(format_type__in=['pdf', 'epub'])
                 ).distinct()
             elif f in ('digital_audio', 'numerique_audio'):
@@ -106,18 +127,18 @@ class OuvrageViewSet(viewsets.ReadOnlyModelViewSet):
                 # Ouvrages disposant de Papier ET Audio
                 qs = qs.filter(
                     (Q(has_audio_version=True) | Q(audio_tracks__isnull=False)) &
-                    (Q(is_paper_available=True) | Q(price_paper__gt=0))
+                    Q(is_paper_available=True)
                 ).distinct()
             elif f in ('paper_digital', 'papier_numerique'):
                 # Ouvrages disposant de Papier ET Numérique
                 qs = qs.filter(
-                    (Q(is_paper_available=True) | Q(price_paper__gt=0)) &
+                    Q(is_paper_available=True) &
                     Q(format_type__in=['pdf', 'epub'])
                 ).distinct()
             elif f in ('digital', 'numerique'):
                 qs = qs.filter(format_type__in=['pdf', 'epub'])
             elif f in ('paper', 'papier'):
-                qs = qs.filter(Q(is_paper_available=True) | Q(price_paper__gt=0))
+                qs = qs.filter(is_paper_available=True)
             else:
                 qs = qs.filter(format_type=f)
 
@@ -760,6 +781,21 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
         if 'is_paper_available' in request.data:
             val = str(request.data.get('is_paper_available')).lower()
             ouvrage.is_paper_available = val in ('true', '1', 'yes')
+            # Synchronisation automatique des déclinaisons linguistiques existantes
+            try:
+                from apps.catalog.models import OuvrageLanguageVersion
+                lang_versions = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage)
+                if ouvrage.is_paper_available:
+                    lang_versions.update(is_paper_available=True)
+                    for lv in lang_versions:
+                        if lv.paper_stock <= 0:
+                            lv.paper_stock = 15
+                            lv.save(update_fields=['paper_stock'])
+                else:
+                    lang_versions.update(is_paper_available=False)
+            except Exception as lv_err:
+                logger.warning(f"Erreur sync language_versions is_paper_available: {lv_err}")
+
             if ouvrage.is_paper_available:
                 try:
                     from apps.commerce.models import Entrepot, StockOuvrage
@@ -777,7 +813,7 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                         ouvrage=ouvrage,
                         entrepot=entrepot,
                         defaults={
-                            'quantite_reelle': 0,
+                            'quantite_reelle': 15,
                             'quantite_reservee': 0,
                             'seuil_alerte': 10
                         }
@@ -888,6 +924,7 @@ class MaquettisteDepositViewSet(viewsets.ModelViewSet):
                 )
 
         ouvrage.save()
+        invalidate_catalog_cache()
         return Response({
             "success": True,
             "message": f"L'ouvrage « {ouvrage.title} » a été mis à jour avec succès.",

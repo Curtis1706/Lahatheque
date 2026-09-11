@@ -31,17 +31,26 @@ def process_moneroo_webhook(event_id: str, event_type: str, payload: dict) -> We
         
     try:
         # Extraire l'ID de transaction (moneroo_id ou fallback metadata tx_id)
-        moneroo_id = payload.get('data', {}).get('id')
-        tx_id = payload.get('data', {}).get('metadata', {}).get('transaction_id')
+        moneroo_id = (
+            payload.get('data', {}).get('id')
+            if isinstance(payload.get('data'), dict)
+            else None
+        ) or payload.get('id') or payload.get('payment_id') or payload.get('paymentId')
+
+        tx_id = (
+            payload.get('data', {}).get('metadata', {}).get('transaction_id')
+            if isinstance(payload.get('data'), dict) and isinstance(payload.get('data', {}).get('metadata'), dict)
+            else None
+        ) or payload.get('metadata', {}).get('transaction_id') if isinstance(payload.get('metadata'), dict) else None
         
         # 2. Verrouillage Pessimiste de la Transaction
-        # On cherche par moneroo_id d'abord
-        payment_tx = PaymentTransaction.objects.select_for_update().filter(moneroo_id=moneroo_id).first()
+        payment_tx = None
+        if moneroo_id:
+            payment_tx = PaymentTransaction.objects.select_for_update().filter(moneroo_id=moneroo_id).first()
         if not payment_tx and tx_id:
             payment_tx = PaymentTransaction.objects.select_for_update().filter(id=tx_id).first()
             
         if not payment_tx:
-            # Transaction inconnue de notre côté, on log mais on marque webhook comme FAILED (ou PROCESSED pour ignorer)
             raise ValueError(f"Transaction introuvable pour moneroo_id={moneroo_id} et tx_id={tx_id}")
 
         if payment_tx.status in [PaymentTransaction.Status.SUCCESS, PaymentTransaction.Status.FAILED, PaymentTransaction.Status.CANCELLED]:
@@ -52,7 +61,8 @@ def process_moneroo_webhook(event_id: str, event_type: str, payload: dict) -> We
             return webhook
 
         # 3. Dispatch
-        if event_type == 'payment.success':
+        clean_event = str(event_type).lower().replace(':', '.')
+        if clean_event in ['payment.success', 'payment.completed', 'payment.paid']:
             payment_tx.status = PaymentTransaction.Status.SUCCESS
             payment_tx.raw_webhook_payload = payload
             payment_tx.save(update_fields=['status', 'raw_webhook_payload'])
@@ -62,7 +72,7 @@ def process_moneroo_webhook(event_id: str, event_type: str, payload: dict) -> We
             from .services import handle_bouquet_payment_success
             handle_bouquet_payment_success(payment_tx)
             
-        elif event_type in ['payment.failed', 'payment.cancelled']:
+        elif clean_event in ['payment.failed', 'payment.cancelled', 'payment.rejected']:
             payment_tx.status = PaymentTransaction.Status.FAILED
             payment_tx.raw_webhook_payload = payload
             payment_tx.save(update_fields=['status', 'raw_webhook_payload'])
@@ -115,8 +125,15 @@ class MonerooWebhookView(APIView):
             else:
                 logger.warning("[Webhook] Aucune signature Moneroo (mode DEBUG, accepté).")
 
-        # 2. Extraction des données
-        event_id = request.data.get('event_id') or request.data.get('id')
+        # 2. Extraction des données (support format racine et format imbriqué data Moneroo)
+        data_block = request.data.get('data', {}) if isinstance(request.data.get('data'), dict) else {}
+        event_id = (
+            request.data.get('event_id')
+            or request.data.get('id')
+            or data_block.get('id')
+            or data_block.get('reference')
+            or request.headers.get('Moneroo-Event-Id')
+        )
         event_type = request.data.get('event_type') or request.data.get('event')
         if not event_id or not event_type:
             return Response(

@@ -69,7 +69,7 @@ def notify_user(
                     kwargs={
                         'recipient_list': [recipient_email], 
                         'subject': notif_title, 
-                        'html_content': f"<h3>{notif_title}</h3><p>{notif_msg}</p>"
+                        'html_content': notif_msg
                     },
                     retry=False,
                     expires=30,

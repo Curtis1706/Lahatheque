@@ -18,7 +18,7 @@ def _unlock_order_content(commande):
     for ligne in lignes:
         ouvrage = ligne.ouvrage
 
-        if ligne.format_type in ('digital', 'pdf', 'epub', 'audio'):
+        if ligne.format_type in ('digital', 'pdf', 'epub'):
             ReadingProgress.objects.get_or_create(
                 user=commande.user,
                 ouvrage=ouvrage,
@@ -29,6 +29,18 @@ def _unlock_order_content(commande):
                 }
             )
             logger.info(f"[Commerce] Accès numérique déverrouillé: {ouvrage.title} pour {commande.user.email}")
+
+        elif ligne.format_type == 'audio':
+            ReadingProgress.objects.get_or_create(
+                user=commande.user,
+                ouvrage=ouvrage,
+                defaults={
+                    'progress_percent': 0,
+                    'current_page': 0,
+                    'total_pages': 0,
+                }
+            )
+            logger.info(f"[Commerce] Accès audio déverrouillé: {ouvrage.title} pour {commande.user.email}")
 
         elif ligne.format_type in ('paper', 'papier'):
             stock = StockOuvrage.objects.filter(
@@ -95,6 +107,10 @@ def _notify_order_finalized(commande, context_label):
             full_name = f"{commande.user.first_name or ''} {commande.user.last_name or ''}".strip() or str(commande.user.email)
             total_amt = float(getattr(commande, 'total_ttc', 0.0) or getattr(commande, 'total_amount', 0.0) or 0.0)
 
+            curr_code = getattr(commande.currency, 'code', None) or str(getattr(commande, 'currency', 'FCFA') or 'FCFA')
+            if curr_code == "XOF":
+                curr_code = "FCFA"
+
             pdf_invoice_data = {
                 "order_number": order_num,
                 "customer_name": full_name,
@@ -103,7 +119,7 @@ def _notify_order_finalized(commande, context_label):
                 "date": commande.created_at.strftime("%d/%m/%Y") if hasattr(commande, 'created_at') and commande.created_at else timezone.now().strftime("%d/%m/%Y"),
                 "items": items_list,
                 "total_amount": total_amt,
-                "currency": getattr(commande, 'currency', 'FCFA') or 'FCFA',
+                "currency": curr_code,
                 "payment_method": context_label,
                 "is_paid": (commande.statut_paiement == 'paid'),
             }
@@ -133,19 +149,126 @@ def _notify_order_finalized(commande, context_label):
 
 
 def handle_payment_success(payment_tx):
-    """Point d'entrée webhook Moneroo — paiement réellement encaissé."""
+    """Point d'entrée webhook Moneroo ou réconciliation API — paiement réellement encaissé."""
     from .models import Order
 
     logger.info(f"[Commerce] Traitement paiement réussi pour transaction {payment_tx.id}")
 
-    try:
-        commande = Order.objects.select_for_update().get(payment_transaction=payment_tx)
-    except Order.DoesNotExist:
-        logger.error(f"[Commerce] Aucune commande trouvée pour la transaction {payment_tx.id}")
-        return
-    except Order.MultipleObjectsReturned:
-        commande = Order.objects.filter(payment_transaction=payment_tx).first()
+    commande = None
+    with transaction.atomic():
+        try:
+            commande = Order.objects.select_for_update().get(payment_transaction=payment_tx)
+        except Order.DoesNotExist:
+            logger.error(f"[Commerce] Aucune commande trouvée pour la transaction {payment_tx.id}")
+            return
+        except Order.MultipleObjectsReturned:
+            commande = Order.objects.filter(payment_transaction=payment_tx).first()
 
+        if commande.statut_paiement == 'paid':
+            logger.info(f"[Commerce] Commande {commande.id} déjà payée. Ignoré.")
+            return
+
+        commande.statut_paiement = 'paid'
+        commande.statut_commande = 'completed'
+        commande.save(update_fields=['statut_paiement', 'statut_commande'])
+        _unlock_order_content(commande)
+
+    if commande:
+        _notify_order_finalized(commande, "Moneroo")
+        logger.info(f"[Commerce] Commande {commande.id} finalisée avec succès.")
+
+
+def reconcile_moneroo_payment(moneroo_id: str | None = None, order_id: str | None = None, user=None):
+    """
+    Vérifie et réconcilie une transaction directement via l'API Moneroo.
+    Met à jour PaymentTransaction, Order, déverrouille l'ouvrage dans ReadingProgress,
+    et notifie l'utilisateur.
+    """
+    from .models import Order, PaymentTransaction
+    from .moneroo_client import client
+
+    tx = None
+    order = None
+
+    if moneroo_id:
+        tx = PaymentTransaction.objects.filter(moneroo_id=moneroo_id).first()
+        if tx:
+            order = Order.objects.filter(payment_transaction=tx).first()
+
+    if not order and order_id:
+        order = Order.objects.filter(id=order_id).first()
+        if order and order.payment_transaction:
+            tx = order.payment_transaction
+            if not moneroo_id and tx.moneroo_id:
+                moneroo_id = tx.moneroo_id
+
+    if not moneroo_id and order and getattr(order, 'payment_transaction', None):
+        moneroo_id = order.payment_transaction.moneroo_id
+
+    if not moneroo_id:
+        return {"success": False, "error": "Identifiant de transaction Moneroo introuvable."}
+
+    # Si la commande est déjà marquée comme payée
+    if order and order.statut_paiement == 'paid':
+        return {"success": True, "status": "paid", "order_id": str(order.id), "already_paid": True}
+
+    # Interrogation directe et sécurisée de l'API Moneroo
+    try:
+        moneroo_data = client.verify_transaction(moneroo_id)
+    except Exception as e:
+        logger.error(f"[Commerce] Erreur lors de l'appel verify_transaction Moneroo ({moneroo_id}): {e}")
+        return {"success": False, "error": f"Erreur de communication avec Moneroo: {e}"}
+
+    if not moneroo_data or not isinstance(moneroo_data, dict):
+        return {"success": False, "error": "Données de paiement indisponibles auprès de Moneroo."}
+
+    m_status = str(moneroo_data.get('status', '')).lower().strip()
+    capture_data = moneroo_data.get('capture') or {}
+    gateway_data = capture_data.get('gateway') if isinstance(capture_data, dict) else {}
+    gateway_status = str(gateway_data.get('transaction_status', '')).lower().strip() if isinstance(gateway_data, dict) else ''
+
+    is_success = (m_status in ('success', 'completed', 'paid', 'approved')) or (gateway_status in ('completed', 'success'))
+    is_failed = (m_status in ('failed', 'cancelled', 'expired', 'rejected')) or (gateway_status in ('failed', 'cancelled', 'rejected'))
+
+    if is_success:
+        with transaction.atomic():
+            if tx:
+                tx.status = PaymentTransaction.Status.SUCCESS
+                tx.save(update_fields=['status'])
+                handle_payment_success(tx)
+            elif order:
+                order.statut_paiement = 'paid'
+                order.statut_commande = 'completed'
+                order.save(update_fields=['statut_paiement', 'statut_commande'])
+                _unlock_order_content(order)
+                _notify_order_finalized(order, "Moneroo")
+
+        logger.info(f"[Commerce] Réconciliation Moneroo RÉUSSIE: {moneroo_id} -> Commande finalisée.")
+        return {"success": True, "status": "paid", "order_id": str(order.id) if order else None}
+
+    elif is_failed:
+        with transaction.atomic():
+            if tx:
+                tx.status = PaymentTransaction.Status.FAILED
+                tx.save(update_fields=['status'])
+                handle_payment_failure(tx)
+            elif order:
+                order.statut_paiement = 'failed'
+                order.save(update_fields=['statut_paiement'])
+
+        logger.info(f"[Commerce] Réconciliation Moneroo ÉCHEC: {moneroo_id} -> Commande marquée échouée.")
+        return {"success": False, "status": "failed", "order_id": str(order.id) if order else None}
+
+    return {
+        "success": True,
+        "status": "pending",
+        "order_id": str(order.id) if order else None,
+        "message": "Paiement en attente de validation par l'opérateur Mobile Money."
+    }
+
+
+def confirm_manual_payment(commande, confirmed_by_user, mode_paiement=None, reference=''):
+    """Confirmation manuelle (Virement, Espèces, MoMo direct, Chèque) par l'Administrateur ou le Gestionnaire."""
     if commande.statut_paiement == 'paid':
         logger.info(f"[Commerce] Commande {commande.id} déjà payée. Ignoré.")
         return
@@ -153,29 +276,23 @@ def handle_payment_success(payment_tx):
     with transaction.atomic():
         commande.statut_paiement = 'paid'
         commande.statut_commande = 'completed'
-        commande.save(update_fields=['statut_paiement', 'statut_commande'])
+        fields_to_update = ['statut_paiement', 'statut_commande', 'manual_payment_confirmed_by']
+        commande.manual_payment_confirmed_by = confirmed_by_user
+
+        if mode_paiement:
+            commande.mode_paiement = mode_paiement
+            fields_to_update.append('mode_paiement')
+        if reference:
+            commande.manual_payment_reference = reference
+            fields_to_update.append('manual_payment_reference')
+
+        commande.save(update_fields=fields_to_update)
         _unlock_order_content(commande)
-
-    _notify_order_finalized(commande, "Moneroo")
-    logger.info(f"[Commerce] Commande {commande.id} finalisée avec succès.")
-
-
-def confirm_manual_payment(commande, confirmed_by_user):
-    """Confirmation manuelle (Virement, Espèces, Carte) par le Gestionnaire."""
-    if commande.statut_paiement == 'paid':
-        logger.info(f"[Commerce] Commande {commande.id} déjà payée. Ignoré.")
-        return
 
     label = commande.get_mode_paiement_display() if hasattr(commande, 'get_mode_paiement_display') else "manuel"
-
-    with transaction.atomic():
-        commande.statut_paiement = 'paid'
-        commande.statut_commande = 'completed'
-        commande.save(update_fields=['statut_paiement', 'statut_commande'])
-        _unlock_order_content(commande)
-
     _notify_order_finalized(commande, label)
-    logger.info(f"[Commerce] Commande {commande.id} confirmée manuellement par {confirmed_by_user.email}.")
+    logger.info(f"[Commerce] Commande {commande.id} confirmée manuellement par {confirmed_by_user.email} (mode: {commande.mode_paiement}, ref: {reference}).")
+
 
 
 def fulfill_credit_order(commande):

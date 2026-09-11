@@ -87,6 +87,33 @@
 
 ---
 
+## Phase 7: Correctifs Filtre Papier, Disponibilité & Redirection Checkout (FR-011 à FR-014)
+
+**Purpose**: Résolution des anomalies de disponibilité papier, saisie du téléphone de livraison et fluidité de la redirection post-connexion
+
+- [X] T027 [P] [US2] Restreindre le filtrage `format=paper` et combinaisons papier (`pack_complet`, `paper_audio`, `paper_digital`) dans `lahatheque-backend/apps/catalog/views.py` strictement à `is_paper_available=True` de l'ouvrage maître
+- [X] T028 [P] [US2] Corriger `lahatheque-frontend/components/catalog/book-action-buttons.tsx` pour afficher et rendre sélectionnable l'option "Livre papier" dès lors que `book.is_paper_available=True`, avec sélection de langue et repli gracieux de stock
+- [X] T029 [US2] Dans `lahatheque-frontend/app/(auth)/login/page.tsx`, prendre en compte le paramètre d'URL `?redirect=` pour renvoyer directement vers `/checkout` dès la connexion réussie avec indicateur de transition éliminant tout écran blanc
+- [X] T030 [US2] Dans `lahatheque-frontend/app/(public)/checkout/page.tsx`, ajouter le champ obligatoire du numéro de téléphone de contact pour la livraison physique et l'intégrer au payload
+- [X] T031 [US2] Dans `lahatheque-backend/apps/commerce/serializers.py`, étendre les choix autorisés de `payment_provider` dans `CreateOrderSerializer` pour inclure `'mock'` et `'stripe'`
+- [X] T032 Valider l'intégrité globale avec `python manage.py check` et `npx tsc --noEmit` sans aucune erreur
+
+---
+
+## Phase 8: Passation de Commande Administrateur via Combobox & Vente Comptoir Boutique (FR-015 à FR-017)
+
+**Purpose**: Modernisation ergonomique de la sélection client via Combobox et gestion complète des ventes physiques au comptoir pour les clients sans compte
+
+- [X] T033 [P] [US4] Étendre le modèle `Order` dans `lahatheque-backend/apps/commerce/models.py` (rendre `user` nullable `null=True, blank=True`, ajouter `is_pos_order`, `guest_name`, `guest_phone`, `guest_email`) et générer la migration Django associée
+- [X] T034 [US4] Adapter le sérialiseur et l'endpoint de commande administrateur dans `lahatheque-backend/apps/commerce/manager_views.py` pour supporter `is_pos_order`, `guest_name`, `guest_phone`, `guest_email` et règlements comptoir immédiats (espèces, momo_direct)
+- [X] T035 [P] [US4] Créer le composant Combobox de recherche client dans `lahatheque-frontend/components/admin/client-combobox.tsx` avec saisie réactive, menu déroulant flottant instantané (avatar, nom, rôle, téléphone) et fermeture automatique
+- [X] T036 [US4] Dans `lahatheque-frontend/app/(dashboard)/admin/orders/page.tsx`, remplacer la liste statique volumineuse par `ClientCombobox` et intégrer la bascule « Compte existant » / « Client comptoir externe (sans compte) »
+- [X] T037 [US4] Adapter le formulaire `OrderCreateForm` dans `lahatheque-frontend/components/student/OrderCreateForm.tsx` pour supporter le mode client comptoir externe (transmission des champs invités, modes de règlement comptoir et option remise immédiate en boutique)
+- [X] T038 [US4] Dans la table des commandes `lahatheque-frontend/app/(dashboard)/admin/orders/page.tsx` et `/admin/sales`, afficher le badge « Vente Comptoir » et les coordonnées du client externe (`guest_name` • `guest_phone`)
+- [X] T039 Valider l'intégrité globale du système avec `python manage.py check`, migration de base de données et `npx tsc --noEmit` sans erreur
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

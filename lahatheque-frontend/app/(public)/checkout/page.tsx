@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
-  CreditCard, 
   Smartphone, 
   CheckCircle2, 
   Truck, 
@@ -26,7 +25,7 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const { items, totalAmount, totalCount, clearCart } = useCart();
 
-  const [paymentProvider, setPaymentProvider] = useState<"mock" | "moneroo" | "stripe">("mock");
+  const [paymentProvider, setPaymentProvider] = useState<"moneroo">("moneroo");
   const [shippingAddress, setShippingAddress] = useState("");
   const [city, setCity] = useState("Cotonou");
   const [country, setCountry] = useState("BJ");
@@ -38,11 +37,32 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [orderCompleted, setOrderCompleted] = useState<any | null>(null);
 
+  useEffect(() => {
+    if (user && !recipientPhone) {
+      const userPhone = (user as any).phone || (user as any).phone_number;
+      if (userPhone) {
+        setRecipientPhone(userPhone);
+      }
+    }
+  }, [user]);
+
+  const hasPaperItem = items.some((i) => i.format === "paper");
+
+  useEffect(() => {
+    console.groupCollapsed(`[CHECKOUT SESSION] État de session [${new Date().toLocaleTimeString()}]`);
+    console.log("Statut utilisateur:", user ? `Connecté (${user.email})` : "Visiteur anonyme (invité)");
+    console.log("Contenu panier:", {
+      nombreArticles: totalCount,
+      montantTotal: totalAmount,
+      contientPapier: hasPaperItem,
+      articles: items.map((i) => ({ titre: i.title, format: i.format, prix: i.price, quantite: i.quantity, langue: i.selectedLanguage })),
+    });
+    console.groupEnd();
+  }, [user, totalCount, totalAmount, hasPaperItem]);
+
   const [paymentPhase, setPaymentPhase] = useState<"idle" | "countdown" | "success">("idle");
   const [countdownAmount, setCountdownAmount] = useState<number>(0);
   const [progressPct, setProgressPct] = useState<number>(0);
-
-  const hasPaperItem = items.some((i) => i.format === "paper");
 
   function runCountdownAnimation(startAmount: number, durationMs: number): Promise<void> {
     return new Promise((resolve) => {
@@ -175,6 +195,11 @@ export default function CheckoutPage() {
       setLoading(false);
       return;
     }
+    if (hasPaperItem && !recipientPhone.trim()) {
+      setError("Veuillez saisir un numéro de téléphone de contact pour la livraison du livre papier.");
+      setLoading(false);
+      return;
+    }
 
     setPaymentPhase("countdown");
     setCountdownAmount(totalAmount);
@@ -185,6 +210,8 @@ export default function CheckoutPage() {
       shipping_address: shippingAddress.trim() || undefined,
       city: city.trim() || undefined,
       country: country,
+      phone: recipientPhone.trim() || undefined,
+      recipient_phone: recipientPhone.trim() || undefined,
       date_livraison_souhaitee: deliveryDate || undefined,
       plage_horaire_debut: timeSlotStart || undefined,
       plage_horaire_fin: timeSlotEnd || undefined,
@@ -223,6 +250,13 @@ export default function CheckoutPage() {
       const data = await res.json();
       console.log(`[CHECKOUT FLOW] Commande validée avec succès en ${elapsedMs}ms:`, data);
       console.groupEnd();
+
+      const checkoutUrl = data.checkout_url || data.data?.checkout_url || data.payment_url;
+      if (checkoutUrl) {
+        clearCart();
+        window.location.href = checkoutUrl;
+        return;
+      }
 
       await new Promise((r) => setTimeout(r, 350));
       setPaymentPhase("success");
@@ -365,7 +399,7 @@ export default function CheckoutPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                       <div>
                         <label className="text-foreground-muted block mb-1">Ville *</label>
                         <input
@@ -389,6 +423,17 @@ export default function CheckoutPage() {
                           <option value="TG">Togo (+228)</option>
                           <option value="CM">Cameroun (+237)</option>
                         </select>
+                      </div>
+                      <div>
+                        <label className="text-foreground-muted block mb-1">Téléphone de livraison *</label>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="Ex: +229 97 00 00 00"
+                          value={recipientPhone}
+                          onChange={(e) => setRecipientPhone(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-navy text-xs"
+                        />
                       </div>
                     </div>
 
@@ -430,69 +475,25 @@ export default function CheckoutPage() {
               <div className="bg-background border border-border rounded-2xl p-5 space-y-4 shadow-sm">
                 <h2 className="text-xs font-bold text-navy uppercase tracking-wider">Mode de Paiement</h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                
-                {/* Mock Provider */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentProvider("mock")}
-                  className={`p-4 rounded-xl border text-left flex flex-col justify-between gap-3 transition-all cursor-pointer ${
-                    paymentProvider === "mock"
-                      ? "border-navy bg-navy/5 ring-2 ring-navy/20"
-                      : "border-border hover:border-gold"
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <Smartphone className="w-5 h-5 text-gold" />
-                    <span className="text-[10px] font-bold uppercase bg-gold/20 text-navy px-2 py-0.5 rounded">Simulateur</span>
+                <div className="grid grid-cols-1 gap-3">
+                  {/* Moneroo Provider */}
+                  <div
+                    className="p-4 rounded-xl border border-navy bg-navy/5 ring-2 ring-navy/20 flex items-center justify-between gap-4 transition-all"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-navy/10 flex items-center justify-center text-navy shrink-0">
+                        <Smartphone className="w-5 h-5 text-navy" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-navy">Moneroo Afrique</p>
+                        <p className="text-xs text-foreground-muted">Mobile Money (MTN, Moov, Wave, Orange, Celtiis)</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase bg-navy text-gold px-2.5 py-1 rounded-lg border border-gold/30 shrink-0">
+                      Paiement Sécurisé
+                    </span>
                   </div>
-                  <div>
-                    <p className="font-bold text-xs text-navy">Test Instantané</p>
-                    <p className="text-[10px] text-foreground-muted">Paiement dev immédiat</p>
-                  </div>
-                </button>
-
-                {/* Moneroo Provider */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentProvider("moneroo")}
-                  className={`p-4 rounded-xl border text-left flex flex-col justify-between gap-3 transition-all cursor-pointer ${
-                    paymentProvider === "moneroo"
-                      ? "border-navy bg-navy/5 ring-2 ring-navy/20"
-                      : "border-border hover:border-gold"
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <Smartphone className="w-5 h-5 text-navy" />
-                    <span className="text-[10px] font-bold uppercase bg-navy/10 text-navy px-2 py-0.5 rounded">Mobile Money</span>
-                  </div>
-                  <div>
-                    <p className="font-bold text-xs text-navy">Moneroo Afrique</p>
-                    <p className="text-[10px] text-foreground-muted">MTN, Moov, Wave, Orange</p>
-                  </div>
-                </button>
-
-                {/* Stripe Provider */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentProvider("stripe")}
-                  className={`p-4 rounded-xl border text-left flex flex-col justify-between gap-3 transition-all cursor-pointer ${
-                    paymentProvider === "stripe"
-                      ? "border-navy bg-navy/5 ring-2 ring-navy/20"
-                      : "border-border hover:border-gold"
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <CreditCard className="w-5 h-5 text-navy" />
-                    <span className="text-[10px] font-bold uppercase bg-navy/10 text-navy px-2 py-0.5 rounded">Carte CB</span>
-                  </div>
-                  <div>
-                    <p className="font-bold text-xs text-navy">Carte Bancaire</p>
-                    <p className="text-[10px] text-foreground-muted">Visa, Mastercard International</p>
-                  </div>
-                </button>
-
-              </div>
+                </div>
             </div>
 
           </div>

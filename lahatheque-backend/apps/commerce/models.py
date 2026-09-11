@@ -10,6 +10,9 @@ class Currency(models.Model):
     peg_rate_to_eur = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True)
     last_updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return self.code
+
 class SubscriptionPlan(models.Model):
     name = models.CharField(max_length=255)
     plan_type = models.CharField(max_length=50) # individual / institution_bouquet
@@ -46,7 +49,7 @@ class PaymentTransaction(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.ForeignKey(Currency, on_delete=models.PROTECT)
     amount_converted_xof = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    status = models.CharField(max_length=30, default='pending')
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
     raw_webhook_payload = models.JSONField(default=dict, blank=True)
 
 class WebhookEvent(models.Model):
@@ -67,7 +70,10 @@ class Order(models.Model):
     PAYMENT_STATUS_CHOICES = [
         ('pending', 'En attente'),
         ('paid', 'Payé'),
+        ('credit', 'Achat à crédit'),
         ('failed', 'Échoué'),
+        ('cancelled', 'Annulé'),
+        ('abandoned', 'Panier abandonné'),
         ('refunded', 'Remboursé'),
     ]
     ORDER_STATUS_CHOICES = [
@@ -84,13 +90,21 @@ class Order(models.Model):
     ]
     PAYMENT_METHOD_CHOICES = [
         ('mobile_money', 'Mobile Money'),
+        ('momo_direct', 'Mobile Money direct (Flotte)'),
         ('virement', 'Virement bancaire'),
         ('especes', 'Espèces'),
         ('carte', 'Carte bancaire'),
+        ('cheque', 'Chèque'),
+        ('credit', 'Achat à crédit'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='commandes')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='commandes')
+    is_pos_order = models.BooleanField(default=False, verbose_name="Vente comptoir / boutique")
+    guest_name = models.CharField(max_length=255, blank=True, default='', verbose_name="Nom client comptoir")
+    guest_phone = models.CharField(max_length=50, blank=True, default='', verbose_name="Téléphone client comptoir")
+    guest_email = models.EmailField(blank=True, default='', verbose_name="E-mail client comptoir")
+    is_immediate_handover = models.BooleanField(default=False, verbose_name="Remise en main propre immédiate")
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.ForeignKey(Currency, on_delete=models.PROTECT)
     statut_paiement = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
@@ -99,7 +113,7 @@ class Order(models.Model):
         max_length=20, choices=ORDER_TYPE_CHOICES, default='personnel'
     )
     mode_paiement = models.CharField(
-        max_length=20, choices=PAYMENT_METHOD_CHOICES, default='mobile_money'
+        max_length=30, choices=PAYMENT_METHOD_CHOICES, default='mobile_money'
     )
     payment_transaction = models.ForeignKey(PaymentTransaction, null=True, blank=True, on_delete=models.SET_NULL, related_name='commandes')
     is_credit_purchase = models.BooleanField(default=False)
@@ -110,6 +124,13 @@ class Order(models.Model):
     )
     returned_at = models.DateTimeField(null=True, blank=True)
     return_reason = models.TextField(blank=True, default='')
+    abandoned_at = models.DateTimeField(null=True, blank=True)
+    last_reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    manual_payment_confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='manual_orders_confirmed'
+    )
+    manual_payment_reference = models.CharField(max_length=150, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -226,6 +226,26 @@ class Ouvrage(models.Model):
             self.slug = str(candidate)
         super().save(*args, **kwargs)
 
+        try:
+            from .models import OuvrageLanguageVersion
+            if self.is_paper_available:
+                all_lvs = OuvrageLanguageVersion.objects.filter(ouvrage=self)
+                if all_lvs.exists():
+                    for ol in all_lvs:
+                        if not ol.is_paper_available:
+                            ol.is_paper_available = True
+                            ol.save(update_fields=['is_paper_available'])
+            else:
+                OuvrageLanguageVersion.objects.filter(ouvrage=self).update(is_paper_available=False)
+        except Exception:
+            pass
+
+        try:
+            from apps.catalog.views import invalidate_catalog_cache
+            invalidate_catalog_cache()
+        except Exception:
+            pass
+
 
 
 class Quiz(models.Model):

@@ -1096,7 +1096,23 @@ export default function AdminBookEditPage() {
                     type="checkbox"
                     id="isPaperAvailGlobal"
                     checked={isPaperAvailable}
-                    onChange={(e) => setIsPaperAvailable(e.target.checked)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsPaperAvailable(checked);
+                      setLanguages((prev) =>
+                        prev.map((l) =>
+                          l.is_original
+                            ? {
+                                ...l,
+                                is_paper_available: checked,
+                                paper_stock: checked ? (l.paper_stock && l.paper_stock > 0 ? l.paper_stock : (paperStock > 0 ? paperStock : 0)) : 0,
+                              }
+                            : checked
+                            ? l
+                            : { ...l, is_paper_available: false }
+                        )
+                      );
+                    }}
                     className="w-4 h-4 rounded border-border text-navy"
                   />
                   <label htmlFor="isPaperAvailGlobal" className="text-xs font-medium text-navy cursor-pointer">

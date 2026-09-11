@@ -328,8 +328,25 @@ export async function getStudentHistoryStats(): Promise<HistoryStatsAPI> {
 
 // ─── Achats & Commandes ────────────────────────────────────────────────────────
 
-export async function getStudentOrders(): Promise<OrderAPI[]> {
-  return bffGet<OrderAPI[]>("/orders/");
+export async function getStudentOrders(queryObj?: { paymentId?: string; orderId?: string }): Promise<OrderAPI[]> {
+  const params = new URLSearchParams();
+  if (queryObj?.paymentId) params.set("paymentId", queryObj.paymentId);
+  if (queryObj?.orderId) params.set("order_id", queryObj.orderId);
+  const q = params.toString();
+  return bffGet<OrderAPI[]>(`/orders/${q ? `?${q}` : ""}`);
+}
+
+export async function verifyOrderPayment(payload: { orderId?: string; paymentId?: string }): Promise<{ success: boolean; data?: any; error?: string }> {
+  const res = await fetch("/api/bff/commerce/payments/verify/", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      order_id: payload.orderId,
+      paymentId: payload.paymentId,
+    }),
+  });
+  return res.json();
 }
 
 export async function createPaperOrder(payload: {

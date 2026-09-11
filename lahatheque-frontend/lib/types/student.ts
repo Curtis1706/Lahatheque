@@ -47,6 +47,10 @@ export interface ClientBookAccess {
   has_audio_version?: boolean;
   price_audio?: number | null;
   has_audio?: boolean;
+  is_audio_owned?: boolean;
+  has_audio_access?: boolean;
+  is_owned?: boolean;
+  has_digital_access?: boolean;
   audio_duration_seconds?: number;
   narrator?: string;
   

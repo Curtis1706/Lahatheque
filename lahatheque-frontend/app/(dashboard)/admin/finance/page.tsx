@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import {
   Landmark,
   TrendingUp,
@@ -17,6 +18,8 @@ import {
   Download,
   Library,
   ChevronDown,
+  RotateCcw,
+  ArrowUpRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -384,35 +387,63 @@ export default function AdminFinancePage() {
         </div>
       </div>
 
-      {/* Marge Plateforme & Créances */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Marge Plateforme, Créances & Manque à Gagner */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Carte 1 : Marge Nette Plateforme */}
         <div className="p-5 rounded-3xl bg-background border border-border flex items-center justify-between gap-4">
           <div className="space-y-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Marge Nette Plateforme</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Marge Nette Plateforme</span>
             <div className="font-serif text-xl font-bold text-navy">
-              {(finance?.platform_margin?.net_retained_platform || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
+              {(finance?.platform_margin?.net_retained_platform || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-muted-foreground">FCFA</span>
             </div>
-            <p className="text-xs text-foreground-muted">
+            <p className="text-xs text-muted-foreground">
               Taux moyen de rétention LAHA : <strong className="text-navy">{finance?.platform_margin?.commission_rate_avg || 0}%</strong>
             </p>
           </div>
-          <div className="p-3 rounded-2xl bg-gold/10 text-gold border border-gold/20 flex-shrink-0">
+          <div className="p-3 rounded-2xl bg-gold/10 text-gold border border-gold/20 shrink-0">
             <TrendingUp className="w-6 h-6" />
           </div>
         </div>
 
+        {/* Carte 2 : Créances en Cours */}
         <div className="p-5 rounded-3xl bg-background border border-border flex items-center justify-between gap-4">
           <div className="space-y-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Créances en Cours d&apos;Encaissement</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Créances en Cours</span>
             <div className="font-serif text-xl font-bold text-navy">
-              {(finance?.credit?.outstanding_total || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-foreground-muted">FCFA</span>
+              {(finance?.credit?.outstanding_total || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-muted-foreground">FCFA</span>
             </div>
-            <p className="text-xs text-foreground-muted">
-              {finance?.credit?.outstanding_count || 0} commande{(finance?.credit?.outstanding_count || 0) > 1 ? "s" : ""} en attente de dénouement
+            <p className="text-xs text-muted-foreground">
+              {finance?.credit?.outstanding_count || 0} achat{(finance?.credit?.outstanding_count || 0) > 1 ? "s" : ""} à crédit à recouvrer
             </p>
           </div>
-          <div className="p-3 rounded-2xl bg-navy/5 text-navy border border-border flex-shrink-0">
+          <div className="p-3 rounded-2xl bg-navy/5 text-navy border border-border shrink-0">
             <Wallet className="w-6 h-6 text-gold" />
+          </div>
+        </div>
+
+        {/* Carte 3 : Manque à Gagner (Abandons) */}
+        <div className="p-5 rounded-3xl bg-background border border-border flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Manque à Gagner (Abandons)</span>
+            <div className="font-serif text-xl font-bold text-rose-700">
+              {(finance?.abandoned_loss?.abandoned_total || 0).toLocaleString("fr-FR")} <span className="text-xs font-normal text-muted-foreground">FCFA</span>
+            </div>
+            <div className="flex items-center gap-1.5 pt-0.5">
+              <span className="text-xs text-muted-foreground">
+                {finance?.abandoned_loss?.abandoned_count || 0} panier{(finance?.abandoned_loss?.abandoned_count || 0) > 1 ? "s" : ""} non finalisé{(finance?.abandoned_loss?.abandoned_count || 0) > 1 ? "s" : ""}
+              </span>
+              <Link
+                href="/admin/orders"
+                className="text-[11px] font-semibold text-gold hover:underline inline-flex items-center gap-0.5 ml-1"
+                title="Consulter et relancer les paniers abandonnés"
+              >
+                <span>Relancer</span>
+                <ArrowUpRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-rose-500/10 text-rose-600 border border-rose-500/20 shrink-0">
+            <RotateCcw className="w-6 h-6" />
           </div>
         </div>
       </div>

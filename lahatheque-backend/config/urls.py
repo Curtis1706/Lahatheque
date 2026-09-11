@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from apps.commerce.webhooks import MonerooWebhookView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,6 +25,8 @@ urlpatterns = [
     path('api/v1/partner/', include('apps.reader.partner_urls')),
     path('api/v1/student/', include('apps.student.urls')),
     path('api/v1/communications/', include('apps.communications.urls')),
+    path('api/v1/webhooks/moneroo/', MonerooWebhookView.as_view(), name='root-webhook-moneroo-v1'),
+    path('webhooks/moneroo/', MonerooWebhookView.as_view(), name='root-webhook-moneroo'),
 ]
 
 if settings.DEBUG:

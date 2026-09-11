@@ -6,12 +6,13 @@
 
 ## Summary
 
-Cette fonctionnalité restructure l'ensemble du pôle financier de la plateforme en 4 volets complémentaires :
-1. **Ventes & Revenus (`/admin/sales`)** : Réconciliation arithmétique 100 % dynamique du Chiffre d'Affaires total consolidé en agrégeant en direct toutes les commandes payées en base (B2C, universités et grossistes). Tableau à lignes consolidées dépliables (accordéons) pour chaque commande afin de détailler les articles, formats, quantités et sous-totaux sans encombrement.
-2. **Demandes de Versement (`/admin/payouts`)** : Création d'une page dédiée avec 4 KPIs de suivi, tableau des demandes d'auteurs, éditeurs et universités, et modales de validation (saisie référence transaction + justificatif facultatif) et de rejet (motif obligatoire).
-3. **Finances Globales (`/admin/finance`)** : Tableau de bord consolidé 360° et tableau récapitulatif multi-partenaires enrichi avec filtres par rôle et accordéons dépliables par ayant-droit.
-4. **Redevances & Droits (`/admin/royalties`)** : Suppression des 3 boutons orphelins dans l'en-tête, retrait du bloc de versement, recentrage sur la configuration des barèmes et des taux contractuels dérogatoires.
-5. **Sidebar (`dashboard-sidebar.tsx`)** : Intégration des 4 sous-menus ordonnés sous le menu « Gestion des Finances ».
+Cette fonctionnalité restructure l'ensemble du pôle financier et de commande de la plateforme en 5 volets complémentaires et interconnectés :
+1. **Gestion des Commandes & Panier Abandonnés (`/admin/orders`)** : Cycle de vie complet (`pending`, `paid`, `credit`, `failed`, `cancelled`, `abandoned`), bascule automatique des commandes sans paiement après 24h vers `abandoned`, filtres par statut et console d'actions opérationnelles (vérification Moneroo en 1 clic, validation manuelle tous modes dont espèces et MoMo direct, relance de panier abandonné, facture PDF acquittée, annulation).
+2. **Ventes & Revenus (`/admin/sales`)** : Réconciliation arithmétique 100 % dynamique du Chiffre d'Affaires total consolidé en agrégeant en direct toutes les commandes payées en base (B2C, universités et grossistes). Tableau à lignes consolidées dépliables (accordéons) pour chaque commande afin de détailler les articles, formats, quantités et sous-totaux sans encombrement.
+3. **Finances Globales & Trésorerie 360° (`/admin/finance` et `/admin/reports`)** : Tableau de bord consolidé multi-flux ventilant le CA brut encaissé par canal (Numérique/audio, Papier, Grossistes, Abonnements, Bouquets), encours de crédit/créances à recouvrer, manque à gagner des paniers abandonnés, et marge nette conservée par la plateforme après déduction des redevances estimées et coûts.
+4. **Redevances, Droits & Demandes de Versement (`/admin/royalties` et `/admin/payouts`)** : Conditionnement strict de l'éligibilité des redevances à l'encaissement effectif (`paid`), épuration de `/admin/royalties` (suppression des 3 boutons orphelins), et page autonome `/admin/payouts` avec KPIs, tableau d'instruction des retraits et archivage des justificatifs.
+5. **Grand Livre Comptable & Rapprochement Bancaire** : Export unifié multi-formats (Excel/CSV détaillé avec brut, commissions passerelles réelles/estimées, net, mode de paiement, référence et auditeur) et rapports PDF périodiques officiels.
+6. **Sidebar (`dashboard-sidebar.tsx`)** : Intégration claire et structurée sous « Gestion des Finances » et « Commandes ».
 
 ---
 
@@ -76,29 +77,34 @@ specs/003-finance-management-suite/
 ```text
 lahatheque-backend/
 ├── apps/
-│   ├── commerce/models.py              # Order, LigneCommande, WholesaleOrder
+│   ├── commerce/
+│   │   ├── models.py                   # Order (cycle de vie complet), PaymentTransaction, LigneCommande
+│   │   ├── views.py                    # VerifyOrderPaymentView, ManualPaymentConfirmView, AdminCreateOrderView
+│   │   ├── services.py                 # reconcile_moneroo_payment, fulfill_credit_order, confirm_manual_payment
+│   │   └── tasks.py                    # Tâche périodique d'auto-bascule 24h des pending vers abandoned
 │   ├── partners/models.py              # UniversityPaperOrder
 │   ├── rights/
 │   │   ├── models.py                   # PayoutRequest, AuthorRight, ContratLegal
 │   │   └── views.py                    # Endpoints PayoutRequest (validate, reject, kpis)
 │   └── reporting/
-│       ├── admin_views.py              # AdminSalesListAPIView, AdminGlobalFinanceView, PartnerRoyalties
-│       └── urls.py                     # Déclaration des routes REST
-
+│       ├── admin_views.py              # AdminSalesListAPIView, AdminGlobalFinanceView, PartnerRoyalties, AccountingLedgerExportView
+│       └── urls.py                     # Déclaration des routes REST financières
 lahatheque-frontend/
 ├── app/(dashboard)/admin/
+│   ├── orders/page.tsx                 # Gestion des Commandes & Paniers abandonnés (console d'actions, filtres statuts)
 │   ├── sales/page.tsx                  # Page Ventes & Revenus (réconciliation dynamique + accordéons)
-│   ├── finance/page.tsx                # Page Finances Globales (synthèse 360° + table multi-partenaires)
-│   ├── royalties/page.tsx              # Page Redevances (épurée des 3 boutons et du bloc versements)
+│   ├── finance/page.tsx                # Page Finances Globales (synthèse 360° multi-flux + table multi-partenaires)
+│   ├── royalties/page.tsx              # Page Redevances (épurée des 3 boutons et conditionnée au paiement)
 │   └── payouts/page.tsx                # Nouvelle page Demandes de Versement (KPIs + data table + modales)
 ├── components/
-│   ├── dashboard-sidebar.tsx           # Mise à jour du menu "Gestion des Finances" (4 sous-liens)
+│   ├── dashboard-sidebar.tsx           # Mise à jour du menu "Gestion des Finances" et "Commandes"
 │   └── features/admin/
+│       ├── order-action-modal.tsx      # Modale d'actions commandes (confirmation manuelle, vérification, relance)
 │       ├── payout-validation-modal.tsx # Modale de validation (référence + justificatif facultatif)
 │       └── payout-rejection-modal.tsx  # Modale de rejet avec motif obligatoire
 ├── lib/
-│   ├── services/admin.ts               # Fonctions d'appels API BFF (payouts, sales, partner royalties)
-│   └── types/admin.ts                  # Typage TypeScript strict des modèles financiers
+│   ├── services/admin.ts               # Fonctions d'appels API BFF (commandes, payouts, sales, finance, exports)
+│   └── types/admin.ts                  # Typage TypeScript strict des modèles financiers et statuts de commandes
 ```
 
 ---

@@ -53,7 +53,9 @@ export function FeaturedBooksSection({ books }: FeaturedBooksSectionProps) {
         author: authorName,
         cover: book.cover_url || book.cover_image,
         format: "digital",
-        price: book.price ? Number(book.price) : 2500,
+        price: ((book as any).price_digital !== undefined && (book as any).price_digital !== null)
+          ? Number((book as any).price_digital)
+          : (book.price ? Number(book.price) : 2500),
         quantity: 1,
         selectedLanguage: selectedLang,
       },
@@ -195,7 +197,10 @@ export function FeaturedBooksSection({ books }: FeaturedBooksSectionProps) {
 
                 <div className="flex items-center justify-between pt-2 border-t border-border mt-1">
                   <span className="text-xs font-bold font-mono text-navy">
-                    {(book.price ? Number(book.price) : 2500).toLocaleString("fr-FR")} FCFA
+                    {(((book as any).price_digital !== undefined && (book as any).price_digital !== null)
+                      ? Number((book as any).price_digital)
+                      : (book.price ? Number(book.price) : 2500)
+                    ).toLocaleString("fr-FR")} FCFA
                   </span>
                   <button
                     type="button"
@@ -290,7 +295,10 @@ export function FeaturedBooksSection({ books }: FeaturedBooksSectionProps) {
 
                 <div className="flex items-center justify-between mt-2 pt-3 border-t border-border">
                   <span className="text-xs sm:text-sm font-bold font-mono text-navy">
-                    {(book.price ? Number(book.price) : 2500).toLocaleString("fr-FR")} FCFA
+                    {(((book as any).price_digital !== undefined && (book as any).price_digital !== null)
+                      ? Number((book as any).price_digital)
+                      : (book.price ? Number(book.price) : 2500)
+                    ).toLocaleString("fr-FR")} FCFA
                   </span>
                   <button
                     type="button"

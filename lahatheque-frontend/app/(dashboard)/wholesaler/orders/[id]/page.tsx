@@ -167,18 +167,29 @@ export default function WholesalerOrderDetailPage() {
                     `${Number(i.subtotal).toLocaleString("fr-FR")} FCFA`,
                   ]),
                   totalAmount: `${Number(order.total_amount).toLocaleString("fr-FR")} ${order.currency || "FCFA"}`,
-                  totalNotes: `Bon de Commande & Facture Proforma Grossiste. Conditions de règlement : Net à 30 jours pour commande à crédit validée.`,
-                  filename: `proforma_grossiste_${order.reference || order.id.slice(0, 8)}.pdf`,
+                  totalLabel: order.status === "delivered" ? "TOTAL PAYÉ :" : "TOTAL NET À PAYER :",
+                  totalNotes: order.status === "delivered"
+                    ? `Facture grossiste certifiée acquittée. Règlement réceptionné.`
+                    : `Bon de Commande & Facture Proforma Grossiste. Conditions de règlement : Net à 30 jours pour achat à crédit validé.`,
+                  filename: order.status === "delivered"
+                    ? `facture_grossiste_${order.reference || order.id.slice(0, 8)}.pdf`
+                    : `proforma_grossiste_${order.reference || order.id.slice(0, 8)}.pdf`,
                 });
-                toast.success("Facture proforma PDF officielle générée et téléchargée !");
+                toast.success(
+                  order.status === "delivered"
+                    ? "Facture acquittée PDF officielle générée avec succès !"
+                    : "Facture proforma PDF officielle générée et téléchargée !"
+                );
               } catch {
-                toast.error("Erreur lors de la génération de la facture proforma.");
+                toast.error("Erreur lors de la génération de la facture.");
               }
             }}
             className="px-3.5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] cursor-pointer"
           >
             <Download className="w-4 h-4 text-gold" />
-            Télécharger Facture Proforma PDF
+            {order.status === "delivered"
+              ? "Télécharger Facture Acquittée PDF"
+              : "Télécharger Facture Proforma PDF"}
           </button>
 
           {order.status !== "delivered" && order.status !== "cancelled" && (

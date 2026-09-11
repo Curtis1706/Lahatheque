@@ -288,7 +288,7 @@ export function UnifiedBookOrderModal({
           </button>
         </div>
 
-        {onOpenSample && (
+        {onOpenSample && !isDigitalOwned && (
           <button
             type="button"
             onClick={onOpenSample}
@@ -342,7 +342,7 @@ export function UnifiedBookOrderModal({
                 setFormat("digital");
               }
             }}
-            className={`p-3.5 rounded-2xl border text-left space-y-1 transition-all relative ${
+            className={`p-3.5 rounded-2xl border text-left space-y-1.5 transition-all relative ${
               isDigitalOwned
                 ? "border-success/30 bg-success/5 cursor-default"
                 : format === "digital"
@@ -350,20 +350,20 @@ export function UnifiedBookOrderModal({
                 : "border-border bg-background-secondary cursor-pointer"
             }`}
           >
-            <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center justify-between gap-1 flex-wrap">
               <span className="text-xs font-bold text-navy flex items-center gap-1.5">
-                <BookOpen className="w-4 h-4 text-gold" />
-                Numérique
+                <BookOpen className="w-4 h-4 text-gold shrink-0" />
+                <span>Numérique</span>
               </span>
               {isDigitalOwned && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success/15 text-success flex items-center gap-1">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success/15 text-success inline-flex items-center gap-0.5">
                   <CheckCircle2 className="w-2.5 h-2.5" /> Acquis
                 </span>
               )}
             </div>
 
             {isDigitalOwned ? (
-              <p className="text-xs font-bold text-success pt-1">
+              <p className="text-xs font-bold text-success pt-0.5">
                 Déjà acquis
               </p>
             ) : (
@@ -387,7 +387,7 @@ export function UnifiedBookOrderModal({
                   setFormat("audio");
                 }
               }}
-              className={`p-3.5 rounded-2xl border text-left space-y-1 transition-all relative ${
+              className={`p-3.5 rounded-2xl border text-left space-y-1.5 transition-all relative ${
                 isAudioOwned
                   ? "border-success/30 bg-success/5 cursor-default"
                   : format === "audio"
@@ -395,20 +395,20 @@ export function UnifiedBookOrderModal({
                   : "border-border bg-background-secondary cursor-pointer"
               }`}
             >
-              <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center justify-between gap-1 flex-wrap">
                 <span className="text-xs font-bold text-navy flex items-center gap-1.5">
-                  <Headphones className="w-4 h-4 text-gold" />
-                  Livre Audio
+                  <Headphones className="w-4 h-4 text-gold shrink-0" />
+                  <span>Livre Audio</span>
                 </span>
                 {isAudioOwned && (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success/15 text-success flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success/15 text-success inline-flex items-center gap-0.5">
                     <CheckCircle2 className="w-2.5 h-2.5" /> Acquis
                   </span>
                 )}
               </div>
 
               {isAudioOwned ? (
-                <p className="text-xs font-bold text-success pt-1">
+                <p className="text-xs font-bold text-success pt-0.5">
                   Déjà acquis
                 </p>
               ) : (
@@ -427,7 +427,7 @@ export function UnifiedBookOrderModal({
             type="button"
             onClick={() => paperAvailable && setFormat("paper")}
             disabled={!paperAvailable}
-            className={`p-3.5 rounded-2xl border text-left space-y-1 transition-all relative ${
+            className={`p-3.5 rounded-2xl border text-left space-y-1.5 transition-all relative ${
               !paperAvailable
                 ? "border-border bg-background-secondary opacity-50 cursor-not-allowed"
                 : format === "paper"
@@ -435,10 +435,10 @@ export function UnifiedBookOrderModal({
                 : "border-border bg-background-secondary cursor-pointer"
             }`}
           >
-            <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center justify-between gap-1 flex-wrap">
               <span className="text-xs font-bold text-navy flex items-center gap-1.5">
-                <Truck className="w-4 h-4 text-navy" />
-                Papier
+                <Truck className="w-4 h-4 text-navy shrink-0" />
+                <span>Papier</span>
               </span>
               {paperAvailable && isDigitalOwned && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-gold/15 text-navy">
@@ -512,7 +512,6 @@ export function UnifiedBookOrderModal({
                 <option value="mobile_money">Mobile Money (MTN / Moov / Orange / Wave)</option>
                 <option value="virement">Virement bancaire</option>
                 <option value="especes">Espèces à la livraison</option>
-                <option value="carte">Carte bancaire</option>
               </select>
             </div>
 

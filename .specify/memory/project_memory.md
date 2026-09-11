@@ -142,10 +142,30 @@
     - Déverrouillage automatique dans `ReadingProgress` (`apps/commerce/services.py`).
     - Accès immédiat dans l'espace client (`/student/books`) avec la liseuse sécurisée FlipBook.
   - *Livre Audio (`audio`)* :
-    - Pris en compte dans `apps/commerce/services.py` et `apps/protection/access_service.py` (`format_type__in=['digital', 'audio']`).
-    - Déverrouillage automatique dans `ReadingProgress` pour l'écoute dans le lecteur audio du dashboard.
+    - Déverrouillage d'écoute audio strictement séparé du droit de lecture numérique.
+    - Seul le format `audio` débloque la piste audio (`AudioStreamSessionView`) sans octroyer l'accès au flux de streaming PDF (`apps/protection/access_service.py`).
+    - L'achat audio débloque la présence dans la bibliothèque avec le badge « Audio » et l'action « Écouter », sans fausse progression de lecture ni bouton « Lire ».
   - *Facturation Transactionnelle* :
     - Génération et envoi automatique de la facture PDF acquittée certifiée en pièce jointe via `templates/emails/orders/confirmation_client.html`.
+
+---
+
+## 7. Ségrégation Stricte des Droits Audio vs Numérique (Corrigé le 2026-09-11)
+
+- **Contrôle d'accès (`apps/protection/access_service.py`)** :
+  - `check_user_book_access` vérifie exclusivement les formats de lecture (`format_type__in=['digital', 'pdf', 'epub']`) ou les abonnements/bouquets actifs. Les achats `audio` purs ne confèrent plus l'accès au streaming de livre PDF.
+- **Déverrouillage des commandes (`apps/commerce/services.py`)** :
+  - Les lignes de format `digital` créent une progression de lecture initiale (`ReadingProgress`).
+  - Les lignes de format `audio` créent l'enregistrement dans la bibliothèque sans fausse progression de lecture.
+- **Bibliothèque Étudiant (`apps/student/views.py` & serializers)** :
+  - `StudentBooksView` et `OuvrageBasicSerializer` gèrent `user_digital_ids` et `user_audio_ids` de manière totalement indépendante.
+  - `is_owned` et `has_digital_access` sont `True` uniquement si le format numérique est possédé.
+  - `is_audio_owned` et `has_audio_access` sont `True` uniquement si le format audio est possédé.
+- **Composants Frontend (`book-card.tsx`, `book-list-item.tsx`, `student/page.tsx`)** :
+  - Badge dynamique : « Numérique » (numérique seul), « Audio » (audio seul), « Num. & Audio » (les deux possédés).
+  - Bouton « Lire » affiché uniquement si `isDigitalOwned === true`.
+  - Bouton « Écouter » affiché uniquement si `isAudioOwned === true` (devient le bouton d'action principal si seul l'audio est possédé).
+  - Clic sur la couverture d'un livre audio seul déclenche la lecture audio via le lecteur persistant.
 
 ### C. Fichiers Cibles de l'Implémentation 006
 - **Types** :

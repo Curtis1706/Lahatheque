@@ -24,6 +24,7 @@ export interface Book {
   summary: string;
   publication_year?: number;
   price?: number;
+  price_digital?: number;
   price_paper?: number;
   price_audio?: number;
   price_audio_eur?: number;

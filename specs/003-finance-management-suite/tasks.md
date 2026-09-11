@@ -110,32 +110,53 @@
 
 ---
 
-## Dependencies & Execution Order
+## Phase 9: User Story 6 - Gestion des Commandes, Paniers Abandonnés & Console d'Actions (/admin/orders) (Priority: P1)
 
-```text
-Phase 1 (Setup Types)
-      ↓
-Phase 2 (Backend Foundations: Models & Endpoints)
-      ↓
-Phase 3 (US1: Ventes & CA Dynamique)  [MVP]
-      ↓
-Phase 4 (US2: Page Dédiée Demandes de Versement)
-      ↓
-Phase 5 (US3: Finances Globales 360° & Multi-Partenaires)
-      ↓
-Phase 6 (US4: Épuration de Redevances & Droits)
-      ↓
-Phase 7 (US5: Navigation Sidebar à 4 Liens)
-      ↓
-Phase 8 (Polish, Responsive & Tests)
-```
+**Goal**: Superviser 100 % des commandes et tentatives de paiement avec cycle de vie complet (`paid`, `pending`, `credit`, `abandoned`, `failed`, `cancelled`), bascule automatique après 24h, et console d'actions rapides (vérification Moneroo en 1 clic, validation manuelle tous modes, relance panier, facture PDF).
+
+**Independent Test**: Ouvrir `/admin/orders`, filtrer par statut `Paniers abandonnés`, constater le calcul du manque à gagner, exécuter une validation manuelle en espèces sur une commande en attente, et constater la mise à jour immédiate des KPIs.
+
+- [x] T029 [P] [US6] Étendre le modèle Order avec le statut 'abandoned' et les champs d'audit (abandoned_at, last_reminder_sent_at, manual_payment_reference) dans lahatheque-backend/apps/commerce/models.py
+- [x] T030 [P] [US6] Créer la tâche de bascule automatique 24h des commandes pending vers abandoned dans lahatheque-backend/apps/commerce/tasks.py
+- [x] T031 [US6] Implémenter la vue backend AdminOrdersListView avec filtres par statut de paiement, recherche textuelle et KPIs financiers dans lahatheque-backend/apps/commerce/views.py
+- [x] T032 [P] [US6] Implémenter l'endpoint de relance de panier abandonné AdminOrderRemindView dans lahatheque-backend/apps/commerce/views.py
+- [x] T033 [P] [US6] Déclarer les fonctions de service API getAdminOrders(), confirmManualOrderPayment() et remindAbandonedOrder() dans lahatheque-frontend/lib/services/admin.ts
+- [x] T034 [P] [US6] Créer le composant de modale d'actions commande (confirmation tous modes et relance) dans lahatheque-frontend/components/features/admin/order-action-modal.tsx
+- [x] T035 [US6] Refactoriser lahatheque-frontend/app/(dashboard)/admin/orders/page.tsx avec onglets de filtrage sémantiques, KPIs financiers réconciliés et console d'actions rapides sur chaque ligne
 
 ---
 
-## Parallel Opportunities
+## Phase 10: User Story 7 - Grand Livre Comptable, Marge Nette & Clôtures (/admin/finance, /admin/sales) (Priority: P1)
 
-- **Phase 1** : T001 et T002 peuvent être réalisés en parallèle.
-- **Phase 2** : T005 et T006 peuvent être développés en parallèle une fois les migrations appliquées.
-- **Phase 3** : T008 et T009 peuvent être exécutés en parallèle avant l'assemblage dans T010.
-- **Phase 4** : T012, T013 et T014 peuvent être développés en parallèle avant l'assemblage de la page T015.
-- **Phase 8** : T024 et T025 peuvent être exécutés en parallèle.
+**Goal**: Fournir l'export officiel du Grand Livre Comptable (Excel/CSV et PDF officiel) et consolider la marge nette plateforme après déduction des redevances et charges d'impression.
+
+**Independent Test**: Télécharger le Grand Livre Comptable depuis `/admin/sales`, vérifier la présence des colonnes Bruts, Commissions Moneroo, Nets et Auditeur, puis vérifier sur `/admin/finance` le calcul de la marge nette conservée par LAHAThèque.
+
+- [x] T036 [P] [US7] Implémenter la vue d'export du Grand Livre Comptable AccountingLedgerExportView (formats xlsx, csv, pdf) dans lahatheque-backend/apps/reporting/admin_views.py
+- [x] T037 [US7] Intégrer les boutons d'export Grand Livre Comptable et Bordereau Récapitulatif dans lahatheque-frontend/app/(dashboard)/admin/sales/page.tsx
+- [x] T038 [US7] Enrichir lahatheque-frontend/app/(dashboard)/admin/finance/page.tsx avec les indicateurs de marge nette plateforme, créances clients à recouvrer et manque à gagner des abandons
+
+---
+
+## Phase 11: Validation Finale, Non-Régression & Tests
+
+**Purpose**: Validation rigoureuse de bout en bout de l'ensemble de la suite financière
+
+- [x] T039 [P] Vérifier l'absence totale de code couleur hexadécimal en dur et d'émojis dans les nouveaux composants
+- [x] T040 Valider le comportement responsive mobile sous 400px sur `/admin/orders`, `/admin/sales` et `/admin/finance`
+- [x] T041 Exécuter la compilation stricte TypeScript via npx tsc --noEmit dans lahatheque-frontend/
+- [x] T042 Exécuter les tests unitaires et d'intégration Django dans lahatheque-backend/
+
+---
+
+## Dependencies & Execution Order
+
+```text
+Phase 1 à 8 (Socle & Écrans Payouts/Sales existants)
+      ↓
+Phase 9 (US6: Gestion des Commandes, Paniers Abandonnés & Console d'Actions Admin)
+      ↓
+Phase 10 (US7: Grand Livre Comptable, Marge Nette & Clôtures)
+      ↓
+Phase 11 (Validation Finale, TypeScript & Tests)
+```
