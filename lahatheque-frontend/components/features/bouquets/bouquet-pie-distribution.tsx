@@ -20,6 +20,7 @@ interface BouquetPieDistributionProps {
   highlightUniversityId?: string;
   highlightUniversityName?: string;
   showTitle?: boolean;
+  isUniversityView?: boolean;
 }
 
 export function BouquetPieDistribution({
@@ -27,6 +28,7 @@ export function BouquetPieDistribution({
   highlightUniversityId,
   highlightUniversityName,
   showTitle = true,
+  isUniversityView,
 }: BouquetPieDistributionProps) {
   const [hoveredUnivId, setHoveredUnivId] = useState<string | null>(null);
 
@@ -124,6 +126,11 @@ export function BouquetPieDistribution({
     return false;
   };
 
+  const isUniv = Boolean(isUniversityView || highlightUniversityId);
+  const currentInst = isUniv
+    ? items.find((it) => isHighlighted(it)) || items[0]
+    : null;
+
   return (
     <div className="p-4 sm:p-6 md:p-8 rounded-3xl bg-background border border-border space-y-6 shadow-xs">
       {/* Titre Général de la Section */}
@@ -139,7 +146,7 @@ export function BouquetPieDistribution({
         </div>
       )}
 
-      {/* Synthèse Financière Option A : Enveloppe CA, Redevances Partenaires, Part Plateforme LAHA */}
+      {/* Synthèse Financière : Distinguer le rôle Université (données propres) du rôle Admin (données globales + marge) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-1 shadow-xs">
           <div className="flex items-center gap-2 text-foreground-muted">
@@ -152,27 +159,59 @@ export function BouquetPieDistribution({
           <p className="text-[10px] text-foreground-muted">Tarif annuel global souscrit</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 space-y-1 shadow-xs">
-          <div className="flex items-center gap-2 text-navy">
-            <TrendingUp className="w-4 h-4 text-gold" />
-            <span className="text-[11px] font-bold uppercase tracking-wider">Total Redevances Universit&eacute;s</span>
-          </div>
-          <p className="font-mono text-lg font-bold text-navy">
-            {total_royalties.toLocaleString("fr-FR")} {currency}
-          </p>
-          <p className="text-[10px] text-foreground-muted">Prorata consultations &bull; {items.length} campus</p>
-        </div>
+        {isUniv ? (
+          <>
+            <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-1 shadow-xs">
+              <div className="flex items-center gap-2 text-foreground-muted">
+                <Building2 className="w-4 h-4 text-navy" />
+                <span className="text-[11px] font-bold uppercase tracking-wider">Assiette Allouée</span>
+              </div>
+              <p className="font-mono text-lg font-bold text-navy">
+                {((currentInst?.ca_share_allocated ?? currentInst?.ca_share) || 0).toLocaleString("fr-FR")} {currency}
+              </p>
+              <p className="text-[10px] text-foreground-muted">
+                Quote-part d&apos;audience : <strong className="text-navy">{currentInst?.usage_share_percent || 0}%</strong>
+              </p>
+            </div>
 
-        <div className="p-4 rounded-2xl bg-navy-light border border-navy-hover/20 space-y-1 shadow-xs">
-          <div className="flex items-center gap-2 text-navy">
-            <Layers className="w-4 h-4 text-navy" />
-            <span className="text-[11px] font-bold uppercase tracking-wider">Part Plateforme LAHA</span>
-          </div>
-          <p className="font-mono text-lg font-bold text-navy">
-            {platformRevenue.toLocaleString("fr-FR")} {currency}
-          </p>
-          <p className="text-[10px] text-foreground-muted">Marge r&eacute;siduelle plateforme d&apos;&eacute;dition</p>
-        </div>
+            <div className="p-4 rounded-2xl bg-navy-light border border-navy-hover/20 space-y-1 shadow-xs">
+              <div className="flex items-center gap-2 text-navy">
+                <TrendingUp className="w-4 h-4 text-gold" />
+                <span className="text-[11px] font-bold uppercase tracking-wider">Votre Redevance Nette</span>
+              </div>
+              <p className="font-mono text-lg font-bold text-navy">
+                {(currentInst?.royalty_amount || 0).toLocaleString("fr-FR")} {currency}
+              </p>
+              <p className="text-[10px] text-foreground-muted">
+                Taux conventionné appliqué : <strong className="text-navy">{currentInst?.royalty_rate || royalty_rate}%</strong>
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="p-4 rounded-2xl bg-gold/10 border border-gold/30 space-y-1 shadow-xs">
+              <div className="flex items-center gap-2 text-navy">
+                <TrendingUp className="w-4 h-4 text-gold" />
+                <span className="text-[11px] font-bold uppercase tracking-wider">Total Redevances Universités</span>
+              </div>
+              <p className="font-mono text-lg font-bold text-navy">
+                {total_royalties.toLocaleString("fr-FR")} {currency}
+              </p>
+              <p className="text-[10px] text-foreground-muted">Prorata consultations &bull; {items.length} campus</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-navy-light border border-navy-hover/20 space-y-1 shadow-xs">
+              <div className="flex items-center gap-2 text-navy">
+                <Layers className="w-4 h-4 text-navy" />
+                <span className="text-[11px] font-bold uppercase tracking-wider">Part Plateforme LAHA</span>
+              </div>
+              <p className="font-mono text-lg font-bold text-navy">
+                {platformRevenue.toLocaleString("fr-FR")} {currency}
+              </p>
+              <p className="text-[10px] text-foreground-muted">Marge résiduelle plateforme d&apos;édition</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ─── GRILLE 2 COLONNES : DIAGRAMME CIRCULAIRE (GAUCHE) & BARRES HORIZONTALES (DROITE) ─── */}
@@ -340,11 +379,19 @@ export function BouquetPieDistribution({
                     </div>
 
                     <span className="font-mono text-xs font-bold text-navy shrink-0">
-                      {item.royalty_amount.toLocaleString("fr-FR", {
-                        minimumFractionDigits: isFcfa ? 0 : 2,
-                        maximumFractionDigits: isFcfa ? 0 : 2,
-                      })}{" "}
-                      {currency}
+                      {isUniv && item.institution_id === "others" ? (
+                        <span className="text-foreground-muted text-[11px] font-normal italic">
+                          Accords confidentiels
+                        </span>
+                      ) : (
+                        <>
+                          {item.royalty_amount.toLocaleString("fr-FR", {
+                            minimumFractionDigits: isFcfa ? 0 : 2,
+                            maximumFractionDigits: isFcfa ? 0 : 2,
+                          })}{" "}
+                          {currency}
+                        </>
+                      )}
                     </span>
                   </div>
 
@@ -473,11 +520,19 @@ export function BouquetPieDistribution({
                       {currency}
                     </td>
                     <td className="py-3 px-3 sm:px-4 text-right font-mono font-bold text-navy">
-                      {item.royalty_amount.toLocaleString("fr-FR", {
-                        minimumFractionDigits: isFcfa ? 0 : 2,
-                        maximumFractionDigits: isFcfa ? 0 : 2,
-                      })}{" "}
-                      {currency}
+                      {isUniv && item.institution_id === "others" ? (
+                        <span className="text-foreground-muted text-[11px] font-normal italic">
+                          Accords confidentiels
+                        </span>
+                      ) : (
+                        <>
+                          {item.royalty_amount.toLocaleString("fr-FR", {
+                            minimumFractionDigits: isFcfa ? 0 : 2,
+                            maximumFractionDigits: isFcfa ? 0 : 2,
+                          })}{" "}
+                          {currency}
+                        </>
+                      )}
                     </td>
                   </tr>
                 );
@@ -486,7 +541,9 @@ export function BouquetPieDistribution({
             {/* Ligne des Totaux */}
             <tfoot>
               <tr className="bg-navy-light/60 border-t-2 border-navy/20 font-bold text-navy text-xs">
-                <td className="py-3 px-3 sm:px-4 uppercase tracking-wider">Total Consolid&eacute;</td>
+                <td className="py-3 px-3 sm:px-4 uppercase tracking-wider">
+                  {isUniv ? "Total de Référence" : "Total Consolidé"}
+                </td>
                 <td className="py-3 px-2 sm:px-4 text-center font-mono">{total_books} livres</td>
                 <td className="py-3 px-2 sm:px-4 text-center font-mono">100.00 %</td>
                 <td className="py-3 px-3 sm:px-4 text-right font-mono">
@@ -497,11 +554,26 @@ export function BouquetPieDistribution({
                   {currency}
                 </td>
                 <td className="py-3 px-3 sm:px-4 text-right font-mono text-sm text-gold">
-                  {total_royalties.toLocaleString("fr-FR", {
-                    minimumFractionDigits: isFcfa ? 0 : 2,
-                    maximumFractionDigits: isFcfa ? 0 : 2,
-                  })}{" "}
-                  {currency}
+                  {isUniv ? (
+                    <>
+                      {(currentInst?.royalty_amount || 0).toLocaleString("fr-FR", {
+                        minimumFractionDigits: isFcfa ? 0 : 2,
+                        maximumFractionDigits: isFcfa ? 0 : 2,
+                      })}{" "}
+                      {currency}
+                      <span className="text-[10px] text-foreground-muted font-normal block">
+                        (votre établissement)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {total_royalties.toLocaleString("fr-FR", {
+                        minimumFractionDigits: isFcfa ? 0 : 2,
+                        maximumFractionDigits: isFcfa ? 0 : 2,
+                      })}{" "}
+                      {currency}
+                    </>
+                  )}
                 </td>
               </tr>
             </tfoot>
