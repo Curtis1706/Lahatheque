@@ -76,10 +76,7 @@ import {
   Mail,
   Headphones,
   CreditCard,
-  ChevronDown,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
 
 interface SubLinkItem {
   label: string;
@@ -99,14 +96,6 @@ export function DashboardSidebar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [openSection, setOpenSection] = useState<string | null>(null);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-
-  const toggleGroup = (groupLabel: string) => {
-    setCollapsedGroups((prev) => ({
-      ...prev,
-      [groupLabel]: !prev[groupLabel],
-    }));
-  };
 
   const getLinks = (): { groupLabel?: string; items: NavLinkItem[] }[] => {
     switch (user?.role) {
@@ -565,30 +554,10 @@ export function DashboardSidebar() {
     }
   };
 
-  // Synchronise l'ouverture des sous-menus et des groupes selon la route courante
+  // Synchronise l'ouverture des sous-menus selon la route courante
   useEffect(() => {
     let matched = false;
     for (const group of groups) {
-      const isGroupChildActive = group.items.some((item) => {
-        if (pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"))) {
-          return true;
-        }
-        if (item.sublinks) {
-          return item.sublinks.some(
-            (sub) => pathname === sub.href || (sub.href !== "/" && pathname.startsWith(sub.href + "/"))
-          );
-        }
-        return false;
-      });
-
-      // Si le groupe actif est replié, on le déplie pour garder l'élément courant visible
-      if (isGroupChildActive && group.groupLabel && collapsedGroups[group.groupLabel]) {
-        setCollapsedGroups((prev) => ({
-          ...prev,
-          [group.groupLabel!]: false,
-        }));
-      }
-
       for (const item of group.items) {
         if (item.sublinks) {
           const isChildActive = item.sublinks.some(
@@ -597,6 +566,7 @@ export function DashboardSidebar() {
           if (isChildActive) {
             setOpenSection(item.label);
             matched = true;
+            return;
           }
         }
       }
@@ -604,7 +574,7 @@ export function DashboardSidebar() {
     if (!matched) {
       setOpenSection(null);
     }
-  }, [pathname, groups]);
+  }, [pathname]);
 
   const getDashboardRoot = () => {
     if (!user) return "/student";
@@ -664,111 +634,79 @@ export function DashboardSidebar() {
 
       {/* Navigation Principale groupée */}
       <AnimatedSidebarContent>
-        {groups.map((group, gIdx) => {
-          const isFolded = Boolean(group.groupLabel && collapsedGroups[group.groupLabel]);
+        {groups.map((group, gIdx) => (
+          <AnimatedSidebarGroup key={gIdx} className="py-1">
+            {group.groupLabel && (
+              <AnimatedSidebarGroupLabel>
+                {group.groupLabel}
+              </AnimatedSidebarGroupLabel>
+            )}
+            <AnimatedSidebarGroupContent>
+              <AnimatedSidebarMenu>
+                {group.items.map((item) => {
+                  const hasSublinks = Boolean(item.sublinks && item.sublinks.length > 0);
+                  const isDirectActive = pathname === item.href;
+                  const isChildActive = Boolean(
+                    item.sublinks?.some(
+                      (sub) => pathname === sub.href || (sub.href.startsWith("/") && pathname.startsWith(sub.href + "/"))
+                    )
+                  );
+                  const isActive = isDirectActive || isChildActive;
+                  const isOpen = openSection === item.label;
 
-          return (
-            <AnimatedSidebarGroup key={gIdx} className="py-1">
-              {group.groupLabel && (
-                <AnimatedSidebarGroupLabel className="h-auto p-0 mb-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(group.groupLabel!)}
-                    className="w-full flex items-center justify-between px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-[0.14em] text-white/50 hover:text-white hover:bg-navy-hover/40 transition-all cursor-pointer group/label select-none outline-none focus-visible:ring-1 focus-visible:ring-gold/50"
-                    aria-expanded={!isFolded}
-                    title={isFolded ? `Déplier ${group.groupLabel}` : `Plier ${group.groupLabel}`}
-                  >
-                    <span className="truncate">{group.groupLabel}</span>
-                    <ChevronDown
-                      className={cn(
-                        "size-3 text-white/40 group-hover/label:text-white/80 transition-transform duration-200 shrink-0",
-                        isFolded ? "-rotate-90" : "rotate-0"
-                      )}
-                    />
-                  </button>
-                </AnimatedSidebarGroupLabel>
-              )}
+                  return (
+                    <AnimatedSidebarMenuItem key={item.label}>
+                      <AnimatedSidebarMenuButton
+                        href={hasSublinks ? undefined : item.href}
+                        isActive={isActive}
+                        ariaExpanded={hasSublinks ? isOpen : undefined}
+                        icon={item.icon}
+                        badge={item.badge}
+                        onSelect={() => {
+                          if (hasSublinks) {
+                            setOpenSection((current) =>
+                              current === item.label ? null : item.label
+                            );
+                          } else {
+                            setOpenSection(null);
+                          }
+                        }}
+                      >
+                        {item.label}
+                      </AnimatedSidebarMenuButton>
 
-              <AnimatePresence initial={false}>
-                {!isFolded && (
-                  <motion.div
-                    key={`group-content-${group.groupLabel || gIdx}`}
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2, ease: "easeInOut" }}
-                    className="w-full overflow-hidden group-data-[state=collapsed]/sidebar:!h-auto group-data-[state=collapsed]/sidebar:!opacity-100 group-data-[state=collapsed]/sidebar:!block"
-                  >
-                    <AnimatedSidebarGroupContent>
-                      <AnimatedSidebarMenu>
-                        {group.items.map((item) => {
-                          const hasSublinks = Boolean(item.sublinks && item.sublinks.length > 0);
-                          const isDirectActive = pathname === item.href;
-                          const isChildActive = Boolean(
-                            item.sublinks?.some(
-                              (sub) => pathname === sub.href || (sub.href.startsWith("/") && pathname.startsWith(sub.href + "/"))
-                            )
-                          );
-                          const isActive = isDirectActive || isChildActive;
-                          const isOpen = openSection === item.label;
-
-                          return (
-                            <AnimatedSidebarMenuItem key={item.label}>
-                              <AnimatedSidebarMenuButton
-                                href={hasSublinks ? undefined : item.href}
-                                isActive={isActive}
-                                ariaExpanded={hasSublinks ? isOpen : undefined}
-                                icon={item.icon}
-                                badge={item.badge}
-                                onSelect={() => {
-                                  if (hasSublinks) {
-                                    setOpenSection((current) =>
-                                      current === item.label ? null : item.label
-                                    );
-                                  } else {
-                                    setOpenSection(null);
-                                  }
-                                }}
-                              >
-                                {item.label}
-                              </AnimatedSidebarMenuButton>
-
-                              {hasSublinks && item.sublinks ? (
-                                <AnimatedSidebarMenuSub open={isOpen}>
-                                  {item.sublinks.map((sub) => {
-                                    const isSubActive =
-                                      pathname === sub.href ||
-                                      (sub.href.startsWith("/") && pathname.startsWith(sub.href + "/"));
-                                    return (
-                                      <AnimatedSidebarMenuSubItem key={sub.href + sub.label}>
-                                        <AnimatedSidebarMenuSubButton
-                                          href={sub.href === "#contact" ? undefined : sub.href}
-                                          isActive={isSubActive}
-                                          icon={sub.icon}
-                                          onSelect={() => {
-                                            if (sub.href === "#contact") {
-                                              window.dispatchEvent(new CustomEvent("app-open-contact"));
-                                            }
-                                          }}
-                                        >
-                                          {sub.label}
-                                        </AnimatedSidebarMenuSubButton>
-                                      </AnimatedSidebarMenuSubItem>
-                                    );
-                                  })}
-                                </AnimatedSidebarMenuSub>
-                              ) : null}
-                            </AnimatedSidebarMenuItem>
-                          );
-                        })}
-                      </AnimatedSidebarMenu>
-                    </AnimatedSidebarGroupContent>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </AnimatedSidebarGroup>
-          );
-        })}
+                      {hasSublinks && item.sublinks ? (
+                        <AnimatedSidebarMenuSub open={isOpen}>
+                          {item.sublinks.map((sub) => {
+                            const isSubActive =
+                              pathname === sub.href ||
+                              (sub.href.startsWith("/") && pathname.startsWith(sub.href + "/"));
+                            return (
+                              <AnimatedSidebarMenuSubItem key={sub.href + sub.label}>
+                                <AnimatedSidebarMenuSubButton
+                                  href={sub.href === "#contact" ? undefined : sub.href}
+                                  isActive={isSubActive}
+                                  icon={sub.icon}
+                                  onSelect={() => {
+                                    if (sub.href === "#contact") {
+                                      window.dispatchEvent(new CustomEvent("app-open-contact"));
+                                    }
+                                  }}
+                                >
+                                  {sub.label}
+                                </AnimatedSidebarMenuSubButton>
+                              </AnimatedSidebarMenuSubItem>
+                            );
+                          })}
+                        </AnimatedSidebarMenuSub>
+                      ) : null}
+                    </AnimatedSidebarMenuItem>
+                  );
+                })}
+              </AnimatedSidebarMenu>
+            </AnimatedSidebarGroupContent>
+          </AnimatedSidebarGroup>
+        ))}
       </AnimatedSidebarContent>
 
       {/* Footer Profile & Actions */}

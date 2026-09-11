@@ -454,12 +454,22 @@ export async function getAdminConsolidatedSales(params?: {
   period?: string;
   time_slot?: string;
   q?: string;
+  start_date?: string;
+  end_date?: string;
+  author?: string;
+  institution?: string;
+  publisher?: string;
 }): Promise<AdminSalesConsolidatedResponse> {
   const query = new URLSearchParams();
   if (params?.channel && params.channel !== 'all') query.set('channel', params.channel);
   if (params?.period && params.period !== 'all') query.set('period', params.period);
   if (params?.time_slot && params.time_slot !== 'all') query.set('time_slot', params.time_slot);
   if (params?.q) query.set('q', params.q);
+  if (params?.start_date) query.set('start_date', params.start_date);
+  if (params?.end_date) query.set('end_date', params.end_date);
+  if (params?.author) query.set('author', params.author);
+  if (params?.institution) query.set('institution', params.institution);
+  if (params?.publisher) query.set('publisher', params.publisher);
 
   const qs = query.toString();
   const res = await fetch(`/api/bff/admin/sales${qs ? `?${qs}` : ''}`, { cache: 'no-store' });

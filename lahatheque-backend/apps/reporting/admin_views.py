@@ -2567,35 +2567,63 @@ class AdminSalesListAPIView(APIView):
 
     def get(self, request):
         from apps.commerce.models import Order, WholesaleOrder, WholesaleOrderStatus
-        from apps.partners.models import UniversityPaperOrder
-        from datetime import timedelta
+        from apps.partners.models import UniversityPaperOrder, Institution
+        from apps.publishers_portal.models import Publisher
+        from apps.catalog.models import Ouvrage
+        from datetime import timedelta, datetime, time
         from django.utils import timezone
+        from django.utils.dateparse import parse_date
 
         channel_filter = request.GET.get('channel', 'all')
         period_filter = request.GET.get('period', 'all')
         time_slot = request.GET.get('time_slot')
         query = request.GET.get('q', '').strip().lower()
+        start_date_str = request.GET.get('start_date', '').strip()
+        end_date_str = request.GET.get('end_date', '').strip()
+        author_filter = request.GET.get('author', '').strip().lower()
+        institution_filter = request.GET.get('institution', '').strip().lower()
+        publisher_filter = request.GET.get('publisher', '').strip().lower()
 
-        now = timezone.now()
-        since_date = None
-        if period_filter == '1d':
-            since_date = now - timedelta(days=1)
-        elif period_filter == '1w':
-            since_date = now - timedelta(days=7)
-        elif period_filter == '1m':
-            since_date = now - timedelta(days=30)
-        elif period_filter == '3m':
-            since_date = now - timedelta(days=90)
-        elif period_filter == '1y':
-            since_date = now - timedelta(days=365)
+        # Résolution des dates de début et fin
+        filter_start = None
+        filter_end = None
+
+        if start_date_str:
+            parsed_start = parse_date(start_date_str)
+            if parsed_start:
+                filter_start = timezone.make_aware(datetime.combine(parsed_start, time.min))
+        if end_date_str:
+            parsed_end = parse_date(end_date_str)
+            if parsed_end:
+                filter_end = timezone.make_aware(datetime.combine(parsed_end, time.max))
+
+        # Si pas de dates personnalisées, application du preset période
+        if not filter_start and not filter_end:
+            now = timezone.now()
+            if period_filter == '1d':
+                filter_start = now - timedelta(days=1)
+            elif period_filter == '1w':
+                filter_start = now - timedelta(days=7)
+            elif period_filter == '1m':
+                filter_start = now - timedelta(days=30)
+            elif period_filter == '3m':
+                filter_start = now - timedelta(days=90)
+            elif period_filter == '1y':
+                filter_start = now - timedelta(days=365)
 
         orders_list = []
 
         # 1. B2C / Commandes unitaires (Order)
         if channel_filter in ['all', 'b2c_individual']:
-            qs_orders = Order.objects.filter(statut_paiement='paid').select_related('user').prefetch_related('lignes__ouvrage')
-            if since_date:
-                qs_orders = qs_orders.filter(created_at__gte=since_date)
+            qs_orders = Order.objects.filter(statut_paiement='paid').select_related('user').prefetch_related(
+                'lignes__ouvrage__authors',
+                'lignes__ouvrage__institution',
+                'lignes__ouvrage__publisher'
+            )
+            if filter_start:
+                qs_orders = qs_orders.filter(created_at__gte=filter_start)
+            if filter_end:
+                qs_orders = qs_orders.filter(created_at__lte=filter_end)
 
             for o in qs_orders:
                 buyer = o.user
@@ -2606,10 +2634,19 @@ class AdminSalesListAPIView(APIView):
 
                 items = []
                 for l in o.lignes.all():
+                    book = l.ouvrage
+                    authors_list = [f"{a.first_name} {a.last_name}".strip() for a in book.authors.all()] if book else []
+                    author_str = ", ".join(authors_list) if authors_list else ""
+                    inst_name = book.institution.name if (book and book.institution) else ""
+                    pub_name = (book.publisher.name if (book and book.publisher) else "") or (book.publisher_name if book else "")
                     items.append({
                         "id": str(l.id),
-                        "book_title": l.ouvrage.title if l.ouvrage else "Ouvrage",
-                        "isbn": getattr(l.ouvrage, 'isbn', '') or '',
+                        "book_title": book.title if book else "Ouvrage",
+                        "isbn": getattr(book, 'isbn', '') or '',
+                        "author_names": authors_list,
+                        "author_display": author_str,
+                        "institution_name": inst_name,
+                        "publisher_name": pub_name,
                         "format": l.format_type or 'digital',
                         "quantity": l.quantity or 1,
                         "unit_price": float(l.unit_price or 0),
@@ -2638,8 +2675,10 @@ class AdminSalesListAPIView(APIView):
         # 2. B2B Universités (UniversityPaperOrder)
         if channel_filter in ['all', 'b2b_university']:
             qs_univ = UniversityPaperOrder.objects.exclude(status='cancelled').select_related('institution', 'institution__user')
-            if since_date:
-                qs_univ = qs_univ.filter(created_at__gte=since_date)
+            if filter_start:
+                qs_univ = qs_univ.filter(created_at__gte=filter_start)
+            if filter_end:
+                qs_univ = qs_univ.filter(created_at__lte=filter_end)
 
             for uo in qs_univ:
                 inst = uo.institution
@@ -2656,6 +2695,10 @@ class AdminSalesListAPIView(APIView):
                         "id": f"univ-{uo.id}-{idx}",
                         "book_title": it.get('title') or "Ouvrage Papier Universitaire",
                         "isbn": it.get('isbn', '') or '',
+                        "author_names": [],
+                        "author_display": it.get('author', '') or '',
+                        "institution_name": inst_name,
+                        "publisher_name": "Éditions LAHA / Partenariat",
                         "format": "paper",
                         "quantity": qty,
                         "unit_price": uprice,
@@ -2668,6 +2711,10 @@ class AdminSalesListAPIView(APIView):
                         "id": f"univ-{uo.id}-0",
                         "book_title": f"Commande Institutionnelle ({ref})",
                         "isbn": "",
+                        "author_names": [],
+                        "author_display": "",
+                        "institution_name": inst_name,
+                        "publisher_name": "Éditions LAHA / Partenariat",
                         "format": "paper",
                         "quantity": 1,
                         "unit_price": float(uo.total_amount or 0),
@@ -2695,9 +2742,15 @@ class AdminSalesListAPIView(APIView):
 
         # 3. B2B Grossistes (WholesaleOrder)
         if channel_filter in ['all', 'b2b_wholesale']:
-            qs_ws = WholesaleOrder.objects.exclude(status=WholesaleOrderStatus.CANCELLED).select_related('user').prefetch_related('items__book')
-            if since_date:
-                qs_ws = qs_ws.filter(created_at__gte=since_date)
+            qs_ws = WholesaleOrder.objects.exclude(status=WholesaleOrderStatus.CANCELLED).select_related('user').prefetch_related(
+                'items__book__authors',
+                'items__book__institution',
+                'items__book__publisher'
+            )
+            if filter_start:
+                qs_ws = qs_ws.filter(created_at__gte=filter_start)
+            if filter_end:
+                qs_ws = qs_ws.filter(created_at__lte=filter_end)
 
             for wo in qs_ws:
                 buyer = wo.user
@@ -2707,11 +2760,21 @@ class AdminSalesListAPIView(APIView):
 
                 items = []
                 for it in wo.items.all():
+                    book = it.book
+                    authors_list = [f"{a.first_name} {a.last_name}".strip() for a in book.authors.all()] if book else []
+                    author_str = ", ".join(authors_list) if authors_list else ""
+                    inst_name = book.institution.name if (book and book.institution) else ""
+                    pub_name = (book.publisher.name if (book and book.publisher) else "") or (book.publisher_name if book else "")
+
                     if it.print_copies_qty > 0:
                         items.append({
                             "id": f"{it.id}-print",
-                            "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
-                            "isbn": getattr(it.book, 'isbn', '') if it.book else '',
+                            "book_title": it.title or (book.title if book else "Ouvrage"),
+                            "isbn": getattr(book, 'isbn', '') if book else '',
+                            "author_names": authors_list,
+                            "author_display": author_str,
+                            "institution_name": inst_name,
+                            "publisher_name": pub_name,
                             "format": "paper",
                             "quantity": it.print_copies_qty,
                             "unit_price": float(it.print_unit_price or 0),
@@ -2721,8 +2784,12 @@ class AdminSalesListAPIView(APIView):
                     if it.digital_licenses_qty > 0:
                         items.append({
                             "id": f"{it.id}-digital",
-                            "book_title": it.title or (it.book.title if it.book else "Ouvrage"),
-                            "isbn": getattr(it.book, 'isbn', '') if it.book else '',
+                            "book_title": it.title or (book.title if book else "Ouvrage"),
+                            "isbn": getattr(book, 'isbn', '') if book else '',
+                            "author_names": authors_list,
+                            "author_display": author_str,
+                            "institution_name": inst_name,
+                            "publisher_name": pub_name,
                             "format": "digital",
                             "quantity": it.digital_licenses_qty,
                             "unit_price": float(it.digital_unit_price or 0),
@@ -2748,6 +2815,43 @@ class AdminSalesListAPIView(APIView):
                     "items": items,
                 })
 
+        # Filtrage par Auteur
+        if author_filter:
+            filtered_by_author = []
+            for o in orders_list:
+                match = any(
+                    author_filter in it.get('author_display', '').lower()
+                    or any(author_filter in an.lower() for an in it.get('author_names', []))
+                    for it in o['items']
+                )
+                if match:
+                    filtered_by_author.append(o)
+            orders_list = filtered_by_author
+
+        # Filtrage par Université / Institution
+        if institution_filter:
+            filtered_by_inst = []
+            for o in orders_list:
+                match = (
+                    institution_filter in o.get('buyer_name', '').lower()
+                    or any(institution_filter in (it.get('institution_name') or '').lower() for it in o['items'])
+                )
+                if match:
+                    filtered_by_inst.append(o)
+            orders_list = filtered_by_inst
+
+        # Filtrage par Éditeur / Maison d'édition
+        if publisher_filter:
+            filtered_by_pub = []
+            for o in orders_list:
+                match = any(
+                    publisher_filter in (it.get('publisher_name') or '').lower()
+                    for it in o['items']
+                )
+                if match:
+                    filtered_by_pub.append(o)
+            orders_list = filtered_by_pub
+
         # Filtrage par plage horaire
         if time_slot in ['morning', 'afternoon', 'evening', 'night']:
             slot_ranges = {
@@ -2766,7 +2870,7 @@ class AdminSalesListAPIView(APIView):
                         filtered_by_slot.append(ord_item)
             orders_list = filtered_by_slot
 
-        # Filtrage textuel q
+        # Filtrage textuel q (Titre, ISBN, Référence, Acheteur, Auteur)
         if query:
             filtered_by_q = []
             for o in orders_list:
@@ -2774,7 +2878,14 @@ class AdminSalesListAPIView(APIView):
                     query in o['order_reference'].lower()
                     or query in o['buyer_name'].lower()
                     or query in o['buyer_email'].lower()
-                    or any(query in it['book_title'].lower() for it in o['items'])
+                    or any(
+                        query in it['book_title'].lower()
+                        or query in (it.get('isbn') or '').lower()
+                        or query in (it.get('author_display') or '').lower()
+                        or query in (it.get('institution_name') or '').lower()
+                        or query in (it.get('publisher_name') or '').lower()
+                        for it in o['items']
+                    )
                 )
                 if match:
                     filtered_by_q.append(o)
@@ -2811,6 +2922,12 @@ class AdminSalesListAPIView(APIView):
             },
         }
 
+        # Récupération des filtres disponibles pour l'autocomplete frontend
+        available_institutions = list(Institution.objects.filter(is_active=True).values_list('name', flat=True).distinct().order_by('name'))
+        available_publishers_raw = list(Publisher.objects.values_list('name', flat=True).distinct().order_by('name'))
+        other_pubs = Ouvrage.objects.exclude(publisher_name='').values_list('publisher_name', flat=True).distinct()
+        all_pubs = sorted(list(set(filter(bool, available_publishers_raw + list(other_pubs)))))
+
         return Response({
             "success": True,
             "data": {
@@ -2818,6 +2935,8 @@ class AdminSalesListAPIView(APIView):
                 "total_orders_count": len(orders_list),
                 "channel_breakdown": channel_breakdown,
                 "orders": orders_list,
+                "available_institutions": available_institutions,
+                "available_publishers": all_pubs,
             },
             "error": None
         })
