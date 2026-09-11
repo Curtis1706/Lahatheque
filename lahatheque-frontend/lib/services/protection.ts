@@ -432,35 +432,20 @@ export async function analyzeForensicEvidence(
   console.log("Horodatage:", new Date().toISOString());
   console.log("Nom fichier:", file.name, "Taille:", file.size, "Type:", file.type);
 
-  // Conversion instantanée du fichier en Base64
-  let base64Payload: string;
-  try {
-    base64Payload = await fileToBase64(file);
-    console.log(`[FORENSIC ANALYZE] Encodage Base64 terminé (${base64Payload.length} caractères)`);
-  } catch (readErr: any) {
-    console.error("[FORENSIC ANALYZE] Erreur lecture locale du fichier:", readErr);
-    console.groupEnd();
-    throw new Error("Impossible de lire le fichier sélectionné sur votre appareil.");
-  }
-
   const controller = new AbortController();
-  const timeoutMs = 180000; // 180 secondes (3 minutes) pour laisser le temps complet au prétraitement d'image + OCR + vision IA
+  const timeoutMs = 180000; // 180 secondes (3 minutes)
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  const formData = new FormData();
+  formData.append("file", file);
+  if (notes) formData.append("notes", notes);
+
   try {
+    console.log("[FORENSIC ANALYZE] Envoi direct en flux multipart vers le proxy BFF...");
     const res = await fetch("/api/bff/protection/forensic/analyze/", {
       method: "POST",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        file_name: file.name,
-        file_size: file.size,
-        file_type: file.type,
-        file_base64: base64Payload,
-        notes: notes,
-      }),
+      body: formData,
       signal: controller.signal,
     });
 

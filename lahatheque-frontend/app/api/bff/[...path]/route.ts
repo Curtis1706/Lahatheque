@@ -62,13 +62,23 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
     headers.set('x-reader-token', readerToken)
   }
 
+  // Transmission explicite du Cookie et du Bearer pour Django
+  if (accessToken) {
+    headers.set('authorization', `Bearer ${accessToken}`)
+    headers.set('cookie', `laha_access=${accessToken}`)
+  } else if (authHeader) {
+    headers.set('authorization', authHeader)
+  }
+
+  // Transmission du cookie brut de la requête si présent
+  const rawCookie = request.headers.get('cookie')
+  if (rawCookie && !headers.has('cookie')) {
+    headers.set('cookie', rawCookie)
+  }
+
   const isReaderSessionRoute = cleanSubPath.startsWith('reader/')
   if (isReaderSessionRoute && (authHeader || readerToken)) {
     if (authHeader) headers.set('authorization', authHeader)
-  } else if (accessToken) {
-    headers.set('authorization', `Bearer ${accessToken}`)
-  } else if (authHeader) {
-    headers.set('authorization', authHeader)
   }
 
   let body: any = undefined
