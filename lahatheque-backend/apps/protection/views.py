@@ -4,6 +4,7 @@ Conforme au format d'API unifié LAHAThèque: { success, data, error }.
 """
 
 import uuid
+import base64
 import logging
 from django.http import HttpResponse
 from django.utils import timezone
@@ -283,6 +284,67 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
                 "timestamp": t.timestamp.isoformat() if t.timestamp else timezone.now().isoformat(),
             })
 
+        # 3. Intégration des lectures directes réelles (ReadingProgress) non encore matérialisées
+        try:
+            from apps.student.models import ReadingProgress
+            recent_student_readings = (
+                ReadingProgress.objects.select_related("user", "ouvrage")
+                .filter(last_read_at__isnull=False)
+                .order_by("-last_read_at")[:100]
+            )
+            for rp in recent_student_readings:
+                if not rp.user or not rp.ouvrage:
+                    continue
+
+                u_email = rp.user.email
+                b_id = str(rp.ouvrage_id)
+                rp_ts = rp.last_read_at.isoformat()
+
+                # Si une trace existe déjà pour cet utilisateur et cet ouvrage dans la même heure, mettre à jour sa date si plus récente
+                existing_match = next((r for r in results if r.get("user_email") == u_email and r.get("book_id") == b_id), None)
+                if existing_match:
+                    if rp_ts > existing_match.get("timestamp", ""):
+                        existing_match["timestamp"] = rp_ts
+                        existing_match["current_page"] = rp.current_page or existing_match.get("current_page", 1)
+                        if rp.progress_percent:
+                            existing_match["progress_percent"] = rp.progress_percent
+                    continue
+
+                u_name = f"{rp.user.first_name} {rp.user.last_name}".strip() or rp.user.username or u_email
+                b_title = rp.ouvrage.title
+
+                cover_url = ""
+                if hasattr(rp.ouvrage, "cover_image") and rp.ouvrage.cover_image:
+                    try:
+                        cover_url = rp.ouvrage.cover_image.url
+                    except Exception:
+                        cover_url = ""
+
+                tot_p = rp.total_pages or getattr(rp.ouvrage, "page_count", None) or getattr(rp.ouvrage, "pages", 1) or 1
+                cur_p = rp.current_page or 1
+                p_pct = rp.progress_percent if rp.progress_percent is not None else int((cur_p / max(tot_p, 1)) * 100)
+
+                results.append({
+                    "id": f"progress-{rp.id}",
+                    "user_email": u_email,
+                    "user_name": u_name,
+                    "partner_name": "Accès Direct",
+                    "book_title": b_title,
+                    "book_id": b_id,
+                    "cover_url": cover_url,
+                    "access_type": "read_chunk",
+                    "ip_address": "127.0.0.1",
+                    "country": "BJ",
+                    "device_fingerprint": f"Client Web LAHAThèque ({rp.user.username})",
+                    "current_page": cur_p,
+                    "total_pages": tot_p,
+                    "progress_percent": p_pct,
+                    "reading_time_minutes": max(1, int(session_time_map.get((rp.user_id, rp.ouvrage_id), 60) // 60)),
+                    "timestamp": rp_ts,
+                })
+        except Exception as rp_err:
+            logger.warning(f"Erreur intégration ReadingProgress dans TraceAcces: {rp_err}")
+
         # Tri chronologique décroissant
         results.sort(key=lambda x: x["timestamp"], reverse=True)
 
@@ -470,11 +532,35 @@ class ForensicAnalyzeView(APIView):
     Accessible STRICTEMENT aux administrateurs et super-administrateurs.
     """
     permission_classes = [IsAuthenticated, IsAdminOnly]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
-        uploaded_file = request.FILES.get("file")
-        if not uploaded_file:
+        file_bytes = None
+        file_name = "document_suspect"
+        notes = request.data.get("notes", "")
+
+        # 1. Format JSON avec payload Base64 (Transmission immédiate sans blocage proxy/multipart)
+        file_b64 = request.data.get("file_base64")
+        if file_b64:
+            try:
+                # Retrait d'un éventuel en-tête data:*/*;base64,
+                if "," in file_b64:
+                    file_b64 = file_b64.split(",", 1)[1]
+                file_bytes = base64.b64decode(file_b64)
+                file_name = request.data.get("file_name") or "document_suspect"
+            except Exception as b64_err:
+                return Response(
+                    {"success": False, "data": {}, "error": f"Format Base64 invalide : {str(b64_err)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # 2. Format multipart/form-data standard (Fallback)
+        elif request.FILES.get("file"):
+            uploaded_file = request.FILES.get("file")
+            file_bytes = uploaded_file.read()
+            file_name = uploaded_file.name or "document_suspect"
+
+        if not file_bytes:
             return Response(
                 {"success": False, "data": {}, "error": "Aucun fichier suspect n'a été fourni."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -482,15 +568,11 @@ class ForensicAnalyzeView(APIView):
 
         # Limite de taille à 50 Mo
         max_size_bytes = 50 * 1024 * 1024
-        if uploaded_file.size > max_size_bytes:
+        if len(file_bytes) > max_size_bytes:
             return Response(
                 {"success": False, "data": {}, "error": "Le fichier dépasse la taille maximale autorisée (50 Mo)."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        notes = request.data.get("notes", "")
-        file_bytes = uploaded_file.read()
-        file_name = uploaded_file.name or "document_suspect"
 
         try:
             result = ForensicService.analyze_evidence(

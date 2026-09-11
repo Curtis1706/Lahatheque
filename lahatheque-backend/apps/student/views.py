@@ -1,7 +1,10 @@
 """Vues pour l'Espace Client Lecteur / Étudiant."""
 import hashlib
+import logging
 from typing import Any
 from datetime import timedelta, date
+
+logger = logging.getLogger(__name__)
 
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
@@ -386,6 +389,44 @@ class StudentUpdateReadingProgressView(APIView):
                 pages_read=max(1, pages_read),
                 session_date=timezone.now().date(),
             )
+        # Journalisation légale et synchronisation TraceAccès en temps réel
+        try:
+            from apps.protection.models import TraceAcces
+            ip = request.META.get("HTTP_X_FORWARDED_FOR")
+            if ip:
+                ip = ip.split(",")[0].strip()
+            else:
+                ip = request.META.get("HTTP_X_REAL_IP") or request.META.get("REMOTE_ADDR", "127.0.0.1")
+
+            country_code = request.headers.get("CF-IPCountry") or request.META.get("HTTP_CF_IPCOUNTRY", "BJ") or "BJ"
+            device_fp = request.headers.get("X-Device-Fingerprint") or request.META.get("HTTP_USER_AGENT", "")[:255] or f"Navigateur ({user.username})"
+
+            # Met à jour la trace récente ou en crée une nouvelle
+            existing_trace = TraceAcces.objects.filter(
+                user=user,
+                ouvrage=ouvrage,
+                timestamp__gte=timezone.now() - timezone.timedelta(minutes=30)
+            ).order_by("-timestamp").first()
+
+            if existing_trace:
+                existing_trace.page_number = current_page
+                existing_trace.ip_address = ip
+                existing_trace.country = country_code
+                existing_trace.save(update_fields=["page_number", "ip_address", "country", "timestamp"])
+            else:
+                TraceAcces.objects.create(
+                    user=user,
+                    ouvrage=ouvrage,
+                    document_title=getattr(ouvrage, "title", "Ouvrage Académique"),
+                    ip_address=ip,
+                    country=country_code,
+                    user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
+                    device_fingerprint=device_fp[:255],
+                    access_type="read_chunk",
+                    page_number=current_page,
+                )
+        except Exception as trace_err:
+            logger.warning(f"Erreur synchronisation TraceAcces depuis progress: {trace_err}")
 
         return Response({
             'success': True,

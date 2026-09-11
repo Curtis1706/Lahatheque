@@ -152,11 +152,6 @@ export async function getAccessTraces(): Promise<TraceRecord[]> {
           // Éviter les doublons
           if (traces.some((t) => t.id === tId)) continue;
 
-          // Ignorer les pings internes 10.0.1.1 ou "Lecteur Client" générique si nous avons des sessions réelles
-          if ((item.ip_address === "10.0.1.1" || item.user_name === "Lecteur Client") && traces.length > 0) {
-            continue;
-          }
-
           traces.push({
             id: tId,
             user_email: item.user_email || "lecteur@lahatheque.com",
@@ -408,6 +403,26 @@ export interface ForensicAnalysisResult {
  * Envoie un fichier suspect (PDF ou image) pour analyse forensique et extraction de filigrane.
  * Endpoint : POST /api/bff/protection/forensic/analyze/
  */
+/**
+ * Convertit un fichier en chaîne Base64 côté navigateur pour transmission JSON instantanée.
+ */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = reader.result as string;
+      resolve(res);
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Envoie un fichier suspect (PDF ou image) pour analyse forensique et extraction de filigrane.
+ * Utilise un payload JSON Base64 pour un transit instantané (< 100ms) et infaillible sans blocage multipart.
+ * Endpoint : POST /api/bff/protection/forensic/analyze/
+ */
 export async function analyzeForensicEvidence(
   file: File,
   notes: string = ""
@@ -417,18 +432,37 @@ export async function analyzeForensicEvidence(
   console.log("Horodatage:", new Date().toISOString());
   console.log("Nom fichier:", file.name, "Taille:", file.size, "Type:", file.type);
 
-  const formData = new FormData();
-  formData.append("file", file);
-  if (notes) {
-    formData.append("notes", notes);
+  // Conversion instantanée du fichier en Base64
+  let base64Payload: string;
+  try {
+    base64Payload = await fileToBase64(file);
+    console.log(`[FORENSIC ANALYZE] Encodage Base64 terminé (${base64Payload.length} caractères)`);
+  } catch (readErr: any) {
+    console.error("[FORENSIC ANALYZE] Erreur lecture locale du fichier:", readErr);
+    console.groupEnd();
+    throw new Error("Impossible de lire le fichier sélectionné sur votre appareil.");
   }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 secondes max
 
   try {
     const res = await fetch("/api/bff/protection/forensic/analyze/", {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        file_name: file.name,
+        file_size: file.size,
+        file_type: file.type,
+        file_base64: base64Payload,
+        notes: notes,
+      }),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
     const elapsed = Math.round(performance.now() - startTime);
     console.log(`Temps de traitement: ${elapsed} ms | Statut HTTP: ${res.status}`);
 
@@ -445,6 +479,12 @@ export async function analyzeForensicEvidence(
     console.groupEnd();
     return json.data as ForensicAnalysisResult;
   } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      console.error("[FORENSIC ANALYZE TIMEOUT] Délai d'analyse dépassé (> 45s)");
+      console.groupEnd();
+      throw new Error("Le délai d'analyse forensique a été dépassé (45s). Veuillez réessayer.");
+    }
     console.error("[FORENSIC ANALYZE EXCEPTION]", err);
     console.groupEnd();
     throw err;

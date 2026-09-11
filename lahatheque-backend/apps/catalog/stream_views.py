@@ -149,7 +149,40 @@ class BookStreamView(APIView):
                 "error": "Impossible de charger le document sécurisé."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # 5. Traitement de l'en-tête HTTP Range (RFC 7233)
+        # 5. Journalisation légale immuable dans TraceAcces (Fiche X3: 1 entrée par session de 5 minutes)
+        trace_throttle_key = f"trace_logged:{request.user.id}:{book_id}"
+        if not django_cache.get(trace_throttle_key):
+            try:
+                bouquet_sub_id = access_result.get("bouquet_subscription_id")
+                institution_obj = None
+                bouquet_sub_obj = None
+
+                if bouquet_sub_id:
+                    from apps.partners.models import UniversityBouquetSubscription
+                    bouquet_sub_obj = UniversityBouquetSubscription.objects.filter(id=bouquet_sub_id).first()
+                    if bouquet_sub_obj:
+                        institution_obj = bouquet_sub_obj.institution
+
+                country_code = request.headers.get("CF-IPCountry") or request.META.get("HTTP_CF_IPCOUNTRY", "BJ") or "BJ"
+                device_fp = user_info.get("device_fingerprint") or request.META.get("HTTP_USER_AGENT", "")[:255] or f"Navigateur ({request.user.username})"
+
+                TraceAcces.objects.create(
+                    user=request.user,
+                    ouvrage=ouvrage,
+                    document_title=doc_title,
+                    ip_address=ip,
+                    country=country_code,
+                    user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
+                    device_fingerprint=device_fp[:255],
+                    access_type="read_chunk",
+                    institution=institution_obj,
+                    bouquet_subscription=bouquet_sub_obj,
+                )
+                django_cache.set(trace_throttle_key, True, timeout=300)
+            except Exception as log_err:
+                logger.warning(f"Erreur enregistrement TraceAcces: {log_err}")
+
+        # 6. Traitement de l'en-tête HTTP Range (RFC 7233)
         range_header = request.META.get("HTTP_RANGE")
         if not range_header:
             # Requête standard sans Range: servir le document complet
@@ -171,36 +204,6 @@ class BookStreamView(APIView):
         # Découpage du fragment
         chunk_data = pdf_bytes[start_byte : end_byte + 1]
         chunk_length = len(chunk_data)
-
-        # 6. Journalisation légale immuable dans TraceAcces (Fiche X3: 1 entrée par session de 5 minutes)
-        trace_throttle_key = f"trace_logged:{request.user.id}:{book_id}"
-        if not django_cache.get(trace_throttle_key):
-            try:
-                bouquet_sub_id = access_result.get("bouquet_subscription_id")
-                institution_obj = None
-                bouquet_sub_obj = None
-
-                if bouquet_sub_id:
-                    from apps.partners.models import UniversityBouquetSubscription
-                    bouquet_sub_obj = UniversityBouquetSubscription.objects.filter(id=bouquet_sub_id).first()
-                    if bouquet_sub_obj:
-                        institution_obj = bouquet_sub_obj.institution
-
-                TraceAcces.objects.create(
-                    user=request.user,
-                    ouvrage=ouvrage,
-                    document_title=doc_title,
-                    ip_address=ip,
-                    country=request.headers.get("CF-IPCountry", ""),
-                    user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
-                    device_fingerprint=user_info["device_fingerprint"][:255],
-                    access_type="read_chunk",
-                    institution=institution_obj,
-                    bouquet_subscription=bouquet_sub_obj,
-                )
-                django_cache.set(trace_throttle_key, True, timeout=300)
-            except Exception as log_err:
-                logger.warning(f"Erreur enregistrement TraceAcces: {log_err}")
 
         # 7. Réponse HTTP 206 Partial Content avec en-têtes de sécurité
         response = HttpResponse(chunk_data, status=status.HTTP_206_PARTIAL_CONTENT, content_type="application/pdf")

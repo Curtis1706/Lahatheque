@@ -183,7 +183,7 @@ class ForensicLeakDetectionTestCase(TestCase):
         response_student = self.client.post("/api/v1/protection/forensic/analyze/", {"file": upload_data}, format="multipart")
         self.assertEqual(response_student.status_code, status.HTTP_403_FORBIDDEN)
 
-        # 3. Requête administrateur -> 200 OK
+        # 3. Requête administrateur -> 200 OK (Multipart)
         self.client.force_authenticate(user=self.admin_user)
         upload_data.seek(0)
         response_admin = self.client.post("/api/v1/protection/forensic/analyze/", {"file": upload_data}, format="multipart")
@@ -191,3 +191,28 @@ class ForensicLeakDetectionTestCase(TestCase):
         data = response_admin.json()
         self.assertTrue(data["success"])
         self.assertEqual(data["data"]["status"], "identified")
+
+    def test_forensic_analyze_endpoint_json_base64(self):
+        """
+        Vérifie que l'endpoint /api/v1/protection/forensic/analyze/ accepte directement
+        un payload JSON avec le fichier encodé en Base64 sans nécessiter de multipart.
+        """
+        import base64
+        pdf_bytes = self._create_synthetic_marked_pdf()
+        b64_str = base64.b64encode(pdf_bytes).decode("utf-8")
+
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.post(
+            "/api/v1/protection/forensic/analyze/",
+            {
+                "file_name": "capture_fuite.pdf",
+                "file_base64": f"data:application/pdf;base64,{b64_str}",
+                "notes": "Investigation automatisée via Base64 JSON"
+            },
+            format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["data"]["status"], "identified")
+        self.assertEqual(data["data"]["file_name"], "capture_fuite.pdf")

@@ -367,7 +367,7 @@ class ForensicService:
         """
         try:
             import openai
-            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY, timeout=35.0)
+            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY, timeout=12.0)
 
             # Compression légère de l'image en JPEG base64 pour transmission rapide
             img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
