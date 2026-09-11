@@ -48,6 +48,7 @@ function RestockModal({
   onSuccess: () => void;
 }) {
   const [books, setBooks] = useState<AvailableBookForStock[]>([]);
+  const [initialBooks, setInitialBooks] = useState<AvailableBookForStock[]>([]);
   const [selectedBook, setSelectedBook] = useState<AvailableBookForStock | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [quantite, setQuantite] = useState(1);
@@ -57,30 +58,51 @@ function RestockModal({
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       setLoadingBooks(true);
       try {
         const data = await getAvailableBooksForStock();
-        setBooks(data);
+        if (!cancelled) {
+          setBooks(data);
+          setInitialBooks(data);
+        }
       } catch {
-        setError("Impossible de charger les ouvrages.");
+        if (!cancelled) setError("Impossible de charger les ouvrages.");
       } finally {
-        setLoadingBooks(false);
+        if (!cancelled) setLoadingBooks(false);
       }
     }
     load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const filteredBooks = useMemo(() => {
-    if (!searchQuery.trim()) return books;
-    const q = searchQuery.toLowerCase();
-    return books.filter(
-      (b) =>
-        b.title.toLowerCase().includes(q) ||
-        b.authors.toLowerCase().includes(q) ||
-        b.isbn.toLowerCase().includes(q)
-    );
-  }, [books, searchQuery]);
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      if (initialBooks.length > 0) {
+        setBooks(initialBooks);
+      }
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setLoadingBooks(true);
+      try {
+        const data = await getAvailableBooksForStock(trimmed);
+        setBooks(data);
+      } catch {
+        // Garder la liste existante en cas d'erreur réseau
+      } finally {
+        setLoadingBooks(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, initialBooks]);
+
+  const filteredBooks = books;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

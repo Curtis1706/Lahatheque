@@ -1312,9 +1312,9 @@ class ManagerReportExportView(APIView):
 class AvailableBooksForStockView(APIView):
     """
     GET /api/v1/commerce/manager/stock/available-books/
-    Retourne tous les ouvrages publiés avec leur stock actuel par entrepôt.
-    Si un ouvrage n'a pas de StockOuvrage, il est marqué comme "nouveau" (stock 0).
-    Permet au gestionnaire de réassortir n'importe quel livre publié.
+    Retourne les ouvrages publiés avec leur stock actuel par entrepôt.
+    Optimisé pour les volumétries importantes (1600+ ouvrages) avec pré-chargement en masse,
+    recherche multi-critères et limitation ciblée pour éviter tout timeout HTTP.
     """
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
@@ -1325,20 +1325,59 @@ class AvailableBooksForStockView(APIView):
         from apps.catalog.models import Ouvrage
 
         search = request.query_params.get("search", "").strip()
-        ouvrages = Ouvrage.objects.filter(status='published').select_related(
-            'discipline', 'institution'
-        ).prefetch_related('authors').order_by('title')
+        warehouse_code = request.query_params.get("warehouse", "").strip()
 
-        if search:
-            ouvrages = ouvrages.filter(title__icontains=search)
-
-        entrepot = Entrepot.objects.filter(is_active=True).first()
+        entrepot = None
+        if warehouse_code:
+            entrepot = Entrepot.objects.filter(code=warehouse_code).first()
+        if not entrepot:
+            entrepot = Entrepot.objects.filter(is_active=True).first()
         if not entrepot:
             entrepot = Entrepot.objects.first()
 
+        if search:
+            ouvrages = list(
+                Ouvrage.objects.filter(status='published')
+                .filter(
+                    Q(title__icontains=search) |
+                    Q(isbn__icontains=search) |
+                    Q(authors__first_name__icontains=search) |
+                    Q(authors__last_name__icontains=search)
+                )
+                .select_related('discipline')
+                .prefetch_related('authors')
+                .distinct()[:50]
+            )
+            stocks_map = {
+                s.ouvrage_id: s
+                for s in StockOuvrage.objects.filter(entrepot=entrepot, ouvrage__in=ouvrages).select_related('entrepot')
+            } if entrepot else {}
+        else:
+            stocks_map = {
+                s.ouvrage_id: s
+                for s in StockOuvrage.objects.filter(entrepot=entrepot).select_related('entrepot')
+            } if entrepot else {}
+
+            stock_ids = list(stocks_map.keys())
+            ouvrages_with_stock = list(
+                Ouvrage.objects.filter(id__in=stock_ids, status='published')
+                .select_related('discipline')
+                .prefetch_related('authors')[:80]
+            )
+            existing_ids = {o.id for o in ouvrages_with_stock}
+            remaining = max(0, 100 - len(ouvrages_with_stock))
+            other_ouvrages = list(
+                Ouvrage.objects.filter(status='published')
+                .exclude(id__in=existing_ids)
+                .select_related('discipline')
+                .prefetch_related('authors')
+                .order_by('-created_at')[:remaining]
+            )
+            ouvrages = ouvrages_with_stock + other_ouvrages
+
         result = []
         for ouvrage in ouvrages:
-            stock = StockOuvrage.objects.filter(ouvrage=ouvrage, entrepot=entrepot).first() if entrepot else None
+            stock = stocks_map.get(ouvrage.id)
 
             authors_str = ""
             if ouvrage.pk:
@@ -1349,13 +1388,15 @@ class AvailableBooksForStockView(APIView):
                 except Exception:
                     pass
 
+            cover_url = f"/api/bff/catalog/books/{ouvrage.id}/cover/" if ouvrage.cover_image else ""
+
             result.append({
                 "ouvrage_id": str(ouvrage.id),
                 "stock_id": str(stock.id) if stock else None,
                 "title": ouvrage.title,
                 "isbn": ouvrage.isbn or "",
                 "authors": authors_str,
-                "cover_url": ouvrage.cover_url,
+                "cover_url": cover_url,
                 "discipline": ouvrage.discipline.name if ouvrage.discipline else "",
                 "format_type": ouvrage.format_type,
                 "warehouse": entrepot.code if entrepot else "",

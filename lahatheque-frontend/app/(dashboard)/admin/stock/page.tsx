@@ -9,6 +9,17 @@ import {
   recordAdminManualPayment,
 } from "@/lib/services/admin";
 import {
+  getStockItems,
+  getAvailableBooksForStock,
+  createRestock,
+  createManualExit,
+} from "@/lib/services/manager";
+import type { AvailableBookForStock } from "@/lib/services/manager";
+import type {
+  StockItem,
+  StockFilterStatus,
+} from "@/lib/types/manager";
+import {
   AdminStockOverview,
   StockHolder,
   StockTransaction,
@@ -16,6 +27,7 @@ import {
 import {
   Boxes,
   Building2,
+  Warehouse,
   AlertTriangle,
   ArrowRight,
   TrendingDown,
@@ -39,18 +51,35 @@ import {
   Smartphone,
   Wallet,
   Calendar,
+  Package,
+  ArrowDownCircle,
+  Check,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
-import { PageLoader } from "@/components/ui/page-loader";
+import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
+import { DataTable, DataTableColumn } from "@/components/ui/data-table";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { BookCover3D } from "@/components/ui/book-cover-3d";
 
 export default function AdminStockOverviewPage() {
   const [overview, setOverview] = useState<AdminStockOverview | null>(null);
   const [holders, setHolders] = useState<StockHolder[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Navigation par onglets
-  const [activeTab, setActiveTab] = useState<"holders" | "transactions" | "warehouses">("holders");
+  const [activeTab, setActiveTab] = useState<"inventory" | "holders" | "transactions" | "warehouses">("inventory");
+
+  // Filtres inventaire des ouvrages
+  const [stockSearchQuery, setStockSearchQuery] = useState("");
+  const [stockStatusFilter, setStockStatusFilter] = useState<StockFilterStatus>("all");
+  const [stockWarehouseFilter, setStockWarehouseFilter] = useState<string>("all");
+
+  // Modales d'action stock physique
+  const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false);
 
   // Filtres détenteurs
   const [searchHolder, setSearchHolder] = useState("");
@@ -74,14 +103,16 @@ export default function AdminStockOverviewPage() {
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const [overviewData, holdersData, txData] = await Promise.all([
+      const [overviewData, holdersData, txData, stockData] = await Promise.all([
         getAdminStockOverview(),
         getAdminStockHolders().catch(() => []),
         getAdminStockTransactions().catch(() => []),
+        getStockItems().catch(() => []),
       ]);
       setOverview(overviewData);
       setHolders(holdersData);
       setTransactions(txData);
+      setStockItems(stockData);
     } catch {
       toast.error("Impossible de charger les données de stock physique.");
     } finally {
@@ -193,6 +224,144 @@ export default function AdminStockOverviewPage() {
     });
   }, [transactions, searchTx, methodFilter]);
 
+  // Entrepôts uniques pour le stock d'ouvrages
+  const stockWarehouses = useMemo(() => {
+    const set = new Set<string>();
+    stockItems.forEach((it) => {
+      if (it.warehouse) set.add(it.warehouse);
+    });
+    return Array.from(set);
+  }, [stockItems]);
+
+  // Filtrage du catalogue physique
+  const filteredStockItems = useMemo(() => {
+    return stockItems.filter((item) => {
+      if (stockStatusFilter !== "all" && item.status !== stockStatusFilter) return false;
+      if (stockWarehouseFilter !== "all" && item.warehouse !== stockWarehouseFilter) return false;
+      if (stockSearchQuery.trim()) {
+        const q = stockSearchQuery.toLowerCase();
+        if (
+          !item.title.toLowerCase().includes(q) &&
+          !item.isbn.toLowerCase().includes(q) &&
+          !(item.discipline || "").toLowerCase().includes(q)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [stockItems, stockSearchQuery, stockStatusFilter, stockWarehouseFilter]);
+
+  // Colonnes du tableau de stock des ouvrages
+  const stockColumns: DataTableColumn<StockItem>[] = [
+    {
+      key: "title",
+      header: "Ouvrage & Couverture",
+      cell: (row) => {
+        const coverUrl =
+          row.cover_url ||
+          (row.book_id ? `/api/bff/catalog/books/${row.book_id}/cover/` : undefined);
+        return (
+          <Link
+            href={`/admin/stock/${row.id}`}
+            className="flex items-center gap-3 group py-1"
+          >
+            <BookCover3D
+              title={row.title}
+              authors={row.authors}
+              discipline={row.discipline}
+              coverUrl={coverUrl}
+              size="xs"
+            />
+            <div className="min-w-0">
+              <p className="font-semibold text-xs text-navy group-hover:text-gold transition-colors truncate max-w-[220px]">
+                {row.title}
+              </p>
+              <p className="text-[10px] text-foreground-muted font-mono mt-0.5">
+                ISBN : {row.isbn}
+              </p>
+            </div>
+          </Link>
+        );
+      },
+    },
+    {
+      key: "discipline",
+      header: "Discipline",
+      hideOnMobile: true,
+      cell: (row) => (
+        <span className="text-xs text-foreground-muted">{row.discipline || "—"}</span>
+      ),
+    },
+    {
+      key: "warehouse",
+      header: "Entrepôt & Pays",
+      cell: (row) => (
+        <div className="text-xs">
+          <p className="font-semibold text-foreground flex items-center gap-1">
+            <Warehouse className="w-3.5 h-3.5 text-gold shrink-0" />
+            {(row as any).warehouse_nom || row.warehouse}
+          </p>
+          <p className="text-[10px] text-foreground-muted">
+            {(row as any).ville ? `${(row as any).ville}, ` : ""}{row.country}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Stock Dispo",
+      cell: (row) => (
+        <div className="font-mono text-xs">
+          <span
+            className={`font-bold ${
+              row.quantity === 0
+                ? "text-error"
+                : row.quantity <= row.alert_threshold
+                ? "text-gold"
+                : "text-navy"
+            }`}
+          >
+            {row.quantity} ex.
+          </span>
+          {(row as any).quantite_reservee > 0 && (
+            <p className="text-[10px] text-foreground-muted">
+              ({(row as any).quantite_reservee} réservé{(row as any).quantite_reservee > 1 ? "s" : ""})
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "alert_threshold",
+      header: "Seuil Alerte",
+      hideOnMobile: true,
+      cell: (row) => (
+        <span className="font-mono text-xs text-foreground-muted">
+          {row.alert_threshold} ex.
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Statut",
+      cell: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: "actions" as any,
+      header: "Action",
+      cell: (row) => (
+        <Link
+          href={`/admin/stock/${row.id}`}
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-navy/10 text-navy hover:bg-navy hover:text-white text-xs font-semibold transition-colors"
+        >
+          <span>Gérer</span>
+          <ArrowRight className="w-3 h-3" />
+        </Link>
+      ),
+    },
+  ];
+
   // Totaux consolidés pour le reporting
   const totalOutstandingToRecover = useMemo(() => {
     return holders.reduce((sum, h) => sum + (h.remaining_balance_xof || 0), 0);
@@ -216,19 +385,37 @@ export default function AdminStockOverviewPage() {
               Administration
             </Link>
             <span>/</span>
-            <span className="text-navy font-semibold">Stock Physique & Entrepôts</span>
+            <span className="text-navy font-semibold">Stock Physique &amp; Entrepôts</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy flex items-center gap-2.5">
             <Boxes className="w-6 h-6 text-gold shrink-0" />
-            Supervision des Stocks Physiques Régionaux
+            Supervision &amp; Gestion des Stocks Physiques
           </h1>
           <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">
-            Suivi des détenteurs, valorisation du stock papier, historique des transactions et encaissements manuels en espèces.
+            Gestion du catalogue physique, réapprovisionnements, suivi des détenteurs et encaissements de caisse.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Action Principale : Enregistrer un Paiement Manuel */}
+          {/* Action : Réassort (+Stock) */}
+          <button
+            onClick={() => setIsRestockModalOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-all shadow-xs cursor-pointer min-h-[44px]"
+          >
+            <Package className="w-4 h-4 text-gold" />
+            <span>Réassort (+Stock)</span>
+          </button>
+
+          {/* Action : Sortie manuelle */}
+          <button
+            onClick={() => setIsExitModalOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-background border border-error text-error text-xs font-semibold hover:bg-error/5 transition-colors min-h-[44px]"
+          >
+            <ArrowDownCircle className="w-4 h-4" />
+            <span>Sortie manuelle</span>
+          </button>
+
+          {/* Action : Enregistrer un Paiement Manuel */}
           <button
             onClick={() => handleOpenPaymentModal()}
             className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold/90 transition-all shadow-xs cursor-pointer min-h-[44px]"
@@ -238,11 +425,19 @@ export default function AdminStockOverviewPage() {
           </button>
 
           <Link
+            href="/admin/stock/alerts"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-xs font-semibold hover:border-gold transition-colors min-h-[44px]"
+          >
+            <AlertTriangle className="w-4 h-4 text-gold" />
+            <span>Alertes</span>
+          </Link>
+
+          <Link
             href="/admin/stock/movements"
-            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy/90 transition-colors shadow-xs min-h-[44px]"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-xs font-semibold hover:border-gold transition-colors min-h-[44px]"
           >
             <TrendingDown className="w-4 h-4 text-gold" />
-            <span>Mouvements & Pertes</span>
+            <span>Mouvements &amp; Pertes</span>
           </Link>
 
           <Link
@@ -250,72 +445,122 @@ export default function AdminStockOverviewPage() {
             className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-xs font-semibold hover:border-gold transition-colors min-h-[44px]"
           >
             <Building2 className="w-4 h-4 text-gold" />
-            <span>Gérer les Entrepôts</span>
+            <span>Entrepôts</span>
           </Link>
         </div>
       </div>
 
-      {/* Cartes d'Indicateurs Consolidation */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-background-secondary border border-border">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-foreground-muted">Stock Physique Total</span>
-            <Boxes className="w-4 h-4 text-gold" />
+      {/* Cartes d'Indicateurs Contextuelles */}
+      {activeTab === "inventory" ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted mb-1">
+              Total Références
+            </p>
+            <p className="text-2xl font-bold font-mono text-navy">{stockItems.length}</p>
           </div>
-          <p className="text-2xl font-bold font-serif text-navy mt-2">
-            {overview.totalPhysicalStock.toLocaleString("fr-FR")}
-          </p>
-          <p className="text-[11px] text-foreground-muted mt-1">
-            {totalPhysicalCopiesHeld > 0
-              ? `${totalPhysicalCopiesHeld.toLocaleString("fr-FR")} ex. répartis sur le réseau`
-              : "Exemplaires papier en stock"}
-          </p>
+          <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted mb-1">
+              En Stock Normal
+            </p>
+            <p className="text-2xl font-bold font-mono text-success">
+              {stockItems.filter((i) => i.status === "normal").length}
+            </p>
+          </div>
+          <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted mb-1">
+              Seuil Bas
+            </p>
+            <p className="text-2xl font-bold font-mono text-gold">
+              {stockItems.filter((i) => i.status === "low_stock").length}
+            </p>
+          </div>
+          <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted mb-1">
+              Ruptures
+            </p>
+            <p className="text-2xl font-bold font-mono text-error">
+              {stockItems.filter((i) => i.status === "out_of_stock").length}
+            </p>
+          </div>
         </div>
-
-        <div className="p-4 rounded-2xl bg-background-secondary border border-border">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-foreground-muted">Valeur Consolidée</span>
-            <PackageCheck className="w-4 h-4 text-success" />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground-muted">Stock Physique Total</span>
+              <Boxes className="w-4 h-4 text-gold" />
+            </div>
+            <p className="text-2xl font-bold font-serif text-navy mt-2">
+              {overview.totalPhysicalStock.toLocaleString("fr-FR")}
+            </p>
+            <p className="text-[11px] text-foreground-muted mt-1">
+              {totalPhysicalCopiesHeld > 0
+                ? `${totalPhysicalCopiesHeld.toLocaleString("fr-FR")} ex. répartis sur le réseau`
+                : "Exemplaires papier en stock"}
+            </p>
           </div>
-          <p className="text-2xl font-bold font-mono text-navy mt-2">
-            {overview.totalStockValueXof.toLocaleString("fr-FR")}{" "}
-            <span className="text-xs font-sans text-gold font-bold">FCFA</span>
-          </p>
-          <p className="text-[11px] text-foreground-muted mt-1">Valorisation au prix public moyen</p>
+
+          <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground-muted">Valeur Consolidée</span>
+              <PackageCheck className="w-4 h-4 text-success" />
+            </div>
+            <p className="text-2xl font-bold font-mono text-navy mt-2">
+              {overview.totalStockValueXof.toLocaleString("fr-FR")}{" "}
+              <span className="text-xs font-sans text-gold font-bold">FCFA</span>
+            </p>
+            <p className="text-[11px] text-foreground-muted mt-1">Valorisation au prix public moyen</p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground-muted">Reste à Recouvrer</span>
+              <Wallet className="w-4 h-4 text-gold" />
+            </div>
+            <p className="text-2xl font-bold font-mono text-navy mt-2">
+              {totalOutstandingToRecover.toLocaleString("fr-FR")}{" "}
+              <span className="text-xs font-sans text-gold font-bold">FCFA</span>
+            </p>
+            <p className="text-[11px] text-foreground-muted mt-1">Encaissements et créances en attente</p>
+          </div>
+
+          <Link
+            href="/admin/stock/movements"
+            className="p-4 rounded-2xl bg-gold/10 border border-gold/30 hover:border-gold transition-all block group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-navy">Régularisations en Attente</span>
+              <Clock className="w-4 h-4 text-gold" />
+            </div>
+            <p className="text-2xl font-bold font-serif text-navy mt-2">
+              {overview.pendingLossAdjustments}
+            </p>
+            <p className="text-[11px] text-foreground-muted mt-1 group-hover:text-navy flex items-center gap-1 transition-colors">
+              <span>Passations en perte à valider</span>
+              <ArrowRight className="w-3 h-3 text-gold" />
+            </p>
+          </Link>
         </div>
-
-        <div className="p-4 rounded-2xl bg-background-secondary border border-border">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-foreground-muted">Reste à Recouvrer</span>
-            <Wallet className="w-4 h-4 text-gold" />
-          </div>
-          <p className="text-2xl font-bold font-mono text-navy mt-2">
-            {totalOutstandingToRecover.toLocaleString("fr-FR")}{" "}
-            <span className="text-xs font-sans text-gold font-bold">FCFA</span>
-          </p>
-          <p className="text-[11px] text-foreground-muted mt-1">Encaissements et créances en attente</p>
-        </div>
-
-        <Link
-          href="/admin/stock/movements"
-          className="p-4 rounded-2xl bg-gold/10 border border-gold/30 hover:border-gold transition-all block group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-navy">Régularisations en Attente</span>
-            <Clock className="w-4 h-4 text-gold" />
-          </div>
-          <p className="text-2xl font-bold font-serif text-navy mt-2">
-            {overview.pendingLossAdjustments}
-          </p>
-          <p className="text-[11px] text-foreground-muted mt-1 group-hover:text-navy flex items-center gap-1 transition-colors">
-            <span>Passations en perte à valider</span>
-            <ArrowRight className="w-3 h-3 text-gold" />
-          </p>
-        </Link>
-      </div>
+      )}
 
       {/* Onglets de Navigation Principale */}
       <div className="flex items-center gap-2 border-b border-border overflow-x-auto pb-px">
+        <button
+          onClick={() => setActiveTab("inventory")}
+          className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer shrink-0 ${
+            activeTab === "inventory"
+              ? "border-navy text-navy font-bold"
+              : "border-transparent text-foreground-muted hover:text-navy"
+          }`}
+        >
+          <Boxes className="w-4 h-4 text-gold" />
+          <span>Inventaire des Ouvrages</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-navy/10 text-navy">
+            {stockItems.length}
+          </span>
+        </button>
+
         <button
           onClick={() => setActiveTab("holders")}
           className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer shrink-0 ${
@@ -325,7 +570,7 @@ export default function AdminStockOverviewPage() {
           }`}
         >
           <Users className="w-4 h-4 text-gold" />
-          <span>Détenteurs de Stock & Valorisation</span>
+          <span>Détenteurs B2B &amp; Dépôts</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-navy/10 text-navy">
             {holders.length}
           </span>
@@ -355,12 +600,148 @@ export default function AdminStockOverviewPage() {
           }`}
         >
           <Building2 className="w-4 h-4 text-gold" />
-          <span>Entrepôts & Plateformes Régionales</span>
+          <span>Entrepôts &amp; Plateformes Régionales</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-navy/10 text-navy">
             {overview.warehouses.length}
           </span>
         </button>
       </div>
+
+      {/* ========================================================================= */}
+      {/* ONGLET 0 : INVENTAIRE DES OUVRAGES & STOCKS PAPIER                       */}
+      {/* ========================================================================= */}
+      {activeTab === "inventory" && (
+        <div className="space-y-4">
+          {/* Filtres & Recherche */}
+          <div className="bg-background border border-border p-4 rounded-2xl space-y-3 shadow-xs">
+            <div className="flex flex-col md:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Rechercher par titre, ISBN ou discipline..."
+                  value={stockSearchQuery}
+                  onChange={(e) => setStockSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-foreground placeholder:text-foreground-muted min-h-[40px]"
+                />
+              </div>
+
+              {stockWarehouses.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider shrink-0">
+                    Entrepôt :
+                  </span>
+                  <select
+                    value={stockWarehouseFilter}
+                    onChange={(e) => setStockWarehouseFilter(e.target.value)}
+                    className="px-3 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-foreground min-h-[40px]"
+                  >
+                    <option value="all">Tous les entrepôts</option>
+                    {stockWarehouses.map((w) => (
+                      <option key={w} value={w}>
+                        {w}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 pt-2 border-t border-border overflow-x-auto">
+              <span className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider shrink-0 flex items-center gap-1">
+                <Filter className="w-3 h-3 text-gold" />
+                Statut :
+              </span>
+              {[
+                { id: "all" as StockFilterStatus, label: "Tous" },
+                { id: "normal" as StockFilterStatus, label: "Stock Normal" },
+                { id: "low_stock" as StockFilterStatus, label: "Seuil Bas" },
+                { id: "out_of_stock" as StockFilterStatus, label: "En Rupture" },
+              ].map((st) => (
+                <button
+                  key={st.id}
+                  onClick={() => setStockStatusFilter(st.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    stockStatusFilter === st.id
+                      ? "bg-navy text-white font-bold"
+                      : "bg-background-secondary text-foreground-muted hover:text-navy border border-border"
+                  }`}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Table */}
+          <DataTable
+            data={filteredStockItems}
+            columns={stockColumns}
+            rowKey="id"
+            loading={loading}
+            emptyMessage="Aucun ouvrage en stock ne correspond à vos critères de recherche."
+            onRowClick={(row) => {
+              window.location.href = `/admin/stock/${row.id}`;
+            }}
+            pageSize={10}
+            mobileCard={(row) => {
+              const coverUrl =
+                row.cover_url ||
+                (row.book_id ? `/api/bff/catalog/books/${row.book_id}/cover/` : undefined);
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <BookCover3D
+                      title={row.title}
+                      authors={row.authors}
+                      discipline={row.discipline}
+                      coverUrl={coverUrl}
+                      size="xs"
+                      interactive={false}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <StatusBadge status={row.status} />
+                        {row.discipline && (
+                          <span className="text-[10px] font-semibold text-navy bg-navy/10 px-2 py-0.5 rounded-md">
+                            {row.discipline}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-serif font-bold text-navy text-sm leading-snug line-clamp-2">
+                        {row.title}
+                      </h4>
+                      <p className="text-xs text-foreground-muted mt-0.5 line-clamp-1">
+                        {row.authors?.length > 0 ? row.authors.join(", ") : "—"}
+                      </p>
+                      <p className="text-[10px] font-mono text-foreground-muted mt-0.5">
+                        ISBN : {row.isbn}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
+                    <span className="text-foreground-muted">
+                      {(row as any).warehouse_nom || row.warehouse} ({row.country})
+                    </span>
+                    <span className="font-mono font-bold text-navy">
+                      {row.quantity} ex. dispo
+                    </span>
+                  </div>
+                  <div className="pt-1">
+                    <Link
+                      href={`/admin/stock/${row.id}`}
+                      className="w-full inline-flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy/90 transition-colors min-h-[38px]"
+                    >
+                      <span>Gérer la fiche détaillée</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-gold" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            }}
+          />
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* ONGLET 1 : DÉTENTEURS DE STOCK & VALORISATION                             */}
@@ -976,6 +1357,408 @@ export default function AdminStockOverviewPage() {
           </div>
         </div>
       )}
+
+      {/* Modale Réassort Stock (Admin) */}
+      {isRestockModalOpen && (
+        <AdminGeneralRestockModal
+          onClose={() => setIsRestockModalOpen(false)}
+          onSuccess={loadAllData}
+        />
+      )}
+
+      {/* Modale Sortie Manuelle (Admin) */}
+      {isExitModalOpen && (
+        <AdminGeneralExitModal
+          stockItems={stockItems}
+          onClose={() => setIsExitModalOpen(false)}
+          onSuccess={loadAllData}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Modale Réassort Catalogue pour l'Administrateur ─────────────────────────
+function AdminGeneralRestockModal({
+  onClose,
+  onSuccess,
+}: {
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [books, setBooks] = useState<AvailableBookForStock[]>([]);
+  const [initialBooks, setInitialBooks] = useState<AvailableBookForStock[]>([]);
+  const [selectedBook, setSelectedBook] = useState<AvailableBookForStock | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [quantite, setQuantite] = useState(10);
+  const [reference, setReference] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loadingBooks, setLoadingBooks] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoadingBooks(true);
+      try {
+        const data = await getAvailableBooksForStock();
+        if (!cancelled) {
+          setBooks(data);
+          setInitialBooks(data);
+        }
+      } catch {
+        if (!cancelled) setError("Impossible de charger les ouvrages.");
+      } finally {
+        if (!cancelled) setLoadingBooks(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      if (initialBooks.length > 0) {
+        setBooks(initialBooks);
+      }
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setLoadingBooks(true);
+      try {
+        const data = await getAvailableBooksForStock(trimmed);
+        setBooks(data);
+      } catch {
+        // Ignorer
+      } finally {
+        setLoadingBooks(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, initialBooks]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!selectedBook) {
+      setError("Sélectionnez un ouvrage.");
+      return;
+    }
+    if (quantite <= 0) {
+      setError("Quantité invalide.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await createRestock({
+        stock_id: selectedBook.stock_id || undefined,
+        ouvrage_id: selectedBook.stock_id ? undefined : selectedBook.ouvrage_id,
+        quantite,
+        reference_document: reference,
+      });
+      toast.success(`Réassort de ${quantite} exemplaires enregistré avec succès.`);
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || "Erreur lors du réassort.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+      <div className="bg-background border border-border rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-200 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-serif text-lg font-bold text-navy flex items-center gap-2">
+              <Package className="w-5 h-5 text-gold" />
+              Réassort Stock (Admin)
+            </h2>
+            <p className="text-xs text-foreground-muted mt-0.5">Approvisionner un ouvrage publié du catalogue.</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-background-secondary transition-colors cursor-pointer" title="Fermer">
+            <X className="w-4 h-4 text-foreground-muted" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
+              Rechercher un ouvrage
+            </label>
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Titre, auteur ou ISBN..."
+                className="w-full pl-9 pr-3 py-2.5 text-xs border border-border rounded-xl bg-background-secondary focus:outline-none focus:border-gold text-foreground min-h-[42px]"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
+              Ouvrage ({books.length} résultat{books.length > 1 ? "s" : ""})
+            </label>
+            <div className="max-h-48 overflow-y-auto border border-border rounded-xl bg-background-secondary divide-y divide-border">
+              {loadingBooks ? (
+                <div className="p-4 text-center text-xs text-foreground-muted">Chargement des ouvrages...</div>
+              ) : books.length === 0 ? (
+                <div className="p-4 text-center text-xs text-foreground-muted">Aucun ouvrage trouvé.</div>
+              ) : (
+                books.map((book) => (
+                  <button
+                    key={book.ouvrage_id}
+                    type="button"
+                    onClick={() => setSelectedBook(book)}
+                    className={`w-full flex items-center gap-3 p-3 text-left transition-colors cursor-pointer ${
+                      selectedBook?.ouvrage_id === book.ouvrage_id
+                        ? "bg-gold/10 font-medium"
+                        : "hover:bg-background"
+                    }`}
+                  >
+                    <div className="w-8 h-11 rounded bg-navy/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                      {book.cover_url ? (
+                        <img src={book.cover_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <BookOpen className="w-4 h-4 text-navy/40" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-navy truncate">{book.title}</p>
+                      <p className="text-[10px] text-foreground-muted truncate">
+                        {book.authors || "Auteur inconnu"} {book.isbn ? `— ${book.isbn}` : ""}
+                      </p>
+                    </div>
+
+                    <div className="flex-shrink-0 text-right">
+                      {book.is_new_stock ? (
+                        <span className="inline-block px-2 py-0.5 rounded-full bg-gold/20 text-gold text-[10px] font-bold">
+                          Nouveau
+                        </span>
+                      ) : (
+                        <span className={`text-xs font-mono font-bold ${
+                          book.quantite_disponible <= 0 ? "text-error" :
+                          book.quantite_disponible <= book.seuil_alerte ? "text-gold" :
+                          "text-success"
+                        }`}>
+                          {book.quantite_disponible} en stock
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          {selectedBook && (
+            <div className="p-3 rounded-xl bg-navy/5 border border-navy/20 space-y-1">
+              <p className="text-xs font-bold text-navy">{selectedBook.title}</p>
+              <div className="flex items-center gap-3 text-[10px] text-foreground-muted">
+                <span>Entrepôt : {selectedBook.warehouse_nom || selectedBook.warehouse || "Principal"}</span>
+                <span>Stock actuel : <strong className="text-navy">{selectedBook.quantite_reelle}</strong></span>
+                {selectedBook.is_new_stock && (
+                  <span className="text-gold font-bold">Première entrée en stock</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
+              Quantité à approvisionner
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={quantite}
+              onChange={(e) => setQuantite(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full px-3 py-2.5 text-sm font-mono border border-border rounded-xl bg-background-secondary focus:outline-none focus:border-gold text-foreground min-h-[42px]"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">
+              Référence document <span className="font-normal">(optionnel)</span>
+            </label>
+            <input
+              type="text"
+              value={reference}
+              placeholder="BL-2026-001, facture fournisseur, bon de tirage..."
+              onChange={(e) => setReference(e.target.value)}
+              className="w-full px-3 py-2.5 text-xs border border-border rounded-xl bg-background-secondary focus:outline-none focus:border-gold text-foreground min-h-[42px]"
+            />
+          </div>
+
+          {error && (
+            <p className="text-xs text-error bg-error/10 border border-error/20 rounded-xl px-3 py-2">{error}</p>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-background-secondary transition-colors min-h-[44px] cursor-pointer">
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !selectedBook}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px] cursor-pointer"
+            >
+              {saving ? <InlineLoader size={16} /> : <Check className="w-4 h-4" />}
+              Valider l&apos;approvisionnement {quantite > 0 ? `(+${quantite})` : ""}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modale Sortie Manuelle pour l'Administrateur ────────────────────────────
+function AdminGeneralExitModal({
+  stockItems,
+  onClose,
+  onSuccess,
+}: {
+  stockItems: StockItem[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [stockId, setStockId] = useState("");
+  const [quantite, setQuantite] = useState(1);
+  const [motif, setMotif] = useState("");
+  const [typeM, setTypeM] = useState<"manual_exit" | "adjustment" | "return">("manual_exit");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!stockId) {
+      setError("Sélectionnez un ouvrage.");
+      return;
+    }
+    if (quantite <= 0) {
+      setError("Quantité invalide.");
+      return;
+    }
+    if (!motif.trim()) {
+      setError("Le motif est obligatoire.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await createManualExit({ stock_id: stockId, quantite, motif: motif.trim(), type_mouvement: typeM });
+      toast.success(`Sortie de stock de ${quantite} exemplaires enregistrée.`);
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || "Erreur lors de la sortie manuelle.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+      <div className="bg-background border border-border rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-serif text-lg font-bold text-navy">Sortie de Stock (Admin)</h2>
+            <p className="text-xs text-foreground-muted mt-0.5">Enregistrer une sortie manuelle, avarie ou régularisation.</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-background-secondary transition-colors cursor-pointer" title="Fermer">
+            <X className="w-4 h-4 text-foreground-muted" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">Type de sortie</label>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { val: "manual_exit", label: "Sortie manuelle" },
+                { val: "return", label: "Retour" },
+                { val: "adjustment", label: "Ajustement" },
+              ].map((opt) => (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => setTypeM(opt.val as any)}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
+                    typeM === opt.val ? "bg-navy/10 text-navy border border-navy/30 font-bold" : "text-foreground-muted border border-border hover:border-navy/20"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">Ouvrage / Stock</label>
+            <div className="relative">
+              <select
+                value={stockId}
+                onChange={(e) => setStockId(e.target.value)}
+                className="w-full appearance-none px-3 pr-8 py-2.5 text-xs border border-border rounded-xl bg-background-secondary focus:outline-none focus:border-gold text-foreground min-h-[42px]"
+              >
+                <option value="">-- Choisir un ouvrage --</option>
+                {stockItems.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title} — {(s as any).warehouse_nom || s.warehouse} ({s.quantity} ex. dispo)
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-foreground-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">Quantité à déduire</label>
+            <input
+              type="number"
+              min={1}
+              value={quantite}
+              onChange={(e) => setQuantite(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full px-3 py-2.5 text-sm font-mono border border-border rounded-xl bg-background-secondary focus:outline-none focus:border-gold text-foreground min-h-[42px]"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-foreground-muted uppercase tracking-wider">Motif <span className="text-error">*</span></label>
+            <textarea
+              value={motif}
+              onChange={(e) => setMotif(e.target.value)}
+              placeholder="Ex : Déstockage événementiel, avarie constatée..."
+              rows={3}
+              className="w-full px-3 py-2.5 text-xs border border-border rounded-xl bg-background-secondary focus:outline-none focus:border-gold text-foreground resize-none"
+            />
+          </div>
+
+          {error && (
+            <p className="text-xs text-error bg-error/10 border border-error/20 rounded-xl px-3 py-2">{error}</p>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-background-secondary transition-colors min-h-[44px] cursor-pointer">
+              Annuler
+            </button>
+            <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 rounded-xl bg-error text-white text-xs font-bold hover:bg-error/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px] cursor-pointer">
+              {saving ? <InlineLoader size={16} /> : <ArrowDownCircle className="w-4 h-4" />}
+              Confirmer la sortie
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

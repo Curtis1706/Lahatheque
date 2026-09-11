@@ -388,9 +388,9 @@ export function DashboardSidebar() {
                 href: "/admin/stock",
                 icon: <Boxes className="size-4" />,
                 sublinks: [
-                  { label: "Vue Stock & Hubs", href: "/admin/stock", icon: <Boxes className="size-3.5" /> },
+                  { label: "Inventaire des Ouvrages", href: "/admin/stock", icon: <Boxes className="size-3.5" /> },
                   { label: "Flux & Pertes", href: "/admin/stock/movements", icon: <TrendingDown className="size-3.5" /> },
-                  { label: "Alertes de Rupture", href: "/manager/stock/alerts", icon: <AlertTriangle className="size-3.5" /> },
+                  { label: "Alertes de Rupture", href: "/admin/stock/alerts", icon: <AlertTriangle className="size-3.5" /> },
                   { label: "Entrepôts Régionaux", href: "/admin/stock/warehouses", icon: <Building2 className="size-3.5" /> },
                 ],
               },
