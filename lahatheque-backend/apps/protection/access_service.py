@@ -80,17 +80,17 @@ class AccessService:
                 "stream_url": f"/api/v1/catalog/books/{resolved_book_id}/stream/{stream_query}"
             }
 
-        # Achat individuel payé ou achat à crédit accordé (Formats numérique ou audio)
+        # Achat individuel payé ou achat à crédit accordé (Formats numérique)
         from django.db.models import Q
-        has_purchased_digital_or_audio = LigneCommande.objects.filter(
+        has_purchased_digital = LigneCommande.objects.filter(
             commande__user=user,
             ouvrage_id=resolved_book_id,
-            format_type__in=['digital', 'audio'],
+            format_type__in=['digital', 'pdf', 'epub'],
         ).filter(
             Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
         ).exists()
 
-        if has_purchased_digital_or_audio:
+        if has_purchased_digital:
             return {
                 "access_granted": True,
                 "reason": "individual_purchase",

@@ -31,7 +31,7 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
   const [isFav, setIsFav] = useState(book.is_favorite);
 
   const isAudioOwned = Boolean(book.is_audio_owned || (book as any).has_audio_access);
-  const isDigitalOwned = Boolean(book.is_owned || book.has_digital_access || book.progress_percent !== undefined);
+  const isDigitalOwned = Boolean(book.is_owned || book.has_digital_access);
 
   const handleFavoriteClick = async () => {
     const nextFav = !isFav;
@@ -89,9 +89,19 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
       >
         {/* Couverture & Détails */}
         <div className="flex items-center gap-4 min-w-0 w-full md:w-auto flex-1">
-          <Link href={`/catalog/reader/${book.id}`} title="Ouvrir dans la Liseuse" className="shrink-0">
-            <BookCover book={book} size="sm" />
-          </Link>
+          {isDigitalOwned ? (
+            <Link href={`/catalog/reader/${book.id}`} title="Ouvrir dans la Liseuse" className="shrink-0">
+              <BookCover book={book} size="sm" />
+            </Link>
+          ) : isAudioOwned ? (
+            <button type="button" onClick={() => playBook(book.id)} title="Écouter la version audio" className="shrink-0 cursor-pointer">
+              <BookCover book={book} size="sm" />
+            </button>
+          ) : (
+            <div className="shrink-0">
+              <BookCover book={book} size="sm" />
+            </div>
+          )}
 
           <div className="space-y-1 min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
@@ -194,7 +204,12 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
             <button
               type="button"
               onClick={() => playBook(book.id)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy font-bold text-xs border border-gold/40 transition-all min-h-[40px] cursor-pointer shadow-xs"
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-xs transition-all min-h-[40px] cursor-pointer shadow-xs",
+                !isDigitalOwned
+                  ? "bg-navy hover:bg-navy-hover text-white"
+                  : "bg-gold/15 hover:bg-gold/25 text-navy border border-gold/40"
+              )}
               title="Écouter la version audio"
             >
               <Headphones className="w-3.5 h-3.5 text-gold" />
@@ -202,14 +217,16 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
             </button>
           )}
 
-          <Link
-            href={`/catalog/reader/${book.id}`}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[40px]"
-            title="Lire dans la Liseuse"
-          >
-            <span>Lire</span>
-            <ArrowUpRight className="w-3.5 h-3.5 text-gold" />
-          </Link>
+          {isDigitalOwned && (
+            <Link
+              href={`/catalog/reader/${book.id}`}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[40px]"
+              title="Lire dans la Liseuse"
+            >
+              <span>Lire</span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-gold" />
+            </Link>
+          )}
         </div>
       </motion.div>
 

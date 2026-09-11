@@ -12,7 +12,7 @@
 
 <!-- Corps du Message Soft -->
 <div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; font-size: 14px; line-height: 1.7; color: #1E293B; border: 0;">
-    {{ message_body|linebreaks }}
+    {{ message_body|striptags|linebreaks }}
 </div>
 
 {% if action_url %}

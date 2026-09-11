@@ -36,7 +36,7 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
   );
 
   const isAudioOwned = Boolean(book.is_audio_owned || (book as any).has_audio_access);
-  const isDigitalOwned = Boolean(book.is_owned || book.has_digital_access || book.progress_percent !== undefined);
+  const isDigitalOwned = Boolean(book.is_owned || book.has_digital_access);
 
   const handleFavoriteClick = async () => {
     const nextFav = !isFav;
@@ -101,13 +101,28 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
         {/* Partie Haute : Couverture & Métadonnées */}
         <div className="space-y-3 min-w-0">
           <div className="flex items-start gap-3.5 min-w-0">
-            <Link
-              href={`/catalog/reader/${book.id}${selectedLang ? `?lang=${selectedLang}` : ""}`}
-              title="Ouvrir dans la Liseuse"
-              className="shrink-0 group-hover:scale-[1.02] transition-transform"
-            >
-              <BookCover book={book} size="sm" />
-            </Link>
+            {isDigitalOwned ? (
+              <Link
+                href={`/catalog/reader/${book.id}${selectedLang ? `?lang=${selectedLang}` : ""}`}
+                title="Ouvrir dans la Liseuse"
+                className="shrink-0 group-hover:scale-[1.02] transition-transform"
+              >
+                <BookCover book={book} size="sm" />
+              </Link>
+            ) : isAudioOwned ? (
+              <button
+                type="button"
+                onClick={() => playBook(book.id)}
+                title="Écouter la version audio"
+                className="shrink-0 group-hover:scale-[1.02] transition-transform cursor-pointer"
+              >
+                <BookCover book={book} size="sm" />
+              </button>
+            ) : (
+              <div className="shrink-0">
+                <BookCover book={book} size="sm" />
+              </div>
+            )}
 
             <div className="flex-1 min-w-0 space-y-1.5">
               {/* Discipline, Format & Favoris */}
@@ -178,8 +193,8 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
             </div>
           </div>
 
-          {/* Barre de Progression */}
-          {book.progress_percent !== undefined && (
+          {/* Barre de Progression (Réservée à la lecture numérique) */}
+          {isDigitalOwned && typeof book.progress_percent === "number" && (
             <div className="space-y-1 pt-1">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-foreground-muted font-medium">Progression</span>
@@ -216,11 +231,16 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
             <button
               type="button"
               onClick={() => playBook(book.id)}
-              className="px-3 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy font-bold text-xs border border-gold/40 transition-all min-h-[38px] inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs shrink-0"
+              className={cn(
+                "px-3 py-2 rounded-xl transition-all min-h-[38px] inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs",
+                !isDigitalOwned
+                  ? "flex-1 bg-navy hover:bg-navy-hover text-white font-bold text-xs"
+                  : "bg-gold/15 hover:bg-gold/25 text-navy font-bold text-xs border border-gold/40 shrink-0"
+              )}
               title="Écouter la version audio"
             >
               <Headphones className="w-3.5 h-3.5 text-gold" />
-              <span>Écouter</span>
+              <span className="truncate">Écouter</span>
             </button>
           )}
 
@@ -236,7 +256,7 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
             </button>
           )}
 
-          {book.available_languages && book.available_languages.length > 1 && (
+          {isDigitalOwned && book.available_languages && book.available_languages.length > 1 && (
             <div className="inline-flex items-center rounded-xl bg-background-secondary border border-border p-0.5 text-xs shrink-0">
               {book.available_languages.map((lang) => (
                 <button
@@ -256,14 +276,16 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
             </div>
           )}
 
-          <Link
-            href={`/catalog/reader/${book.id}${selectedLang ? `?lang=${selectedLang}` : ""}`}
-            className="flex-1 px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[38px] inline-flex items-center justify-center gap-1.5 min-w-0 truncate"
-            title="Lire dans la Liseuse"
-          >
-            <span className="truncate">Lire</span>
-            <ArrowUpRight className="w-3.5 h-3.5 text-gold shrink-0" />
-          </Link>
+          {isDigitalOwned && (
+            <Link
+              href={`/catalog/reader/${book.id}${selectedLang ? `?lang=${selectedLang}` : ""}`}
+              className="flex-1 px-4 py-2 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[38px] inline-flex items-center justify-center gap-1.5 min-w-0 truncate"
+              title="Lire dans la Liseuse"
+            >
+              <span className="truncate">Lire</span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-gold shrink-0" />
+            </Link>
+          )}
         </div>
       </motion.div>
 

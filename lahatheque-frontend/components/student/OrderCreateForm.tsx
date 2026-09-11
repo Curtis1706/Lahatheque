@@ -685,13 +685,11 @@ export default function OrderCreateForm({
                 <>
                   <option value="especes">Espèces (Comptoir)</option>
                   <option value="mobile_money">Mobile Money direct (MTN / Moov / Celtiis)</option>
-                  <option value="carte">Carte bancaire (TPE)</option>
                   <option value="virement">Virement bancaire</option>
                 </>
               ) : (
                 <>
                   <option value="mobile_money">Mobile Money (MTN / Moov / Celtiis)</option>
-                  <option value="carte">Carte bancaire (Visa / Mastercard)</option>
                   <option value="virement">Virement bancaire</option>
                   <option value="especes">Espèces à la livraison</option>
                 </>

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
-  CreditCard, 
   Smartphone, 
   CheckCircle2, 
   Truck, 
@@ -26,7 +25,7 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const { items, totalAmount, totalCount, clearCart } = useCart();
 
-  const [paymentProvider, setPaymentProvider] = useState<"mock" | "moneroo" | "stripe">("mock");
+  const [paymentProvider, setPaymentProvider] = useState<"moneroo">("moneroo");
   const [shippingAddress, setShippingAddress] = useState("");
   const [city, setCity] = useState("Cotonou");
   const [country, setCountry] = useState("BJ");
@@ -476,69 +475,25 @@ export default function CheckoutPage() {
               <div className="bg-background border border-border rounded-2xl p-5 space-y-4 shadow-sm">
                 <h2 className="text-xs font-bold text-navy uppercase tracking-wider">Mode de Paiement</h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                
-                {/* Mock Provider */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentProvider("mock")}
-                  className={`p-4 rounded-xl border text-left flex flex-col justify-between gap-3 transition-all cursor-pointer ${
-                    paymentProvider === "mock"
-                      ? "border-navy bg-navy/5 ring-2 ring-navy/20"
-                      : "border-border hover:border-gold"
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <Smartphone className="w-5 h-5 text-gold" />
-                    <span className="text-[10px] font-bold uppercase bg-gold/20 text-navy px-2 py-0.5 rounded">Simulateur</span>
+                <div className="grid grid-cols-1 gap-3">
+                  {/* Moneroo Provider */}
+                  <div
+                    className="p-4 rounded-xl border border-navy bg-navy/5 ring-2 ring-navy/20 flex items-center justify-between gap-4 transition-all"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-navy/10 flex items-center justify-center text-navy shrink-0">
+                        <Smartphone className="w-5 h-5 text-navy" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-navy">Moneroo Afrique</p>
+                        <p className="text-xs text-foreground-muted">Mobile Money (MTN, Moov, Wave, Orange, Celtiis)</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase bg-navy text-gold px-2.5 py-1 rounded-lg border border-gold/30 shrink-0">
+                      Paiement Sécurisé
+                    </span>
                   </div>
-                  <div>
-                    <p className="font-bold text-xs text-navy">Test Instantané</p>
-                    <p className="text-[10px] text-foreground-muted">Paiement dev immédiat</p>
-                  </div>
-                </button>
-
-                {/* Moneroo Provider */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentProvider("moneroo")}
-                  className={`p-4 rounded-xl border text-left flex flex-col justify-between gap-3 transition-all cursor-pointer ${
-                    paymentProvider === "moneroo"
-                      ? "border-navy bg-navy/5 ring-2 ring-navy/20"
-                      : "border-border hover:border-gold"
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <Smartphone className="w-5 h-5 text-navy" />
-                    <span className="text-[10px] font-bold uppercase bg-navy/10 text-navy px-2 py-0.5 rounded">Mobile Money</span>
-                  </div>
-                  <div>
-                    <p className="font-bold text-xs text-navy">Moneroo Afrique</p>
-                    <p className="text-[10px] text-foreground-muted">MTN, Moov, Wave, Orange</p>
-                  </div>
-                </button>
-
-                {/* Stripe Provider */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentProvider("stripe")}
-                  className={`p-4 rounded-xl border text-left flex flex-col justify-between gap-3 transition-all cursor-pointer ${
-                    paymentProvider === "stripe"
-                      ? "border-navy bg-navy/5 ring-2 ring-navy/20"
-                      : "border-border hover:border-gold"
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <CreditCard className="w-5 h-5 text-navy" />
-                    <span className="text-[10px] font-bold uppercase bg-navy/10 text-navy px-2 py-0.5 rounded">Carte CB</span>
-                  </div>
-                  <div>
-                    <p className="font-bold text-xs text-navy">Carte Bancaire</p>
-                    <p className="text-[10px] text-foreground-muted">Visa, Mastercard International</p>
-                  </div>
-                </button>
-
-              </div>
+                </div>
             </div>
 
           </div>

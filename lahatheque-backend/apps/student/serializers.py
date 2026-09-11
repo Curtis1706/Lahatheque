@@ -78,7 +78,7 @@ class OuvrageBasicSerializer(serializers.ModelSerializer):
         if self.context.get('is_partner_context') or getattr(request, 'is_partner', False) or getattr(request, 'partner', None):
             return False
         if request and request.user and request.user.is_authenticated:
-            user_owned_ids = self.context.get('user_owned_ids')
+            user_owned_ids = self.context.get('user_owned_ids') if self.context.get('user_owned_ids') is not None else self.context.get('user_digital_ids')
             if user_owned_ids is not None:
                 if user_owned_ids is True:
                     return True

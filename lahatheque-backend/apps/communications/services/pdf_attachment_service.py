@@ -139,13 +139,15 @@ class PdfAttachmentService:
 
         # 5. Tampon & Certification de Paiement
         tampon_y = current_y + 55
-        page.draw_rect(fitz.Rect(40, tampon_y, 320, tampon_y + 65), color=gold, fill=light_gray)
+        page.draw_rect(fitz.Rect(40, tampon_y, 555, tampon_y + 60), color=gold, fill=light_gray)
         page.insert_text(fitz.Point(55, tampon_y + 20), "CERTIFICATION ÉLECTRONIQUE LAHATHÈQUE", fontsize=8.5, fontname="helv", color=navy)
         page.insert_text(fitz.Point(55, tampon_y + 34), f"Document scellé cryptographiquement le {date_str}", fontsize=7.5, fontname="helv", color=dark_gray)
         page.insert_text(fitz.Point(55, tampon_y + 46), f"Réf Sécurité : {order_num}-SEC-2026", fontsize=7.5, fontname="helv", color=gold)
         if is_paid:
-            page.draw_rect(fitz.Rect(240, tampon_y + 12, 305, tampon_y + 36), color=gold, fill=navy)
-            page.insert_text(fitz.Point(252, tampon_y + 28), "PAYÉ", fontsize=11, fontname="helv", color=gold)
+            page.draw_rect(fitz.Rect(455, tampon_y + 14, 540, tampon_y + 46), color=gold, fill=navy)
+            p_len = fitz.get_text_length("PAYÉ", fontname="helv", fontsize=11)
+            p_x = 455 + (85 - p_len) / 2
+            page.insert_text(fitz.Point(p_x, tampon_y + 34), "PAYÉ", fontsize=11, fontname="helv", color=gold)
 
         # 6. Pied de page Légal
         footer_y = 800

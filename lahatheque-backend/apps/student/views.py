@@ -47,19 +47,33 @@ class StudentOverviewView(APIView):
             .order_by('-last_read_at')
         )
 
+        user_audio_ids = set(
+            str(bid) for bid in LigneCommande.objects.filter(
+                commande__user=user,
+                format_type='audio',
+            ).filter(
+                Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
+            ).values_list('ouvrage_id', flat=True)
+        )
+
         valid_progress = [
             p for p in all_progress
             if AccessService.check_user_book_access(user, str(p.ouvrage.id)).get("access_granted")
+               or str(p.ouvrage.id) in user_audio_ids
         ]
 
-        # Bibliothèque : livres avec accès légitime
+        # Bibliothèque : livres avec accès légitime (numérique ou audio)
         total_books = len(valid_progress)
 
-        # Livre en cours de lecture (progression max non terminé)
+        # Livre en cours de lecture numérique (progression max non terminé)
         current_reading_data = None
-        current_reading = next((p for p in valid_progress if not p.is_completed), None)
-        if not current_reading and valid_progress:
-            current_reading = valid_progress[0]
+        digital_readings = [
+            p for p in valid_progress
+            if AccessService.check_user_book_access(user, str(p.ouvrage.id)).get("access_granted")
+        ]
+        current_reading = next((p for p in digital_readings if not p.is_completed), None)
+        if not current_reading and digital_readings:
+            current_reading = digital_readings[0]
 
         if current_reading:
             progress_pct = current_reading.progress_percent
@@ -160,6 +174,7 @@ class StudentBooksView(APIView):
             qs = qs.filter(is_favorite=True)
 
         user_audio_ids = set()
+        user_digital_ids = set()
         platform_roles = ['admin', 'super_admin', 'chief_layout', 'layout_artist', 'legal_reviewer']
         from django.conf import settings
         is_platform_admin = (
@@ -170,6 +185,7 @@ class StudentBooksView(APIView):
         )
         if is_platform_admin:
             user_audio_ids = True
+            user_digital_ids = True
         else:
             user_audio_ids = set(
                 str(bid) for bid in LigneCommande.objects.filter(
@@ -179,11 +195,24 @@ class StudentBooksView(APIView):
                     Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
                 ).values_list('ouvrage_id', flat=True)
             )
+            user_digital_ids = set(
+                str(bid) for bid in LigneCommande.objects.filter(
+                    commande__user=user,
+                    format_type__in=['digital', 'pdf', 'epub'],
+                ).filter(
+                    Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
+                ).values_list('ouvrage_id', flat=True)
+            )
 
         data = []
         for progress in qs:
-            access_info = AccessService.check_user_book_access(user, str(progress.ouvrage.id))
-            if not access_info.get("access_granted"):
+            book_id_str = str(progress.ouvrage.id)
+            access_info = AccessService.check_user_book_access(user, book_id_str)
+            has_digital_access = bool(access_info.get("access_granted"))
+            has_audio_access = (user_audio_ids is True) or (book_id_str in user_audio_ids)
+
+            # Si l'utilisateur n'a ni accès numérique ni accès audio, ignorer
+            if not has_digital_access and not has_audio_access:
                 continue
 
             progress_pct = progress.progress_percent
@@ -192,23 +221,26 @@ class StudentBooksView(APIView):
 
             ouvrage_data = OuvrageBasicSerializer(
                 progress.ouvrage,
-                context={'request': request, 'user_audio_ids': user_audio_ids}
+                context={
+                    'request': request,
+                    'user_audio_ids': user_audio_ids,
+                    'user_digital_ids': user_digital_ids if not is_platform_admin else True,
+                }
             ).data
-
-            book_id_str = str(progress.ouvrage.id)
-            has_audio_access = (user_audio_ids is True) or (book_id_str in user_audio_ids)
 
             data.append({
                 **ouvrage_data,
+                'is_owned': has_digital_access,
+                'has_digital_access': has_digital_access,
                 'is_audio_owned': has_audio_access,
                 'has_audio_access': has_audio_access,
-                'progress_percent': progress_pct,
-                'current_page': progress.current_page,
-                'last_read_chapter': progress.last_read_chapter,
+                'progress_percent': progress_pct if has_digital_access else None,
+                'current_page': progress.current_page if has_digital_access else 0,
+                'last_read_chapter': progress.last_read_chapter if has_digital_access else '',
                 'last_read_at': progress.last_read_at,
-                'is_completed': progress.is_completed or progress_pct >= 100,
+                'is_completed': (progress.is_completed or progress_pct >= 100) if has_digital_access else False,
                 'is_favorite': progress.is_favorite,
-                'access_type': access_info.get("reason", "purchased"),
+                'access_type': access_info.get("reason", "purchased") if has_digital_access else "audio_purchase",
             })
 
         return Response({'success': True, 'data': data, 'error': None})

@@ -125,17 +125,25 @@ class CreateOrderView(APIView):
                 from apps.catalog.models import OuvrageLanguageVersion
                 lang_ver = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage, language__iexact=selected_language).first()
                 if lang_ver:
+                    # Si l'ouvrage maître est configuré comme disponible en papier, la version linguistique hérite de cette disponibilité
+                    if not lang_ver.is_paper_available and getattr(ouvrage, 'is_paper_available', False):
+                        lang_ver.is_paper_available = True
+                        lang_ver.save(update_fields=['is_paper_available'])
+
                     if not lang_ver.is_paper_available:
                         return Response({
                             'error': f"L'édition {selected_language.upper()} de « {ouvrage.title} » n'est pas disponible en version papier."
                         }, status=status.HTTP_400_BAD_REQUEST)
-                    if lang_ver.paper_stock < quantity:
-                        return Response({
-                            'error': f"Stock insuffisant pour l'édition {selected_language.upper()} de « {ouvrage.title} » "
-                                     f"(disponible : {lang_ver.paper_stock}, demandé : {quantity})."
-                        }, status=status.HTTP_400_BAD_REQUEST)
-                    lang_ver.paper_stock -= quantity
-                    lang_ver.save(update_fields=['paper_stock'])
+
+                    # Si un stock linguistique dédié est configuré, on contrôle ce stock réel
+                    if lang_ver.paper_stock > 0:
+                        if lang_ver.paper_stock < quantity:
+                            return Response({
+                                'error': f"Stock insuffisant pour l'édition {selected_language.upper()} de « {ouvrage.title} » "
+                                         f"(disponible : {lang_ver.paper_stock}, demandé : {quantity})."
+                            }, status=status.HTTP_400_BAD_REQUEST)
+                        lang_ver.paper_stock -= quantity
+                        lang_ver.save(update_fields=['paper_stock'])
 
                 from django.db.models import Sum, F
                 from apps.commerce.models import StockOuvrage

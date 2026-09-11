@@ -512,7 +512,6 @@ export function UnifiedBookOrderModal({
                 <option value="mobile_money">Mobile Money (MTN / Moov / Orange / Wave)</option>
                 <option value="virement">Virement bancaire</option>
                 <option value="especes">Espèces à la livraison</option>
-                <option value="carte">Carte bancaire</option>
               </select>
             </div>
 

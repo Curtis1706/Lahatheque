@@ -229,14 +229,12 @@ class Ouvrage(models.Model):
         try:
             from .models import OuvrageLanguageVersion
             if self.is_paper_available:
-                orig_lvs = OuvrageLanguageVersion.objects.filter(ouvrage=self, is_original=True)
-                if orig_lvs.exists():
-                    for ol in orig_lvs:
-                        if not ol.is_paper_available or ol.paper_stock <= 0:
+                all_lvs = OuvrageLanguageVersion.objects.filter(ouvrage=self)
+                if all_lvs.exists():
+                    for ol in all_lvs:
+                        if not ol.is_paper_available:
                             ol.is_paper_available = True
-                            if ol.paper_stock <= 0:
-                                ol.paper_stock = 15
-                            ol.save(update_fields=['is_paper_available', 'paper_stock'])
+                            ol.save(update_fields=['is_paper_available'])
             else:
                 OuvrageLanguageVersion.objects.filter(ouvrage=self).update(is_paper_available=False)
         except Exception:

@@ -18,7 +18,7 @@ def _unlock_order_content(commande):
     for ligne in lignes:
         ouvrage = ligne.ouvrage
 
-        if ligne.format_type in ('digital', 'pdf', 'epub', 'audio'):
+        if ligne.format_type in ('digital', 'pdf', 'epub'):
             ReadingProgress.objects.get_or_create(
                 user=commande.user,
                 ouvrage=ouvrage,
@@ -29,6 +29,18 @@ def _unlock_order_content(commande):
                 }
             )
             logger.info(f"[Commerce] Accès numérique déverrouillé: {ouvrage.title} pour {commande.user.email}")
+
+        elif ligne.format_type == 'audio':
+            ReadingProgress.objects.get_or_create(
+                user=commande.user,
+                ouvrage=ouvrage,
+                defaults={
+                    'progress_percent': 0,
+                    'current_page': 0,
+                    'total_pages': 0,
+                }
+            )
+            logger.info(f"[Commerce] Accès audio déverrouillé: {ouvrage.title} pour {commande.user.email}")
 
         elif ligne.format_type in ('paper', 'papier'):
             stock = StockOuvrage.objects.filter(

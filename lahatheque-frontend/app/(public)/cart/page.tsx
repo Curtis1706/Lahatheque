@@ -236,7 +236,7 @@ export default function CartPage() {
               <div className="pt-3 border-t border-border space-y-2 text-[11px] text-foreground-muted">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-gold shrink-0" />
-                  <span>Paiement 100% sécurisé via Mobile Money (MTN, Moov, Orange, Wave) ou Carte Bancaire.</span>
+                  <span>Paiement 100% sécurisé via Mobile Money (MTN, Moov, Celtiis, Orange, Wave).</span>
                 </div>
               </div>
             </div>

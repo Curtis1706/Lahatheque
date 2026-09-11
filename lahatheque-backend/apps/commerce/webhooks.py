@@ -121,8 +121,15 @@ class MonerooWebhookView(APIView):
             else:
                 logger.warning("[Webhook] Aucune signature Moneroo (mode DEBUG, accepté).")
 
-        # 2. Extraction des données
-        event_id = request.data.get('event_id') or request.data.get('id')
+        # 2. Extraction des données (support format racine et format imbriqué data Moneroo)
+        data_block = request.data.get('data', {}) if isinstance(request.data.get('data'), dict) else {}
+        event_id = (
+            request.data.get('event_id')
+            or request.data.get('id')
+            or data_block.get('id')
+            or data_block.get('reference')
+            or request.headers.get('Moneroo-Event-Id')
+        )
         event_type = request.data.get('event_type') or request.data.get('event')
         if not event_id or not event_type:
             return Response(

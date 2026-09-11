@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useAudioPlayer } from "@/components/features/audio/audio-player-context";
 import { RecentAudioWidget } from "@/components/features/student/recent-audio-widget";
+import { cn } from "@/lib/utils";
 import {
   getPersonalizedRecommendations,
   type RecommendedBook,
@@ -49,36 +50,79 @@ function RecentBookCard({ book }: { book: BookAPI }) {
   const isAudioOwned = Boolean(
     book.is_audio_owned || (book as any).has_audio_access
   );
-  const isAudioOnly = isAudioOwned && (book as any).is_digital_available === false;
-  const primaryHref = isAudioOnly ? `/listen/${book.id}` : `/catalog/reader/${book.id}`;
+  const isDigitalOwned = Boolean(
+    book.is_owned || (book as any).has_digital_access
+  );
+  const isAudioOnly = isAudioOwned && !isDigitalOwned;
 
   return (
     <div className="group p-4 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center gap-4">
-      <Link href={primaryHref} className="shrink-0" title={isAudioOnly ? `Écouter ${book.title}` : `Lire ${book.title}`}>
-        <BookCover book={book} size="xs" />
-      </Link>
+      {isDigitalOwned ? (
+        <Link href={`/catalog/reader/${book.id}`} className="shrink-0" title={`Lire ${book.title}`}>
+          <BookCover book={book} size="xs" />
+        </Link>
+      ) : isAudioOwned ? (
+        <button
+          type="button"
+          onClick={() => playBook(book.id)}
+          className="shrink-0 cursor-pointer"
+          title={`Écouter ${book.title}`}
+        >
+          <BookCover book={book} size="xs" />
+        </button>
+      ) : (
+        <div className="shrink-0">
+          <BookCover book={book} size="xs" />
+        </div>
+      )}
 
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           <p className="text-[11px] font-bold text-gold uppercase tracking-wider">
             {book.discipline_name || "Académique"}
           </p>
-          {isAudioOwned && (
+          {isAudioOwned && isDigitalOwned ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-gold/15 text-navy border border-gold/30">
+              <Headphones className="w-2.5 h-2.5 text-gold" />
+              Num. &amp; Audio
+            </span>
+          ) : isAudioOwned ? (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-gold/15 text-navy border border-gold/30">
               <Headphones className="w-2.5 h-2.5 text-gold" />
               Audio
             </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-navy/5 text-navy border border-border">
+              <BookOpen className="w-2.5 h-2.5 text-gold" />
+              Numérique
+            </span>
           )}
         </div>
-        <Link href={primaryHref}>
-          <h3 className="font-serif font-bold text-navy text-sm leading-tight truncate group-hover:text-gold transition-colors">
+        {isDigitalOwned ? (
+          <Link href={`/catalog/reader/${book.id}`}>
+            <h3 className="font-serif font-bold text-navy text-sm leading-tight truncate group-hover:text-gold transition-colors">
+              {book.title}
+            </h3>
+          </Link>
+        ) : isAudioOwned ? (
+          <button
+            type="button"
+            onClick={() => playBook(book.id)}
+            className="text-left w-full block cursor-pointer"
+          >
+            <h3 className="font-serif font-bold text-navy text-sm leading-tight truncate hover:text-gold transition-colors">
+              {book.title}
+            </h3>
+          </button>
+        ) : (
+          <h3 className="font-serif font-bold text-navy text-sm leading-tight truncate">
             {book.title}
           </h3>
-        </Link>
+        )}
         <p className="text-[11px] text-foreground-muted truncate">
           Par {authorName}
         </p>
-        {typeof book.progress_percent !== "undefined" && (
+        {isDigitalOwned && typeof book.progress_percent === "number" && (
           <div className="space-y-1 pt-1">
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-foreground-muted">
@@ -103,13 +147,18 @@ function RecentBookCard({ book }: { book: BookAPI }) {
           <button
             type="button"
             onClick={() => playBook(book.id)}
-            className="p-2.5 rounded-xl bg-gold/15 hover:bg-gold/25 text-navy border border-gold/40 transition-colors cursor-pointer"
+            className={cn(
+              "p-2.5 rounded-xl border transition-colors cursor-pointer",
+              !isDigitalOwned
+                ? "bg-navy text-white hover:bg-navy-hover border-navy"
+                : "bg-gold/15 hover:bg-gold/25 text-navy border-gold/40"
+            )}
             title="Écouter la version audio"
           >
             <Headphones className="w-4 h-4 text-gold" />
           </button>
         )}
-        {!isAudioOnly && (
+        {isDigitalOwned && (
           <Link
             href={`/catalog/reader/${book.id}`}
             className="p-2.5 rounded-xl bg-navy/10 hover:bg-gold/20 transition-colors"

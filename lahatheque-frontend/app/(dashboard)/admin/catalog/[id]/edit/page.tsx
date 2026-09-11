@@ -1105,7 +1105,7 @@ export default function AdminBookEditPage() {
                             ? {
                                 ...l,
                                 is_paper_available: checked,
-                                paper_stock: checked ? (l.paper_stock && l.paper_stock > 0 ? l.paper_stock : (paperStock > 0 ? paperStock : 15)) : 0,
+                                paper_stock: checked ? (l.paper_stock && l.paper_stock > 0 ? l.paper_stock : (paperStock > 0 ? paperStock : 0)) : 0,
                               }
                             : checked
                             ? l
