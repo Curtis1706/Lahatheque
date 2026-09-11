@@ -290,16 +290,28 @@ class CreateOrderView(APIView):
             ) or {}
         except Exception as payment_err:
             logger.error(f"Échec initialisation paiement pour la commande {commande.id}: {payment_err}")
-            # Marquer la commande comme échouée
-            try:
-                commande.statut_paiement = 'failed'
-                commande.save(update_fields=['statut_paiement'])
-            except Exception:
-                pass
+
+            from apps.commerce.models import StockOuvrage
+            from apps.catalog.models import OuvrageLanguageVersion
+            from django.db.models import F
+
+            for ligne_annulee in LigneCommande.objects.filter(commande=commande, format_type__in=('paper', 'papier')):
+                StockOuvrage.objects.filter(
+                    ouvrage=ligne_annulee.ouvrage, quantite_reservee__gte=ligne_annulee.quantity
+                ).update(quantite_reservee=F('quantite_reservee') - ligne_annulee.quantity)
+
+                lang_ver_annulee = OuvrageLanguageVersion.objects.filter(
+                    ouvrage=ligne_annulee.ouvrage, language__iexact=(ligne_annulee.selected_language or 'fr')
+                ).first()
+                if lang_ver_annulee and lang_ver_annulee.paper_stock >= 0:
+                    lang_ver_annulee.paper_stock = F('paper_stock') + ligne_annulee.quantity
+                    lang_ver_annulee.save(update_fields=['paper_stock'])
+
+            commande.delete()
             return Response({
                 "success": False,
                 "error": "Impossible d'initialiser le paiement pour le moment. Veuillez réessayer dans quelques instants."
-            }, status=status.HTTP_502_BAD_GATEWAY)
+            }, status=502)
 
         tx = PaymentTransaction.objects.create(
             user=request.user,

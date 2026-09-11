@@ -43,26 +43,57 @@ def _unlock_order_content(commande):
             logger.info(f"[Commerce] Accès audio déverrouillé: {ouvrage.title} pour {commande.user.email}")
 
         elif ligne.format_type in ('paper', 'papier'):
-            stock = StockOuvrage.objects.filter(
-                ouvrage=ouvrage,
-                quantite_reelle__gte=ligne.quantity
-            ).select_for_update().first()
+            from django.db.models import F
 
-            if stock:
-                stock.quantite_reelle -= ligne.quantity
-                stock.save(update_fields=['quantite_reelle'])
+            remaining_to_release = ligne.quantity
+            stocks_with_reservation = list(
+                StockOuvrage.objects.select_for_update()
+                .filter(ouvrage=ouvrage, quantite_reservee__gt=0)
+            )
+
+            for stock in stocks_with_reservation:
+                if remaining_to_release <= 0:
+                    break
+                release_here = min(stock.quantite_reservee, remaining_to_release)
+                if release_here <= 0:
+                    continue
+
+                stock.quantite_reelle = F('quantite_reelle') - release_here
+                stock.quantite_reservee = F('quantite_reservee') - release_here
+                stock.save(update_fields=['quantite_reelle', 'quantite_reservee'])
 
                 MouvementStock.objects.create(
                     stock=stock,
                     type_mouvement='sale',
-                    quantite=ligne.quantity,
+                    quantite=release_here,
                     reference_document=f"Commande #{commande.id}",
                     motif="Vente confirmée" if commande.statut_paiement == 'paid' else "Sortie sur achat à crédit",
                     auteur=commande.user,
                 )
-                logger.info(f"[Commerce] Stock décrémenté: -{ligne.quantity} pour {ouvrage.title}")
-            else:
-                logger.warning(f"[Commerce] Stock insuffisant pour {ouvrage.title} (quantité demandée: {ligne.quantity})")
+                logger.info(f"[Commerce] Stock décrémenté et réservation libérée: -{release_here} pour {ouvrage.title}")
+                remaining_to_release -= release_here
+
+            if remaining_to_release > 0:
+                fallback_stock = StockOuvrage.objects.filter(
+                    ouvrage=ouvrage, quantite_reelle__gte=remaining_to_release
+                ).select_for_update().first()
+                if fallback_stock:
+                    fallback_stock.quantite_reelle = F('quantite_reelle') - remaining_to_release
+                    fallback_stock.save(update_fields=['quantite_reelle'])
+                    MouvementStock.objects.create(
+                        stock=fallback_stock,
+                        type_mouvement='sale',
+                        quantite=remaining_to_release,
+                        reference_document=f"Commande #{commande.id}",
+                        motif="Vente confirmée (repli — aucune réservation trouvée)",
+                        auteur=commande.user,
+                    )
+                    logger.warning(
+                        f"[Commerce] Aucune réservation StockOuvrage trouvée pour la commande "
+                        f"{commande.id} / {ouvrage.title} — décrémentation directe en repli."
+                    )
+                else:
+                    logger.warning(f"[Commerce] Stock insuffisant pour {ouvrage.title} (quantité demandée: {ligne.quantity})")
 
 
 def _notify_order_finalized(commande, context_label):
