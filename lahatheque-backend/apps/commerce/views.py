@@ -518,7 +518,8 @@ class ClientBouquetSubscribeView(APIView):
 
     def post(self, request, offering_id):
         from apps.partners.models import BouquetOffering
-        from .models import ClientBouquetSubscription
+        from .models import ClientBouquetSubscription, Currency, PaymentTransaction
+        from .payment_providers import get_payment_provider
         from datetime import timedelta
         from django.utils import timezone
 
@@ -541,11 +542,69 @@ class ClientBouquetSubscribeView(APIView):
             currency=offering.currency,
             start_date=start,
             end_date=start + timedelta(days=365),
+            status="pending",  # <-- PAS 'active'
         )
+
+        mode_paiement = request.data.get("mode_paiement", "mobile_money")
+        if mode_paiement != "mobile_money":
+            return Response({
+                "success": True,
+                "data": {"id": str(sub.id), "status": "pending", "end_date": str(sub.end_date)},
+                "message": f"Souscription enregistrée. Paiement par {mode_paiement} en attente de confirmation.",
+            }, status=201)
+
+        currency, _ = Currency.objects.get_or_create(
+            code=offering.currency or "XOF",
+            defaults={"peg_rate_to_eur": 655.957}
+        )
+        provider = get_payment_provider("moneroo")
+        frontend_base = get_frontend_base_url(request)
+        return_url = request.data.get("return_url") or f"{frontend_base}/student/books"
+
+        try:
+            payment_res = provider.initiate_payment(
+                amount=offering.annual_price,
+                currency=currency.code,
+                description=f"Bouquet « {offering.title} »",
+                customer_email=request.user.email,
+                customer_name=request.user.get_full_name() or request.user.email,
+                return_url=return_url,
+                metadata={
+                    "client_bouquet_subscription_id": str(sub.id),
+                    "type": "bouquet_client",
+                },
+            ) or {}
+        except Exception as payment_err:
+            import logging
+            logging.getLogger(__name__).error(f"Échec paiement bouquet client {sub.id}: {payment_err}")
+            return Response({
+                "success": False,
+                "error": "Impossible d'initialiser le paiement. Veuillez réessayer."
+            }, status=502)
+
+        tx = PaymentTransaction.objects.create(
+            user=request.user,
+            amount=offering.annual_price,
+            currency=currency,
+            status=payment_res.get("status", "pending"),
+            moneroo_id=payment_res.get("moneroo_id") or payment_res.get("payment_id"),
+        )
+        sub.payment_transaction = tx
+        sub.save(update_fields=["payment_transaction"])
+
+        if payment_res.get("status") == "success":
+            tx.status = "success"
+            tx.save(update_fields=["status"])
+            sub.status = "active"
+            sub.save(update_fields=["status"])
 
         return Response({
             "success": True,
-            "message": f"Souscription au bouquet « {offering.title} » confirmée.",
-            "data": {"id": str(sub.id), "end_date": str(sub.end_date)}
+            "data": {
+                "id": str(sub.id),
+                "status": sub.status,
+                "checkout_url": payment_res.get("checkout_url"),
+                "end_date": str(sub.end_date),
+            },
         }, status=201)
 

@@ -54,14 +54,18 @@ def process_moneroo_webhook(event_id: str, event_type: str, payload: dict) -> We
         # 3. Dispatch
         if event_type == 'payment.success':
             payment_tx.status = PaymentTransaction.Status.SUCCESS
-            payment_tx.webhook_payload = payload
-            payment_tx.save(update_fields=['status', 'webhook_payload', 'updated_at'])
+            payment_tx.raw_webhook_payload = payload
+            payment_tx.save(update_fields=['status', 'raw_webhook_payload'])
             handle_payment_success(payment_tx)
+
+            # Activer aussi les souscriptions bouquet liées à cette transaction
+            from .services import handle_bouquet_payment_success
+            handle_bouquet_payment_success(payment_tx)
             
         elif event_type in ['payment.failed', 'payment.cancelled']:
             payment_tx.status = PaymentTransaction.Status.FAILED
-            payment_tx.webhook_payload = payload
-            payment_tx.save(update_fields=['status', 'webhook_payload', 'updated_at'])
+            payment_tx.raw_webhook_payload = payload
+            payment_tx.save(update_fields=['status', 'raw_webhook_payload'])
             handle_payment_failure(payment_tx)
         else:
             logger.warning(f"Event type non géré: {event_type}")

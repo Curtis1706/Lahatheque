@@ -4020,14 +4020,40 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
     if books_qs and inst_data:
         for key, info in inst_data.items():
             inst_books = books_qs.filter(institution_id=key)
+
+            # 1. Consultations en ligne
+            from apps.protection.models import TraceAcces
+            consultations = TraceAcces.objects.filter(
+                ouvrage__in=inst_books,
+                access_type__in=["read_online", "read_chunk"],
+            ).count()
+
+            # 2. Pages lues
+            from apps.student.models import ReadingSession as StudentReadingSession
+            from django.db.models import Sum as DjangoSum
+            pages_read = StudentReadingSession.objects.filter(
+                ouvrage__in=inst_books,
+            ).aggregate(total=DjangoSum("pages_read"))["total"] or 0
+
+            # 3. Téléchargements
+            downloads = TraceAcces.objects.filter(
+                ouvrage__in=inst_books,
+                access_type="download",
+            ).count()
+
+            # 4. Écoutes audio
+            from apps.audio.models import AudioListeningSession
+            audio_listens = AudioListeningSession.objects.filter(
+                ouvrage__in=inst_books,
+            ).count()
+
+            # Sessions depuis l'API partenaire (reader.ReaderSession)
             sessions_count = ReaderSession.objects.filter(
                 source_type='catalog_book',
                 ouvrage__in=inst_books
             ).count()
-            traces_count = TraceAcces.objects.filter(
-                ouvrage__in=inst_books
-            ).count()
-            info["reads_count"] = sessions_count + traces_count
+
+            info["reads_count"] = consultations + pages_read + downloads + audio_listens + sessions_count
 
     total_reads = sum(item["reads_count"] for item in inst_data.values())
     total_inst_books = sum(item["books_count"] for item in inst_data.values()) or 1

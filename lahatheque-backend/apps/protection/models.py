@@ -85,6 +85,7 @@ class TraceAcces(models.Model):
         ("read_chunk", "Lecture fragment Range 206"),
         ("text_request", "Requête texte TTS"),
         ("audio_stream", "Streaming audio"),
+        ("download", "Téléchargement"),
     ]
     access_type = models.CharField(max_length=32, choices=ACCESS_TYPE_CHOICES, default="read_chunk", db_index=True)
     page_number = models.IntegerField(null=True, blank=True)

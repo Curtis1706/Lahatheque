@@ -154,6 +154,20 @@ class UniversityKpisView(APIView):
             "currency": "XOF",
         }
 
+        # Calcul dynamique de la tendance (mois courant vs mois précédent)
+        previous_month_consultations = TraceAcces.objects.filter(
+            Q(institution=inst) | Q(ouvrage__institution=inst) | Q(bouquet_subscription__institution=inst),
+            timestamp__gte=timezone.now() - timedelta(days=60),
+            timestamp__lt=timezone.now() - timedelta(days=30),
+        ).count()
+
+        if previous_month_consultations > 0:
+            consultations_trend = round(
+                ((monthly_consultations - previous_month_consultations) / previous_month_consultations) * 100, 1
+            )
+        else:
+            consultations_trend = 0.0 if monthly_consultations == 0 else 100.0
+
         return Response({
             "success": True,
             "data": {
@@ -165,7 +179,7 @@ class UniversityKpisView(APIView):
                 "total_royalties_available": avail_royalty,
                 "total_royalties_paid": paid_royalty,
                 "currency": "XOF",
-                "consultations_trend_percent": 14.2,
+                "consultations_trend_percent": consultations_trend,
                 "top_disciplines": top_disc,
                 "faculty_distribution": faculty_distrib,
                 "revenue_split": revenue_split,
@@ -313,6 +327,9 @@ class UniversityBouquetSubscribeView(APIView):
 
     def post(self, request, pk):
         from .models import BouquetOffering
+        from apps.commerce.models import Currency, PaymentTransaction
+        from apps.commerce.payment_providers import get_payment_provider
+        from apps.commerce.views import get_frontend_base_url
 
         inst = get_user_institution(request.user)
         if not inst:
@@ -331,6 +348,7 @@ class UniversityBouquetSubscribeView(APIView):
         start = timezone.now().date()
         end = start + timedelta(days=365)
 
+        # Créer la souscription en statut 'pending' (PAS 'active')
         sub = UniversityBouquetSubscription.objects.create(
             institution=inst,
             offering_id=offering.id,
@@ -341,19 +359,93 @@ class UniversityBouquetSubscribeView(APIView):
             books_count=offering.get_books_queryset(requesting_institution=inst).count(),
             annual_price=offering.annual_price,
             currency=offering.currency,
-            status="active",
+            status="pending",  # <-- PAS 'active' tant que le paiement n'est pas confirmé
             start_date=start,
             end_date=end,
         )
+
+        # Initialiser le paiement via Moneroo
+        mode_paiement = request.data.get("mode_paiement", "mobile_money")
+
+        if mode_paiement != "mobile_money":
+            # Paiement manuel (virement, espèces) — souscription en attente de confirmation admin
+            return Response({
+                "success": True,
+                "data": {
+                    "bouquet_id": str(sub.id),
+                    "status": "pending",
+                    "start_date": str(sub.start_date),
+                    "end_date": str(sub.end_date),
+                    "message": (
+                        f"Souscription au bouquet « {offering.title} » enregistrée. "
+                        f"Réglez par {mode_paiement} pour finaliser — un agent LAHA Éditions vous contactera."
+                    ),
+                },
+                "error": None
+            })
+
+        currency, _ = Currency.objects.get_or_create(
+            code=offering.currency or "XOF",
+            defaults={"peg_rate_to_eur": 655.957}
+        )
+
+        provider = get_payment_provider("moneroo")
+        frontend_base = get_frontend_base_url(request)
+        return_url = request.data.get("return_url") or f"{frontend_base}/university/bouquets"
+
+        try:
+            payment_res = provider.initiate_payment(
+                amount=offering.annual_price,
+                currency=currency.code,
+                description=f"Bouquet « {offering.title} » — {inst.name}",
+                customer_email=request.user.email,
+                customer_name=request.user.get_full_name() or request.user.email,
+                return_url=return_url,
+                metadata={
+                    "bouquet_subscription_id": str(sub.id),
+                    "institution_id": str(inst.id),
+                    "type": "bouquet_university",
+                },
+            ) or {}
+        except Exception as payment_err:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Échec initialisation paiement bouquet {sub.id}: {payment_err}")
+            # Ne pas supprimer la souscription — elle reste 'pending' et peut être relancée
+            return Response({
+                "success": False,
+                "error": "Impossible d'initialiser le paiement pour le moment. Veuillez réessayer."
+            }, status=502)
+
+        # Créer la transaction de paiement
+        tx = PaymentTransaction.objects.create(
+            user=request.user,
+            amount=offering.annual_price,
+            currency=currency,
+            status=payment_res.get("status", "pending"),
+            moneroo_id=payment_res.get("moneroo_id") or payment_res.get("payment_id"),
+        )
+
+        # Lier la transaction à la souscription
+        sub.payment_transaction = tx
+        sub.save(update_fields=["payment_transaction"])
+
+        # Si le provider est mock et succès immédiat (dev uniquement)
+        if payment_res.get("status") == "success":
+            tx.status = "success"
+            tx.save(update_fields=["status"])
+            sub.status = "active"
+            sub.save(update_fields=["status"])
 
         return Response({
             "success": True,
             "data": {
                 "bouquet_id": str(sub.id),
-                "status": "active",
+                "status": sub.status,
+                "checkout_url": payment_res.get("checkout_url"),
                 "start_date": str(sub.start_date),
                 "end_date": str(sub.end_date),
-                "message": f"Souscription au bouquet « {offering.title} » validée."
+                "message": f"Souscription au bouquet « {offering.title} » initiée. Redirection vers le paiement.",
             },
             "error": None
         })

@@ -1206,3 +1206,84 @@ class PartnerUsageStatsView(APIView):
                 "top_books": top_books,
             }
         })
+
+
+class PartnerBouquetSubscribeView(APIView):
+    """
+    POST /api/v1/partner/bouquets/<offering_id>/subscribe/
+    Souscription à un bouquet via l'API Partenaire (CDC 9.1).
+    Crée une UniversityBouquetSubscription en statut 'pending' et retourne
+    l'URL de paiement Moneroo si applicable, ou un statut d'attente pour
+    paiement hors-ligne.
+    """
+    authentication_classes = [PartnerAuthentication]
+    permission_classes = [IsAuthenticatedPartner]
+
+    def post(self, request, offering_id):
+        from apps.partners.models import (
+            BouquetOffering, UniversityBouquetSubscription, Institution
+        )
+        from apps.commerce.models import Currency, PaymentTransaction
+        from apps.commerce.payment_providers import get_payment_provider
+        from datetime import timedelta
+        from django.utils import timezone
+
+        partner = getattr(request, 'partner', None)
+        institution = getattr(partner, 'linked_institution', None) if partner else None
+
+        if not institution:
+            return Response({
+                "success": False,
+                "error": "Aucune institution rattachée à ce partenaire. Contactez LAHA Éditions."
+            }, status=403)
+
+        try:
+            offering = BouquetOffering.objects.get(id=offering_id, is_active=True)
+        except BouquetOffering.DoesNotExist:
+            return Response({
+                "success": False, "error": "Bouquet introuvable ou indisponible."
+            }, status=404)
+
+        if UniversityBouquetSubscription.objects.filter(
+            institution=institution, offering_id=offering.id, status='active'
+        ).exists():
+            return Response({
+                "success": False, "error": "Ce bouquet est déjà souscrit par votre institution."
+            }, status=400)
+
+        start = timezone.now().date()
+        end = start + timedelta(days=365)
+
+        sub = UniversityBouquetSubscription.objects.create(
+            institution=institution,
+            offering_id=offering.id,
+            title=offering.title,
+            bouquet_type=offering.bouquet_type,
+            faculty_code=offering.faculty_code,
+            discipline=offering.discipline,
+            books_count=offering.get_books_queryset(requesting_institution=institution).count(),
+            annual_price=offering.annual_price,
+            currency=offering.currency,
+            status="pending",
+            start_date=start,
+            end_date=end,
+        )
+
+        # L'API partenaire retourne les informations pour paiement hors-ligne
+        # (les intégrations M2M ne redirigent pas vers un checkout navigateur)
+        return Response({
+            "success": True,
+            "data": {
+                "subscription_id": str(sub.id),
+                "bouquet_title": offering.title,
+                "amount": float(offering.annual_price),
+                "currency": offering.currency,
+                "status": "pending",
+                "start_date": str(start),
+                "end_date": str(end),
+                "payment_instructions": (
+                    "Souscription enregistrée en attente de paiement. "
+                    "Contactez LAHA Éditions pour finaliser le règlement."
+                ),
+            }
+        }, status=201)
