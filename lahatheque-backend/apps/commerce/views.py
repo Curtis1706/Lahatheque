@@ -462,11 +462,46 @@ class AdminCreateOrderView(CreateOrderView):
 
                 if format_type == 'paper':
                     has_paper = True
-                    from apps.catalog.models import OuvrageLanguageVersion
-                    lang_ver = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage, language__iexact=selected_language).first()
-                    if lang_ver and lang_ver.paper_stock >= quantity:
-                        lang_ver.paper_stock -= quantity
-                        lang_ver.save(update_fields=['paper_stock'])
+
+                    if not getattr(ouvrage, 'is_paper_available', False):
+                        return Response({
+                            'error': f"« {ouvrage.title} » n'est pas disponible en version papier."
+                        }, status=status.HTTP_400_BAD_REQUEST)
+
+                    from apps.commerce.models import StockOuvrage, MouvementStock
+                    from django.db.models import F
+
+                    with transaction.atomic():
+                        stocks_locked = list(
+                            StockOuvrage.objects.select_for_update().filter(ouvrage=ouvrage)
+                        )
+                        total_disponible = sum(
+                            (s.quantite_reelle - s.quantite_reservee) for s in stocks_locked
+                        )
+
+                        if total_disponible < quantity:
+                            return Response({
+                                'error': f"Stock insuffisant pour « {ouvrage.title} » en version papier "
+                                         f"(disponible : {total_disponible}, demandé : {quantity})."
+                            }, status=status.HTTP_400_BAD_REQUEST)
+
+                        remaining_to_deduct = quantity
+                        for stock in stocks_locked:
+                            available_here = stock.quantite_reelle - stock.quantite_reservee
+                            if available_here <= 0 or remaining_to_deduct <= 0:
+                                continue
+                            take = min(available_here, remaining_to_deduct)
+                            stock.quantite_reelle = F('quantite_reelle') - take
+                            stock.save(update_fields=['quantite_reelle'])
+                            MouvementStock.objects.create(
+                                stock=stock,
+                                type_mouvement='sale',
+                                quantite=take,
+                                reference_document=f"Vente comptoir Admin — {guest_name}",
+                                motif="Vente comptoir confirmée",
+                                auteur=request.user,
+                            )
+                            remaining_to_deduct -= take
 
                     unit_price = getattr(ouvrage, 'price_paper', None) or Decimal("5000.00")
                 elif format_type == 'digital':
