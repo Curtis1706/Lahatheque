@@ -436,16 +436,22 @@ export async function analyzeForensicEvidence(
   const timeoutMs = 180000; // 180 secondes (3 minutes)
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const formData = new FormData();
-  formData.append("file", file);
-  if (notes) formData.append("notes", notes);
-
   try {
-    console.log("[FORENSIC ANALYZE] Envoi direct en flux multipart vers le proxy BFF...");
+    console.log("[FORENSIC ANALYZE] Encodage Base64 du document...");
+    const base64Data = await fileToBase64(file);
+    console.log(`[FORENSIC ANALYZE] Encodage terminé (${base64Data.length} caractères). Envoi JSON vers proxy BFF...`);
+
     const res = await fetch("/api/bff/protection/forensic/analyze/", {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
       credentials: "include",
-      body: formData,
+      body: JSON.stringify({
+        file_base64: base64Data,
+        file_name: file.name,
+        notes: notes || "",
+      }),
       signal: controller.signal,
     });
 

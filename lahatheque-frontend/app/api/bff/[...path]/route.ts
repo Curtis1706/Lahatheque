@@ -110,17 +110,21 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
     const fetchController = new AbortController()
     const timeoutHandle = setTimeout(() => fetchController.abort(), timeoutMs)
 
+    const fetchOptions: RequestInit = {
+      method: request.method,
+      headers: headers,
+      body: body || undefined,
+      cache: 'no-store',
+      signal: fetchController.signal,
+    }
+    if (body && typeof (body as any).getReader === 'function') {
+      // @ts-ignore
+      fetchOptions.duplex = 'half'
+    }
+
     try {
       console.log(`[BFF Proxy] Envoi requête ${request.method} vers ${targetUrl} (timeout: ${timeoutMs / 1000}s)...`)
-      backendRes = await fetch(targetUrl, {
-        method: request.method,
-        headers: headers,
-        body: body || undefined,
-        cache: 'no-store',
-        signal: fetchController.signal,
-        // @ts-ignore
-        duplex: 'half',
-      })
+      backendRes = await fetch(targetUrl, fetchOptions)
       clearTimeout(timeoutHandle)
       console.log(`[BFF Proxy] Réponse Django reçue pour ${targetUrl} : HTTP ${backendRes.status}`)
     } catch (netErr: any) {
@@ -134,14 +138,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
       }
       if (targetUrl.includes('localhost')) {
         const ipv4Url = targetUrl.replace('localhost', '127.0.0.1')
-        backendRes = await fetch(ipv4Url, {
-          method: request.method,
-          headers: headers,
-          body: body || undefined,
-          cache: 'no-store',
-          // @ts-ignore
-          duplex: 'half',
-        })
+        backendRes = await fetch(ipv4Url, fetchOptions)
       } else {
         throw netErr
       }
