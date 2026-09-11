@@ -67,3 +67,19 @@
      - La commande est enregistrée dans `Order`.
      - L'adresse de livraison est stockée dans `PhysicalDelivery` et consultable dans `/student/orders`.
      - Le livre numérique est immédiatement accessible dans `/student/books` et consultable dans la liseuse FlipBook.
+
+---
+
+### Scénario 3 : Commande Administrateur via Combobox & Vente Comptoir Boutique (`/admin/orders`)
+
+1. **Sélection Rapide par Combobox (Compte Existant)** :
+   - Se connecter en tant qu'administrateur et se rendre sur `/admin/orders`.
+   - Cliquer sur « Passer une commande pour un client ».
+   - Saisir quelques lettres dans la Combobox client : le menu déroulant flottant liste instantanément les correspondances avec avatar, rôle et téléphone.
+   - Cliquer sur un client : le panneau se referme et affiche la carte récapitulative compacte du client sélectionné avec le bouton « Changer de client ».
+2. **Bascule et Commande pour un Client Comptoir Externe** :
+   - Dans le sélecteur, basculer sur l'onglet « Client comptoir externe (sans compte) ».
+   - Renseigner le Nom complet et le Numéro de téléphone du client physique.
+   - Sélectionner les articles désirés (papier et/ou numérique).
+   - Choisir le mode de règlement comptoir (Espèces ou Mobile Money direct).
+   - Valider la création : la commande est enregistrée avec `user = null` et `is_pos_order = True`, et apparaît immédiatement dans le registre général `/admin/orders` avec les coordonnées de l'acheteur externe.

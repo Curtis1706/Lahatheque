@@ -1423,10 +1423,17 @@ export async function searchClients(query: string, role?: string) {
 }
 
 export async function adminCreateOrderForClient(payload: {
-  client_id: string;
+  client_id?: string;
+  is_pos_order?: boolean;
+  guest_name?: string;
+  guest_phone?: string;
+  guest_email?: string;
+  is_immediate_handover?: boolean;
+  statut_paiement?: string;
   items: Array<{ ouvrage_id: string; format_type: string; quantity: number }>;
   shipping_address?: string;
   mode_paiement?: string;
+  payment_method?: string;
   type_commande?: string;
   date_livraison_souhaitee?: string;
   plage_horaire_debut?: string;

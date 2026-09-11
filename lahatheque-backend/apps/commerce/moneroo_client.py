@@ -49,6 +49,20 @@ class MonerooClient:
         if currency != 'XOF':
             raise ValueError(f"Devise non supportée : {currency}. Seul le XOF est accepté.")
 
+        # Extraction robuste du nom et prénom pour Moneroo (qui exige obligatoirement first_name et last_name non vides)
+        clean_name = (customer_name or '').strip()
+        parts = [p for p in clean_name.split() if p]
+        if len(parts) >= 2:
+            first_name = parts[0]
+            last_name = ' '.join(parts[1:])
+        elif len(parts) == 1:
+            first_name = parts[0]
+            last_name = "Client"
+        else:
+            email_part = (customer_email or "lecteur").split("@")[0]
+            first_name = email_part or "Lecteur"
+            last_name = "LAHA"
+
         url = f"{self.base_url}/payments/initialize"
         payload = {
             "amount": float(amount),
@@ -56,8 +70,8 @@ class MonerooClient:
             "description": description,
             "customer": {
                 "email": customer_email,
-                "first_name": customer_name.split(' ')[0] if customer_name else '',
-                "last_name": ' '.join(customer_name.split(' ')[1:]) if customer_name and ' ' in customer_name else ''
+                "first_name": first_name,
+                "last_name": last_name
             },
             "return_url": return_url,
             "metadata": metadata or {}
@@ -76,6 +90,9 @@ class MonerooClient:
                     }
                 else:
                     logger.error(f"Moneroo API Error {response.status_code}: {response.text}")
+                    # Ne pas faire de retry sur les erreurs client 4xx (validation, bad request, auth)
+                    if 400 <= response.status_code < 500:
+                        raise MonerooAPIError(f"Erreur Moneroo: {response.text}")
                     if attempt == self.MAX_RETRIES - 1:
                         raise MonerooAPIError(f"Erreur Moneroo: {response.text}")
             except requests.exceptions.Timeout:

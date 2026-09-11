@@ -28,6 +28,7 @@ import {
   TrendingUp,
   AlertTriangle,
   XCircle,
+  Store,
 } from "lucide-react";
 import { toast } from "sonner";
 import { OrderCreateForm } from "@/components/student/OrderCreateForm";
@@ -35,7 +36,6 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { OrderActionModal } from "@/components/features/admin/order-action-modal";
 import {
   getAdminOrders,
-  searchClients,
   remindAbandonedOrder,
 } from "@/lib/services/admin";
 import type {
@@ -45,17 +45,7 @@ import type {
 } from "@/lib/types/admin";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Loader } from "@/components/ui/loader";
-
-interface ClientSearchResult {
-  id: string;
-  email: string;
-  first_name?: string;
-  last_name?: string;
-  role?: string;
-  phone?: string;
-  country?: string;
-  avatar_url?: string;
-}
+import { ClientCombobox, type ClientItem } from "@/components/admin/client-combobox";
 
 export default function AdminOrdersPage() {
   // ─── État Commandes Réelles (BFF / Django) ──────────────────────────────────
@@ -82,13 +72,22 @@ export default function AdminOrdersPage() {
   // ─── Modale d'Action Commande ──────────────────────────────────────────────
   const [selectedOrderForAction, setSelectedOrderForAction] = useState<AdminOrder | null>(null);
 
-  // ─── État Création Manuelle de Commande pour un Client ──────────────────────
+  // ─── État Création Manuelle de Commande (Compte existant ou Vente Comptoir) ──
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
-  const [clientSearchQuery, setClientSearchQuery] = useState("");
-  const [clientRoleFilter, setClientRoleFilter] = useState<string>("all");
-  const [searchingClients, setSearchingClients] = useState(false);
-  const [searchResults, setSearchResults] = useState<ClientSearchResult[]>([]);
-  const [selectedClient, setSelectedClient] = useState<ClientSearchResult | null>(null);
+  const [orderClientMode, setOrderClientMode] = useState<"existing" | "pos">("existing");
+  const [selectedClient, setSelectedClient] = useState<ClientItem | null>(null);
+
+  // Champs client comptoir externe (sans compte)
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+
+  const resetCreationForm = () => {
+    setSelectedClient(null);
+    setGuestName("");
+    setGuestPhone("");
+    setGuestEmail("");
+  };
 
   // ─── Chargement des Commandes ───────────────────────────────────────────────
   const loadOrders = useCallback(async () => {
@@ -117,28 +116,6 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
-
-  // ─── Recherche de Clients pour Création ─────────────────────────────────────
-  useEffect(() => {
-    if (!isCreatingOrder || selectedClient) return;
-
-    const timer = setTimeout(async () => {
-      setSearchingClients(true);
-      try {
-        const results = await searchClients(
-          clientSearchQuery.trim(),
-          clientRoleFilter === "all" ? undefined : clientRoleFilter
-        );
-        setSearchResults(Array.isArray(results) ? results : []);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearchingClients(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [clientSearchQuery, clientRoleFilter, isCreatingOrder, selectedClient]);
 
   // ─── Relance Panier Rapide en 1 clic ────────────────────────────────────────
   const handleQuickReminder = async (e: React.MouseEvent, order: AdminOrder) => {
@@ -181,11 +158,24 @@ export default function AdminOrdersPage() {
       header: "Acheteur & Coordonnées",
       cell: (row) => (
         <div>
-          <p className="font-semibold text-xs text-navy">{row.customer_name}</p>
-          <p className="text-[11px] text-muted-foreground">{row.customer_email}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-semibold text-xs text-navy">
+              {row.is_pos_order ? (row.guest_name || "Client Comptoir") : row.customer_name}
+            </p>
+            {row.is_pos_order && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/15 text-gold-dark border border-gold/30">
+                Vente Comptoir
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {row.is_pos_order
+              ? (row.guest_phone ? `${row.guest_phone}${row.guest_email ? ` • ${row.guest_email}` : ""}` : (row.guest_email || "Vente en boutique"))
+              : row.customer_email}
+          </p>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="text-[10px] px-1.5 py-0.2 rounded font-medium bg-muted text-muted-foreground capitalize">
-              {row.customer_role || "Lecteur"}
+              {row.is_pos_order ? "Client externe boutique" : (row.customer_role || "Lecteur")}
             </span>
             {row.manual_payment_reference && (
               <span className="text-[10px] text-gold font-mono truncate max-w-[130px]" title={row.manual_payment_reference}>
@@ -369,8 +359,7 @@ export default function AdminOrdersPage() {
               type="button"
               onClick={() => {
                 setIsCreatingOrder(true);
-                setSelectedClient(null);
-                setClientSearchQuery("");
+                resetCreationForm();
               }}
               className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-2 min-h-[44px] cursor-pointer shadow-md"
             >
@@ -382,7 +371,7 @@ export default function AdminOrdersPage() {
               type="button"
               onClick={() => {
                 setIsCreatingOrder(false);
-                setSelectedClient(null);
+                resetCreationForm();
               }}
               className="px-4 py-2.5 rounded-xl border border-border text-navy text-xs font-semibold hover:bg-background-secondary transition-colors flex items-center gap-1.5 min-h-[44px] cursor-pointer"
             >
@@ -504,154 +493,157 @@ export default function AdminOrdersPage() {
         </Link>
       </div>
 
-      {/* ── Section 1 — Création Manuelle de Commande pour un Client ─────── */}
+      {/* ── Section 1 — Création de Commande (Client Existant ou Vente Comptoir) ─────── */}
       {isCreatingOrder && (
-        <section aria-labelledby="section-create-order" className="space-y-6">
+        <section aria-labelledby="section-create-order" className="space-y-6 animate-in fade-in duration-200">
           <div className="bg-background-secondary/60 border border-border rounded-3xl p-5 sm:p-7 space-y-6">
-            <div className="border-b border-border pb-4">
-              <h2
-                id="section-create-order"
-                className="font-serif text-lg sm:text-xl font-bold text-navy flex items-center gap-2"
-              >
-                <UserIcon className="w-5 h-5 text-gold" />
-                <span>1. Identification du Client Cible</span>
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Recherchez l&apos;utilisateur (étudiant, lecteur, auteur, établissement) pour qui la commande sera établie.
-              </p>
+            <div className="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2
+                  id="section-create-order"
+                  className="font-serif text-lg sm:text-xl font-bold text-navy flex items-center gap-2"
+                >
+                  <UserIcon className="w-5 h-5 text-gold" />
+                  <span>1. Destinataire de la Commande &amp; Canal</span>
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Choisissez si la commande est enregistrée pour un compte LAHAThèque existant ou un client comptoir en boutique.
+                </p>
+              </div>
+
+              {/* Sélecteur de mode en 2 onglets */}
+              <div className="inline-flex p-1 rounded-2xl bg-background border border-border">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderClientMode("existing");
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                    orderClientMode === "existing"
+                      ? "bg-navy text-white shadow-xs"
+                      : "text-muted-foreground hover:text-navy"
+                  }`}
+                >
+                  <UserIcon className="w-4 h-4 text-gold" />
+                  <span>Compte client existant</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderClientMode("pos");
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                    orderClientMode === "pos"
+                      ? "bg-navy text-white shadow-xs"
+                      : "text-muted-foreground hover:text-navy"
+                  }`}
+                >
+                  <Store className="w-4 h-4 text-gold" />
+                  <span>Vente comptoir boutique</span>
+                </button>
+              </div>
             </div>
 
-            {!selectedClient ? (
+            {orderClientMode === "existing" ? (
+              <div className="space-y-3">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy block">
+                  Rechercher un compte utilisateur
+                </label>
+                <ClientCombobox
+                  selectedClient={selectedClient}
+                  onSelect={(client) => setSelectedClient(client)}
+                  onClear={() => setSelectedClient(null)}
+                />
+              </div>
+            ) : (
               <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-                  <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <div className="p-3.5 rounded-2xl bg-gold/10 border border-gold/20 flex items-start gap-3">
+                  <Store className="w-5 h-5 text-gold-dark shrink-0 mt-0.5" />
+                  <div className="text-xs text-navy">
+                    <p className="font-bold">Mode Vente Comptoir Immédiate (Sans compte utilisateur)</p>
+                    <p className="text-muted-foreground mt-0.5">
+                      Idéal pour les clients de passage qui achètent directement en boutique. Aucun compte ne sera créé, la commande sera enregistrée avec remise immédiate au comptoir.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label htmlFor="guest-name" className="text-[11px] font-bold text-navy uppercase tracking-wider block mb-1.5">
+                      Nom complet de l&apos;acheteur *
+                    </label>
                     <input
+                      id="guest-name"
                       type="text"
-                      value={clientSearchQuery}
-                      onChange={(e) => setClientSearchQuery(e.target.value)}
-                      placeholder="Rechercher un client par nom, email, téléphone..."
-                      className="w-full pl-10 pr-4 py-2.5 text-xs bg-background border border-border rounded-xl text-navy placeholder:text-muted-foreground focus:border-gold outline-hidden min-h-[44px]"
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      placeholder="Ex: Jean Koffi"
+                      className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy placeholder:text-muted-foreground focus:border-gold outline-hidden min-h-[44px]"
+                      required
                     />
                   </div>
 
-                  <select
-                    value={clientRoleFilter}
-                    onChange={(e) => setClientRoleFilter(e.target.value)}
-                    className="px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy focus:border-gold outline-hidden min-h-[44px]"
-                    aria-label="Filtrer par rôle"
-                  >
-                    <option value="all">Tous les profils</option>
-                    <option value="student">Lecteurs / Étudiants</option>
-                    <option value="author">Auteurs</option>
-                    <option value="university">Universités</option>
-                    <option value="wholesaler">Grossistes</option>
-                  </select>
-                </div>
+                  <div>
+                    <label htmlFor="guest-phone" className="text-[11px] font-bold text-navy uppercase tracking-wider block mb-1.5">
+                      Téléphone / WhatsApp *
+                    </label>
+                    <input
+                      id="guest-phone"
+                      type="tel"
+                      value={guestPhone}
+                      onChange={(e) => setGuestPhone(e.target.value)}
+                      placeholder="Ex: +229 97 00 00 00"
+                      className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy placeholder:text-muted-foreground focus:border-gold outline-hidden min-h-[44px]"
+                      required
+                    />
+                  </div>
 
-                <div className="border border-border rounded-2xl bg-background overflow-hidden divide-y divide-border max-h-72 overflow-y-auto">
-                  {searchingClients ? (
-                    <div className="p-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-                      <Loader variant="spinner" size={14} className="text-gold" />
-                      <span>Recherche des comptes clients en cours...</span>
-                    </div>
-                  ) : searchResults.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-muted-foreground italic">
-                      {clientSearchQuery.trim()
-                        ? `Aucun compte trouvé pour « ${clientSearchQuery} »`
-                        : "Tapez au moins une lettre pour rechercher un compte client"}
-                    </div>
-                  ) : (
-                    searchResults.map((client) => {
-                      const fullName = `${client.first_name || ""} ${client.last_name || ""}`.trim() || client.email;
-                      return (
-                        <div
-                          key={client.id}
-                          className="p-3.5 flex items-center justify-between gap-3 hover:bg-background-secondary transition-colors"
-                        >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <UserAvatar
-                              src={client.avatar_url}
-                              name={fullName}
-                              size="sm"
-                              className="border border-gold/20 shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <p className="font-serif font-bold text-navy text-xs truncate">
-                                {fullName}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground truncate">
-                                {client.email}
-                                {client.phone ? ` • ${client.phone}` : ""}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-navy/5 text-navy border border-border capitalize">
-                              {client.role || "Lecteur"}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedClient(client)}
-                              className="px-3.5 py-1.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs min-h-[36px]"
-                            >
-                              <Check className="w-3.5 h-3.5 text-gold" />
-                              <span>Sélectionner</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 rounded-2xl bg-background border border-gold/30 flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3 min-w-0">
-                  <UserAvatar
-                    src={selectedClient.avatar_url}
-                    name={`${selectedClient.first_name || ""} ${selectedClient.last_name || ""}`.trim() || selectedClient.email}
-                    size="md"
-                    className="border-2 border-gold shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-gold block">
-                      Client sélectionné
-                    </span>
-                    <p className="font-serif font-bold text-navy text-sm sm:text-base truncate">
-                      {`${selectedClient.first_name || ""} ${selectedClient.last_name || ""}`.trim() || selectedClient.email}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {selectedClient.email}
-                      {selectedClient.phone ? ` • ${selectedClient.phone}` : ""}
-                    </p>
+                  <div>
+                    <label htmlFor="guest-email" className="text-[11px] font-bold text-navy uppercase tracking-wider block mb-1.5">
+                      Adresse e-mail (optionnel)
+                    </label>
+                    <input
+                      id="guest-email"
+                      type="email"
+                      value={guestEmail}
+                      onChange={(e) => setGuestEmail(e.target.value)}
+                      placeholder="Ex: jean.koffi@example.com"
+                      className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy placeholder:text-muted-foreground focus:border-gold outline-hidden min-h-[44px]"
+                    />
                   </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedClient(null)}
-                  className="px-3.5 py-2 rounded-xl border border-border text-xs font-semibold text-navy hover:bg-background-secondary transition-colors cursor-pointer"
-                >
-                  Changer de client
-                </button>
               </div>
             )}
           </div>
 
-          {selectedClient && (
+          {/* Formulaire de création de commande */}
+          {orderClientMode === "pos" && (!guestName.trim() || !guestPhone.trim()) && (
+            <div className="p-5 rounded-2xl bg-background border border-dashed border-border text-center text-xs text-foreground-muted">
+              Renseignez au minimum le <strong>nom complet</strong> et le <strong>numéro de téléphone</strong> de l&apos;acheteur ci-dessus pour ouvrir le panier d&apos;articles.
+            </div>
+          )}
+
+          {((orderClientMode === "existing" && selectedClient) ||
+            (orderClientMode === "pos" && guestName.trim() && guestPhone.trim())) && (
             <div className="space-y-3">
               <OrderCreateForm
-                targetClientId={selectedClient.id}
-                targetClientName={`${selectedClient.first_name || ""} ${selectedClient.last_name || ""}`.trim() || selectedClient.email}
+                targetClientId={orderClientMode === "existing" ? selectedClient?.id : undefined}
+                targetClientName={
+                  orderClientMode === "existing"
+                    ? `${selectedClient?.first_name || ""} ${selectedClient?.last_name || ""}`.trim() || selectedClient?.email
+                    : guestName
+                }
+                isPosOrder={orderClientMode === "pos"}
+                guestName={guestName}
+                guestPhone={guestPhone}
+                guestEmail={guestEmail}
                 onSuccess={() => {
-                  setSelectedClient(null);
+                  resetCreationForm();
                   setIsCreatingOrder(false);
                   loadOrders();
                 }}
                 onCancel={() => {
-                  setSelectedClient(null);
+                  resetCreationForm();
                   setIsCreatingOrder(false);
                 }}
               />

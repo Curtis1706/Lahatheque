@@ -6,6 +6,7 @@ from apps.accounts.permissions import IsAdminOrSuperAdmin
 from django.db import transaction
 from decimal import Decimal
 import logging
+import uuid
 
 from .models import Currency, Order, LigneCommande, PhysicalDelivery, PaymentTransaction, SubscriptionPlan, Subscription
 from .serializers import OrderSerializer, CreateOrderSerializer, SubscriptionPlanSerializer
@@ -261,44 +262,52 @@ class CreateOrderView(APIView):
                     'message': f"Commande enregistrée. Réglez par {commande.get_mode_paiement_display()} pour finaliser — un agent LAHA Éditions vous contactera.",
                 }, status=status.HTTP_201_CREATED)
 
-            provider = get_payment_provider(provider_name)
-            frontend_base = get_frontend_base_url(request)
-            return_url = validated.get('return_url') or f"{frontend_base}/student/orders"
-            try:
-                payment_res = provider.initiate_payment(
-                    amount=total_amount,
-                    currency=currency.code,
-                    description=f"Commande LAHAThèque #{commande.id}",
-                    customer_email=request.user.email,
-                    customer_name=f"{request.user.first_name} {request.user.last_name}",
-                    return_url=return_url
-                ) or {}
-            except Exception as payment_err:
-                logger.error(f"Échec initialisation paiement pour la commande {commande.id}: {payment_err}")
-                try:
-                    commande.delete()
-                except Exception:
-                    pass
-                return Response({
-                    "success": False,
-                    "error": "Impossible d'initialiser le paiement pour le moment. Veuillez réessayer dans quelques instants."
-                }, status=status.HTTP_502_BAD_GATEWAY)
+        # ─── Initialisation du paiement en ligne (hors transaction SQL) ────────────
+        provider = get_payment_provider(provider_name)
+        frontend_base = get_frontend_base_url(request)
+        return_url = validated.get('return_url') or f"{frontend_base}/student/orders"
+        
+        user_full_name = f"{request.user.first_name or ''} {request.user.last_name or ''}".strip()
+        if not user_full_name and request.user.email:
+            user_full_name = request.user.email.split('@')[0]
 
-            tx = PaymentTransaction.objects.create(
-                user=request.user,
+        try:
+            payment_res = provider.initiate_payment(
                 amount=total_amount,
-                currency=currency,
-                status=payment_res.get('status', 'pending'),
-                moneroo_id=payment_res.get('moneroo_id') or payment_res.get('payment_id'),
-            )
-            commande.payment_transaction = tx
-            commande.save(update_fields=['payment_transaction'])
+                currency=currency.code,
+                description=f"Commande LAHAThèque #{str(commande.id)[:8].upper()}",
+                customer_email=request.user.email,
+                customer_name=user_full_name or "Client LAHA",
+                return_url=return_url
+            ) or {}
+        except Exception as payment_err:
+            logger.error(f"Échec initialisation paiement pour la commande {commande.id}: {payment_err}")
+            # Marquer la commande comme échouée
+            try:
+                commande.statut_paiement = 'failed'
+                commande.save(update_fields=['statut_paiement'])
+            except Exception:
+                pass
+            return Response({
+                "success": False,
+                "error": "Impossible d'initialiser le paiement pour le moment. Veuillez réessayer dans quelques instants."
+            }, status=status.HTTP_502_BAD_GATEWAY)
 
-            # Si le provider est mock et immédiat, valider le paiement tout de suite
-            if payment_res.get('status') == 'success':
-                from .services import handle_payment_success
-                handle_payment_success(tx)
-                commande.refresh_from_db()
+        tx = PaymentTransaction.objects.create(
+            user=request.user,
+            amount=total_amount,
+            currency=currency,
+            status=payment_res.get('status', 'pending'),
+            moneroo_id=payment_res.get('moneroo_id') or payment_res.get('payment_id') or None,
+        )
+        commande.payment_transaction = tx
+        commande.save(update_fields=['payment_transaction'])
+
+        # Si le provider est mock et immédiat, valider le paiement tout de suite
+        if payment_res.get('status') == 'success':
+            from .services import handle_payment_success
+            handle_payment_success(tx)
+            commande.refresh_from_db()
 
         if has_paper:
             try:
@@ -389,7 +398,7 @@ class OrderRetryPaymentView(APIView):
             amount=total_amount,
             currency=commande.currency,
             status=payment_res.get('status', 'pending'),
-            moneroo_id=payment_res.get('moneroo_id') or payment_res.get('payment_id'),
+            moneroo_id=payment_res.get('moneroo_id') or payment_res.get('payment_id') or None,
         )
         commande.payment_transaction = tx
         if commande.statut_paiement == 'abandoned':
@@ -415,15 +424,144 @@ class OrderRetryPaymentView(APIView):
 class AdminCreateOrderView(CreateOrderView):
     """
     POST /api/v1/commerce/admin/orders/create-for-client/
-    Permet à un Admin de créer une commande au nom de n'importe quel client — réutilise
-    entièrement la logique de CreateOrderView, avec le client cible désigné explicitement.
+    Permet à un Admin de créer une commande au nom d'un compte inscrit ou pour un client comptoir externe (sans compte).
     """
     permission_classes = [IsAuthenticated, IsAdminOrSuperAdmin]
 
     def post(self, request):
+        is_pos_order = bool(request.data.get("is_pos_order", False))
         target_user_id = request.data.get("client_id")
-        if not target_user_id:
-            return Response({"error": "Le client cible (client_id) est requis."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not target_user_id and not is_pos_order:
+            return Response({"error": "Le client cible (client_id) est requis ou activez le mode comptoir (is_pos_order)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if is_pos_order:
+            guest_name = (request.data.get("guest_name") or "").strip()
+            guest_phone = (request.data.get("guest_phone") or "").strip()
+            guest_email = (request.data.get("guest_email") or "").strip()
+            is_immediate_handover = bool(request.data.get("is_immediate_handover", True))
+            payment_method = request.data.get("mode_paiement") or request.data.get("payment_method") or "especes"
+            statut_paiement = request.data.get("statut_paiement") or "paid"
+            shipping_address = (request.data.get("shipping_address") or "").strip()
+            items = request.data.get("items", [])
+
+            if not guest_name:
+                return Response({"error": "Le nom du client de passage est requis."}, status=status.HTTP_400_BAD_REQUEST)
+            if not guest_phone:
+                return Response({"error": "Le numéro de téléphone du client est requis pour le contact et le reçu."}, status=status.HTTP_400_BAD_REQUEST)
+            if not items:
+                return Response({"error": "La commande doit comporter au moins un article."}, status=status.HTTP_400_BAD_REQUEST)
+
+            has_digital = any(i.get("format_type") in ("digital", "audio") for i in items)
+            if has_digital and not guest_email:
+                return Response({"error": "Une adresse e-mail est obligatoire pour l'envoi des accès aux livres numériques ou audio."}, status=status.HTTP_400_BAD_REQUEST)
+
+            currency = Currency.objects.filter(code='XOF').first() or Currency.objects.first()
+            total_amount = Decimal("0.00")
+            lignes_to_create = []
+            has_paper = False
+
+            for item in items:
+                try:
+                    ouvrage = Ouvrage.objects.get(id=item['ouvrage_id'])
+                except Ouvrage.DoesNotExist:
+                    return Response({'error': f"Ouvrage introuvable: {item.get('ouvrage_id')}"}, status=status.HTTP_400_BAD_REQUEST)
+
+                format_type = item.get('format_type', 'paper')
+                quantity = int(item.get('quantity', 1))
+                selected_language = item.get('selected_language') or 'fr'
+
+                if format_type == 'paper':
+                    has_paper = True
+                    from apps.catalog.models import OuvrageLanguageVersion
+                    lang_ver = OuvrageLanguageVersion.objects.filter(ouvrage=ouvrage, language__iexact=selected_language).first()
+                    if lang_ver and lang_ver.paper_stock >= quantity:
+                        lang_ver.paper_stock -= quantity
+                        lang_ver.save(update_fields=['paper_stock'])
+
+                    unit_price = getattr(ouvrage, 'price_paper', None) or Decimal("5000.00")
+                elif format_type == 'digital':
+                    unit_price = getattr(ouvrage, 'price_digital', None) or Decimal("3000.00")
+                else:
+                    unit_price = getattr(ouvrage, 'price_audio', None) or getattr(ouvrage, 'price_digital', None) or Decimal("2500.00")
+
+                line_total = Decimal(str(unit_price)) * quantity
+                total_amount += line_total
+                lignes_to_create.append({
+                    'ouvrage': ouvrage,
+                    'format_type': format_type,
+                    'selected_language': selected_language,
+                    'unit_price': unit_price,
+                    'quantity': quantity
+                })
+
+            if has_paper and not is_immediate_handover and not shipping_address:
+                return Response({'error': "Une adresse de livraison est requise si le livre papier n'est pas remis en main propre."}, status=status.HTTP_400_BAD_REQUEST)
+
+            with transaction.atomic():
+                commande = Order.objects.create(
+                    user=None,
+                    is_pos_order=True,
+                    guest_name=guest_name,
+                    guest_phone=guest_phone,
+                    guest_email=guest_email,
+                    is_immediate_handover=is_immediate_handover,
+                    total_amount=total_amount,
+                    currency=currency,
+                    statut_paiement=statut_paiement,
+                    statut_commande='completed' if (is_immediate_handover and statut_paiement == 'paid') else 'processing',
+                    type_commande='personnel',
+                    mode_paiement=payment_method,
+                    manual_payment_confirmed_by=request.user if statut_paiement == 'paid' else None,
+                    manual_payment_reference=f"VENTE-COMPTOIR-{uuid.uuid4().hex[:6].upper()}" if statut_paiement == 'paid' else ''
+                )
+
+                for l in lignes_to_create:
+                    LigneCommande.objects.create(
+                        commande=commande,
+                        ouvrage=l['ouvrage'],
+                        format_type=l['format_type'],
+                        selected_language=l.get('selected_language', 'fr'),
+                        unit_price=l['unit_price'],
+                        quantity=l['quantity']
+                    )
+
+                if has_paper and (shipping_address or not is_immediate_handover):
+                    formatted_address = f"{shipping_address or 'Remise ultérieure en boutique'}\nTél client : {guest_phone}"
+                    PhysicalDelivery.objects.create(
+                        commande=commande,
+                        shipping_address=formatted_address,
+                        city=request.data.get('city', 'Cotonou'),
+                        country=request.data.get('country', 'BJ'),
+                        statut='livre' if is_immediate_handover else 'en_preparation'
+                    )
+
+            logger.info(f"[Commerce POS] Commande comptoir #{commande.id} créée pour {guest_name} ({guest_phone}) - Total: {total_amount} XOF")
+            return Response({
+                'success': True,
+                'order_id': str(commande.id),
+                'data': {
+                    'id': str(commande.id),
+                    'total_amount': float(commande.total_amount),
+                    'is_pos_order': True,
+                    'guest_name': guest_name,
+                    'guest_phone': guest_phone,
+                    'guest_email': guest_email,
+                    'statut_paiement': commande.statut_paiement,
+                    'statut_commande': commande.statut_commande,
+                },
+                'order': {
+                    'id': str(commande.id),
+                    'total_amount': float(commande.total_amount),
+                    'is_pos_order': True,
+                    'guest_name': guest_name,
+                    'guest_phone': guest_phone,
+                    'guest_email': guest_email,
+                    'statut_paiement': commande.statut_paiement,
+                    'statut_commande': commande.statut_commande,
+                },
+                'message': f"Commande comptoir enregistrée avec succès pour {guest_name}."
+            }, status=status.HTTP_201_CREATED)
 
         from apps.accounts.models import User
         try:

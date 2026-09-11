@@ -99,7 +99,12 @@ class Order(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='commandes')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='commandes')
+    is_pos_order = models.BooleanField(default=False, verbose_name="Vente comptoir / boutique")
+    guest_name = models.CharField(max_length=255, blank=True, default='', verbose_name="Nom client comptoir")
+    guest_phone = models.CharField(max_length=50, blank=True, default='', verbose_name="Téléphone client comptoir")
+    guest_email = models.EmailField(blank=True, default='', verbose_name="E-mail client comptoir")
+    is_immediate_handover = models.BooleanField(default=False, verbose_name="Remise en main propre immédiate")
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.ForeignKey(Currency, on_delete=models.PROTECT)
     statut_paiement = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')

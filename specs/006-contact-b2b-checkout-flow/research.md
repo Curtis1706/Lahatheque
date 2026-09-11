@@ -78,3 +78,21 @@
 - Les fonctions de soumission du contact et du checkout comportent :
   - `console.groupCollapsed("[CONTACT FORM] ...")` : logs de validation, rôles, besoins, temps de réponse en ms.
   - `console.groupCollapsed("[CHECKOUT FLOW] ...")` : traçabilité du statut auth, étape du panier, création d'accès numérique et statut de livraison.
+
+---
+
+## 4. Passation de Commande Administrateur & Ventes Comptoir (`/admin/orders`)
+
+### Décision 4.1 : Ergonomie de Sélection Client par Combobox
+- **Choix arrêté** : Remplacer l'ancienne liste statique qui prenait tout l'écran par un composant d'Autocomplete / Combobox fluide.
+  - Recherche en temps réel sur le nom, l'e-mail et le numéro de téléphone.
+  - Menu déroulant flottant avec avatar, libellé du rôle, coordonnées et bouton d'action directe.
+  - Fermeture automatique au clic et affichage d'une carte récapitulative compacte du client choisi.
+- **Raisonnement** : Respect du Principe VIII (Sobriété et Finitions Nobles) et élimination du défilement vertical inutile.
+
+### Décision 4.2 : Mode Client Comptoir Externe (Vente Boutique sans Compte)
+- **Choix arrêté** : Bascule « Compte existant » / « Client comptoir externe » :
+  - Pour un client de passage en boutique physique, l'administrateur renseigne son nom complet, son numéro de téléphone (obligatoire pour le reçu/traçabilité) et son e-mail (optionnel, obligatoire uniquement si la commande comporte un produit numérique).
+  - La commande est enregistrée avec `user = null`, `is_pos_order = True`, `guest_name`, `guest_phone`, `guest_email`.
+  - Pas de création de compte utilisateur forcé en base.
+  - Règlements comptoir immédiats : Espèces ou Mobile Money direct de flotte (`momo_direct`), avec statut `paid` immédiat et remise physique en boutique (`hand_delivery`).

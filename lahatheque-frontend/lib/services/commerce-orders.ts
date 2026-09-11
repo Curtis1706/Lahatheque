@@ -50,7 +50,7 @@ export async function createOrder(payload: OrderCreatePayload): Promise<OrderCre
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || "Échec de la création de la commande.");
+    throw new Error(errData.error || errData.detail || errData.message || "Échec de la création de la commande.");
   }
 
   const data = await res.json();

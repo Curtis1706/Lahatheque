@@ -252,6 +252,13 @@ export default function CheckoutPage() {
       console.log(`[CHECKOUT FLOW] Commande validée avec succès en ${elapsedMs}ms:`, data);
       console.groupEnd();
 
+      const checkoutUrl = data.checkout_url || data.data?.checkout_url || data.payment_url;
+      if (checkoutUrl) {
+        clearCart();
+        window.location.href = checkoutUrl;
+        return;
+      }
+
       await new Promise((r) => setTimeout(r, 350));
       setPaymentPhase("success");
       setOrderCompleted(data);

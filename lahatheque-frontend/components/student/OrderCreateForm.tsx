@@ -236,6 +236,10 @@ export interface OrderCreateFormProps {
   onCancel: () => void;
   targetClientId?: string;
   targetClientName?: string;
+  isPosOrder?: boolean;
+  guestName?: string;
+  guestPhone?: string;
+  guestEmail?: string;
 }
 
 export default function OrderCreateForm({
@@ -243,6 +247,10 @@ export default function OrderCreateForm({
   onCancel,
   targetClientId,
   targetClientName,
+  isPosOrder = false,
+  guestName,
+  guestPhone,
+  guestEmail,
 }: OrderCreateFormProps) {
   const { disciplines: dbDisciplines } = useDisciplines();
   const [books, setBooks] = useState<BookAPI[]>([]);
@@ -254,7 +262,10 @@ export default function OrderCreateForm({
   const [cart, setCart] = useState<CartItem[]>([]);
 
   const [typeCommande, setTypeCommande] = useState<"rentree_scolaire" | "personnel" | "institutionnel">("personnel");
-  const [modePaiement, setModePaiement] = useState<"mobile_money" | "virement" | "especes" | "carte">("mobile_money");
+  const [modePaiement, setModePaiement] = useState<"mobile_money" | "virement" | "especes" | "carte">(
+    isPosOrder ? "especes" : "mobile_money"
+  );
+  const [isImmediateHandover, setIsImmediateHandover] = useState(true);
 
   const [dateLivraison, setDateLivraison] = useState("");
   const [heureDebut, setHeureDebut] = useState("07:00");
@@ -281,6 +292,8 @@ export default function OrderCreateForm({
   }, [disciplineFilter]);
 
   const hasPaperItem = cart.some((i) => i.format_type === "paper");
+  const hasDigitalItem = cart.some((i) => i.format_type === "digital");
+  const requiresShipping = hasPaperItem && (!isPosOrder || !isImmediateHandover);
 
   const subtotal = useMemo(
     () => cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0),
@@ -288,7 +301,7 @@ export default function OrderCreateForm({
   );
   const shippingTotal = 0;
   const total = subtotal + shippingTotal;
-  const shippingFeeUnknown = hasPaperItem;
+  const shippingFeeUnknown = requiresShipping;
 
   function handleAddToCart() {
     const book = books.find((b) => b.id === selectedBookId);
@@ -344,8 +357,12 @@ export default function OrderCreateForm({
       toast.error("Ajoutez au moins un article au panier.");
       return;
     }
-    if (hasPaperItem && !shippingAddress.trim()) {
-      toast.error("L'adresse de livraison est requise pour un livre papier.");
+    if (isPosOrder && hasDigitalItem && !guestEmail?.trim()) {
+      toast.error("L'adresse e-mail est obligatoire pour l'envoi des accès aux livres numériques.");
+      return;
+    }
+    if (requiresShipping && !shippingAddress.trim()) {
+      toast.error("L'adresse de livraison est requise pour l'expédition d'un livre papier.");
       return;
     }
 
@@ -357,6 +374,29 @@ export default function OrderCreateForm({
         quantity: i.quantity,
       }));
 
+      // Vente comptoir POS sans compte
+      if (isPosOrder) {
+        await adminCreateOrderForClient({
+          is_pos_order: true,
+          guest_name: guestName || "Client de passage",
+          guest_phone: guestPhone || "",
+          guest_email: guestEmail || undefined,
+          is_immediate_handover: isImmediateHandover,
+          statut_paiement: "paid",
+          items,
+          type_commande: typeCommande,
+          mode_paiement: modePaiement,
+          shipping_address: requiresShipping ? shippingAddress : undefined,
+          date_livraison_souhaitee: requiresShipping && dateLivraison ? dateLivraison : undefined,
+          plage_horaire_debut: requiresShipping && heureDebut ? heureDebut : undefined,
+          plage_horaire_fin: requiresShipping && heureFin ? heureFin : undefined,
+        });
+        toast.success(`Vente comptoir enregistrée avec succès pour ${guestName || "le client"}.`);
+        onSuccess();
+        return;
+      }
+
+      // Commande admin pour un compte client existant
       if (targetClientId) {
         await adminCreateOrderForClient({
           client_id: targetClientId,
@@ -409,10 +449,18 @@ export default function OrderCreateForm({
         <div className="space-y-0.5">
           <h2 className="font-serif text-xl sm:text-2xl font-bold text-navy flex items-center gap-2">
             <ShoppingCart className="w-5 h-5 text-gold" aria-hidden="true" />
-            <span>{targetClientId ? `Nouvelle Commande pour ${targetClientName || "le client"}` : "Nouvelle Commande d'Ouvrages"}</span>
+            <span>
+              {isPosOrder
+                ? `Vente Comptoir — ${guestName || "Client Externe"}`
+                : targetClientId
+                ? `Nouvelle Commande pour ${targetClientName || "le client"}`
+                : "Nouvelle Commande d'Ouvrages"}
+            </span>
           </h2>
           <p className="text-xs text-foreground-muted">
-            {targetClientId
+            {isPosOrder
+              ? `Vente directe au comptoir de la boutique LAHA Éditions enregistrée pour ${guestName || "ce client"}.`
+              : targetClientId
               ? `Commande administrative enregistrée au nom de ${targetClientName || "ce client"}.`
               : "Sélectionnez les livres avec aperçu visuel et choisissez vos modalités de paiement."}
           </p>
@@ -633,95 +681,130 @@ export default function OrderCreateForm({
               onChange={(e) => setModePaiement(e.target.value as typeof modePaiement)}
               className="w-full px-3.5 py-2.5 text-xs border border-border rounded-xl bg-background-secondary text-navy focus:border-gold outline-none min-h-[44px]"
             >
-              <option value="mobile_money">Mobile Money (MTN / Moov / Celtiis)</option>
-              <option value="carte">Carte bancaire (Visa / Mastercard)</option>
-              <option value="virement">Virement bancaire</option>
-              <option value="especes">Espèces à la livraison</option>
+              {isPosOrder ? (
+                <>
+                  <option value="especes">Espèces (Comptoir)</option>
+                  <option value="mobile_money">Mobile Money direct (MTN / Moov / Celtiis)</option>
+                  <option value="carte">Carte bancaire (TPE)</option>
+                  <option value="virement">Virement bancaire</option>
+                </>
+              ) : (
+                <>
+                  <option value="mobile_money">Mobile Money (MTN / Moov / Celtiis)</option>
+                  <option value="carte">Carte bancaire (Visa / Mastercard)</option>
+                  <option value="virement">Virement bancaire</option>
+                  <option value="especes">Espèces à la livraison</option>
+                </>
+              )}
             </select>
           </div>
         </div>
       </section>
 
-      {/* ── Section 3 — Coordonnées de Livraison ─────────────────────────── */}
+      {/* ── Section 3 — Coordonnées de Livraison / Remise en boutique ──────────────── */}
       {hasPaperItem && (
-        <section
-          aria-labelledby="section-livraison"
-          className="bg-navy text-white rounded-3xl p-5 sm:p-6 space-y-4"
-        >
-          <h3
-            id="section-livraison"
-            className="text-xs font-bold uppercase tracking-wider text-gold"
-          >
-            3. Coordonnées de Livraison Physique
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label
-                htmlFor="date-livraison"
-                className="text-[11px] font-semibold block mb-1 text-white/80"
-              >
-                Date souhaitée
-              </label>
+        <div className="space-y-4">
+          {isPosOrder && (
+            <div className="p-4 rounded-2xl bg-background-secondary border border-border flex items-start gap-3">
               <input
-                id="date-livraison"
-                type="date"
-                value={dateLivraison}
-                onChange={(e) => setDateLivraison(e.target.value)}
-                className="w-full px-3 py-2.5 text-xs rounded-xl bg-navy-dark border border-navy-hover text-white focus:border-gold outline-none min-h-[44px]"
+                type="checkbox"
+                id="immediate-handover"
+                checked={isImmediateHandover}
+                onChange={(e) => setIsImmediateHandover(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-border text-gold accent-gold cursor-pointer"
               />
+              <div>
+                <label htmlFor="immediate-handover" className="text-xs font-bold text-navy cursor-pointer block">
+                  Remise immédiate en main propre au comptoir
+                </label>
+                <p className="text-[11px] text-foreground-muted mt-0.5">
+                  L&apos;ouvrage papier est remis directement à l&apos;acheteur au comptoir de la boutique LAHA Éditions. Aucune expédition ni adresse postale n&apos;est requise.
+                </p>
+              </div>
             </div>
+          )}
 
-            <div>
-              <label
-                htmlFor="heure-debut"
-                className="text-[11px] font-semibold block mb-1 text-white/80"
-              >
-                Créneau de
-              </label>
-              <input
-                id="heure-debut"
-                type="time"
-                value={heureDebut}
-                onChange={(e) => setHeureDebut(e.target.value)}
-                className="w-full px-3 py-2.5 text-xs rounded-xl bg-navy-dark border border-navy-hover text-white focus:border-gold outline-none min-h-[44px]"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="heure-fin"
-                className="text-[11px] font-semibold block mb-1 text-white/80"
-              >
-                À
-              </label>
-              <input
-                id="heure-fin"
-                type="time"
-                value={heureFin}
-                onChange={(e) => setHeureFin(e.target.value)}
-                className="w-full px-3 py-2.5 text-xs rounded-xl bg-navy-dark border border-navy-hover text-white focus:border-gold outline-none min-h-[44px]"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="shipping-address"
-              className="text-[11px] font-semibold block mb-1 text-white/80"
+          {requiresShipping && (
+            <section
+              aria-labelledby="section-livraison"
+              className="bg-navy text-white rounded-3xl p-5 sm:p-6 space-y-4"
             >
-              Adresse précise de livraison (Quartier, ville, repère)
-            </label>
-            <textarea
-              id="shipping-address"
-              value={shippingAddress}
-              onChange={(e) => setShippingAddress(e.target.value)}
-              rows={3}
-              placeholder="Ex: Cotonou, Quartier Cadjèhoun, Rue 123..."
-              className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-navy-dark border border-navy-hover text-white placeholder:text-white/40 focus:border-gold outline-none resize-none"
-            />
-          </div>
-        </section>
+              <h3
+                id="section-livraison"
+                className="text-xs font-bold uppercase tracking-wider text-gold"
+              >
+                3. Coordonnées de Livraison Physique
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label
+                    htmlFor="date-livraison"
+                    className="text-[11px] font-semibold block mb-1 text-white/80"
+                  >
+                    Date souhaitée
+                  </label>
+                  <input
+                    id="date-livraison"
+                    type="date"
+                    value={dateLivraison}
+                    onChange={(e) => setDateLivraison(e.target.value)}
+                    className="w-full px-3 py-2.5 text-xs rounded-xl bg-navy-dark border border-navy-hover text-white focus:border-gold outline-none min-h-[44px]"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="heure-debut"
+                    className="text-[11px] font-semibold block mb-1 text-white/80"
+                  >
+                    Créneau de
+                  </label>
+                  <input
+                    id="heure-debut"
+                    type="time"
+                    value={heureDebut}
+                    onChange={(e) => setHeureDebut(e.target.value)}
+                    className="w-full px-3 py-2.5 text-xs rounded-xl bg-navy-dark border border-navy-hover text-white focus:border-gold outline-none min-h-[44px]"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="heure-fin"
+                    className="text-[11px] font-semibold block mb-1 text-white/80"
+                  >
+                    À
+                  </label>
+                  <input
+                    id="heure-fin"
+                    type="time"
+                    value={heureFin}
+                    onChange={(e) => setHeureFin(e.target.value)}
+                    className="w-full px-3 py-2.5 text-xs rounded-xl bg-navy-dark border border-navy-hover text-white focus:border-gold outline-none min-h-[44px]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="shipping-address"
+                  className="text-[11px] font-semibold block mb-1 text-white/80"
+                >
+                  Adresse précise de livraison (Quartier, ville, repère)
+                </label>
+                <textarea
+                  id="shipping-address"
+                  value={shippingAddress}
+                  onChange={(e) => setShippingAddress(e.target.value)}
+                  rows={3}
+                  placeholder="Ex: Cotonou, Quartier Cadjèhoun, Rue 123..."
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-navy-dark border border-navy-hover text-white placeholder:text-white/40 focus:border-gold outline-none resize-none"
+                />
+              </div>
+            </section>
+          )}
+        </div>
       )}
 
       {/* ── Actions ─────────────────────────────────────────────────────── */}
@@ -738,8 +821,18 @@ export default function OrderCreateForm({
           disabled={submitting || cart.length === 0}
           className="flex-1 px-5 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors min-h-[48px] cursor-pointer shadow-md"
         >
-          {submitting ? <Loader variant="spinner" size={16} /> : <ShoppingCart className="w-4 h-4 text-gold" />}
-          <span>{submitting ? "Création de la commande…" : "Valider et créer la commande"}</span>
+          {submitting ? (
+            <Loader variant="spinner" size={16} />
+          ) : (
+            <ShoppingCart className="w-4 h-4 text-gold" />
+          )}
+          <span>
+            {submitting
+              ? "Enregistrement en cours…"
+              : isPosOrder
+              ? "Encaisser & Enregistrer la Vente Comptoir"
+              : "Valider et créer la commande"}
+          </span>
         </button>
       </div>
     </form>

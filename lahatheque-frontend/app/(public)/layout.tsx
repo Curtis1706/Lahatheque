@@ -25,28 +25,23 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { totalCount, toggleDrawer } = useCart();
 
-  useEffect(() => {
-    if (!loading && user) {
-      const roleDashboardMap: Record<string, string> = {
-        admin: "/admin",
-        super_admin: "/admin",
-        university: "/university",
-        publisher: "/publisher",
-        author: "/author",
-        teacher: "/teacher",
-        student: "/student",
-        parent: "/student",
-        wholesaler: "/wholesaler",
-        super_client: "/wholesaler",
-        legal_reviewer: "/legal-reviewer",
-        layout_artist: "/layout-artist",
-        chief_layout: "/chief-layout",
-        manager: "/manager",
-      };
-      const dashboardUrl = (user.role && roleDashboardMap[user.role]) || `/${user.role || "student"}`;
-      router.replace(dashboardUrl);
-    }
-  }, [user, loading, router]);
+  const roleDashboardMap: Record<string, string> = {
+    admin: "/admin",
+    super_admin: "/admin",
+    university: "/university",
+    publisher: "/publisher",
+    author: "/author",
+    teacher: "/teacher",
+    student: "/student",
+    parent: "/student",
+    wholesaler: "/wholesaler",
+    super_client: "/wholesaler",
+    legal_reviewer: "/legal-reviewer",
+    layout_artist: "/layout-artist",
+    chief_layout: "/chief-layout",
+    manager: "/manager",
+  };
+  const dashboardUrl = user ? ((user.role && roleDashboardMap[user.role]) || `/${user.role || "student"}`) : "/login";
 
   // Fermeture par Escape + verrouillage du scroll body
   useEffect(() => {
@@ -70,19 +65,6 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   }, [isDrawerOpen, isSearchOpen]);
 
   const closeDrawer = useCallback(() => setIsDrawerOpen(false), []);
-
-  // Si l'utilisateur est connecté, bloquer l'accès aux pages publiques et afficher un écran de transition
-  if (user) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center space-y-4">
-        <div className="w-10 h-10 rounded-full border-2 border-gold border-t-transparent animate-spin" />
-        <p className="font-serif text-lg font-bold text-navy">Redirection vers votre espace de travail...</p>
-        <p className="text-xs text-foreground-muted font-sans">
-          Vous êtes connecté. Accès réservé à votre tableau de bord.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200 overflow-x-hidden">
@@ -176,13 +158,23 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               <HeaderSearchBar placeholder="Rechercher..." />
             </div>
 
-            {/* Desktop Connexion Link */}
-            <Link
-              href="/login"
-              className="hidden lg:flex items-center gap-2 text-foreground [@media(hover:hover)]:hover:text-navy font-medium text-sm whitespace-nowrap"
-            >
-              <User className="w-5 h-5 text-gold" /> Connexion
-            </Link>
+            {/* Desktop Connexion / Espace Link */}
+            {user ? (
+              <Link
+                href={dashboardUrl}
+                className="hidden lg:flex items-center gap-2 text-navy hover:text-gold font-bold text-sm whitespace-nowrap bg-gold/10 hover:bg-gold/20 px-3 py-1.5 rounded-xl border border-gold/30 transition-all"
+              >
+                <User className="w-4 h-4 text-gold" />
+                <span>Mon Espace</span>
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="hidden lg:flex items-center gap-2 text-foreground [@media(hover:hover)]:hover:text-navy font-medium text-sm whitespace-nowrap"
+              >
+                <User className="w-5 h-5 text-gold" /> Connexion
+              </Link>
+            )}
 
             {/* Mobile Search Icon — opens overlay */}
             <button
@@ -285,16 +277,27 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             ))}
           </div>
 
-          {/* Drawer Footer — Connexion */}
+          {/* Drawer Footer — Connexion / Mon Espace */}
           <div className="shrink-0 p-4 border-t border-border">
-            <Link
-              href="/login"
-              onClick={closeDrawer}
-              className="flex items-center justify-center gap-2 w-full py-3 bg-navy text-white rounded font-medium text-sm transition-colors"
-            >
-              <User className="w-4 h-4" />
-              Se connecter
-            </Link>
+            {user ? (
+              <Link
+                href={dashboardUrl}
+                onClick={closeDrawer}
+                className="flex items-center justify-center gap-2 w-full py-3 bg-navy text-white rounded-xl font-medium text-sm transition-colors shadow-sm"
+              >
+                <User className="w-4 h-4 text-gold" />
+                <span>Mon Espace ({user.first_name || user.email})</span>
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                onClick={closeDrawer}
+                className="flex items-center justify-center gap-2 w-full py-3 bg-navy text-white rounded-xl font-medium text-sm transition-colors"
+              >
+                <User className="w-4 h-4" />
+                <span>Se connecter</span>
+              </Link>
+            )}
           </div>
         </nav>
       </div>

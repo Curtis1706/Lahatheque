@@ -44,6 +44,7 @@ function CatalogSearchInner() {
   const searchParams = useSearchParams();
   const urlQuery = searchParams.get("q") || "";
   const urlLanguage = searchParams.get("language") || "";
+  const urlFormat = searchParams.get("format") || "";
   const urlPage = parseInt(searchParams.get("page") || "1", 10);
   const urlPageSize = parseInt(searchParams.get("page_size") || "20", 10);
   const urlOrdering = searchParams.get("ordering") || "-created_at";
@@ -59,7 +60,7 @@ function CatalogSearchInner() {
   const [selectedDiscipline, setSelectedDiscipline] = useState("");
   const [selectedInstitution, setSelectedInstitution] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState(urlLanguage);
-  const [selectedFormat, setSelectedFormat] = useState("");
+  const [selectedFormat, setSelectedFormat] = useState(urlFormat);
   const [selectedYear, setSelectedYear] = useState("");
   const [ordering, setOrdering] = useState(urlOrdering);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -82,12 +83,18 @@ function CatalogSearchInner() {
     });
   }, []);
 
-  // Sync searchQuery when URL query parameter changes
+  // Sync searchQuery and urlFormat when URL query parameters change
   useEffect(() => {
     if (urlQuery) {
       setSearchQuery(urlQuery);
     }
   }, [urlQuery]);
+
+  useEffect(() => {
+    if (urlFormat) {
+      setSelectedFormat(urlFormat);
+    }
+  }, [urlFormat]);
 
   // Bloquer le défilement arrière quand les filtres mobiles sont ouverts
   useEffect(() => {

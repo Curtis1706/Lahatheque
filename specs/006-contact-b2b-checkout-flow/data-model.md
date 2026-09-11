@@ -33,7 +33,11 @@ Représente la commande validée par un client authentifié (rôle `student`).
 | Champ | Type | Description |
 | :--- | :--- | :--- |
 | `id` | UUIDv4 | Identifiant unique de la commande |
-| `user` | ForeignKey(User) | Acheteur authentifié (rôle `student`) |
+| `user` | ForeignKey(User, null=True, blank=True) | Acheteur authentifié (ou null si vente comptoir externe) |
+| `is_pos_order` | BooleanField(default=False) | Vente physique au comptoir / boutique |
+| `guest_name` | CharField(255, blank=True) | Nom complet du client externe boutique |
+| `guest_phone` | CharField(50, blank=True) | Numéro de téléphone du client externe (obligatoire) |
+| `guest_email` | EmailField(blank=True) | E-mail du client externe (optionnel, requis si numérique) |
 | `total_amount` | DecimalField | Montant total en FCFA |
 | `statut_paiement` | CharField | `pending` → `paid` / `failed` / `refunded` |
 | `statut_commande` | CharField | `pending` → `processing` → `completed` |

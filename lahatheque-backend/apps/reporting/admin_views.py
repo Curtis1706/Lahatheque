@@ -2751,9 +2751,17 @@ class AdminSalesListAPIView(APIView):
 
             for o in qs_orders:
                 buyer = o.user
-                buyer_name = (buyer.get_full_name() if buyer else "") or (buyer.email if buyer else "Client")
-                buyer_email = buyer.email if buyer else ""
-                buyer_role = getattr(buyer, 'role', 'student')
+                is_pos = getattr(o, 'is_pos_order', False)
+                if is_pos:
+                    buyer_name = getattr(o, 'guest_name', None) or "Client Comptoir"
+                    buyer_email = getattr(o, 'guest_email', None) or getattr(o, 'guest_phone', None) or "Vente Boutique"
+                    buyer_role = 'client'
+                    channel_label = "Vente Comptoir Boutique"
+                else:
+                    buyer_name = (buyer.get_full_name() if buyer else "") or (buyer.email if buyer else "Client")
+                    buyer_email = buyer.email if buyer else ""
+                    buyer_role = getattr(buyer, 'role', 'student')
+                    channel_label = "Vente Unitaire Lecteur"
                 ref = str(o.id)[:8].upper()
 
                 items = []
@@ -2795,7 +2803,11 @@ class AdminSalesListAPIView(APIView):
                     "id": f"ord-{str(o.id)[:8]}",
                     "order_reference": ref,
                     "channel": "b2c_individual",
-                    "channel_label": "Vente Unitaire Lecteur",
+                    "channel_label": channel_label,
+                    "is_pos_order": is_pos,
+                    "guest_name": getattr(o, 'guest_name', None),
+                    "guest_phone": getattr(o, 'guest_phone', None),
+                    "guest_email": getattr(o, 'guest_email', None),
                     "buyer_name": buyer_name,
                     "buyer_email": buyer_email,
                     "buyer_role": buyer_role if buyer_role in ['student', 'author', 'university', 'wholesaler'] else 'client',

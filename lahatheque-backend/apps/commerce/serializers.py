@@ -51,12 +51,14 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'user', 'total_amount', 'currency', 'statut_paiement', 'statut_commande',
+            'id', 'user', 'is_pos_order', 'guest_name', 'guest_phone', 'guest_email',
+            'is_immediate_handover', 'mode_paiement',
+            'total_amount', 'currency', 'statut_paiement', 'statut_commande',
             'delivery_status', 'delivery_status_display',
             'is_credit_purchase', 'credit_due_date', 'returned_at', 'return_reason',
             'lignes', 'livraison', 'created_at'
         ]
-        read_only_fields = ['id', 'user', 'created_at']
+        read_only_fields = ['id', 'created_at']
 
 class CreateOrderItemSerializer(serializers.Serializer):
     ouvrage_id = serializers.UUIDField()

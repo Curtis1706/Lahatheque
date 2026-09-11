@@ -78,7 +78,7 @@ export function RecentAudioWidget() {
           </div>
         </div>
         <Link
-          href="/catalog?format=audio"
+          href="/student/catalog?format=audio"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-dark transition-all shrink-0 shadow-xs"
         >
           <BookOpen className="w-4 h-4 text-gold" />
@@ -107,7 +107,7 @@ export function RecentAudioWidget() {
         </div>
 
         <Link
-          href="/catalog?format=audio"
+          href="/student/catalog?format=audio"
           className="text-xs font-semibold text-gold hover:text-gold-hover inline-flex items-center gap-1 transition-colors"
         >
           <span>Voir tout l'audio</span>

@@ -35,7 +35,21 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("laha_cart");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          console.log(`[CART PERSISTENCE] Panier initialisé depuis le stockage local (${parsed.length} article(s))`);
+          return parsed;
+        }
+      } catch (e) {
+        console.error("[CART PERSISTENCE] Erreur de lecture initiale du panier", e);
+      }
+    }
+    return [];
+  });
   const [loaded, setLoaded] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 

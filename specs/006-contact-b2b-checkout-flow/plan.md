@@ -16,6 +16,10 @@ Cette fonctionnalité harmonise l'acquisition B2B et la conversion e-commerce de
    - Disponibilité papier fiable sur la page de détail (`/catalog/[slug]`) pilotée par l'autorisation éditoriale de l'ouvrage maître avec sélection de langue.
    - Collecte et enregistrement des coordonnées complètes de livraison (adresse, ville, pays, téléphone du destinataire pour le livreur) dans `PhysicalDelivery` reliée à `Order` pour l'espace d'administration (`/admin/orders`, `/manager/delivery`).
    - Déverrouillage instantané des formats numériques et audio dans la bibliothèque de l'espace client (`/student/books`).
+4. **Un formulaire d'administration des commandes (`/admin/orders`) enrichi & fluidifié** :
+   - Remplacement de la liste statique volumineuse par une **Combobox searchable instantanée** (avatar, nom, rôle, email, téléphone) sélectionnable en un clic.
+   - Bascule directe vers le mode **« Client comptoir externe »** pour les ventes physiques en boutique sans création de compte utilisateur, avec saisie du nom, du téléphone (obligatoire) et de l'e-mail (optionnel, obligatoire si format numérique).
+   - Persistance sur le modèle `Order` (`user=null`, `guest_name`, `guest_phone`, `guest_email`, `is_pos_order=True`) et validation immédiate du paiement en espèces ou Mobile Money direct.
 
 ---
 

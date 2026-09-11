@@ -32,6 +32,10 @@ export interface AdminSaleOrder {
   order_reference: string;
   channel: SaleChannel;
   channel_label: string;
+  is_pos_order?: boolean;
+  guest_name?: string | null;
+  guest_phone?: string | null;
+  guest_email?: string | null;
   buyer_name: string;
   buyer_email: string;
   buyer_role: 'student' | 'author' | 'university' | 'wholesaler' | 'client';
@@ -160,6 +164,11 @@ export interface AdminOrder {
   customer_name: string;
   customer_email: string;
   customer_role: string;
+  is_pos_order?: boolean;
+  guest_name?: string | null;
+  guest_phone?: string | null;
+  guest_email?: string | null;
+  is_immediate_handover?: boolean;
   total_amount: number;
   currency: string;
   statut_paiement: 'paid' | 'pending' | 'credit' | 'abandoned' | 'failed' | 'cancelled' | string;

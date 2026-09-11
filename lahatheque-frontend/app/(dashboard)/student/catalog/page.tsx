@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
   BookOpen,
@@ -408,16 +408,26 @@ function CatalogBookListItem({
 
 // ─── Page Principale ──────────────────────────────────────────────────────────
 
-export default function StudentCatalogPage() {
+function StudentCatalogContent() {
+  const searchParams = useSearchParams();
+  const urlFormat = searchParams.get("format") || "all";
   const [catalogData, setCatalogData] = useState<CatalogDataAPI | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState("all");
   const [selectedLanguage, setSelectedLanguage] = useState("all");
-  const [selectedFormat, setSelectedFormat] = useState("all");
+  const [selectedFormat, setSelectedFormat] = useState(urlFormat);
   const [debouncedQ, setDebouncedQ] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+
+  // Synchronisation si le paramètre URL change
+  useEffect(() => {
+    if (urlFormat) {
+      setSelectedFormat(urlFormat);
+      setCurrentPage(1);
+    }
+  }, [urlFormat]);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -783,5 +793,24 @@ export default function StudentCatalogPage() {
         onClose={() => setSampleChoiceBook(null)}
       />
     </div>
+  );
+}
+
+export default function StudentCatalogPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6 animate-pulse p-4 sm:p-6 lg:p-8">
+          <div className="h-8 w-64 bg-navy/10 rounded-xl" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <SkeletonBookCard />
+            <SkeletonBookCard />
+            <SkeletonBookCard />
+          </div>
+        </div>
+      }
+    >
+      <StudentCatalogContent />
+    </Suspense>
   );
 }

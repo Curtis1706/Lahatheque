@@ -166,11 +166,20 @@ export default function AdminSalesPage() {
       header: "Client / Établissement",
       cell: (row) => (
         <div className="font-poppins">
-          <p className="font-medium text-xs text-foreground line-clamp-1">
-            {row.buyer_name}
-          </p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-medium text-xs text-foreground line-clamp-1">
+              {row.is_pos_order ? (row.guest_name || row.buyer_name || "Client Comptoir") : row.buyer_name}
+            </p>
+            {row.is_pos_order && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/15 text-gold-dark border border-gold/30">
+                Vente Comptoir
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-foreground-muted line-clamp-1 font-mono">
-            {row.buyer_email || "N/A"}
+            {row.is_pos_order
+              ? (row.guest_phone ? `${row.guest_phone}${row.guest_email ? ` • ${row.guest_email}` : ""}` : (row.guest_email || "Vente en boutique"))
+              : (row.buyer_email || "N/A")}
           </p>
         </div>
       ),
