@@ -86,7 +86,10 @@ export async function searchCatalogBooks(filters: SearchFilters): Promise<Pagina
     if (filters.institution) params.set("institution", filters.institution.trim());
     if (filters.language) params.set("language", filters.language.trim());
     if (filters.country) params.set("country", filters.country.trim());
-    if (filters.format) params.set("format", filters.format.trim());
+    if (filters.format) {
+      params.set("book_format", filters.format.trim());
+      params.set("format", filters.format.trim());
+    }
     if (filters.year) params.set("year", filters.year.toString().trim());
     if (filters.ordering) params.set("ordering", filters.ordering.trim());
     params.set("page", String(currentPage));

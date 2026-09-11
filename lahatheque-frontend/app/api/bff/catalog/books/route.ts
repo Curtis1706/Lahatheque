@@ -19,8 +19,20 @@ const DJANGO_API_URL =
  * Relaye directement vers Django /api/v1/catalog/books/ avec support des query params et cookies.
  */
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.search || "";
-  const targetUrl = `${DJANGO_API_URL}/v1/catalog/books/${searchParams}`;
+  const url = new URL(request.url);
+  const searchParams = new URLSearchParams(url.search);
+
+  // Si un paramètre 'format' métier est fourni (ex: digital, audio, paper),
+  // on le mappe en 'book_format' et on retire 'format' pour que
+  // Django Rest Framework ne le confonde pas avec un format de rendu renderer (?format=json, ?format=api)
+  const formatVal = searchParams.get("format");
+  if (formatVal && !["json", "api"].includes(formatVal.toLowerCase())) {
+    searchParams.set("book_format", formatVal);
+    searchParams.delete("format");
+  }
+
+  const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  const targetUrl = `${DJANGO_API_URL}/v1/catalog/books/${queryStr}`;
 
   const headers = new Headers();
   const contentType = request.headers.get("content-type");
