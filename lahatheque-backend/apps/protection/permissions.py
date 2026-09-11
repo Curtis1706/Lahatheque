@@ -23,3 +23,20 @@ class IsAdminOrStaff(BasePermission):
             'admin' in getattr(user, 'active_roles', [])
         )
 
+
+class IsAdminOnly(BasePermission):
+    """
+    Permission ultra-stricte : réservée exclusivement aux administrateurs et super-administrateurs.
+    Exclut catégoriquement les enseignants, auteurs, éditeurs, relecteurs, étudiants et simples staff.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        user = request.user
+        return bool(
+            getattr(user, 'is_superuser', False) or
+            getattr(user, 'role', '') in ('admin', 'super_admin') or
+            'admin' in getattr(user, 'active_roles', [])
+        )
+
+

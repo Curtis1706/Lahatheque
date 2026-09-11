@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ProtectionConfig, TraceAcces, Annotation, GlobalDrmConfig
+from .models import ProtectionConfig, TraceAcces, Annotation, GlobalDrmConfig, ForensicInvestigation
 
 class ProtectionConfigSerializer(serializers.ModelSerializer):
     class Meta:
@@ -50,5 +50,34 @@ class GlobalDrmConfigSerializer(serializers.ModelSerializer):
             'session_duration_minutes', 'config_version', 'updated_at',
         ]
         read_only_fields = ['updated_at']
+
+
+class ForensicInvestigationSerializer(serializers.ModelSerializer):
+    admin_name = serializers.SerializerMethodField()
+    suspect_name = serializers.SerializerMethodField()
+    book_title = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ForensicInvestigation
+        fields = '__all__'
+        read_only_fields = ['id', 'created_at']
+
+    def get_admin_name(self, obj: ForensicInvestigation) -> str:
+        if obj.admin_user:
+            name = f"{obj.admin_user.first_name} {obj.admin_user.last_name}".strip()
+            return name or obj.admin_user.email
+        return "Administrateur"
+
+    def get_suspect_name(self, obj: ForensicInvestigation) -> str:
+        if obj.suspect_user:
+            name = f"{obj.suspect_user.first_name} {obj.suspect_user.last_name}".strip()
+            return name or str(obj.suspect_user.email)
+        return str(obj.suspect_email or "Non identifié")
+
+    def get_book_title(self, obj: ForensicInvestigation) -> str:
+        if obj.ouvrage:
+            return obj.ouvrage.title
+        return ""
+
 
 

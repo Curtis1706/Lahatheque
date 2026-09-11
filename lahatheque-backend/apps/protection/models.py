@@ -213,3 +213,129 @@ class GlobalDrmConfig(models.Model):
         """Retourne ou crée l'unique instance de configuration globale."""
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class ForensicInvestigation(models.Model):
+    """
+    Journal légal immuable et dossier d'investigation forensique pour
+    l'identification de fuites d'ouvrages numériques (PDF, captures d'écran, photos).
+    Conforme aux règles de sécurité, de traçabilité et au modèle SpecKit 007.
+    """
+    FILE_TYPE_CHOICES = [
+        ("pdf", "Document PDF"),
+        ("image", "Capture d'écran / Photo"),
+    ]
+
+    STATUS_CHOICES = [
+        ("identified", "Fuite et lecteur formellement identifiés"),
+        ("inconclusive", "Indices partiels / Identification non concluante"),
+        ("no_trace", "Aucune empreinte ou filigrane détecté"),
+    ]
+
+    ANALYSIS_MODE_CHOICES = [
+        ("pdf_steganography", "Stéganographie binaire PDF PyMuPDF"),
+        ("local_ocr", "Prétraitement d'image et OCR local"),
+        ("multimodal_vision", "Vision multimodale haute précision"),
+        ("inconclusive", "Analyse sans résultat probant"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    admin_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="forensic_investigations",
+        help_text="Administrateur ayant diligenté l'investigation forensique"
+    )
+    file_name = models.CharField(max_length=255)
+    file_type = models.CharField(max_length=32, choices=FILE_TYPE_CHOICES, default="pdf")
+    file_size = models.BigIntegerField(default=0)
+    file_hash = models.CharField(max_length=64, db_index=True, help_text="Empreinte SHA-256 du fichier suspect")
+
+    analysis_mode = models.CharField(max_length=32, choices=ANALYSIS_MODE_CHOICES, default="inconclusive")
+    certainty_score = models.IntegerField(default=0, help_text="Degré de certitude calculé entre 0 et 100%")
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="no_trace", db_index=True)
+
+    detected_payload = models.JSONField(default=dict, blank=True, help_text="Données brutes extraites (tatouage ou texte visuel)")
+
+    suspect_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="forensic_findings",
+        help_text="Lecteur formellement rattaché à l'empreinte"
+    )
+    suspect_email = models.CharField(max_length=255, blank=True, default="")
+    suspect_ip = models.GenericIPAddressField(null=True, blank=True)
+
+    ouvrage = models.ForeignKey(
+        "catalog.Ouvrage",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="forensic_investigations"
+    )
+    order_reference = models.CharField(max_length=64, blank=True, default="")
+    actions_taken = models.JSONField(default=list, blank=True, help_text="Sanctions appliquées (account_suspended, sessions_revoked, report_exported)")
+    notes = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["file_hash"]),
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["suspect_user", "-created_at"]),
+        ]
+        verbose_name = "Investigation Forensique"
+        verbose_name_plural = "Investigations Forensiques"
+
+    def __str__(self) -> str:
+        return f"Investigation {str(self.id)[:8]} - {self.file_name} ({self.status} - {self.certainty_score}%)"
+
+
+class BlockedReaderIdentity(models.Model):
+    """
+    Liste noire active des lecteurs identifiés comme source de fuite ou fraude,
+    particulièrement pour les utilisateurs externes issus de SaaS ou partenaires API
+    (ex: LAHALEX, universités) n'ayant pas de compte utilisateur local.
+    Verrouille immédiatement le proxy de streaming Range 206 et la liseuse.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    partner_id = models.CharField(max_length=64, blank=True, db_index=True, help_text="Identifiant du partenaire SaaS (ex: LAHALEX)")
+    reader_email = models.CharField(max_length=255, blank=True, db_index=True, help_text="Adresse email ou identifiant du lecteur tiers")
+    device_fingerprint = models.CharField(max_length=255, blank=True, db_index=True, help_text="Empreinte matérielle du terminal")
+    ip_address = models.GenericIPAddressField(null=True, blank=True, help_text="Adresse IP dernièrement utilisée")
+    reason = models.TextField(blank=True, default="Fuite de document protégée identifiée par analyse forensique")
+    blocked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="blocked_readers_issued"
+    )
+    forensic_investigation = models.ForeignKey(
+        ForensicInvestigation,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="blocked_identities"
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["reader_email", "is_active"]),
+            models.Index(fields=["device_fingerprint", "is_active"]),
+            models.Index(fields=["partner_id", "is_active"]),
+        ]
+        verbose_name = "Lecteur Partenaire Bloqué"
+        verbose_name_plural = "Lecteurs Partenaires Bloqués"
+
+    def __str__(self) -> str:
+        ident = self.reader_email or self.device_fingerprint or self.ip_address or "Inconnu"
+        return f"Bloqué: {ident} (Partenaire: {self.partner_id or 'Global'})"
+
+

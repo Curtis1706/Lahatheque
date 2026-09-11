@@ -838,6 +838,32 @@ class ReaderProtectedStreamView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN
             )
 
+        # Vérification de sécurité : Liste noire des lecteurs bloqués (BlockedReaderIdentity)
+        from apps.protection.models import BlockedReaderIdentity
+        reader_email = (session.end_user.email or "") if session.end_user else ""
+        client_ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "127.0.0.1")).split(",")[0].strip()
+
+        # Ciblage chirurgical : Seul le lecteur individuel incriminé est bloqué (email ou terminal)
+        # On ne bloque JAMAIS l'organisation partenaire ni les autres utilisateurs partageant le même réseau
+        is_blocked = False
+        if reader_email and BlockedReaderIdentity.objects.filter(reader_email__iexact=reader_email, is_active=True).exists():
+            is_blocked = True
+        elif session.device_fingerprint and BlockedReaderIdentity.objects.filter(device_fingerprint=session.device_fingerprint, is_active=True).exists():
+            is_blocked = True
+
+        if is_blocked:
+            session.is_revoked = True
+            session.revoked_reason = "Accès révoqué pour violation des droits d'auteur (Liste noire active)."
+            session.save(update_fields=["is_revoked", "revoked_reason"])
+            logger.warning(
+                f"[ReaderStream BLOCKED] Accès refusé au lecteur bloqué: {reader_email or client_ip} "
+                f"(Session: {session.id} | Partenaire: {session.partner_id})"
+            )
+            return standard_response(
+                error="Accès révoqué pour violation des droits d'auteur.",
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
         # 1. Résolution de la configuration de protection (Par ouvrage avec fallback GlobalDrmConfig)
         global_drm = GlobalDrmConfig.get_singleton()
         protection_config = None

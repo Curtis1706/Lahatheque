@@ -338,3 +338,189 @@ export async function saveBookProtectionConfig(bookId: string, config: Protectio
   }
   return false;
 }
+
+// =========================================================================
+// ATELIER FORENSIQUE : DÉTECTION DE FUITES ET ACTIONS ADMINISTRATEUR
+// =========================================================================
+
+export interface ForensicAnalysisResult {
+  investigation_id: string;
+  file_name: string;
+  file_hash: string;
+  file_size: number;
+  file_type: "pdf" | "image";
+  analysis_mode: "pdf_steganography" | "local_ocr" | "multimodal_vision" | "inconclusive";
+  certainty_score: number;
+  status: "identified" | "inconclusive" | "no_trace";
+  message: string;
+  extracted_data: {
+    user_id?: string;
+    email?: string;
+    ip_address?: string;
+    device_fingerprint?: string;
+    signature_valid?: boolean;
+    raw_text_detected?: string;
+  };
+  suspect_profile?: {
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+    phone?: string;
+    country: string;
+    university_affiliation?: string;
+    institution_name?: string;
+    is_suspended: boolean;
+    suspension_reason?: string;
+    created_at: string;
+  };
+  book_details?: {
+    id: string;
+    title: string;
+    author: string;
+    cover_url?: string;
+  };
+  purchase_details?: {
+    order_id: string;
+    reference: string;
+    purchase_date: string;
+    amount: number;
+    currency: string;
+    payment_method: string;
+  };
+  matched_traces: Array<{
+    id: string;
+    ip_address: string;
+    country: string;
+    device_fingerprint: string;
+    access_type: string;
+    page_number?: number;
+    timestamp: string;
+  }>;
+  available_actions: {
+    can_suspend: boolean;
+    can_revoke_sessions: boolean;
+    can_download_report: boolean;
+  };
+}
+
+/**
+ * Envoie un fichier suspect (PDF ou image) pour analyse forensique et extraction de filigrane.
+ * Endpoint : POST /api/bff/protection/forensic/analyze/
+ */
+export async function analyzeForensicEvidence(
+  file: File,
+  notes: string = ""
+): Promise<ForensicAnalysisResult> {
+  const startTime = performance.now();
+  console.groupCollapsed(`[FORENSIC ANALYZE] Téléversement et inspection: ${file.name}`);
+  console.log("Horodatage:", new Date().toISOString());
+  console.log("Nom fichier:", file.name, "Taille:", file.size, "Type:", file.type);
+
+  const formData = new FormData();
+  formData.append("file", file);
+  if (notes) {
+    formData.append("notes", notes);
+  }
+
+  try {
+    const res = await fetch("/api/bff/protection/forensic/analyze/", {
+      method: "POST",
+      body: formData,
+    });
+
+    const elapsed = Math.round(performance.now() - startTime);
+    console.log(`Temps de traitement: ${elapsed} ms | Statut HTTP: ${res.status}`);
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      const errorMsg = errJson.error || `Erreur serveur HTTP ${res.status}`;
+      console.error("[FORENSIC ANALYZE ERROR]", errorMsg);
+      console.groupEnd();
+      throw new Error(errorMsg);
+    }
+
+    const json = await res.json();
+    console.log("[FORENSIC ANALYZE SUCCESS] Résultat:", json.data);
+    console.groupEnd();
+    return json.data as ForensicAnalysisResult;
+  } catch (err: any) {
+    console.error("[FORENSIC ANALYZE EXCEPTION]", err);
+    console.groupEnd();
+    throw err;
+  }
+}
+
+/**
+ * Applique une mesure de suspension ou révocation de session sur le compte d'un lecteur suspect.
+ * Endpoint : POST /api/bff/protection/forensic/mitigate/
+ */
+export async function mitigateForensicInfraction(
+  investigationId: string,
+  action: "suspend_user" | "revoke_sessions",
+  reason: string = ""
+): Promise<{ success: boolean; message: string; is_suspended?: boolean; session_version?: number }> {
+  const startTime = performance.now();
+  console.groupCollapsed(`[FORENSIC MITIGATE] Action: ${action} sur Enquête #${investigationId}`);
+  console.log("Horodatage:", new Date().toISOString());
+  console.log("Raison:", reason);
+
+  try {
+    const res = await fetch("/api/bff/protection/forensic/mitigate/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        investigation_id: investigationId,
+        action,
+        reason,
+      }),
+    });
+
+    const elapsed = Math.round(performance.now() - startTime);
+    console.log(`Temps de réponse: ${elapsed} ms | Statut HTTP: ${res.status}`);
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      const errorMsg = errJson.error || "Erreur lors de l'application de la sanction.";
+      console.error("[FORENSIC MITIGATE ERROR]", errorMsg);
+      console.groupEnd();
+      throw new Error(errorMsg);
+    }
+
+    const json = await res.json();
+    console.log("[FORENSIC MITIGATE SUCCESS]", json.data);
+    console.groupEnd();
+    return json.data;
+  } catch (err: any) {
+    console.error("[FORENSIC MITIGATE EXCEPTION]", err);
+    console.groupEnd();
+    throw err;
+  }
+}
+
+/**
+ * Retourne l'URL de téléchargement direct du procès-verbal certifié PDF.
+ */
+export function getForensicReportDownloadUrl(investigationId: string): string {
+  return `/api/bff/protection/forensic/report/${investigationId}/`;
+}
+
+/**
+ * Récupère l'historique des investigations forensiques réalisées.
+ */
+export async function getForensicInvestigationsHistory(): Promise<any[]> {
+  try {
+    const res = await fetch("/api/bff/protection/forensic/investigations/", {
+      method: "GET",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return Array.isArray(json) ? json : (json.data || json.results || []);
+    }
+  } catch (err) {
+    console.error("[Protection] Erreur chargement historique forensique:", err);
+  }
+  return [];
+}
+

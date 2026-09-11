@@ -5,6 +5,7 @@ Conforme au format d'API unifié LAHAThèque: { success, data, error }.
 
 import uuid
 import logging
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
@@ -12,14 +13,23 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.decorators import action
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 logger = logging.getLogger(__name__)
 
-from .models import Annotation, ProtectionConfig, TraceAcces, GlobalDrmConfig
-from .serializers import AnnotationSerializer, ProtectionConfigSerializer, TraceAccesSerializer, GlobalDrmConfigSerializer
-from .permissions import IsAnnotationOwner, IsAdminOrStaff
+from .models import Annotation, ProtectionConfig, TraceAcces, GlobalDrmConfig, ForensicInvestigation
+from .serializers import (
+    AnnotationSerializer,
+    ProtectionConfigSerializer,
+    TraceAccesSerializer,
+    GlobalDrmConfigSerializer,
+    ForensicInvestigationSerializer,
+)
+from .permissions import IsAnnotationOwner, IsAdminOrStaff, IsAdminOnly
 from .lcp_client import LCPClient
 from .access_service import AccessService
+from .forensic_service import ForensicService
+
 
 
 class ReadBookView(APIView):
@@ -158,6 +168,13 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
 
                 duration_minutes = int(s.reading_time_seconds / 60) if s.reading_time_seconds else 0
 
+                cover_url = ""
+                if s.ouvrage and hasattr(s.ouvrage, "cover_image") and s.ouvrage.cover_image:
+                    try:
+                        cover_url = s.ouvrage.cover_image.url
+                    except Exception:
+                        cover_url = ""
+
                 results.append({
                     "id": str(s.id),
                     "user_email": u_email,
@@ -165,6 +182,7 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
                     "partner_name": partner_name,
                     "book_title": title,
                     "book_id": str(s.ouvrage_id or "byod-doc"),
+                    "cover_url": cover_url,
                     "access_type": "read_chunk",
                     "ip_address": student_ip,
                     "country": country,
@@ -178,8 +196,32 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
         except Exception as sess_err:
             logger.warning(f"Erreur agrégation ReaderSession dans TraceAcces: {sess_err}")
 
-        # 2. Ajout des traces d'accès TraceAcces sans doublon
-        traces_qs = self.get_queryset().order_by("-timestamp")[:100]
+        # 2. Ajout des traces d'accès TraceAcces réelles (Lectures directes sur LAHAThèque)
+        traces_qs = self.get_queryset().select_related("user", "ouvrage").order_by("-timestamp")[:150]
+
+        # Pré-chargement optimisé des progressions et sessions de lecture réelles
+        user_ids = [t.user_id for t in traces_qs if t.user_id]
+        ouvrage_ids = [t.ouvrage_id for t in traces_qs if t.ouvrage_id]
+
+        progress_map = {}
+        session_time_map = {}
+        try:
+            from apps.student.models import ReadingProgress, ReadingSession
+            from django.db.models import Sum
+
+            if user_ids and ouvrage_ids:
+                rp_qs = ReadingProgress.objects.filter(user_id__in=user_ids, ouvrage_id__in=ouvrage_ids)
+                for rp in rp_qs:
+                    progress_map[(rp.user_id, rp.ouvrage_id)] = rp
+
+                rs_agg = ReadingSession.objects.filter(
+                    user_id__in=user_ids, ouvrage_id__in=ouvrage_ids
+                ).values("user_id", "ouvrage_id").annotate(total_sec=Sum("duration_seconds"))
+                for row in rs_agg:
+                    session_time_map[(row["user_id"], row["ouvrage_id"])] = row["total_sec"] or 0
+        except Exception as prog_err:
+            logger.warning(f"Erreur pré-chargement ReadingProgress: {prog_err}")
+
         for t in traces_qs:
             t_id = str(t.id)
             if any(r["id"] == t_id for r in results):
@@ -189,6 +231,39 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
             u_name = f"{t.user.first_name} {t.user.last_name}".strip() if t.user else "Lecteur Client"
             b_title = t.ouvrage.title if (t.ouvrage and hasattr(t.ouvrage, "title")) else (t.document_title or "Ouvrage Académique")
 
+            # Couverture réelle de l'ouvrage
+            cover_url = ""
+            if t.ouvrage and hasattr(t.ouvrage, "cover_image") and t.ouvrage.cover_image:
+                try:
+                    cover_url = t.ouvrage.cover_image.url
+                except Exception:
+                    cover_url = ""
+
+            # Nombre total de pages réel
+            total_pages = 1
+            if t.ouvrage and hasattr(t.ouvrage, "nombre_pages") and t.ouvrage.nombre_pages:
+                total_pages = t.ouvrage.nombre_pages
+            elif t.ouvrage and hasattr(t.ouvrage, "pages") and t.ouvrage.pages:
+                total_pages = t.ouvrage.pages
+
+            # Progression réelle de lecture
+            rp = progress_map.get((t.user_id, t.ouvrage_id)) if (t.user_id and t.ouvrage_id) else None
+            current_page = t.page_number or 1
+
+            if rp:
+                current_page = rp.current_page or current_page
+                if rp.total_pages and rp.total_pages > 0:
+                    total_pages = rp.total_pages
+                prog_pct = rp.progress_percent if rp.progress_percent is not None else int((current_page / max(total_pages, 1)) * 100)
+            else:
+                prog_pct = int((current_page / max(total_pages, 1)) * 100) if total_pages > 1 else (100 if current_page >= 1 else 0)
+
+            prog_pct = max(0, min(100, prog_pct))
+
+            # Temps de lecture réel cumulé
+            total_sec = session_time_map.get((t.user_id, t.ouvrage_id), 0)
+            reading_time_mins = max(1, int(total_sec // 60)) if total_sec > 0 else 1
+
             results.append({
                 "id": t_id,
                 "user_email": u_email,
@@ -196,14 +271,15 @@ class TraceAccesViewSet(ReadOnlyModelViewSet):
                 "partner_name": "Accès Direct",
                 "book_title": b_title,
                 "book_id": str(t.ouvrage_id or ""),
+                "cover_url": cover_url,
                 "access_type": t.access_type or "read_chunk",
                 "ip_address": t.ip_address or "127.0.0.1",
                 "country": t.country or "BJ",
                 "device_fingerprint": t.user_agent or t.device_fingerprint or "Lecteur Web DRM",
-                "current_page": t.page_number or 1,
-                "total_pages": 1,
-                "progress_percent": 100,
-                "reading_time_minutes": 0,
+                "current_page": current_page,
+                "total_pages": total_pages,
+                "progress_percent": prog_pct,
+                "reading_time_minutes": reading_time_mins,
                 "timestamp": t.timestamp.isoformat() if t.timestamp else timezone.now().isoformat(),
             })
 
@@ -385,3 +461,123 @@ class GlobalDrmConfigView(APIView):
             "data": GlobalDrmConfigSerializer(instance).data,
             "error": None,
         })
+
+
+class ForensicAnalyzeView(APIView):
+    """
+    Analyse un document suspect (PDF, capture d'écran, photographie) pour extraire
+    le tatouage stéganographique ou le filigrane semi-transparent et identifier le compte source.
+    Accessible STRICTEMENT aux administrateurs et super-administrateurs.
+    """
+    permission_classes = [IsAuthenticated, IsAdminOnly]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response(
+                {"success": False, "data": {}, "error": "Aucun fichier suspect n'a été fourni."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Limite de taille à 50 Mo
+        max_size_bytes = 50 * 1024 * 1024
+        if uploaded_file.size > max_size_bytes:
+            return Response(
+                {"success": False, "data": {}, "error": "Le fichier dépasse la taille maximale autorisée (50 Mo)."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        notes = request.data.get("notes", "")
+        file_bytes = uploaded_file.read()
+        file_name = uploaded_file.name or "document_suspect"
+
+        try:
+            result = ForensicService.analyze_evidence(
+                file_bytes=file_bytes,
+                file_name=file_name,
+                admin_user=request.user,
+                notes=notes
+            )
+            return Response({"success": True, "data": result, "error": None}, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"[FORENSIC ERROR] Erreur analyse preuve: {e}", exc_info=True)
+            return Response(
+                {"success": False, "data": {}, "error": f"Erreur lors de l'analyse forensique : {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ForensicMitigateView(APIView):
+    """
+    Applique une sanction immédiate sur le compte d'un lecteur convaincu de fuite :
+    suspension de compte et/ou révocation instantanée de toutes ses sessions de lecture.
+    Accessible STRICTEMENT aux administrateurs.
+    """
+    permission_classes = [IsAuthenticated, IsAdminOnly]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        investigation_id = request.data.get("investigation_id")
+        action_type = request.data.get("action")
+        reason = request.data.get("reason", "")
+
+        if not investigation_id or not action_type:
+            return Response(
+                {"success": False, "data": {}, "error": "Les paramètres 'investigation_id' et 'action' sont obligatoires."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            result = ForensicService.mitigate_infraction(
+                investigation_id=investigation_id,
+                action=action_type,
+                reason=reason,
+                admin_user=request.user
+            )
+            return Response({"success": True, "data": result, "error": None}, status=status.HTTP_200_OK)
+        except ValueError as ve:
+            return Response({"success": False, "data": {}, "error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"[FORENSIC ERROR] Erreur action d'atténuation: {e}", exc_info=True)
+            return Response(
+                {"success": False, "data": {}, "error": f"Erreur lors de l'application de la sanction : {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ForensicReportView(APIView):
+    """
+    Génère et télécharge le procès-verbal d'investigation forensique certifié en PDF.
+    Accessible STRICTEMENT aux administrateurs.
+    """
+    permission_classes = [IsAuthenticated, IsAdminOnly]
+
+    def get(self, request, investigation_id):
+        try:
+            pdf_bytes = ForensicService.generate_certified_report(str(investigation_id))
+            filename = f"rapport_forensique_LAHA_{str(investigation_id)[:8]}.pdf"
+            response = HttpResponse(pdf_bytes, content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            return response
+        except ValueError as ve:
+            return Response({"success": False, "data": {}, "error": str(ve)}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"[FORENSIC ERROR] Erreur génération rapport PDF: {e}", exc_info=True)
+            return Response(
+                {"success": False, "data": {}, "error": f"Erreur génération du rapport PDF : {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ForensicInvestigationViewSet(ReadOnlyModelViewSet):
+    """
+    Consultation de l'historique et du journal d'audit des investigations forensiques.
+    Accessible STRICTEMENT aux administrateurs.
+    """
+    serializer_class = ForensicInvestigationSerializer
+    permission_classes = [IsAuthenticated, IsAdminOnly]
+
+    def get_queryset(self):
+        return ForensicInvestigation.objects.select_related("admin_user", "suspect_user", "ouvrage").all()
+

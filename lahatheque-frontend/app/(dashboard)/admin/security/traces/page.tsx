@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Shield,
   Search,
@@ -15,14 +16,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Laptop,
+  FileSearch,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getAccessTraces, type TraceRecord } from "@/lib/services/protection";
+import { getAccessTraces, getForensicInvestigationsHistory, type TraceRecord } from "@/lib/services/protection";
 import { PageLoader } from "@/components/ui/page-loader";
 import { generateCsvExport } from "@/lib/services/export-service";
 
 export default function AdminTracesAccesPage() {
   const [traces, setTraces] = useState<TraceRecord[]>([]);
+  const [confirmedLeaksCount, setConfirmedLeaksCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("all");
@@ -36,8 +39,15 @@ export default function AdminTracesAccesPage() {
   const loadTraces = async () => {
     setIsLoading(true);
     try {
-      const data = await getAccessTraces();
+      const [data, investigations] = await Promise.all([
+        getAccessTraces(),
+        getForensicInvestigationsHistory().catch(() => [])
+      ]);
       setTraces(data);
+      const leaks = Array.isArray(investigations)
+        ? investigations.filter((inv: any) => inv.status === "identified").length
+        : 0;
+      setConfirmedLeaksCount(leaks);
     } catch {
       toast.error("Erreur lors de la récupération des traces d'accès.");
     } finally {
@@ -167,7 +177,15 @@ export default function AdminTracesAccesPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <Link
+            href="/admin/security/forensic"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-navy hover:bg-navy-hover text-white shadow-sm transition-all"
+          >
+            <FileSearch className="w-3.5 h-3.5 text-gold" />
+            <span>Atelier Forensique Fuites</span>
+          </Link>
+
           <button
             type="button"
             onClick={loadTraces}
@@ -239,8 +257,14 @@ export default function AdminTracesAccesPage() {
 
         <div className="p-4 rounded-2xl bg-background-secondary border border-border space-y-1">
           <p className="text-[11px] font-medium text-foreground-muted">Intégrité & Fuites</p>
-          <p className="text-xl font-bold text-emerald-600 font-mono">0 Fuite</p>
-          <p className="text-[10px] text-foreground-muted">100% des fragments signés</p>
+          <p className={`text-xl font-bold font-mono ${confirmedLeaksCount > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+            {confirmedLeaksCount} {confirmedLeaksCount > 1 ? "Fuites" : "Fuite"}
+          </p>
+          <p className="text-[10px] text-foreground-muted">
+            {traces.length > 0
+              ? `${Math.max(0, Math.round(((traces.length - confirmedLeaksCount) / traces.length) * 1000) / 10)}% des fragments sains`
+              : "100% des fragments signés"}
+          </p>
         </div>
       </div>
 

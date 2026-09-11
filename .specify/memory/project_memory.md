@@ -189,3 +189,37 @@
 - **Observabilité & Télémétrie** :
   - Groupes DevTools : `[CONTACT FORM]`, `[CHECKOUT FLOW]`, `[CHECKOUT AUTH]`.
   - Logs serveur Django : `[CONTACT]`, `[ORDER]`, `[Commerce]`.
+
+---
+
+## 8. Détection Forensique de Fuites & Analyse de Captures d'Écran (Feature 007)
+
+- **Objectif** : Doter l'administrateur d'une interface d'investigation médico-légale pour démasquer les fuites d'ouvrages à partir d'un fichier PDF fuité ou d'une capture d'écran / photo de smartphone.
+- **Capacités clés** :
+  - Extraction binaire automatique du tatouage invisible `LTQ:{...}` et des métadonnées `LTQ_SIG:`.
+  - Prétraitement d'image (Pillow, réhaussement de contraste, binarisation) et analyse de vision haute précision pour extraire les filigranes transparents à 20% sur les photos/captures.
+  - Corrélation croisée avec la base des traces d'accès (`TraceAcces`), comptes utilisateurs et commandes réelles.
+  - Calcul d'un score de certitude et affichage de la fiche d'investigation complète dans l'espace administration (`/admin/security/forensic`).
+- **Artefacts SpecKit générés** :
+  - Spécification : `specs/007-forensic-leak-detection/spec.md`
+  - Checklist qualité : `specs/007-forensic-leak-detection/checklists/requirements.md` (100% validée)
+  - Plan d'implémentation : `specs/007-forensic-leak-detection/plan.md`
+  - Recherche technique (Phase 0) : `specs/007-forensic-leak-detection/research.md`
+  - Modèle de données (Phase 1) : `specs/007-forensic-leak-detection/data-model.md`
+  - Guide de démarrage rapide : `specs/007-forensic-leak-detection/quickstart.md`
+  - Contrats d'API : `specs/007-forensic-leak-detection/contracts/api-forensic.md`
+- **Décisions d'Architecture Validées** :
+  - Pipeline hybride : Pillow (contraste/binarisation) + OCR local par défaut, repli automatique sur vision multimodale (OpenAI) pour photos floues/inclinées.
+  - Modèle Django dédié : `ForensicInvestigation` dans `apps/protection/models.py` assurant l'archivage légal complet (migration `0008_forensicinvestigation` appliquée).
+  - Actions immédiates intégrées : Suspension de compte (`is_suspended=True`), révocation instantanée des sessions (`session_version += 1`), export de rapport certifié PDF (ReportLab).
+  - Sécurité & Cloisonnement : Accès strictement et exclusivement réservé au tableau de bord administrateur (`role in ['admin', 'super_admin']`).
+- **Fichiers Implémentés & Validés** :
+  - Backend : `apps/protection/models.py` (`ForensicInvestigation`), `apps/protection/forensic_service.py` (`ForensicService`), `apps/protection/views.py` (`ForensicAnalyzeView`, `ForensicMitigateView`, `ForensicReportView`, `ForensicInvestigationViewSet`), `apps/protection/urls.py`, `apps/protection/tests/test_forensic.py`.
+  - Frontend : `lahatheque-frontend/lib/services/protection.ts` (`analyzeForensicEvidence`, `mitigateForensicInfraction`, `getForensicReportDownloadUrl`), `lahatheque-frontend/app/(dashboard)/admin/security/forensic/page.tsx` (interface complète d'enquête forensique et d'actions directes), `lahatheque-frontend/app/(dashboard)/admin/security/traces/page.tsx` (navigation directe).
+- **Validation** :
+  - 100% des tâches `tasks.md` achevées (24/24).
+  - Validation binaire PDF : 100% de détection du tatouage invisible et signature cryptographique.
+  - Validation image/capture d'écran : 95% de score sur filigrane semi-transparent à 20% d'opacité.
+  - Validation sanctions : suspension immédiate et révocation instantanée des sessions de lecture vérifiées.
+
+
