@@ -92,12 +92,16 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
 
   try {
     let backendRes: Response | null = null
-    const timeoutMs = (contentType && contentType.includes('multipart/form-data')) ? 300000 : 30000
+    // Timeout étendu pour les uploads multipart et les analyses forensiques (OCR + IA)
+    const isForensicRoute = cleanSubPath.includes('forensic/')
+    const timeoutMs = (contentType && contentType.includes('multipart/form-data'))
+      ? 300000 
+      : (isForensicRoute ? 180000 : 30000)
     const fetchController = new AbortController()
     const timeoutHandle = setTimeout(() => fetchController.abort(), timeoutMs)
 
     try {
-      console.log(`[BFF Proxy] Envoi requête ${request.method} vers ${targetUrl}...`)
+      console.log(`[BFF Proxy] Envoi requête ${request.method} vers ${targetUrl} (timeout: ${timeoutMs / 1000}s)...`)
       backendRes = await fetch(targetUrl, {
         method: request.method,
         headers: headers,

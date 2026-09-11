@@ -539,6 +539,11 @@ class ForensicAnalyzeView(APIView):
         file_name = "document_suspect"
         notes = request.data.get("notes", "")
 
+        logger.info(
+            f"[FORENSIC ANALYZE REQUEST] Réception requête par: {request.user.email} | "
+            f"Content-Type: {request.content_type} | Notes: '{notes}'"
+        )
+
         # 1. Format JSON avec payload Base64 (Transmission immédiate sans blocage proxy/multipart)
         file_b64 = request.data.get("file_base64")
         if file_b64:
@@ -548,7 +553,12 @@ class ForensicAnalyzeView(APIView):
                     file_b64 = file_b64.split(",", 1)[1]
                 file_bytes = base64.b64decode(file_b64)
                 file_name = request.data.get("file_name") or "document_suspect"
+                logger.info(
+                    f"[FORENSIC ANALYZE] Payload Base64 décodé avec succès: "
+                    f"Fichier '{file_name}' ({len(file_bytes)} octets)"
+                )
             except Exception as b64_err:
+                logger.error(f"[FORENSIC ANALYZE] Erreur décodage Base64: {b64_err}")
                 return Response(
                     {"success": False, "data": {}, "error": f"Format Base64 invalide : {str(b64_err)}"},
                     status=status.HTTP_400_BAD_REQUEST
@@ -559,8 +569,13 @@ class ForensicAnalyzeView(APIView):
             uploaded_file = request.FILES.get("file")
             file_bytes = uploaded_file.read()
             file_name = uploaded_file.name or "document_suspect"
+            logger.info(
+                f"[FORENSIC ANALYZE] Fichier multipart reçu: "
+                f"'{file_name}' ({len(file_bytes)} octets)"
+            )
 
         if not file_bytes:
+            logger.warning("[FORENSIC ANALYZE] Requête rejetée: aucun fichier suspect fourni.")
             return Response(
                 {"success": False, "data": {}, "error": "Aucun fichier suspect n'a été fourni."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -569,17 +584,25 @@ class ForensicAnalyzeView(APIView):
         # Limite de taille à 50 Mo
         max_size_bytes = 50 * 1024 * 1024
         if len(file_bytes) > max_size_bytes:
+            logger.warning(f"[FORENSIC ANALYZE] Fichier trop volumineux: {len(file_bytes)} > {max_size_bytes}")
             return Response(
                 {"success": False, "data": {}, "error": "Le fichier dépasse la taille maximale autorisée (50 Mo)."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
+            start_t = timezone.now()
+            logger.info(f"[FORENSIC ANALYZE] Lancement de l'analyse forensique pour '{file_name}'...")
             result = ForensicService.analyze_evidence(
                 file_bytes=file_bytes,
                 file_name=file_name,
                 admin_user=request.user,
                 notes=notes
+            )
+            duration = (timezone.now() - start_t).total_seconds()
+            logger.info(
+                f"[FORENSIC ANALYZE SUCCESS] Analyse terminée en {duration:.2f}s | "
+                f"Statut: {result.get('status')} | Score: {result.get('certainty_score')}%"
             )
             return Response({"success": True, "data": result, "error": None}, status=status.HTTP_200_OK)
         except Exception as e:

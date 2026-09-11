@@ -444,11 +444,13 @@ export async function analyzeForensicEvidence(
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 secondes max
+  const timeoutMs = 180000; // 180 secondes (3 minutes) pour laisser le temps complet au prétraitement d'image + OCR + vision IA
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch("/api/bff/protection/forensic/analyze/", {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -481,9 +483,9 @@ export async function analyzeForensicEvidence(
   } catch (err: any) {
     clearTimeout(timeoutId);
     if (err.name === "AbortError") {
-      console.error("[FORENSIC ANALYZE TIMEOUT] Délai d'analyse dépassé (> 45s)");
+      console.error("[FORENSIC ANALYZE TIMEOUT] Délai d'analyse dépassé (> 180s)");
       console.groupEnd();
-      throw new Error("Le délai d'analyse forensique a été dépassé (45s). Veuillez réessayer.");
+      throw new Error("Le délai d'analyse forensique a été dépassé (180s). Veuillez réessayer.");
     }
     console.error("[FORENSIC ANALYZE EXCEPTION]", err);
     console.groupEnd();
@@ -552,6 +554,7 @@ export async function getForensicInvestigationsHistory(): Promise<any[]> {
   try {
     const res = await fetch("/api/bff/protection/forensic/investigations/", {
       method: "GET",
+      credentials: "include",
       cache: "no-store",
     });
     if (res.ok) {

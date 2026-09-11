@@ -350,9 +350,11 @@ class ForensicService:
             raw_text = ""
             try:
                 import pytesseract
+                logger.info("[FORENSIC OCR] Exécution de Tesseract OCR sur l'image rehaussée (lang='fra+eng')...")
                 raw_text = pytesseract.image_to_string(filtered, lang="fra+eng")
+                logger.info(f"[FORENSIC OCR] Texte extrait par Tesseract ({len(raw_text)} caractères) : {raw_text[:120].strip()}...")
             except Exception as ocr_err:
-                logger.info(f"[FORENSIC OCR] Pytesseract non disponible ou erreur: {ocr_err}")
+                logger.warning(f"[FORENSIC OCR] Pytesseract indisponible ou erreur d'exécution: {ocr_err}")
 
             return filtered, raw_text
         except Exception as e:
