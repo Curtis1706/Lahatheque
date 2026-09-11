@@ -151,9 +151,17 @@ def _compute_reading_streak(user) -> int:
 class StudentBooksView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def perform_content_negotiation(self, request, force=False):
+        # Empêche DRF d'intercepter ?format=digital/audio/paper comme format de renderer API
+        format_param = request.query_params.get('format')
+        if format_param and format_param.lower() not in ('json', 'api'):
+            renderers = self.get_renderers()
+            return renderers[0], renderers[0].media_type
+        return super().perform_content_negotiation(request, force=force)
+
     def get(self, request):
         user = request.user
-        format_filter = request.query_params.get('format')
+        format_filter = request.query_params.get('book_format') or request.query_params.get('format')
         favorites_only = request.query_params.get('favorites') == 'true'
         from apps.protection.access_service import AccessService
 
@@ -169,7 +177,15 @@ class StudentBooksView(APIView):
         )
 
         if format_filter and format_filter != 'all':
-            qs = qs.filter(ouvrage__format_type=format_filter)
+            f = format_filter.lower().strip()
+            if f in ('audio', 'audio_all', 'livres_audio'):
+                qs = qs.filter(Q(ouvrage__format_type='audio') | Q(ouvrage__has_audio_version=True) | Q(ouvrage__audio_tracks__isnull=False)).distinct()
+            elif f in ('digital', 'numerique'):
+                qs = qs.filter(ouvrage__format_type__in=['pdf', 'epub'])
+            elif f in ('paper', 'papier'):
+                qs = qs.filter(ouvrage__is_paper_available=True)
+            else:
+                qs = qs.filter(ouvrage__format_type=f)
         if favorites_only:
             qs = qs.filter(is_favorite=True)
 
@@ -720,6 +736,14 @@ class StudentUniversityView(APIView):
 class StudentCatalogView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def perform_content_negotiation(self, request, force=False):
+        # Empêche DRF d'intercepter ?format=digital/audio/paper comme format de renderer API
+        format_param = request.query_params.get('format')
+        if format_param and format_param.lower() not in ('json', 'api'):
+            renderers = self.get_renderers()
+            return renderers[0], renderers[0].media_type
+        return super().perform_content_negotiation(request, force=force)
+
     def get(self, request):
         user = request.user
 
@@ -758,7 +782,7 @@ class StudentCatalogView(APIView):
             else:
                 qs = qs.filter(Q(discipline__name__iexact=discipline_id) | Q(discipline__name__icontains=discipline_id))
 
-        format_type = request.query_params.get('format')
+        format_type = request.query_params.get('book_format') or request.query_params.get('format')
         if format_type and format_type != 'all':
             f = format_type.lower().strip()
             if f in ('audio', 'audio_all', 'livres_audio'):

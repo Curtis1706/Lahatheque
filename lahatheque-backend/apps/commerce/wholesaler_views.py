@@ -64,6 +64,30 @@ class WholesalerCatalogListView(APIView):
         search_query = request.query_params.get("search", "").strip()
         discipline = request.query_params.get("discipline", "").strip()
 
+        from django.core.cache import cache
+        cache_key = f"wholesaler_catalog:{search_query}:{discipline}"
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return Response({
+                "success": True,
+                "data": cached_data,
+                "error": None,
+            })
+
+        from apps.reporting.pricing_service import get_platform_config
+        config = get_platform_config()
+        digital_discount_pct = float(config.remise_grossiste_numerique_pct)
+        paper_discount_pct = float(config.remise_grossiste_papier_pct)
+
+        # Agrégation globale de tous les stocks en 1 seule requête SQL
+        stock_agg = {
+            s['ouvrage_id']: max(0, (s['tot_reelle'] or 0) - (s['tot_reservee'] or 0))
+            for s in StockOuvrage.objects.values('ouvrage_id').annotate(
+                tot_reelle=Sum('quantite_reelle'),
+                tot_reservee=Sum('quantite_reservee')
+            )
+        }
+
         ouvrages = Ouvrage.objects.filter(status="published").select_related("discipline", "publisher").prefetch_related("authors")
 
         if discipline and discipline != "all":
@@ -83,15 +107,9 @@ class WholesalerCatalogListView(APIView):
         for o in ouvrages:
             public_digital = float(o.price_digital or 5000)
             public_paper = float(o.price_paper or 7500)
-            pricing = compute_role_price(o, "wholesaler")
-            dig_p = pricing["digital_price"]
-            prt_p = pricing["paper_price"]
-            digital_discount_pct = pricing["digital_discount_pct"]
-            paper_discount_pct = pricing["paper_discount_pct"]
-            
-            # Stock physique disponible
-            stocks = StockOuvrage.objects.filter(ouvrage=o)
-            total_dispo = sum(s.quantite_disponible for s in stocks) if stocks.exists() else 0
+            dig_p = round(public_digital * (1 - digital_discount_pct / 100), 2)
+            prt_p = round(public_paper * (1 - paper_discount_pct / 100), 2)
+            total_dispo = stock_agg.get(o.id, 0)
 
             authors_list = [f"{a.first_name} {a.last_name}".strip() for a in o.authors.all()]
             if not authors_list and hasattr(o, "auteur") and o.auteur:
@@ -117,6 +135,8 @@ class WholesalerCatalogListView(APIView):
                 "is_paper_available": bool(o.is_paper_available or total_dispo > 0),
                 "summary": o.summary or "Ouvrage académique et professionnel de référence.",
             })
+
+        cache.set(cache_key, data, timeout=300)
 
         return Response({
             "success": True,

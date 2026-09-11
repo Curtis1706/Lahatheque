@@ -273,7 +273,10 @@ export async function getStudentBooks(
   favoritesOnly?: boolean
 ): Promise<BookAPI[]> {
   const params = new URLSearchParams();
-  if (format && format !== "all") params.set("format", format);
+  if (format && format !== "all") {
+    params.set("format", format);
+    params.set("book_format", format);
+  }
   if (favoritesOnly) params.set("favorites", "true");
   const query = params.toString();
   return bffGet<BookAPI[]>(`/books/${query ? `?${query}` : ""}`);
@@ -390,7 +393,10 @@ export async function getStudentCatalog(
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (discipline && discipline !== "all") params.set("discipline", discipline);
-  if (format && format !== "all") params.set("format", format);
+  if (format && format !== "all") {
+    params.set("format", format);
+    params.set("book_format", format);
+  }
   if (language && language !== "all") params.set("language", language);
   if (page) params.set("page", String(page));
   if (pageSize) params.set("page_size", String(pageSize));
