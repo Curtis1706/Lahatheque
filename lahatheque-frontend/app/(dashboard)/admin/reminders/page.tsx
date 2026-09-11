@@ -245,6 +245,8 @@ export default function AdminRemindersPage() {
           columns={columns}
           rowKey="id"
           loading={loading}
+          pageSize={20}
+          pageSizeOptions={[10, 20, 50, 100]}
           filterKey="type"
           filterOptions={[
             { value: "all", label: "Toutes les relances" },

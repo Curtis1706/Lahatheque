@@ -92,7 +92,13 @@ export default function AdminUnpaidRemindersPage() {
         </div>
       </div>
 
-      <DataTable data={data} columns={columns} rowKey="id" />
+      <DataTable
+        data={data}
+        columns={columns}
+        rowKey="id"
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
+      />
     </div>
   );
 }

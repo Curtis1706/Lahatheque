@@ -186,10 +186,17 @@ export default function AdminAuditLogsPage() {
             <span>/</span>
             <span className="text-navy font-semibold">Sécurité & Audit</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold font-serif text-navy flex items-center gap-2.5">
-            <Activity className="w-6 h-6 text-gold" />
-            Journal d&apos;Audit Système & Flux Live
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold font-serif text-navy flex items-center gap-2.5">
+              <Activity className="w-6 h-6 text-gold" />
+              Journal d&apos;Audit Système & Flux Live
+            </h1>
+            {!loading && (
+              <span className="text-xs font-mono font-medium px-2.5 py-0.5 rounded-full bg-navy/5 text-navy border border-border">
+                {logs.length} entrée{logs.length > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
           <p className="text-xs sm:text-sm text-foreground-muted mt-1">
             Surveillance continue et traçabilité 360° de toutes les actions d&apos;administration sur l&apos;application.
           </p>
@@ -338,6 +345,8 @@ export default function AdminAuditLogsPage() {
             loading={loading}
             searchPlaceholder="Rechercher par administrateur, action ou ressource..."
             emptyMessage="Aucune entrée d'audit trouvée."
+            pageSize={20}
+            pageSizeOptions={[10, 20, 50, 100]}
           />
         </div>
       )}

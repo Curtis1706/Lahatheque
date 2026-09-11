@@ -692,7 +692,14 @@ export default function AdminRoleUsersPage() {
         </Link>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy">{getRoleTitle()}</h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy">{getRoleTitle()}</h1>
+              {!loading && (
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-navy/10 text-navy font-mono">
+                  {users.length} utilisateur{users.length > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
             <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">
               Gestion spécifique et indicateurs d'activité du rôle {roleSlug}.
             </p>
@@ -716,6 +723,8 @@ export default function AdminRoleUsersPage() {
         loading={loading}
         searchPlaceholder="Rechercher dans ce rôle..."
         emptyMessage="Aucun utilisateur trouvé pour ce rôle."
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
       />
 
       {/* Modal Créer un compte pour ce rôle précis */}

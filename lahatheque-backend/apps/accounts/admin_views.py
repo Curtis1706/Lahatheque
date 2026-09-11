@@ -107,7 +107,7 @@ def send_custom_notification_email(recipient_email: str, recipient_name: str, su
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
-    max_page_size = 100
+    max_page_size = 500
 
 
 class AdminUserManagementViewSet(viewsets.ViewSet):
@@ -121,7 +121,7 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
         """
         GET /api/v1/admin/users/
         """
-        queryset = User.objects.all().order_by('-date_joined')
+        queryset = User.objects.all().select_related('institution').order_by('-date_joined')
 
         role = request.query_params.get('role')
         if role and role != 'all':
@@ -145,14 +145,29 @@ class AdminUserManagementViewSet(viewsets.ViewSet):
                 Q(pen_name__icontains=search)
             )
 
+        # Si all=true ou no_page=true, renvoyer l'intégralité des enregistrements sans troncature
+        all_records = request.query_params.get('all') or request.query_params.get('no_page')
+        page_size_param = request.query_params.get('page_size')
+        if all_records in ['true', '1'] or page_size_param in ['all', '0']:
+            serializer = UserSerializer(queryset, many=True)
+            return Response({
+                "count": queryset.count(),
+                "total_pages": 1,
+                "current_page": 1,
+                "results": serializer.data
+            })
+
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request)
         if page is not None:
             serializer = UserSerializer(page, many=True)
-            return paginator.get_paginated_response(serializer.data)
+            response = paginator.get_paginated_response(serializer.data)
+            response.data['total_pages'] = paginator.page.paginator.num_pages
+            response.data['current_page'] = paginator.page.number
+            return response
 
         serializer = UserSerializer(queryset, many=True)
-        return Response({"results": serializer.data, "count": queryset.count()})
+        return Response({"results": serializer.data, "count": queryset.count(), "total_pages": 1, "current_page": 1})
 
     def retrieve(self, request, pk=None):
         """GET /api/v1/admin/users/<id>/"""

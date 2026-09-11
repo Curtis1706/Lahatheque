@@ -629,7 +629,8 @@ export default function AdminPublisherDepositsPage() {
         searchPlaceholder="Rechercher par titre, éditeur ou ISBN..."
         mobileCard={renderMobileCard}
         onRowClick={(row) => openModal(row, "details")}
-        pageSize={10}
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
         emptyMessage="Aucun dépôt éditeur tiers à examiner."
       />
 

@@ -857,6 +857,8 @@ export default function AdminPricingCascadePage() {
           rowKey="id"
           loading={loading}
           searchPlaceholder="Rechercher par titre, ISBN ou auteur..."
+          pageSize={20}
+          pageSizeOptions={[10, 20, 50, 100]}
         />
       </div>
 

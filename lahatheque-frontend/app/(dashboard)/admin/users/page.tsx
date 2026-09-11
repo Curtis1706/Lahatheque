@@ -101,28 +101,43 @@ export default function AdminUsersGlobalPage() {
     {
       key: "name",
       header: "Nom & Prénom",
-      cell: (row) => (
-        <div className="flex items-center gap-2.5">
-          <UserAvatar
-            src={row.avatar_url || row.avatar}
-            name={`${row.first_name} ${row.last_name}`}
-            size="sm"
-          />
-          <div>
-            <p className="font-semibold text-xs text-foreground">
-              {row.first_name} {row.last_name}
-            </p>
-            <p className="text-[11px] text-foreground-muted">{row.email}</p>
+      cell: (row) => {
+        const org = row.institution_name || row.organization || row.extra_info?.institution_name;
+        return (
+          <div className="flex items-center gap-2.5">
+            <UserAvatar
+              src={row.avatar_url || row.avatar}
+              name={`${row.first_name} ${row.last_name}`}
+              size="sm"
+            />
+            <div>
+              <p className="font-semibold text-xs text-foreground">
+                {row.first_name} {row.last_name}
+              </p>
+              <p className="text-[11px] text-foreground-muted">{row.email}</p>
+              {org && (
+                <p className="text-[10px] text-gold font-medium truncate max-w-[180px]">{org}</p>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "role",
       header: "Rôle Principal",
       cell: (row) => (
-        <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-light text-navy font-semibold">
+        <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy/10 text-navy font-semibold">
           {formatRoleLabel(row.role)}
+        </span>
+      ),
+    },
+    {
+      key: "phone",
+      header: "Téléphone",
+      cell: (row) => (
+        <span className="text-xs text-foreground-muted font-mono">
+          {row.phone || "—"}
         </span>
       ),
     },
@@ -197,9 +212,16 @@ export default function AdminUsersGlobalPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy">
-            Gestion Globale des Utilisateurs
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy">
+              Gestion Globale des Utilisateurs
+            </h1>
+            {!loading && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-navy/10 text-navy font-mono">
+                {users.length} compte{users.length > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
           <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">
             Superviser et administrer l'ensemble des comptes (étudiants, auteurs, éditeurs, universités, juristes).
           </p>
@@ -223,7 +245,9 @@ export default function AdminUsersGlobalPage() {
         filterKey="role"
         filterOptions={roleFilterOptions}
         filterPlaceholder="Filtrer par rôle..."
-        searchPlaceholder="Rechercher par nom ou e-mail..."
+        searchPlaceholder="Rechercher par nom, e-mail ou téléphone..."
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
       />
 
       {/* Modal Créer un compte */}

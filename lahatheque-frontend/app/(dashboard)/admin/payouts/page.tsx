@@ -51,8 +51,7 @@ export default function AdminPayoutsPage() {
           status: statusFilter !== "all" ? statusFilter : undefined,
           type: typeFilter !== "all" ? typeFilter : undefined,
           q: searchQuery || undefined,
-          page,
-          page_size: 15,
+          all: true,
         }),
         getAdminPayoutKpis().catch(() => null),
       ]);
@@ -259,9 +258,14 @@ export default function AdminPayoutsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy">
-            Demandes de Versement des Droits &amp; Redevances
-          </h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy">
+              Demandes de Versement des Droits &amp; Redevances
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-navy/10 text-navy border border-navy/20 font-mono">
+              {payoutsResponse?.results?.length ?? 0} demande{(payoutsResponse?.results?.length ?? 0) > 1 ? "s" : ""}
+            </span>
+          </div>
           <p className="text-xs sm:text-sm text-foreground-muted mt-0.5 font-poppins">
             Instruction, validation avec enregistrement des références bancaires/Momo et traitement des décaissements.
           </p>
@@ -410,6 +414,8 @@ export default function AdminPayoutsPage() {
           columns={columns}
           rowKey="id"
           loading={loading}
+          pageSize={20}
+          pageSizeOptions={[10, 20, 50, 100]}
           searchPlaceholder="Rechercher par ayant-droit, email, motif..."
           emptyMessage="Aucune demande de versement ne correspond à ces critères."
         />

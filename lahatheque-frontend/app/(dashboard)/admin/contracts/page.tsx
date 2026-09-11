@@ -474,7 +474,8 @@ export default function AdminContractsPage() {
           loading={loading}
           searchable={false}
           emptyMessage="Aucun contrat juridique ne correspond aux critères sélectionnés."
-          pageSize={10}
+          pageSize={20}
+          pageSizeOptions={[10, 20, 50, 100]}
         />
       </div>
 

@@ -259,7 +259,12 @@ export default function AdminCatalogPage() {
       {/* En-tête de la page */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
-          <h1 className="font-serif text-2xl font-bold text-navy">Gestion du Catalogue Global</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="font-serif text-2xl font-bold text-navy">Gestion du Catalogue Global</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gold/10 text-gold border border-gold/20 font-mono">
+              {books.length} ouvrage(s)
+            </span>
+          </div>
           <p className="text-xs text-foreground-muted mt-1">
             Supervision du catalogue universitaire, tarification dérogatoire et politiques de protection DRM.
           </p>
@@ -460,6 +465,8 @@ export default function AdminCatalogPage() {
           secondaryFilterPlaceholder="Toutes les langues"
           secondaryFilterFn={(row, lang) => matchesLanguageFilter(row, lang)}
           searchPlaceholder="Rechercher par titre ou auteur..."
+          pageSize={20}
+          pageSizeOptions={[10, 20, 50, 100]}
         />
       )}
 

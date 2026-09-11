@@ -509,7 +509,8 @@ export default function AdminValidationPage() {
         searchable={true}
         searchPlaceholder="Rechercher par titre, auteur, éditeur ou chef maquettiste..."
         mobileCard={renderMobileCard}
-        pageSize={10}
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
         emptyMessage="Aucune épreuve de maquette ne correspond aux critères sélectionnés."
       />
 

@@ -35,7 +35,7 @@ from apps.accounts.permissions import IsAdminOrSuperAdmin
 class StandardAdminPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
-    max_page_size = 100
+    max_page_size = 500
 
 
 logger = logging.getLogger(__name__)
@@ -950,15 +950,33 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
             })
 
         total_count = len(results)
+        is_all = (
+            request.GET.get('all') == 'true'
+            or request.GET.get('no_page') == 'true'
+            or str(request.GET.get('page_size', '')).lower() in ['all', '0']
+        )
+
+        if is_all:
+            return Response({
+                "success": True,
+                "data": {
+                    "count": total_count,
+                    "page": 1,
+                    "total_pages": 1,
+                    "results": results,
+                },
+                "error": None
+            })
+
         try:
             page = int(request.GET.get('page', 1))
-            page_size = int(request.GET.get('page_size', 10))
+            page_size = int(request.GET.get('page_size', 20))
         except (ValueError, TypeError):
             page = 1
-            page_size = 10
+            page_size = 20
 
         page = max(1, page)
-        page_size = max(1, min(100, page_size))
+        page_size = max(1, min(500, page_size))
         total_pages = max(1, (total_count + page_size - 1) // page_size)
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size
@@ -1331,7 +1349,7 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
                 })
 
             # 2. Contrats légaux dérogatoires
-            contracts = ContratLegal.objects.filter(status='active').order_by('-created_at')[:50]
+            contracts = ContratLegal.objects.filter(status='active').order_by('-created_at')
             for c in contracts:
                 p_type = "publisher" if c.type_contrat in ["editeur_tiers", "pre_edition"] else ("university" if c.type_contrat == "partenariat_universite" else "author")
                 if not any(r["partner_name"] == (c.contracting_party or c.titre) for r in results):
@@ -1348,7 +1366,7 @@ class AdminRoyaltiesPayoutViewSet(viewsets.ViewSet):
                     })
 
             # 3. Établissements Universitaires Partenaires (Institution)
-            institutions = Institution.objects.filter(is_active=True).order_by('name')[:20]
+            institutions = Institution.objects.filter(is_active=True).order_by('name')
             for inst in institutions:
                 if not any(r["partner_id"] == str(inst.id) for r in results):
                     results.append({
@@ -1438,7 +1456,7 @@ class AdminRemindersViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
-        logs = RelanceAutomatiqueLog.objects.all().order_by('-created_at')[:100]
+        logs = RelanceAutomatiqueLog.objects.all().order_by('-created_at')
         type_map = {
             RelanceAutomatiqueLog.TypeRelance.DEPOT_EN_ATTENTE: "pending_deposit",
             RelanceAutomatiqueLog.TypeRelance.FACTURE_IMPAYEE: "unpaid_invoice",
@@ -1524,7 +1542,27 @@ class AdminAuditLogViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
 
     def list(self, request):
-        logs = JournalAuditAdmin.objects.all().select_related('administrateur').order_by('-created_at')[:150]
+        qs = JournalAuditAdmin.objects.all().select_related('administrateur').order_by('-created_at')
+        all_records = request.query_params.get('all') or request.query_params.get('no_page')
+        limit = request.query_params.get('limit')
+
+        action_filter = request.query_params.get('action')
+        if action_filter:
+            qs = qs.filter(action__icontains=action_filter)
+        user_filter = request.query_params.get('user')
+        if user_filter:
+            qs = qs.filter(administrateur__email__icontains=user_filter)
+
+        if all_records in ['true', '1'] or request.query_params.get('page_size') in ['all', '0']:
+            logs = qs
+        elif limit:
+            try:
+                logs = qs[:int(limit)]
+            except (ValueError, TypeError):
+                logs = qs
+        else:
+            logs = qs
+
         results = []
         for log in logs:
             admin_email = log.administrateur.email if log.administrateur else "Système / Tâche Automatique"
@@ -1873,11 +1911,34 @@ class AdminContractViewSet(viewsets.ViewSet):
         logger = logging.getLogger(__name__)
         try:
             from apps.rights.models import ContratLegal
-            contracts = ContratLegal.objects.all().select_related(
+            qs = ContratLegal.objects.all().select_related(
                 'ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition', 'juriste_responsable'
-            ).order_by('-created_at')[:50]
+            ).order_by('-created_at')
+
+            is_all = (
+                request.query_params.get('all', '').lower() in ('true', '1')
+                or request.query_params.get('no_page', '').lower() in ('true', '1')
+                or request.query_params.get('page_size', '').lower() in ('all', '-1')
+            )
+            page = request.query_params.get('page')
+            page_size = request.query_params.get('page_size')
+
+            if is_all:
+                contracts = list(qs)
+            elif page and page_size:
+                try:
+                    p = max(1, int(page))
+                    ps = min(500, max(1, int(page_size)))
+                    start = (p - 1) * ps
+                    contracts = list(qs[start:start + ps])
+                except (ValueError, TypeError):
+                    contracts = list(qs)
+            else:
+                # Default: return all records
+                contracts = list(qs)
+
             results = [self._serialize_contract(c) for c in contracts]
-            return Response({"success": True, "data": results, "error": None})
+            return Response({"success": True, "data": results, "total": qs.count(), "error": None})
         except Exception as e:
             logger.error(f"[AdminContractViewSet.list] Erreur : {e}", exc_info=True)
             return Response(
@@ -2092,10 +2153,31 @@ class AdminStockViewSet(viewsets.ViewSet):
             qs = (
                 MouvementStock.objects
                 .select_related('stock__ouvrage', 'stock__entrepot', 'auteur')
-                .order_by('-created_at')[:100]
+                .order_by('-created_at')
             )
+            is_all = (
+                request.query_params.get('all', '').lower() in ('true', '1')
+                or request.query_params.get('no_page', '').lower() in ('true', '1')
+                or request.query_params.get('page_size', '').lower() in ('all', '-1')
+            )
+            page = request.query_params.get('page')
+            page_size = request.query_params.get('page_size')
+
+            if is_all:
+                items = list(qs)
+            elif page and page_size:
+                try:
+                    p = max(1, int(page))
+                    ps = min(500, max(1, int(page_size)))
+                    start = (p - 1) * ps
+                    items = list(qs[start:start + ps])
+                except (ValueError, TypeError):
+                    items = list(qs)
+            else:
+                items = list(qs)
+
             results = []
-            for m in qs:
+            for m in items:
                 book_title = "N/A"
                 if m.stock and m.stock.ouvrage:
                     book_title = getattr(m.stock.ouvrage, 'titre', m.stock.ouvrage.title)
@@ -2119,7 +2201,7 @@ class AdminStockViewSet(viewsets.ViewSet):
                     "status": "approved",
                     "created_at": m.created_at.isoformat() if m.created_at else None,
                 })
-            return Response({"success": True, "data": results, "error": None})
+            return Response({"success": True, "data": results, "total": qs.count(), "error": None})
         except Exception as e:
             logger.error(f"[AdminStockViewSet.movements] Erreur : {e}", exc_info=True)
             return Response(
@@ -2204,7 +2286,7 @@ class AdminStockViewSet(viewsets.ViewSet):
                 .filter(lignes__format_type='paper', is_credit_purchase=True)
                 .select_related('user')
                 .distinct()
-                .order_by('-created_at')[:100]
+                .order_by('-created_at')
             )
             client_map = {}
             for ord_obj in paper_orders:
@@ -2314,7 +2396,7 @@ class AdminStockViewSet(viewsets.ViewSet):
             # 1. Règlements manuels enregistrés dans le journal d'audit
             manual_logs = JournalAuditAdmin.objects.filter(
                 action__in=["RECORD_MANUAL_CASH_PAYMENT", "RECORD_MANUAL_STOCK_PAYMENT"]
-            ).order_by('-created_at')[:100]
+            ).order_by('-created_at')
 
             for log in manual_logs:
                 d = log.details or {}
@@ -2342,7 +2424,7 @@ class AdminStockViewSet(viewsets.ViewSet):
                 Order.objects
                 .filter(statut_paiement='paid')
                 .select_related('user')
-                .order_by('-created_at')[:50]
+                .order_by('-created_at')
             )
             for o in orders:
                 u = o.user
@@ -2369,7 +2451,7 @@ class AdminStockViewSet(viewsets.ViewSet):
                 WholesaleOrder.objects
                 .exclude(status='cancelled')
                 .select_related('user')
-                .order_by('-created_at')[:50]
+                .order_by('-created_at')
             )
             for wo in w_orders:
                 transactions.append({
@@ -2389,7 +2471,7 @@ class AdminStockViewSet(viewsets.ViewSet):
                 })
 
             transactions.sort(key=lambda x: x["date"], reverse=True)
-            return Response({"success": True, "data": transactions[:100], "error": None})
+            return Response({"success": True, "data": transactions, "total": len(transactions), "error": None})
         except Exception as e:
             logger.error(f"[AdminStockViewSet.transactions] Erreur : {e}", exc_info=True)
             return Response({"success": False, "data": [], "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2639,10 +2721,18 @@ class AdminSalesListAPIView(APIView):
                     author_str = ", ".join(authors_list) if authors_list else ""
                     inst_name = book.institution.name if (book and book.institution) else ""
                     pub_name = (book.publisher.name if (book and book.publisher) else "") or (book.publisher_name if book else "")
+                    cover_url = ""
+                    if book and getattr(book, 'cover_image', None):
+                        try:
+                            cover_url = book.cover_image.url
+                        except Exception:
+                            cover_url = ""
                     items.append({
                         "id": str(l.id),
+                        "book_id": str(book.id) if book else "",
                         "book_title": book.title if book else "Ouvrage",
                         "isbn": getattr(book, 'isbn', '') or '',
+                        "cover_url": cover_url,
                         "author_names": authors_list,
                         "author_display": author_str,
                         "institution_name": inst_name,
@@ -2693,8 +2783,10 @@ class AdminSalesListAPIView(APIView):
                     uprice = float(it.get('unit_price', 0) or 0)
                     items.append({
                         "id": f"univ-{uo.id}-{idx}",
+                        "book_id": str(it.get('book_id') or it.get('id') or ""),
                         "book_title": it.get('title') or "Ouvrage Papier Universitaire",
                         "isbn": it.get('isbn', '') or '',
+                        "cover_url": it.get('cover_url') or it.get('cover_image') or "",
                         "author_names": [],
                         "author_display": it.get('author', '') or '',
                         "institution_name": inst_name,
@@ -2709,8 +2801,10 @@ class AdminSalesListAPIView(APIView):
                 if not items:
                     items.append({
                         "id": f"univ-{uo.id}-0",
+                        "book_id": "",
                         "book_title": f"Commande Institutionnelle ({ref})",
                         "isbn": "",
+                        "cover_url": "",
                         "author_names": [],
                         "author_display": "",
                         "institution_name": inst_name,
@@ -2765,12 +2859,20 @@ class AdminSalesListAPIView(APIView):
                     author_str = ", ".join(authors_list) if authors_list else ""
                     inst_name = book.institution.name if (book and book.institution) else ""
                     pub_name = (book.publisher.name if (book and book.publisher) else "") or (book.publisher_name if book else "")
+                    cover_url = ""
+                    if book and getattr(book, 'cover_image', None):
+                        try:
+                            cover_url = book.cover_image.url
+                        except Exception:
+                            cover_url = ""
 
                     if it.print_copies_qty > 0:
                         items.append({
                             "id": f"{it.id}-print",
+                            "book_id": str(book.id) if book else "",
                             "book_title": it.title or (book.title if book else "Ouvrage"),
                             "isbn": getattr(book, 'isbn', '') if book else '',
+                            "cover_url": cover_url,
                             "author_names": authors_list,
                             "author_display": author_str,
                             "institution_name": inst_name,
@@ -2784,8 +2886,10 @@ class AdminSalesListAPIView(APIView):
                     if it.digital_licenses_qty > 0:
                         items.append({
                             "id": f"{it.id}-digital",
+                            "book_id": str(book.id) if book else "",
                             "book_title": it.title or (book.title if book else "Ouvrage"),
                             "isbn": getattr(book, 'isbn', '') if book else '',
+                            "cover_url": cover_url,
                             "author_names": authors_list,
                             "author_display": author_str,
                             "institution_name": inst_name,

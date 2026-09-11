@@ -17,13 +17,12 @@ import {
   RotateCcw,
   CheckCircle2,
   BookMarked,
-  ChevronLeft,
-  ChevronRight,
   Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Combobox, ComboboxOption } from "@/components/ui/combobox";
+import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { getAdminConsolidatedSales } from "@/lib/services/admin";
 import { generateOfficialPdf, generateCsvExport } from "@/lib/services/export-service";
 import type {
@@ -55,10 +54,6 @@ export default function AdminReportsPage() {
   const [salesData, setSalesData] = useState<AdminSalesConsolidatedResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isExporting, setIsExporting] = useState<boolean>(false);
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 10;
 
   // Calcul automatique des dates de presets
   const applyPresetDates = useCallback((preset: PeriodPreset) => {
@@ -109,7 +104,6 @@ export default function AdminReportsPage() {
         publisher: selectedPublisher !== "all" ? selectedPublisher : undefined,
       });
       setSalesData(data);
-      setCurrentPage(1);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erreur de chargement des ventes.";
       toast.error(msg);
@@ -210,12 +204,196 @@ export default function AdminReportsPage() {
     return list;
   }, [orders]);
 
-  // Pagination sur la prévisualisation
-  const totalPages = Math.ceil(orders.length / pageSize) || 1;
-  const paginatedOrders = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return orders.slice(start, start + pageSize);
-  }, [orders, currentPage]);
+  // Définition des colonnes du composant DataTable avec affichage des Book Covers
+  const columns: DataTableColumn<AdminSaleOrder>[] = useMemo(() => [
+    {
+      key: "order_reference",
+      header: "Date & Réf.",
+      className: "whitespace-nowrap font-medium",
+      cell: (o) => (
+        <div>
+          <div className="font-semibold text-navy">{o.order_reference}</div>
+          <div className="text-[11px] text-foreground-muted">
+            {o.created_at ? new Date(o.created_at).toLocaleDateString("fr-FR") : "-"}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "channel",
+      header: "Canal",
+      className: "whitespace-nowrap",
+      cell: (o) => (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-navy/10 text-navy">
+          {o.channel === "b2c_individual" && <User className="w-3.5 h-3.5 text-gold" />}
+          {o.channel === "b2b_university" && <Building2 className="w-3.5 h-3.5 text-gold" />}
+          {o.channel === "b2b_wholesale" && <Layers className="w-3.5 h-3.5 text-gold" />}
+          <span>{o.channel_label}</span>
+        </span>
+      ),
+    },
+    {
+      key: "buyer_name",
+      header: "Acheteur",
+      cell: (o) => (
+        <div>
+          <div className="font-medium text-foreground">{o.buyer_name}</div>
+          {o.buyer_email && (
+            <div className="text-[11px] text-foreground-muted truncate max-w-[200px]" title={o.buyer_email}>
+              {o.buyer_email}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "items",
+      header: "Ouvrages & Auteurs",
+      className: "min-w-[280px]",
+      cell: (o) => (
+        <div className="space-y-2">
+          {o.items.map((it, idx) => {
+            const coverSrc = it.cover_url || (it.book_id ? `/api/bff/catalog/books/${it.book_id}/cover/` : "");
+            return (
+              <div key={it.id || idx} className="flex items-center gap-3">
+                <div className="w-10 h-14 rounded-md overflow-hidden bg-navy/5 border border-border shrink-0 flex items-center justify-center relative shadow-xs">
+                  {coverSrc ? (
+                    <img
+                      src={coverSrc}
+                      alt={it.book_title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <BookOpen className="w-4 h-4 text-gold/70" />
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-foreground text-xs leading-snug line-clamp-1" title={it.book_title}>
+                    {it.book_title}
+                  </div>
+                  <div className="text-[11px] text-foreground-muted truncate">
+                    {it.author_display && <span>Par {it.author_display}</span>}
+                    {it.publisher_name && (
+                      <span className="ml-1 text-gold font-medium">({it.publisher_name})</span>
+                    )}
+                    {it.institution_name && !it.publisher_name && (
+                      <span className="ml-1 text-gold font-medium">({it.institution_name})</span>
+                    )}
+                  </div>
+                  {it.format && (
+                    <div className="text-[10px] text-foreground-muted/80 mt-0.5">
+                      Format: {it.format === "digital" ? "Numérique" : it.format === "paper" ? "Papier Relié" : it.format === "audio" ? "Audio" : it.format}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Quantité",
+      className: "text-center whitespace-nowrap",
+      cell: (o) => (
+        <span className="font-medium text-foreground">
+          {o.items.reduce((acc, it) => acc + (it.quantity || 1), 0)} ex.
+        </span>
+      ),
+    },
+    {
+      key: "net_amount_paid",
+      header: "Montant Réglé",
+      className: "text-right whitespace-nowrap",
+      cell: (o) => (
+        <span className="font-bold font-serif text-navy">
+          {formatFcfa(o.net_amount_paid)} FCFA
+        </span>
+      ),
+    },
+    {
+      key: "payment_status",
+      header: "Statut",
+      className: "text-center whitespace-nowrap",
+      cell: (o) => (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          {o.payment_status === "paid" ? "Réglé" : o.payment_status}
+        </span>
+      ),
+    },
+  ], []);
+
+  // Rendu mobile-first responsive des cartes de transaction
+  const renderMobileOrderCard = useCallback((o: AdminSaleOrder) => (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2">
+        <div>
+          <div className="font-semibold text-navy text-sm">{o.order_reference}</div>
+          <div className="text-[11px] text-foreground-muted">
+            {o.created_at ? new Date(o.created_at).toLocaleDateString("fr-FR") : "-"}
+          </div>
+        </div>
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          {o.payment_status === "paid" ? "Réglé" : o.payment_status}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between text-xs">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-navy/10 text-navy">
+          {o.channel === "b2c_individual" && <User className="w-3 h-3 text-gold" />}
+          {o.channel === "b2b_university" && <Building2 className="w-3 h-3 text-gold" />}
+          {o.channel === "b2b_wholesale" && <Layers className="w-3 h-3 text-gold" />}
+          <span>{o.channel_label}</span>
+        </span>
+        <span className="text-foreground-muted truncate max-w-[160px]">{o.buyer_name}</span>
+      </div>
+
+      <div className="space-y-2 pt-1">
+        {o.items.map((it, idx) => {
+          const coverSrc = it.cover_url || (it.book_id ? `/api/bff/catalog/books/${it.book_id}/cover/` : "");
+          return (
+            <div key={it.id || idx} className="flex items-center gap-2.5">
+              <div className="w-9 h-12 rounded-md overflow-hidden bg-navy/5 border border-border shrink-0 flex items-center justify-center relative shadow-xs">
+                {coverSrc ? (
+                  <img
+                    src={coverSrc}
+                    alt={it.book_title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <BookOpen className="w-4 h-4 text-gold/70" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-foreground text-xs line-clamp-1">{it.book_title}</div>
+                <div className="text-[10px] text-foreground-muted truncate">
+                  {it.author_display && <span>{it.author_display}</span>}
+                  {it.publisher_name && <span className="ml-1 text-gold">({it.publisher_name})</span>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center justify-between pt-2 border-t border-border/40 text-xs">
+        <span className="text-foreground-muted">
+          {o.items.reduce((acc, it) => acc + (it.quantity || 1), 0)} ex.
+        </span>
+        <span className="font-bold font-serif text-navy text-sm">
+          {formatFcfa(o.net_amount_paid)} FCFA
+        </span>
+      </div>
+    </div>
+  ), []);
 
   // Libellé de période pour les documents
   const getPeriodSummary = () => {
@@ -619,9 +797,9 @@ export default function AdminReportsPage() {
         </div>
       </div>
 
-      {/* ── Table de Prévisualisation Interactive ── */}
-      <div className="rounded-2xl bg-background-secondary border border-border overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      {/* ── Table de Prévisualisation Interactive avec DataTable & Book Covers ── */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-foreground">
               Aperçu des Données Filtrées
@@ -630,156 +808,19 @@ export default function AdminReportsPage() {
               Prévisualisation des transactions exactes avant téléchargement du rapport.
             </p>
           </div>
-
-          <div className="text-xs text-foreground-muted">
-            Page {currentPage} sur {totalPages}
-          </div>
         </div>
 
-        {/* État de chargement */}
-        {isLoading ? (
-          <div className="p-12 text-center space-y-3">
-            <RefreshCw className="w-6 h-6 text-gold animate-spin mx-auto" />
-            <p className="text-xs text-foreground-muted">Extraction et consolidation des ventes en cours...</p>
-          </div>
-        ) : orders.length === 0 ? (
-          /* État vide */
-          <div className="p-12 text-center space-y-3">
-            <BookMarked className="w-8 h-8 text-foreground-muted mx-auto" />
-            <p className="text-sm font-semibold text-foreground">Aucune transaction trouvée</p>
-            <p className="text-xs text-foreground-muted max-w-sm mx-auto">
-              Aucun résultat ne correspond aux filtres de date, titre, auteur ou institution sélectionnés.
-            </p>
-            <button
-              onClick={handleResetFilters}
-              className="mt-2 px-4 py-2 rounded-xl bg-background border border-border text-xs font-semibold text-navy hover:bg-background-secondary transition-colors cursor-pointer min-h-[44px]"
-            >
-              Effacer les filtres
-            </button>
-          </div>
-        ) : (
-          /* Tableau des transactions */
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-background text-foreground-muted font-medium border-b border-border">
-                <tr>
-                  <th className="py-3 px-4">Date & Réf.</th>
-                  <th className="py-3 px-4">Canal</th>
-                  <th className="py-3 px-4">Acheteur</th>
-                  <th className="py-3 px-4">Ouvrages & Auteurs</th>
-                  <th className="py-3 px-4 text-center">Quantité</th>
-                  <th className="py-3 px-4 text-right">Montant Réglé</th>
-                  <th className="py-3 px-4 text-center">Statut</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {paginatedOrders.map((o) => (
-                  <tr key={o.id} className="hover:bg-background/60 transition-colors">
-                    {/* Date & Réf */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="font-semibold text-navy">{o.order_reference}</div>
-                      <div className="text-[11px] text-foreground-muted">
-                        {o.created_at ? new Date(o.created_at).toLocaleDateString("fr-FR") : "-"}
-                      </div>
-                    </td>
-
-                    {/* Canal */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-navy/10 text-navy">
-                        {o.channel === "b2c_individual" && <User className="w-3 h-3 text-gold" />}
-                        {o.channel === "b2b_university" && <Building2 className="w-3 h-3 text-gold" />}
-                        {o.channel === "b2b_wholesale" && <Layers className="w-3 h-3 text-gold" />}
-                        <span>{o.channel_label}</span>
-                      </span>
-                    </td>
-
-                    {/* Acheteur */}
-                    <td className="py-3.5 px-4">
-                      <div className="font-medium text-foreground">{o.buyer_name}</div>
-                      {o.buyer_email && (
-                        <div className="text-[11px] text-foreground-muted truncate max-w-[180px]">
-                          {o.buyer_email}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Ouvrages & Auteurs */}
-                    <td className="py-3.5 px-4 max-w-xs">
-                      {o.items.map((it, idx) => (
-                        <div key={it.id || idx} className="mb-1 last:mb-0">
-                          <div className="font-medium text-foreground truncate" title={it.book_title}>
-                            {it.book_title}
-                          </div>
-                          <div className="text-[11px] text-foreground-muted truncate">
-                            {it.author_display && <span>Par {it.author_display}</span>}
-                            {it.publisher_name && (
-                              <span className="ml-1 text-gold/80">({it.publisher_name})</span>
-                            )}
-                            {it.institution_name && !it.publisher_name && (
-                              <span className="ml-1 text-gold/80">({it.institution_name})</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </td>
-
-                    {/* Quantité */}
-                    <td className="py-3.5 px-4 text-center font-medium text-foreground whitespace-nowrap">
-                      {o.items.reduce((acc, it) => acc + (it.quantity || 1), 0)} ex.
-                    </td>
-
-                    {/* Montant Réglé */}
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <span className="font-bold font-serif text-navy">
-                        {formatFcfa(o.net_amount_paid)} FCFA
-                      </span>
-                    </td>
-
-                    {/* Statut */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {o.payment_status === "paid" ? "Réglé" : o.payment_status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ── Contrôles de pagination ── */}
-        {orders.length > pageSize && (
-          <div className="p-3.5 border-t border-border flex items-center justify-between text-xs bg-background">
-            <span className="text-foreground-muted">
-              Affichage {((currentPage - 1) * pageSize) + 1} à {Math.min(currentPage * pageSize, orders.length)} sur {orders.length} transactions
-            </span>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg bg-background-secondary border border-border text-foreground hover:bg-background disabled:opacity-40 cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
-                title="Page précédente"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-
-              <span className="font-medium text-foreground px-2">
-                {currentPage} / {totalPages}
-              </span>
-
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg bg-background-secondary border border-border text-foreground hover:bg-background disabled:opacity-40 cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
-                title="Page suivante"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
+        <DataTable
+          data={orders}
+          columns={columns}
+          rowKey="id"
+          loading={isLoading}
+          searchable={false}
+          pageSize={10}
+          pageSizeOptions={[10, 20, 50, 100]}
+          emptyMessage="Aucune transaction ne correspond aux filtres sélectionnés."
+          mobileCard={renderMobileOrderCard}
+        />
       </div>
     </div>
   );

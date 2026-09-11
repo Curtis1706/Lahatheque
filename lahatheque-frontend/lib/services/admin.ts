@@ -64,15 +64,31 @@ export async function getRevenueCategoryBreakdown(): Promise<RevenueCategoryBrea
 // GESTION DES UTILISATEURS & ANNUAIRE MULTI-RÔLES
 // =========================================================================
 
-export async function getAdminUsers(roleFilter?: AdminRole | string, search?: string): Promise<AdminUser[]> {
-  let url = '/api/bff/admin/users/?';
+export async function getAdminUsers(
+  roleFilter?: AdminRole | string,
+  search?: string,
+  options?: { page?: number; page_size?: number; all?: boolean }
+): Promise<AdminUser[]> {
+  const query = new URLSearchParams();
   if (roleFilter && roleFilter !== 'all') {
-    url += `role=${roleFilter}&`;
+    query.set('role', roleFilter);
   }
   if (search) {
-    url += `q=${encodeURIComponent(search)}&`;
+    query.set('q', search);
+  }
+  if (options?.page) {
+    query.set('page', String(options.page));
+  }
+  if (options?.page_size) {
+    query.set('page_size', String(options.page_size));
+  }
+  // Par défaut, si aucune pagination n'est explicitement requise, demander l'intégralité des données (all=true) pour éviter le blocage à 20 items
+  if (options?.all || (!options?.page && !options?.page_size)) {
+    query.set('all', 'true');
   }
 
+  const qs = query.toString();
+  const url = `/api/bff/admin/users/${qs ? `?${qs}` : ''}`;
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Erreur annuaire utilisateurs: ${res.status}`);
   const data = await res.json();
@@ -493,7 +509,7 @@ export async function rotatePartnerApiSecret(keyId: string): Promise<{ clientSec
 // =========================================================================
 
 export async function getAdminRoyalties(beneficiaryType?: "author" | "publisher" | "university"): Promise<AdminRoyalty[]> {
-  const res = await fetch('/api/bff/admin/royalties/payouts', { cache: 'no-store' });
+  const res = await fetch('/api/bff/admin/royalties/payouts?all=true', { cache: 'no-store' });
   if (!res.ok) throw new Error(`Erreur versements redevances: ${res.status}`);
   const json = await res.json();
   const rawList = Array.isArray(json.data) ? json.data : (json.data?.results || json.results || []);
@@ -510,11 +526,13 @@ export async function getAdminPayouts(params?: {
   q?: string;
   page?: number;
   page_size?: number;
+  all?: boolean;
 }): Promise<AdminPayoutsListResponse> {
   const query = new URLSearchParams();
   if (params?.status && params.status !== 'all') query.set('status', params.status);
   if (params?.type && params.type !== 'all') query.set('type', params.type);
   if (params?.q) query.set('q', params.q);
+  if (params?.all || !params?.page) query.set('all', 'true');
   if (params?.page) query.set('page', String(params.page));
   if (params?.page_size) query.set('page_size', String(params.page_size));
 
@@ -661,7 +679,7 @@ export async function resendReminder(id: string): Promise<{ success: boolean; me
 // =========================================================================
 
 export async function getAdminLogs(): Promise<AdminAccessLog[]> {
-  const res = await fetch('/api/bff/admin/logs', { cache: 'no-store' });
+  const res = await fetch('/api/bff/admin/logs?all=true', { cache: 'no-store' });
   if (!res.ok) throw new Error(`Erreur journaux d'audit: ${res.status}`);
   const json = await res.json();
   return json.data || json.results || [];
@@ -792,7 +810,7 @@ export interface PartnerReaderSessionItem {
 }
 
 export async function getPartnerReaderSessions(): Promise<PartnerReaderSessionItem[]> {
-  const res = await fetch("/api/bff/partners/sessions", {
+  const res = await fetch("/api/bff/partners/sessions?all=true", {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
@@ -852,7 +870,7 @@ export interface ApiRequestLogItem {
 }
 
 export async function getPartnerApiLogs(): Promise<ApiRequestLogItem[]> {
-  const res = await fetch("/api/bff/partners/logs", {
+  const res = await fetch("/api/bff/partners/logs?all=true", {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
@@ -903,8 +921,9 @@ export async function processAdminValidation(
 // CONTRATS JURIDIQUES & ACCORDS DÉROGATOIRES ADMIN
 // =========================================================================
 
-export async function getAdminContracts(): Promise<AdminContract[]> {
-  const res = await fetch('/api/bff/admin/contracts/', { cache: 'no-store' });
+export async function getAdminContracts(all: boolean = true): Promise<AdminContract[]> {
+  const params = all ? '?all=true' : '';
+  const res = await fetch(`/api/bff/admin/contracts/${params}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Erreur contrats admin: ${res.status}`);
   const json = await res.json();
   return json.data || json.results || [];
@@ -946,8 +965,9 @@ export async function getAdminStockOverview(): Promise<AdminStockOverview> {
   return json.data || json;
 }
 
-export async function getAdminStockMovements(): Promise<AdminStockMovement[]> {
-  const res = await fetch('/api/bff/admin/stock/movements/', { cache: 'no-store' });
+export async function getAdminStockMovements(all: boolean = true): Promise<AdminStockMovement[]> {
+  const params = all ? '?all=true' : '';
+  const res = await fetch(`/api/bff/admin/stock/movements/${params}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Erreur mouvements stock: ${res.status}`);
   const json = await res.json();
   return json.data || json.results || [];

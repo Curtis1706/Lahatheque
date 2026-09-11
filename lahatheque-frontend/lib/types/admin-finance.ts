@@ -12,8 +12,10 @@ export type ItemFormat = 'digital' | 'paper' | 'audio' | 'bouquet';
 
 export interface AdminSaleOrderItem {
   id: string;
+  book_id?: string;
   book_title: string;
   isbn?: string;
+  cover_url?: string;
   author_names?: string[];
   author_display?: string;
   institution_name?: string;

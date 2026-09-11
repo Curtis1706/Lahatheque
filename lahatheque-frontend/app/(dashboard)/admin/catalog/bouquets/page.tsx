@@ -586,7 +586,8 @@ export default function AdminBouquetsPage() {
         rowKey="id"
         loading={loading}
         emptyMessage="Aucun bouquet documentaire ne correspond à vos filtres."
-        pageSize={10}
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
       />
 
       {/* Modal Création / Édition */}

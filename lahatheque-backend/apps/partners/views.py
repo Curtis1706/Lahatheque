@@ -578,7 +578,24 @@ class PartnerSessionSupervisionViewSet(viewsets.ViewSet):
     def list(self, request: Request) -> Response:
         """GET /api/v1/partners/sessions/ - Liste toutes les sessions de lecture."""
         try:
-            sessions = ReaderSession.objects.all().select_related("partner", "end_user", "ouvrage").order_by("-created_at")[:100]
+            is_all = request.query_params.get('all', '').lower() in ['true', '1'] or request.query_params.get('no_page', '').lower() in ['true', '1']
+            limit = request.query_params.get('limit')
+            qs = ReaderSession.objects.all().select_related("partner", "end_user", "ouvrage").order_by("-created_at")
+
+            status_filter = request.query_params.get('status')
+            if status_filter and status_filter != 'all':
+                qs = qs.filter(status=status_filter)
+
+            if is_all or request.query_params.get('page_size') in ['all', '0']:
+                sessions = qs
+            elif limit:
+                try:
+                    sessions = qs[:int(limit)]
+                except (ValueError, TypeError):
+                    sessions = qs
+            else:
+                sessions = qs
+
             results: List[Dict[str, Any]] = []
 
             for s in sessions:
@@ -668,8 +685,27 @@ class PartnerLogAdminViewSet(viewsets.ViewSet):
         try:
             from apps.reader.models import ApiRequestLog, ReaderSession
 
-            logs = list(ApiRequestLog.objects.select_related("partner").order_by("-created_at")[:100])
-            sessions = list(ReaderSession.objects.select_related("partner").order_by("-created_at")[:100])
+            is_all = request.query_params.get('all', '').lower() in ['true', '1'] or request.query_params.get('no_page', '').lower() in ['true', '1']
+            limit = request.query_params.get('limit')
+
+            logs_qs = ApiRequestLog.objects.select_related("partner").order_by("-created_at")
+            sessions_qs = ReaderSession.objects.select_related("partner").order_by("-created_at")
+
+            if is_all or request.query_params.get('page_size') in ['all', '0']:
+                logs = list(logs_qs)
+                sessions = list(sessions_qs)
+            elif limit:
+                try:
+                    lim = int(limit)
+                    logs = list(logs_qs[:lim])
+                    sessions = list(sessions_qs[:lim])
+                except (ValueError, TypeError):
+                    logs = list(logs_qs)
+                    sessions = list(sessions_qs)
+            else:
+                logs = list(logs_qs)
+                sessions = list(sessions_qs)
+
             results: List[Dict[str, Any]] = []
 
             for log in logs:
@@ -791,7 +827,16 @@ class PartnerLogAdminViewSet(viewsets.ViewSet):
                 })
 
             # Journaux de webhooks (déjà réels — inchangés)
-            webhook_logs = WebhookLog.objects.all().select_related("partner").order_by("-delivered_at")[:50]
+            webhook_qs = WebhookLog.objects.all().select_related("partner").order_by("-delivered_at")
+            if is_all or request.query_params.get('page_size') in ['all', '0']:
+                webhook_logs = list(webhook_qs)
+            elif limit:
+                try:
+                    webhook_logs = list(webhook_qs[:int(limit)])
+                except (ValueError, TypeError):
+                    webhook_logs = list(webhook_qs)
+            else:
+                webhook_logs = list(webhook_qs)
             for wlog in webhook_logs:
                 results.append({
                     "id": f"wh-{str(wlog.id)[:8]}",

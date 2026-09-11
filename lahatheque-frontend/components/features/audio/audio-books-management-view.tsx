@@ -71,8 +71,8 @@ export function AudioBooksManagementView({
 
   // Pagination pour la vue en Grille
   const [gridCurrentPage, setGridCurrentPage] = useState(1);
-  const [gridPageSize, setGridPageSize] = useState(6);
-  const gridPageSizeOptions = [6, 9, 12, 24];
+  const [gridPageSize, setGridPageSize] = useState(12);
+  const gridPageSizeOptions = [6, 12, 24, 48];
 
   const fetchBooks = async () => {
     setLoading(true);
@@ -556,8 +556,8 @@ export function AudioBooksManagementView({
           columns={columns}
           rowKey="id"
           searchable={false}
-          pageSize={10}
-          pageSizeOptions={[10, 20, 50]}
+          pageSize={20}
+          pageSizeOptions={[10, 20, 50, 100]}
           showPagination={true}
         />
       ) : (

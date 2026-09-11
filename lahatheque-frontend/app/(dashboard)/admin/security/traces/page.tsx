@@ -31,7 +31,7 @@ export default function AdminTracesAccesPage() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   const loadTraces = async () => {
     setIsLoading(true);
@@ -553,7 +553,7 @@ export default function AdminTracesAccesPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-foreground-muted">Par page :</span>
                   <div className="flex gap-1 bg-background-secondary p-0.5 rounded-lg border border-border">
-                    {[5, 10, 20, 50].map((size) => (
+                    {[10, 20, 50, 100].map((size) => (
                       <button
                         key={size}
                         type="button"

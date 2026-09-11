@@ -5,7 +5,6 @@ import {
   Key, 
   Filter, 
   RotateCcw, 
-  Activity, 
   CheckCircle2, 
   AlertTriangle, 
   Clock, 
@@ -13,8 +12,7 @@ import {
   Eye, 
   X, 
   Copy, 
-  Check,
-  Search
+  Check
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { getPartnerApiLogs, ApiRequestLogItem } from "@/lib/services/admin";
@@ -302,10 +300,17 @@ export default function AdminApiLogsPage() {
       {/* Header */}
       <div className="pb-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy flex items-center gap-2">
-            <Key className="w-5 h-5 text-gold" />
-            Logs d&apos;Appels API Partenaires
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-bold font-serif text-navy flex items-center gap-2">
+              <Key className="w-5 h-5 text-gold" />
+              Logs d&apos;Appels API Partenaires
+            </h1>
+            {!loading && (
+              <span className="text-xs font-mono font-medium px-2.5 py-0.5 rounded-full bg-navy/5 text-navy border border-border">
+                {filteredLogs.length} requête{filteredLogs.length > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
           <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">
             Historique et surveillance des requêtes effectuées par les partenaires via l&apos;API REST.
           </p>
@@ -468,6 +473,8 @@ export default function AdminApiLogsPage() {
         loading={loading}
         searchPlaceholder="Recherche libre par IP, payload, mot-clé..."
         emptyMessage="Aucun appel API ne correspond aux filtres sélectionnés."
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
       />
 
       {/* Modal Détail Requête */}
