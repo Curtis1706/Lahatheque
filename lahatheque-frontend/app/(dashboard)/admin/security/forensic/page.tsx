@@ -91,6 +91,8 @@ export default function AdminForensicPage() {
     }
   };
 
+  const [analysisStep, setAnalysisStep] = useState<string>("");
+
   const handleStartAnalysis = async () => {
     if (!selectedFile) {
       toast.error("Veuillez sélectionner un fichier PDF ou une image suspecte.");
@@ -98,8 +100,22 @@ export default function AdminForensicPage() {
     }
 
     setIsAnalyzing(true);
+    setAnalysisStep("Transmission du fichier sécurisé vers le serveur backend...");
+    const timer1 = setTimeout(() => {
+      setAnalysisStep("Traitement de l'image & extraction OCR Tesseract en cours...");
+    }, 1500);
+    const timer2 = setTimeout(() => {
+      setAnalysisStep("Analyse approfondie par vision et décodage de filigrane...");
+    }, 5000);
+    const timer3 = setTimeout(() => {
+      setAnalysisStep("Corrélation croisée avec la base des comptes et traces de lecture...");
+    }, 14000);
+
     try {
       const res = await analyzeForensicEvidence(selectedFile, notes);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
       setAnalysisResult(res);
       if (res.status === "identified") {
         toast.success("Analyse terminée : Lecteur source formellement identifié.");
@@ -110,9 +126,13 @@ export default function AdminForensicPage() {
       }
       loadHistory();
     } catch (err: any) {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
       toast.error(err.message || "Échec de l'analyse forensique.");
     } finally {
       setIsAnalyzing(false);
+      setAnalysisStep("");
     }
   };
 
@@ -303,8 +323,8 @@ export default function AdminForensicPage() {
               />
             </div>
 
-            {/* Bouton d'action principal */}
-            <div className="pt-2">
+            {/* Bouton d'action principal et statut temps réel */}
+            <div className="pt-2 flex flex-col items-center gap-3">
               <button
                 type="button"
                 onClick={handleStartAnalysis}
@@ -323,6 +343,15 @@ export default function AdminForensicPage() {
                   </>
                 )}
               </button>
+
+              {isAnalyzing && analysisStep && (
+                <div className="w-full max-w-md p-2.5 rounded-lg bg-navy/5 border border-gold/30 text-center animate-in fade-in duration-300">
+                  <p className="text-xs font-medium text-navy flex items-center justify-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-gold animate-ping inline-block" />
+                    <span>{analysisStep}</span>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
