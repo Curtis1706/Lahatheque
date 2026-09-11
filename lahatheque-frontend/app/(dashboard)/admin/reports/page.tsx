@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Combobox, ComboboxOption } from "@/components/ui/combobox";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
+import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 import { getAdminConsolidatedSales } from "@/lib/services/admin";
 import { generateOfficialPdf, generateCsvExport } from "@/lib/services/export-service";
 import type {
@@ -175,9 +176,9 @@ export default function AdminReportsPage() {
 
   const channelOptions: ComboboxOption[] = useMemo(() => [
     { value: "all", label: "Tous les canaux de vente", icon: Layers },
-    { value: "b2c_individual", label: "Vente Unitaire Lecteur (B2C)", icon: User },
-    { value: "b2b_university", label: "Commande Campus B2B (Universités)", icon: Building2 },
-    { value: "b2b_wholesale", label: "Commande Grossiste B2B", icon: Layers },
+    { value: "b2c_individual", label: "Vente Client/Lecteur", icon: User },
+    { value: "b2b_university", label: "Commande Campus (Universités)", icon: Building2 },
+    { value: "b2b_wholesale", label: "Commande Grossiste", icon: Layers },
   ], []);
 
   // Options d'auteurs issues des données réelles
@@ -275,13 +276,20 @@ export default function AdminReportsPage() {
                   <div className="font-medium text-foreground text-xs leading-snug line-clamp-1" title={it.book_title}>
                     {it.book_title}
                   </div>
-                  <div className="text-[11px] text-foreground-muted truncate">
-                    {it.author_display && <span>Par {it.author_display}</span>}
+                  <div className="text-[11px] text-foreground-muted flex items-center flex-wrap gap-1 mt-0.5">
+                    <span>Par</span>
+                    <AuthorsDisplay
+                      authors={it.author_names && it.author_names.length > 0 ? it.author_names : it.author_display}
+                      fallbackName={it.author_display}
+                      bookTitle={it.book_title}
+                      maxVisible={2}
+                      className="text-foreground-muted font-medium"
+                    />
                     {it.publisher_name && (
-                      <span className="ml-1 text-gold font-medium">({it.publisher_name})</span>
+                      <span className="text-gold font-medium">({it.publisher_name})</span>
                     )}
                     {it.institution_name && !it.publisher_name && (
-                      <span className="ml-1 text-gold font-medium">({it.institution_name})</span>
+                      <span className="text-gold font-medium">({it.institution_name})</span>
                     )}
                   </div>
                   {it.format && (
@@ -374,9 +382,16 @@ export default function AdminReportsPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="font-medium text-foreground text-xs line-clamp-1">{it.book_title}</div>
-                <div className="text-[10px] text-foreground-muted truncate">
-                  {it.author_display && <span>{it.author_display}</span>}
-                  {it.publisher_name && <span className="ml-1 text-gold">({it.publisher_name})</span>}
+                <div className="text-[10px] text-foreground-muted flex items-center flex-wrap gap-1 mt-0.5">
+                  <span>Par</span>
+                  <AuthorsDisplay
+                    authors={it.author_names && it.author_names.length > 0 ? it.author_names : it.author_display}
+                    fallbackName={it.author_display}
+                    bookTitle={it.book_title}
+                    maxVisible={1}
+                    className="text-foreground-muted font-medium"
+                  />
+                  {it.publisher_name && <span className="text-gold">({it.publisher_name})</span>}
                 </div>
               </div>
             </div>
