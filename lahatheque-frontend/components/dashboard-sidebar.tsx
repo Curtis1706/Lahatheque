@@ -295,7 +295,7 @@ export function DashboardSidebar() {
       case "super_admin":
         return [
           {
-            groupLabel: "Administration",
+            groupLabel: "Pilotage & Relations",
             items: [
               { label: "Vue d'ensemble", href: "/admin", icon: <LayoutDashboard className="size-4" /> },
               {
@@ -317,6 +317,20 @@ export function DashboardSidebar() {
               },
               { label: "Nos Contacts", href: "/admin/contacts", icon: <Users className="size-4" /> },
               {
+                label: "Guides & Assistance",
+                href: "/admin/guides",
+                icon: <HelpCircle className="size-4" />,
+                sublinks: [
+                  { label: "Guides d'utilisation", href: "/admin/guide", icon: <BookOpen className="size-3.5" /> },
+                  { label: "Gestion des guides", href: "/admin/guides", icon: <Edit2 className="size-3.5" /> },
+                ],
+              },
+            ],
+          },
+          {
+            groupLabel: "Catalogue & Édition",
+            items: [
+              {
                 label: "Catalogue & Tarifs",
                 href: "/admin/catalog",
                 icon: <BookOpen className="size-4" />,
@@ -331,57 +345,32 @@ export function DashboardSidebar() {
               },
               { label: "Validation BAT & Maquettes", href: "/admin/validation", icon: <FileCheck2 className="size-4" /> },
               { label: "Gestion Livres Audio", href: "/admin/audio", icon: <Headphones className="size-4" /> },
-              { label: "Manuscrits Reçus (Public)", href: "/admin/manuscript-leads", icon: <Mail className="size-4" /> },
-              { label: "Manuscrits à Préparer", href: "/admin/manuscript-submissions", icon: <FileCheck className="size-4" /> },
               { label: "Dépôts Éditeurs Tiers", href: "/admin/publisher-deposits", icon: <BookOpen className="size-4" /> },
               {
-                label: "Gestion des Finances",
-                href: "/admin/finance",
-                icon: <Wallet className="size-4" />,
+                label: "Manuscrits Reçus",
+                href: "/admin/manuscript-leads",
+                icon: <Mail className="size-4" />,
                 sublinks: [
-                  { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="size-3.5" /> },
-                  { label: "Finances Globales", href: "/admin/finance", icon: <Landmark className="size-3.5" /> },
-                  { label: "Redevances", href: "/admin/royalties", icon: <DollarSign className="size-3.5" /> },
-                  { label: "Demandes de Versement", href: "/admin/payouts", icon: <CreditCard className="size-3.5" /> },
+                  { label: "Dépôts Publics (Leads)", href: "/admin/manuscript-leads", icon: <Mail className="size-3.5" /> },
+                  { label: "Manuscrits à Préparer", href: "/admin/manuscript-submissions", icon: <FileCheck className="size-3.5" /> },
                 ],
               },
-              { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="size-4" /> },
-              { label: "Reporting & Exports", href: "/admin/reports", icon: <FileSpreadsheet className="size-4" /> },
-              { label: "Clés API & Partenaires", href: "/admin/api", icon: <Key className="size-4" /> },
-              {
-                label: "Traçabilité & Logs",
-                href: "/admin/logs",
-                icon: <Activity className="size-4" />,
-                sublinks: [
-                  { label: "Traces d'Accès DRM", href: "/admin/security/traces", icon: <ShieldCheck className="size-3.5" /> },
-                  { label: "Logs d'Audit Système", href: "/admin/logs", icon: <Activity className="size-3.5" /> },
-                  { label: "Logs d'Appels API", href: "/admin/api/logs", icon: <Key className="size-3.5" /> },
-                ],
-              },
-              {
-                label: "Paramètres Globaux",
-                href: "/admin/settings",
-                icon: <Settings className="size-4" />,
-                sublinks: [
-                  { label: "Général & Plateforme", href: "/admin/settings", icon: <Settings className="size-3.5" /> },
-                  { label: "Sécurité DRM & Filigrane", href: "/admin/settings/drm", icon: <ShieldCheck className="size-3.5" /> },
-                ],
-              },
-              {
-                label: "Guides & Assistance",
-                href: "/admin/guides",
-                icon: <HelpCircle className="size-4" />,
-                sublinks: [
-                  { label: "Guides d'utilisation", href: "/admin/guide", icon: <BookOpen className="size-3.5" /> },
-                  { label: "Gestion des guides", href: "/admin/guides", icon: <Edit2 className="size-3.5" /> },
-                ],
-              },
+              { label: "Publication en Attente", href: "/legal-reviewer/publication-en-attente", icon: <BookOpenCheck className="size-4" /> },
             ],
           },
           {
-            groupLabel: "Gestion Opérationnelle & Logistique",
+            groupLabel: "Gestion des Finances",
             items: [
-              { label: "Vue d'ensemble Gestionnaire", href: "/manager", icon: <Warehouse className="size-4" /> },
+              { label: "Vue Finances Globales", href: "/admin/finance", icon: <Landmark className="size-4" /> },
+              { label: "Ventes & Revenus", href: "/admin/sales", icon: <ShoppingBag className="size-4" /> },
+              { label: "Redevances & Droits", href: "/admin/royalties", icon: <DollarSign className="size-4" /> },
+              { label: "Demandes de Versement", href: "/admin/payouts", icon: <CreditCard className="size-4" /> },
+              { label: "Relances & Alertes", href: "/admin/reminders", icon: <BellRing className="size-4" /> },
+            ],
+          },
+          {
+            groupLabel: "Logistique & Commandes",
+            items: [
               {
                 label: "Gestion des Commandes",
                 href: "/admin/orders",
@@ -406,16 +395,13 @@ export function DashboardSidebar() {
                 ],
               },
               { label: "Coordination des Ruptures", href: "/manager/coordination", icon: <ArrowUpCircle className="size-4" /> },
-              { label: "Finances & Flux Logistique", href: "/manager/finance", icon: <Wallet className="size-4" /> },
-              { label: "Rapports & Exports Logistique", href: "/manager/reports", icon: <FileBarChart className="size-4" /> },
             ],
           },
           {
-            groupLabel: "Affaires Juridiques & Contrats",
+            groupLabel: "Juridique, Sécurité & Système",
             items: [
-              { label: "Publication en Attente", href: "/legal-reviewer/publication-en-attente", icon: <BookOpenCheck className="size-4" /> },
               {
-                label: "Contrats Légaux",
+                label: "Contrats Légaux & GED",
                 href: "/legal-reviewer/contracts",
                 icon: <ShieldCheck className="size-4" />,
                 sublinks: [
@@ -424,7 +410,6 @@ export function DashboardSidebar() {
                   { label: "Arbitrage Dérogatoire", href: "/admin/contracts", icon: <Scale className="size-3.5" /> },
                 ],
               },
-              { label: "Droits d'Auteur", href: "/legal-reviewer/royalties", icon: <Percent className="size-4" /> },
               {
                 label: "Pré-éditions",
                 href: "/legal-reviewer/pre-editions",
@@ -434,9 +419,27 @@ export function DashboardSidebar() {
                   { label: "Nouveau Dossier", href: "/legal-reviewer/pre-editions", icon: <PlusCircle className="size-3.5" /> },
                 ],
               },
-              { label: "Redevances Partenaires", href: "/legal-reviewer/redevances", icon: <DollarSign className="size-4" /> },
-              { label: "Relances & Impayés", href: "/legal-reviewer/relances", icon: <BellRing className="size-4" /> },
-              { label: "Validation Livres Audio", href: "/legal-reviewer/audio", icon: <Headphones className="size-4" /> },
+              {
+                label: "Traçabilité & Logs",
+                href: "/admin/logs",
+                icon: <Activity className="size-4" />,
+                sublinks: [
+                  { label: "Traces d'Accès DRM", href: "/admin/security/traces", icon: <ShieldCheck className="size-3.5" /> },
+                  { label: "Logs d'Audit Système", href: "/admin/logs", icon: <Activity className="size-3.5" /> },
+                  { label: "Logs d'Appels API", href: "/admin/api/logs", icon: <Key className="size-3.5" /> },
+                ],
+              },
+              { label: "Clés API & Partenaires", href: "/admin/api", icon: <Key className="size-4" /> },
+              {
+                label: "Paramètres Globaux",
+                href: "/admin/settings",
+                icon: <Settings className="size-4" />,
+                sublinks: [
+                  { label: "Général & Plateforme", href: "/admin/settings", icon: <Settings className="size-3.5" /> },
+                  { label: "Sécurité DRM & Filigrane", href: "/admin/settings/drm", icon: <ShieldCheck className="size-3.5" /> },
+                ],
+              },
+              { label: "Reporting & Exports", href: "/admin/reports", icon: <FileSpreadsheet className="size-4" /> },
             ],
           },
         ];

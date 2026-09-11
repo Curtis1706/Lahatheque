@@ -535,7 +535,7 @@ export default function DepositDetailPage() {
               <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
                 isEditing ? "bg-gold/15 text-gold border border-gold/30" : "bg-navy/10 text-navy border border-navy/20"
               }`}>
-                {isEditing ? "Mode Édition / Correction" : "Mode Consultation (Lecture seule)"}
+                {isEditing ? "Mode Édition / Correction" : "Mode Consultation"}
               </span>
             </div>
             <h1 className="font-serif text-xl sm:text-2xl font-bold text-navy">{deposit.metadata.title}</h1>

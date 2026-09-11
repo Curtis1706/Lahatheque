@@ -177,7 +177,7 @@ export default function PublisherBookDetailPage() {
                 </p>
               </div>
 
-              {/* Taux contractuel en lecture seule */}
+              {/* Taux contractuel en lecture seule 
               <div className="sm:col-span-2 p-3.5 rounded-2xl bg-navy/5 border border-navy/20 flex items-center justify-between">
                 <div>
                   <span className="font-bold text-navy block text-xs">Taux de Redevance Contractuel Convenu</span>
@@ -186,7 +186,7 @@ export default function PublisherBookDetailPage() {
                 <span className="font-mono font-bold text-gold text-sm px-3 py-1 bg-background rounded-xl border border-border">
                   {book.contractual_royalty_rate}%
                 </span>
-              </div>
+              </div>*/}
             </div>
           </div>
         </div>
