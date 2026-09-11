@@ -431,6 +431,17 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
         def_num = float(config.prix_defaut_numerique_xof) if config else 3000.0
         def_pap = float(config.prix_defaut_papier_xof) if config else 5000.0
 
+        # Optimisation majeure : pré-calcul agrégé du stock physique en UNE SEULE requête SQL
+        # au lieu de 3 200+ requêtes SQL individuelles par ouvrage (évite les timeouts 504)
+        from apps.commerce.models import StockOuvrage
+        from django.db.models import Sum, F
+        stock_data = (
+            StockOuvrage.objects
+            .values('ouvrage_id')
+            .annotate(total=Sum(F('quantite_reelle') - F('quantite_reservee')))
+        )
+        stock_map = {item['ouvrage_id']: max(0, item['total'] or 0) for item in stock_data}
+
         books = (
             Ouvrage.objects
             .select_related('publisher', 'discipline', 'institution')
@@ -465,6 +476,9 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             audio_tracks_list = list(b.audio_tracks.all()) if hasattr(b, 'audio_tracks') else []
             has_audio = bool(getattr(b, "has_audio_version", False) or len(audio_tracks_list) > 0)
 
+            real_stock = stock_map.get(b.id, 0)
+            is_paper_avail = bool(b.is_paper_available and real_stock > 0)
+
             results.append({
                 "id": str(b.id),
                 "isbn": b.isbn or "",
@@ -473,8 +487,8 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "summary": b.summary or "",
                 "publication_year": b.publication_date.year if b.publication_date else (b.created_at.year if b.created_at else 2026),
                 "page_count": b.page_count or 0,
-                "is_paper_available": is_really_available_paper(b),
-                "paper_stock": get_real_paper_stock(b.id),
+                "is_paper_available": is_paper_avail,
+                "paper_stock": real_stock,
                 "protection_type": b.protection_type or 'lcp',
                 "format_type": b.format_type or 'pdf',
                 "file_url": b.file.url if b.file else "",
@@ -507,8 +521,8 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                         "r2_key_pdf": lv.r2_key_pdf or "",
                         "r2_key_epub": lv.r2_key_epub or "",
                         "cover_url": lv.cover_url or "",
-                        "is_paper_available": is_really_available_paper(b),
-                        "paper_stock": get_real_paper_stock(b.id),
+                        "is_paper_available": bool(lv.is_paper_available and real_stock > 0) if lv.is_paper_available is not None else is_paper_avail,
+                        "paper_stock": lv.paper_stock if lv.paper_stock else real_stock,
                         "translation_status": lv.translation_status or 'ready',
                     }
                     for lv in lang_versions
@@ -884,6 +898,9 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                         "was_archived": was_archived,
                     }
                 )
+
+            from apps.catalog.views import invalidate_catalog_cache
+            invalidate_catalog_cache()
 
             if was_archived:
                 message = f"L'ouvrage '{book_title}' est lié à des droits ou transactions protégées. Il a été retiré de la publication (archivé) et n'apparaît plus sur le catalogue ni sur la vitrine."

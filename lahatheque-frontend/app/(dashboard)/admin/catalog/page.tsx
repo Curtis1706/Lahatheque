@@ -18,6 +18,8 @@ import {
   PlusCircle,
   Headphones,
   Languages, 
+  RotateCcw,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -53,21 +55,27 @@ export default function AdminCatalogPage() {
   const [gridLanguage, setGridLanguage] = useState<string>("all");
   const [gridSearch, setGridSearch] = useState<string>("");
 
-  // State pour la suppression
+  // State pour la suppression et l'erreur de chargement
   const [deleteConfirmBook, setDeleteConfirmBook] = useState<AdminCatalogBook | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadCatalog = async () => {
+    try {
+      setLoading(true);
+      setLoadError(null);
+      const data = await getAdminCatalog();
+      setBooks(data);
+    } catch (err: any) {
+      console.error("Erreur chargement catalogue admin", err);
+      const msg = err?.message || "Impossible de charger les ouvrages.";
+      setLoadError(msg);
+      toast.error("Erreur lors du chargement du catalogue. Veuillez réessayer.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadCatalog() {
-      try {
-        setLoading(true);
-        const data = await getAdminCatalog();
-        setBooks(data);
-      } catch (err) {
-        console.error("Erreur chargement catalogue admin", err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadCatalog();
   }, []);
 
@@ -313,6 +321,29 @@ export default function AdminCatalogPage() {
           onChange={setSelectedFormat}
         />
       </div>
+
+      {/* État d'erreur si le chargement a échoué */}
+      {loadError && books.length === 0 && !loading && (
+        <div className="p-6 rounded-2xl bg-background border border-error/30 text-center space-y-3">
+          <div className="w-10 h-10 rounded-full bg-error/10 text-error mx-auto flex items-center justify-center">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-navy">Échec du chargement du catalogue</h3>
+            <p className="text-xs text-foreground-muted max-w-md mx-auto">
+              Une erreur est survenue lors de la récupération des ouvrages ({loadError}). Le serveur a peut-être pris plus de temps que prévu.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadCatalog}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-gold" />
+            <span>Réessayer</span>
+          </button>
+        </div>
+      )}
 
       {/* Mode de vue conditionnel (Grille / Liste) */}
       {viewMode === "grid" ? (

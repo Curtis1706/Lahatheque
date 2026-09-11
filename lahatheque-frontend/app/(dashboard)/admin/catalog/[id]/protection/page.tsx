@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck, BookOpen } from "lucide-react";
 import { ProtectionConfigCard } from "@/components/features/publisher/protection-config-card";
-import { getAdminCatalog } from "@/lib/services/admin";
+import { getAdminCatalogBook } from "@/lib/services/admin";
 import { getBookProtectionConfig, saveBookProtectionConfig } from "@/lib/services/protection";
 import type { AdminCatalogBook } from "@/lib/types/admin";
 import type { ProtectionConfig } from "@/lib/types/publisher";
@@ -22,12 +22,11 @@ export default function AdminBookProtectionPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const [books, config] = await Promise.all([
-          getAdminCatalog(),
+        const [bookData, config] = await Promise.all([
+          getAdminCatalogBook(bookId),
           getBookProtectionConfig(bookId),
         ]);
-        const found = books.find((b) => b.id === bookId) || null;
-        setBook(found);
+        setBook(bookData);
         setProtectionConfig(config);
       } catch (err) {
         console.error("Erreur chargement données de protection ouvrage:", err);

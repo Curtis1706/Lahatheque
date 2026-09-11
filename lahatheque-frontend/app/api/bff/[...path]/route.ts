@@ -101,11 +101,12 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
 
   try {
     let backendRes: Response | null = null
-    // Timeout étendu pour les uploads multipart et les analyses forensiques (OCR + IA)
+    // Timeout étendu pour les uploads multipart, les analyses forensiques (OCR + IA) et le catalogue volumineux
     const isForensicRoute = cleanSubPath.includes('forensic/')
+    const isCatalogPricingRoute = cleanSubPath.includes('catalog/pricing') || cleanSubPath.includes('admin/catalog')
     const timeoutMs = (contentType && contentType.includes('multipart/form-data'))
       ? 300000 
-      : (isForensicRoute ? 180000 : 30000)
+      : (isForensicRoute ? 180000 : (isCatalogPricingRoute ? 90000 : 30000))
     const fetchController = new AbortController()
     const timeoutHandle = setTimeout(() => fetchController.abort(), timeoutMs)
 

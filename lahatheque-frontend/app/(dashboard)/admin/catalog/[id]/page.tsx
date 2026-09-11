@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, BookOpen, Shield, Tag, Eye, ShoppingBag, Download, Headphones, Pencil, Languages } from "lucide-react";
-import { getAdminCatalog } from "@/lib/services/admin";
+import { getAdminCatalogBook } from "@/lib/services/admin";
 import { AdminCatalogBook } from "@/lib/types/admin";
 import { StatusBadge } from "@/components/ui/status-badge";
 
@@ -15,8 +15,7 @@ export default function AdminBookDetailPage() {
 
   useEffect(() => {
     async function loadBook() {
-      const books = await getAdminCatalog();
-      const found = books.find((b) => b.id === bookId) || books[0];
+      const found = await getAdminCatalogBook(bookId);
       setBook(found);
     }
     loadBook();
