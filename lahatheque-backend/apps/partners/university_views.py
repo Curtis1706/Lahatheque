@@ -299,7 +299,11 @@ class UniversityBouquetDistributionView(APIView):
 
         target = offering if offering else sub
         from apps.reporting.admin_views import compute_bouquet_distribution_payload
-        data = compute_bouquet_distribution_payload(target, requesting_institution_id=str(inst.id) if inst else None)
+        data = compute_bouquet_distribution_payload(
+            target,
+            requesting_institution_id=str(inst.id) if inst else None,
+            anonymize_others=True,
+        )
         return Response({"success": True, "data": data, "error": None})
 
 

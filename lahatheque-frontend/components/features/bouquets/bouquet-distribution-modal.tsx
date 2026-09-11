@@ -11,9 +11,7 @@ import {
 } from "@/lib/services/bouquet-distribution";
 import { AlertCircle } from "lucide-react";
 
-interface BouquetDistributionModalProps {
-  open: boolean;
-  onClose: () => void;
+export interface BouquetDistributionContentProps {
   bouquet: {
     id: string;
     title: string;
@@ -30,22 +28,22 @@ interface BouquetDistributionModalProps {
   highlightUniversityId?: string;
   highlightUniversityName?: string;
   royaltyRate?: number;
+  onClose?: () => void;
 }
 
-export function BouquetDistributionModal({
-  open,
-  onClose,
+export function BouquetDistributionContent({
   bouquet,
   highlightUniversityId,
   highlightUniversityName,
   royaltyRate,
-}: BouquetDistributionModalProps) {
+  onClose,
+}: BouquetDistributionContentProps) {
   const [data, setData] = useState<BouquetDistributionResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || !bouquet) {
+    if (!bouquet) {
       setData(null);
       setError(null);
       return;
@@ -91,8 +89,68 @@ export function BouquetDistributionModal({
     return () => {
       isMounted = false;
     };
-  }, [open, bouquet, royaltyRate, highlightUniversityId]);
+  }, [bouquet, royaltyRate, highlightUniversityId]);
 
+  if (!bouquet) return null;
+
+  return (
+    <div className="space-y-4">
+      {loading ? (
+        <div className="py-16">
+          <PageLoader label="Calcul de la répartition et chargement des consultations" />
+        </div>
+      ) : error ? (
+        <div className="p-8 text-center space-y-3 bg-background-secondary rounded-2xl border border-border">
+          <AlertCircle className="w-8 h-8 text-gold mx-auto" />
+          <p className="text-sm font-semibold text-navy">{error}</p>
+          <p className="text-xs text-foreground-muted">
+            Veuillez vérifier votre connexion ou réessayer ultérieurement.
+          </p>
+        </div>
+      ) : data ? (
+        <BouquetPieDistribution
+          distribution={data}
+          highlightUniversityId={highlightUniversityId}
+          highlightUniversityName={highlightUniversityName}
+          showTitle={false}
+        />
+      ) : (
+        <div className="p-8 text-center space-y-2 bg-background-secondary rounded-2xl border border-border">
+          <p className="text-sm font-semibold text-navy">Aucune donnée de consultation disponible</p>
+          <p className="text-xs text-foreground-muted">
+            Ce bouquet ne comporte pas encore d&apos;activité d&apos;audience enregistrée.
+          </p>
+        </div>
+      )}
+
+      {onClose && (
+        <div className="flex justify-end pt-3 border-t border-border">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors cursor-pointer"
+          >
+            Fermer l&apos;analyse
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export interface BouquetDistributionModalProps extends BouquetDistributionContentProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export function BouquetDistributionModal({
+  open,
+  onClose,
+  bouquet,
+  highlightUniversityId,
+  highlightUniversityName,
+  royaltyRate,
+}: BouquetDistributionModalProps) {
   if (!open || !bouquet) return null;
 
   return (
@@ -104,43 +162,13 @@ export function BouquetDistributionModal({
       maxHeight="min(90vh, 850px)"
     >
       <div className="p-4 sm:p-6 max-h-[85vh] overflow-y-auto space-y-4">
-        {loading ? (
-          <div className="py-16">
-            <PageLoader label="Calcul de la répartition et chargement des consultations" />
-          </div>
-        ) : error ? (
-          <div className="p-8 text-center space-y-3 bg-background-secondary rounded-2xl border border-border">
-            <AlertCircle className="w-8 h-8 text-gold mx-auto" />
-            <p className="text-sm font-semibold text-navy">{error}</p>
-            <p className="text-xs text-foreground-muted">
-              Veuillez vérifier votre connexion ou réessayer ultérieurement.
-            </p>
-          </div>
-        ) : data ? (
-          <BouquetPieDistribution
-            distribution={data}
-            highlightUniversityId={highlightUniversityId}
-            highlightUniversityName={highlightUniversityName}
-            showTitle={false}
-          />
-        ) : (
-          <div className="p-8 text-center space-y-2 bg-background-secondary rounded-2xl border border-border">
-            <p className="text-sm font-semibold text-navy">Aucune donnée de consultation disponible</p>
-            <p className="text-xs text-foreground-muted">
-              Ce bouquet ne comporte pas encore d&apos;activité d&apos;audience enregistrée.
-            </p>
-          </div>
-        )}
-
-        <div className="flex justify-end pt-3 border-t border-border">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy-hover transition-colors cursor-pointer"
-          >
-            Fermer l&apos;analyse
-          </button>
-        </div>
+        <BouquetDistributionContent
+          bouquet={bouquet}
+          highlightUniversityId={highlightUniversityId}
+          highlightUniversityName={highlightUniversityName}
+          royaltyRate={royaltyRate}
+          onClose={onClose}
+        />
       </div>
     </Modal>
   );

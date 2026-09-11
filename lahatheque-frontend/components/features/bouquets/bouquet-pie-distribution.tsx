@@ -252,7 +252,9 @@ export function BouquetPieDistribution({
                         className="text-[9px] font-normal"
                         fill="#6B7280"
                       >
-                        {slice.item.consultations_count.toLocaleString("fr-FR")} consult. ({slice.item.usage_share_percent}%)
+                        {slice.item.consultations_count != null && slice.item.consultations_count > 0
+                          ? `${slice.item.consultations_count.toLocaleString("fr-FR")} consult. (${slice.item.usage_share_percent}%)`
+                          : `${slice.item.usage_share_percent}%`}
                       </tspan>
                     </text>
                   </g>
@@ -328,7 +330,7 @@ export function BouquetPieDistribution({
                         style={{ backgroundColor: item.color }}
                       />
                       <span className="font-bold text-navy truncate">
-                        {item.short_name}
+                        {item.institution_id === "others" ? item.institution_name : item.short_name}
                       </span>
                       {isItemHighlighted && (
                         <span className="text-[9px] px-1.5 py-0.2 rounded bg-gold text-navy font-bold uppercase">

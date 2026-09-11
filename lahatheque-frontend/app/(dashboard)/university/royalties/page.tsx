@@ -21,7 +21,7 @@ import {
   FileText,
   PieChart,
 } from "lucide-react";
-import { BouquetDistributionModal } from "@/components/features/bouquets/bouquet-distribution-modal";
+import { BouquetDistributionContent } from "@/components/features/bouquets/bouquet-distribution-modal";
 import { UniversityRoyaltyCard } from "@/components/features/university/university-royalty-card";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -706,11 +706,19 @@ export default function UniversityRoyaltiesPage() {
                           </span>
                           <button
                             type="button"
-                            onClick={() => setSelectedBouquetForDistribution(bouquet)}
+                            onClick={() => {
+                              setSelectedBouquetForDistribution(
+                                selectedBouquetForDistribution?.bouquet_id === bouquet.bouquet_id ? null : bouquet
+                              );
+                            }}
                             className="px-3 py-1.5 rounded-full bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs min-h-[34px]"
                           >
                             <PieChart className="w-3.5 h-3.5 text-gold" />
-                            <span>Répartition &amp; Redevances</span>
+                            <span>
+                              {selectedBouquetForDistribution?.bouquet_id === bouquet.bouquet_id
+                                ? "Masquer l'analyse"
+                                : "Répartition & Redevances"}
+                            </span>
                           </button>
                         </div>
                       </div>
@@ -782,24 +790,41 @@ export default function UniversityRoyaltiesPage() {
         )}
       </div>
 
-      {/* Modale Répartition Multi-Universités & Statistiques */}
-      <BouquetDistributionModal
-        open={!!selectedBouquetForDistribution}
-        onClose={() => setSelectedBouquetForDistribution(null)}
-        bouquet={
-          selectedBouquetForDistribution
-            ? {
-                id: selectedBouquetForDistribution.bouquet_id,
-                title: selectedBouquetForDistribution.bouquet_title,
-                annual_price: selectedBouquetForDistribution.bouquet_revenue_allocated,
-                currency: selectedBouquetForDistribution.currency,
-              }
-            : null
-        }
-        highlightUniversityId={data.institution?.id}
-        highlightUniversityName={data.institution?.name || "Votre Établissement"}
-        royaltyRate={data.contractual_rate}
-      />
+      {/* Affichage direct de la Répartition Multi-Universités Anonymisée */}
+      {selectedBouquetForDistribution && (
+        <div className="p-4 sm:p-6 rounded-3xl bg-background border border-border shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div>
+              <span className="text-[10px] font-bold text-gold uppercase tracking-wider block">
+                Analyse &amp; Répartition du Bouquet
+              </span>
+              <h3 className="font-serif text-lg font-bold text-navy">
+                {selectedBouquetForDistribution.bouquet_title}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedBouquetForDistribution(null)}
+              className="px-3 py-1.5 rounded-xl border border-border bg-background-secondary text-xs font-semibold text-navy hover:bg-background transition-colors cursor-pointer"
+            >
+              Fermer l&apos;analyse
+            </button>
+          </div>
+
+          <BouquetDistributionContent
+            bouquet={{
+              id: selectedBouquetForDistribution.bouquet_id,
+              title: selectedBouquetForDistribution.bouquet_title,
+              annual_price: selectedBouquetForDistribution.bouquet_revenue_allocated,
+              currency: selectedBouquetForDistribution.currency,
+            }}
+            highlightUniversityId={data.institution?.id}
+            highlightUniversityName={data.institution?.name || "Votre Établissement"}
+            royaltyRate={data.contractual_rate}
+            onClose={() => setSelectedBouquetForDistribution(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }

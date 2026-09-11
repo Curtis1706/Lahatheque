@@ -3740,7 +3740,7 @@ class AdminBouquetOfferingDetailView(APIView):
         return Response({"success": True, "message": "Bouquet désactivé."})
 
 
-def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution_id=None):
+def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution_id=None, anonymize_others=False):
     """
     Moteur central de calcul de répartition multi-universités (CDC Section 11 & 12).
     Calcule dynamiquement :
@@ -3848,6 +3848,40 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
             "color": palette[idx % len(palette)],
             "is_current_institution": str(info["id"]) == str(requesting_institution_id) if requesting_institution_id else False,
         })
+
+    if anonymize_others and requesting_institution_id:
+        anonymized_distribution = []
+        others_ca_share = 0.0
+        others_royalty_amount = 0.0
+        others_usage_percent = 0.0
+        others_count = 0
+
+        for item in distribution:
+            if str(item.get("institution_id")) == str(requesting_institution_id):
+                anonymized_distribution.append(item)
+            else:
+                others_ca_share += item.get("ca_share", 0) or 0
+                others_royalty_amount += item.get("royalty_amount", 0) or 0
+                others_usage_percent += item.get("usage_percentage", 0) or 0
+                others_count += 1
+
+        if others_count > 0:
+            anonymized_distribution.append({
+                "institution_id": "others",
+                "institution_name": "Autres établissements partenaires",
+                "institution_code": f"{others_count} autre(s) établissement(s)",
+                "books_owned_count": None,
+                "reads_count": None,
+                "usage_percentage": round(others_usage_percent, 2),
+                "ca_share": round(others_ca_share, 2),
+                "royalty_rate": distribution[0].get("royalty_rate", 15) if distribution else 15,
+                "royalty_amount": round(others_royalty_amount, 2),
+                "color": "#64748B",
+                "is_aggregated_others": True,
+                "is_current_institution": False,
+            })
+
+        distribution = anonymized_distribution
 
     platform_revenue = max(0.0, round(annual_price - total_royalties, 2))
 
