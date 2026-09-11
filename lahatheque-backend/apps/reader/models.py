@@ -276,6 +276,13 @@ class ReaderSession(models.Model):
         """Indique si la session est active et non expirée."""
         return self.status in ['created', 'opened', 'in_progress'] and (not self.expires_at or timezone.now() < self.expires_at)
 
+    @property
+    def device_fingerprint(self) -> str:
+        """Empreinte du terminal associée à la session."""
+        if isinstance(self.metadata, dict):
+            return str(self.metadata.get("device_fingerprint") or self.metadata.get("user_agent") or "")
+        return ""
+
     def is_expired(self) -> bool:
         """Indique si la session a dépassé sa date limite."""
         return bool(self.expires_at and timezone.now() > self.expires_at)

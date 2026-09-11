@@ -845,10 +845,16 @@ class ReaderProtectedStreamView(APIView):
 
         # Ciblage chirurgical : Seul le lecteur individuel incriminé est bloqué (email ou terminal)
         # On ne bloque JAMAIS l'organisation partenaire ni les autres utilisateurs partageant le même réseau
+        device_fp = (
+            (session.metadata.get("device_fingerprint") if isinstance(session.metadata, dict) else None)
+            or (session.metadata.get("user_agent") if isinstance(session.metadata, dict) else None)
+            or request.headers.get("X-Device-Fingerprint")
+            or ""
+        )
         is_blocked = False
         if reader_email and BlockedReaderIdentity.objects.filter(reader_email__iexact=reader_email, is_active=True).exists():
             is_blocked = True
-        elif session.device_fingerprint and BlockedReaderIdentity.objects.filter(device_fingerprint=session.device_fingerprint, is_active=True).exists():
+        elif device_fp and BlockedReaderIdentity.objects.filter(device_fingerprint=device_fp, is_active=True).exists():
             is_blocked = True
 
         if is_blocked:
