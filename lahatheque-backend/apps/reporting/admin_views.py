@@ -768,7 +768,8 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                             is_original=False
                         ).delete()
 
-            cache.delete("admin_catalog_pricing_all")
+            from apps.catalog.views import invalidate_catalog_cache
+            invalidate_catalog_cache()
 
             if request.user and request.user.is_authenticated:
                 JournalAuditAdmin.objects.create(
@@ -791,7 +792,8 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 book.price_digital = config.prix_defaut_numerique_xof
                 book.price_paper = config.prix_defaut_papier_xof
                 book.save()
-            cache.delete("admin_catalog_pricing_all")
+            from apps.catalog.views import invalidate_catalog_cache
+            invalidate_catalog_cache()
 
             JournalAuditAdmin.objects.create(
                 administrateur=request.user,

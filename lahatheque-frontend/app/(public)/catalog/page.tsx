@@ -700,6 +700,36 @@ function CatalogSearchInner() {
                     formatBadgeClass = "text-foreground-muted bg-background-secondary border-border";
                   }
 
+                  const numDigital = (book.price_digital !== undefined && book.price_digital !== null)
+                    ? Number(book.price_digital)
+                    : (book.price !== undefined && book.price !== null ? Number(book.price) : null);
+                  const numPaper = (book.price_paper !== undefined && book.price_paper !== null)
+                    ? Number(book.price_paper)
+                    : null;
+                  const numAudio = (book.price_audio !== undefined && book.price_audio !== null)
+                    ? Number(book.price_audio)
+                    : null;
+
+                  let displayPrice = 2500;
+                  let displayPriceLabel = "Achat à l'unité";
+
+                  if (selectedFormat === "audio" || (hasAudio && !hasDigital && !hasPaper)) {
+                    displayPrice = numAudio ?? numDigital ?? 2500;
+                    displayPriceLabel = "Format audio";
+                  } else if (selectedFormat === "paper" || (hasPaper && !hasDigital && !hasAudio)) {
+                    displayPrice = numPaper ?? 5000;
+                    displayPriceLabel = "Format papier";
+                  } else if (numDigital !== null) {
+                    displayPrice = numDigital;
+                    displayPriceLabel = (hasPaper || hasAudio) ? "Dès (numérique)" : "Format numérique";
+                  } else if (numPaper !== null) {
+                    displayPrice = numPaper;
+                    displayPriceLabel = "Format papier";
+                  } else if (numAudio !== null) {
+                    displayPrice = numAudio;
+                    displayPriceLabel = "Format audio";
+                  }
+
                   return (
                     <article
                       key={book.id}
@@ -774,10 +804,10 @@ function CatalogSearchInner() {
                         <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
                           <div>
                             <span className="text-xs sm:text-sm font-bold font-mono text-navy block">
-                              {(book.price || 2500).toLocaleString("fr-FR")} FCFA
+                              {displayPrice.toLocaleString("fr-FR")} FCFA
                             </span>
                             <span className="text-[10px] text-foreground-muted font-medium">
-                              {hasAudio && !hasDigital ? "Format audio" : "Achat à l'unité"}
+                              {displayPriceLabel}
                             </span>
                           </div>
 

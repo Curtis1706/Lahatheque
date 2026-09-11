@@ -50,6 +50,7 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
     created_by_id = serializers.SerializerMethodField()
     available_languages = serializers.SerializerMethodField()
     languages = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
 
     class Meta:
         model = Ouvrage
@@ -187,6 +188,14 @@ class OuvrageReadSerializer(serializers.ModelSerializer):
                 return len(tracks) > 0
             return obj.audio_tracks.exists()
         return False
+
+    def get_price(self, obj):
+        if obj.price_digital is not None:
+            try:
+                return float(obj.price_digital)
+            except (ValueError, TypeError):
+                return 0.0
+        return 0.0
 
 
 # Alias pour rétrocompatibilité

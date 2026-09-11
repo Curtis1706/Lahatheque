@@ -26,10 +26,31 @@ logger = logging.getLogger(__name__)
 CATALOG_CACHE_TTL = 300
 
 
+def invalidate_catalog_cache():
+    """Invalide immédiatement tous les caches du catalogue public et de tarification."""
+    try:
+        current_v = cache.get("catalog_cache_version") or 1
+        cache.set("catalog_cache_version", current_v + 1, 86400 * 30)
+    except Exception:
+        pass
+    try:
+        cache.clear()
+    except Exception:
+        pass
+    try:
+        cache.delete("admin_catalog_pricing_all")
+    except Exception:
+        pass
+
+
 def _catalog_cache_key(prefix: str, query_params: dict) -> str:
-    """Génère une clé de cache déterministe à partir du préfixe et des paramètres de requête."""
+    """Génère une clé de cache déterministe à partir du préfixe, de la version et des paramètres."""
+    try:
+        version = cache.get("catalog_cache_version") or 1
+    except Exception:
+        version = 1
     sorted_params = sorted(query_params.items())
-    raw = f"{prefix}:{sorted_params}"
+    raw = f"{prefix}:v{version}:{sorted_params}"
     return "catalog:" + hashlib.md5(raw.encode()).hexdigest()
 
 

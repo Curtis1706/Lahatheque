@@ -35,6 +35,7 @@ interface BookActionButtonsProps {
     country?: string;
     level?: string;
     price?: number;
+    price_digital?: number;
     price_paper?: number;
     price_audio?: number;
     price_audio_eur?: number;
@@ -96,9 +97,20 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
   const [addedAnimation, setAddedAnimation] = useState<boolean>(false);
   const [showSampleModal, setShowSampleModal] = useState<boolean>(false);
 
-  const priceDigital = book.price || 2500;
-  const pricePaper = book.price_paper || (book.price ? Math.round(book.price * 1.3) : 3500);
-  const priceAudio = book.price_audio || 2500;
+  const rawDigital = book.price_digital ?? book.price;
+  const priceDigital = rawDigital !== undefined && rawDigital !== null && !isNaN(Number(rawDigital))
+    ? Number(rawDigital)
+    : 2500;
+
+  const rawPaper = book.price_paper;
+  const pricePaper = rawPaper !== undefined && rawPaper !== null && !isNaN(Number(rawPaper))
+    ? Number(rawPaper)
+    : (priceDigital > 0 ? Math.round(priceDigital * 1.3) : 3500);
+
+  const rawAudio = book.price_audio;
+  const priceAudio = rawAudio !== undefined && rawAudio !== null && !isNaN(Number(rawAudio))
+    ? Number(rawAudio)
+    : 2500;
 
   // Calcul du montant total cumulé
   const totalAmount = 

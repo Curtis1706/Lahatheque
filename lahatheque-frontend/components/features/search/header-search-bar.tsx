@@ -275,7 +275,10 @@ export function HeaderSearchBar({
                       {/* Prix / Badge */}
                       <div className="shrink-0 text-right">
                         <span className="text-xs font-bold text-navy block font-mono">
-                          {(book.price || 2500).toLocaleString("fr-FR")} {book.currency || "FCFA"}
+                          {((book.price_digital !== undefined && book.price_digital !== null)
+                            ? Number(book.price_digital)
+                            : (book.price !== undefined && book.price !== null ? Number(book.price) : 2500)
+                          ).toLocaleString("fr-FR")} {book.currency || "FCFA"}
                         </span>
                         <span className="text-[10px] text-foreground-muted font-medium">
                           Achat à l'unité

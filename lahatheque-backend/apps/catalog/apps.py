@@ -6,15 +6,14 @@ class CatalogConfig(AppConfig):
     name = 'apps.catalog'
 
     def ready(self):
-        """Connexion du signal d'invalidation du cache catalogue au signal post_save d'Ouvrage."""
-        from django.db.models.signals import post_save
-        from django.core.cache import cache
+        """Connexion des signaux d'invalidation du cache catalogue."""
+        from django.db.models.signals import post_save, post_delete
 
-        def invalidate_catalog_cache(sender, instance, **kwargs):
-            """Vide tous les caches du catalogue public lors d'une modification d'ouvrage."""
-            try:
-                cache.clear()
-            except Exception:
-                pass
+        def _on_ouvrage_changed(sender, instance, **kwargs):
+            from apps.catalog.views import invalidate_catalog_cache
+            invalidate_catalog_cache()
 
-        post_save.connect(invalidate_catalog_cache, sender='catalog.Ouvrage', weak=False)
+        post_save.connect(_on_ouvrage_changed, sender='catalog.Ouvrage', weak=False)
+        post_delete.connect(_on_ouvrage_changed, sender='catalog.Ouvrage', weak=False)
+        post_save.connect(_on_ouvrage_changed, sender='catalog.OuvrageLanguageVersion', weak=False)
+        post_delete.connect(_on_ouvrage_changed, sender='catalog.OuvrageLanguageVersion', weak=False)
