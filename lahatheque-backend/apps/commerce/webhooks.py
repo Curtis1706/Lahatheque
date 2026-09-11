@@ -67,6 +67,10 @@ def process_moneroo_webhook(event_id: str, event_type: str, payload: dict) -> We
             payment_tx.raw_webhook_payload = payload
             payment_tx.save(update_fields=['status', 'raw_webhook_payload'])
             handle_payment_success(payment_tx)
+
+            # Activer aussi les souscriptions bouquet liées à cette transaction
+            from .services import handle_bouquet_payment_success
+            handle_bouquet_payment_success(payment_tx)
             
         elif clean_event in ['payment.failed', 'payment.cancelled', 'payment.rejected']:
             payment_tx.status = PaymentTransaction.Status.FAILED

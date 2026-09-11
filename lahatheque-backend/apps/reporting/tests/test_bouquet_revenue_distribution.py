@@ -177,15 +177,17 @@ class BouquetRevenueDistributionTestCase(TestCase):
             password="TestPass123!", role="student"
         )
 
-        # 90 sessions UAC et 10 sessions UNA
+        # 90% consultations UAC (9) et 10% consultations UNA (1)
         for _ in range(9):
-            ReaderSession.objects.create(
-                user=student, ouvrage=book_uac, source_type='catalog_book',
-                current_page=1, duration_seconds=60
+            TraceAcces.objects.create(
+                user=student, ouvrage=book_uac, access_type='read_chunk',
+                ip_address="127.0.0.1", document_title=book_uac.title,
+                institution=self.uac
             )
-        ReaderSession.objects.create(
-            user=student, ouvrage=book_una, source_type='catalog_book',
-            current_page=1, duration_seconds=60
+        TraceAcces.objects.create(
+            user=student, ouvrage=book_una, access_type='read_chunk',
+            ip_address="127.0.0.1", document_title=book_una.title,
+            institution=self.una
         )
 
         payload = compute_bouquet_distribution_payload(self.offering, requesting_institution_id=str(self.uac.id))

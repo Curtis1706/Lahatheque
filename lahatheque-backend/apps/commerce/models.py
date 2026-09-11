@@ -501,12 +501,16 @@ class ClientBouquetSubscription(models.Model):
     currency = models.CharField(max_length=10, default="XOF")
     status = models.CharField(
         max_length=20,
-        choices=[("active", "Actif"), ("expired", "Expiré"), ("cancelled", "Annulé")],
-        default="active"
+        choices=[("active", "Actif"), ("pending", "En attente"), ("expired", "Expiré"), ("cancelled", "Annulé")],
+        default="pending"
     )
     start_date = models.DateField(default=timezone.now)
     end_date = models.DateField()
     created_at = models.DateTimeField(default=timezone.now)
+    payment_transaction = models.ForeignKey(
+        'commerce.PaymentTransaction', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='client_bouquet_subscriptions'
+    )
 
     class Meta:
         ordering = ["-created_at"]

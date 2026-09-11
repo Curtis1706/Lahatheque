@@ -173,11 +173,11 @@ export interface UniversityDistributionItem {
   institution_code: string;
   short_name: string;
   books_owned_count: number;
-  reads_count: number;
+  reads_count: number | null;
   usage_share_percent: number;
-  ca_share: number;
-  royalty_rate: number;
-  royalty_amount: number;
+  ca_share: number | null;
+  royalty_rate: number | null;
+  royalty_amount: number | null;
   color: string;
   is_current_institution?: boolean;
 }

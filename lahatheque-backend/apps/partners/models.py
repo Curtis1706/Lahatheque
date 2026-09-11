@@ -36,7 +36,7 @@ class Institution(models.Model):
     
     # Contrat & Mandat
     contract_reference = models.CharField(max_length=64, default="CTR-UNIV-2025-01", verbose_name="Réf. Convention Cadre")
-    royalty_rate = models.DecimalField(max_digits=5, decimal_places=2, default=15.00, verbose_name="Taux de Redevance (%)")
+    royalty_rate = models.DecimalField(max_digits=5, decimal_places=2, default=15.00, null=True, blank=True, verbose_name="Taux de Redevance (%)")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -164,6 +164,10 @@ class UniversityBouquetSubscription(models.Model):
     start_date = models.DateField(default=timezone.now)
     end_date = models.DateField(default=timezone.now)
     created_at = models.DateTimeField(default=timezone.now)
+    payment_transaction = models.ForeignKey(
+        'commerce.PaymentTransaction', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='bouquet_subscriptions'
+    )
 
     class Meta:
         ordering = ["-start_date"]

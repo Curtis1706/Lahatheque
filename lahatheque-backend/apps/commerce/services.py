@@ -331,3 +331,27 @@ def handle_payment_failure(payment_tx):
             pass
     except Order.DoesNotExist:
         logger.error(f"[Commerce] Aucune commande trouvée pour la transaction {payment_tx.id}")
+
+
+def handle_bouquet_payment_success(payment_tx):
+    """Active une souscription bouquet après confirmation de paiement Moneroo."""
+    from apps.partners.models import UniversityBouquetSubscription
+
+    subs = UniversityBouquetSubscription.objects.filter(
+        payment_transaction=payment_tx, status='pending'
+    )
+    for sub in subs:
+        sub.status = 'active'
+        sub.save(update_fields=['status'])
+        logger.info(f"[Commerce] Bouquet {sub.id} activé pour {sub.institution.name} après paiement.")
+
+    # Souscriptions client
+    from apps.commerce.models import ClientBouquetSubscription
+    client_subs = ClientBouquetSubscription.objects.filter(
+        payment_transaction=payment_tx, status='pending'
+    )
+    for csub in client_subs:
+        csub.status = 'active'
+        csub.save(update_fields=['status'])
+        logger.info(f"[Commerce] Bouquet client {csub.id} activé après paiement.")
+

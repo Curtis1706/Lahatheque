@@ -8,6 +8,7 @@ from .views import (
     PartnerCatalogDetailView,
     PartnerBouquetsListView,
     PartnerBouquetLicenseCheckView,
+    PartnerBouquetSubscribeView,
     PartnerUsageStatsView,
 )
 
@@ -20,6 +21,7 @@ urlpatterns = [
 
     # ─── Bouquets & Licences (CDC 9.1) ────────────────────────────────────────
     path('bouquets/', PartnerBouquetsListView.as_view(), name='partner-bouquets-list'),
+    path('bouquets/<str:offering_id>/subscribe/', PartnerBouquetSubscribeView.as_view(), name='partner-bouquet-subscribe'),
     path('bouquets/<str:offering_id>/check-access/', PartnerBouquetLicenseCheckView.as_view(), name='partner-bouquet-check-access'),
 
     # ─── Statistiques d'Usage (CDC 9.1) ──────────────────────────────────────

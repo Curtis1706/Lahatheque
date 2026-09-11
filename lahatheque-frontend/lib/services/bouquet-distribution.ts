@@ -14,8 +14,8 @@ import type {
 export interface UniversityDistributionItem extends BaseUniversityDistributionItem {
   short_name: string;
   books_count: number;
-  consultations_count: number;
-  ca_share_allocated: number;
+  consultations_count: number | null;
+  ca_share_allocated: number | null;
 }
 
 export interface BouquetDistributionResult extends BaseBouquetDistributionResult {
@@ -185,8 +185,8 @@ export function computeBouquetDistribution(params: {
     });
 
   const total_royalties = isFcfa
-    ? Math.round(items.reduce((acc, it) => acc + it.royalty_amount, 0))
-    : Number(items.reduce((acc, it) => acc + it.royalty_amount, 0).toFixed(2));
+    ? Math.round(items.reduce((acc, it) => acc + (it.royalty_amount || 0), 0))
+    : Number(items.reduce((acc, it) => acc + (it.royalty_amount || 0), 0).toFixed(2));
 
   const platform_revenue = Math.max(0, total_ca - total_royalties);
 
@@ -241,11 +241,11 @@ export async function fetchBouquetDistribution(
 
         const items: UniversityDistributionItem[] = rawItems.map((it: any, idx: number) => {
           const booksCount = it.books_owned_count ?? it.books_count ?? 0;
-          const readsCount = it.reads_count ?? it.consultations_count ?? 0;
+          const readsCount = it.reads_count != null ? it.reads_count : (it.consultations_count != null ? it.consultations_count : null);
           const usagePct = it.usage_percentage ?? it.usage_share_percent ?? 0;
-          const caShare = it.ca_share ?? it.ca_share_allocated ?? 0;
-          const rate = it.royalty_rate ?? 15;
-          const amount = it.royalty_amount ?? 0;
+          const caShare = it.ca_share != null ? it.ca_share : (it.ca_share_allocated != null ? it.ca_share_allocated : null);
+          const rate = it.royalty_rate != null ? it.royalty_rate : null;
+          const amount = it.royalty_amount != null ? it.royalty_amount : null;
           const shortName = it.institution_code || (it.institution_name ? it.institution_name.slice(0, 16) : `Univ ${idx + 1}`);
 
           return {
@@ -268,9 +268,9 @@ export async function fetchBouquetDistribution(
         });
 
         const totalBooks = d.total_books_count ?? d.totals?.total_books ?? items.reduce((acc, it) => acc + it.books_count, 0);
-        const totalConsultations = items.reduce((acc, it) => acc + it.consultations_count, 0);
+        const totalConsultations = items.reduce((acc, it) => acc + (it.consultations_count || 0), 0);
         const totalCa = d.annual_price ?? d.totals?.total_ca ?? 0;
-        const totalRoyalties = d.totals?.total_royalties ?? items.reduce((acc, it) => acc + it.royalty_amount, 0);
+        const totalRoyalties = d.totals?.total_royalties ?? items.reduce((acc, it) => acc + (it.royalty_amount || 0), 0);
         const platformRevenue = d.totals?.platform_revenue ?? Math.max(0, totalCa - totalRoyalties);
         const appliedRate = d.royalty_rate_applied ?? 15;
 

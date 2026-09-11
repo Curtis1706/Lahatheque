@@ -123,6 +123,7 @@ class ConfigurationPlateformeGlobale(models.Model):
     )
     default_university_royalty_rate = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal("15.00"),
+        null=True, blank=True,
         help_text="Taux standard des universités partenaires (%)"
     )
     default_platform_share_rate = models.DecimalField(

@@ -342,6 +342,16 @@ def task_calculate_monthly_royalties(include_current_month=False):
     """
     Calcul automatique des redevances : part université (ventes directes hors bouquet
     partagé), part éditeur tiers, part auteur sur le reste.
+
+    NOTE ARCHITECTURALE — SÉPARATION DES FLUX :
+    Cette tâche traite UNIQUEMENT les ventes unitaires (LigneCommande payées).
+    Les revenus issus des bouquets documentaires sont traités séparément par
+    task_distribute_bouquet_revenue (CDC section 11) sur la base du prix d'abonnement.
+    Il n'y a pas de doublon : les ventes unitaires génèrent des références REP-DIRECT-*
+    et les bouquets génèrent des références REP-BOUQ-*. Une université peut percevoir
+    les deux types de redevances simultanément (vente directe + part bouquet), ce qui
+    est conforme au CDC.
+
     Exécuté le 1er de chaque mois via Celery Beat (mois précédent), ou manuellement
     par l'administrateur avec include_current_month=True (mois précédent + mois en cours).
     """
@@ -829,7 +839,7 @@ def task_distribute_bouquet_revenue():
         BouquetOffering, UniversityBouquetSubscription, UniversityRoyaltyStatement
     )
     from apps.protection.models import TraceAcces
-    from django.db.models import Count
+    from django.db.models import Q, Count, Sum as DjangoSum
     from django.utils import timezone
     from datetime import timedelta
     import uuid as uuid_lib
@@ -850,7 +860,14 @@ def task_distribute_bouquet_revenue():
 
     statements_created = 0
 
+    from apps.catalog.models import Ouvrage
+
     for offering_id in shared_offering_ids:
+        # Résoudre le BouquetOffering pour accéder à get_books_queryset
+        offering = BouquetOffering.objects.filter(id=offering_id).first()
+        if not offering:
+            continue
+
         subs = UniversityBouquetSubscription.objects.filter(
             offering_id=offering_id, status="active"
         ).select_related("institution")
@@ -864,14 +881,58 @@ def task_distribute_bouquet_revenue():
         total_usage = 0
 
         for sub in subs:
-            count = TraceAcces.objects.filter(
-                bouquet_subscription=sub,
+            bouquet_books = offering.get_books_queryset(
+                requesting_institution=sub.institution
+            ) if offering else Ouvrage.objects.none()
+
+            # 1. Consultations (lectures en ligne)
+            consultations_count = TraceAcces.objects.filter(
+                Q(bouquet_subscription=sub) |
+                Q(institution=sub.institution, ouvrage__in=bouquet_books) |
+                Q(ouvrage__institution=sub.institution, ouvrage__in=bouquet_books),
+                access_type__in=["read_online", "read_chunk"],
                 timestamp__gte=period_start,
                 timestamp__lte=period_end,
             ).count()
 
-            usage_by_institution[sub.institution_id] = usage_by_institution.get(sub.institution_id, 0) + count
-            total_usage += count
+            # 2. Pages lues
+            from apps.student.models import ReadingSession as StudentReadingSession
+            pages_read = StudentReadingSession.objects.filter(
+                Q(user__affiliations__institution=sub.institution) |
+                Q(ouvrage__institution=sub.institution),
+                ouvrage__in=bouquet_books,
+                session_date__gte=period_start.date(),
+                session_date__lte=period_end.date(),
+            ).aggregate(total=DjangoSum("pages_read"))["total"] or 0
+
+            # 3. Téléchargements
+            downloads_count = TraceAcces.objects.filter(
+                Q(bouquet_subscription=sub) |
+                Q(institution=sub.institution, ouvrage__in=bouquet_books) |
+                Q(ouvrage__institution=sub.institution, ouvrage__in=bouquet_books),
+                access_type="download",
+                timestamp__gte=period_start,
+                timestamp__lte=period_end,
+            ).count()
+
+            # 4. Écoutes audio
+            from apps.audio.models import AudioListeningSession
+            audio_listens = 0
+            try:
+                audio_listens = AudioListeningSession.objects.filter(
+                    Q(user__affiliations__institution=sub.institution) |
+                    Q(institution=sub.institution) |
+                    Q(ouvrage__institution=sub.institution),
+                    ouvrage__in=bouquet_books,
+                    session_date__gte=period_start.date(),
+                    session_date__lte=period_end.date(),
+                ).count()
+            except Exception:
+                pass
+
+            institution_usage = consultations_count + pages_read + downloads_count + audio_listens
+            usage_by_institution[sub.institution_id] = institution_usage
+            total_usage += institution_usage
 
         if total_usage == 0:
             n_inst = len(set(s.institution_id for s in subs))
@@ -881,7 +942,8 @@ def task_distribute_bouquet_revenue():
         for sub in subs:
             part_utilisation = usage_by_institution.get(sub.institution_id, 0) / total_usage
             ca_institution = total_pool * part_utilisation
-            taux = float(sub.institution.royalty_rate) if hasattr(sub.institution, 'royalty_rate') else 15.0
+            from apps.reporting.pricing_service import get_institution_royalty_rate
+            taux = get_institution_royalty_rate(sub.institution)
             redevance = ca_institution * (taux / 100)
 
             if redevance <= 0:
