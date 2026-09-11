@@ -107,7 +107,7 @@ export function BouquetPieDistribution({
   });
 
   // ─── Bar Chart Horizontal des Redevances ─────────────────────────────────
-  const maxRoyalty = Math.max(...items.map((it) => it.royalty_amount || 0), 1);
+  const maxRoyalty = Math.max(...items.map((it) => it.royalty_amount ?? 0), 1);
   // Générateur d'échelle pour l'axe horizontal (adapté au FCFA ou devise standard)
   const stepUnit = isFcfa ? (maxRoyalty > 500000 ? 100000 : 25000) : 50;
   const scaleStep = Math.ceil(maxRoyalty / 4 / stepUnit) * stepUnit || (isFcfa ? 100000 : 100);
@@ -345,7 +345,9 @@ export function BouquetPieDistribution({
           {/* Graphique à barres horizontales conforme à la capture */}
           <div className="space-y-4 my-2 pr-2">
             {reversedItems.map((item) => {
-              const barPercent = Math.min(100, Math.max(4, (item.royalty_amount / maxRoyalty) * 100));
+              const barPercent = item.royalty_amount != null
+                ? Math.max(2, (item.royalty_amount / (scaleStep * 4)) * 100)
+                : 0;
               const isHovered = hoveredUnivId === item.institution_id;
               const isItemHighlighted = isHighlighted(item);
 
@@ -379,19 +381,12 @@ export function BouquetPieDistribution({
                     </div>
 
                     <span className="font-mono text-xs font-bold text-navy shrink-0">
-                      {isUniv && item.institution_id === "others" ? (
-                        <span className="text-foreground-muted text-[11px] font-normal italic">
-                          Accords confidentiels
-                        </span>
-                      ) : (
-                        <>
-                          {item.royalty_amount.toLocaleString("fr-FR", {
+                      {item.royalty_amount != null
+                        ? `${item.royalty_amount.toLocaleString("fr-FR", {
                             minimumFractionDigits: isFcfa ? 0 : 2,
                             maximumFractionDigits: isFcfa ? 0 : 2,
-                          })}{" "}
-                          {currency}
-                        </>
-                      )}
+                          })} ${currency}`
+                        : "—"}
                     </span>
                   </div>
 
@@ -494,7 +489,10 @@ export function BouquetPieDistribution({
                         <div>
                           <p className="font-bold text-navy">{item.institution_name}</p>
                           <p className="text-[10px] text-foreground-muted">
-                            Sigle : {item.short_name} &bull; {item.consultations_count.toLocaleString("fr-FR")} lectures
+                            Sigle : {item.short_name}
+                            {item.consultations_count != null
+                              ? ` • ${item.consultations_count.toLocaleString("fr-FR")} lectures`
+                              : ""}
                           </p>
                         </div>
                         {isItemHighlighted && (
@@ -513,26 +511,20 @@ export function BouquetPieDistribution({
                       {item.usage_share_percent}%
                     </td>
                     <td className="py-3 px-3 sm:px-4 text-right font-mono font-semibold text-foreground">
-                      {item.ca_share_allocated.toLocaleString("fr-FR", {
-                        minimumFractionDigits: isFcfa ? 0 : 2,
-                        maximumFractionDigits: isFcfa ? 0 : 2,
-                      })}{" "}
-                      {currency}
-                    </td>
-                    <td className="py-3 px-3 sm:px-4 text-right font-mono font-bold text-navy">
-                      {isUniv && item.institution_id === "others" ? (
-                        <span className="text-foreground-muted text-[11px] font-normal italic">
-                          Accords confidentiels
-                        </span>
-                      ) : (
-                        <>
-                          {item.royalty_amount.toLocaleString("fr-FR", {
+                      {item.ca_share_allocated != null
+                        ? `${item.ca_share_allocated.toLocaleString("fr-FR", {
                             minimumFractionDigits: isFcfa ? 0 : 2,
                             maximumFractionDigits: isFcfa ? 0 : 2,
-                          })}{" "}
-                          {currency}
-                        </>
-                      )}
+                          })} ${currency}`
+                        : "—"}
+                    </td>
+                    <td className="py-3 px-3 sm:px-4 text-right font-mono font-bold text-navy">
+                      {item.royalty_amount != null
+                        ? `${item.royalty_amount.toLocaleString("fr-FR", {
+                            minimumFractionDigits: isFcfa ? 0 : 2,
+                            maximumFractionDigits: isFcfa ? 0 : 2,
+                          })} ${currency}`
+                        : "—"}
                     </td>
                   </tr>
                 );

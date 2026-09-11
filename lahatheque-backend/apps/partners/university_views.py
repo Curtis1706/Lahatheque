@@ -313,11 +313,41 @@ class UniversityBouquetDistributionView(APIView):
 
         target = offering if offering else sub
         from apps.reporting.admin_views import compute_bouquet_distribution_payload
-        data = compute_bouquet_distribution_payload(
-            target,
-            requesting_institution_id=str(inst.id) if inst else None,
-            anonymize_others=True,
-        )
+        data = compute_bouquet_distribution_payload(target, requesting_institution_id=str(inst.id) if inst else None)
+
+        # ── Confidentialité CDC : anonymiser les données financières des autres universités ──
+        # L'université connectée voit ses propres chiffres exacts.
+        # Les autres universités n'apparaissent qu'avec leur nom, leur pourcentage
+        # d'utilisation et leur nombre de livres — jamais leurs montants financiers.
+        requesting_id = str(inst.id) if inst else None
+        if requesting_id and "distribution" in data:
+            anonymized = []
+            for entry in data["distribution"]:
+                if str(entry.get("institution_id")) == requesting_id:
+                    # L'université connectée voit tout
+                    anonymized.append(entry)
+                else:
+                    # Les autres : pourcentage et livres uniquement, pas de montants
+                    anonymized.append({
+                        "institution_id": entry.get("institution_id"),
+                        "institution_name": entry.get("institution_name"),
+                        "institution_code": entry.get("institution_code"),
+                        "books_owned_count": entry.get("books_owned_count", 0),
+                        "usage_percentage": entry.get("usage_percentage", 0),
+                        "reads_count": None,
+                        "ca_share": None,
+                        "royalty_rate": None,
+                        "royalty_amount": None,
+                        "color": entry.get("color"),
+                        "is_current_institution": False,
+                    })
+            data["distribution"] = anonymized
+
+            # Masquer aussi la part plateforme et le total des redevances globales
+            if "totals" in data:
+                data["totals"].pop("platform_revenue", None)
+                data["totals"].pop("total_royalties", None)
+
         return Response({"success": True, "data": data, "error": None})
 
 

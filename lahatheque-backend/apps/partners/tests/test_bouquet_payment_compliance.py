@@ -214,3 +214,69 @@ class BouquetPaymentComplianceTestCase(TestCase):
         # (10 - 5) / 5 * 100 = 100.0%
         trend = res.data["data"]["consultations_trend_percent"]
         self.assertEqual(trend, 100.0)
+
+    def test_university_bouquet_distribution_confidentiality(self):
+        """Vérifie la confidentialité des données financières des autres universités."""
+        from apps.catalog.models import Ouvrage
+
+        self.client.force_authenticate(user=self.univ_user)
+
+        # 2ème institution
+        user_una = User.objects.create_user(
+            email="rector@una.bj", username="rector_una", password="Password123!", role="university"
+        )
+        inst_una = Institution.objects.create(
+            name="Université Nationale d'Agriculture", code="UNA", user=user_una, royalty_rate=Decimal("15.00")
+        )
+
+        book_uac = Ouvrage.objects.create(
+            title="Droit Constitutionnel Béninois", price_digital=Decimal("15000.00"), status="published",
+            institution=self.institution
+        )
+        book_una = Ouvrage.objects.create(
+            title="Agronomie Tropicale", price_digital=Decimal("12000.00"), status="published",
+            institution=inst_una
+        )
+
+        offering = BouquetOffering.objects.create(
+            title="Bouquet National Universités",
+            annual_price=Decimal("5000000.00"),
+            currency="XOF",
+            bouquet_type="university",
+            is_active=True,
+        )
+        offering.custom_books.set([book_uac, book_una])
+
+        res = self.client.get(f"/api/v1/partners/university/bouquets/{offering.id}/distribution/")
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.data["success"])
+
+        dist = res.data["data"]["distribution"]
+        self.assertEqual(len(dist), 2)
+
+        # Retrouver UAC et UNA
+        uac_entry = next(e for e in dist if str(e["institution_id"]) == str(self.institution.id))
+        una_entry = next(e for e in dist if str(e["institution_id"]) == str(inst_una.id))
+
+        # UAC (l'université connectée) voit tous ses chiffres
+        self.assertTrue(uac_entry["is_current_institution"])
+        self.assertIsNotNone(uac_entry["ca_share"])
+        self.assertIsNotNone(uac_entry["royalty_amount"])
+        self.assertIsNotNone(uac_entry["royalty_rate"])
+
+        # UNA (autre université) a ses montants financiers masqués
+        self.assertFalse(una_entry["is_current_institution"])
+        self.assertIsNone(una_entry["ca_share"])
+        self.assertIsNone(una_entry["royalty_amount"])
+        self.assertIsNone(una_entry["royalty_rate"])
+        self.assertIsNone(una_entry["reads_count"])
+        # Mais conserve son nom, son code, ses livres et son pourcentage
+        self.assertEqual(una_entry["institution_code"], "UNA")
+        self.assertEqual(una_entry["books_owned_count"], 1)
+        self.assertIsNotNone(una_entry["usage_percentage"])
+
+        # Les totaux ne doivent pas faire fuiter la part plateforme ni le total des redevances
+        totals = res.data["data"].get("totals", {})
+        self.assertNotIn("platform_revenue", totals)
+        self.assertNotIn("total_royalties", totals)
+
