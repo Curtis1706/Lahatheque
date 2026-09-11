@@ -92,7 +92,6 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
         console.log(`[BFF Proxy] Multipart reçu (${(body.byteLength / (1024 * 1024)).toFixed(2)} Mo) -> transmission avec Content-Length vers ${targetUrl}`)
       } else {
         body = await request.text()
-        headers.set('content-length', String(Buffer.byteLength(body, 'utf-8')))
       }
     } catch (readErr) {
       console.error(`[BFF Proxy ERROR] Erreur lecture du body :`, readErr)
