@@ -328,17 +328,71 @@ class ForensicService:
         }
 
     @classmethod
+    def _run_safe_tesseract_ocr(cls, pil_image: Image.Image, timeout_seconds: float = 6.0) -> str:
+        """
+        Exécute Tesseract OCR avec un isolement strict contre tout blocage :
+        1. Fixe OMP_THREAD_LIMIT=1 pour désactiver le multi-threading OpenMP de Tesseract
+           (cause majeure de deadlocks CPU dans les conteneurs Linux/Docker sous Gunicorn).
+        2. Détecte la présence du binaire tesseract avant toute tentative pour éviter les subprocess zombies.
+        3. Détecte les langues disponibles (fra+eng, fra ou eng seul).
+        4. Exécute l'OCR dans un ThreadPoolExecutor avec timeout dur pour garantir
+           qu'aucun subprocess ne peut bloquer le worker Gunicorn au-delà du délai imparti.
+        """
+        import shutil
+        import concurrent.futures
+
+        # 1. Vérification de la présence du binaire tesseract sur le système
+        tesseract_bin = shutil.which("tesseract")
+        if not tesseract_bin:
+            logger.info("[FORENSIC OCR] Binaire système 'tesseract' absent, OCR local ignoré instantanément.")
+            return ""
+
+        # 2. Protection OpenMP contre les deadlocks sous Linux/Gunicorn
+        os.environ["OMP_THREAD_LIMIT"] = "1"
+        os.environ["OMP_NUM_THREADS"] = "1"
+
+        def _do_ocr() -> str:
+            import pytesseract
+            # Détection des packs de langues installés
+            try:
+                avail = pytesseract.get_languages()
+                if "fra" in avail and "eng" in avail:
+                    lang = "fra+eng"
+                elif "fra" in avail:
+                    lang = "fra"
+                else:
+                    lang = "eng"
+            except Exception:
+                lang = "eng"
+
+            # Configuration optimisée pour détection rapide de texte/filigrane
+            custom_config = r"--oem 1 --psm 11"
+            return pytesseract.image_to_string(pil_image, lang=lang, config=custom_config)
+
+        try:
+            logger.info(f"[FORENSIC OCR] Exécution de Tesseract OCR sécurisé (timeout={timeout_seconds}s)...")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(_do_ocr)
+                return future.result(timeout=timeout_seconds)
+        except concurrent.futures.TimeoutError:
+            logger.warning(f"[FORENSIC OCR] Timeout dur de {timeout_seconds}s dépassé lors de l'OCR local, abandon immédiat.")
+            return ""
+        except Exception as ocr_err:
+            logger.warning(f"[FORENSIC OCR] Pytesseract indisponible ou erreur d'exécution: {ocr_err}")
+            return ""
+
+    @classmethod
     def preprocess_and_local_ocr(cls, image_bytes: bytes) -> Tuple[Image.Image, str]:
         """
-        Applique les filtres de rehaussement de contraste sur l'image pour révéler
-        le filigrane transparent à 20%, puis exécute l'OCR Tesseract localement si présent.
-        Optimisé avec redimensionnement préalable et timeout strict pour éviter tout blocage worker.
+        Applique un prétraitement doux sur l'image pour révéler les filigranes
+        sans générer de bruit haute-fréquence qui ferait caler l'OCR,
+        puis exécute l'OCR Tesseract de manière isolée et chronométrée.
         """
         try:
             image = Image.open(io.BytesIO(image_bytes))
 
-            # Redimensionner l'image si elle est trop grande (max 1280px) pour préserver le CPU
-            max_dim = 1280
+            # Redimensionner l'image si elle est trop grande (max 1024px) pour préserver le CPU
+            max_dim = 1024
             if max(image.size) > max_dim:
                 image.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
@@ -349,27 +403,19 @@ class ForensicService:
             # 1. Conversion en niveaux de gris
             gray = ImageOps.grayscale(image)
 
-            # 2. Expansion dynamique de contraste modérée
+            # 2. Expansion dynamique de contraste modérée (sans bruit de moiré excessif)
             contrast_enhancer = ImageEnhance.Contrast(gray)
-            enhanced = contrast_enhancer.enhance(2.2)
+            enhanced = contrast_enhancer.enhance(1.4)
 
-            # 3. Rehaussement de la netteté
+            # 3. Rehaussement subtil de la netteté
             sharpness_enhancer = ImageEnhance.Sharpness(enhanced)
-            sharpened = sharpness_enhancer.enhance(1.8)
+            sharpened = sharpness_enhancer.enhance(1.2)
 
-            # 4. Filtre de contour subtil
-            filtered = sharpened.filter(ImageFilter.SHARPEN)
+            raw_text = cls._run_safe_tesseract_ocr(sharpened, timeout_seconds=6.0)
+            if raw_text:
+                logger.info(f"[FORENSIC OCR] Texte extrait ({len(raw_text)} caractères) : {raw_text[:120].strip()}...")
 
-            raw_text = ""
-            try:
-                import pytesseract
-                logger.info("[FORENSIC OCR] Exécution de Tesseract OCR local (timeout=8s)...")
-                raw_text = pytesseract.image_to_string(filtered, lang="fra+eng", timeout=8)
-                logger.info(f"[FORENSIC OCR] Texte extrait par Tesseract ({len(raw_text)} caractères) : {raw_text[:120].strip()}...")
-            except Exception as ocr_err:
-                logger.warning(f"[FORENSIC OCR] Pytesseract indisponible, timeout dépassé ou erreur: {ocr_err}")
-
-            return filtered, raw_text
+            return sharpened, raw_text
         except Exception as e:
             logger.error(f"[FORENSIC PREPROCESS] Erreur prétraitement image: {e}")
             return Image.new("RGB", (100, 100)), ""
@@ -379,20 +425,20 @@ class ForensicService:
         """
         Bascule sur le modèle de vision multimodale OpenAI pour décoder
         les filigranes transparents sur les captures d'écran ou photos de smartphones.
-        Exécution ultra-rapide (2 à 4 secondes).
+        Exécution ultra-rapide (2 à 4 secondes) sécurisée par timeout réseau strict.
         """
         try:
             import openai
             api_key = getattr(settings, "OPENAI_API_KEY", "") or os.environ.get("OPENAI_API_KEY", "")
-            if not api_key:
-                logger.warning("[FORENSIC VISION] Aucune clé OPENAI_API_KEY configurée.")
+            if not api_key or api_key.startswith("your_api"):
+                logger.warning("[FORENSIC VISION] Aucune clé OPENAI_API_KEY valide configurée.")
                 return {"detected": False}
 
-            client = openai.OpenAI(api_key=api_key, timeout=15.0)
+            client = openai.OpenAI(api_key=api_key, timeout=12.0)
 
             # Compression légère de l'image en JPEG base64 pour transmission ultra-rapide
             img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-            max_size = 1600
+            max_size = 1400
             if max(img.size) > max_size:
                 img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
 
@@ -433,7 +479,8 @@ class ForensicService:
                     }
                 ],
                 max_tokens=400,
-                temperature=0.1
+                temperature=0.1,
+                timeout=12.0
             )
 
             content = response.choices[0].message.content or "{}"

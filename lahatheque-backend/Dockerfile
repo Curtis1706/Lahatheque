@@ -34,6 +34,8 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=config.settings.production \
+    OMP_THREAD_LIMIT=1 \
+    OMP_NUM_THREADS=1 \
     PORT=8000
 
 # Paquets d'exécution nécessaires

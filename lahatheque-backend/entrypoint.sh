@@ -17,12 +17,15 @@ if [ "$1" = "gunicorn" ] || [ "$1" = "web" ]; then
     echo "==> Collecte des fichiers statiques (WhiteNoise)..."
     python manage.py collectstatic --noinput
 
+    export OMP_THREAD_LIMIT=1
+    export OMP_NUM_THREADS=1
+
     echo "==> Lancement du serveur Gunicorn WSGI..."
     exec gunicorn config.wsgi:application \
         --bind 0.0.0.0:${PORT:-8000} \
         --workers ${GUNICORN_WORKERS:-3} \
         --threads ${GUNICORN_THREADS:-2} \
-        --timeout ${GUNICORN_TIMEOUT:-120} \
+        --timeout ${GUNICORN_TIMEOUT:-300} \
         --access-logfile - \
         --error-logfile -
 fi
