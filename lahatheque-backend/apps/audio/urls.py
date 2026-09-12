@@ -12,6 +12,7 @@ from .views import (
     AudioStudioSubmitView,
     AudioManagementListView,
     AudioWorkflowTransitionView,
+    AudioBookDetailManagementView,
     RecentAudioListeningsView,
 )
 
@@ -23,6 +24,7 @@ router.register(r'tracks-crud', AudioTrackViewSet, basename='audio-tracks-crud')
 urlpatterns = [
     path('eligible-books/', AudioEligibleBooksView.as_view(), name='audio-eligible-books'),
     path('studio/submit/', AudioStudioSubmitView.as_view(), name='audio-studio-submit'),
+    path('management/books/<str:book_id>/', AudioBookDetailManagementView.as_view(), name='audio-management-book-detail'),
     path('management/<str:role>/', AudioManagementListView.as_view(), name='audio-management-list'),
     path('management/<str:book_id>/transition/', AudioWorkflowTransitionView.as_view(), name='audio-workflow-transition'),
     path('recent-listenings/', RecentAudioListeningsView.as_view(), name='audio-recent-listenings'),
