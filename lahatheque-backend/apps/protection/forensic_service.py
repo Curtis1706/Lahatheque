@@ -328,58 +328,92 @@ class ForensicService:
         }
 
     @classmethod
-    def _run_safe_tesseract_ocr(cls, pil_image: Image.Image, timeout_seconds: float = 6.0) -> str:
+    def _run_safe_tesseract_ocr(cls, pil_image: Image.Image, timeout_seconds: float = 4.0) -> str:
         """
-        Exécute Tesseract OCR avec un isolement strict contre tout blocage :
-        1. Fixe OMP_THREAD_LIMIT=1 pour désactiver le multi-threading OpenMP de Tesseract
-           (cause majeure de deadlocks CPU dans les conteneurs Linux/Docker sous Gunicorn).
-        2. Détecte la présence du binaire tesseract avant toute tentative pour éviter les subprocess zombies.
-        3. Détecte les langues disponibles (fra+eng, fra ou eng seul).
-        4. Exécute l'OCR dans un ThreadPoolExecutor avec timeout dur pour garantir
-           qu'aucun subprocess ne peut bloquer le worker Gunicorn au-delà du délai imparti.
+        Exécute Tesseract OCR avec un isolement système natif et inviolable :
+        1. Vérifie si le binaire 'tesseract' existe dans le PATH.
+        2. Sauvegarde l'image dans un fichier temporaire disque pour éviter tout verrou de mémoire partagée.
+        3. Lance le processus avec start_new_session=True (sur POSIX) et OMP_THREAD_LIMIT=1.
+        4. Si le processus dépasse le délai strict, proc.kill() (ou SIGKILL de groupe)
+           l'extermine immédiatement et garantit un retour à Django en moins de timeout_seconds.
         """
         import shutil
-        import concurrent.futures
+        import subprocess
+        import tempfile
+        import signal
 
-        # 1. Vérification de la présence du binaire tesseract sur le système
         tesseract_bin = shutil.which("tesseract")
         if not tesseract_bin:
             logger.info("[FORENSIC OCR] Binaire système 'tesseract' absent, OCR local ignoré instantanément.")
             return ""
 
-        # 2. Protection OpenMP contre les deadlocks sous Linux/Gunicorn
-        os.environ["OMP_THREAD_LIMIT"] = "1"
-        os.environ["OMP_NUM_THREADS"] = "1"
-
-        def _do_ocr() -> str:
-            import pytesseract
-            # Détection des packs de langues installés
-            try:
-                avail = pytesseract.get_languages()
-                if "fra" in avail and "eng" in avail:
-                    lang = "fra+eng"
-                elif "fra" in avail:
-                    lang = "fra"
-                else:
-                    lang = "eng"
-            except Exception:
-                lang = "eng"
-
-            # Configuration optimisée pour détection rapide de texte/filigrane
-            custom_config = r"--oem 1 --psm 11"
-            return pytesseract.image_to_string(pil_image, lang=lang, config=custom_config)
+        tmp_in_path = None
+        tmp_out_base = None
+        tmp_out_txt = None
 
         try:
-            logger.info(f"[FORENSIC OCR] Exécution de Tesseract OCR sécurisé (timeout={timeout_seconds}s)...")
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_do_ocr)
-                return future.result(timeout=timeout_seconds)
-        except concurrent.futures.TimeoutError:
-            logger.warning(f"[FORENSIC OCR] Timeout dur de {timeout_seconds}s dépassé lors de l'OCR local, abandon immédiat.")
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_in:
+                tmp_in_path = tmp_in.name
+                pil_image.save(tmp_in_path, format="PNG")
+
+            tmp_out_base = tmp_in_path + "_out"
+            tmp_out_txt = tmp_out_base + ".txt"
+
+            env = os.environ.copy()
+            env["OMP_THREAD_LIMIT"] = "1"
+            env["OMP_NUM_THREADS"] = "1"
+
+            # Arguments optimisés pour détection ultra-rapide de texte/filigrane
+            cmd = [
+                tesseract_bin,
+                tmp_in_path,
+                tmp_out_base,
+                "-l", "fra+eng",
+                "--psm", "11",
+                "--oem", "1"
+            ]
+
+            is_posix = os.name != "nt"
+            popen_kwargs = {
+                "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL,
+                "env": env
+            }
+            if is_posix:
+                popen_kwargs["start_new_session"] = True
+
+            logger.info(f"[FORENSIC OCR] Lancement Tesseract subprocess (timeout={timeout_seconds}s)...")
+            proc = subprocess.Popen(cmd, **popen_kwargs)
+
+            try:
+                proc.wait(timeout=timeout_seconds)
+            except subprocess.TimeoutExpired:
+                logger.warning(f"[FORENSIC OCR] Timeout dur de {timeout_seconds}s dépassé, terminaison immédiate.")
+                try:
+                    if is_posix and hasattr(os, "killpg"):
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    else:
+                        proc.kill()
+                except Exception:
+                    proc.kill()
+                proc.wait()
+                return ""
+
+            if os.path.exists(tmp_out_txt):
+                with open(tmp_out_txt, "r", encoding="utf-8", errors="ignore") as f:
+                    return f.read()
+
             return ""
         except Exception as ocr_err:
-            logger.warning(f"[FORENSIC OCR] Pytesseract indisponible ou erreur d'exécution: {ocr_err}")
+            logger.warning(f"[FORENSIC OCR] Exception OCR sécurisé: {ocr_err}")
             return ""
+        finally:
+            for path in [tmp_in_path, tmp_out_txt]:
+                if path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
 
     @classmethod
     def preprocess_and_local_ocr(cls, image_bytes: bytes) -> Tuple[Image.Image, str]:
@@ -411,7 +445,7 @@ class ForensicService:
             sharpness_enhancer = ImageEnhance.Sharpness(enhanced)
             sharpened = sharpness_enhancer.enhance(1.2)
 
-            raw_text = cls._run_safe_tesseract_ocr(sharpened, timeout_seconds=6.0)
+            raw_text = cls._run_safe_tesseract_ocr(sharpened, timeout_seconds=4.0)
             if raw_text:
                 logger.info(f"[FORENSIC OCR] Texte extrait ({len(raw_text)} caractères) : {raw_text[:120].strip()}...")
 
@@ -425,25 +459,30 @@ class ForensicService:
         """
         Bascule sur le modèle de vision multimodale OpenAI pour décoder
         les filigranes transparents sur les captures d'écran ou photos de smartphones.
-        Exécution ultra-rapide (2 à 4 secondes) sécurisée par timeout réseau strict.
+        Exécution ultra-rapide (2 à 4 secondes) sécurisée par timeout réseau strict et 0 retry.
         """
         try:
             import openai
+            import httpx
             api_key = getattr(settings, "OPENAI_API_KEY", "") or os.environ.get("OPENAI_API_KEY", "")
-            if not api_key or api_key.startswith("your_api"):
+            if not api_key or api_key.startswith("your_api") or len(api_key) < 20:
                 logger.warning("[FORENSIC VISION] Aucune clé OPENAI_API_KEY valide configurée.")
                 return {"detected": False}
 
-            client = openai.OpenAI(api_key=api_key, timeout=12.0)
+            client = openai.OpenAI(
+                api_key=api_key,
+                timeout=httpx.Timeout(8.0, connect=3.0),
+                max_retries=0
+            )
 
-            # Compression légère de l'image en JPEG base64 pour transmission ultra-rapide
+            # Compression légère de l'image en JPEG base64 (max 1024px) pour transmission instantanée
             img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-            max_size = 1400
+            max_size = 1024
             if max(img.size) > max_size:
                 img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
 
             buffer = io.BytesIO()
-            img.save(buffer, format="JPEG", quality=80)
+            img.save(buffer, format="JPEG", quality=75)
             b64_image = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
             prompt = (
@@ -478,9 +517,9 @@ class ForensicService:
                         ]
                     }
                 ],
-                max_tokens=400,
+                max_tokens=350,
                 temperature=0.1,
-                timeout=12.0
+                timeout=8.0
             )
 
             content = response.choices[0].message.content or "{}"
