@@ -267,7 +267,11 @@ class BouquetOffering(models.Model):
         qs = Ouvrage.objects.filter(status="published")
 
         if self.bouquet_type == "discipline" and self.discipline:
-            qs = qs.filter(discipline__name__icontains=self.discipline)
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(discipline__name__icontains=self.discipline) |
+                Q(disciplines__name__icontains=self.discipline)
+            ).distinct()
         elif self.bouquet_type == "faculty" and self.faculty_code:
             qs = qs.filter(faculty__icontains=self.faculty_code)
             if self.target_institution:
