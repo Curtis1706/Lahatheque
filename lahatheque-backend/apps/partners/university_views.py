@@ -793,6 +793,8 @@ class UniversityRoyaltiesView(APIView):
             else:
                 buyer_type = "client"
 
+            format_val = "paper" if l.format_type in ("paper", "papier") else ("audio" if l.format_type == "audio" else "digital")
+
             unit_sales.append({
                 "id": str(l.id),
                 "transaction_ref": f"TX-UNIV-{str(l.commande_id)[:8].upper()}",
@@ -801,7 +803,7 @@ class UniversityRoyaltiesView(APIView):
                 "cover_url": cover_url,
                 "authors": authors,
                 "discipline": l.ouvrage.discipline.name if l.ouvrage.discipline else "Général",
-                "format": "paper" if l.format_type == "paper" else "digital",
+                "format": format_val,
                 "quantity": l.quantity,
                 "unit_price": unit_p,
                 "gross_amount": gross,
@@ -813,7 +815,7 @@ class UniversityRoyaltiesView(APIView):
                 "date": l.commande.created_at.strftime("%Y-%m-%d") if l.commande.created_at else str(timezone.now().date()),
             })
 
-        # Calcul des totaux réels des ventes unitaires
+        # Calcul des totaux réels des ventes unitaires (papier, numérique et audio)
         paper_sales_count = sum(s["quantity"] for s in unit_sales if s["format"] == "paper")
         paper_gross_total = sum(s["gross_amount"] for s in unit_sales if s["format"] == "paper")
         paper_royalties_total = sum(s["royalty_amount"] for s in unit_sales if s["format"] == "paper")
@@ -821,6 +823,10 @@ class UniversityRoyaltiesView(APIView):
         digital_sales_count = sum(s["quantity"] for s in unit_sales if s["format"] == "digital")
         digital_gross_total = sum(s["gross_amount"] for s in unit_sales if s["format"] == "digital")
         digital_royalties_total = sum(s["royalty_amount"] for s in unit_sales if s["format"] == "digital")
+
+        audio_sales_count = sum(s["quantity"] for s in unit_sales if s["format"] == "audio")
+        audio_gross_total = sum(s["gross_amount"] for s in unit_sales if s["format"] == "audio")
+        audio_royalties_total = sum(s["royalty_amount"] for s in unit_sales if s["format"] == "audio")
 
         # Extraction des bouquets réels associés à l'institution (Section 11 CDC - Zéro mock, zéro faculté)
         from .models import BouquetOffering, UniversityBouquetSubscription
@@ -890,7 +896,7 @@ class UniversityRoyaltiesView(APIView):
                 "currency": sub.currency or "XOF",
             })
 
-        total_earned = paper_royalties_total + digital_royalties_total + bouquet_royalties_total
+        total_earned = paper_royalties_total + digital_royalties_total + audio_royalties_total + bouquet_royalties_total
         available_balance = max(0.0, total_earned - total_paid) if total_earned > 0 else avail_bal
 
         resp_data = {
@@ -911,6 +917,9 @@ class UniversityRoyaltiesView(APIView):
                 "digital_sales_count": digital_sales_count,
                 "digital_royalties_total": digital_royalties_total,
                 "digital_gross_total": digital_gross_total,
+                "audio_sales_count": audio_sales_count,
+                "audio_royalties_total": audio_royalties_total,
+                "audio_gross_total": audio_gross_total,
                 "bouquet_consultations_count": bouquet_consultations_count,
                 "bouquet_royalties_total": bouquet_royalties_total,
                 "bouquet_gross_allocated": bouquet_gross_allocated,
