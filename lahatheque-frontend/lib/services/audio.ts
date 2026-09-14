@@ -314,3 +314,78 @@ export async function getRecentAudioListenings(): Promise<any[]> {
   }
   return [];
 }
+
+/**
+ * Récupère les détails complets d'un livre audio pour consultation/édition admin.
+ */
+export async function getAudioBookDetail(bookId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/audio/management/books/${bookId}/`, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erreur réseau lors du chargement des détails." };
+  }
+}
+
+/**
+ * Met à jour les métadonnées et tarifs d'un livre audio.
+ */
+export async function updateAudioBook(
+  bookId: string,
+  data: Record<string, any>
+): Promise<{ success: boolean; data?: any; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/audio/management/books/${bookId}/`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erreur réseau lors de la mise à jour." };
+  }
+}
+
+/**
+ * Supprime un livre audio autonome ou détache proprement la version audio d'un livre.
+ */
+export async function deleteAudioBook(
+  bookId: string
+): Promise<{ success: boolean; data?: any; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/audio/management/books/${bookId}/`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erreur réseau lors de la suppression." };
+  }
+}
+
+/**
+ * Supprime une piste audio individuelle par son identifiant unique.
+ */
+export async function deleteAudioTrack(
+  trackId: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/audio/tracks-crud/${trackId}/`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.status === 204 || res.ok) {
+      return { success: true, message: "Piste audio supprimée avec succès." };
+    }
+    const json = await res.json().catch(() => ({}));
+    return { success: false, error: json.error || `Erreur HTTP ${res.status}` };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erreur réseau lors de la suppression de la piste." };
+  }
+}
+

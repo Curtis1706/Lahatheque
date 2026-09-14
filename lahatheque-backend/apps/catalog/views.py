@@ -373,8 +373,8 @@ class DisciplineViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        active_only = self.request.query_params.get('active_only')
-        if active_only in ('true', '1', 'True'):
+        include_inactive = self.request.query_params.get('include_inactive') in ('true', '1', 'True')
+        if not include_inactive:
             qs = qs.filter(is_active=True)
         return qs
 

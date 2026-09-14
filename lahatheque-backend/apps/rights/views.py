@@ -411,7 +411,7 @@ class AuthorBooksListView(APIView):
             format_breakdown = {
                 "digital": (lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0) + w_dig_qty,
                 "paper": (lignes.filter(format_type='paper').aggregate(total=Sum('quantity'))['total'] or 0) + w_prt_qty,
-                "audio": 0,
+                "audio": (lignes.filter(format_type='audio').aggregate(total=Sum('quantity'))['total'] or 0),
             }
             from apps.commerce.models import StockOuvrage, MouvementStock
             b_stocks = StockOuvrage.objects.filter(ouvrage=b)
@@ -509,7 +509,7 @@ class AuthorBookDetailView(APIView):
         format_breakdown = {
             "digital": (lignes.filter(format_type='digital').aggregate(total=Sum('quantity'))['total'] or 0) + w_dig_qty,
             "paper": (lignes.filter(format_type='paper').aggregate(total=Sum('quantity'))['total'] or 0) + w_prt_qty,
-            "audio": 0,
+            "audio": (lignes.filter(format_type='audio').aggregate(total=Sum('quantity'))['total'] or 0),
         }
         from apps.commerce.models import StockOuvrage, MouvementStock
         b_stocks = StockOuvrage.objects.filter(ouvrage=b)

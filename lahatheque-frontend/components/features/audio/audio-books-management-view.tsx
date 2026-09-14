@@ -19,10 +19,22 @@ import {
   List, 
   ChevronLeft, 
   ChevronRight, 
-  XCircle
+  XCircle,
+  Pencil,
+  Trash2,
+  SlidersHorizontal,
+  Volume2,
+  X,
+  FileAudio
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
-import { getAudioBooksList, updateAudioWorkflowStatus } from "@/lib/services/audio";
+import { 
+  getAudioBooksList, 
+  updateAudioWorkflowStatus,
+  getAudioBookDetail,
+  updateAudioBook,
+  deleteAudioBook
+} from "@/lib/services/audio";
 import { formatAudioDuration } from "@/lib/config/audio-constants";
 
 export interface AudioBookItem {
@@ -32,6 +44,8 @@ export interface AudioBookItem {
   category_name: string;
   country: string;
   cover_url?: string;
+  format_type?: string;
+  has_audio_version?: boolean;
   price_audio_xof: number;
   price_audio_eur: number;
   audio_status: string;
@@ -58,7 +72,6 @@ export function AudioBooksManagementView({
 }: AudioBooksManagementViewProps) {
   const [books, setBooks] = useState<AudioBookItem[]>([]);
   const [loading, setLoading] = useState(true);
-  // Vue par défaut : VUE EN LISTE demandée expressément par l'utilisateur
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -68,6 +81,23 @@ export function AudioBooksManagementView({
   // Modale de rejet (Chef Maquettiste)
   const [rejectingBookId, setRejectingBookId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+
+  // Modale d'inspection détaillée (Admin)
+  const [inspectingBookId, setInspectingBookId] = useState<string | null>(null);
+  const [inspectingBookData, setInspectingBookData] = useState<any | null>(null);
+  const [isLoadingInspection, setIsLoadingInspection] = useState(false);
+  const [inspectionVoiceFilter, setInspectionVoiceFilter] = useState<"all" | "male" | "female">("all");
+
+  // Modale d'édition rapide (Admin)
+  const [quickEditBook, setQuickEditBook] = useState<AudioBookItem | null>(null);
+  const [quickPriceXof, setQuickPriceXof] = useState<number>(2500);
+  const [quickPriceEur, setQuickPriceEur] = useState<number>(3.8);
+  const [quickStatus, setQuickStatus] = useState<string>("draft");
+  const [isQuickSaving, setIsQuickSaving] = useState(false);
+
+  // Modale de confirmation de suppression (Admin)
+  const [deletingBook, setDeletingBook] = useState<AudioBookItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Pagination pour la vue en Grille
   const [gridCurrentPage, setGridCurrentPage] = useState(1);
@@ -90,7 +120,6 @@ export function AudioBooksManagementView({
     fetchBooks();
   }, [role, statusFilter]);
 
-  // Réinitialiser la page grille lors de la recherche
   useEffect(() => {
     setGridCurrentPage(1);
   }, [searchQuery, statusFilter]);
@@ -105,7 +134,7 @@ export function AudioBooksManagementView({
       if (res.success) {
         setNotification({
           type: "success",
-          text: currentStatus === "published" ? "Livre audio retiré du catalogue public." : "Livre audio publié sur le catalogue public !"
+          text: currentStatus === "published" ? "Livre audio retiré du catalogue public." : "Livre audio publié sur le catalogue public."
         });
         await fetchBooks();
       } else {
@@ -177,6 +206,84 @@ export function AudioBooksManagementView({
     }
   };
 
+  // Gestion Inspection (Admin)
+  const handleOpenInspection = async (bookId: string) => {
+    setInspectingBookId(bookId);
+    setIsLoadingInspection(true);
+    setInspectingBookData(null);
+    setInspectionVoiceFilter("all");
+    try {
+      const res = await getAudioBookDetail(bookId);
+      if (res.success && res.data) {
+        setInspectingBookData(res.data);
+      } else {
+        setNotification({ type: "error", text: res.error || "Impossible de charger les détails du livre audio." });
+        setInspectingBookId(null);
+      }
+    } catch (err: any) {
+      setNotification({ type: "error", text: err.message || "Erreur réseau lors de l'inspection." });
+      setInspectingBookId(null);
+    } finally {
+      setIsLoadingInspection(false);
+    }
+  };
+
+  // Gestion Édition Rapide (Admin)
+  const handleOpenQuickEdit = (book: AudioBookItem) => {
+    setQuickEditBook(book);
+    setQuickPriceXof(book.price_audio_xof || 2500);
+    setQuickPriceEur(book.price_audio_eur || 3.8);
+    setQuickStatus(book.audio_status || "draft");
+  };
+
+  const handleSaveQuickEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickEditBook) return;
+
+    setIsQuickSaving(true);
+    setNotification(null);
+    try {
+      const res = await updateAudioBook(quickEditBook.id, {
+        price_audio_xof: quickPriceXof,
+        price_audio_eur: quickPriceEur,
+        audio_status: quickStatus,
+      });
+      if (res.success) {
+        setNotification({ type: "success", text: "Tarifs et statut mis à jour avec succès." });
+        setQuickEditBook(null);
+        await fetchBooks();
+      } else {
+        setNotification({ type: "error", text: res.error || "Erreur lors de la mise à jour." });
+      }
+    } catch (err: any) {
+      setNotification({ type: "error", text: err.message || "Erreur réseau." });
+    } finally {
+      setIsQuickSaving(false);
+    }
+  };
+
+  // Gestion Suppression (Admin)
+  const handleConfirmDelete = async () => {
+    if (!deletingBook) return;
+
+    setIsDeleting(true);
+    setNotification(null);
+    try {
+      const res = await deleteAudioBook(deletingBook.id);
+      if (res.success) {
+        setNotification({ type: "success", text: res.message || "Livre audio supprimé avec succès." });
+        setDeletingBook(null);
+        await fetchBooks();
+      } else {
+        setNotification({ type: "error", text: res.error || "Erreur lors de la suppression." });
+      }
+    } catch (err: any) {
+      setNotification({ type: "error", text: err.message || "Erreur réseau." });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Filtrage local pour la recherche
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return books;
@@ -197,6 +304,15 @@ export function AudioBooksManagementView({
     const start = (safeGridPage - 1) * gridPageSize;
     return filtered.slice(start, start + gridPageSize);
   }, [filtered, safeGridPage, gridPageSize]);
+
+  // Filtrage des pistes pour la modale d'inspection
+  const filteredInspectionTracks = useMemo(() => {
+    if (!inspectingBookData?.tracks) return [];
+    if (inspectionVoiceFilter === "all") return inspectingBookData.tracks;
+    return inspectingBookData.tracks.filter(
+      (t: any) => t.voice_gender === inspectionVoiceFilter
+    );
+  }, [inspectingBookData, inspectionVoiceFilter]);
 
   // Badge de statut
   const renderStatusBadge = (status: string) => {
@@ -234,12 +350,12 @@ export function AudioBooksManagementView({
     }
   };
 
-  // Colonnes DataTable hautement soignées avec largeurs et typographie rigoureuses
+  // Colonnes DataTable
   const columns: DataTableColumn<AudioBookItem>[] = [
     {
       key: "title",
       header: "Ouvrage",
-      className: "min-w-[300px] lg:min-w-[340px]",
+      className: "min-w-[280px] lg:min-w-[320px]",
       cell: (book) => (
         <div className="flex items-center gap-3.5 py-1">
           <div className="w-12 h-16 rounded-xl bg-background-secondary border border-border overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
@@ -263,7 +379,7 @@ export function AudioBooksManagementView({
     {
       key: "category_name",
       header: "Discipline & Pays",
-      className: "min-w-[180px] whitespace-nowrap",
+      className: "min-w-[160px] whitespace-nowrap",
       cell: (book) => (
         <div className="space-y-1 whitespace-nowrap">
           <span className="text-xs font-semibold text-navy block truncate" title={book.category_name}>
@@ -317,11 +433,14 @@ export function AudioBooksManagementView({
     {
       key: "price_audio_xof",
       header: "Tarif",
-      className: "min-w-[140px] whitespace-nowrap",
+      className: "min-w-[130px] whitespace-nowrap",
       cell: (book) => (
         <div className="whitespace-nowrap font-mono">
           <span className="text-xs font-bold text-navy block whitespace-nowrap">
             {book.price_audio_xof.toLocaleString("fr-FR")} FCFA
+          </span>
+          <span className="text-[10px] text-foreground-muted block">
+            {book.price_audio_eur ? `${book.price_audio_eur.toFixed(2)} €` : "-"}
           </span>
         </div>
       ),
@@ -339,9 +458,9 @@ export function AudioBooksManagementView({
     {
       key: "id",
       header: "Actions",
-      className: "min-w-[160px] text-right whitespace-nowrap",
+      className: "min-w-[270px] text-right whitespace-nowrap",
       cell: (book) => (
-        <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
           <Link
             href={`/listen/${book.id}`}
             className="w-9 h-9 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy hover:text-gold transition-colors inline-flex items-center justify-center shrink-0 shadow-2xs cursor-pointer"
@@ -350,30 +469,69 @@ export function AudioBooksManagementView({
             <ExternalLink className="w-4 h-4 text-gold" />
           </Link>
 
-          {/* Actions Rôle Admin */}
+          {/* Actions Rôle Admin (CRUD Complet) */}
           {role === "admin" && (
-            <button
-              type="button"
-              onClick={() => handleTogglePublish(book.id, book.audio_status)}
-              disabled={actionLoading}
-              className={`h-9 px-3.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50 ${
-                book.audio_status === "published"
-                  ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 shadow-2xs"
-                  : "bg-navy text-white hover:bg-navy-hover shadow-xs"
-              }`}
-            >
-              {book.audio_status === "published" ? (
-                <>
-                  <EyeOff className="w-3.5 h-3.5" />
-                  <span>Dépublier</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-3.5 h-3.5 text-gold" />
-                  <span>Publier</span>
-                </>
-              )}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => handleOpenInspection(book.id)}
+                className="w-9 h-9 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy hover:text-gold transition-colors inline-flex items-center justify-center shrink-0 shadow-2xs cursor-pointer"
+                title="Inspecter les pistes et détails"
+              >
+                <Eye className="w-4 h-4" />
+              </button>
+
+              <Link
+                href={`/admin/audio/${book.id}/edit`}
+                className="w-9 h-9 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy hover:text-gold transition-colors inline-flex items-center justify-center shrink-0 shadow-2xs cursor-pointer"
+                title="Modifier l'ouvrage audio"
+              >
+                <Pencil className="w-4 h-4" />
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => handleOpenQuickEdit(book)}
+                className="w-9 h-9 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy hover:text-gold transition-colors inline-flex items-center justify-center shrink-0 shadow-2xs cursor-pointer"
+                title="Édition rapide (prix & statut)"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTogglePublish(book.id, book.audio_status)}
+                disabled={actionLoading}
+                className={`h-9 px-3 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50 ${
+                  book.audio_status === "published"
+                    ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 shadow-2xs"
+                    : "bg-navy text-white hover:bg-navy-hover shadow-xs"
+                }`}
+                title={book.audio_status === "published" ? "Dépublier du catalogue" : "Publier au catalogue"}
+              >
+                {book.audio_status === "published" ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5" />
+                    <span className="hidden xl:inline">Dépublier</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5 text-gold" />
+                    <span className="hidden xl:inline">Publier</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeletingBook(book)}
+                disabled={actionLoading}
+                className="w-9 h-9 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 transition-colors inline-flex items-center justify-center shrink-0 shadow-2xs cursor-pointer disabled:opacity-50"
+                title="Supprimer le livre audio"
+              >
+                <Trash2 className="w-4 h-4 text-red-600" />
+              </button>
+            </>
           )}
 
           {/* Actions Rôle Chef Maquettiste */}
@@ -619,11 +777,16 @@ export function AudioBooksManagementView({
 
                 {/* Actions Grid */}
                 <div className="flex items-center justify-between pt-1 gap-2">
-                  <span className="text-xs font-bold font-mono text-navy">
-                    {book.price_audio_xof.toLocaleString("fr-FR")} FCFA
-                  </span>
+                  <div className="font-mono">
+                    <span className="text-xs font-bold text-navy block">
+                      {book.price_audio_xof.toLocaleString("fr-FR")} FCFA
+                    </span>
+                    <span className="text-[10px] text-foreground-muted block">
+                      {book.price_audio_eur ? `${book.price_audio_eur.toFixed(2)} €` : "-"}
+                    </span>
+                  </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <Link
                       href={`/listen/${book.id}`}
                       className="p-2 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy transition-colors cursor-pointer"
@@ -632,30 +795,63 @@ export function AudioBooksManagementView({
                       <ExternalLink className="w-3.5 h-3.5 text-gold" />
                     </Link>
 
-                    {/* Action Admin */}
+                    {/* Actions Admin (CRUD Complet) */}
                     {role === "admin" && (
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePublish(book.id, book.audio_status)}
-                        disabled={actionLoading}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
-                          book.audio_status === "published"
-                            ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                            : "bg-navy text-white hover:bg-navy-hover shadow-xs"
-                        }`}
-                      >
-                        {book.audio_status === "published" ? (
-                          <>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenInspection(book.id)}
+                          className="p-2 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy hover:text-gold transition-colors cursor-pointer"
+                          title="Inspecter les pistes et détails"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+
+                        <Link
+                          href={`/admin/audio/${book.id}/edit`}
+                          className="p-2 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy hover:text-gold transition-colors cursor-pointer"
+                          title="Modifier l'ouvrage audio"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenQuickEdit(book)}
+                          className="p-2 rounded-xl border border-border bg-background hover:bg-background-secondary text-navy hover:text-gold transition-colors cursor-pointer"
+                          title="Édition rapide (prix & statut)"
+                        >
+                          <SlidersHorizontal className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePublish(book.id, book.audio_status)}
+                          disabled={actionLoading}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 ${
+                            book.audio_status === "published"
+                              ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                              : "bg-navy text-white hover:bg-navy-hover shadow-xs"
+                          }`}
+                          title={book.audio_status === "published" ? "Dépublier du catalogue" : "Publier au catalogue"}
+                        >
+                          {book.audio_status === "published" ? (
                             <EyeOff className="w-3.5 h-3.5" />
-                            <span>Dépublier</span>
-                          </>
-                        ) : (
-                          <>
+                          ) : (
                             <Eye className="w-3.5 h-3.5 text-gold" />
-                            <span>Publier</span>
-                          </>
-                        )}
-                      </button>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDeletingBook(book)}
+                          disabled={actionLoading}
+                          className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 transition-colors cursor-pointer disabled:opacity-50"
+                          title="Supprimer le livre audio"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
                     )}
 
                     {/* Action Chef Maquettiste */}
@@ -755,6 +951,399 @@ export function AudioBooksManagementView({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modale d'Inspection Détaillée (Admin) */}
+      {inspectingBookId && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl max-h-[90vh] rounded-3xl bg-background border border-border shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-border bg-background-secondary/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-navy/10 flex items-center justify-center text-navy">
+                  <Headphones className="w-5 h-5 text-gold" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-lg text-navy">
+                    Inspection Détaillée du Livre Audio
+                  </h3>
+                  <p className="text-xs text-foreground-muted">
+                    Analyse des pistes, des narrateurs et de la configuration audio.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectingBookId(null)}
+                className="p-2 rounded-xl text-foreground-muted hover:text-navy hover:bg-background-secondary transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Contenu Modal */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {isLoadingInspection ? (
+                <div className="py-16 text-center text-xs text-foreground-muted flex items-center justify-center gap-2">
+                  <Sparkles className="w-5 h-5 text-gold animate-spin" />
+                  <span>Chargement des détails et pistes de l'ouvrage...</span>
+                </div>
+              ) : inspectingBookData ? (
+                <>
+                  {/* Résumé de l'ouvrage */}
+                  <div className="flex flex-col sm:flex-row gap-5 p-5 rounded-2xl bg-background-secondary/40 border border-border">
+                    <div className="w-20 h-28 rounded-xl bg-background-secondary border border-border overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
+                      {inspectingBookData.cover_url ? (
+                        <img src={inspectingBookData.cover_url} alt={inspectingBookData.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <Headphones className="w-8 h-8 text-gold" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-mono font-bold uppercase text-gold">
+                          {inspectingBookData.category_name} • {inspectingBookData.country}
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-background border border-border text-foreground-muted">
+                          {inspectingBookData.format_type === "audio" ? "Livre audio autonome" : "Version audio rattachée"}
+                        </span>
+                        {renderStatusBadge(inspectingBookData.audio_status)}
+                      </div>
+
+                      <h4 className="font-serif font-bold text-lg text-navy leading-snug">
+                        {inspectingBookData.title}
+                      </h4>
+
+                      <p className="text-xs text-foreground-muted">
+                        Auteurs : <strong className="text-navy">{inspectingBookData.authors_display}</strong>
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-4 pt-1 text-xs font-mono">
+                        <div className="flex items-center gap-1.5 text-navy font-bold">
+                          <Clock className="w-4 h-4 text-gold" />
+                          <span>{formatAudioDuration(inspectingBookData.total_duration_seconds)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-foreground-muted font-sans">
+                          <Music className="w-4 h-4 text-navy" />
+                          <span>{inspectingBookData.total_tracks_count} piste{inspectingBookData.total_tracks_count > 1 ? "s" : ""} au total</span>
+                        </div>
+                        <div className="text-navy font-bold">
+                          {inspectingBookData.price_audio_xof?.toLocaleString("fr-FR")} FCFA / {inspectingBookData.price_audio_eur?.toFixed(2)} €
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filtre Voix */}
+                  <div className="flex items-center justify-between gap-4 border-b border-border pb-3">
+                    <div className="flex items-center gap-2">
+                      <Volume2 className="w-4 h-4 text-gold" />
+                      <span className="font-serif font-bold text-sm text-navy">Pistes Sonores & Narrations</span>
+                    </div>
+
+                    <div className="inline-flex items-center p-1 rounded-xl bg-background-secondary border border-border text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setInspectionVoiceFilter("all")}
+                        className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                          inspectionVoiceFilter === "all" ? "bg-navy text-white" : "text-foreground-muted hover:text-navy"
+                        }`}
+                      >
+                        Toutes ({inspectingBookData.tracks?.length || 0})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInspectionVoiceFilter("male")}
+                        className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                          inspectionVoiceFilter === "male" ? "bg-navy text-white" : "text-foreground-muted hover:text-navy"
+                        }`}
+                      >
+                        Homme ({inspectingBookData.tracks?.filter((t: any) => t.voice_gender === "male").length || 0})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInspectionVoiceFilter("female")}
+                        className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                          inspectionVoiceFilter === "female" ? "bg-navy text-white" : "text-foreground-muted hover:text-navy"
+                        }`}
+                      >
+                        Femme ({inspectingBookData.tracks?.filter((t: any) => t.voice_gender === "female").length || 0})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Liste des Pistes */}
+                  {filteredInspectionTracks.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-foreground-muted bg-background-secondary/30 rounded-2xl border border-dashed border-border">
+                      Aucune piste sonore trouvée pour ce filtre.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredInspectionTracks.map((track: any, idx: number) => (
+                        <div
+                          key={track.id || idx}
+                          className="p-4 rounded-2xl border border-border bg-background hover:border-gold/50 transition-all flex flex-col gap-3"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-navy/5 border border-navy/10 flex items-center justify-center text-navy shrink-0">
+                                <FileAudio className="w-4 h-4 text-gold" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-xs text-navy">
+                                    {track.track_type === "full" ? "Livre complet" : `Chapitre ${track.chapter_number || idx + 1}`}
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    track.voice_gender === "male"
+                                      ? "bg-navy/10 text-navy border border-navy/20"
+                                      : "bg-gold/15 text-gold border border-gold/30"
+                                  }`}>
+                                    {track.voice_gender === "male" ? "Voix Homme" : "Voix Femme"}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-foreground-muted font-serif">
+                                  {track.title || `Piste ${idx + 1}`}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 font-mono text-xs text-foreground-muted">
+                              <span className="flex items-center gap-1 font-semibold text-navy">
+                                <Clock className="w-3.5 h-3.5 text-gold" />
+                                {formatAudioDuration(track.duration_seconds || 0)}
+                              </span>
+                              {track.bitrate_kbps && (
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-background-secondary border border-border">
+                                  {track.bitrate_kbps} kbps
+                                </span>
+                              )}
+                              {track.file_size_bytes && (
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-background-secondary border border-border">
+                                  {(track.file_size_bytes / (1024 * 1024)).toFixed(1)} Mo
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Lecteur audio intégré si URL accessible */}
+                          {track.audio_url && (
+                            <div className="pt-2 border-t border-border/60">
+                              <audio
+                                controls
+                                preload="none"
+                                src={track.audio_url}
+                                className="w-full h-8"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-5 border-t border-border bg-background-secondary/30 flex items-center justify-between gap-4">
+              <button
+                type="button"
+                onClick={() => setInspectingBookId(null)}
+                className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-background transition-colors cursor-pointer"
+              >
+                Fermer
+              </button>
+
+              {inspectingBookData && (
+                <Link
+                  href={`/admin/audio/${inspectingBookData.id}/edit`}
+                  className="px-5 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-gold" />
+                  <span>Accéder à l'Éditeur Complet</span>
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale d'Édition Rapide (Admin) */}
+      {quickEditBook && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSaveQuickEdit}
+            className="w-full max-w-md rounded-3xl bg-background border border-border p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95"
+          >
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <SlidersHorizontal className="w-5 h-5 text-gold" />
+                <h3 className="font-serif font-bold text-base text-navy">
+                  Édition Rapide — Tarifs & Statut
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickEditBook(null)}
+                className="p-1.5 rounded-lg text-foreground-muted hover:text-navy transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-foreground-muted line-clamp-1">
+              Ouvrage : <strong className="text-navy font-semibold">{quickEditBook.title}</strong>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-navy mb-1.5">
+                  Tarif Livre Audio en FCFA (XOF)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={quickPriceXof}
+                  onChange={(e) => setQuickPriceXof(Number(e.target.value))}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-navy"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-navy mb-1.5">
+                  Tarif Livre Audio en Euros (€ EUR)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.05}
+                  value={quickPriceEur}
+                  onChange={(e) => setQuickPriceEur(Number(e.target.value))}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-navy"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-navy mb-1.5">
+                  Statut de diffusion audio
+                </label>
+                <select
+                  value={quickStatus}
+                  onChange={(e) => setQuickStatus(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-navy cursor-pointer"
+                >
+                  <option value="draft">Brouillon</option>
+                  <option value="pending_layout_validation">Attente Chef Maquettiste</option>
+                  <option value="pending_legal_validation">Attente Juriste</option>
+                  <option value="published">Publié au catalogue public</option>
+                  <option value="rejected">Rejeté / Demande de corrections</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setQuickEditBook(null)}
+                className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-background-secondary transition-colors cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={isQuickSaving}
+                className="px-5 py-2 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isQuickSaving ? "Enregistrement..." : "Enregistrer les modifications"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modale de Confirmation de Suppression (Admin) */}
+      {deletingBook && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-background border border-border p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-red-600 pb-2 border-b border-border">
+              <div className="w-10 h-10 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-serif font-bold text-base text-navy">
+                  Supprimer le livre audio ?
+                </h3>
+                <p className="text-xs text-foreground-muted">
+                  Confirmation de l'opération de suppression
+                </p>
+              </div>
+            </div>
+
+            {/* Avertissement selon nature du livre */}
+            <div className="p-3.5 rounded-2xl bg-red-50/70 border border-red-200 text-xs text-red-800 space-y-1">
+              <p className="font-semibold">Avertissement important :</p>
+              <p>
+                {deletingBook.format_type === "audio"
+                  ? "Cet ouvrage est un livre audio autonome. Cette action supprimera définitivement le livre audio du catalogue, ainsi que l'ensemble de ses pistes sonores hébergées."
+                  : "Cet ouvrage possède également une version numérique ou papier. Cette action supprimera l'ensemble des pistes audio et désactivera la version audio, sans impacter la publication principale."}
+              </p>
+            </div>
+
+            {/* Fiche récapitulative */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-background-secondary border border-border">
+              <div className="w-10 h-14 rounded-lg bg-background border border-border overflow-hidden shrink-0 flex items-center justify-center">
+                {deletingBook.cover_url ? (
+                  <img src={deletingBook.cover_url} alt={deletingBook.title} className="w-full h-full object-cover" />
+                ) : (
+                  <Headphones className="w-5 h-5 text-gold" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-serif font-bold text-xs text-navy truncate">
+                  {deletingBook.title}
+                </h4>
+                <p className="text-[11px] text-foreground-muted truncate">
+                  {deletingBook.authors_display}
+                </p>
+                <p className="text-[10px] font-mono text-gold font-bold">
+                  {deletingBook.total_tracks_count} piste{deletingBook.total_tracks_count > 1 ? "s" : ""} • {formatAudioDuration(deletingBook.total_duration_seconds)}
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingBook(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-background-secondary transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                    <span>Suppression en cours...</span>
+                  </>
+                ) : (
+                  <span>Confirmer la suppression</span>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

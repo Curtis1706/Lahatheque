@@ -19,6 +19,7 @@ import {
   DollarSign,
   Info,
   ChevronRight,
+  Headphones,
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -134,7 +135,20 @@ export default function AuthorRoyaltiesPage() {
     const totalGross = filteredPayments.reduce((acc, p) => acc + p.gross_revenue, 0);
     const totalEarned = filteredPayments.reduce((acc, p) => acc + p.author_earned_amount, 0);
 
-    return { totalPaid, totalPending, totalSales, totalGross, totalEarned };
+    const totalPaperSold = filteredPayments.reduce(
+      (acc, p) => acc + (p.paper_sales_count || 0),
+      0
+    );
+    const totalDigitalSold = filteredPayments.reduce(
+      (acc, p) => acc + (p.digital_sales_count || 0),
+      0
+    );
+    const totalAudioSold = filteredPayments.reduce(
+      (acc, p) => acc + (p.audio_sales_count || 0),
+      0
+    );
+
+    return { totalPaid, totalPending, totalSales, totalGross, totalEarned, totalPaperSold, totalDigitalSold, totalAudioSold };
   }, [filteredPayments]);
 
   // Déduction rigoureuse des demandes de versement (retraits)
@@ -375,7 +389,7 @@ export default function AuthorRoyaltiesPage() {
           </span>
           {row.paper_sales_count !== undefined && row.digital_sales_count !== undefined && (
             <p className="text-[10px] text-foreground-muted">
-              {row.paper_sales_count} papier &bull; {row.digital_sales_count} num.
+              {row.paper_sales_count} papier &bull; {row.digital_sales_count} num. &bull; {row.audio_sales_count || 0} audio
             </p>
           )}
         </div>
@@ -760,7 +774,7 @@ export default function AuthorRoyaltiesPage() {
                     {startDate ? `du ${startDate}` : "début"} {endDate ? `au ${endDate}` : ""}
                   </strong>{" "}
                   &bull; <span className="font-bold">{filteredPayments.length}</span> trimestre(s) décompté(s) &bull;{" "}
-                  <span className="font-bold">{periodTotals.totalSales}</span> vente(s) cumulée(s)
+                  <span className="font-bold">{periodTotals.totalSales}</span> vente(s) ({periodTotals.totalPaperSold} pap., {periodTotals.totalDigitalSold} num., {periodTotals.totalAudioSold} aud.)
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -868,7 +882,8 @@ export default function AuthorRoyaltiesPage() {
                                     </span>
                                   )}
                                   {b.format_breakdown.audio > 0 && (
-                                    <span className="px-1.5 py-0.5 rounded-md bg-background-secondary text-foreground-muted font-bold text-[10px]">
+                                    <span className="px-1.5 py-0.5 rounded-md bg-gold/15 text-navy font-bold text-[10px] inline-flex items-center gap-1 border border-gold/30">
+                                      <Headphones className="w-3 h-3 text-gold" />
                                       {b.format_breakdown.audio} aud.
                                     </span>
                                   )}
@@ -914,7 +929,27 @@ export default function AuthorRoyaltiesPage() {
                             <div className="min-w-0 flex-1">
                               <p className="font-serif font-bold text-xs text-navy leading-snug">{b.title}</p>
                               <p className="text-[10px] text-foreground-muted">{b.discipline}</p>
-                              <div className="flex items-center justify-between mt-1 text-[11px] font-mono">
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {b.format_breakdown.digital > 0 && (
+                                  <span className="px-1.5 py-0.2 rounded-md bg-navy/10 text-navy font-bold text-[9px] inline-flex items-center gap-0.5">
+                                    <Laptop className="w-2.5 h-2.5" />
+                                    {b.format_breakdown.digital} num.
+                                  </span>
+                                )}
+                                {b.format_breakdown.paper > 0 && (
+                                  <span className="px-1.5 py-0.2 rounded-md bg-gold/10 text-gold font-bold text-[9px] inline-flex items-center gap-0.5">
+                                    <BookOpen className="w-2.5 h-2.5" />
+                                    {b.format_breakdown.paper} pap.
+                                  </span>
+                                )}
+                                {b.format_breakdown.audio > 0 && (
+                                  <span className="px-1.5 py-0.2 rounded-md bg-gold/15 text-navy font-bold text-[9px] inline-flex items-center gap-0.5 border border-gold/30">
+                                    <Headphones className="w-2.5 h-2.5 text-gold" />
+                                    {b.format_breakdown.audio} aud.
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-between mt-1.5 text-[11px] font-mono">
                                 <span className="text-foreground-muted">{b.sales_count} ex. vendus</span>
                                 <span className="font-bold text-gold">{b.net_royalty.toLocaleString("fr-FR")} XOF</span>
                               </div>

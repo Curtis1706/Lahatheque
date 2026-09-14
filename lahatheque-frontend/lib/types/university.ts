@@ -139,7 +139,7 @@ export interface UniversityUnitSaleRoyalty {
   cover_url?: string;
   authors: string[];
   discipline: string;
-  format: "paper" | "digital";
+  format: "paper" | "digital" | "audio";
   quantity: number;
   unit_price: number;
   gross_amount: number;
@@ -218,6 +218,9 @@ export interface UniversityRoyaltiesDetailData {
     digital_sales_count: number;
     digital_royalties_total: number;
     digital_gross_total: number;
+    audio_sales_count?: number;
+    audio_royalties_total?: number;
+    audio_gross_total?: number;
     bouquet_consultations_count: number;
     bouquet_royalties_total: number;
     bouquet_gross_allocated: number;

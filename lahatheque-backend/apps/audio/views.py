@@ -731,7 +731,25 @@ class AudioStudioSubmitView(APIView):
         target_audio_status = "published" if is_admin_or_super else "pending_layout_validation"
 
         ouvrage = None
-        if is_attached and attached_book_id:
+        existing_book_id = data.get("book_id") or data.get("ouvrage_id")
+        if existing_book_id:
+            try:
+                ouvrage = Ouvrage.objects.get(id=existing_book_id)
+                ouvrage.has_audio_version = True
+                ouvrage.price_audio = price_xof
+                ouvrage.price_audio_eur = price_eur
+                if "title" in data and data.get("title"):
+                    ouvrage.title = str(data["title"]).strip()
+                if "description" in data:
+                    ouvrage.summary = str(data.get("description") or "").strip()
+                if "country" in data:
+                    ouvrage.country = str(data["country"]).strip()
+                if is_admin_or_super and "status" in data:
+                    ouvrage.audio_status = data.get("status")
+                ouvrage.save()
+            except Ouvrage.DoesNotExist:
+                return Response({"success": False, "error": "Ouvrage introuvable pour la mise à jour."}, status=404)
+        elif is_attached and attached_book_id:
             try:
                 ouvrage = Ouvrage.objects.get(id=attached_book_id)
                 ouvrage.has_audio_version = True
@@ -893,6 +911,8 @@ class AudioManagementListView(APIView):
                 "has_female_voice": has_female,
                 "total_duration_seconds": total_dur,
                 "total_tracks_count": len(tracks),
+                "format_type": b.format_type,
+                "has_audio_version": bool(b.has_audio_version),
                 "created_at": b.created_at.isoformat() if b.created_at else "",
                 "rejection_reason": getattr(b, "rejection_reason", "") or "",
             })
@@ -974,3 +994,202 @@ class RecentAudioListeningsView(APIView):
             })
 
         return Response({"success": True, "data": data})
+
+
+class AudioBookDetailManagementView(APIView):
+    """
+    Gestion détaillée d'un livre audio pour l'espace administrateur :
+    GET    → Détails complets du livre audio et de toutes ses pistes sonores
+    PATCH  → Mise à jour des métadonnées, tarifs et statut
+    DELETE → Suppression définitive ou détachement de la version audio
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAudioUploader]
+
+    def get(self, request, book_id):
+        from apps.catalog.models import Ouvrage
+
+        try:
+            ouvrage = (
+                Ouvrage.objects
+                .select_related('discipline', 'publisher')
+                .prefetch_related('authors', 'audio_tracks', 'language_versions')
+                .get(id=book_id)
+            )
+        except Ouvrage.DoesNotExist:
+            return Response({"success": False, "error": "Livre audio introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        tracks = list(ouvrage.audio_tracks.all().order_by('voice_gender', 'track_type', 'chapter_number', 'order_index'))
+        authors_list = [f"{a.first_name} {a.last_name}".strip() for a in ouvrage.authors.all()]
+        authors_str = ", ".join(authors_list) if authors_list else (ouvrage.publisher_name or "Auteur LAHA")
+
+        tracks_data = []
+        for t in tracks:
+            audio_url = ""
+            if t.audio_file:
+                try:
+                    audio_url = t.audio_file.url
+                except Exception:
+                    audio_url = ""
+            tracks_data.append({
+                "id": str(t.id),
+                "title": t.title,
+                "voice_gender": t.voice_gender,
+                "track_type": t.track_type,
+                "chapter_number": t.chapter_number,
+                "order_index": t.order_index,
+                "duration_seconds": t.duration_seconds,
+                "file_size_bytes": t.file_size_bytes,
+                "bitrate_kbps": t.bitrate_kbps,
+                "stream_id": t.stream_id,
+                "hls_manifest_url": t.hls_manifest_url,
+                "audio_url": audio_url,
+                "narration_language": t.narration_language,
+                "created_at": t.created_at.isoformat() if t.created_at else "",
+            })
+
+        total_dur = sum(t.duration_seconds or 0 for t in tracks)
+
+        data = {
+            "id": str(ouvrage.id),
+            "title": ouvrage.title,
+            "subtitle": ouvrage.subtitle or "",
+            "summary": ouvrage.summary or "",
+            "description": ouvrage.summary or "",
+            "country": ouvrage.country or "BJ",
+            "format_type": ouvrage.format_type,
+            "has_audio_version": bool(ouvrage.has_audio_version),
+            "audio_status": getattr(ouvrage, "audio_status", "draft") or "draft",
+            "status": ouvrage.status,
+            "price_audio_xof": float(ouvrage.price_audio or ouvrage.price_digital or 2500),
+            "price_audio_eur": float(ouvrage.price_audio_eur or 3.80),
+            "cover_url": ouvrage.cover_url,
+            "authors_display": authors_str,
+            "discipline_id": str(ouvrage.discipline.id) if ouvrage.discipline else "",
+            "discipline_name": ouvrage.discipline.name if ouvrage.discipline else "Général",
+            "category_name": ouvrage.discipline.name if ouvrage.discipline else "Général",
+            "total_duration_seconds": total_dur,
+            "total_tracks_count": len(tracks),
+            "created_at": ouvrage.created_at.isoformat() if ouvrage.created_at else "",
+            "updated_at": ouvrage.updated_at.isoformat() if ouvrage.updated_at else "",
+            "tracks": tracks_data,
+        }
+
+        return Response({"success": True, "data": data})
+
+    def patch(self, request, book_id):
+        from apps.catalog.models import Ouvrage, Discipline
+        from apps.catalog.views import invalidate_catalog_cache
+        from decimal import Decimal
+
+        try:
+            ouvrage = Ouvrage.objects.get(id=book_id)
+        except Ouvrage.DoesNotExist:
+            return Response({"success": False, "error": "Livre audio introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+        fields_to_update = ["updated_at"]
+
+        if "title" in data and data.get("title"):
+            ouvrage.title = str(data["title"]).strip()
+            fields_to_update.append("title")
+
+        if "summary" in data or "description" in data:
+            ouvrage.summary = str(data.get("summary") or data.get("description") or "").strip()
+            fields_to_update.append("summary")
+
+        if "country" in data:
+            ouvrage.country = str(data["country"]).strip()
+            fields_to_update.append("country")
+
+        if "price_audio_xof" in data or "price_xof" in data or "price_audio" in data:
+            val = data.get("price_audio_xof") or data.get("price_xof") or data.get("price_audio")
+            try:
+                ouvrage.price_audio = Decimal(str(val))
+                fields_to_update.append("price_audio")
+            except Exception:
+                pass
+
+        if "price_audio_eur" in data or "price_eur" in data:
+            val = data.get("price_audio_eur") or data.get("price_eur")
+            try:
+                ouvrage.price_audio_eur = Decimal(str(val))
+                fields_to_update.append("price_audio_eur")
+            except Exception:
+                pass
+
+        if "audio_status" in data:
+            new_st = str(data["audio_status"]).strip()
+            allowed_statuses = ['draft', 'pending_layout_validation', 'pending_legal_validation', 'published', 'rejected']
+            if new_st in allowed_statuses:
+                ouvrage.audio_status = new_st
+                fields_to_update.append("audio_status")
+                if new_st == "published":
+                    ouvrage.status = "published"
+                    fields_to_update.append("status")
+
+        if "category" in data or "discipline" in data:
+            cat_name = str(data.get("category") or data.get("discipline") or "").strip()
+            if cat_name:
+                disc = Discipline.objects.filter(name__iexact=cat_name).first()
+                if not disc:
+                    try:
+                        disc = Discipline.objects.filter(id=cat_name).first()
+                    except Exception:
+                        pass
+                if disc:
+                    ouvrage.discipline = disc
+                    fields_to_update.append("discipline")
+
+        ouvrage.save(update_fields=list(set(fields_to_update)))
+        invalidate_catalog_cache()
+
+        return Response({
+            "success": True,
+            "data": {
+                "id": str(ouvrage.id),
+                "title": ouvrage.title,
+                "audio_status": ouvrage.audio_status,
+                "price_audio_xof": float(ouvrage.price_audio or 0),
+                "price_audio_eur": float(ouvrage.price_audio_eur or 0),
+            },
+            "message": "Livre audio mis à jour avec succès."
+        })
+
+    def delete(self, request, book_id):
+        from apps.catalog.models import Ouvrage
+        from apps.catalog.views import invalidate_catalog_cache
+
+        try:
+            ouvrage = Ouvrage.objects.get(id=book_id)
+        except Ouvrage.DoesNotExist:
+            return Response({"success": False, "error": "Livre audio introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        is_standalone_audio = (ouvrage.format_type == 'audio')
+
+        # 1. Supprimer toutes les pistes audio associées
+        tracks_count = ouvrage.audio_tracks.count()
+        ouvrage.audio_tracks.all().delete()
+
+        if is_standalone_audio:
+            # Ouvrage purement audio : suppression complète
+            title = ouvrage.title
+            ouvrage.delete()
+            invalidate_catalog_cache()
+            return Response({
+                "success": True,
+                "data": {"id": str(book_id), "type": "standalone"},
+                "message": f"Livre audio autonome '{title}' ({tracks_count} pistes) supprimé définitivement."
+            })
+        else:
+            # Ouvrage hybride (PDF/EPUB avec version audio rattachée) : détachement propre
+            ouvrage.has_audio_version = False
+            ouvrage.audio_status = "draft"
+            ouvrage.price_audio = None
+            ouvrage.price_audio_eur = None
+            ouvrage.save(update_fields=["has_audio_version", "audio_status", "price_audio", "price_audio_eur"])
+            invalidate_catalog_cache()
+            return Response({
+                "success": True,
+                "data": {"id": str(book_id), "type": "detached"},
+                "message": f"Version audio ({tracks_count} pistes) détachée et supprimée de '{ouvrage.title}'. L'ouvrage papier/numérique est conservé."
+            })
