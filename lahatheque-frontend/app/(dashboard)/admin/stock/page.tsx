@@ -61,6 +61,7 @@ import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
+import { AdminRestockModal } from "@/components/features/admin/admin-restock-modal";
 
 export default function AdminStockOverviewPage() {
   const [overview, setOverview] = useState<AdminStockOverview | null>(null);
@@ -80,6 +81,18 @@ export default function AdminStockOverviewPage() {
   // Modales d'action stock physique
   const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+
+  // Modale Réassort par livre (AdminRestockModal - Fiche II2)
+  const [restockTarget, setRestockTarget] = useState<{
+    stockId?: string;
+    bookId: string;
+    bookTitle: string;
+    isbn?: string;
+    warehouseName?: string;
+    warehouseCode?: string;
+    currentQuantity?: number;
+    alertThreshold?: number;
+  } | null>(null);
 
   // Filtres détenteurs
   const [searchHolder, setSearchHolder] = useState("");
@@ -351,13 +364,35 @@ export default function AdminStockOverviewPage() {
       key: "actions" as any,
       header: "Action",
       cell: (row) => (
-        <Link
-          href={`/admin/stock/${row.id}`}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-navy/10 text-navy hover:bg-navy hover:text-white text-xs font-semibold transition-colors"
-        >
-          <span>Gérer</span>
-          <ArrowRight className="w-3 h-3" />
-        </Link>
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() =>
+              setRestockTarget({
+                stockId: row.id,
+                bookId: row.book_id || row.id,
+                bookTitle: row.title,
+                isbn: row.isbn,
+                warehouseName: (row as any).warehouse_nom,
+                warehouseCode: row.warehouse,
+                currentQuantity: row.quantity,
+                alertThreshold: row.alert_threshold,
+              })
+            }
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gold/15 text-navy hover:bg-gold hover:text-navy text-xs font-semibold transition-colors cursor-pointer"
+            title="Ordonner un réapprovisionnement"
+          >
+            <Package className="w-3.5 h-3.5 text-gold hover:text-navy" />
+            <span>Réassort</span>
+          </button>
+          <Link
+            href={`/admin/stock/${row.id}`}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-navy/10 text-navy hover:bg-navy hover:text-white text-xs font-semibold transition-colors"
+          >
+            <span>Gérer</span>
+            <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
       ),
     },
   ];
@@ -727,12 +762,31 @@ export default function AdminStockOverviewPage() {
                       {row.quantity} ex. dispo
                     </span>
                   </div>
-                  <div className="pt-1">
+                  <div className="grid grid-cols-2 gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRestockTarget({
+                          stockId: row.id,
+                          bookId: row.book_id || row.id,
+                          bookTitle: row.title,
+                          isbn: row.isbn,
+                          warehouseName: (row as any).warehouse_nom,
+                          warehouseCode: row.warehouse,
+                          currentQuantity: row.quantity,
+                          alertThreshold: row.alert_threshold,
+                        })
+                      }
+                      className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-gold text-navy text-xs font-bold hover:bg-gold/90 transition-colors min-h-[38px] cursor-pointer"
+                    >
+                      <Package className="w-3.5 h-3.5 text-navy" />
+                      <span>Réassort</span>
+                    </button>
                     <Link
                       href={`/admin/stock/${row.id}`}
-                      className="w-full inline-flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy/90 transition-colors min-h-[38px]"
+                      className="inline-flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-navy text-white text-xs font-semibold hover:bg-navy/90 transition-colors min-h-[38px]"
                     >
-                      <span>Gérer la fiche détaillée</span>
+                      <span>Gérer</span>
                       <ArrowRight className="w-3.5 h-3.5 text-gold" />
                     </Link>
                   </div>
@@ -1363,6 +1417,16 @@ export default function AdminStockOverviewPage() {
         <AdminGeneralRestockModal
           onClose={() => setIsRestockModalOpen(false)}
           onSuccess={loadAllData}
+        />
+      )}
+
+      {/* Modale Réassort par Ouvrage (Fiche II2) */}
+      {restockTarget && (
+        <AdminRestockModal
+          isOpen={!!restockTarget}
+          onClose={() => setRestockTarget(null)}
+          onSuccess={loadAllData}
+          item={restockTarget}
         />
       )}
 

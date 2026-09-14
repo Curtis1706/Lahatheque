@@ -110,8 +110,24 @@ class StockListView(APIView):
         if search:
             qs = qs.filter(ouvrage__title__icontains=search)
 
+        qs = qs.order_by("ouvrage__title")
+
+        try:
+            page_number = max(1, int(request.query_params.get("page", 1)))
+        except (TypeError, ValueError):
+            page_number = 1
+        try:
+            page_size = min(100, max(1, int(request.query_params.get("page_size", 20))))
+        except (TypeError, ValueError):
+            page_size = 20
+
+        total_count = qs.count()
+        start = (page_number - 1) * page_size
+        end = start + page_size
+        qs_page = qs[start:end]
+
         items = []
-        for s in qs:
+        for s in qs_page:
             item_status = s.statut
             if status_filter and status_filter != "all" and item_status != status_filter:
                 continue
@@ -140,7 +156,17 @@ class StockListView(APIView):
                 "last_restock_at": s.last_restock_at.isoformat() if s.last_restock_at else None,
             })
 
-        return Response({"success": True, "data": items, "error": None})
+        return Response({
+            "success": True,
+            "data": items,
+            "pagination": {
+                "page": page_number,
+                "page_size": page_size,
+                "total_count": total_count,
+                "total_pages": (total_count + page_size - 1) // page_size if page_size > 0 else 1,
+            },
+            "error": None,
+        })
 
 
 class StockDetailView(APIView):

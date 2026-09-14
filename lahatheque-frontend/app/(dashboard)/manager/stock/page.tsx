@@ -6,7 +6,8 @@ import { Warehouse, Search, ArrowLeft, Filter, Plus, PackageCheck, AlertTriangle
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BookCover3D } from "@/components/ui/book-cover-3d";
-import { getStockItems } from "@/lib/services/manager";
+import { getStockItemsPaginated } from "@/lib/services/manager";
+import { Pagination } from "@/components/ui/pagination";
 import type { StockItem, StockFilterStatus } from "@/lib/types/manager";
 
 export default function StockGlobalPage() {
@@ -15,16 +16,43 @@ export default function StockGlobalPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StockFilterStatus>("all");
   const [warehouseFilter, setWarehouseFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, warehouseFilter]);
+
+  useEffect(() => {
+    let active = true;
     async function loadData() {
       setLoading(true);
-      const data = await getStockItems();
-      setItems(data);
-      setLoading(false);
+      try {
+        const res = await getStockItemsPaginated({
+          page: currentPage,
+          page_size: pageSize,
+          search: searchQuery.trim() || undefined,
+          warehouse: warehouseFilter !== "all" ? warehouseFilter : undefined,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+        });
+        if (active) {
+          setItems(res.items);
+          setTotalPages(res.pagination.total_pages);
+          setTotalCount(res.pagination.total_count);
+        }
+      } catch (err) {
+        console.error("Erreur chargement stock:", err);
+      } finally {
+        if (active) setLoading(false);
+      }
     }
     loadData();
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [currentPage, pageSize, searchQuery, statusFilter, warehouseFilter]);
 
   const warehouses = useMemo(() => {
     const set = new Set<string>();
@@ -295,7 +323,7 @@ export default function StockGlobalPage() {
         onRowClick={(row) => {
           window.location.href = `/manager/stock/${row.id}`;
         }}
-        pageSize={10}
+        showPagination={false}
         mobileCard={(row) => {
           const coverUrl =
             row.cover_url ||
@@ -342,6 +370,21 @@ export default function StockGlobalPage() {
             </div>
           );
         }}
+      />
+
+      {/* Pagination Réelle (Fiche II1) */}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalCount}
+        pageSize={pageSize}
+        onPageChange={(page) => setCurrentPage(page)}
+        onPageSizeChange={(newSize) => {
+          setPageSize(newSize);
+          setCurrentPage(1);
+        }}
+        pageSizeOptions={[10, 20, 50, 100]}
+        itemLabel="ouvrages"
       />
     </div>
   );
