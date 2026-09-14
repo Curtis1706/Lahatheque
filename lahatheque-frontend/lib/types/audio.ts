@@ -102,7 +102,7 @@ export interface AudioStudioFormState {
   category: string;
   level: string;
   price_xof: number;
-  price_eur: number;
+  price_eur?: number | null;
   cover_image: File | null;
   cover_url: string;
   narration_language: string;
@@ -120,7 +120,7 @@ export interface AudioBookSummary {
   country: string;
   cover_url: string;
   price_audio_xof: number;
-  price_audio_eur: number;
+  price_audio_eur?: number | null;
   audio_status: AudioWorkflowStatus;
   has_male_voice: boolean;
   has_female_voice: boolean;

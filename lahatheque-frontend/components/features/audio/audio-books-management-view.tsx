@@ -47,7 +47,7 @@ export interface AudioBookItem {
   format_type?: string;
   has_audio_version?: boolean;
   price_audio_xof: number;
-  price_audio_eur: number;
+  price_audio_eur?: number | null;
   audio_status: string;
   has_male_voice: boolean;
   has_female_voice: boolean;
@@ -91,7 +91,6 @@ export function AudioBooksManagementView({
   // Modale d'édition rapide (Admin)
   const [quickEditBook, setQuickEditBook] = useState<AudioBookItem | null>(null);
   const [quickPriceXof, setQuickPriceXof] = useState<number>(2500);
-  const [quickPriceEur, setQuickPriceEur] = useState<number>(3.8);
   const [quickStatus, setQuickStatus] = useState<string>("draft");
   const [isQuickSaving, setIsQuickSaving] = useState(false);
 
@@ -231,8 +230,7 @@ export function AudioBooksManagementView({
   // Gestion Édition Rapide (Admin)
   const handleOpenQuickEdit = (book: AudioBookItem) => {
     setQuickEditBook(book);
-    setQuickPriceXof(book.price_audio_xof || 2500);
-    setQuickPriceEur(book.price_audio_eur || 3.8);
+    setQuickPriceXof(book.price_audio_xof !== undefined && book.price_audio_xof !== null ? book.price_audio_xof : 2500);
     setQuickStatus(book.audio_status || "draft");
   };
 
@@ -245,7 +243,6 @@ export function AudioBooksManagementView({
     try {
       const res = await updateAudioBook(quickEditBook.id, {
         price_audio_xof: quickPriceXof,
-        price_audio_eur: quickPriceEur,
         audio_status: quickStatus,
       });
       if (res.success) {
@@ -439,9 +436,7 @@ export function AudioBooksManagementView({
           <span className="text-xs font-bold text-navy block whitespace-nowrap">
             {book.price_audio_xof.toLocaleString("fr-FR")} FCFA
           </span>
-          <span className="text-[10px] text-foreground-muted block">
-            {book.price_audio_eur ? `${book.price_audio_eur.toFixed(2)} €` : "-"}
-          </span>
+         
         </div>
       ),
     },
@@ -781,9 +776,6 @@ export function AudioBooksManagementView({
                     <span className="text-xs font-bold text-navy block">
                       {book.price_audio_xof.toLocaleString("fr-FR")} FCFA
                     </span>
-                    <span className="text-[10px] text-foreground-muted block">
-                      {book.price_audio_eur ? `${book.price_audio_eur.toFixed(2)} €` : "-"}
-                    </span>
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -1030,7 +1022,7 @@ export function AudioBooksManagementView({
                           <span>{inspectingBookData.total_tracks_count} piste{inspectingBookData.total_tracks_count > 1 ? "s" : ""} au total</span>
                         </div>
                         <div className="text-navy font-bold">
-                          {inspectingBookData.price_audio_xof?.toLocaleString("fr-FR")} FCFA / {inspectingBookData.price_audio_eur?.toFixed(2)} €
+                          {inspectingBookData.price_audio_xof?.toLocaleString("fr-FR")} FCFA
                         </div>
                       </div>
                     </div>
@@ -1206,24 +1198,9 @@ export function AudioBooksManagementView({
                 <input
                   type="number"
                   min={0}
-                  step={100}
+                  step="any"
                   value={quickPriceXof}
-                  onChange={(e) => setQuickPriceXof(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-navy"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-navy mb-1.5">
-                  Tarif Livre Audio en Euros (€ EUR)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  step={0.05}
-                  value={quickPriceEur}
-                  onChange={(e) => setQuickPriceEur(Number(e.target.value))}
+                  onChange={(e) => setQuickPriceXof(e.target.value === "" ? 0 : Number(e.target.value))}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-navy"
                   required
                 />

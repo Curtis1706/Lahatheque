@@ -715,9 +715,13 @@ class AudioStudioSubmitView(APIView):
         attached_book_id = data.get("attached_book_id")
 
         price_xof_val = data.get("price_xof")
+        if price_xof_val is None:
+            price_xof_val = data.get("price_audio_xof")
         price_eur_val = data.get("price_eur")
-        price_xof = Decimal(str(price_xof_val)) if price_xof_val else Decimal("2500.00")
-        price_eur = Decimal(str(price_eur_val)) if price_eur_val else Decimal("3.80")
+        if price_eur_val is None:
+            price_eur_val = data.get("price_audio_eur")
+        price_xof = Decimal(str(price_xof_val)) if price_xof_val is not None and str(price_xof_val).strip() != "" else Decimal("2500.00")
+        price_eur = Decimal(str(price_eur_val)) if price_eur_val is not None and str(price_eur_val).strip() != "" else None
 
         user = request.user
         user_role = getattr(user, "role", "")
@@ -904,8 +908,8 @@ class AudioManagementListView(APIView):
                 "category_name": b.discipline.name if b.discipline else "Général",
                 "country": b.country or "BJ",
                 "cover_url": b.cover_url,
-                "price_audio_xof": float(b.price_audio or b.price_digital or 2500),
-                "price_audio_eur": float(b.price_audio_eur or 3.80),
+                "price_audio_xof": float(b.price_audio) if b.price_audio is not None else float(b.price_digital or 2500),
+                "price_audio_eur": float(b.price_audio_eur) if b.price_audio_eur is not None else None,
                 "audio_status": getattr(b, "audio_status", "draft") or "draft",
                 "has_male_voice": has_male,
                 "has_female_voice": has_female,
@@ -1060,8 +1064,8 @@ class AudioBookDetailManagementView(APIView):
             "has_audio_version": bool(ouvrage.has_audio_version),
             "audio_status": getattr(ouvrage, "audio_status", "draft") or "draft",
             "status": ouvrage.status,
-            "price_audio_xof": float(ouvrage.price_audio or ouvrage.price_digital or 2500),
-            "price_audio_eur": float(ouvrage.price_audio_eur or 3.80),
+            "price_audio_xof": float(ouvrage.price_audio) if ouvrage.price_audio is not None else float(ouvrage.price_digital or 2500),
+            "price_audio_eur": float(ouvrage.price_audio_eur) if ouvrage.price_audio_eur is not None else None,
             "cover_url": ouvrage.cover_url,
             "authors_display": authors_str,
             "discipline_id": str(ouvrage.discipline.id) if ouvrage.discipline else "",
@@ -1102,17 +1106,29 @@ class AudioBookDetailManagementView(APIView):
             fields_to_update.append("country")
 
         if "price_audio_xof" in data or "price_xof" in data or "price_audio" in data:
-            val = data.get("price_audio_xof") or data.get("price_xof") or data.get("price_audio")
+            val = data.get("price_audio_xof")
+            if val is None:
+                val = data.get("price_xof")
+            if val is None:
+                val = data.get("price_audio")
             try:
-                ouvrage.price_audio = Decimal(str(val))
+                if val is not None and str(val).strip() != "":
+                    ouvrage.price_audio = Decimal(str(val))
+                else:
+                    ouvrage.price_audio = None
                 fields_to_update.append("price_audio")
             except Exception:
                 pass
 
         if "price_audio_eur" in data or "price_eur" in data:
-            val = data.get("price_audio_eur") or data.get("price_eur")
+            val = data.get("price_audio_eur")
+            if val is None:
+                val = data.get("price_eur")
             try:
-                ouvrage.price_audio_eur = Decimal(str(val))
+                if val is not None and str(val).strip() != "":
+                    ouvrage.price_audio_eur = Decimal(str(val))
+                else:
+                    ouvrage.price_audio_eur = None
                 fields_to_update.append("price_audio_eur")
             except Exception:
                 pass
@@ -1149,8 +1165,8 @@ class AudioBookDetailManagementView(APIView):
                 "id": str(ouvrage.id),
                 "title": ouvrage.title,
                 "audio_status": ouvrage.audio_status,
-                "price_audio_xof": float(ouvrage.price_audio or 0),
-                "price_audio_eur": float(ouvrage.price_audio_eur or 0),
+                "price_audio_xof": float(ouvrage.price_audio) if ouvrage.price_audio is not None else 0.0,
+                "price_audio_eur": float(ouvrage.price_audio_eur) if ouvrage.price_audio_eur is not None else None,
             },
             "message": "Livre audio mis à jour avec succès."
         })

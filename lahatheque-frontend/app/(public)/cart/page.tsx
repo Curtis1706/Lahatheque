@@ -153,9 +153,6 @@ export default function CartPage() {
                     <div className="text-sm font-bold font-mono text-navy">
                       {(item.price * item.quantity).toLocaleString("fr-FR")} F CFA
                     </div>
-                    <div className="text-[11px] text-foreground-muted font-mono">
-                      ≈ {formatEur(item.price * item.quantity)} €
-                    </div>
                   </div>
                 </div>
               </div>
@@ -186,9 +183,7 @@ export default function CartPage() {
                     <span className="font-bold font-mono text-navy text-sm">
                       {totalAmount.toLocaleString("fr-FR")} F CFA
                     </span>
-                    <div className="text-[10px] text-foreground-muted font-mono">
-                      ≈ {formatEur(totalAmount)} €
-                    </div>
+                  
                   </div>
                 </div>
 
