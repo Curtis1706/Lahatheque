@@ -391,7 +391,11 @@ export default function OrderCreateForm({
           plage_horaire_debut: requiresShipping && heureDebut ? heureDebut : undefined,
           plage_horaire_fin: requiresShipping && heureFin ? heureFin : undefined,
         });
-        toast.success(`Vente comptoir enregistrée avec succès pour ${guestName || "le client"}.`);
+        toast.success(
+          requiresShipping
+            ? `Vente comptoir enregistrée pour ${guestName || "le client"}. La commande physique sera préparée pour expédition.`
+            : `Vente comptoir enregistrée avec succès pour ${guestName || "le client"}.`
+        );
         onSuccess();
         return;
       }
@@ -408,7 +412,11 @@ export default function OrderCreateForm({
           plage_horaire_debut: heureDebut || undefined,
           plage_horaire_fin: heureFin || undefined,
         });
-        toast.success(`Commande créée avec succès pour ${targetClientName || "le client"}.`);
+        toast.success(
+          requiresShipping
+            ? `Commande physique créée avec succès pour ${targetClientName || "le client"}. Préparation logistique en cours.`
+            : `Commande créée avec succès pour ${targetClientName || "le client"}.`
+        );
         onSuccess();
         return;
       }
@@ -429,7 +437,11 @@ export default function OrderCreateForm({
         return;
       }
 
-      toast.success("Commande créée avec succès. Un agent LAHA Éditions vous contactera.");
+      toast.success(
+        requiresShipping
+          ? "Commande physique enregistrée avec succès ! Notre service logistique vous contactera pour l'expédition."
+          : "Commande créée avec succès. Un agent LAHA Éditions vous contactera."
+      );
       onSuccess();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erreur lors de la création de la commande.";

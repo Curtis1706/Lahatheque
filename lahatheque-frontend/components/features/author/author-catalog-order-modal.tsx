@@ -195,7 +195,11 @@ export function AuthorCatalogOrderModal({
         // Achat à crédit
         await createOrder(payload);
         setSuccess(true);
-        toast.success(`Achat à crédit validé. Échéance au ${new Date(creditDueDate).toLocaleDateString("fr-FR")}.`);
+        if (format === "paper") {
+          toast.success(`Achat à crédit physique validé (${quantity} ex.). Échéance au ${new Date(creditDueDate).toLocaleDateString("fr-FR")}. Votre colis sera préparé pour expédition.`);
+        } else {
+          toast.success(`Achat à crédit validé. Échéance au ${new Date(creditDueDate).toLocaleDateString("fr-FR")}.`);
+        }
         onOrderSuccess?.();
       }
     } catch (err: any) {

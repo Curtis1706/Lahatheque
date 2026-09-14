@@ -140,7 +140,7 @@ export function UnifiedBookOrderModal({
         setSuccess(true);
         onDigitalPurchaseSuccess?.();
       } else {
-        toast.success(`Commande papier enregistrée (${quantity} exemplaire${quantity > 1 ? "s" : ""}).`);
+        toast.success(`Commande physique enregistrée (${quantity} exemplaire${quantity > 1 ? "s" : ""}) ! Votre livre broché sera préparé et expédié à votre adresse.`);
         onClose();
       }
     } catch (err: unknown) {
