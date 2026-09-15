@@ -114,8 +114,8 @@ class PdfAttachmentService:
         page.insert_text(fitz.Point(40, 115), "Émetteur :", fontsize=10, fontname="helv", color=navy)
         page.insert_text(fitz.Point(40, 128), "LAHA Éditions S.A.", fontsize=10.5, fontname="helv", color=navy)
         page.insert_text(fitz.Point(40, 142), "Capital Social : 1 000 000 000 FCFA", fontsize=8.5, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(40, 155), "IFU : 3202415897451 | RCCM : RB/COT/24 B 12458", fontsize=8.5, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(40, 168), "Siège : Avenue Jean-Paul II, Cotonou, Bénin", fontsize=8.5, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 155), "IFU : 3202011691197 | RCCM : RB/COT/24 B 12458", fontsize=8.5, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 168), "Siège : MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou, Bénin", fontsize=7.5, fontname="helv", color=dark_gray)
         page.insert_text(fitz.Point(40, 181), "lahaeditions1@gmail.com | www.lahatheque.com", fontsize=8.5, fontname="helv", color=dark_gray)
 
         # Destinataire (Droite)
@@ -186,14 +186,14 @@ class PdfAttachmentService:
         page.draw_line(fitz.Point(40, footer_y - 10), fitz.Point(555, footer_y - 10), color=border_gray)
         page.insert_text(
             fitz.Point(40, footer_y + 5),
-            "LAHA Éditions S.A. au capital de 1 000 000 000 FCFA • Siège Social : Avenue Jean-Paul II, Cotonou, Bénin",
+            "LAHA Éditions S.A. • Siège Social : MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou, Littoral, Bénin",
             fontsize=7.5,
             fontname="helv",
             color=(0.4, 0.4, 0.4),
         )
         page.insert_text(
             fitz.Point(40, footer_y + 17),
-            "RCCM RB/COT/24 B 12458 • IFU 3202415897451 • Document officiel certifié conforme aux normes comptables SYSCOHADA.",
+            "RCCM RB/COT/24 B 12458 • IFU 3202011691197 • Document officiel certifié conforme aux normes comptables SYSCOHADA.",
             fontsize=7,
             fontname="helv",
             color=(0.5, 0.5, 0.5),
@@ -255,8 +255,8 @@ class PdfAttachmentService:
         page.insert_text(fitz.Point(40, 105), "Émetteur :", fontsize=10, fontname="helv", color=navy)
         page.insert_text(fitz.Point(40, 118), "LAHA Éditions S.A.", fontsize=10.5, fontname="helv", color=navy)
         page.insert_text(fitz.Point(40, 131), "Capital Social : 1 000 000 000 FCFA", fontsize=8, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(40, 143), "IFU : 3202415897451 | RCCM : RB/COT/24 B 12458", fontsize=8, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(40, 155), "Siège : Avenue Jean-Paul II, Cotonou, Bénin", fontsize=8, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 143), "IFU : 3202011691197 | RCCM : RB/COT/24 B 12458", fontsize=8, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 155), "Siège : MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou, Bénin", fontsize=7.5, fontname="helv", color=dark_gray)
         page.insert_text(fitz.Point(40, 167), "lahaeditions1@gmail.com | www.lahatheque.com", fontsize=8, fontname="helv", color=dark_gray)
 
         # Ayant Droit (Droite)
@@ -323,14 +323,14 @@ class PdfAttachmentService:
         page.draw_line(fitz.Point(40, footer_y - 10), fitz.Point(555, footer_y - 10), color=border_gray)
         page.insert_text(
             fitz.Point(40, footer_y + 5),
-            "LAHA Éditions S.A. au capital de 1 000 000 000 FCFA • Siège Social : Avenue Jean-Paul II, Cotonou, Bénin",
+            "LAHA Éditions S.A. • Siège Social : MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou, Littoral, Bénin",
             fontsize=7.5,
             fontname="helv",
             color=(0.4, 0.4, 0.4),
         )
         page.insert_text(
             fitz.Point(40, footer_y + 17),
-            "RCCM RB/COT/24 B 12458 • IFU 3202415897451 • Bordereau certifié conforme aux stipulations du contrat d'édition (SYSCOHADA).",
+            "RCCM RB/COT/24 B 12458 • IFU 3202011691197 • Bordereau certifié conforme aux stipulations du contrat d'édition (SYSCOHADA).",
             fontsize=7,
             fontname="helv",
             color=(0.5, 0.5, 0.5),

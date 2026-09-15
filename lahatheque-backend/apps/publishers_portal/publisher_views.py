@@ -36,7 +36,7 @@ def get_or_create_publisher_profile(user) -> PublisherProfile:
             "contact_person": f"{user.first_name} {user.last_name}".strip() or "Responsable Éditorial",
             "contact_email": user.email or "partenaires@editions-afrique.com",
             "contact_phone": getattr(user, "phone", "+229 97 00 11 22"),
-            "headquarters_address": "Avenue Jean-Paul II, Cotonou, Bénin",
+            "headquarters_address": "MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arrondissement Cotonou, Littoral, BÉNIN",
             "contract_reference": "CTR-PUB-2025-08",
             "contractual_royalty_rate": Decimal("22.00"),
         }
