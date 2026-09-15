@@ -47,7 +47,7 @@ export function PaperOrderModal({
     setSubmitting(true);
     try {
       await onConfirmOrder(book.id, book.title, unitPrice, shippingAddress, quantity, selectedLanguage);
-      toast.success(`Commande de ${quantity} exemplaire(s) enregistrée avec succès !`);
+      toast.success(`Commande physique enregistrée (${quantity} ex.) ! Votre exemplaire papier sera préparé et expédié à votre adresse.`);
       onClose();
     } catch (err: unknown) {
       // Le message réel (ex: "Stock insuffisant pour...") vient du backend via onConfirmOrder.

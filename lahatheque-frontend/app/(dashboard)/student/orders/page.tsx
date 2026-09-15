@@ -119,7 +119,17 @@ function StudentOrdersContent() {
       try {
         const res = await verifyOrderPayment({ orderId, paymentId });
         if (res.success && res.data?.status === "paid") {
-          toast.success("Paiement validé avec succès. Vos ouvrages numériques sont accessibles dans votre bibliothèque.");
+          const targetOrder = orders.find((o) => o.id === orderId);
+          const hasPaper = targetOrder?.lignes?.some((l) => l.format_type === "paper") || !!targetOrder?.livraison;
+          const hasDigital = targetOrder?.lignes?.some((l) => l.format_type !== "paper");
+
+          if (hasPaper && hasDigital) {
+            toast.success("Paiement validé avec succès ! Vos accès numériques sont disponibles et votre commande physique est en cours de préparation logistique.");
+          } else if (hasPaper) {
+            toast.success("Paiement validé avec succès ! Votre commande de livre physique est confirmée et sera expédiée à votre adresse de livraison.");
+          } else {
+            toast.success("Paiement validé avec succès. Vos ouvrages numériques sont accessibles dans votre bibliothèque.");
+          }
           await loadData();
         } else if (res.success && res.data?.status === "pending") {
           toast.info("Paiement en attente de confirmation par l'opérateur.");

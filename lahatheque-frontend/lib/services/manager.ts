@@ -107,21 +107,41 @@ export async function getEntrepots(): Promise<Entrepot[]> {
 
 // ─── Stock ────────────────────────────────────────────────────────────────────
 
-export async function getStockItems(filters?: {
+export interface StockPaginationInfo {
+  page: number;
+  page_size: number;
+  total_count: number;
+  total_pages: number;
+}
+
+export interface PaginatedStockResponse {
+  items: StockItem[];
+  pagination: StockPaginationInfo;
+}
+
+export async function getStockItemsPaginated(filters?: {
   status?: string;
   warehouse?: string;
   country?: string;
   search?: string;
-}): Promise<StockItem[]> {
+  page?: number;
+  page_size?: number;
+}): Promise<PaginatedStockResponse> {
   const params = new URLSearchParams();
   if (filters?.status && filters.status !== "all") params.set("status", filters.status);
   if (filters?.warehouse) params.set("warehouse", filters.warehouse);
   if (filters?.country) params.set("country", filters.country);
   if (filters?.search) params.set("search", filters.search);
+  if (filters?.page) params.set("page", String(filters.page));
+  if (filters?.page_size) params.set("page_size", String(filters.page_size));
+
   try {
-    const raw = await bffGet<any>(`/stock/?${params.toString()}`);
-    const list = Array.isArray(raw) ? raw : (raw as any)?.results || (raw as any)?.data || [];
-    return list.map((s: any) => ({
+    const res = await fetch(`${BFF}/stock/?${params.toString()}`, { credentials: "include" });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Erreur serveur");
+
+    const rawList = Array.isArray(json.data) ? json.data : (json.data?.results || []);
+    const items = rawList.map((s: any) => ({
       id: s.id,
       book_id: s.book_id || (s.id ? String(s.id) : ""),
       isbn: s.isbn ?? "",
@@ -145,9 +165,38 @@ export async function getStockItems(filters?: {
       seuil_alerte: s.seuil_alerte,
       statut: s.statut,
     } as StockItem & Record<string, any>));
+
+    const pagination: StockPaginationInfo = json.pagination || {
+      page: filters?.page || 1,
+      page_size: filters?.page_size || items.length || 20,
+      total_count: json.pagination?.total_count ?? items.length,
+      total_pages: json.pagination?.total_pages ?? 1,
+    };
+
+    return { items, pagination };
   } catch {
-    return [];
+    return {
+      items: [],
+      pagination: {
+        page: filters?.page || 1,
+        page_size: filters?.page_size || 20,
+        total_count: 0,
+        total_pages: 1,
+      },
+    };
   }
+}
+
+export async function getStockItems(filters?: {
+  status?: string;
+  warehouse?: string;
+  country?: string;
+  search?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<StockItem[]> {
+  const res = await getStockItemsPaginated(filters);
+  return res.items;
 }
 
 

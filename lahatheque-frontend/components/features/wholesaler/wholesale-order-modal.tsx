@@ -96,7 +96,11 @@ export function WholesaleOrderModal({
         }
       );
 
-      toast.success(`Commande ${order.reference || order.id} enregistrée avec succès !`);
+      toast.success(
+        format === "paper"
+          ? `Commande physique grossiste ${order.reference || order.id} enregistrée ! Expédition des exemplaires en cours de traitement.`
+          : `Commande numérique grossiste ${order.reference || order.id} enregistrée avec succès !`
+      );
       onClose();
       if (onOrderSuccess) onOrderSuccess();
       router.push(`/wholesaler/orders/${order.id}`);

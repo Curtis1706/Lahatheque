@@ -19,6 +19,7 @@ import { useCart } from "@/context/cart-context";
 import { useAuth } from "@/hooks/use-auth";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { CheckoutAuthPanel } from "@/components/checkout/checkout-auth-panel";
+import { toast } from "sonner";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -162,8 +163,12 @@ export default function CheckoutPage() {
             Numéro de commande : <span className="font-bold font-mono text-navy">{orderCompleted.order_id}</span>
           </p>
           <p className="text-xs text-foreground/80 leading-relaxed pt-2">
-            Votre règlement de <span className="font-bold text-gold-dark font-mono">{parseInt(orderCompleted.total_amount || 0).toLocaleString("fr-FR")} FCFA</span> a été débité et validé avec succès.
-            Vos accès de lecture sont désormais immédiatement actifs.
+            Votre règlement de <span className="font-bold text-gold-dark font-mono">{parseInt(orderCompleted.total_amount || 0).toLocaleString("fr-FR")} FCFA</span> a été débité et validé avec succès.{" "}
+            {hasPaperItem && items.some((i) => i.format !== "paper")
+              ? "Vos accès de lecture numérique sont immédiatement disponibles et votre commande de livre physique est en cours de préparation logistique."
+              : hasPaperItem
+              ? "Votre commande de livre physique est en cours de préparation logistique pour expédition à votre adresse de livraison."
+              : "Vos accès de lecture sont désormais immédiatement actifs."}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full pt-4">
@@ -262,6 +267,14 @@ export default function CheckoutPage() {
       setPaymentPhase("success");
       setOrderCompleted(data);
       clearCart();
+      const hasDigital = items.some((i) => i.format !== "paper");
+      if (hasPaperItem && hasDigital) {
+        toast.success("Commande validée avec succès ! Vos accès numériques sont immédiatement actifs et votre livre broché sera préparé pour expédition.");
+      } else if (hasPaperItem) {
+        toast.success("Commande physique validée avec succès ! Votre exemplaire papier sera préparé et expédié à votre adresse.");
+      } else {
+        toast.success("Paiement validé avec succès ! Vos accès de lecture sont désormais immédiatement actifs.");
+      }
     } catch (err: any) {
       setPaymentPhase("idle");
       setError(err.message || "Erreur réseau lors de la validation de commande.");

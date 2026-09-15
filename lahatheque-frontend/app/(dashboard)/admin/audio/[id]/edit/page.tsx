@@ -31,7 +31,7 @@ import {
   uploadFileDirectToR2,
   submitAudioStudioForm,
 } from "@/lib/services/audio";
-import { formatAudioDuration, formatXofToEur } from "@/lib/config/audio-constants";
+import { formatAudioDuration } from "@/lib/config/audio-constants";
 import { InlineLoader } from "@/components/ui/page-loader";
 import { DisciplineCombobox } from "@/components/features/catalog/discipline-combobox";
 import { CountryCombobox } from "@/components/features/catalog/country-combobox";
@@ -54,7 +54,6 @@ export default function AdminAudioEditPage() {
   const [discipline, setDiscipline] = useState("");
   const [country, setCountry] = useState("BJ");
   const [priceXof, setPriceXof] = useState<number>(2500);
-  const [priceEur, setPriceEur] = useState<number>(3.80);
   const [audioStatus, setAudioStatus] = useState<string>("draft");
 
   // Pistes existantes
@@ -88,8 +87,7 @@ export default function AdminAudioEditPage() {
         setDescription(d.description || d.summary || "");
         setDiscipline(d.category_name || d.discipline_name || "Général");
         setCountry(d.country || "BJ");
-        setPriceXof(d.price_audio_xof || 2500);
-        setPriceEur(d.price_audio_eur || 3.80);
+        setPriceXof(d.price_audio_xof !== undefined && d.price_audio_xof !== null ? d.price_audio_xof : (d.price_audio !== undefined && d.price_audio !== null ? d.price_audio : 2500));
         setAudioStatus(d.audio_status || "draft");
         setTracks(d.tracks || []);
       } else {
@@ -106,12 +104,9 @@ export default function AdminAudioEditPage() {
     loadBookDetails();
   }, [bookId]);
 
-  // Calcul automatique du prix EUR
+  // Modification du prix FCFA (ajustable librement, sans minimum imposé)
   const handlePriceXofChange = (val: number) => {
-    const xof = Math.max(0, val);
-    const eur = parseFloat((xof / 655.957).toFixed(2));
-    setPriceXof(xof);
-    setPriceEur(eur);
+    setPriceXof(Math.max(0, val));
   };
 
   // Sauvegarde des métadonnées
@@ -130,7 +125,6 @@ export default function AdminAudioEditPage() {
         category: discipline,
         country,
         price_audio_xof: priceXof,
-        price_audio_eur: priceEur,
         audio_status: audioStatus,
       });
 
@@ -430,7 +424,7 @@ export default function AdminAudioEditPage() {
                 <span>Tarification &amp; Publication</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-navy mb-1.5">
                     Prix Audio (FCFA)
@@ -439,32 +433,13 @@ export default function AdminAudioEditPage() {
                     <input
                       type="number"
                       min={0}
-                      step={100}
+                      step="any"
                       value={priceXof}
-                      onChange={(e) => handlePriceXofChange(Number(e.target.value))}
+                      onChange={(e) => handlePriceXofChange(e.target.value === "" ? 0 : Number(e.target.value))}
                       className="w-full h-10 px-3.5 pr-14 rounded-xl border border-border bg-background font-mono text-xs sm:text-sm font-bold text-navy focus:outline-none focus:ring-2 focus:ring-navy"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-foreground-muted font-mono">
                       FCFA
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-navy mb-1.5">
-                    Équivalent EUR
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.05}
-                      value={priceEur}
-                      onChange={(e) => setPriceEur(Number(e.target.value))}
-                      className="w-full h-10 px-3.5 pr-12 rounded-xl border border-border bg-background font-mono text-xs sm:text-sm font-bold text-navy focus:outline-none focus:ring-2 focus:ring-navy"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-foreground-muted">
-                      €
                     </span>
                   </div>
                 </div>
