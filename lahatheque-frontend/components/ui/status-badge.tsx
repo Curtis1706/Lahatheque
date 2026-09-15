@@ -62,9 +62,16 @@ const statusConfig: Record<string, { style: string; defaultLabel: string; defaul
   default: { style: "bg-background-secondary text-foreground-muted border-border", defaultLabel: "Neutre", defaultIcon: AlertCircle },
 
   // ─── Statuts Gestionnaire — Stock ───────────────────────────────────────────
-  normal: { style: "bg-success/10 text-success border-success/20", defaultLabel: "Stock normal", defaultIcon: CheckCircle2 },
+  in_stock: { style: "bg-success/10 text-success border-success/20", defaultLabel: "En stock", defaultIcon: CheckCircle2 },
+  en_stock: { style: "bg-success/10 text-success border-success/20", defaultLabel: "En stock", defaultIcon: CheckCircle2 },
+  normal: { style: "bg-success/10 text-success border-success/20", defaultLabel: "En stock", defaultIcon: CheckCircle2 },
+  stock_normal: { style: "bg-success/10 text-success border-success/20", defaultLabel: "En stock", defaultIcon: CheckCircle2 },
+  disponible: { style: "bg-success/10 text-success border-success/20", defaultLabel: "En stock", defaultIcon: CheckCircle2 },
+  optimal: { style: "bg-success/10 text-success border-success/20", defaultLabel: "En stock", defaultIcon: CheckCircle2 },
   low_stock: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Seuil bas", defaultIcon: AlertTriangle },
+  seuil_bas: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "Seuil bas", defaultIcon: AlertTriangle },
   out_of_stock: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Rupture", defaultIcon: XCircle },
+  rupture: { style: "bg-error/10 text-error border-error/20", defaultLabel: "Rupture", defaultIcon: XCircle },
 
   // ─── Statuts Gestionnaire — Livraison ───────────────────────────────────────
   to_ship: { style: "bg-gold/10 text-gold border-gold/20", defaultLabel: "À expédier", defaultIcon: Package },

@@ -38,14 +38,16 @@ import {
   getAdminOrders,
   remindAbandonedOrder,
 } from "@/lib/services/admin";
-import type {
+import {
   AdminOrder,
   AdminOrdersKpis,
   AdminOrderPaymentStatus,
+  formatRoleLabel,
 } from "@/lib/types/admin";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Loader } from "@/components/ui/loader";
 import { ClientCombobox, type ClientItem } from "@/components/admin/client-combobox";
+import { BookCover } from "@/components/features/student/book-cover";
 
 export default function AdminOrdersPage() {
   // ─── État Commandes Réelles (BFF / Django) ──────────────────────────────────
@@ -174,8 +176,12 @@ export default function AdminOrdersPage() {
               : row.customer_email}
           </p>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[10px] px-1.5 py-0.2 rounded font-medium bg-muted text-muted-foreground capitalize">
-              {row.is_pos_order ? "Client externe boutique" : (row.customer_role || "Lecteur")}
+            <span className="text-[10px] px-1.5 py-0.2 rounded font-medium bg-muted text-muted-foreground">
+              {row.is_pos_order
+                ? "Client externe boutique"
+                : (row.customer_role?.toLowerCase() === "student" || row.customer_role?.toLowerCase() === "reader" || !row.customer_role
+                    ? "Espace Client"
+                    : formatRoleLabel(row.customer_role))}
             </span>
             {row.manual_payment_reference && (
               <span className="text-[10px] text-gold font-mono truncate max-w-[130px]" title={row.manual_payment_reference}>
@@ -196,17 +202,28 @@ export default function AdminOrdersPage() {
         }
 
         return (
-          <div className="min-w-0 max-w-xs">
-            <p className="text-xs font-medium text-navy truncate" title={firstItem.book_title}>
-              {firstItem.book_title}
-            </p>
-            <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground">
-              <span className="font-mono font-semibold text-navy">
-                {row.items_count} article{row.items_count > 1 ? "s" : ""}
-              </span>
-              {row.items.length > 1 && (
-                <span>(+{row.items.length - 1} autre{row.items.length > 2 ? "s" : ""})</span>
-              )}
+          <div className="flex items-center gap-3 min-w-0 max-w-sm py-1">
+            <BookCover
+              book={{
+                title: firstItem.book_title,
+                id: firstItem.book_id || undefined,
+                cover_url: firstItem.cover_url || undefined,
+              }}
+              size="xs"
+              className="w-10 h-14 min-w-[2.5rem] min-h-[3.5rem] shadow-xs shrink-0 rounded-xs"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-navy line-clamp-2 leading-snug" title={firstItem.book_title}>
+                {firstItem.book_title}
+              </p>
+              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-muted-foreground">
+                <span className="font-mono font-semibold text-navy">
+                  {row.items_count} article{row.items_count > 1 ? "s" : ""}
+                </span>
+                {row.items.length > 1 && (
+                  <span>(+{row.items.length - 1} autre{row.items.length > 2 ? "s" : ""})</span>
+                )}
+              </div>
             </div>
           </div>
         );

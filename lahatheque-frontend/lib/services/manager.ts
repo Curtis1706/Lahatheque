@@ -133,7 +133,7 @@ export async function getStockItems(filters?: {
       country: s.pays ?? s.country ?? "",
       quantity: s.quantite_disponible ?? s.quantity ?? 0,
       alert_threshold: s.seuil_alerte ?? s.alert_threshold ?? 0,
-      status: (s.statut ?? s.status ?? "normal") as StockItem["status"],
+      status: (s.statut ?? s.status ?? "in_stock") as StockItem["status"],
       last_restock_at: s.last_restock_at,
       // Champs enrichis BFF
       warehouse_nom: s.warehouse_nom,
@@ -166,7 +166,7 @@ export async function getStockItemDetail(id: string): Promise<StockItemDetail | 
       country: s.pays ?? s.country ?? "",
       quantity: s.quantite_disponible ?? s.quantity ?? 0,
       alert_threshold: s.seuil_alerte ?? s.alert_threshold ?? 0,
-      status: (s.statut ?? s.status ?? "normal") as StockItem["status"],
+      status: (s.statut ?? s.status ?? "in_stock") as StockItem["status"],
       last_restock_at: s.last_restock_at,
       publisher_name: s.publisher_name ?? "",
       publication_date: s.publication_date ?? "",

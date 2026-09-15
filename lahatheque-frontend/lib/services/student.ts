@@ -95,6 +95,8 @@ export interface BookAPI {
   is_completed?: boolean;
   is_favorite?: boolean;
   access_type?: string;
+  expires_at?: string;
+  expires_in_days?: number;
 }
 
 export interface StudentOverviewKPIs {

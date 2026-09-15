@@ -131,7 +131,7 @@ export default function SubmitManuscriptPage() {
       setSubmitSuccess(true);
     } catch {
       setIsSubmitting(false);
-      setSubmitError("Une erreur est survenue. Vérifiez votre connexion et réessayez, ou contactez-nous à contact@lahatheque.com.");
+      setSubmitError("Une erreur est survenue. Vérifiez votre connexion et réessayez, ou contactez-nous à lahaeditions1@gmail.com.");
     }
   };
 

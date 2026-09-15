@@ -65,6 +65,8 @@ export interface ClientBookAccess {
   course_name?: string;
   is_recommended?: boolean;
   expiresInDays?: number;
+  expires_at?: string;
+  expires_in_days?: number;
   available_languages?: string[];
   languages?: Array<{
     id: string;

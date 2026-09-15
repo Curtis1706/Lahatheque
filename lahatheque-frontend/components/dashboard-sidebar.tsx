@@ -102,9 +102,9 @@ export function DashboardSidebar() {
       case "student":
         return [
           {
-            groupLabel: "Mon Espace",
+            groupLabel: "Espace Client",
             items: [
-              { label: "Espace Lecteur", href: "/student", icon: <LayoutDashboard className="size-4" /> },
+              { label: "Espace Client", href: "/student", icon: <LayoutDashboard className="size-4" /> },
               { label: "Catalogue & Recherche", href: "/student/catalog", icon: <Search className="size-4" /> },
               { label: "Ma Bibliothèque", href: "/student/books", icon: <BookOpen className="size-4" /> },
               // { label: "Bouquets Documentaires", href: "/student/bouquets", icon: <Layers className="size-4" /> },

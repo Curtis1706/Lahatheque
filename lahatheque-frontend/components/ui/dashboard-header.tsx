@@ -107,14 +107,14 @@ export function DashboardHeader() {
     if (path.startsWith("/university/profile")) return { section: "Espace Université", title: "Profil Établissement" };
     if (path === "/university") return { section: "Espace Université", title: "Vue d'ensemble Université" };
 
-    if (path.startsWith("/student/catalog")) return { section: "Espace Lecteur", title: "Catalogue & Découverte" };
-    if (path.startsWith("/student/books")) return { section: "Espace Lecteur", title: "Ma Bibliothèque" };
-    if (path.startsWith("/student/orders")) return { section: "Espace Lecteur", title: "Achats & Commandes Papier" };
-    if (path.startsWith("/student/history")) return { section: "Espace Lecteur", title: "Historique & Statistiques d'Étude" };
-    if (path.startsWith("/student/subscriptions")) return { section: "Espace Lecteur", title: "Accès & Formules" };
-    if (path.startsWith("/student/profile")) return { section: "Espace Lecteur", title: "Mon Profil" };
-    if (path.startsWith("/student/university")) return { section: "Espace Lecteur", title: "Mon Université" };
-    if (path === "/student") return { section: "Espace Lecteur", title: "Mon Espace Lecteur" };
+    if (path.startsWith("/student/catalog")) return { section: "Espace Client", title: "Catalogue & Découverte" };
+    if (path.startsWith("/student/books")) return { section: "Espace Client", title: "Ma Bibliothèque" };
+    if (path.startsWith("/student/orders")) return { section: "Espace Client", title: "Achats & Commandes Papier" };
+    if (path.startsWith("/student/history")) return { section: "Espace Client", title: "Historique & Statistiques d'Étude" };
+    if (path.startsWith("/student/subscriptions")) return { section: "Espace Client", title: "Accès & Formules" };
+    if (path.startsWith("/student/profile")) return { section: "Espace Client", title: "Mon Profil" };
+    if (path.startsWith("/student/university")) return { section: "Espace Client", title: "Mon Université" };
+    if (path === "/student") return { section: "Espace Client", title: "Mon Espace Client" };
 
     if (path.startsWith("/wholesaler/catalog")) return { section: "Espace Grossiste", title: "Catalogue & Achat Gros" };
     if (path.startsWith("/wholesaler/orders")) return { section: "Espace Grossiste", title: "Commandes" };

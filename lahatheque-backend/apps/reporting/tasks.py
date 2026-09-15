@@ -669,7 +669,7 @@ def check_and_generate_stock_notifications(user=None, force_email=False):
                 f"Cordialement,\n"
                 f"Système Logistique LAHAThèque"
             )
-            sender = getattr(settings, 'DEFAULT_FROM_EMAIL', 'Lahatheque <contact@mail.lahalex.com>')
+            sender = getattr(settings, 'DEFAULT_FROM_EMAIL', 'Lahatheque <lahaeditions1@gmail.com>')
             try:
                 from apps.communications.services.email_service import EmailService
                 EmailService.send(

@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Headphones,
   Languages,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClientBookAccess } from "@/lib/types/student";
@@ -187,6 +188,12 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-navy bg-gold/15 px-2 py-0.5 rounded-md border border-gold/30 shrink-0">
                     <Sparkles className="w-3 h-3 text-gold" />
                     Bouquet Campus
+                  </span>
+                )}
+                {((book.expires_in_days !== undefined && book.expires_in_days !== null) || book.expiresInDays !== undefined) && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-navy bg-navy/5 px-2 py-0.5 rounded-md border border-border shrink-0">
+                    <Clock className="w-3 h-3 text-gold shrink-0" />
+                    <span>Accès 12 mois ({book.expires_in_days ?? book.expiresInDays} j restants)</span>
                   </span>
                 )}
               </div>

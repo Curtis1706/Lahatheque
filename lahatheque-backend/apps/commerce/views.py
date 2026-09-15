@@ -225,6 +225,14 @@ class CreateOrderView(APIView):
             logger.info(f"[Commerce] Commande #{commande.id} créée pour {request.user.email} - Total: {total_amount} XOF (Papier: {has_paper})")
             print(f"[ORDER] Nouvelle commande #{commande.id} - {request.user.email} ({total_amount} XOF)")
 
+            # Notification immédiate de l'administrateur pour toute nouvelle commande créée
+            if not is_credit_purchase:
+                try:
+                    from .services import notify_admin_order_event
+                    notify_admin_order_event(commande, event_type="order_created")
+                except Exception as admin_mail_err:
+                    logger.warning(f"[Commerce] Impossible de notifier l'admin à la création: {admin_mail_err}")
+
             if is_credit_purchase:
                 from .services import fulfill_credit_order
                 fulfill_credit_order(commande)
@@ -999,10 +1007,14 @@ class AdminOrdersListView(APIView):
             items_data = []
             for item in o.lignes.all():
                 book_title = item.ouvrage.titre if item.ouvrage else "Ouvrage"
+                cover_url = item.ouvrage.cover_url if (item.ouvrage and hasattr(item.ouvrage, 'cover_url')) else (
+                    f"/api/bff/catalog/books/{item.ouvrage_id}/cover/" if item.ouvrage_id else ""
+                )
                 items_data.append({
                     "id": str(item.id),
                     "book_id": str(item.ouvrage_id) if item.ouvrage_id else None,
                     "book_title": book_title,
+                    "cover_url": cover_url,
                     "format": item.format_type,
                     "quantity": item.quantity,
                     "unit_price": float(item.unit_price),

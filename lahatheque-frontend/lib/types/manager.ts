@@ -4,7 +4,7 @@
 
 // ─── Stock ────────────────────────────────────────────────────────────────────
 
-export type StockStatus = "normal" | "low_stock" | "out_of_stock";
+export type StockStatus = "normal" | "in_stock" | "low_stock" | "out_of_stock";
 
 export interface StockItem {
   id: string;
@@ -194,5 +194,5 @@ export interface WarehouseDistribution {
 
 // ─── Filtres ──────────────────────────────────────────────────────────────────
 
-export type StockFilterStatus = "all" | "normal" | "low_stock" | "out_of_stock";
+export type StockFilterStatus = "all" | "normal" | "in_stock" | "low_stock" | "out_of_stock";
 export type DeliveryPeriodFilter = "today" | "week" | "month" | "all";

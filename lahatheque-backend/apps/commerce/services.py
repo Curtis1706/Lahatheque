@@ -96,13 +96,159 @@ def _unlock_order_content(commande):
                     logger.warning(f"[Commerce] Stock insuffisant pour {ouvrage.title} (quantité demandée: {ligne.quantity})")
 
 
+def notify_admin_order_event(commande, event_type: str = "order_created", extra_context: dict | None = None):
+    """
+    Notifie systématiquement la direction et les administrateurs pour chaque commande (créée, payée, à crédit, etc.).
+    Envoi d'un e-mail récapitulatif ultra-détaillé à l'adresse officielle lahaeditions1@gmail.com et aux comptes admin.
+    """
+    from apps.communications.services.email_service import send_transactional_email
+    from apps.accounts.models import User
+    from .models import LigneCommande, PhysicalDelivery
+    from django.conf import settings
+
+    try:
+        # Récupération des destinataires administrateurs
+        admin_emails = list(
+            User.objects.filter(role__in=['admin', 'super_admin'], is_active=True)
+            .exclude(email='')
+            .values_list('email', flat=True)
+        )
+        official_admin = getattr(settings, 'ADMIN_NOTIFICATION_EMAIL', 'lahaeditions1@gmail.com')
+        if official_admin and official_admin not in admin_emails:
+            admin_emails.append(official_admin)
+
+        if not admin_emails:
+            admin_emails = ['lahaeditions1@gmail.com']
+
+        order_num = str(getattr(commande, 'numero_commande', '') or str(commande.id)[:8].upper())
+        user = commande.user
+        customer_name = (
+            f"{user.first_name or ''} {user.last_name or ''}".strip() or str(user.email)
+            if user else str(getattr(commande, 'guest_name', 'Client Comptoir') or 'Client')
+        )
+        customer_email = str(user.email if user else getattr(commande, 'guest_email', 'Non renseigné'))
+        customer_phone = str(getattr(user, 'phone', None) or getattr(user, 'phone_number', None) or getattr(commande, 'guest_phone', '') or '')
+        customer_role = str(getattr(user, 'role', 'Client')).capitalize() if user else "Client Boutique"
+        customer_inst = str(getattr(user, 'university_affiliation', '') or (getattr(user, 'institution', None).name if getattr(user, 'institution', None) else ''))
+
+        # Lignes d'articles
+        lignes = LigneCommande.objects.filter(commande=commande).select_related('ouvrage')
+        items_list = []
+        has_physical = False
+        format_map = {
+            'digital': 'Numérique (EPUB/PDF)',
+            'pdf': 'Numérique (PDF)',
+            'epub': 'Numérique (EPUB)',
+            'paper': 'Exemplaire Papier',
+            'papier': 'Exemplaire Papier',
+            'audio': 'Livre Audio (Streaming)',
+        }
+        for l in lignes:
+            if l.format_type in ('paper', 'papier'):
+                has_physical = True
+            items_list.append({
+                "title": l.ouvrage.title if l.ouvrage else "Ouvrage LAHAThèque",
+                "format_label": format_map.get(l.format_type, l.format_type),
+                "quantity": l.quantity,
+                "unit_price": float(l.unit_price or 0.0),
+                "total": float(getattr(l, 'total_price', None) or (l.quantity * (l.unit_price or 0))),
+            })
+
+        # Données de livraison si commande physique
+        shipping_addr = ""
+        city = ""
+        country = "Bénin"
+        delivery = PhysicalDelivery.objects.filter(commande=commande).first()
+        if delivery:
+            shipping_addr = delivery.shipping_address
+            city = delivery.city
+            country = delivery.country
+
+        total_amt = float(getattr(commande, 'total_ttc', 0.0) or getattr(commande, 'total_amount', 0.0) or 0.0)
+        curr_code = getattr(commande.currency, 'code', None) or str(getattr(commande, 'currency', 'FCFA') or 'FCFA')
+        if curr_code == "XOF":
+            curr_code = "FCFA"
+
+        is_paid = (commande.statut_paiement == 'paid')
+        status_paiement_display = dict(commande.PAYMENT_STATUS_CHOICES).get(commande.statut_paiement, commande.statut_paiement)
+        status_commande_display = dict(commande.ORDER_STATUS_CHOICES).get(commande.statut_commande, commande.statut_commande)
+        mode_paiement_display = dict(commande.PAYMENT_METHOD_CHOICES).get(commande.mode_paiement, commande.mode_paiement)
+
+        if event_type == "payment_success":
+            badge_label = "Paiement Encaissé • Validé"
+            event_title = f"Paiement Confirmé pour la Commande #{order_num}"
+            intro_msg = f"Le paiement de la commande #{order_num} a été encaissé avec succès via {mode_paiement_display}."
+        elif event_type == "credit_granted":
+            badge_label = "Vente à Crédit • Dépôt Validé"
+            event_title = f"Nouvelle Commande à Crédit #{order_num}"
+            due_date = commande.credit_due_date.strftime('%d/%m/%Y') if getattr(commande, 'credit_due_date', None) else "Non définie"
+            intro_msg = f"Une commande à crédit (#{order_num}) a été accordée au client. Échéance de règlement fixée au {due_date}."
+        elif event_type == "manual_confirmed":
+            badge_label = "Règlement Manuel Validé"
+            event_title = f"Règlement Encaissé pour la Commande #{order_num}"
+            intro_msg = f"Le paiement manuel de la commande #{order_num} a été certifié par l'administrateur."
+        elif event_type == "payment_failed":
+            badge_label = "Échec de Paiement"
+            event_title = f"Échec de Paiement sur la Commande #{order_num}"
+            intro_msg = f"La tentative de paiement pour la commande #{order_num} a échoué auprès de l'opérateur."
+        else:
+            badge_label = "Nouvelle Commande Enregistrée"
+            event_title = f"Nouvelle Commande #{order_num} ({status_paiement_display})"
+            intro_msg = f"Une nouvelle commande (#{order_num}) vient d'être enregistrée sur la plateforme (Statut paiement : {status_paiement_display})."
+
+        order_date_str = commande.created_at.strftime("%d/%m/%Y à %H:%M") if hasattr(commande, 'created_at') and commande.created_at else timezone.now().strftime("%d/%m/%Y à %H:%M")
+
+        context = {
+            "order_number": order_num,
+            "order_date": order_date_str,
+            "badge_label": badge_label,
+            "event_title": event_title,
+            "intro_message": intro_msg,
+            "is_paid": is_paid,
+            "status_paiement_label": status_paiement_display,
+            "status_commande_label": status_commande_display,
+            "payment_method_label": mode_paiement_display,
+            "payment_reference": getattr(commande, 'manual_payment_reference', '') or getattr(getattr(commande, 'payment_transaction', None), 'moneroo_id', ''),
+            "customer_name": customer_name,
+            "customer_email": customer_email,
+            "customer_phone": customer_phone,
+            "customer_role": customer_role,
+            "customer_institution": customer_inst,
+            "items": items_list,
+            "total_amount": f"{total_amt:,.0f}".replace(",", " "),
+            "currency": curr_code,
+            "has_physical": has_physical,
+            "shipping_address": shipping_addr,
+            "city": city,
+            "country": country,
+            "site_url": getattr(settings, 'FRONTEND_URL', 'https://lahatheque.com') or 'https://lahatheque.com',
+        }
+        if extra_context:
+            context.update(extra_context)
+
+        for admin_email in set(admin_emails):
+            send_transactional_email(
+                email_type="admin_order_notification",
+                to_email=str(admin_email),
+                subject=f"[ADMIN LAHAThèque] {event_title}",
+                template_name="emails/orders/admin_order_notification.html",
+                context=context,
+                recipient_name="Direction & Administration LAHA",
+                async_send=True,
+            )
+        logger.info(f"[Commerce] Notification email administrateur déclenchée pour commande {order_num} vers {admin_emails}")
+    except Exception as notify_err:
+        logger.error(f"[Commerce] Erreur notification admin pour commande {commande.id}: {notify_err}", exc_info=True)
+
+
 def _notify_order_finalized(commande, context_label):
     from apps.reporting.services import notify_user
     from apps.reporting.models import Notification
     from apps.communications.services.email_service import send_transactional_email
     from .models import LigneCommande
+    from django.conf import settings
 
-    # 1. Notification in-app interne
+    # 1. Notification in-app interne (mentionne la validité 12 mois pour le numérique)
     try:
         notify_user(
             user=commande.user,
@@ -110,7 +256,7 @@ def _notify_order_finalized(commande, context_label):
             title="Paiement confirmé" if commande.statut_paiement == 'paid' else "Commande à crédit activée",
             message=(
                 f"Votre commande #{str(commande.id)[:8]} ({context_label}) a été traitée avec succès. "
-                f"Vos ouvrages numériques sont accessibles dans votre bibliothèque."
+                f"Vos ouvrages numériques sont accessibles dans votre bibliothèque pour une durée de 12 mois."
             ),
             action_url="/student/books",
             resource_id=str(commande.id),
@@ -118,7 +264,7 @@ def _notify_order_finalized(commande, context_label):
     except Exception as e:
         logger.warning(f"[Commerce] Erreur notification in-app: {e}")
 
-    # 2. Envoi d'email transactionnel officiel avec Facture PDF jointe
+    # 2. Envoi d'email transactionnel officiel avec Facture PDF jointe (Client)
     try:
         if commande.user and commande.user.email:
             lignes = LigneCommande.objects.filter(commande=commande).select_related('ouvrage')
@@ -168,6 +314,7 @@ def _notify_order_finalized(commande, context_label):
                     "total_amount": f"{total_amt:,.0f}".replace(",", " "),
                     "currency": pdf_invoice_data["currency"],
                     "is_physical": has_physical,
+                    "site_url": getattr(settings, 'FRONTEND_URL', 'https://lahatheque.com') or 'https://lahatheque.com',
                 },
                 recipient_name=full_name,
                 pdf_invoice_data=pdf_invoice_data,
@@ -176,6 +323,13 @@ def _notify_order_finalized(commande, context_label):
             logger.info(f"[Commerce] Email de confirmation avec facture PDF déclenché pour commande {order_num} vers {commande.user.email}")
     except Exception as mail_err:
         logger.error(f"[Commerce] Erreur envoi email facture pour commande {commande.id}: {mail_err}")
+
+    # 3. Notification systématique de la Direction / Administration LAHA
+    try:
+        event = "payment_success" if commande.statut_paiement == 'paid' else "credit_granted"
+        notify_admin_order_event(commande, event_type=event)
+    except Exception as admin_mail_err:
+        logger.error(f"[Commerce] Erreur envoi notification admin pour commande {commande.id}: {admin_mail_err}")
 
 
 
@@ -360,6 +514,11 @@ def handle_payment_failure(payment_tx):
             )
         except Exception:
             pass
+
+        try:
+            notify_admin_order_event(commande, event_type="payment_failed")
+        except Exception as admin_err:
+            logger.error(f"[Commerce] Erreur notification admin échec paiement: {admin_err}")
     except Order.DoesNotExist:
         logger.error(f"[Commerce] Aucune commande trouvée pour la transaction {payment_tx.id}")
 

@@ -170,7 +170,7 @@ export function SendInstitutionStatementModal({
                 )}
                 <div className="pt-2 border-t border-border flex items-center gap-2 text-xs text-foreground-muted">
                   <ShieldCheck className="w-3.5 h-3.5 text-gold flex-shrink-0" />
-                  <span>Canal officiel <strong className="text-navy">contact@mail.lahalex.com</strong></span>
+                  <span>Canal officiel <strong className="text-navy">lahaeditions1@gmail.com</strong></span>
                 </div>
               </div>
 

@@ -36,7 +36,10 @@ export default function StockGlobalPage() {
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      if (statusFilter !== "all" && item.status !== statusFilter) return false;
+      if (statusFilter !== "all") {
+        if (statusFilter === "normal" && item.status !== "normal" && item.status !== "in_stock") return false;
+        if (statusFilter !== "normal" && item.status !== statusFilter) return false;
+      }
       if (warehouseFilter !== "all" && item.warehouse !== warehouseFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -200,10 +203,10 @@ export default function StockGlobalPage() {
         </div>
         <div className="p-4 rounded-2xl bg-background-secondary border border-border">
           <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted mb-1">
-            En Stock Normal
+            En Stock
           </p>
           <p className="text-2xl font-bold font-mono text-success">
-            {items.filter((i) => i.status === "normal").length}
+            {items.filter((i) => i.status === "normal" || i.status === "in_stock").length}
           </p>
         </div>
         <div className="p-4 rounded-2xl bg-background-secondary border border-border">
@@ -266,7 +269,7 @@ export default function StockGlobalPage() {
           </span>
           {[
             { id: "all" as StockFilterStatus, label: "Tous" },
-            { id: "normal" as StockFilterStatus, label: "Stock Normal" },
+            { id: "normal" as StockFilterStatus, label: "En Stock" },
             { id: "low_stock" as StockFilterStatus, label: "Seuil Bas" },
             { id: "out_of_stock" as StockFilterStatus, label: "En Rupture" },
           ].map((st) => (

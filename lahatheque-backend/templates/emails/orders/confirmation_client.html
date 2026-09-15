@@ -9,9 +9,14 @@
 <p style="margin: 0 0 16px 0; font-size: 15px;">
     Bonjour <strong>{{ recipient_name|default:"Cher Client" }}</strong>,
 </p>
-<p style="margin: 0 0 24px 0; line-height: 1.65;">
-    Nous vous confirmons l'enregistrement de votre commande <strong>N° {{ order_number }}</strong> effectuée le {{ order_date|default:"ce jour" }}. Vos ouvrages numériques sont immédiatement disponibles dans votre bibliothèque connectée.
+<p style="margin: 0 0 20px 0; line-height: 1.65;">
+    Nous vous confirmons l'enregistrement de votre commande <strong>N° {{ order_number }}</strong> effectuée le {{ order_date|default:"ce jour" }}. Vos ouvrages numériques sont immédiatement disponibles dans votre bibliothèque connectée pour une durée de 12 mois.
 </p>
+
+<!-- Encart Durée d'Accès Numérique 12 Mois -->
+<div class="box-soft" style="background-color: #F8FAFC; border-left: 3px solid #B08D42; padding: 12px 16px; border-radius: 4px; margin-bottom: 24px; font-size: 13px; color: #1B2A4E;">
+    <strong>Durée d'accès numérique :</strong> 12 mois d'accès illimité dans votre bibliothèque à compter de la date de confirmation de votre commande.
+</div>
 
 <!-- Récapitulatif Soft & Aéré (Zéro Bordure Lourde) -->
 <div class="box-soft" style="background-color: #F8FAFC; border-radius: 6px; padding: 20px; margin-bottom: 24px; border: 0;">

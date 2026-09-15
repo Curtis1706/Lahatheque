@@ -315,7 +315,7 @@ RESEND_API_KEY = config('RESEND_API_KEY', default='')
 EMAIL_DOMAIN = config('EMAIL_DOMAIN', default='mail.lahalex.com')
 EMAIL_ENABLE_FALLBACK = config('EMAIL_ENABLE_FALLBACK', default=True, cast=bool)
 
-# Paramètres SMTP Standard (1 seule boîte mail pro configurée, ex: contact@mail.lahalex.com)
+# Paramètres SMTP Standard (1 seule boîte mail pro configurée, ex: lahaeditions1@gmail.com)
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.hostinger.com')
 EMAIL_PORT = config('EMAIL_PORT', default=465, cast=int)
 EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=True, cast=bool)

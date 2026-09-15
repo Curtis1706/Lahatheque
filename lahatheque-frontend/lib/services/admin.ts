@@ -1291,14 +1291,18 @@ export async function getBouquetOfferings(): Promise<BouquetOfferingAdmin[]> {
   return [];
 }
 
-export async function getAvailableBouquets(): Promise<Array<{ id: string; title: string }>> {
+export async function getAvailableBouquets(): Promise<Array<{ id: string; title: string; books_count?: number }>> {
   try {
     const res = await fetch('/api/bff/admin/bouquet-offerings/', { credentials: 'include', cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
       const list = json.data || json.results || (Array.isArray(json) ? json : []);
       if (Array.isArray(list)) {
-        return list.map((b: any) => ({ id: String(b.id), title: b.title }));
+        return list.map((b: any) => ({
+          id: String(b.id),
+          title: b.title,
+          books_count: b.books_count ?? b.total_books ?? b.total_books_count ?? 0,
+        }));
       }
     }
   } catch {

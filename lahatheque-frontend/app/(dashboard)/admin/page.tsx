@@ -49,6 +49,7 @@ import {
   Scale,
   UserCheck,
   User,
+  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -69,7 +70,7 @@ const getRollingTimeline = (count: number) => {
 
 // Palette officielle et contrastée par rôle métier
 const ROLE_CONFIG: Record<string, { color: string; label: string; desc: string }> = {
-  student: { color: "#2563EB", label: "Étudiants & Lecteurs", desc: "Consultation & Achats" },
+  student: { color: "#2563EB", label: "Espace Client", desc: "Consultation & Achats" },
   teacher: { color: "#059669", label: "Enseignants & Chercheurs", desc: "Recommandations" },
   author: { color: "#D97706", label: "Auteurs Partenaires", desc: "Droits & Manuscrits" },
   publisher: { color: "#7C3AED", label: "Éditeurs Tiers", desc: "Publications & Catalogues" },
@@ -95,7 +96,7 @@ export default function AdminOverviewDashboard() {
   const [loading, setLoading] = useState(true);
 
   // Gestion dynamique des bouquets documentaires réels (ZÉRO mock)
-  const [bouquetsList, setBouquetsList] = useState<Array<{ id: string; title: string }>>([]);
+  const [bouquetsList, setBouquetsList] = useState<Array<{ id: string; title: string; books_count?: number }>>([]);
   const [selectedBouquetId, setSelectedBouquetId] = useState<string>("");
   const [bouquetDist, setBouquetDist] = useState<BouquetDistributionResult | null>(null);
   const [loadingBouquet, setLoadingBouquet] = useState<boolean>(false);
@@ -465,94 +466,137 @@ export default function AdminOverviewDashboard() {
 
       {/* ─── BLOC RÉPARTITION DES REDEVANCES — BOUQUETS DOCUMENTAIRES ─── */}
       <div className="p-5 sm:p-7 rounded-3xl bg-background-secondary border border-border space-y-6 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-border">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/15 text-navy text-xs font-bold">
-              <Building2 className="w-3.5 h-3.5 text-gold" />
-              Ressources Documentaires Multi-Universités
-            </div>
-            <h2 className="text-lg sm:text-2xl font-bold font-serif text-navy">
-              R&eacute;partition des Redevances &ndash; Bouquets Documentaires
-            </h2>
-            <p className="text-xs text-foreground-muted">
-              Consolidation multi-campus et r&eacute;partition proportionnelle &bull; Taux conventionn&eacute; :{" "}
-              <span className="font-bold text-navy">
-                {bouquetDist ? `${bouquetDist.royalty_rate_applied ?? bouquetDist.royalty_rate ?? 15} %` : "15 %"}
-              </span>
-            </p>
-          </div>
+        {(() => {
+          const selectedBouquet = bouquetsList.find((b) => b.id === selectedBouquetId);
+          const currentBooksCount = bouquetDist?.total_books ?? bouquetDist?.total_books_count ?? selectedBouquet?.books_count ?? 0;
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            {bouquetsList.length > 0 && (
-              <div className="flex items-center gap-2">
-                <label htmlFor="bouquet-select" className="text-xs font-semibold text-foreground-muted">
-                  Bouquet :
-                </label>
-                <select
-                  id="bouquet-select"
-                  value={selectedBouquetId}
-                  onChange={(e) => handleSelectBouquet(e.target.value)}
-                  disabled={loadingBouquet}
-                  className="px-3 py-2 rounded-xl bg-background border border-border text-navy text-xs font-bold focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[44px] cursor-pointer"
-                >
-                  {bouquetsList.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.title}
-                    </option>
-                  ))}
-                </select>
+          return (
+            <>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-border">
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/15 text-navy text-xs font-bold">
+                    <Building2 className="w-3.5 h-3.5 text-gold" />
+                    Ressources Documentaires Multi-Universités
+                  </div>
+                  <h2 className="text-lg sm:text-2xl font-bold font-serif text-navy">
+                    R&eacute;partition des Redevances &ndash; Bouquets Documentaires
+                  </h2>
+                  <p className="text-xs text-foreground-muted">
+                    Consolidation multi-campus et r&eacute;partition proportionnelle &bull;{" "}
+                    <span className="font-semibold text-navy">
+                      {currentBooksCount} {currentBooksCount > 1 ? "livres inclus" : "livre inclus"}
+                    </span>{" "}
+                    &bull; Taux conventionn&eacute; :{" "}
+                    <span className="font-bold text-navy">
+                      {bouquetDist ? `${bouquetDist.royalty_rate_applied ?? bouquetDist.royalty_rate ?? 15} %` : "15 %"}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-end md:items-center gap-3 shrink-0">
+                  {bouquetsList.length > 0 && (
+                    <div className="space-y-1">
+                      <label htmlFor="bouquet-select" className="text-xs font-semibold text-foreground-muted block">
+                        S&eacute;lectionnez le bouquet dont vous souhaitez voir les statistiques :
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <select
+                          id="bouquet-select"
+                          value={selectedBouquetId}
+                          onChange={(e) => handleSelectBouquet(e.target.value)}
+                          disabled={loadingBouquet}
+                          className="px-3.5 py-2 rounded-xl bg-background border border-border text-navy text-xs font-bold focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[44px] cursor-pointer shadow-xs transition-colors"
+                        >
+                          {bouquetsList.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.title} {typeof b.books_count === "number" && b.books_count > 0 ? `(${b.books_count} livre${b.books_count > 1 ? "s" : ""})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                        {loadingBouquet && (
+                          <span className="text-[11px] text-foreground-muted animate-pulse">
+                            Chargement...
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <Link
+                    href="/admin/catalog/bouquets"
+                    className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] self-start sm:self-end md:self-auto"
+                  >
+                    <Layers className="w-4 h-4 text-gold" />
+                    <span>G&eacute;rer les Bouquets</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
               </div>
-            )}
 
-            <Link
-              href="/admin/catalog/bouquets"
-              className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
-            >
-              <Layers className="w-4 h-4 text-gold" />
-              <span>G&eacute;rer les Bouquets</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
+              {/* Grille de 5 KPIs Responsive Mobile */}
+              {bouquetDist && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                  <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-foreground-muted">Livres dans le Bouquet</span>
+                      <BookOpen className="w-3.5 h-3.5 text-navy" />
+                    </div>
+                    <p className="text-base sm:text-lg font-bold font-mono text-navy">
+                      {currentBooksCount} {currentBooksCount > 1 ? "livres" : "livre"}
+                    </p>
+                    <span className="text-[10px] text-foreground-muted">Fonds documentaire actif</span>
+                  </div>
 
-        {/* Mini Grille de 4 KPIs Responsive Mobile */}
-        {bouquetDist && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
-              <span className="text-[11px] font-medium text-foreground-muted">Assiette Financière Bouquet</span>
-              <p className="text-base sm:text-lg font-bold font-mono text-navy">
-                {bouquetDist.total_ca.toLocaleString("fr-FR")} {bouquetDist.currency}
-              </p>
-              <span className="text-[10px] text-foreground-muted">Chiffre d&apos;affaires annuel</span>
-            </div>
+                  <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-foreground-muted">Assiette Financière Bouquet</span>
+                      <DollarSign className="w-3.5 h-3.5 text-gold" />
+                    </div>
+                    <p className="text-base sm:text-lg font-bold font-mono text-navy">
+                      {bouquetDist.total_ca.toLocaleString("fr-FR")} {bouquetDist.currency}
+                    </p>
+                    <span className="text-[10px] text-foreground-muted">Chiffre d&apos;affaires annuel</span>
+                  </div>
 
-            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
-              <span className="text-[11px] font-medium text-foreground-muted">Lectures Multi-Campus</span>
-              <p className="text-base sm:text-lg font-bold font-mono text-emerald-600">
-                {bouquetDist.total_consultations.toLocaleString("fr-FR")} lectures
-              </p>
-              <span className="text-[10px] text-foreground-muted">Usage réel certifié</span>
-            </div>
+                  <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-foreground-muted">Lectures Multi-Campus</span>
+                      <Activity className="w-3.5 h-3.5 text-emerald-600" />
+                    </div>
+                    <p className="text-base sm:text-lg font-bold font-mono text-emerald-600">
+                      {bouquetDist.total_consultations.toLocaleString("fr-FR")} lectures
+                    </p>
+                    <span className="text-[10px] text-foreground-muted">Usage réel certifié</span>
+                  </div>
 
-            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
-              <span className="text-[11px] font-medium text-foreground-muted">
-                Enveloppe Redevances ({bouquetDist.royalty_rate_applied ?? bouquetDist.royalty_rate ?? 15}%)
-              </span>
-              <p className="text-base sm:text-lg font-bold font-mono text-gold">
-                {bouquetDist.total_royalties.toLocaleString("fr-FR")} {bouquetDist.currency}
-              </p>
-              <span className="text-[10px] text-foreground-muted">À verser aux universités</span>
-            </div>
+                  <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-foreground-muted">
+                        Enveloppe Redevances ({bouquetDist.royalty_rate_applied ?? bouquetDist.royalty_rate ?? 15}%)
+                      </span>
+                      <TrendingUp className="w-3.5 h-3.5 text-gold" />
+                    </div>
+                    <p className="text-base sm:text-lg font-bold font-mono text-gold">
+                      {bouquetDist.total_royalties.toLocaleString("fr-FR")} {bouquetDist.currency}
+                    </p>
+                    <span className="text-[10px] text-foreground-muted">À verser aux universités</span>
+                  </div>
 
-            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
-              <span className="text-[11px] font-medium text-foreground-muted">Établissements Actifs</span>
-              <p className="text-base sm:text-lg font-bold font-mono text-navy">
-                {bouquetDist.items.length} Établissement{bouquetDist.items.length > 1 ? "s" : ""}
-              </p>
-              <span className="text-[10px] text-foreground-muted">Universités partenaires</span>
-            </div>
-          </div>
-        )}
+                  <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-foreground-muted">Établissements Actifs</span>
+                      <Building2 className="w-3.5 h-3.5 text-navy" />
+                    </div>
+                    <p className="text-base sm:text-lg font-bold font-mono text-navy">
+                      {bouquetDist.items.length} Établissement{bouquetDist.items.length > 1 ? "s" : ""}
+                    </p>
+                    <span className="text-[10px] text-foreground-muted">Universités partenaires</span>
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* Intégration du composant visuel BouquetPieDistribution */}
         {bouquetDist ? (

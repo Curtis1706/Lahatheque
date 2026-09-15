@@ -150,6 +150,7 @@ export interface AdminOrderItemDetail {
   id: string;
   book_id?: string | null;
   book_title: string;
+  cover_url?: string | null;
   format: string;
   quantity: number;
   unit_price: number;
