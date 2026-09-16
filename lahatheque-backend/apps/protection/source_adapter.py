@@ -427,9 +427,13 @@ class DocumentSourceAdapter:
     def _fetch_external_url(cls, url: str, options: Dict[str, Any]) -> bytes:
         """
         Télécharge de manière sécurisée un PDF depuis une URL distante partenaire
-        avec protection Anti-SSRF, whitelist et limitation de débit/taille.
+        avec protection Anti-SSRF, whitelist, limitation de débit/taille et contrôle strict des redirections (SEC-10).
         """
-        cls._validate_ssrf_and_whitelist(url, options)
+        from urllib.parse import urljoin
+
+        current_url = url
+        max_redirects = 2
+        redirect_count = 0
 
         max_mb = options.get("max_file_size_mb")
         max_bytes = (max_mb * 1024 * 1024) if max_mb and max_mb > 0 else cls.MAX_BYTES_DEFAULT
@@ -438,10 +442,42 @@ class DocumentSourceAdapter:
         if options.get("auth_header"):
             headers["Authorization"] = options["auth_header"]
 
-        try:
-            response = requests.get(url, headers=headers, stream=True, timeout=15)
-            response.raise_for_status()
+        while True:
+            # SEC-10: Valider chaque URL (initiale et cibles de redirection) contre SSRF et whitelist
+            cls._validate_ssrf_and_whitelist(current_url, options)
 
+            try:
+                response = requests.get(
+                    current_url,
+                    headers=headers,
+                    stream=True,
+                    timeout=15,
+                    allow_redirects=False  # SEC-10: Désactiver les redirections automatiques
+                )
+            except requests.RequestException as e:
+                logger.error(f"Échec du téléchargement distant ({current_url}): {e}")
+                raise DocumentSourceError(f"Impossible de récupérer le document distant: {str(e)}")
+
+            if response.status_code in (301, 302, 303, 307, 308):
+                redirect_count += 1
+                if redirect_count > max_redirects:
+                    raise DocumentSourceError("Trop de redirections HTTP lors de la récupération du document distant.")
+
+                target_location = response.headers.get("Location")
+                if not target_location:
+                    raise DocumentSourceError("Redirection 3xx reçue sans en-tête Location.")
+
+                current_url = urljoin(current_url, target_location)
+                continue
+
+            try:
+                response.raise_for_status()
+            except requests.RequestException as e:
+                raise DocumentSourceError(f"Erreur HTTP lors du téléchargement distant: {e}")
+
+            break
+
+        try:
             # Vérification de l'en-tête Content-Length
             content_length = response.headers.get("Content-Length")
             if content_length and int(content_length) > max_bytes:
@@ -459,12 +495,12 @@ class DocumentSourceAdapter:
 
             # Vérification basique du header PDF
             if not content.startswith(b"%PDF-"):
-                logger.warning(f"Le fichier distant ({url}) n'a pas la signature '%PDF-', conversion ou streaming toléré.")
+                logger.warning(f"Le fichier distant ({current_url}) n'a pas la signature '%PDF-', conversion ou streaming toléré.")
 
             return bytes(content)
 
         except requests.RequestException as e:
-            logger.error(f"Échec du téléchargement distant ({url}): {e}")
+            logger.error(f"Échec de lecture du contenu distant ({current_url}): {e}")
             raise DocumentSourceError(f"Impossible de récupérer le document distant: {str(e)}")
 
     @classmethod

@@ -612,7 +612,7 @@ class PublisherBatchImportView(APIView):
         import csv
         import io
         import json as json_lib
-        import xml.etree.ElementTree as ET
+        import defusedxml.ElementTree as ET
 
         user = request.user
         prof = get_or_create_publisher_profile(user)
@@ -623,6 +623,14 @@ class PublisherBatchImportView(APIView):
         if not uploaded_file:
             return Response({
                 "success": False, "error": "Aucun fichier fourni pour l'import."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # SEC-07: Protection contre le déni de service par fichier volumineux (50 Mo max)
+        MAX_IMPORT_FILE_SIZE = 50 * 1024 * 1024  # 50 Mo
+        if uploaded_file.size > MAX_IMPORT_FILE_SIZE:
+            return Response({
+                "success": False,
+                "error": "Fichier trop volumineux. Limite maximale : 50 Mo."
             }, status=status.HTTP_400_BAD_REQUEST)
 
         filename = uploaded_file.name

@@ -185,12 +185,14 @@ class BookStreamView(APIView):
         # 6. Traitement de l'en-tête HTTP Range (RFC 7233)
         range_header = request.META.get("HTTP_RANGE")
         if not range_header:
-            # Requête standard sans Range: servir le document complet
-            response = HttpResponse(pdf_bytes, status=status.HTTP_200_OK, content_type="application/pdf")
+            # DRM-01: Rejeter les requêtes sans en-tête Range pour bloquer l'aspiration et le téléchargement direct
+            response = HttpResponse(
+                b"En-tete Range obligatoire pour le streaming securise.",
+                status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+                content_type="text/plain"
+            )
             response["Accept-Ranges"] = "bytes"
-            response["Content-Length"] = str(total_size)
-            response["Cache-Control"] = "private, no-store, must-revalidate"
-            response["X-Content-Type-Options"] = "nosniff"
+            response["Content-Range"] = f"bytes */{total_size}"
             return response
 
         start_byte, end_byte = self._parse_range_header(range_header, total_size)

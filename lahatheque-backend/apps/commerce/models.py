@@ -98,6 +98,13 @@ class Order(models.Model):
         ('credit', 'Achat à crédit'),
     ]
 
+    CREDIT_STATUS_CHOICES = [
+        ('not_applicable', 'Non applicable'),
+        ('pending_approval', "En attente d'approbation"),
+        ('approved', 'Approuvé'),
+        ('rejected', 'Rejeté'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='commandes')
     is_pos_order = models.BooleanField(default=False, verbose_name="Vente comptoir / boutique")
@@ -118,6 +125,12 @@ class Order(models.Model):
     payment_transaction = models.ForeignKey(PaymentTransaction, null=True, blank=True, on_delete=models.SET_NULL, related_name='commandes')
     is_credit_purchase = models.BooleanField(default=False)
     credit_due_date = models.DateField(null=True, blank=True)
+    credit_status = models.CharField(
+        max_length=30,
+        choices=CREDIT_STATUS_CHOICES,
+        default='not_applicable',
+        verbose_name="Statut d'approbation du crédit"
+    )
     credit_granted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='credits_accordes'

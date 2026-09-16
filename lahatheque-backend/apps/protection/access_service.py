@@ -80,6 +80,38 @@ class AccessService:
                 "stream_url": f"/api/v1/catalog/books/{resolved_book_id}/stream/{stream_query}"
             }
 
+        # Accès de l'éditeur déposant à son propre dépôt (PublisherBookDeposit)
+        try:
+            from apps.publishers_portal.models import PublisherBookDeposit
+            if PublisherBookDeposit.objects.filter(
+                id=resolved_book_id, publisher__user=user
+            ).exists():
+                return {
+                    "access_granted": True,
+                    "reason": "publisher_owner",
+                    "resolved_book_id": str(resolved_book_id),
+                    "language": resolved_lang,
+                    "stream_url": f"/api/v1/catalog/books/{resolved_book_id}/stream/{stream_query}"
+                }
+        except Exception:
+            pass
+
+        # Accès de l'auteur déposant à son propre manuscrit (AuthorManuscriptSubmission)
+        try:
+            from apps.rights.models import AuthorManuscriptSubmission
+            if AuthorManuscriptSubmission.objects.filter(
+                id=resolved_book_id, author=user
+            ).exists():
+                return {
+                    "access_granted": True,
+                    "reason": "author_owner",
+                    "resolved_book_id": str(resolved_book_id),
+                    "language": resolved_lang,
+                    "stream_url": f"/api/v1/catalog/books/{resolved_book_id}/stream/{stream_query}"
+                }
+        except Exception:
+            pass
+
         # Achat individuel payé ou achat à crédit accordé (Formats numérique)
         from django.db.models import Q
         has_purchased_digital = LigneCommande.objects.filter(

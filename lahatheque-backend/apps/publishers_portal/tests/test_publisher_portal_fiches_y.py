@@ -6,6 +6,7 @@ la mesure en direct des consultations/revenus et la vérification de solde au re
 import io
 import hashlib
 from decimal import Decimal
+from unittest.mock import patch
 from django.test import TestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
@@ -386,7 +387,8 @@ class PublisherPortalFichesYTestCase(TestCase):
             self.assertEqual(b["consultations_count"], 0)
             self.assertEqual(b["revenue_generated"], 0.0)
 
-    def test_publisher_deposit_reader_metadata_and_stream(self):
+    @patch("apps.protection.derived_materializer.DerivedMaterializer.get_or_create_derived", return_value=(b"%PDF-1.4 mock content bytes for range stream", 45))
+    def test_publisher_deposit_reader_metadata_and_stream(self, mock_derived):
         """Vérifie que la liseuse peut récupérer les métadonnées et streamer le flux d'un dépôt éditeur."""
         deposit = PublisherBookDeposit.objects.create(
             publisher=self.publisher_profile,
@@ -407,8 +409,8 @@ class PublisherPortalFichesYTestCase(TestCase):
         self.assertEqual(res_meta.data["data"]["title"], "Duis dolore asperior")
         self.assertEqual(res_meta.data["data"]["authors"][0]["full_name"], "Qui duis inventore a")
 
-        # 2. Streaming sécurisé du flux PDF pour le lecteur
-        res_stream = self.client.get(f"/api/v1/catalog/books/{deposit.id}/stream/")
+        # 2. Streaming sécurisé du flux PDF pour le lecteur (avec en-tête Range conforme DRM-01)
+        res_stream = self.client.get(f"/api/v1/catalog/books/{deposit.id}/stream/", HTTP_RANGE="bytes=0-1024")
         self.assertIn(res_stream.status_code, [200, 206])
         self.assertTrue(len(res_stream.content) > 0)
 

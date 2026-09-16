@@ -99,6 +99,7 @@ class PasswordResetCode(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     used = models.BooleanField(default=False)
+    attempts = models.PositiveIntegerField(default=0)
 
     class Meta:
         db_table = 'accounts_password_reset_code'
@@ -113,5 +114,5 @@ class PasswordResetCode(models.Model):
         )
 
     def is_valid(self):
-        return not self.used and timezone.now() < self.expires_at
+        return not self.used and self.attempts < 5 and timezone.now() < self.expires_at
 
