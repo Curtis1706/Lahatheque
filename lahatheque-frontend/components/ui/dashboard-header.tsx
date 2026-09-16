@@ -129,6 +129,7 @@ export function DashboardHeader() {
     if (path.startsWith("/chief-layout/history")) return { section: "Chef Maquettiste", title: "Historique des Validations" };
     if (path === "/chief-layout") return { section: "Chef Maquettiste", title: "Vue d'ensemble Chef Maquettiste" };
 
+    if (path.startsWith("/legal-reviewer/publication-en-attente")) return { section: "Espace Juriste", title: "Publications en Attente (Chef Maquettiste)" };
     if (path.startsWith("/legal-reviewer/contracts")) return { section: "Espace Juriste", title: "Contrats Légaux" };
     if (path.startsWith("/legal-reviewer/royalties")) return { section: "Espace Juriste", title: "Droits d'Auteur" };
     if (path.startsWith("/legal-reviewer/pre-editions")) return { section: "Espace Juriste", title: "Pré-éditions" };
