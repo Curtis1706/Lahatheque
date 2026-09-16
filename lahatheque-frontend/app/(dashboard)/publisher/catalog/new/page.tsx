@@ -1274,7 +1274,7 @@ export default function NewPublisherBookPage() {
                   <span>Tous Droits Réservés &bull; Convention Partenaire LAHA</span>
                 </div>
                 <p className="text-[11px] text-foreground-muted leading-relaxed">
-                  L&apos;ouvrage déposé est automatiquement protégé par le système DRM LCP (Readium) conformément aux dispositions contractuelles de votre convention d&apos;édition.
+                  L&apos;ouvrage déposé est automatiquement protégé par le système DRM LCP (Readium).
                 </p>
               </div>
 
