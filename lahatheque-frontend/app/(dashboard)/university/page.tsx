@@ -311,7 +311,7 @@ export default function UniversityOverviewPage() {
               Ressources Documentaires Campus
             </div>
             <h2 className="font-serif text-xl font-bold text-navy">
-              Bouquets Documentaires Souscrits &amp; Disponibles
+              Bouquets Documentaires Disponibles
             </h2>
           </div>
           <Link

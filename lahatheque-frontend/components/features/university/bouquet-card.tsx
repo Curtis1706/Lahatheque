@@ -6,16 +6,10 @@ import {
   Layers,
   BookOpen,
   CheckCircle2,
-  Download,
   Calendar,
-  Building2,
   Sparkles,
-  PieChart,
-  TrendingUp,
 } from "lucide-react";
-import { getInstitutionBouquetMetrics } from "@/lib/services/bouquet-distribution";
 import {
-  exportBouquetCatalogWord,
   getBouquetRelevanceReport,
   type BouquetRelevanceReport,
 } from "@/lib/services/university";
@@ -30,7 +24,7 @@ interface BouquetCardProps {
 
 export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
   const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  // const [exporting, setExporting] = useState(false);
   const [relevance, setRelevance] = useState<BouquetRelevanceReport | null>(null);
 
   const isActive = bouquet.is_subscribed ?? (bouquet.status === "active");
@@ -50,8 +44,6 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
     };
   }, [bouquet.id, bouquet.offering_id, isActive]);
 
-  const metrics = getInstitutionBouquetMetrics(bouquet);
-
   const handleSubscribe = async () => {
     if (!onSubscribe) return;
     setLoading(true);
@@ -69,6 +61,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
     }
   };
 
+  /*
   const handleExportWord = async () => {
     setExporting(true);
     try {
@@ -80,6 +73,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
       setExporting(false);
     }
   };
+  */
 
   return (
     <div className="p-6 rounded-3xl bg-background border border-border flex flex-col justify-between gap-5 hover:border-gold/50 transition-all shadow-xs group">
@@ -128,42 +122,6 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
             </span>
             <p className="font-mono text-sm font-bold text-navy">
               {bouquet.annual_price.toLocaleString("fr-FR")} {bouquet.currency}
-            </p>
-          </div>
-        </div>
-
-        {/* Grille de 3 Cards KPI du Bouquet (Zéro Modale) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          <div className="p-3 rounded-2xl bg-gold/10 border border-gold/25 space-y-0.5">
-            <span className="text-[10px] text-navy font-bold uppercase tracking-wider flex items-center gap-1">
-              <Building2 className="w-3.5 h-3.5 text-gold shrink-0" />
-              <span>Vos Ouvrages</span>
-            </span>
-            <p className="font-mono text-base font-bold text-navy">
-              {metrics.books_count}{" "}
-              <span className="text-[11px] font-sans font-normal text-foreground-muted">
-                ({metrics.books_percentage}%)
-              </span>
-            </p>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-background-secondary border border-border space-y-0.5">
-            <span className="text-[10px] text-foreground-muted font-bold uppercase tracking-wider flex items-center gap-1">
-              <PieChart className="w-3.5 h-3.5 text-gold shrink-0" />
-              <span>Part d&apos;Audience</span>
-            </span>
-            <p className="font-mono text-base font-bold text-navy">
-              {metrics.usage_share_percent}%
-            </p>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-0.5">
-            <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Redevance ({metrics.royalty_rate}%)</span>
-            </span>
-            <p className="font-mono text-base font-bold text-emerald-700 truncate">
-              {metrics.royalty_amount.toLocaleString("fr-FR")} {metrics.currency}
             </p>
           </div>
         </div>
@@ -254,6 +212,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
           </button>
         )}
 
+        {/* Bouton Export Word mis en commentaire
         <button
           type="button"
           onClick={handleExportWord}
@@ -268,6 +227,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
           )}
           <span>Export Word</span>
         </button>
+        */}
       </div>
     </div>
   );
