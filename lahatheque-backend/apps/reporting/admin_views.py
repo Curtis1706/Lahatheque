@@ -4559,6 +4559,14 @@ class AccountingLedgerExportView(APIView):
                 leading=9,
             )
 
+            import os
+            from reportlab.platypus import Image as RLImage
+            from apps.communications.services.pdf_attachment_service import PdfAttachmentService
+            logo_path = PdfAttachmentService.get_logo_file_path()
+            if logo_path and os.path.exists(logo_path):
+                elements.append(RLImage(logo_path, width=120, height=40))
+                elements.append(Spacer(1, 8))
+
             elements.append(Paragraph("LAHATHÈQUE — GRAND LIVRE COMPTABLE OFFICIEL", title_style))
             elements.append(Paragraph(f"Période : {period.upper()} | Date d'extraction : {now.strftime('%d/%m/%Y %H:%M')} | Monnaie : XOF", meta_style))
             elements.append(Spacer(1, 15))

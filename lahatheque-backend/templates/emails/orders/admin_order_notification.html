@@ -1,0 +1,153 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}{{ event_title|default:"Notification Commande" }} #{{ order_number }} • Administration LAHAThèque{% endblock %}
+{% block badge_header %}{{ badge_label|default:"Administration • Commande" }}{% endblock %}
+
+{% block email_title %}{{ event_title|default:"Notification de Commande" }}{% endblock %}
+
+{% block email_content %}
+<p style="margin: 0 0 16px 0; font-size: 15px;">
+    Bonjour <strong>Direction &amp; Administration LAHA</strong>,
+</p>
+<p style="margin: 0 0 20px 0; line-height: 1.65; font-size: 14px; color: #334155;" class="text-dark-adapt">
+    {{ intro_message|default:"Un événement relatif à une commande client vient de se produire sur la plateforme LAHAThèque." }}
+</p>
+
+<!-- Bloc Statut et Métadonnées Clés -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 8px; padding: 18px; margin-bottom: 20px; border: 1px solid #E2E8F0;">
+    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 12px;">
+        Données Générales de la Commande
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B; width: 45%;">Numéro de Commande :</td>
+            <td style="padding: 5px 0; font-size: 13px; font-weight: 700; color: #1B2A4E;" class="text-dark-adapt font-mono">#{{ order_number }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B;">Date &amp; Heure :</td>
+            <td style="padding: 5px 0; font-size: 13px; color: #1B2A4E;" class="text-dark-adapt">{{ order_date }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B;">Statut du Paiement :</td>
+            {% if is_paid %}
+            <td style="padding: 5px 0; font-size: 13px; font-weight: 700; color: #0D9488;">
+                {{ status_paiement_label }}
+            </td>
+            {% else %}
+            <td style="padding: 5px 0; font-size: 13px; font-weight: 700; color: #B08D42;">
+                {{ status_paiement_label }}
+            </td>
+            {% endif %}
+        </tr>
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B;">Statut Commande :</td>
+            <td style="padding: 5px 0; font-size: 13px; color: #1B2A4E;" class="text-dark-adapt">{{ status_commande_label }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B;">Mode de Règlement :</td>
+            <td style="padding: 5px 0; font-size: 13px; color: #1B2A4E;" class="text-dark-adapt">{{ payment_method_label }}</td>
+        </tr>
+        {% if payment_reference %}
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B;">Référence / Transaction :</td>
+            <td style="padding: 5px 0; font-size: 13px; font-family: monospace; color: #1B2A4E;" class="text-dark-adapt">{{ payment_reference }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+<!-- Bloc Coordonnées Client -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 8px; padding: 18px; margin-bottom: 20px; border: 1px solid #E2E8F0;">
+    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 12px;">
+        Identité &amp; Coordonnées du Client
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B; width: 45%;">Nom &amp; Prénom :</td>
+            <td style="padding: 5px 0; font-size: 13px; font-weight: 600; color: #1B2A4E;" class="text-dark-adapt">{{ customer_name }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B;">Adresse E-mail :</td>
+            <td style="padding: 5px 0; font-size: 13px; color: #1B2A4E;" class="text-dark-adapt">{{ customer_email }}</td>
+        </tr>
+        {% if customer_phone %}
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B;">Téléphone :</td>
+            <td style="padding: 5px 0; font-size: 13px; color: #1B2A4E;" class="text-dark-adapt">{{ customer_phone }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B;">Profil / Rôle :</td>
+            <td style="padding: 5px 0; font-size: 13px; color: #1B2A4E;" class="text-dark-adapt">{{ customer_role }}</td>
+        </tr>
+        {% if customer_institution %}
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B;">Établissement affilié :</td>
+            <td style="padding: 5px 0; font-size: 13px; color: #1B2A4E;" class="text-dark-adapt">{{ customer_institution }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+<!-- Tableau Détaillé des Articles -->
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 8px; padding: 18px; margin-bottom: 20px; border: 1px solid #E2E8F0;">
+    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 12px;">
+        Articles Commandés
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        {% for item in items %}
+        <tr>
+            <td align="left" style="padding: 8px 0; border-bottom: 1px solid #E2E8F0; font-size: 13px;" class="text-dark-adapt divider-soft">
+                <strong>{{ item.title }}</strong><br>
+                <span style="font-size: 11px; color: #64748B;">
+                    Format : {{ item.format_label|default:"Numérique" }} • Qté : {{ item.quantity|default:"1" }} • Prix unitaire : {{ item.unit_price|default:"0" }} {{ currency|default:"FCFA" }}
+                </span>
+            </td>
+            <td align="right" style="padding: 8px 0; border-bottom: 1px solid #E2E8F0; font-size: 13px; font-weight: 700; color: #1B2A4E;" class="text-dark-adapt divider-soft">
+                {{ item.total|default:item.total_price }} {{ currency|default:"FCFA" }}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="2" align="left" style="padding: 8px 0; font-size: 13px; color: #64748B;">Détail non disponible</td>
+        </tr>
+        {% endfor %}
+        <tr>
+            <td align="left" style="padding-top: 14px; font-size: 14px; font-weight: 700; color: #1B2A4E;" class="text-dark-adapt">
+                Montant Total Commande :
+            </td>
+            <td align="right" style="padding-top: 14px; font-size: 16px; font-weight: 800; color: #B08D42;">
+                {{ total_amount }} {{ currency|default:"FCFA" }}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- Bloc Détails Logistiques (si format physique inclus) -->
+{% if has_physical %}
+<div class="box-soft" style="background-color: #F8FAFC; border-radius: 8px; padding: 18px; margin-bottom: 24px; border: 1px solid #E2E8F0;">
+    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #B08D42; letter-spacing: 0.8px; margin-bottom: 12px;">
+        Expédition &amp; Livraison Physique
+    </div>
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B; width: 45%;">Adresse de livraison :</td>
+            <td style="padding: 5px 0; font-size: 13px; color: #1B2A4E;" class="text-dark-adapt">{{ shipping_address|linebreaksbr }}</td>
+        </tr>
+        {% if city %}
+        <tr>
+            <td style="padding: 5px 0; font-size: 13px; color: #64748B;">Ville &amp; Pays :</td>
+            <td style="padding: 5px 0; font-size: 13px; color: #1B2A4E;" class="text-dark-adapt">{{ city }}, {{ country|default:"Bénin" }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+{% endif %}
+
+<!-- Bouton d'Action vers Dashboard Admin -->
+<div style="text-align: center; margin: 30px 0 20px 0;">
+    <a href="{{ site_url }}/admin/commandes" class="btn-navy" style="background-color: #1B2A4E; color: #FFFFFF; font-weight: 600; text-decoration: none; padding: 13px 28px; border-radius: 6px; display: inline-block; border: 0;">
+        Consulter la Commande sur le Dashboard Admin
+    </a>
+</div>
+{% endblock %}

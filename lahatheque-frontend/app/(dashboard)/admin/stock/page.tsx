@@ -249,7 +249,10 @@ export default function AdminStockOverviewPage() {
   // Filtrage du catalogue physique
   const filteredStockItems = useMemo(() => {
     return stockItems.filter((item) => {
-      if (stockStatusFilter !== "all" && item.status !== stockStatusFilter) return false;
+      if (stockStatusFilter !== "all") {
+        if (stockStatusFilter === "normal" && item.status !== "normal" && item.status !== "in_stock") return false;
+        if (stockStatusFilter !== "normal" && item.status !== stockStatusFilter) return false;
+      }
       if (stockWarehouseFilter !== "all" && item.warehouse !== stockWarehouseFilter) return false;
       if (stockSearchQuery.trim()) {
         const q = stockSearchQuery.toLowerCase();
@@ -496,10 +499,10 @@ export default function AdminStockOverviewPage() {
           </div>
           <div className="p-4 rounded-2xl bg-background-secondary border border-border">
             <p className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted mb-1">
-              En Stock Normal
+              En Stock
             </p>
             <p className="text-2xl font-bold font-mono text-success">
-              {stockItems.filter((i) => i.status === "normal").length}
+              {stockItems.filter((i) => i.status === "normal" || i.status === "in_stock").length}
             </p>
           </div>
           <div className="p-4 rounded-2xl bg-background-secondary border border-border">
@@ -689,7 +692,7 @@ export default function AdminStockOverviewPage() {
               </span>
               {[
                 { id: "all" as StockFilterStatus, label: "Tous" },
-                { id: "normal" as StockFilterStatus, label: "Stock Normal" },
+                { id: "normal" as StockFilterStatus, label: "En Stock" },
                 { id: "low_stock" as StockFilterStatus, label: "Seuil Bas" },
                 { id: "out_of_stock" as StockFilterStatus, label: "En Rupture" },
               ].map((st) => (

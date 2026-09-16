@@ -16,7 +16,9 @@ export type AdminRole =
   | "partner_api";
 
 export const ADMIN_ROLE_LABELS: Record<string, string> = {
-  student: "Client / Lecteur",
+  student: "Espace Client",
+  reader: "Espace Client",
+  client: "Espace Client",
   teacher: "Enseignant",
   parent: "Parent d'élève",
   author: "Auteur",

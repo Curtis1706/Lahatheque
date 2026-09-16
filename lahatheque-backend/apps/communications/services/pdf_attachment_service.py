@@ -15,20 +15,50 @@ class PdfAttachmentService:
     Générateur autonome de documents PDF binaires en mémoire pour pièces jointes.
     """
 
+    _cached_logo_bytes: Optional[bytes] = None
+    _cached_logo_path: Optional[str] = None
+
     @classmethod
-    def _get_logo_bytes(cls) -> Optional[bytes]:
-        """Récupère les octets du fichier logo.png officiel."""
+    def get_logo_file_path(cls) -> Optional[str]:
+        """Retourne le chemin absolu vers logo.png sur le système de fichiers (résolution multi-environnements)."""
+        if cls._cached_logo_path and os.path.exists(cls._cached_logo_path):
+            return cls._cached_logo_path
+
+        from django.conf import settings
+        base_dir = getattr(settings, 'BASE_DIR', None)
+        static_root = getattr(settings, 'STATIC_ROOT', None)
+
         possible_paths = [
+            os.path.join(base_dir, "static", "logo.png") if base_dir else None,
+            os.path.join(static_root, "logo.png") if static_root else None,
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "logo.png")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "lahatheque-frontend", "public", "logo.png")),
+            "/app/static/logo.png",
+            "/app/staticfiles/logo.png",
             "e:/Lahatheque/lahatheque-backend/static/logo.png",
             "e:/Lahatheque/lahatheque-frontend/public/logo.png",
         ]
+
         for p in possible_paths:
-            if os.path.exists(p):
-                try:
-                    with open(p, "rb") as f:
-                        return f.read()
-                except Exception:
-                    pass
+            if p and os.path.exists(p):
+                cls._cached_logo_path = p
+                return p
+        return None
+
+    @classmethod
+    def _get_logo_bytes(cls) -> Optional[bytes]:
+        """Récupère les octets du fichier logo.png officiel avec mise en cache et multi-résolution."""
+        if cls._cached_logo_bytes:
+            return cls._cached_logo_bytes
+
+        logo_path = cls.get_logo_file_path()
+        if logo_path:
+            try:
+                with open(logo_path, "rb") as f:
+                    cls._cached_logo_bytes = f.read()
+                    return cls._cached_logo_bytes
+            except Exception:
+                pass
         return None
 
     @classmethod
@@ -62,9 +92,11 @@ class PdfAttachmentService:
         
         logo_bytes = cls._get_logo_bytes()
         if logo_bytes:
-            page.insert_image(fitz.Rect(35, 15, 85, 65), stream=logo_bytes, keep_proportion=True)
-            page.insert_text(fitz.Point(95, 43), "LAHATHÈQUE", fontsize=20, fontname="helv", color=(1, 1, 1))
-            page.insert_text(fitz.Point(95, 58), "Éditions & Bibliothèque Numérique", fontsize=8.5, fontname="helv", color=gold)
+            # Encart blanc chic et propre pour le logo sur fond Navy
+            page.draw_rect(fitz.Rect(35, 12, 140, 68), color=(1, 1, 1), fill=(1, 1, 1))
+            page.insert_image(fitz.Rect(38, 14, 137, 66), stream=logo_bytes, keep_proportion=True)
+            page.insert_text(fitz.Point(155, 43), "LAHATHÈQUE", fontsize=19, fontname="helv", color=(1, 1, 1))
+            page.insert_text(fitz.Point(155, 58), "Éditions & Bibliothèque Numérique", fontsize=8.5, fontname="helv", color=gold)
         else:
             page.insert_text(fitz.Point(40, 48), "LAHATHÈQUE", fontsize=22, fontname="helv", color=(1, 1, 1))
             page.insert_text(fitz.Point(40, 64), "Éditions & Bibliothèque Numérique", fontsize=9, fontname="helv", color=gold)
@@ -81,10 +113,10 @@ class PdfAttachmentService:
         # Émetteur (Gauche)
         page.insert_text(fitz.Point(40, 115), "Émetteur :", fontsize=10, fontname="helv", color=navy)
         page.insert_text(fitz.Point(40, 128), "LAHA Éditions S.A.", fontsize=10.5, fontname="helv", color=navy)
-        page.insert_text(fitz.Point(40, 142), "Capital Social : 500 000 000 FCFA", fontsize=8.5, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(40, 155), "IFU : 3202415897451 | RCCM : RB/COT/24 B 12458", fontsize=8.5, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(40, 168), "Siège : Avenue Jean-Paul II, Cotonou, Bénin", fontsize=8.5, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(40, 181), "contact@mail.lahalex.com | www.lahatheque.com", fontsize=8.5, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 142), "Capital Social : 1 000 000 000 FCFA", fontsize=8.5, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 155), "IFU : 3202011691197 | RCCM : RB/COT/24 B 12458", fontsize=8.5, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 168), "Siège : MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou, Bénin", fontsize=7.5, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 181), "lahaeditions1@gmail.com | www.lahatheque.com", fontsize=8.5, fontname="helv", color=dark_gray)
 
         # Destinataire (Droite)
         page.draw_rect(fitz.Rect(320, 100, 555, 185), color=border_gray, fill=light_gray)
@@ -154,14 +186,14 @@ class PdfAttachmentService:
         page.draw_line(fitz.Point(40, footer_y - 10), fitz.Point(555, footer_y - 10), color=border_gray)
         page.insert_text(
             fitz.Point(40, footer_y + 5),
-            "LAHA Éditions S.A. au capital de 500 000 000 FCFA • Siège Social : Avenue Jean-Paul II, Cotonou, Bénin",
+            "LAHA Éditions S.A. • Siège Social : MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou, Littoral, Bénin",
             fontsize=7.5,
             fontname="helv",
             color=(0.4, 0.4, 0.4),
         )
         page.insert_text(
             fitz.Point(40, footer_y + 17),
-            "RCCM RB/COT/24 B 12458 • IFU 3202415897451 • Document officiel certifié conforme aux normes comptables SYSCOHADA.",
+            "RCCM RB/COT/24 B 12458 • IFU 3202011691197 • Document officiel certifié conforme aux normes comptables SYSCOHADA.",
             fontsize=7,
             fontname="helv",
             color=(0.5, 0.5, 0.5),
@@ -202,9 +234,11 @@ class PdfAttachmentService:
         
         logo_bytes = cls._get_logo_bytes()
         if logo_bytes:
-            page.insert_image(fitz.Rect(35, 15, 85, 65), stream=logo_bytes, keep_proportion=True)
-            page.insert_text(fitz.Point(95, 43), "LAHATHÈQUE", fontsize=20, fontname="helv", color=(1, 1, 1))
-            page.insert_text(fitz.Point(95, 58), "Bordereau Officiel de Droits & Redevances", fontsize=8.5, fontname="helv", color=gold)
+            # Encart blanc chic et propre pour le logo sur fond Navy
+            page.draw_rect(fitz.Rect(35, 12, 140, 68), color=(1, 1, 1), fill=(1, 1, 1))
+            page.insert_image(fitz.Rect(38, 14, 137, 66), stream=logo_bytes, keep_proportion=True)
+            page.insert_text(fitz.Point(155, 43), "LAHATHÈQUE", fontsize=19, fontname="helv", color=(1, 1, 1))
+            page.insert_text(fitz.Point(155, 58), "Bordereau Officiel de Droits & Redevances", fontsize=8.5, fontname="helv", color=gold)
         else:
             page.insert_text(fitz.Point(40, 48), "LAHATHÈQUE", fontsize=22, fontname="helv", color=(1, 1, 1))
             page.insert_text(fitz.Point(40, 64), "Bordereau Officiel de Droits & Redevances", fontsize=9, fontname="helv", color=gold)
@@ -220,10 +254,10 @@ class PdfAttachmentService:
         # Émetteur (Gauche)
         page.insert_text(fitz.Point(40, 105), "Émetteur :", fontsize=10, fontname="helv", color=navy)
         page.insert_text(fitz.Point(40, 118), "LAHA Éditions S.A.", fontsize=10.5, fontname="helv", color=navy)
-        page.insert_text(fitz.Point(40, 131), "Capital Social : 500 000 000 FCFA", fontsize=8, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(40, 143), "IFU : 3202415897451 | RCCM : RB/COT/24 B 12458", fontsize=8, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(40, 155), "Siège : Avenue Jean-Paul II, Cotonou, Bénin", fontsize=8, fontname="helv", color=dark_gray)
-        page.insert_text(fitz.Point(40, 167), "contact@mail.lahalex.com | www.lahatheque.com", fontsize=8, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 131), "Capital Social : 1 000 000 000 FCFA", fontsize=8, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 143), "IFU : 3202011691197 | RCCM : RB/COT/24 B 12458", fontsize=8, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 155), "Siège : MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou, Bénin", fontsize=7.5, fontname="helv", color=dark_gray)
+        page.insert_text(fitz.Point(40, 167), "lahaeditions1@gmail.com | www.lahatheque.com", fontsize=8, fontname="helv", color=dark_gray)
 
         # Ayant Droit (Droite)
         page.draw_rect(fitz.Rect(320, 95, 555, 175), color=border_gray, fill=light_gray)
@@ -289,14 +323,14 @@ class PdfAttachmentService:
         page.draw_line(fitz.Point(40, footer_y - 10), fitz.Point(555, footer_y - 10), color=border_gray)
         page.insert_text(
             fitz.Point(40, footer_y + 5),
-            "LAHA Éditions S.A. au capital de 500 000 000 FCFA • Siège Social : Avenue Jean-Paul II, Cotonou, Bénin",
+            "LAHA Éditions S.A. • Siège Social : MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou, Littoral, Bénin",
             fontsize=7.5,
             fontname="helv",
             color=(0.4, 0.4, 0.4),
         )
         page.insert_text(
             fitz.Point(40, footer_y + 17),
-            "RCCM RB/COT/24 B 12458 • IFU 3202415897451 • Bordereau certifié conforme aux stipulations du contrat d'édition (SYSCOHADA).",
+            "RCCM RB/COT/24 B 12458 • IFU 3202011691197 • Bordereau certifié conforme aux stipulations du contrat d'édition (SYSCOHADA).",
             fontsize=7,
             fontname="helv",
             color=(0.5, 0.5, 0.5),

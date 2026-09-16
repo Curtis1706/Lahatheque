@@ -10,6 +10,7 @@ import {
   BookOpen,
   ShoppingBag,
   Headphones,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClientBookAccess } from "@/lib/types/student";
@@ -128,6 +129,12 @@ export function BookListItem({ book, onToggleFavorite, className }: BookListItem
                 <span className="inline-flex items-center gap-1 text-[10px] text-navy font-medium bg-background-secondary px-2 py-0.5 rounded-md border border-border truncate max-w-[200px]">
                   <CheckCircle2 className="w-3 h-3 text-gold shrink-0" />
                   <span className="truncate">{book.institution_name}</span>
+                </span>
+              )}
+              {((book.expires_in_days !== undefined && book.expires_in_days !== null) || book.expiresInDays !== undefined) && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-navy bg-navy/5 px-2 py-0.5 rounded-md border border-border shrink-0">
+                  <Clock className="w-3 h-3 text-gold shrink-0" />
+                  <span>Accès 12 mois ({book.expires_in_days ?? book.expiresInDays} j restants)</span>
                 </span>
               )}
             </div>

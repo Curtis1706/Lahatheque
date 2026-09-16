@@ -579,7 +579,7 @@ export function CreateDebtForm({ onSuccess, onCancel, reminderConfig }: CreateDe
               />
               <div className="text-xs">
                 <span className="font-bold text-navy block">
-                  Mettre en copie le service comptabilité ({reminderConfig?.accountant_email || "contact@mail.lahalex.com"})
+                  Mettre en copie le service comptabilité ({reminderConfig?.accountant_email || "lahaeditions1@gmail.com"})
                 </span>
                 <span className="text-foreground-muted text-[11px]">
                   Permet la réconciliation financière et le suivi des règlements bancaires / Mobile Money.

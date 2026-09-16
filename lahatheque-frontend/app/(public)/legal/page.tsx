@@ -49,7 +49,7 @@ export default function LegalPage() {
             <ul className="space-y-1.5 text-foreground-muted list-disc list-inside">
               <li><strong>Raison sociale :</strong> Laha Éditions SA</li>
               <li><strong>Siège social :</strong> Cotonou, République du Bénin</li>
-              <li><strong>Courriel de contact :</strong> contact@lahatheque.com</li>
+              <li><strong>Courriel de contact :</strong> lahaeditions1@gmail.com</li>
               <li><strong>Directeur de la publication :</strong> Direction Générale de Laha Éditions SA</li>
             </ul>
           </section>

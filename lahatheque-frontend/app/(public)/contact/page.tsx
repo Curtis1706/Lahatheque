@@ -153,9 +153,9 @@ function ContactFormContent() {
                   </p>
                   <a 
                     className="text-base md:text-lg font-bold text-navy hover:text-gold transition-colors duration-200" 
-                    href="mailto:contact@lahatheque.com"
+                    href="mailto:lahaeditions1@gmail.com"
                   >
-                    contact@lahatheque.com
+                    lahaeditions1@gmail.com
                   </a>
                 </div>
               </div>

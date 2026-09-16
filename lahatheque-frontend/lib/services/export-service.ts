@@ -20,7 +20,7 @@ export interface CompanyLegalInfo {
 
 export const LAHA_LEGAL_INFO: CompanyLegalInfo = {
   name: "LAHAThèque Éditions & Numérique S.A.",
-  ifu: "3202415897451",
+  ifu: "3202011691197",
   rccm: "RB/COT/24 B 12458",
   address: "Immeuble LAHA Éditions, Boulevard de la Marina, Cotonou, République du Bénin",
   phone: "(+229) 21 30 45 80 / (+229) 97 00 11 22",

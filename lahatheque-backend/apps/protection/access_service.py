@@ -113,14 +113,31 @@ class AccessService:
             pass
 
         # Achat individuel payé ou achat à crédit accordé (Formats numérique)
+        # Règle métier LAHAThèque : l'accès numérique est valide pendant 12 mois (365 jours) à compter de l'achat.
         from django.db.models import Q
-        has_purchased_digital = LigneCommande.objects.filter(
+        from django.utils import timezone
+        from datetime import timedelta
+
+        latest_digital_line = LigneCommande.objects.filter(
             commande__user=user,
             ouvrage_id=resolved_book_id,
             format_type__in=['digital', 'pdf', 'epub'],
         ).filter(
             Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
-        ).exists()
+        ).select_related('commande').order_by('-commande__created_at').first()
+
+        has_purchased_digital = False
+        access_expires_at = None
+        expires_in_days = None
+
+        if latest_digital_line and latest_digital_line.commande and latest_digital_line.commande.created_at:
+            purchase_date = latest_digital_line.commande.created_at
+            access_expires_at = purchase_date + timedelta(days=365)
+            now = timezone.now()
+            if now <= access_expires_at:
+                has_purchased_digital = True
+                remaining_delta = access_expires_at - now
+                expires_in_days = max(0, remaining_delta.days)
 
         if has_purchased_digital:
             return {
@@ -128,7 +145,9 @@ class AccessService:
                 "reason": "individual_purchase",
                 "resolved_book_id": str(resolved_book_id),
                 "language": resolved_lang,
-                "stream_url": f"/api/v1/catalog/books/{resolved_book_id}/stream/{stream_query}"
+                "stream_url": f"/api/v1/catalog/books/{resolved_book_id}/stream/{stream_query}",
+                "expires_at": access_expires_at.isoformat() if access_expires_at else None,
+                "expires_in_days": expires_in_days,
             }
 
         # Abonnement individuel actif
@@ -198,6 +217,14 @@ class AccessService:
                         "bouquet_subscription_id": str(bouquet_access.id),
                         "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
                     }
+
+        if latest_digital_line and access_expires_at and timezone.now() > access_expires_at:
+            return {
+                "access_granted": False,
+                "reason": "access_expired",
+                "expired_at": access_expires_at.isoformat(),
+                "error": "Accès numérique expiré (validité 12 mois écoulée). Veuillez renouveler votre achat pour continuer la lecture."
+            }
 
         return {
             "access_granted": False,

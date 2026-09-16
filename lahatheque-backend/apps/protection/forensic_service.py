@@ -927,6 +927,14 @@ class ForensicService:
 
         story = []
 
+        # Logo officiel LAHAThèque
+        from apps.communications.services.pdf_attachment_service import PdfAttachmentService
+        from reportlab.platypus import Image as RLImage
+        logo_path = PdfAttachmentService.get_logo_file_path()
+        if logo_path and os.path.exists(logo_path):
+            story.append(RLImage(logo_path, width=120, height=40))
+            story.append(Spacer(1, 8))
+
         # En-tête officiel
         story.append(Paragraph("LAHATHÈQUE • DIRECTION DE LA SÉCURITÉ ET DU COPYRIGHT", subtitle_style))
         story.append(Spacer(1, 4))

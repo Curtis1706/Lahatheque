@@ -3119,7 +3119,7 @@ class LegalRelancesListView(APIView):
                 or ""
             ).strip()
             cc_accountant = bool(request.data.get("cc_accountant", False))
-            accountant_email = "contact@mail.lahalex.com"
+            accountant_email = "lahaeditions1@gmail.com"
 
             try:
                 def _find_user(val):
@@ -3198,7 +3198,7 @@ class LegalRelancesListView(APIView):
                 sender_name = f"{sender.first_name} {sender.last_name}".strip() if sender.is_authenticated else ""
                 if not sender_name:
                     sender_name = "Service Juridique & Recouvrement"
-                sender_email = sender.email if (sender.is_authenticated and sender.email) else "contact@mail.lahalex.com"
+                sender_email = sender.email if (sender.is_authenticated and sender.email) else "lahaeditions1@gmail.com"
 
                 # Destinataires de l'email (client + copie comptabilité optionnelle)
                 recipients = [target_user.email]

@@ -51,18 +51,9 @@ class EmailService:
     @classmethod
     def _get_logo_base64(cls) -> str:
         import base64
-        import os
-        possible_paths = [
-            "e:/Lahatheque/lahatheque-backend/static/logo.png",
-            "e:/Lahatheque/lahatheque-frontend/public/logo.png",
-        ]
-        for p in possible_paths:
-            if os.path.exists(p):
-                try:
-                    with open(p, "rb") as f:
-                        return base64.b64encode(f.read()).decode("utf-8")
-                except Exception:
-                    pass
+        logo_bytes = PdfAttachmentService._get_logo_bytes()
+        if logo_bytes:
+            return base64.b64encode(logo_bytes).decode("utf-8")
         return ""
 
     @classmethod
@@ -88,7 +79,7 @@ class EmailService:
         # Enrichissement du contexte global (logo, url du site, mentions légales, année courante)
         ctx.setdefault("site_name", "LAHAThèque")
         ctx.setdefault("site_url", getattr(settings, "FRONTEND_URL", "https://lahatheque.com"))
-        ctx.setdefault("support_email", "contact@mail.lahalex.com")
+        ctx.setdefault("support_email", "lahaeditions1@gmail.com")
         ctx.setdefault("support_phone", "+229 01 53 00 00 00")
         ctx.setdefault("current_year", timezone.now().year)
         ctx.setdefault("recipient_name", recipient_name)

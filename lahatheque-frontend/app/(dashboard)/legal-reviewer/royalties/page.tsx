@@ -220,31 +220,11 @@ function LegalRoyaltiesPageContent() {
         </div>
       </div>
 
-      {/* Onglets Global vs Suggestions IA */}
+      {/* Vue Globale des Taux par Livre */}
       <div className="flex items-center gap-2 border-b border-border">
-        <button
-          type="button"
-          onClick={() => setActiveTab("global")}
-          className={`pb-3 px-4 text-xs font-bold transition-colors border-b-2 ${
-            activeTab === "global"
-              ? "border-gold text-navy font-serif text-sm"
-              : "border-transparent text-foreground-muted hover:text-navy"
-          }`}
-        >
+        <div className="pb-3 px-4 font-bold border-b-2 border-gold text-navy font-serif text-sm">
           Vue globale des taux par livre ({royalties.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("suggestions")}
-          className={`pb-3 px-4 text-xs font-bold transition-colors border-b-2 flex items-center gap-1.5 ${
-            activeTab === "suggestions"
-              ? "border-gold text-navy font-serif text-sm"
-              : "border-transparent text-foreground-muted hover:text-navy"
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-gold" />
-          Suggestions IA à valider ({aiSuggestions.length})
-        </button>
+        </div>
       </div>
 
       {/* Tab 1: Global */}

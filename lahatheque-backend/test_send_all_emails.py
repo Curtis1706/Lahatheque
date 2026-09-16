@@ -81,7 +81,7 @@ for recipient in TEST_RECIPIENTS:
             "order_number": "GRS-2026-104",
             "customer_name": "Librairie Universitaire Notre-Dame",
             "customer_email": recipient,
-            "customer_address": "Avenue Pape Jean-Paul II, Cotonou",
+            "customer_address": "MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou",
             "date": "03/09/2026",
             "items": [
                 {"title": "Pack 50 Manuels de Mathématiques Générales", "quantity": 50, "unit_price": 3750, "total": 187500}

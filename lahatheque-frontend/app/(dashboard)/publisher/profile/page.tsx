@@ -386,7 +386,7 @@ export default function PublisherProfilePage() {
                 type="text"
                 value={headquartersAddress}
                 onChange={(e) => setHeadquartersAddress(e.target.value)}
-                placeholder="Avenue Jean-Paul II, Immeuble Horizon, Cotonou"
+                placeholder="MAISON ABD'EL HAKIM LALEYE, Agla, 13ème arr., Cotonou"
                 className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy font-semibold min-h-[44px]"
               />
             </div>

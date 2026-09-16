@@ -221,10 +221,13 @@ class StudentBooksView(APIView):
                     Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
                 ).values_list('ouvrage_id', flat=True)
             )
+            from datetime import timedelta
+            twelve_months_ago = timezone.now() - timedelta(days=365)
             user_digital_ids = set(
                 str(bid) for bid in LigneCommande.objects.filter(
                     commande__user=user,
                     format_type__in=['digital', 'pdf', 'epub'],
+                    commande__created_at__gte=twelve_months_ago,
                 ).filter(
                     Q(commande__statut_paiement='paid') | Q(commande__is_credit_purchase=True)
                 ).values_list('ouvrage_id', flat=True)
@@ -267,6 +270,8 @@ class StudentBooksView(APIView):
                 'is_completed': (progress.is_completed or progress_pct >= 100) if has_digital_access else False,
                 'is_favorite': progress.is_favorite,
                 'access_type': access_info.get("reason", "purchased") if has_digital_access else "audio_purchase",
+                'expires_at': access_info.get("expires_at"),
+                'expires_in_days': access_info.get("expires_in_days"),
             })
 
         return Response({'success': True, 'data': data, 'error': None})

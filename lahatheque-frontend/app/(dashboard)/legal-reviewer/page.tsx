@@ -178,8 +178,8 @@ export default function LegalReviewerOverviewPage() {
         </div>
       )}
 
-      {/* 5 KPI Cards en Barres Histogrammes (Full Width Responsive Grid) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-5">
+      {/* 4 KPI Cards en Barres Histogrammes (Full Width Responsive Grid) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-5">
         <Link href="/legal-reviewer/contracts" className="block">
           <ProgressMetricCard
             title="Contrats Stockés"
@@ -189,19 +189,6 @@ export default function LegalReviewerOverviewPage() {
             accent="gold"
             delta={`${kpis?.totalContracts ?? contracts.length} contrat(s)`}
             deltaLabel="enregistrés"
-            data={kpis?.timeline || []}
-          />
-        </Link>
-
-        <Link href="/legal-reviewer/royalties?tab=suggestions" className="block">
-          <ProgressMetricCard
-            title="Suggestions IA"
-            total={`${kpis?.pendingAiSuggestions ?? aiSuggestions.length} clés`}
-            percent={aiSuggestions.length > 0 ? "À valider" : "À jour"}
-            trend="up"
-            accent="gold"
-            delta={`${aiSuggestions.length} suggestion(s)`}
-            deltaLabel="en attente"
             data={kpis?.timeline || []}
           />
         </Link>
@@ -264,7 +251,7 @@ export default function LegalReviewerOverviewPage() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
               {/* Jauge 1 : Couverture Contrats Auteurs */}
               <div className="space-y-2 bg-background p-4 rounded-2xl border border-border">
                 <div className="flex items-center justify-between text-xs font-bold">
@@ -296,23 +283,6 @@ export default function LegalReviewerOverviewPage() {
                 <p className="text-[10px] text-foreground-muted flex justify-between">
                   <span>1.070.000 FCFA</span>
                   <span className="font-semibold text-foreground-muted">2 relances</span>
-                </p>
-              </div>
-
-              {/* Jauge 3 : Validation des Suggestions IA */}
-              <div className="space-y-2 bg-background p-4 rounded-2xl border border-border">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-navy flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-info" /> Validation IA
-                  </span>
-                  <span className="text-info font-bold">85%</span>
-                </div>
-                <div className="w-full h-2.5 rounded-full bg-background-secondary overflow-hidden border border-border">
-                  <div className="h-full bg-info rounded-full transition-all duration-500" style={{ width: "85%" }} />
-                </div>
-                <p className="text-[10px] text-foreground-muted flex justify-between">
-                  <span>12 clés validées</span>
-                  <span className="font-semibold text-info">2 attente</span>
                 </p>
               </div>
             </div>
@@ -377,107 +347,51 @@ export default function LegalReviewerOverviewPage() {
             )}
           </div>
 
-          {/* Grid à 2 blocs : Suggestions IA & Impayés */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Bloc Suggestions IA */}
-            <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold font-serif text-navy">Suggestions IA à Valider</h3>
-                    <p className="text-[10px] text-foreground-muted">Clés de répartition co-auteurs</p>
-                  </div>
+          {/* Bloc Impayés Clients */}
+          <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
+                  <AlertTriangle className="w-4 h-4" />
                 </div>
-                <Link href="/legal-reviewer/royalties?tab=suggestions" className="text-[11px] font-bold text-gold">
-                  Voir tout ({aiSuggestions.length})
-                </Link>
+                <div>
+                  <h3 className="text-xs font-bold font-serif text-navy">Clients en Impayé</h3>
+                  <p className="text-[10px] text-foreground-muted">Relances échues</p>
+                </div>
               </div>
-
-              {loading ? (
-                <div className="h-28 w-full bg-border/40 animate-pulse rounded-2xl" />
-              ) : aiSuggestions.length === 0 ? (
-                <p className="text-xs text-foreground-muted py-4 text-center">Aucune suggestion en attente.</p>
-              ) : (
-                <div className="space-y-3">
-                  {aiSuggestions.map((sug) => (
-                    <div key={sug.id} className="p-3.5 rounded-2xl bg-background border border-border space-y-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-bold text-xs text-navy leading-tight line-clamp-1">{sug.title}</h4>
-                        <span className="px-1.5 py-0.5 rounded bg-info/10 text-info font-bold text-[9px] shrink-0">
-                          {sug.ai_confidence}%
-                        </span>
-                      </div>
-                      <div className="space-y-1 text-[11px]">
-                        {sug.proposed_splits.map((split, i) => (
-                          <div key={i} className="flex justify-between text-foreground-muted">
-                            <span className="truncate">{split.author_name}</span>
-                            <span className="font-bold text-navy ml-2">{split.percentage}%</span>
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        onClick={() => handleValidateSuggestion(sug.id)}
-                        className="w-full py-1.5 px-2 rounded-xl bg-gold text-navy font-bold text-[11px] hover:bg-gold-hover transition-colors flex items-center justify-center gap-1 shadow-xs"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Valider Clé IA
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <Link href="/legal-reviewer/relances?tab=debts" className="text-[11px] font-bold text-gold">
+                Toutes ({debts.length})
+              </Link>
             </div>
 
-            {/* Bloc Impayés Clients */}
-            <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
-                    <AlertTriangle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold font-serif text-navy">Clients en Impayé</h3>
-                    <p className="text-[10px] text-foreground-muted">Relances échues</p>
-                  </div>
-                </div>
-                <Link href="/legal-reviewer/relances?tab=debts" className="text-[11px] font-bold text-gold">
-                  Toutes ({debts.length})
-                </Link>
-              </div>
-
-              {loading ? (
-                <div className="h-28 w-full bg-border/40 animate-pulse rounded-2xl" />
-              ) : debts.length === 0 ? (
-                <p className="text-xs text-foreground-muted py-4 text-center">Aucun impayé signalé.</p>
-              ) : (
-                <div className="space-y-3">
-                  {debts.map((debt) => (
-                    <div key={debt.id} className="p-3.5 rounded-2xl bg-background border border-border space-y-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-bold text-xs text-navy leading-tight truncate">{debt.client_name}</h4>
-                        <span className="font-bold text-xs text-error font-mono shrink-0">
-                          {(debt.amount || debt.total_debt_amount || 0).toLocaleString("fr-FR")} {debt.currency}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-[10px] text-foreground-muted">
-                        <span>{debt.days_overdue}j de retard</span>
-                        <span>{debt.reminder_count} relance(s)</span>
-                      </div>
-                      <button
-                        onClick={() => handleRemindDebt(debt.id)}
-                        className="w-full py-1.5 px-2 rounded-xl bg-navy text-gold font-bold text-[11px] hover:bg-navy-dark transition-colors flex items-center justify-center gap-1 border border-gold/30 shadow-xs"
-                      >
-                        <Send className="w-3.5 h-3.5" /> Relancer Client
-                      </button>
+            {loading ? (
+              <div className="h-28 w-full bg-border/40 animate-pulse rounded-2xl" />
+            ) : debts.length === 0 ? (
+              <p className="text-xs text-foreground-muted py-4 text-center">Aucun impayé signalé.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {debts.map((debt) => (
+                  <div key={debt.id} className="p-3.5 rounded-2xl bg-background border border-border space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-bold text-xs text-navy leading-tight truncate">{debt.client_name}</h4>
+                      <span className="font-bold text-xs text-error font-mono shrink-0">
+                        {(debt.amount || debt.total_debt_amount || 0).toLocaleString("fr-FR")} {debt.currency}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
+                    <div className="flex justify-between text-[10px] text-foreground-muted">
+                      <span>{debt.days_overdue}j de retard</span>
+                      <span>{debt.reminder_count} relance(s)</span>
+                    </div>
+                    <button
+                      onClick={() => handleRemindDebt(debt.id)}
+                      className="w-full py-1.5 px-2 rounded-xl bg-navy text-gold font-bold text-[11px] hover:bg-navy-dark transition-colors flex items-center justify-center gap-1 border border-gold/30 shadow-xs"
+                    >
+                      <Send className="w-3.5 h-3.5" /> Relancer Client
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
         </div>
@@ -489,7 +403,7 @@ export default function LegalReviewerOverviewPage() {
           <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
             <div className="pb-3 border-b border-border">
               <h2 className="text-base font-bold font-serif text-navy">Actions Rapides Juridiques</h2>
-              <p className="text-[11px] text-foreground-muted">Accès direct aux 6 sous-modules</p>
+              <p className="text-[11px] text-foreground-muted">Accès direct aux modules juridiques</p>
             </div>
 
             <div className="flex flex-col gap-2.5">
@@ -500,12 +414,6 @@ export default function LegalReviewerOverviewPage() {
                   icon: PlusCircle,
                   href: "/legal-reviewer/contracts/new",
                   primary: true,
-                },
-                {
-                  label: "Valider Suggestions IA",
-                  desc: "Clés de répartition co-auteurs",
-                  icon: Sparkles,
-                  href: "/legal-reviewer/royalties?tab=suggestions",
                 },
                 {
                   label: "Nouveau Contrat Pré-édition",

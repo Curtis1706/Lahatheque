@@ -237,7 +237,7 @@ export function SendContactEmailModal({
             {/* Note sur la traçabilité */}
             <p className="text-[11px] text-foreground-muted leading-relaxed">
               Le message sera mis en page avec l'en-tête officiel LAHAThèque et transmis via l'adresse{" "}
-              <strong className="text-foreground">contact@mail.lahalex.com</strong>. L'adresse de réponse (<em>reply-to</em>) sera configurée avec votre adresse e-mail personnelle afin que les réponses vous parviennent directement.
+              <strong className="text-foreground">lahaeditions1@gmail.com</strong>. L'adresse de réponse (<em>reply-to</em>) sera configurée avec votre adresse e-mail personnelle afin que les réponses vous parviennent directement.
             </p>
           </>
         )}

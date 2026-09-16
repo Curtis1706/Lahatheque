@@ -24,6 +24,7 @@ import {
   User,
 } from "lucide-react";
 import { toast } from "sonner";
+import { BookCover } from "@/components/features/student/book-cover";
 
 interface OrderActionModalProps {
   order: AdminOrder;
@@ -288,14 +289,25 @@ export function OrderActionModal({
                 <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
                   {order.items && order.items.length > 0 ? (
                     order.items.map((it, idx) => (
-                      <div key={it.id || idx} className="p-3 flex items-center justify-between text-xs">
-                        <div>
-                          <p className="font-medium text-foreground">{it.book_title}</p>
-                          <p className="text-muted-foreground text-[11px]">
-                            Format: {it.format} &bull; Qté: {it.quantity} &times; {formatAmount(it.unit_price)}
-                          </p>
+                      <div key={it.id || idx} className="p-3 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <BookCover
+                            book={{
+                              title: it.book_title,
+                              id: it.book_id || undefined,
+                              cover_url: it.cover_url || undefined,
+                            }}
+                            size="xs"
+                            className="w-10 h-14 min-w-[2.5rem] min-h-[3.5rem] shadow-xs shrink-0 rounded-xs"
+                          />
+                          <div className="min-w-0">
+                            <p className="font-semibold text-foreground truncate" title={it.book_title}>{it.book_title}</p>
+                            <p className="text-muted-foreground text-[11px] mt-0.5">
+                              Format: {it.format} &bull; Qté: {it.quantity} &times; {formatAmount(it.unit_price)}
+                            </p>
+                          </div>
                         </div>
-                        <span className="font-semibold text-foreground">
+                        <span className="font-semibold text-foreground shrink-0 font-mono">
                           {formatAmount(it.total_price)}
                         </span>
                       </div>
