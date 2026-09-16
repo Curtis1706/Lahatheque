@@ -116,7 +116,7 @@ function LegalRoyaltiesPageContent() {
     );
     if (res.success) {
       setAiSuggestions((prev) => prev.filter((s) => s.id !== sug.id));
-      toast.success(res.message || "Les taux de droits d'auteur ont été validés et enregistrés avec succès !");
+      toast.success(res.message || "La répartition des droits a été validée avec succès !");
     } else {
       toast.error(res.error || "Impossible de valider la suggestion.");
     }
@@ -212,7 +212,7 @@ function LegalRoyaltiesPageContent() {
             Gestion Exclusive des Droits
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Droits d&apos;Auteur &amp; Répartition IA
+            Droits d&apos;Auteur &amp; Répartition
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
             Seul le Juriste peut enregistrer, modifier rétroactivement ou valider les pourcentages de droits d&apos;auteur.
@@ -220,7 +220,7 @@ function LegalRoyaltiesPageContent() {
         </div>
       </div>
 
-      {/* Onglets Global vs Suggestions IA */}
+      {/* Onglets Global vs Propositions en Attente */}
       <div className="flex items-center gap-2 border-b border-border">
         <button
           type="button"
@@ -243,7 +243,7 @@ function LegalRoyaltiesPageContent() {
           }`}
         >
           <Sparkles className="w-4 h-4 text-gold" />
-          Suggestions IA à valider ({aiSuggestions.length})
+          Propositions en attente ({aiSuggestions.length})
         </button>
       </div>
 
@@ -265,7 +265,7 @@ function LegalRoyaltiesPageContent() {
           {aiSuggestions.length === 0 ? (
             <div className="p-8 text-center bg-background-secondary border border-border rounded-3xl space-y-2">
               <Check className="w-8 h-8 text-success mx-auto" />
-              <h3 className="font-serif font-bold text-navy text-sm">Toutes les suggestions IA sont validées !</h3>
+              <h3 className="font-serif font-bold text-navy text-sm">Toutes les propositions de répartition sont validées !</h3>
               <p className="text-xs text-foreground-muted">Aucun nouveau partage de droits en attente d&apos;examen.</p>
             </div>
           ) : (
@@ -278,7 +278,7 @@ function LegalRoyaltiesPageContent() {
                     <div>
                       <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gold/15 text-gold text-[10px] font-bold uppercase tracking-wider mb-1">
                         <Sparkles className="w-3 h-3" />
-                        Confiance IA : {sug.ai_confidence}%
+                        Indice de confiance : {sug.ai_confidence}%
                       </div>
                       <h3 className="font-serif font-bold text-navy text-base leading-snug">{sug.title}</h3>
                       <p className="text-xs text-foreground-muted">
@@ -292,7 +292,7 @@ function LegalRoyaltiesPageContent() {
                       className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] shrink-0"
                     >
                       <Check className="w-4 h-4 text-gold" />
-                      Valider les Taux
+                      Valider la Répartition
                     </button>
                   </div>
 

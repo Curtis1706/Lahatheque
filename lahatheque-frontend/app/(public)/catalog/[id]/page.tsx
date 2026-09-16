@@ -5,8 +5,6 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { 
   ArrowLeft, 
-  ShieldCheck, 
-  Award, 
   AlertTriangle,
   Star,
   ChevronRight,
@@ -178,18 +176,6 @@ export default function BookDetailPage() {
                 width={{ sm: 180, md: 200, lg: 210, xl: 210 }}
                 textured
               />
-            </div>
-
-            {/* Badges de Confiance & Garantie */}
-            <div className="flex items-center justify-center gap-4 text-foreground-muted text-xs pt-1">
-              <span className="flex items-center gap-1.5 font-medium">
-                <ShieldCheck className="w-4 h-4 text-gold" />
-                Certifié LAHA
-              </span>
-              <span className="flex items-center gap-1.5 font-medium">
-                <Award className="w-4 h-4 text-gold" />
-                Garantie Éditeur
-              </span>
             </div>
           </div>
 

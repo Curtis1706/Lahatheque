@@ -92,7 +92,7 @@ export default function LegalReviewerOverviewPage() {
   const handleValidateSuggestion = async (id: string) => {
     const success = await validateAISuggestion(id);
     if (success) {
-      setActionMessage("Clé de répartition IA validée avec succès !");
+      setActionMessage("Répartition validée avec succès !");
       setTimeout(() => setActionMessage(null), 4000);
       loadData();
     }
@@ -195,13 +195,13 @@ export default function LegalReviewerOverviewPage() {
 
         <Link href="/legal-reviewer/royalties?tab=suggestions" className="block">
           <ProgressMetricCard
-            title="Suggestions IA"
-            total={`${kpis?.pendingAiSuggestions ?? aiSuggestions.length} clés`}
-            percent={aiSuggestions.length > 0 ? "À valider" : "À jour"}
+            title="Propositions de Répartition"
+            total={`${kpis?.pendingAiSuggestions ?? aiSuggestions.length} en attente`}
+            percent={aiSuggestions.length > 0 ? "À arbitrer" : "À jour"}
             trend="up"
             accent="gold"
-            delta={`${aiSuggestions.length} suggestion(s)`}
-            deltaLabel="en attente"
+            delta={`${aiSuggestions.length} proposition(s)`}
+            deltaLabel="à valider"
             data={kpis?.timeline || []}
           />
         </Link>
@@ -299,11 +299,11 @@ export default function LegalReviewerOverviewPage() {
                 </p>
               </div>
 
-              {/* Jauge 3 : Validation des Suggestions IA */}
+              {/* Jauge 3 : Validation des Répartitions Suggérées */}
               <div className="space-y-2 bg-background p-4 rounded-2xl border border-border">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-navy flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-info" /> Validation IA
+                    <Sparkles className="w-4 h-4 text-info" /> Propositions Traitées
                   </span>
                   <span className="text-info font-bold">85%</span>
                 </div>
@@ -311,8 +311,8 @@ export default function LegalReviewerOverviewPage() {
                   <div className="h-full bg-info rounded-full transition-all duration-500" style={{ width: "85%" }} />
                 </div>
                 <p className="text-[10px] text-foreground-muted flex justify-between">
-                  <span>12 clés validées</span>
-                  <span className="font-semibold text-info">2 attente</span>
+                  <span>12 propositions validées</span>
+                  <span className="font-semibold text-info">2 en attente</span>
                 </p>
               </div>
             </div>
@@ -380,7 +380,7 @@ export default function LegalReviewerOverviewPage() {
           {/* Grid à 2 blocs : Suggestions IA & Impayés */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
-            {/* Bloc Suggestions IA */}
+            {/* Bloc Propositions de Répartition */}
             <div className="p-6 rounded-3xl bg-background-secondary border border-border space-y-4 shadow-xs">
               <div className="flex items-center justify-between border-b border-border pb-3">
                 <div className="flex items-center gap-2">
@@ -388,8 +388,8 @@ export default function LegalReviewerOverviewPage() {
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold font-serif text-navy">Suggestions IA à Valider</h3>
-                    <p className="text-[10px] text-foreground-muted">Clés de répartition co-auteurs</p>
+                    <h3 className="text-xs font-bold font-serif text-navy">Propositions de Répartition</h3>
+                    <p className="text-[10px] text-foreground-muted">Quote-parts et taux d&apos;auteurs</p>
                   </div>
                 </div>
                 <Link href="/legal-reviewer/royalties?tab=suggestions" className="text-[11px] font-bold text-gold">
@@ -400,7 +400,7 @@ export default function LegalReviewerOverviewPage() {
               {loading ? (
                 <div className="h-28 w-full bg-border/40 animate-pulse rounded-2xl" />
               ) : aiSuggestions.length === 0 ? (
-                <p className="text-xs text-foreground-muted py-4 text-center">Aucune suggestion en attente.</p>
+                <p className="text-xs text-foreground-muted py-4 text-center">Aucune proposition en attente.</p>
               ) : (
                 <div className="space-y-3">
                   {aiSuggestions.map((sug) => (
@@ -423,7 +423,7 @@ export default function LegalReviewerOverviewPage() {
                         onClick={() => handleValidateSuggestion(sug.id)}
                         className="w-full py-1.5 px-2 rounded-xl bg-gold text-navy font-bold text-[11px] hover:bg-gold-hover transition-colors flex items-center justify-center gap-1 shadow-xs"
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Valider Clé IA
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Valider la répartition
                       </button>
                     </div>
                   ))}
@@ -502,8 +502,8 @@ export default function LegalReviewerOverviewPage() {
                   primary: true,
                 },
                 {
-                  label: "Valider Suggestions IA",
-                  desc: "Clés de répartition co-auteurs",
+                  label: "Arbitrer les Répartitions",
+                  desc: "Quote-parts co-auteurs et taux proposés",
                   icon: Sparkles,
                   href: "/legal-reviewer/royalties?tab=suggestions",
                 },
