@@ -589,21 +589,26 @@ class ReaderQuizSubmitView(APIView):
 
 
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
 
 class QuizRetrieveOrGenerateView(APIView):
     """
     GET /api/v1/reader/quizzes/?book_id=<uuid>
-    Retourne le quiz existant pour un ouvrage, ou en génère un via IA si aucun n'existe.
-    Accessible aux lecteurs internes authentifiés et aux étudiants invités des sessions de lecture.
+    Retourne le quiz existant pour un ouvrage, ou déclenche sa génération asynchrone sécurisée (SEC-06).
+    Protégé par authentification, vérification des droits d'accès à l'ouvrage et rate limiting (3/heure).
     """
-    permission_classes = []
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'quiz_generation'
 
     def get(self, request):
-        from apps.catalog.models import Ouvrage, Quiz, QuizQuestion
+        from apps.catalog.models import Ouvrage, Quiz
+        from apps.protection.access_service import AccessService
+        from apps.ai_engine.tasks import task_generate_quiz
 
         book_id = request.query_params.get('book_id')
         if not book_id:
-            return Response({"success": False, "error": "book_id requis."}, status=400)
+            return Response({"success": False, "error": "book_id requis."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Les extraits gratuits et aperçus temporaires n'ont pas de quiz
         clean_id = str(book_id).strip()
@@ -622,18 +627,27 @@ class QuizRetrieveOrGenerateView(APIView):
             ouvrage = None
 
         if not ouvrage:
-            return Response({"success": True, "data": None, "message": "Aucun quiz disponible pour ce document."})
+            return Response({"success": False, "error": "Ouvrage introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        # SEC-06: Vérification d'accès obligatoire avant de servir ou générer le quiz
+        access_result = AccessService.check_user_book_access(request.user, str(ouvrage.id))
+        if not access_result.get("access_granted"):
+            return Response(
+                {"success": False, "error": "Vous devez posséder l'accès à cet ouvrage pour obtenir ou générer son quiz."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         # Chercher un quiz existant
         quiz = Quiz.objects.filter(ouvrage=ouvrage).prefetch_related('questions').first()
 
         if not quiz:
-            # Générer via IA
-            creator = request.user if (hasattr(request, 'user') and request.user.is_authenticated) else None
-            quiz = self._generate_quiz_with_ai(ouvrage, creator)
-
-        if not quiz:
-            return Response({"success": True, "data": None})
+            # SEC-06: Déclencher la génération en tâche de fond Celery et renvoyer 202 Accepted
+            task_generate_quiz.delay(str(ouvrage.id), str(request.user.id))
+            return Response({
+                "success": True,
+                "status": "generating",
+                "message": "Génération du quiz en cours en arrière-plan. Veuillez réessayer dans quelques instants."
+            }, status=status.HTTP_202_ACCEPTED)
 
         questions_data = []
         for q in quiz.questions.all():
@@ -657,88 +671,6 @@ class QuizRetrieveOrGenerateView(APIView):
                 "questions": questions_data,
             }
         })
-
-    def _generate_quiz_with_ai(self, ouvrage, user):
-        """Génère un quiz de 5 QCM via OpenAI à partir du contenu de l'ouvrage."""
-        from apps.catalog.models import Quiz, QuizQuestion
-        import json
-        import logging
-        logger = logging.getLogger(__name__)
-
-        try:
-            # Extraire du texte du fichier de l'ouvrage
-            text_sample = ""
-            if ouvrage.file:
-                try:
-                    from apps.ai_engine.services.openai_service import extract_text_sample_from_bytes
-                    file_bytes = ouvrage.file.read()
-                    ouvrage.file.seek(0)
-                    ext = ouvrage.file.name.split('.')[-1] if '.' in ouvrage.file.name else 'pdf'
-                    text_sample, _ = extract_text_sample_from_bytes(file_bytes, file_ext=ext)
-                except Exception as e:
-                    logger.warning(f"Impossible d'extraire le texte pour quiz: {e}")
-
-            if not text_sample:
-                text_sample = f"Titre: {ouvrage.title}. Résumé: {ouvrage.summary or 'Non disponible'}."
-
-            # Appel OpenAI
-            from django.conf import settings
-            import openai
-            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-
-            prompt = f"""Tu es un professeur universitaire. Génère exactement 5 questions QCM (quiz à choix multiples) pour évaluer la compréhension de cet ouvrage.
-
-Titre : {ouvrage.title}
-Contenu (extrait) : {text_sample[:3000]}
-
-Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks. Format exact :
-[
-  {{
-    "question": "Texte de la question",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correct_index": 0,
-    "explanation": "Explication courte de la bonne réponse"
-  }}
-]"""
-
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-            )
-            raw = response.choices[0].message.content.strip()
-            # Nettoyer le markdown si présent
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-                if raw.endswith("```"):
-                    raw = raw[:-3]
-                raw = raw.strip()
-
-            questions_list = json.loads(raw)
-
-            # Créer le quiz en base
-            quiz = Quiz.objects.create(
-                ouvrage=ouvrage,
-                title=f"Évaluation : {ouvrage.title[:80]}",
-                description=f"Quiz auto-généré par l'IA LAHAThèque ({len(questions_list)} questions)",
-                is_ai_generated=True,
-                created_by=user,
-            )
-
-            for i, q_data in enumerate(questions_list[:5]):
-                QuizQuestion.objects.create(
-                    quiz=quiz,
-                    question_text=q_data.get('question', ''),
-                    options=q_data.get('options', []),
-                    correct_index=int(q_data.get('correct_index', 0)),
-                    explanation=q_data.get('explanation', ''),
-                    order=i,
-                )
-
-            return quiz
-
-        except Exception as e:
-            logger.error(f"Erreur génération quiz IA: {e}", exc_info=True)
-            return None
 
 
 class QuizSubmitAnswersView(APIView):

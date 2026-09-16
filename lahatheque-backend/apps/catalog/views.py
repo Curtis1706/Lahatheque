@@ -27,20 +27,20 @@ CATALOG_CACHE_TTL = 300
 
 
 def invalidate_catalog_cache():
-    """Invalide immédiatement tous les caches du catalogue public et de tarification."""
+    """Invalide immédiatement tous les caches du catalogue public et de tarification sans vider tout Redis (PERF-03)."""
     try:
-        current_v = cache.get("catalog_cache_version") or 1
-        cache.set("catalog_cache_version", current_v + 1, 86400 * 30)
-    except Exception:
-        pass
-    try:
-        cache.clear()
-    except Exception:
-        pass
+        try:
+            cache.incr("catalog_cache_version")
+        except ValueError:
+            # Si la clé n'existe pas encore dans Redis
+            cache.set("catalog_cache_version", 2, 86400 * 30)
+    except Exception as e:
+        logger.warning(f"Erreur increment catalog_cache_version: {e}")
+
     try:
         cache.delete("admin_catalog_pricing_all")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Erreur suppression cache pricing: {e}")
 
 
 def _catalog_cache_key(prefix: str, query_params: dict) -> str:

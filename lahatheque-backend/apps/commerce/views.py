@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from apps.accounts.permissions import IsAdminOrSuperAdmin
+from apps.accounts.permissions import IsAdminOrSuperAdmin, IsManagerOrAdmin
 from django.db import transaction
 from decimal import Decimal
 import logging
@@ -234,14 +234,17 @@ class CreateOrderView(APIView):
                     logger.warning(f"[Commerce] Impossible de notifier l'admin à la création: {admin_mail_err}")
 
             if is_credit_purchase:
-                from .services import fulfill_credit_order
-                fulfill_credit_order(commande)
+                # SEC-09: Ne JAMAIS débloquer immédiatement un achat à crédit sans validation admin/manager
+                commande.credit_status = 'pending_approval'
+                commande.statut_paiement = 'pending'
+                commande.statut_commande = 'pending'
+                commande.save(update_fields=['credit_status', 'statut_paiement', 'statut_commande'])
                 return Response({
                     'success': True,
                     'order_id': str(commande.id),
                     'data': OrderSerializer(commande).data,
                     'order': OrderSerializer(commande).data,
-                    'message': f"Commande en dépôt confirmée. Paiement dû avant le {credit_due_date.strftime('%d/%m/%Y')}.",
+                    'message': f"Demande d'achat à crédit enregistrée avec succès. Elle est en attente d'approbation par la direction commerciale.",
                 }, status=status.HTTP_201_CREATED)
 
             # Si le mode de règlement n'est pas Mobile Money → règlement manuel
@@ -1166,5 +1169,70 @@ class AdminOrderConfirmPaymentView(APIView):
             "message": f"Paiement de la commande #{str(order.id)[:8].upper()} validé manuellement avec succès.",
             "error": None,
         }, status=status.HTTP_200_OK)
+
+
+class AdminApproveCreditOrderView(APIView):
+    """
+    POST /api/v1/commerce/admin/orders/<uuid:order_id>/approve-credit/
+    Validation ou refus administratif d'une demande d'achat à crédit (SEC-09).
+    Réservé exclusivement aux rôles Gestionnaire (manager) et Administrateur.
+    Body: { "action": "approve" | "reject" }
+    """
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def post(self, request, order_id):
+        action = request.data.get('action', 'approve').strip().lower()
+        if action not in ('approve', 'reject'):
+            return Response(
+                {"success": False, "error": "Action invalide. Choisissez 'approve' ou 'reject'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        commande = Order.objects.filter(id=order_id).first()
+        if not commande:
+            return Response(
+                {"success": False, "error": "Commande introuvable."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not commande.is_credit_purchase:
+            return Response(
+                {"success": False, "error": "Cette commande n'est pas une commande à crédit."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if commande.credit_status != 'pending_approval':
+            return Response(
+                {"success": False, "error": f"Cette commande n'est plus en attente d'approbation (statut actuel: {commande.credit_status})."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if action == 'approve':
+            from .services import fulfill_credit_order
+            with transaction.atomic():
+                commande.credit_status = 'approved'
+                commande.credit_granted_by = request.user
+                commande.save(update_fields=['credit_status', 'credit_granted_by'])
+                fulfill_credit_order(commande)
+
+            logger.info(f"[Commerce] Crédit approuvé pour commande {commande.id} par {request.user.email}.")
+            return Response({
+                "success": True,
+                "message": "Achat à crédit approuvé et commande débloquée avec succès.",
+                "data": OrderSerializer(commande).data
+            }, status=status.HTTP_200_OK)
+
+        elif action == 'reject':
+            with transaction.atomic():
+                commande.credit_status = 'rejected'
+                commande.statut_commande = 'cancelled'
+                commande.save(update_fields=['credit_status', 'statut_commande'])
+
+            logger.info(f"[Commerce] Crédit rejeté pour commande {commande.id} par {request.user.email}.")
+            return Response({
+                "success": True,
+                "message": "Demande d'achat à crédit rejetée et commande annulée.",
+                "data": OrderSerializer(commande).data
+            }, status=status.HTTP_200_OK)
 
 

@@ -6,10 +6,10 @@ from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-lahatheque-dev-key-change-in-prod')
+DEBUG = config('DEBUG', default=True, cast=bool)
+SECRET_KEY = config('SECRET_KEY') if not DEBUG else config('SECRET_KEY', default='django-insecure-dev-only')
 READER_JWT_SIGNING_KEY = config('READER_JWT_SIGNING_KEY', default=SECRET_KEY)
 OAUTH2_PARTNER_JWT_SIGNING_KEY = config('OAUTH2_PARTNER_JWT_SIGNING_KEY', default=config('READER_JWT_SIGNING_KEY', default=SECRET_KEY))
-DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
@@ -97,7 +97,7 @@ import dj_database_url
 DATABASES = {
     'default': dj_database_url.config(
         default=config('DATABASE_URL', default='postgres://lahatheque_user:password@ep-sample-pooler.us-east-2.aws.neon.tech/lahatheque_db?sslmode=require'),
-        conn_max_age=0, # Neon ferme les connexions inactives après 5 min
+        conn_max_age=300, # Recycler les connexions TLS toutes les 5 minutes
         ssl_require=True,
     )
 }
@@ -130,6 +130,8 @@ REST_FRAMEWORK = {
         'payment': '5/min',
         'submission': '20/min',
         'auth': '10/min',
+        'auth_reset': '5/min',
+        'quiz_generation': '3/hour',
     },
     'EXCEPTION_HANDLER': 'common.exceptions.custom_exception_handler',
 }
@@ -140,7 +142,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': False,
+    'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
@@ -197,19 +199,25 @@ BACKEND_URL = config('BACKEND_URL', default='http://localhost:8000' if DEBUG els
 # ── CORS Settings ─────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://([a-zA-Z0-9-]+\.)?lahatheque\.com$",
-    r"^https://.*\.vercel\.app$",
-    r"^https://lahatheque\.vercel\.app$",
-    r"^http://localhost(:\d+)?$",
-    r"^http://127\.0\.0\.1(:\d+)?$",
-    r"^http://0\.0\.0\.0(:\d+)?$",
+    # Restreint aux déploiements Vercel sous le compte LAHA uniquement
+    r"^https://lahatheque(-[a-zA-Z0-9]+)?(-lahas-projects)?\.vercel\.app$",
 ]
+if DEBUG:
+    CORS_ALLOWED_ORIGIN_REGEXES += [
+        r"^http://localhost(:\d+)?$",
+        r"^http://127\.0\.0\.1(:\d+)?$",
+    ]
+
 CORS_ALLOWED_ORIGINS = [
     "https://lahatheque.com",
     "https://www.lahatheque.com",
     "https://lahatheque.vercel.app",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
 ]
+if DEBUG:
+    CORS_ALLOWED_ORIGINS += [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 extra_cors = config('CORS_ALLOWED_ORIGINS', default='', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
 if extra_cors:
     for origin in extra_cors:
@@ -220,12 +228,13 @@ CSRF_TRUSTED_ORIGINS = [
     "https://lahatheque.com",
     "https://www.lahatheque.com",
     "https://api.lahatheque.com",
-    "https://*.lahatheque.com",
-    "https://lahatheque.vercel.app",
-    "https://*.vercel.app",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
 ]
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS += [
+        "https://lahatheque.vercel.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 extra_csrf = config('CSRF_TRUSTED_ORIGINS', default='', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
 if extra_csrf:
     for origin in extra_csrf:
@@ -303,7 +312,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 FILE_UPLOAD_PERMISSIONS = 0o644
 
 # ── DRM & Protection Configuration ───────────────────────────────────────────
-FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY') if not DEBUG else config('FIELD_ENCRYPTION_KEY', default='0' * 64)
 DRM_DERIVED_CACHE_DIR = config('DRM_DERIVED_CACHE_DIR', default=str(BASE_DIR / 'var' / 'drm_cache'))
 DRM_DERIVED_CACHE_TTL_HOURS = config('DRM_DERIVED_CACHE_TTL_HOURS', default=24, cast=int)
 DRM_WATERMARK_DEFAULT_OPACITY = 0.20
@@ -342,7 +351,7 @@ USE_I18N = True
 USE_TZ = True
 
 # ── Configuration Celery & Broker Redis ──────────────────────────────────────
-REDIS_URL = config('REDIS_URL', default='redis://default:4g5uMsfQ7htgCFQk7gDrkv0PU0h4jWX3blgJfNOG3ZucWK33melhXqJ2w4h0Ut8a@191.218.165.180:6379/0')
+REDIS_URL = config('REDIS_URL') if not DEBUG else config('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL)
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL)
 CELERY_ACCEPT_CONTENT = ['json']

@@ -360,6 +360,36 @@ class ProtectionConfigViewSet(ModelViewSet):
     serializer_class = ProtectionConfigSerializer
     permission_classes = [IsAuthenticated]
 
+    def _can_modify_config(self, user, ouvrage):
+        """SEC-04: Seuls admin, super_admin, chief_layout ou l'éditeur propriétaire peuvent modifier les DRM."""
+        if not user or not user.is_authenticated:
+            return False
+        user_roles = set([getattr(user, 'role', None)] + (getattr(user, 'active_roles', []) or []))
+        if (
+            getattr(user, 'is_staff', False)
+            or getattr(user, 'is_superuser', False)
+            or bool(user_roles & {'admin', 'super_admin', 'chief_layout'})
+        ):
+            return True
+
+        if ouvrage and hasattr(ouvrage, 'publisher') and ouvrage.publisher:
+            if ouvrage.publisher.user_id == user.id:
+                return True
+            if hasattr(user, 'publisher_profile') and ouvrage.publisher_id == user.publisher_profile.id:
+                return True
+
+        return False
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+            if not self._can_modify_config(request.user, obj.ouvrage):
+                self.permission_denied(
+                    request,
+                    message="Vous n'avez pas l'autorisation de modifier la configuration DRM de cet ouvrage.",
+                    code=status.HTTP_403_FORBIDDEN
+                )
+
     def get_queryset(self):
         qs = ProtectionConfig.objects.select_related("ouvrage").all()
         ouvrage_id = self.request.query_params.get("ouvrage") or self.request.query_params.get("book_id")
@@ -383,6 +413,13 @@ class ProtectionConfigViewSet(ModelViewSet):
         config, _ = ProtectionConfig.objects.get_or_create(ouvrage=ouvrage)
 
         if request.method.lower() == 'patch':
+            # SEC-04: Contrôle d'accès strict sur la modification DRM
+            if not self._can_modify_config(request.user, ouvrage):
+                return Response(
+                    {"detail": "Vous n'avez pas l'autorisation de modifier la configuration DRM de cet ouvrage."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
             data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
             # Accepter à la fois la nomenclature frontend (ProtectionConfigCard) et modèle Django
             if "watermark_enabled" in data:

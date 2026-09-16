@@ -4,6 +4,7 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
 from .services import (
@@ -287,6 +288,8 @@ class OTPVerifyView(APIView):
 class ForgotPasswordRequestView(APIView):
     """POST /api/v1/accounts/forgot-password/ - Envoie un code de réinitialisation par email."""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth_reset'
 
     def post(self, request):
         from .models import User, PasswordResetCode
@@ -318,11 +321,14 @@ class ForgotPasswordRequestView(APIView):
 class ResetPasswordConfirmView(APIView):
     """POST /api/v1/accounts/reset-password/ - Vérifie le code et change réellement le mot de passe."""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth_reset'
 
     def post(self, request):
         from .models import User, PasswordResetCode
         from django.contrib.auth.password_validation import validate_password
         from django.core.exceptions import ValidationError
+        from django.utils import timezone
 
         email = request.data.get("email", "").strip().lower()
         code = request.data.get("code", "").strip()
@@ -335,12 +341,37 @@ class ResetPasswordConfirmView(APIView):
         if not user:
             return Response({"success": False, "error": "Code invalide ou expiré."}, status=400)
 
-        reset_code = PasswordResetCode.objects.filter(
-            user=user, code=code
+        # Récupérer le code de réinitialisation actif le plus récent de l'utilisateur
+        active_code = PasswordResetCode.objects.filter(
+            user=user, used=False
         ).order_by('-created_at').first()
 
-        if not reset_code or not reset_code.is_valid():
+        if not active_code or not active_code.is_valid():
             return Response({"success": False, "error": "Code invalide ou expiré."}, status=400)
+
+        # SEC-05b: Incrémenter attempts à chaque tentative erronée et bloquer à 5
+        if active_code.code != code:
+            active_code.attempts += 1
+            if active_code.attempts >= 5:
+                active_code.used = True
+                active_code.save(update_fields=['attempts', 'used'])
+                return Response(
+                    {"success": False, "error": "Nombre maximal de tentatives dépassé. Demandez un nouveau code."},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+            active_code.save(update_fields=['attempts'])
+            return Response(
+                {"success": False, "error": f"Code invalide. Il vous reste {5 - active_code.attempts} tentative(s)."},
+                status=400
+            )
+
+        if active_code.attempts >= 5:
+            active_code.used = True
+            active_code.save(update_fields=['used'])
+            return Response(
+                {"success": False, "error": "Nombre maximal de tentatives dépassé. Demandez un nouveau code."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
 
         try:
             validate_password(new_password, user=user)
@@ -350,8 +381,8 @@ class ResetPasswordConfirmView(APIView):
         user.set_password(new_password)
         user.save(update_fields=["password"])
 
-        reset_code.used = True
-        reset_code.save(update_fields=["used"])
+        active_code.used = True
+        active_code.save(update_fields=["used"])
 
         return Response({"success": True, "message": "Mot de passe réinitialisé avec succès."})
 

@@ -154,7 +154,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
       respContentType.includes('image/') ||
       respContentType.includes('application/octet-stream')
     ) {
-      const arrayBuf = await backendRes.arrayBuffer()
+      // PERF-04: Diffuser directement le flux (ReadableStream) sans bufferiser en mémoire RAM (arrayBuffer)
       const forwardHeaders = new Headers()
       forwardHeaders.set('content-type', respContentType)
 
@@ -180,7 +180,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
       forwardHeaders.set('cache-control', 'private, no-store, must-revalidate')
       forwardHeaders.set('x-content-type-options', 'nosniff')
 
-      return new Response(arrayBuf, {
+      return new Response(backendRes.body, {
         status: backendRes.status,
         headers: forwardHeaders,
       })

@@ -246,6 +246,17 @@ class Ouvrage(models.Model):
         except Exception:
             pass
 
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['publisher', 'status']),
+            models.Index(fields=['discipline', 'status']),
+            models.Index(fields=['isbn']),
+            models.Index(fields=['slug']),
+        ]
+
 
 
 class Quiz(models.Model):

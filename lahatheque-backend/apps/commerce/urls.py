@@ -14,6 +14,7 @@ from .views import (
     AdminOrdersListView,
     AdminOrderRemindView,
     AdminOrderConfirmPaymentView,
+    AdminApproveCreditOrderView,
 )
 from .webhooks import MonerooWebhookView
 from .manager_views import (
@@ -52,6 +53,7 @@ app_name = 'commerce'
 urlpatterns = [
     path('admin/orders/', AdminOrdersListView.as_view(), name='admin-orders-list'),
     path('admin/orders/<uuid:order_id>/confirm-payment/', AdminOrderConfirmPaymentView.as_view(), name='admin-order-confirm-payment'),
+    path('admin/orders/<uuid:order_id>/approve-credit/', AdminApproveCreditOrderView.as_view(), name='admin-order-approve-credit'),
     path('orders/<uuid:order_id>/remind-abandoned/', AdminOrderRemindView.as_view(), name='admin-order-remind-abandoned'),
     path('orders/', CreateOrderView.as_view(), name='commerce-orders-create'),
     path('orders/<uuid:order_id>/initiate-payment/', OrderRetryPaymentView.as_view(), name='commerce-order-initiate-payment'),

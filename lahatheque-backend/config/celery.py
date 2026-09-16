@@ -27,6 +27,10 @@ app.conf.beat_schedule = {
         'task': 'apps.catalog.tasks.task_sync_r2_multilingual_books',
         'schedule': crontab(minute='0', hour='*/6'),
     },
+    'purge-expired-blacklisted-tokens': {
+        'task': 'accounts.purge_expired_tokens',
+        'schedule': crontab(hour='3', minute='30'),
+    },
 }
 
 @app.task(bind=True)
