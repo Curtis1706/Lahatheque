@@ -4220,18 +4220,19 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
 
         if total_reads > 0:
             raw_pct = (info["reads_count"] / total_reads) * 100.0
+            if idx == len(items_list) - 1:
+                usage_pct = round(100.0 - accumulated_pct, 2)
+            else:
+                usage_pct = round(raw_pct, 2)
+                accumulated_pct += usage_pct
+            ca_share = round(annual_price * (usage_pct / 100.0), 2)
+            royalty_amt = round(ca_share * (rate / 100.0), 2)
+            total_royalties += royalty_amt
         else:
-            raw_pct = (info["books_count"] / total_inst_books) * 100.0
-
-        if idx == len(items_list) - 1:
-            usage_pct = round(100.0 - accumulated_pct, 2)
-        else:
-            usage_pct = round(raw_pct, 2)
-            accumulated_pct += usage_pct
-
-        ca_share = round(annual_price * (usage_pct / 100.0), 2)
-        royalty_amt = round(ca_share * (rate / 100.0), 2)
-        total_royalties += royalty_amt
+            # AUCUNE CONSULTATION : ZÉRO MOCK, ZÉRO SIMULATION
+            usage_pct = 0.0
+            ca_share = 0.0
+            royalty_amt = 0.0
 
         distribution.append({
             "institution_id": info["id"],
@@ -4281,7 +4282,8 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
 
         distribution = anonymized_distribution
 
-    platform_revenue = max(0.0, round(annual_price - total_royalties, 2))
+    total_usage_pct = 100.0 if total_reads > 0 else 0.0
+    platform_revenue = max(0.0, round(annual_price - total_royalties, 2)) if total_reads > 0 else 0.0
 
     return {
         "bouquet_id": bouquet_id,
@@ -4293,7 +4295,7 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
         "distribution": distribution,
         "totals": {
             "total_books": total_books,
-            "total_usage_percentage": 100.0,
+            "total_usage_percentage": total_usage_pct,
             "total_ca": annual_price,
             "total_royalties": round(total_royalties, 2),
             "platform_revenue": platform_revenue,

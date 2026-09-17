@@ -934,9 +934,8 @@ def task_distribute_bouquet_revenue():
             total_usage += institution_usage
 
         if total_usage == 0:
-            n_inst = len(set(s.institution_id for s in subs))
-            usage_by_institution = {s.institution_id: 1 for s in subs}
-            total_usage = n_inst
+            # ZÉRO MOCK, ZÉRO SIMULATION : aucune lecture qualifiée enregistrée pour cette période
+            continue
 
         for sub in subs:
             part_utilisation = usage_by_institution.get(sub.institution_id, 0) / total_usage

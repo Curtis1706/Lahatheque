@@ -37,10 +37,10 @@ export function BouquetPieDistribution({
   const total_ca = distribution.total_ca ?? distribution.annual_price ?? distribution.totals?.total_ca ?? 0;
   const currency = distribution.currency || "XOF";
   const royalty_rate = distribution.royalty_rate ?? distribution.royalty_rate_applied ?? 15;
-  const total_royalties = distribution.total_royalties ?? distribution.totals?.total_royalties ?? 0;
-  const total_books = distribution.total_books ?? distribution.total_books_count ?? distribution.totals?.total_books ?? 0;
   const total_consultations = distribution.total_consultations ?? items.reduce((acc, it) => acc + (it.reads_count || it.consultations_count || 0), 0);
-  const platformRevenue = distribution.totals?.platform_revenue ?? Math.max(0, total_ca - total_royalties);
+  const total_royalties = total_consultations > 0 ? (distribution.total_royalties ?? distribution.totals?.total_royalties ?? 0) : 0;
+  const total_books = distribution.total_books ?? distribution.total_books_count ?? distribution.totals?.total_books ?? 0;
+  const platformRevenue = total_consultations > 0 ? (distribution.totals?.platform_revenue ?? Math.max(0, total_ca - total_royalties)) : 0;
 
   if (!items || items.length === 0) {
     return (
@@ -227,80 +227,92 @@ export function BouquetPieDistribution({
             </p>
           </div>
 
-          <div className="relative w-full max-w-[320px] aspect-square flex items-center justify-center my-2">
-            <svg
-              viewBox={`0 0 ${size} ${size}`}
-              className="w-full h-full overflow-visible"
-              aria-label="Diagramme de répartition institutionnelle des consultations"
-            >
-              {slices.map((slice) => {
-                const isHovered = hoveredUnivId === slice.item.institution_id;
-                const isItemHighlighted = isHighlighted(slice.item);
+          {total_consultations > 0 ? (
+            <div className="relative w-full max-w-[320px] aspect-square flex items-center justify-center my-2">
+              <svg
+                viewBox={`0 0 ${size} ${size}`}
+                className="w-full h-full overflow-visible"
+                aria-label="Diagramme de répartition institutionnelle des consultations"
+              >
+                {slices.map((slice) => {
+                  const isHovered = hoveredUnivId === slice.item.institution_id;
+                  const isItemHighlighted = isHighlighted(slice.item);
 
-                return (
-                  <g
-                    key={slice.item.institution_id}
-                    className="cursor-pointer transition-transform duration-200"
-                    onMouseEnter={() => setHoveredUnivId(slice.item.institution_id)}
-                    onMouseLeave={() => setHoveredUnivId(null)}
-                    style={{
-                      transform: isHovered
-                        ? `translate(${slice.offsetX * 2.5}px, ${slice.offsetY * 2.5}px)`
-                        : `translate(${slice.offsetX}px, ${slice.offsetY}px)`,
-                    }}
-                  >
-                    {/* Segment plein */}
-                    <path
-                      d={slice.pathData}
-                      fill={slice.item.color}
-                      stroke="#ffffff"
-                      strokeWidth={1.5}
-                      className="transition-opacity duration-150"
-                      opacity={hoveredUnivId && !isHovered ? 0.65 : 1}
-                    />
-
-                    {/* Ligne indicatrice vers l'étiquette extérieure */}
-                    <polyline
-                      points={`${slice.edgeX},${slice.edgeY} ${slice.labelX},${slice.labelY}`}
-                      fill="none"
-                      stroke={slice.item.color}
-                      strokeWidth={1.2}
-                      strokeDasharray="2,2"
-                      opacity={0.8}
-                    />
-
-                    {/* Étiquette textuelle extérieure */}
-                    <text
-                      x={slice.labelX}
-                      y={slice.labelY}
-                      textAnchor={slice.labelX >= center ? "start" : "end"}
-                      dominantBaseline="middle"
-                      className="text-[10px] font-sans font-bold"
-                      fill={slice.item.color}
+                  return (
+                    <g
+                      key={slice.item.institution_id}
+                      className="cursor-pointer transition-transform duration-200"
+                      onMouseEnter={() => setHoveredUnivId(slice.item.institution_id)}
+                      onMouseLeave={() => setHoveredUnivId(null)}
+                      style={{
+                        transform: isHovered
+                          ? `translate(${slice.offsetX * 2.5}px, ${slice.offsetY * 2.5}px)`
+                          : `translate(${slice.offsetX}px, ${slice.offsetY}px)`,
+                      }}
                     >
-                      <tspan
-                        x={slice.labelX >= center ? slice.labelX + 4 : slice.labelX - 4}
-                        dy="-0.3em"
-                        className="font-semibold text-[10px]"
+                      {/* Segment plein */}
+                      <path
+                        d={slice.pathData}
+                        fill={slice.item.color}
+                        stroke="#ffffff"
+                        strokeWidth={1.5}
+                        className="transition-opacity duration-150"
+                        opacity={hoveredUnivId && !isHovered ? 0.65 : 1}
+                      />
+
+                      {/* Ligne indicatrice vers l'étiquette extérieure */}
+                      <polyline
+                        points={`${slice.edgeX},${slice.edgeY} ${slice.labelX},${slice.labelY}`}
+                        fill="none"
+                        stroke={slice.item.color}
+                        strokeWidth={1.2}
+                        strokeDasharray="2,2"
+                        opacity={0.8}
+                      />
+
+                      {/* Étiquette textuelle extérieure */}
+                      <text
+                        x={slice.labelX}
+                        y={slice.labelY}
+                        textAnchor={slice.labelX >= center ? "start" : "end"}
+                        dominantBaseline="middle"
+                        className="text-[10px] font-sans font-bold"
+                        fill={slice.item.color}
                       >
-                        {slice.item.short_name}
-                      </tspan>
-                      <tspan
-                        x={slice.labelX >= center ? slice.labelX + 4 : slice.labelX - 4}
-                        dy="1.2em"
-                        className="text-[9px] font-normal"
-                        fill="#6B7280"
-                      >
-                        {slice.item.consultations_count != null && slice.item.consultations_count > 0
-                          ? `${slice.item.consultations_count.toLocaleString("fr-FR")} consult. (${slice.item.usage_share_percent}%)`
-                          : `${slice.item.usage_share_percent}%`}
-                      </tspan>
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
+                        <tspan
+                          x={slice.labelX >= center ? slice.labelX + 4 : slice.labelX - 4}
+                          dy="-0.3em"
+                          className="font-semibold text-[10px]"
+                        >
+                          {slice.item.short_name}
+                        </tspan>
+                        <tspan
+                          x={slice.labelX >= center ? slice.labelX + 4 : slice.labelX - 4}
+                          dy="1.2em"
+                          className="text-[9px] font-normal"
+                          fill="#6B7280"
+                        >
+                          {slice.item.consultations_count != null && slice.item.consultations_count > 0
+                            ? `${slice.item.consultations_count.toLocaleString("fr-FR")} consult. (${slice.item.usage_share_percent}%)`
+                            : `${slice.item.usage_share_percent}%`}
+                        </tspan>
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+          ) : (
+            <div className="w-full max-w-[280px] aspect-square flex flex-col items-center justify-center my-3 p-6 rounded-full border-2 border-dashed border-border bg-background text-center shadow-2xs">
+              <BookOpen className="w-9 h-9 text-navy mb-2 opacity-30" />
+              <p className="font-serif font-bold text-sm text-navy">
+                0 consultation enregistr&eacute;e
+              </p>
+              <p className="text-[11px] text-foreground-muted mt-1 max-w-[190px] leading-tight">
+                En attente d&apos;une premi&egrave;re lecture sur une application partenaire
+              </p>
+            </div>
+          )}
 
           {/* Légende interactive sous le diagramme circulaire */}
           <div className="w-full flex flex-wrap items-center justify-center gap-2.5 pt-2 border-t border-border/60">
@@ -345,8 +357,9 @@ export function BouquetPieDistribution({
           {/* Graphique à barres horizontales conforme à la capture */}
           <div className="space-y-4 my-2 pr-2">
             {reversedItems.map((item) => {
-              const barPercent = item.royalty_amount != null
-                ? Math.max(2, (item.royalty_amount / (scaleStep * 4)) * 100)
+              const hasRoyalties = total_consultations > 0 && item.royalty_amount != null && item.royalty_amount > 0;
+              const barPercent = hasRoyalties
+                ? Math.max(3, ((item.royalty_amount || 0) / (scaleStep * 4)) * 100)
                 : 0;
               const isHovered = hoveredUnivId === item.institution_id;
               const isItemHighlighted = isHighlighted(item);
@@ -381,12 +394,12 @@ export function BouquetPieDistribution({
                     </div>
 
                     <span className="font-mono text-xs font-bold text-navy shrink-0">
-                      {item.royalty_amount != null
+                      {total_consultations > 0 && item.royalty_amount != null
                         ? `${item.royalty_amount.toLocaleString("fr-FR", {
                             minimumFractionDigits: isFcfa ? 0 : 2,
                             maximumFractionDigits: isFcfa ? 0 : 2,
                           })} ${currency}`
-                        : "—"}
+                        : `0 ${currency}`}
                     </span>
                   </div>
 
@@ -399,7 +412,7 @@ export function BouquetPieDistribution({
                         backgroundColor: item.color,
                       }}
                     >
-                      {barPercent > 25 && (
+                      {barPercent > 25 && item.usage_share_percent > 0 && (
                         <span className="text-[10px] text-white font-mono font-bold drop-shadow-xs">
                           {item.usage_share_percent}%
                         </span>
@@ -508,23 +521,23 @@ export function BouquetPieDistribution({
                       </span>
                     </td>
                     <td className="py-3 px-2 sm:px-4 text-center font-mono font-bold text-navy">
-                      {item.usage_share_percent}%
+                      {total_consultations > 0 ? `${item.usage_share_percent}%` : "0.00 %"}
                     </td>
                     <td className="py-3 px-3 sm:px-4 text-right font-mono font-semibold text-foreground">
-                      {item.ca_share_allocated != null
+                      {total_consultations > 0 && item.ca_share_allocated != null
                         ? `${item.ca_share_allocated.toLocaleString("fr-FR", {
                             minimumFractionDigits: isFcfa ? 0 : 2,
                             maximumFractionDigits: isFcfa ? 0 : 2,
                           })} ${currency}`
-                        : "—"}
+                        : `0 ${currency}`}
                     </td>
                     <td className="py-3 px-3 sm:px-4 text-right font-mono font-bold text-navy">
-                      {item.royalty_amount != null
+                      {total_consultations > 0 && item.royalty_amount != null
                         ? `${item.royalty_amount.toLocaleString("fr-FR", {
                             minimumFractionDigits: isFcfa ? 0 : 2,
                             maximumFractionDigits: isFcfa ? 0 : 2,
                           })} ${currency}`
-                        : "—"}
+                        : `0 ${currency}`}
                     </td>
                   </tr>
                 );
@@ -537,18 +550,21 @@ export function BouquetPieDistribution({
                   {isUniv ? "Total de Référence" : "Total Consolidé"}
                 </td>
                 <td className="py-3 px-2 sm:px-4 text-center font-mono">{total_books} livres</td>
-                <td className="py-3 px-2 sm:px-4 text-center font-mono">100.00 %</td>
+                <td className="py-3 px-2 sm:px-4 text-center font-mono">
+                  {total_consultations > 0 ? "100.00 %" : "0.00 %"}
+                </td>
                 <td className="py-3 px-3 sm:px-4 text-right font-mono">
-                  {total_ca.toLocaleString("fr-FR", {
-                    minimumFractionDigits: isFcfa ? 0 : 2,
-                    maximumFractionDigits: isFcfa ? 0 : 2,
-                  })}{" "}
-                  {currency}
+                  {total_consultations > 0
+                    ? `${total_ca.toLocaleString("fr-FR", {
+                        minimumFractionDigits: isFcfa ? 0 : 2,
+                        maximumFractionDigits: isFcfa ? 0 : 2,
+                      })} ${currency}`
+                    : `0 ${currency}`}
                 </td>
                 <td className="py-3 px-3 sm:px-4 text-right font-mono text-sm text-gold">
                   {isUniv ? (
                     <>
-                      {(currentInst?.royalty_amount || 0).toLocaleString("fr-FR", {
+                      {(total_consultations > 0 ? (currentInst?.royalty_amount || 0) : 0).toLocaleString("fr-FR", {
                         minimumFractionDigits: isFcfa ? 0 : 2,
                         maximumFractionDigits: isFcfa ? 0 : 2,
                       })}{" "}
@@ -559,7 +575,7 @@ export function BouquetPieDistribution({
                     </>
                   ) : (
                     <>
-                      {total_royalties.toLocaleString("fr-FR", {
+                      {(total_consultations > 0 ? total_royalties : 0).toLocaleString("fr-FR", {
                         minimumFractionDigits: isFcfa ? 0 : 2,
                         maximumFractionDigits: isFcfa ? 0 : 2,
                       })}{" "}
