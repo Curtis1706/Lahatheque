@@ -1803,8 +1803,8 @@ class AdminValidationViewSet(viewsets.ViewSet):
             )
 
     def retrieve(self, request, pk=None):
+        from apps.catalog.models import Ouvrage
         try:
-            from apps.catalog.models import Ouvrage
             book = Ouvrage.objects.select_related('publisher', 'discipline', 'created_by', 'institution').prefetch_related('authors').get(id=pk)
             return Response({"success": True, "data": self._serialize_proof(book), "error": None})
         except Ouvrage.DoesNotExist:
@@ -1812,8 +1812,8 @@ class AdminValidationViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['post'], url_path='process')
     def process_validation(self, request, pk=None):
+        from apps.catalog.models import Ouvrage
         try:
-            from apps.catalog.models import Ouvrage
             book = Ouvrage.objects.get(id=pk)
             action_type = request.data.get('action') # 'approve' ou 'reject'
             rejection_reason = request.data.get('rejection_reason', '').strip()
@@ -2066,8 +2066,8 @@ class AdminContractViewSet(viewsets.ViewSet):
             )
 
     def retrieve(self, request, pk=None):
+        from apps.rights.models import ContratLegal
         try:
-            from apps.rights.models import ContratLegal
             c = ContratLegal.objects.select_related(
                 'ouvrage', 'signataire_user', 'institution', 'publisher', 'pre_edition', 'juriste_responsable'
             ).get(id=pk)
@@ -2077,8 +2077,8 @@ class AdminContractViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['post'], url_path='process')
     def process_contract(self, request, pk=None):
+        from apps.rights.models import ContratLegal
         try:
-            from apps.rights.models import ContratLegal
             contract = ContratLegal.objects.get(id=pk)
             action_type = request.data.get('action') # 'approve' ou 'reject'
             rejection_reason = request.data.get('rejection_reason', '').strip()
@@ -3171,8 +3171,9 @@ class AdminSalesListAPIView(APIView):
         # Récupération des filtres disponibles pour l'autocomplete frontend
         available_institutions = list(Institution.objects.filter(is_active=True).values_list('name', flat=True).distinct().order_by('name'))
         available_publishers_raw = list(Publisher.objects.values_list('name', flat=True).distinct().order_by('name'))
-        other_pubs = Ouvrage.objects.exclude(publisher_name='').values_list('publisher_name', flat=True).distinct()
-        all_pubs = sorted(list(set(filter(bool, available_publishers_raw + list(other_pubs)))))
+        other_pubs: list[str] = list(Ouvrage.objects.exclude(publisher_name='').values_list('publisher_name', flat=True).distinct())
+        combined: list[str] = [p for p in (available_publishers_raw + other_pubs) if p]
+        all_pubs: list[str] = sorted(set(combined))
 
         return Response({
             "success": True,
@@ -4918,7 +4919,7 @@ class AccountingLedgerExportView(APIView):
             ]]
 
             for r in records:
-                table_data.append([
+                row: list = [
                     r['date'][:10],
                     r['reference'],
                     r['channel'],
@@ -4930,7 +4931,8 @@ class AccountingLedgerExportView(APIView):
                     f"{r['net_amount']:,.0f}".replace(',', ' '),
                     f"{r['royalties_due']:,.0f}".replace(',', ' '),
                     f"{r['platform_margin']:,.0f}".replace(',', ' '),
-                ])
+                ]
+                table_data.append(row)
 
             table_data.append([
                 "TOTAL", "", "", "", "", "",

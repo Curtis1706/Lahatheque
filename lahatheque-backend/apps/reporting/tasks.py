@@ -151,7 +151,7 @@ def task_scan_and_send_unpaid_reminders():
     Scan des commandes et factures impayées depuis plus de N jours.
     """
     config = _get_platform_config()
-    cutoff_date = timezone.now() - timedelta(days=int(config.delai_relance_impayes_jours or 7))
+    cutoff_date = timezone.now() - timedelta(days=int(config.delai_relance_impayes_jours or 7) if config.delai_relance_impayes_jours is not None else 7)
     results = {"processed": 0, "sent": 0, "errors": 0}
 
     try:
@@ -238,7 +238,7 @@ def task_scan_and_send_subscription_expiry_reminders():
     Scan des abonnements et bouquets arrivant à expiration sous N jours.
     """
     config = _get_platform_config()
-    target_date_max = timezone.now() + timedelta(days=int(config.delai_relance_abonnements_jours or 15))
+    target_date_max = timezone.now() + timedelta(days=int(config.delai_relance_abonnements_jours or 15) if config.delai_relance_abonnements_jours is not None else 15)
     results = {"processed": 0, "sent": 0, "errors": 0}
 
     try:
