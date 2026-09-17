@@ -4118,39 +4118,26 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
         for key, info in inst_data.items():
             inst_books = books_qs.filter(institution_id=key)
 
-            # 1. Consultations en ligne
-            from apps.protection.models import TraceAcces
-            consultations = TraceAcces.objects.filter(
-                ouvrage__in=inst_books,
-                access_type__in=["read_online", "read_chunk"],
-            ).count()
-
-            # 2. Pages lues
+            # 1. Lectures numériques qualifiées : durée >= 30s et au moins 3 pages (anti-rebond COUNTER)
             from apps.student.models import ReadingSession as StudentReadingSession
-            from django.db.models import Sum as DjangoSum
-            pages_read = StudentReadingSession.objects.filter(
+            qualified_readings = StudentReadingSession.objects.filter(
                 ouvrage__in=inst_books,
-            ).aggregate(total=DjangoSum("pages_read"))["total"] or 0
-
-            # 3. Téléchargements
-            downloads = TraceAcces.objects.filter(
-                ouvrage__in=inst_books,
-                access_type="download",
+                duration_seconds__gte=30,
+                pages_read__gte=3,
             ).count()
 
-            # 4. Écoutes audio
+            # 2. Écoutes audio qualifiées : >= 10% du livre complet ou chapitre terminé (>= 90%)
             from apps.audio.models import AudioListeningSession
-            audio_listens = AudioListeningSession.objects.filter(
-                ouvrage__in=inst_books,
-            ).count()
-
-            # Sessions depuis l'API partenaire (reader.ReaderSession)
-            sessions_count = ReaderSession.objects.filter(
-                source_type='catalog_book',
+            qualified_audio_listens = AudioListeningSession.objects.filter(
                 ouvrage__in=inst_books
+            ).filter(
+                Q(audio_track__track_type='full', completion_percent__gte=10.0) |
+                Q(audio_track__track_type='chapter', completion_percent__gte=90.0) |
+                Q(completion_percent__gte=10.0)
             ).count()
 
-            info["reads_count"] = consultations + pages_read + downloads + audio_listens + sessions_count
+            # Note : Les téléchargements sont exclus du calcul d'usage du streaming bouquet
+            info["reads_count"] = qualified_readings + qualified_audio_listens
 
     total_reads = sum(item["reads_count"] for item in inst_data.values())
     total_inst_books = sum(item["books_count"] for item in inst_data.values()) or 1

@@ -885,52 +885,39 @@ def task_distribute_bouquet_revenue():
                 requesting_institution=sub.institution
             ) if offering else Ouvrage.objects.none()
 
-            # 1. Consultations (lectures en ligne)
-            consultations_count = TraceAcces.objects.filter(
-                Q(bouquet_subscription=sub) |
-                Q(institution=sub.institution, ouvrage__in=bouquet_books) |
-                Q(ouvrage__institution=sub.institution, ouvrage__in=bouquet_books),
-                access_type__in=["read_online", "read_chunk"],
-                timestamp__gte=period_start,
-                timestamp__lte=period_end,
-            ).count()
-
-            # 2. Pages lues
+            # 1. Lectures numériques qualifiées : durée >= 30s et au moins 3 pages (anti-rebond COUNTER)
             from apps.student.models import ReadingSession as StudentReadingSession
-            pages_read = StudentReadingSession.objects.filter(
+            qualified_readings = StudentReadingSession.objects.filter(
                 Q(user__affiliations__institution=sub.institution) |
                 Q(ouvrage__institution=sub.institution),
                 ouvrage__in=bouquet_books,
+                duration_seconds__gte=30,
+                pages_read__gte=3,
                 session_date__gte=period_start.date(),
                 session_date__lte=period_end.date(),
-            ).aggregate(total=DjangoSum("pages_read"))["total"] or 0
-
-            # 3. Téléchargements
-            downloads_count = TraceAcces.objects.filter(
-                Q(bouquet_subscription=sub) |
-                Q(institution=sub.institution, ouvrage__in=bouquet_books) |
-                Q(ouvrage__institution=sub.institution, ouvrage__in=bouquet_books),
-                access_type="download",
-                timestamp__gte=period_start,
-                timestamp__lte=period_end,
             ).count()
 
-            # 4. Écoutes audio
+            # 2. Écoutes audio qualifiées : >= 10% du livre complet ou chapitre terminé (>= 90%)
             from apps.audio.models import AudioListeningSession
-            audio_listens = 0
+            qualified_audio = 0
             try:
-                audio_listens = AudioListeningSession.objects.filter(
+                qualified_audio = AudioListeningSession.objects.filter(
                     Q(user__affiliations__institution=sub.institution) |
                     Q(institution=sub.institution) |
                     Q(ouvrage__institution=sub.institution),
                     ouvrage__in=bouquet_books,
                     session_date__gte=period_start.date(),
                     session_date__lte=period_end.date(),
+                ).filter(
+                    Q(audio_track__track_type='full', completion_percent__gte=10.0) |
+                    Q(audio_track__track_type='chapter', completion_percent__gte=90.0) |
+                    Q(completion_percent__gte=10.0)
                 ).count()
             except Exception:
                 pass
 
-            institution_usage = consultations_count + pages_read + downloads_count + audio_listens
+            # Note : Les téléchargements sont exclus du calcul d'usage du streaming bouquet
+            institution_usage = qualified_readings + qualified_audio
             usage_by_institution[sub.institution_id] = institution_usage
             total_usage += institution_usage
 

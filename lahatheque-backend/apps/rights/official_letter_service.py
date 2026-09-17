@@ -150,5 +150,5 @@ class OfficialLetterPdfService:
         pdf_bytes = cls.generate_pdf_bytes(courrier)
         filename = f"{courrier.reference.lower().replace('-', '_')}.pdf"
         courrier.pdf_file.save(filename, ContentFile(pdf_bytes), save=False)
-        courrier.save(update_fields=['pdf_file', 'updated_at'])
+        courrier.save(update_fields=['status', 'validated_at', 'pdf_file', 'updated_at'])
         return courrier.pdf_file.url if courrier.pdf_file else ""

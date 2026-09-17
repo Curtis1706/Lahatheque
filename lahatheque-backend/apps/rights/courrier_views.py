@@ -424,6 +424,7 @@ class CourrierValidateView(APIView):
 
         courrier.status = "validated"
         courrier.validated_at = timezone.now()
+        courrier.save(update_fields=["status", "validated_at", "updated_at"])
         
         # Scellement du PDF définitif
         OfficialLetterPdfService.seal_and_save_pdf(courrier)

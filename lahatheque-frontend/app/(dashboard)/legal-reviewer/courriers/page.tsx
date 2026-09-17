@@ -95,6 +95,8 @@ export default function LegalCourriersPage() {
 
   const handleCourrierUpdated = (updated: CourrierOfficiel) => {
     setCourriers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    // Rafraîchissement complet en arrière-plan pour synchroniser l'ensemble des filtres et statuts
+    fetchCourriers();
   };
 
   const columns: DataTableColumn<CourrierOfficiel>[] = [
