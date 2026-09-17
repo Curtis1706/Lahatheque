@@ -5,7 +5,7 @@ Gère la création de sessions, la validation de token, les quiz, la progression
 
 from datetime import timedelta
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 import uuid
 from django.conf import settings
 from django.db import transaction
@@ -258,7 +258,7 @@ class ReaderSessionViewSet(ViewSet):
             status_code=status.HTTP_201_CREATED
         )
 
-    def retrieve(self, request: Request, pk: str = None) -> Response:
+    def retrieve(self, request: Request, pk: Optional[str] = None) -> Response:
         """
         GET /api/v1/reader/sessions/<id>/
         Polling d'état et consultation de progression d'une session.
@@ -275,7 +275,7 @@ class ReaderSessionViewSet(ViewSet):
         serializer = ReaderSessionDetailSerializer(session)
         return standard_response(data=serializer.data)
 
-    def destroy(self, request: Request, pk: str = None) -> Response:
+    def destroy(self, request: Request, pk: Optional[str] = None) -> Response:
         """
         DELETE /api/v1/reader/sessions/<id>/
         Révocation immédiate d'une session de lecture.
@@ -325,7 +325,7 @@ class ReaderValidateTokenView(APIView):
         if not token_str:
             return standard_response(error="Token de session manquant", status_code=status.HTTP_400_BAD_REQUEST)
 
-        session = None
+        session: Any = None
         error_msg = None
 
         try:
@@ -386,7 +386,7 @@ class ReaderValidateTokenView(APIView):
             ip_address=ip_addr,
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
             access_type='read_online',
-            derived_hash=session.token_hash[:16] if session.token_hash else "nohash"
+            derived_hash=str(session.token_hash or '')[:16] if session.token_hash else "nohash"
         )
 
         import hashlib
@@ -444,7 +444,7 @@ class ReaderValidateTokenView(APIView):
                         ip_address=ip_addr,
                         user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
                         access_type='unauthorized_sharing_attempt',
-                        derived_hash=session.token_hash[:16] if session.token_hash else "nohash"
+                        derived_hash=str(session.token_hash or '')[:16] if session.token_hash else "nohash"
                     )
                 except Exception as log_err:
                     logger.warning(f"Erreur journalisation TraceAcces partage: {log_err}")
@@ -552,7 +552,7 @@ class ReaderProgressView(APIView):
     permission_classes = [IsValidReaderSession]
 
     def post(self, request: Request) -> Response:
-        session: ReaderSession = request.reader_session
+        session: Any = getattr(request, 'reader_session', None)
         serializer = ProgressSyncSerializer(data=request.data)
         if not serializer.is_valid():
             return standard_response(error=serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
@@ -603,7 +603,7 @@ class ReaderQuizSubmitView(APIView):
     permission_classes = [IsValidReaderSession]
 
     def post(self, request: Request) -> Response:
-        session: ReaderSession = request.reader_session
+        session: Any = getattr(request, 'reader_session', None)
         serializer = QuizSubmitSerializer(data=request.data)
         if not serializer.is_valid():
             return standard_response(error=serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
@@ -857,11 +857,11 @@ class ReaderProtectedStreamView(APIView):
 
     DEFAULT_CHUNK_SIZE = 256 * 1024
 
-    def get(self, request: Request) -> Response:
+    def get(self, request: Request) -> Union[Response, HttpResponse]:
         from apps.protection.derived_materializer import DerivedMaterializer
         from apps.protection.models import ProtectionConfig, TraceAcces, GlobalDrmConfig
 
-        session: ReaderSession = request.reader_session
+        session: Any = getattr(request, 'reader_session', None)
 
         if not session.is_valid:
             return standard_response(
@@ -995,7 +995,7 @@ class ReaderProtectedStreamView(APIView):
 
         if is_range_request:
             start_byte, end_byte = self._parse_range_header(range_header, total_size)
-            if start_byte is None:
+            if start_byte is None or end_byte is None:
                 response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
                 response["Content-Range"] = f"bytes */{total_size}"
                 return response
