@@ -565,24 +565,6 @@ class PublisherDepositsView(APIView):
             disable_print=protection_config.get("disable_print", False),
         )
 
-        # Notification in-app immédiate pour les administrateurs LAHA
-        try:
-            from apps.accounts.models import User
-            from apps.reporting.services import notify_user
-            from apps.reporting.models import Notification
-
-            admins = User.objects.filter(role__in=['admin', 'super_admin'], is_active=True)
-            for admin_user in admins:
-                notify_user(
-                    user=admin_user,
-                    notification_type=Notification.NotificationType.SYSTEM,
-                    title="Nouveau dépôt d'ouvrage partenaire",
-                    message=f"L'éditeur « {prof.company_name} » a soumis « {deposit.title} » au comité LAHA.",
-                    action_url="/admin/publisher-deposits",
-                    resource_id=str(deposit.id),
-                )
-        except Exception as notif_err:
-            pass
 
         return Response(
             {
