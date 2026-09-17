@@ -147,6 +147,7 @@ class UniversityBouquetSubscription(models.Model):
     bouquet_type = models.CharField(
         max_length=32,
         choices=[
+            ("general", "Bouquet Général (Catalogue Intégral)"),
             ("discipline", "Par Discipline"),
             ("faculty", "Par Faculté"),
             ("university", "Intégral Université"),
@@ -216,6 +217,7 @@ class BouquetOffering(models.Model):
     Type 'custom' : sélection manuelle de livres par l'Admin.
     """
     BOUQUET_TYPE_CHOICES = [
+        ("general", "Bouquet Général (Catalogue Intégral)"),
         ("discipline", "Par Discipline"),
         ("faculty", "Par Faculté"),
         ("university", "Intégral Université"),
@@ -266,7 +268,9 @@ class BouquetOffering(models.Model):
 
         qs = Ouvrage.objects.filter(status="published")
 
-        if self.bouquet_type == "discipline" and self.discipline:
+        if self.bouquet_type == "general":
+            return qs
+        elif self.bouquet_type == "discipline" and self.discipline:
             from django.db.models import Q
             qs = qs.filter(
                 Q(discipline__name__icontains=self.discipline) |
@@ -288,5 +292,17 @@ class BouquetOffering(models.Model):
     @property
     def books_count(self):
         return self.get_books_queryset().count()
+
+    def get_real_annual_price(self):
+        """
+        Calcule le prix annuel réel du bouquet.
+        Pour le Bouquet Général, c'est la somme exacte de tous les prix numériques du catalogue.
+        """
+        from django.db.models import Sum
+        from decimal import Decimal
+        if self.bouquet_type == "general":
+            total = self.get_books_queryset().aggregate(total=Sum('price_digital'))['total']
+            return total if total is not None else Decimal('0.00')
+        return self.annual_price
 
 

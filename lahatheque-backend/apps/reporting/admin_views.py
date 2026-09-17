@@ -3954,7 +3954,35 @@ class AdminBouquetOfferingsView(APIView):
 
     def get(self, request):
         from apps.partners.models import BouquetOffering
-        offerings = BouquetOffering.objects.all().order_by('title')
+        from apps.catalog.models import Ouvrage
+        from decimal import Decimal
+        from django.db import models
+        from django.db.models import Sum
+
+        # Somme réelle exacte des prix numériques de tous les ouvrages publiés du catalogue
+        total_catalog_price = Ouvrage.objects.filter(status="published").aggregate(
+            total=Sum('price_digital')
+        )['total'] or Decimal('0.00')
+
+        # S'assurer de la présence du Bouquet Général en base avec le prix réel calculé
+        general_b = BouquetOffering.objects.filter(bouquet_type="general").first()
+        if not general_b:
+            general_b = BouquetOffering.objects.create(
+                bouquet_type="general",
+                title="Bouquet Général (Catalogue Intégral)",
+                annual_price=total_catalog_price,
+                currency="FCFA",
+                description="Bouquet global regroupant l'intégralité du catalogue des ouvrages publiés. Appliqué par défaut pour les API partenaires et consultations transversales.",
+                is_active=True,
+            )
+        elif general_b.annual_price != total_catalog_price:
+            general_b.annual_price = total_catalog_price
+            general_b.save(update_fields=['annual_price'])
+
+        offerings = BouquetOffering.objects.all().order_by(
+            models.Case(models.When(bouquet_type='general', then=0), default=1),
+            'title'
+        )
         data = [{
             "id": str(o.id),
             "title": o.title,
@@ -3964,7 +3992,7 @@ class AdminBouquetOfferingsView(APIView):
             "target_institution": str(o.target_institution_id) if o.target_institution_id else None,
             "country": o.country,
             "books_count": o.books_count,
-            "annual_price": float(o.annual_price),
+            "annual_price": float(o.get_real_annual_price() if hasattr(o, 'get_real_annual_price') else o.annual_price),
             "currency": o.currency,
             "description": o.description,
             "is_active": o.is_active,
@@ -4064,9 +4092,9 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
     """
     Moteur central de calcul de répartition multi-universités (CDC Section 11 & 12).
     Calcule dynamiquement :
-    - Nombre de livres possédés par université dans le bouquet
-    - Part d'utilisation réelle (%) basée sur les consultations réelles (ReaderSession & TraceAcces)
-    - Part du CA allouée par établissement
+    - Nombre de livres possédés par université dans le bouquet (ou dans le catalogue complet pour le Bouquet Général)
+    - Part d'utilisation réelle (%) basée sur les consultations réelles (StudentReadingSession, ReaderSession partenaire & Audio)
+    - Part du CA allouée par établissement (basée sur la valeur réelle du catalogue numérique pour le Bouquet Général)
     - Redevance nette (taux conventionné dynamique résolu hiérarchiquement)
     - Marge résiduelle conservée par la plateforme LAHA
     """
@@ -4074,28 +4102,57 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
     from apps.reporting.pricing_service import get_platform_config, get_institution_royalty_rate
     from apps.reader.models import ReaderSession
     from apps.protection.models import TraceAcces
-    from django.db.models import Count
+    from apps.catalog.models import Ouvrage
+    from django.db.models import Count, Q, Sum
+    from decimal import Decimal
 
-    if isinstance(offering_or_sub, UniversityBouquetSubscription):
+    if isinstance(offering_or_sub, str) and offering_or_sub.lower() in ["general", "default"]:
+        offering = BouquetOffering.objects.filter(bouquet_type="general").first()
+        if not offering:
+            offering = BouquetOffering.objects.create(
+                bouquet_type="general",
+                title="Bouquet Général (Catalogue Intégral)",
+                annual_price=Decimal("0.00"),
+                currency="FCFA",
+                description="Bouquet global regroupant l'intégralité du catalogue des ouvrages publiés.",
+                is_active=True,
+            )
+        title = str(offering.title)
+        books_qs = offering.get_books_queryset()
+        total_books = books_qs.count()
+        real_price = books_qs.aggregate(total=Sum('price_digital'))['total'] or Decimal('0.00')
+        annual_price = float(real_price)
+        currency = "FCFA"
+        bouquet_id = str(offering.id)
+    elif isinstance(offering_or_sub, UniversityBouquetSubscription):
         sub = offering_or_sub
         offering = BouquetOffering.objects.filter(id=sub.offering_id).first() if sub.offering_id else None
         title = str(sub.title)
         annual_price = float(str(sub.annual_price or 0))
         currency = str(sub.currency or "XOF")
         bouquet_id = str(sub.id)
+        books_qs = offering.get_books_queryset() if offering else Ouvrage.objects.none()
+        total_books = books_qs.count()
     else:
         offering = offering_or_sub
         title = str(offering.title)
-        annual_price = float(str(offering.annual_price or 0))
-        currency = str(offering.currency or "XOF")
+        books_qs = offering.get_books_queryset()
+        total_books = books_qs.count()
+        if offering.bouquet_type == "general":
+            real_price = books_qs.aggregate(total=Sum('price_digital'))['total'] or Decimal('0.00')
+            annual_price = float(real_price)
+            currency = "FCFA"
+        else:
+            annual_price = float(str(offering.annual_price or 0))
+            currency = str(offering.currency or "XOF")
         bouquet_id = str(offering.id)
 
     if offering:
         books_qs = offering.get_books_queryset()
         total_books = books_qs.count()
     else:
-        books_qs = None
-        total_books = 0
+        books_qs = Ouvrage.objects.filter(status="published")
+        total_books = books_qs.count()
 
     config = get_platform_config()
     default_royalty_rate = float(config.default_university_royalty_rate) if (config and getattr(config, 'default_university_royalty_rate', None) is not None) else 15.0
@@ -4118,15 +4175,23 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
         for key, info in inst_data.items():
             inst_books = books_qs.filter(institution_id=key)
 
-            # 1. Lectures numériques qualifiées : durée >= 30s et au moins 3 pages (anti-rebond COUNTER)
+            # 1. Lectures numériques étudiantes qualifiées : durée >= 30s et au moins 3 pages (anti-rebond COUNTER)
             from apps.student.models import ReadingSession as StudentReadingSession
-            qualified_readings = StudentReadingSession.objects.filter(
+            qualified_student_readings = StudentReadingSession.objects.filter(
                 ouvrage__in=inst_books,
                 duration_seconds__gte=30,
                 pages_read__gte=3,
             ).count()
 
-            # 2. Écoutes audio qualifiées : >= 10% du livre complet ou chapitre terminé (>= 90%)
+            # 2. Lectures partenaires SaaS via ReaderSession (API Lecteur Hébergé) : durée >= 30s et au moins 3 pages
+            from apps.reader.models import ReaderSession
+            qualified_partner_readings = ReaderSession.objects.filter(
+                ouvrage__in=inst_books,
+                reading_time_seconds__gte=30,
+                last_page__gte=3,
+            ).count()
+
+            # 3. Écoutes audio qualifiées : >= 10% du livre complet ou chapitre terminé (>= 90%)
             from apps.audio.models import AudioListeningSession
             qualified_audio_listens = AudioListeningSession.objects.filter(
                 ouvrage__in=inst_books
@@ -4136,8 +4201,8 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
                 Q(completion_percent__gte=10.0)
             ).count()
 
-            # Note : Les téléchargements sont exclus du calcul d'usage du streaming bouquet
-            info["reads_count"] = qualified_readings + qualified_audio_listens
+            # Total consultations réelles consolidées (étudiants directs + partenaires SaaS + audio)
+            info["reads_count"] = qualified_student_readings + qualified_partner_readings + qualified_audio_listens
 
     total_reads = sum(item["reads_count"] for item in inst_data.values())
     total_inst_books = sum(item["books_count"] for item in inst_data.values()) or 1
@@ -4242,6 +4307,10 @@ class AdminBouquetDistributionView(APIView):
 
     def get(self, request, pk):
         from apps.partners.models import BouquetOffering, UniversityBouquetSubscription
+        if str(pk).lower() in ["general", "default"]:
+            data = compute_bouquet_distribution_payload("general")
+            return Response({"success": True, "data": data, "error": None})
+
         offering = BouquetOffering.objects.filter(id=pk).first()
         sub = None
         if not offering:

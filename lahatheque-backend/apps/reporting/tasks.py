@@ -885,7 +885,7 @@ def task_distribute_bouquet_revenue():
                 requesting_institution=sub.institution
             ) if offering else Ouvrage.objects.none()
 
-            # 1. Lectures numériques qualifiées : durée >= 30s et au moins 3 pages (anti-rebond COUNTER)
+            # 1. Lectures numériques étudiantes qualifiées : durée >= 30s et au moins 3 pages (anti-rebond COUNTER)
             from apps.student.models import ReadingSession as StudentReadingSession
             qualified_readings = StudentReadingSession.objects.filter(
                 Q(user__affiliations__institution=sub.institution) |
@@ -897,7 +897,19 @@ def task_distribute_bouquet_revenue():
                 session_date__lte=period_end.date(),
             ).count()
 
-            # 2. Écoutes audio qualifiées : >= 10% du livre complet ou chapitre terminé (>= 90%)
+            # 2. Lectures partenaires SaaS via ReaderSession (API Lecteur Hébergé) : durée >= 30s et >= 3 pages
+            from apps.reader.models import ReaderSession
+            qualified_partner_readings = ReaderSession.objects.filter(
+                Q(partner__linked_institution=sub.institution) |
+                Q(ouvrage__institution=sub.institution),
+                ouvrage__in=bouquet_books,
+                reading_time_seconds__gte=30,
+                last_page__gte=3,
+                created_at__date__gte=period_start.date(),
+                created_at__date__lte=period_end.date(),
+            ).count()
+
+            # 3. Écoutes audio qualifiées : >= 10% du livre complet ou chapitre terminé (>= 90%)
             from apps.audio.models import AudioListeningSession
             qualified_audio = 0
             try:
@@ -917,7 +929,7 @@ def task_distribute_bouquet_revenue():
                 pass
 
             # Note : Les téléchargements sont exclus du calcul d'usage du streaming bouquet
-            institution_usage = qualified_readings + qualified_audio
+            institution_usage = qualified_readings + qualified_partner_readings + qualified_audio
             usage_by_institution[sub.institution_id] = institution_usage
             total_usage += institution_usage
 

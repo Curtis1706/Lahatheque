@@ -119,11 +119,20 @@ export default function AdminOverviewDashboard() {
         setRecentSales(salesData);
         setReminders(remindersData);
         setRevenueBreakdown(revenueBreakdownData);
-        setContracts(contractsData || []);
-        setBouquetsList(availableBouquets || []);
+        const rawBouquets = availableBouquets || [];
+        const sortedBouquets = [...rawBouquets].sort((a, b) => {
+          const aIsGeneral = a.title.toLowerCase().includes("général") || a.title.toLowerCase().includes("general");
+          const bIsGeneral = b.title.toLowerCase().includes("général") || b.title.toLowerCase().includes("general");
+          if (aIsGeneral && !bIsGeneral) return -1;
+          if (!aIsGeneral && bIsGeneral) return 1;
+          return a.title.localeCompare(b.title);
+        });
+        setBouquetsList(sortedBouquets);
 
-        if (availableBouquets && availableBouquets.length > 0) {
-          const defaultBouquet = availableBouquets[0];
+        if (sortedBouquets.length > 0) {
+          const defaultBouquet = sortedBouquets.find(
+            (b) => b.title.toLowerCase().includes("général") || b.title.toLowerCase().includes("general")
+          ) || sortedBouquets[0];
           setSelectedBouquetId(defaultBouquet.id);
           const dist = await fetchBouquetDistribution(defaultBouquet.id, "admin");
           setBouquetDist(dist);
