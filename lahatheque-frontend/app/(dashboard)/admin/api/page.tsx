@@ -79,6 +79,7 @@ export default function AdminApiKeysPage() {
     webhookUrl: "",
     restrictToBouquet: false,
     selectedBouquetId: "",
+    selectedBouquetIds: [] as string[],
   });
 
   // État formulaire édition
@@ -95,10 +96,14 @@ export default function AdminApiKeysPage() {
     webhookUrl: "",
     restrictToBouquet: false,
     selectedBouquetId: "",
+    selectedBouquetIds: [] as string[],
   });
 
   const openEditModal = (k: PartnerApiKey) => {
     setKeyToEdit(k);
+    const bouquetIds = (k.restricted_bouquets && k.restricted_bouquets.length > 0)
+      ? k.restricted_bouquets.map((b) => b.id)
+      : (k.restricted_bouquet_id ? [k.restricted_bouquet_id] : []);
     setEditFormData({
       name: k.name,
       partner: k.partner,
@@ -110,8 +115,9 @@ export default function AdminApiKeysPage() {
       allowedDocumentSources: (k.allowedDocumentSources || []).join(", "),
       maxFileSizeMb: k.maxFileSizeMb || 200,
       webhookUrl: k.webhookUrl || "",
-      restrictToBouquet: Boolean(k.restricted_bouquet_id || k.restrictedBouquetName),
-      selectedBouquetId: k.restricted_bouquet_id || "",
+      restrictToBouquet: bouquetIds.length > 0 || Boolean(k.restricted_bouquet_id || k.restrictedBouquetName),
+      selectedBouquetId: bouquetIds[0] || k.restricted_bouquet_id || "",
+      selectedBouquetIds: bouquetIds,
     });
   };
   
@@ -184,8 +190,9 @@ export default function AdminApiKeysPage() {
         accessMode: formData.accessMode,
         allowByod: allowByod,
         maxFileSizeMb: Number(formData.maxFileSizeMb) || 200,
-        restricted_bouquet_id: formData.restrictToBouquet && formData.selectedBouquetId ? formData.selectedBouquetId : null,
-      });
+        restricted_bouquet_id: formData.restrictToBouquet && formData.selectedBouquetIds.length > 0 ? formData.selectedBouquetIds[0] : (formData.restrictToBouquet && formData.selectedBouquetId ? formData.selectedBouquetId : null),
+        restricted_bouquets_ids: formData.restrictToBouquet ? (formData.selectedBouquetIds.length > 0 ? formData.selectedBouquetIds : (formData.selectedBouquetId ? [formData.selectedBouquetId] : [])) : [],
+      } as any);
 
       setKeys((prev) => [created, ...prev]);
       setIsCreateModalOpen(false);
@@ -210,6 +217,7 @@ export default function AdminApiKeysPage() {
         webhookUrl: "",
         restrictToBouquet: false,
         selectedBouquetId: "",
+        selectedBouquetIds: [],
       });
 
       toast.success("Application partenaire configurée avec succès !");
@@ -258,13 +266,17 @@ export default function AdminApiKeysPage() {
         dailyRequestLimit: editFormData.isUnlimited ? "unlimited" : Number(editFormData.dailyRequestLimit) || 10000,
         concurrentSessionsLimit: editFormData.isUnlimited ? "unlimited" : Number(editFormData.concurrentSessionsLimit) || 200,
         maxFileSizeMb: Number(editFormData.maxFileSizeMb) || 200,
-        restricted_bouquet_id: editFormData.restrictToBouquet && editFormData.selectedBouquetId ? editFormData.selectedBouquetId : null,
-      });
+        restricted_bouquet_id: editFormData.restrictToBouquet && editFormData.selectedBouquetIds.length > 0 ? editFormData.selectedBouquetIds[0] : (editFormData.restrictToBouquet && editFormData.selectedBouquetId ? editFormData.selectedBouquetId : null),
+        restricted_bouquets_ids: editFormData.restrictToBouquet ? (editFormData.selectedBouquetIds.length > 0 ? editFormData.selectedBouquetIds : (editFormData.selectedBouquetId ? [editFormData.selectedBouquetId] : [])) : [],
+      } as any);
 
       if (updated) {
-        const bouquetObj = availableBouquets.find((b) => b.id === editFormData.selectedBouquetId);
-        const resolvedBouquetName = editFormData.restrictToBouquet ? (bouquetObj?.title || updated.restrictedBouquetName || null) : null;
-        const resolvedBouquetId = editFormData.restrictToBouquet && editFormData.selectedBouquetId ? editFormData.selectedBouquetId : null;
+        const selectedIds = editFormData.restrictToBouquet ? (editFormData.selectedBouquetIds.length > 0 ? editFormData.selectedBouquetIds : (editFormData.selectedBouquetId ? [editFormData.selectedBouquetId] : [])) : [];
+        const bouquetsList = availableBouquets
+          .filter((b) => selectedIds.includes(b.id))
+          .map((b) => ({ id: b.id, title: b.title }));
+        const resolvedBouquetName = bouquetsList.length > 0 ? bouquetsList.map((b) => b.title).join(", ") : (updated.restrictedBouquetName || null);
+        const resolvedBouquetId = selectedIds[0] || null;
 
         setKeys((prev) =>
           prev.map((k) =>
@@ -284,6 +296,8 @@ export default function AdminApiKeysPage() {
                   maxFileSizeMb: Number(editFormData.maxFileSizeMb) || 200,
                   restricted_bouquet_id: resolvedBouquetId,
                   restrictedBouquetName: resolvedBouquetName,
+                  restricted_bouquets: bouquetsList,
+                  restrictedBouquetsSummary: resolvedBouquetName || undefined,
                 }
               : k
           )
@@ -590,11 +604,31 @@ export default function AdminApiKeysPage() {
                         </span>
                       )}
 
-                      {/* Badge Bouquet Restreint */}
-                      {k.restrictedBouquetName && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-navy/10 text-navy border border-navy/20">
-                          <Layers className="w-3 h-3" />
-                          <span>Restreint au bouquet : {k.restrictedBouquetName}</span>
+                      {/* Badges Bouquets Restreints (Multi-Bouquets) */}
+                      {k.restricted_bouquets && k.restricted_bouquets.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {k.restricted_bouquets.map((b) => (
+                            <span
+                              key={b.id}
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gold/15 text-navy border border-gold/30"
+                            >
+                              <Layers className="w-3 h-3 text-gold" />
+                              <span>{b.title}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : k.restrictedBouquetName ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gold/15 text-navy border border-gold/30">
+                          <Layers className="w-3 h-3 text-gold" />
+                          <span>Restreint : {k.restrictedBouquetName}</span>
+                        </span>
+                      ) : null}
+
+                      {/* Échéance d'abonnement campus */}
+                      {k.institutionExpirationDate && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-navy/5 text-navy border border-border">
+                          <Clock className="w-3 h-3 text-gold" />
+                          <span>Échéance campus : {new Date(k.institutionExpirationDate).toLocaleDateString("fr-FR")}</span>
                         </span>
                       )}
 
@@ -848,11 +882,30 @@ export default function AdminApiKeysPage() {
                             <span>Catalogue</span>
                           </span>
                         )}
-                        {k.restrictedBouquetName && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-navy/10 text-navy border border-navy/20 ml-1.5">
-                            <Layers className="w-3 h-3" />
-                            <span>Restreint au bouquet : {k.restrictedBouquetName}</span>
+                        {k.restricted_bouquets && k.restricted_bouquets.length > 0 ? (
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
+                            {k.restricted_bouquets.map((b) => (
+                              <span
+                                key={b.id}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-gold/15 text-navy border border-gold/30"
+                              >
+                                <Layers className="w-2.5 h-2.5 text-gold" />
+                                <span>{b.title}</span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : k.restrictedBouquetName ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold/15 text-navy border border-gold/30 ml-1.5">
+                            <Layers className="w-2.5 h-2.5 text-gold" />
+                            <span>{k.restrictedBouquetName}</span>
                           </span>
+                        ) : null}
+
+                        {k.institutionExpirationDate && (
+                          <div className="text-[10px] text-foreground-muted flex items-center gap-1 mt-1">
+                            <Clock className="w-3 h-3 text-gold" />
+                            <span>Éch. {new Date(k.institutionExpirationDate).toLocaleDateString("fr-FR")}</span>
+                          </div>
                         )}
                       </td>
 
@@ -1247,7 +1300,7 @@ export default function AdminApiKeysPage() {
                   </div>
                 )}
 
-                {/* Restriction à un seul bouquet */}
+                {/* Restriction aux bouquets */}
                 <div className="p-3 rounded-xl border border-border bg-background">
                   <label className="flex items-center gap-2 text-xs font-bold text-navy mb-2 cursor-pointer">
                     <input
@@ -1255,19 +1308,43 @@ export default function AdminApiKeysPage() {
                       checked={formData.restrictToBouquet}
                       onChange={(e) => setFormData({ ...formData, restrictToBouquet: e.target.checked })}
                     />
-                    Restreindre cette clé à un seul bouquet
+                    Restreindre cette clé à des bouquets documentaires
                   </label>
                   {formData.restrictToBouquet && (
-                    <select
-                      value={formData.selectedBouquetId}
-                      onChange={(e) => setFormData({ ...formData, selectedBouquetId: e.target.value })}
-                      className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-background-secondary text-foreground"
-                    >
-                      <option value="">Sélectionner un bouquet...</option>
-                      {availableBouquets.map((b) => (
-                        <option key={b.id} value={b.id}>{b.title}</option>
-                      ))}
-                    </select>
+                    <div className="space-y-2 mt-2">
+                      <span className="text-[11px] text-foreground-muted block">Sélectionnez le(s) bouquet(s) autorisés :</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto p-1">
+                        {availableBouquets.map((b) => {
+                          const isChecked = formData.selectedBouquetIds.includes(b.id) || formData.selectedBouquetId === b.id;
+                          return (
+                            <label
+                              key={b.id}
+                              className={`flex items-center gap-2 text-xs p-2 rounded-lg border transition-colors cursor-pointer ${
+                                isChecked
+                                  ? "border-gold bg-gold/10 text-navy font-bold"
+                                  : "border-border bg-background-secondary text-foreground hover:border-border-hover"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const next = e.target.checked
+                                    ? [...formData.selectedBouquetIds.filter((id) => id !== b.id), b.id]
+                                    : formData.selectedBouquetIds.filter((id) => id !== b.id);
+                                  setFormData({
+                                    ...formData,
+                                    selectedBouquetIds: next,
+                                    selectedBouquetId: next[0] || "",
+                                  });
+                                }}
+                              />
+                              <span className="truncate">{b.title}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1454,7 +1531,7 @@ export default function AdminApiKeysPage() {
                   ))}
                 </div>
 
-                {/* Restriction à un seul bouquet */}
+                {/* Restriction aux bouquets */}
                 <div className="p-3 rounded-xl border border-border bg-background mt-3">
                   <label className="flex items-center gap-2 text-xs font-bold text-navy mb-2 cursor-pointer">
                     <input
@@ -1462,19 +1539,43 @@ export default function AdminApiKeysPage() {
                       checked={editFormData.restrictToBouquet}
                       onChange={(e) => setEditFormData({ ...editFormData, restrictToBouquet: e.target.checked })}
                     />
-                    Restreindre cette clé à un seul bouquet
+                    Restreindre cette clé à des bouquets documentaires
                   </label>
                   {editFormData.restrictToBouquet && (
-                    <select
-                      value={editFormData.selectedBouquetId}
-                      onChange={(e) => setEditFormData({ ...editFormData, selectedBouquetId: e.target.value })}
-                      className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-background-secondary text-foreground"
-                    >
-                      <option value="">Sélectionner un bouquet...</option>
-                      {availableBouquets.map((b) => (
-                        <option key={b.id} value={b.id}>{b.title}</option>
-                      ))}
-                    </select>
+                    <div className="space-y-2 mt-2">
+                      <span className="text-[11px] text-foreground-muted block">Sélectionnez le(s) bouquet(s) autorisés :</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto p-1">
+                        {availableBouquets.map((b) => {
+                          const isChecked = editFormData.selectedBouquetIds.includes(b.id) || editFormData.selectedBouquetId === b.id;
+                          return (
+                            <label
+                              key={b.id}
+                              className={`flex items-center gap-2 text-xs p-2 rounded-lg border transition-colors cursor-pointer ${
+                                isChecked
+                                  ? "border-gold bg-gold/10 text-navy font-bold"
+                                  : "border-border bg-background-secondary text-foreground hover:border-border-hover"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const next = e.target.checked
+                                    ? [...editFormData.selectedBouquetIds.filter((id) => id !== b.id), b.id]
+                                    : editFormData.selectedBouquetIds.filter((id) => id !== b.id);
+                                  setEditFormData({
+                                    ...editFormData,
+                                    selectedBouquetIds: next,
+                                    selectedBouquetId: next[0] || "",
+                                  });
+                                }}
+                              />
+                              <span className="truncate">{b.title}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

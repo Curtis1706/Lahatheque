@@ -4029,7 +4029,7 @@ class AdminBouquetOfferingsView(APIView):
             general_b.annual_price = total_catalog_price
             general_b.save(update_fields=['annual_price'])
 
-        offerings = BouquetOffering.objects.all().order_by(
+        offerings = BouquetOffering.objects.all().select_related('target_institution').order_by(
             models.Case(models.When(bouquet_type='general', then=0), default=1),
             'title'
         )
@@ -4040,8 +4040,10 @@ class AdminBouquetOfferingsView(APIView):
             "discipline": o.discipline,
             "faculty_code": o.faculty_code,
             "target_institution": str(o.target_institution_id) if o.target_institution_id else None,
+            "target_institution_name": o.target_institution.name if o.target_institution else None,
             "country": o.country,
             "books_count": o.books_count,
+            "monthly_price": float(o.get_real_monthly_price() if hasattr(o, 'get_real_monthly_price') else (o.monthly_price or 50000)),
             "annual_price": float(o.get_real_annual_price() if hasattr(o, 'get_real_annual_price') else o.annual_price),
             "currency": o.currency,
             "description": o.description,
@@ -4061,16 +4063,29 @@ class AdminBouquetOfferingsView(APIView):
 
         bouquet_type = d.get("bouquet_type", "discipline")
         if bouquet_type not in dict(BouquetOffering.BOUQUET_TYPE_CHOICES):
-            return Response({"success": False, "error": "Type de bouquet invalide."}, status=400)
+            return Response({"success": False, "error": "Type de bouquet invalide ou obsolète."}, status=400)
+
+        target_inst_id = d.get("target_institution") or None
+        if bouquet_type == "university" and not target_inst_id:
+            return Response({
+                "success": False,
+                "error": "La sélection d'une université partenaire est obligatoire pour le type « Intégral Université »."
+            }, status=400)
+
+        monthly_p = Decimal(str(d.get("monthly_price", 50000)))
+        annual_p = Decimal(str(d.get("annual_price", 500000)))
+        if monthly_p < 0 or annual_p < 0:
+            return Response({"success": False, "error": "Les tarifs ne peuvent pas être négatifs."}, status=400)
 
         offering = BouquetOffering.objects.create(
             title=d["title"],
             bouquet_type=bouquet_type,
             discipline=d.get("discipline", ""),
             faculty_code=d.get("faculty_code", ""),
-            target_institution_id=d.get("target_institution") or None,
+            target_institution_id=target_inst_id,
             country=d.get("country", ""),
-            annual_price=Decimal(str(d.get("annual_price", 500000))),
+            monthly_price=monthly_p,
+            annual_price=annual_p,
             description=d.get("description", ""),
             created_by=request.user,
         )
@@ -4107,12 +4122,28 @@ class AdminBouquetOfferingDetailView(APIView):
             if field in d:
                 setattr(offering, field, d[field])
 
+        if "monthly_price" in d:
+            m_val = Decimal(str(d["monthly_price"]))
+            if m_val < 0:
+                return Response({"success": False, "error": "Le tarif mensuel ne peut pas être négatif."}, status=400)
+            offering.monthly_price = m_val
+
         if "annual_price" in d:
-            offering.annual_price = Decimal(str(d["annual_price"]))
+            a_val = Decimal(str(d["annual_price"]))
+            if a_val < 0:
+                return Response({"success": False, "error": "Le tarif annuel ne peut pas être négatif."}, status=400)
+            offering.annual_price = a_val
+
         if "target_institution" in d:
             offering.target_institution_id = d["target_institution"] or None
         if "bouquet_type" in d and d["bouquet_type"] in dict(BouquetOffering.BOUQUET_TYPE_CHOICES):
             offering.bouquet_type = d["bouquet_type"]
+
+        if offering.bouquet_type == "university" and not offering.target_institution_id:
+            return Response({
+                "success": False,
+                "error": "La sélection d'une université partenaire est obligatoire pour le type « Intégral Université »."
+            }, status=400)
 
         offering.save()
 
@@ -4136,6 +4167,88 @@ class AdminBouquetOfferingDetailView(APIView):
         offering.is_active = False
         offering.save(update_fields=["is_active"])
         return Response({"success": True, "message": "Bouquet désactivé."})
+
+
+class AdminBouquetSubscriptionsView(APIView):
+    """
+    GET /api/v1/admin/bouquet-offerings/<pk>/subscriptions/
+    Liste tous les abonnés (universités et clients particuliers) à ce bouquet précis,
+    avec formule de souscription (mensuel/annuel), dates de début/fin, montant payé et statut.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrSuperAdmin]
+
+    def get(self, request, pk):
+        from apps.partners.models import BouquetOffering, UniversityBouquetSubscription
+        from apps.commerce.models import ClientBouquetSubscription
+        from django.utils import timezone
+
+        try:
+            offering = BouquetOffering.objects.get(id=pk)
+        except BouquetOffering.DoesNotExist:
+            return Response({"success": False, "error": "Bouquet introuvable."}, status=404)
+
+        today = timezone.now().date()
+
+        # 1. Abonnements institutionnels
+        univ_subs = UniversityBouquetSubscription.objects.filter(
+            offering_id=offering.id
+        ).select_related('institution', 'institution__user').order_by('-start_date')
+
+        univ_list = []
+        for s in univ_subs:
+            is_active_now = (s.status == 'active' and s.end_date >= today)
+            univ_list.append({
+                "id": str(s.id),
+                "type": "institution",
+                "subscriber_name": s.institution.name,
+                "subscriber_code": s.institution.code,
+                "subscriber_email": s.institution.contact_email or (s.institution.user.email if s.institution.user else ""),
+                "subscription_period": getattr(s, 'subscription_period', 'annual'),
+                "price_paid": float(s.price_paid or s.annual_price or 0),
+                "currency": s.currency,
+                "status": "active" if is_active_now else ("expired" if s.end_date < today else s.status),
+                "start_date": s.start_date.isoformat() if s.start_date else None,
+                "end_date": s.end_date.isoformat() if s.end_date else None,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+            })
+
+        # 2. Abonnements clients particuliers
+        client_subs = ClientBouquetSubscription.objects.filter(
+            offering_id=offering.id
+        ).select_related('user').order_by('-start_date')
+
+        client_list = []
+        for cs in client_subs:
+            is_active_now = (cs.status == 'active' and cs.end_date >= today)
+            name = f"{cs.user.first_name} {cs.user.last_name}".strip() or cs.user.email
+            client_list.append({
+                "id": str(cs.id),
+                "type": "client",
+                "subscriber_name": name,
+                "subscriber_code": "PARTICULIER",
+                "subscriber_email": cs.user.email,
+                "subscription_period": getattr(cs, 'subscription_period', 'monthly'),
+                "price_paid": float(cs.price_paid or 0),
+                "currency": cs.currency,
+                "status": "active" if is_active_now else ("expired" if cs.end_date < today else cs.status),
+                "start_date": cs.start_date.isoformat() if cs.start_date else None,
+                "end_date": cs.end_date.isoformat() if cs.end_date else None,
+                "created_at": cs.created_at.isoformat() if cs.created_at else None,
+            })
+
+        all_subs = univ_list + client_list
+        active_count = sum(1 for sub in all_subs if sub["status"] == "active")
+
+        return Response({
+            "success": True,
+            "data": {
+                "bouquet_id": str(offering.id),
+                "bouquet_title": offering.title,
+                "total_subscribers": len(all_subs),
+                "active_subscribers": active_count,
+                "subscriptions": all_subs,
+            }
+        })
 
 
 def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution_id=None, anonymize_others=False):

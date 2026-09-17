@@ -97,6 +97,10 @@ export interface BookAPI {
   access_type?: string;
   expires_at?: string;
   expires_in_days?: number;
+  is_bouquet_book?: boolean;
+  bouquet_name?: string | null;
+  bouquet_id?: string | null;
+  bouquet_end_date?: string | null;
 }
 
 export interface StudentOverviewKPIs {

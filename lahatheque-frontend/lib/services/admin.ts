@@ -1263,12 +1263,14 @@ export const triggerRoyaltyCalculation = triggerRoyaltyCalculationNow;
 export interface BouquetOfferingAdmin {
   id: string;
   title: string;
-  bouquet_type: "discipline" | "faculty" | "university" | "country" | "custom";
+  bouquet_type: "discipline" | "faculty" | "university" | "country" | "custom" | "general";
   discipline: string;
   faculty_code: string;
   target_institution: string | null;
+  target_institution_name?: string | null;
   country: string;
   books_count: number;
+  monthly_price: number;
   annual_price: number;
   currency: string;
   description: string;
@@ -1334,6 +1336,81 @@ export async function deleteBouquetOffering(id: string): Promise<boolean> {
     method: "DELETE", credentials: "include",
   });
   return res.ok;
+}
+
+export interface BouquetSubscriberItem {
+  id: string;
+  type: "institution" | "client";
+  subscriber_name: string;
+  subscriber_code: string;
+  subscriber_email: string;
+  subscription_period: "monthly" | "annual";
+  price_paid: number;
+  currency: string;
+  status: "active" | "expired" | "pending" | "cancelled";
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string | null;
+}
+
+export interface BouquetSubscriptionsResponse {
+  bouquet_id: string;
+  bouquet_title: string;
+  total_subscribers: number;
+  active_subscribers: number;
+  subscriptions: BouquetSubscriberItem[];
+}
+
+export async function getBouquetSubscriptions(bouquetId: string): Promise<BouquetSubscriptionsResponse | null> {
+  try {
+    const res = await fetch(`/api/bff/admin/bouquet-offerings/${bouquetId}/subscriptions/`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || null;
+    }
+  } catch (err) {
+    console.error("[getBouquetSubscriptions] Error:", err);
+  }
+  return null;
+}
+
+export interface InstitutionBookPreviewItem {
+  id: string;
+  title: string;
+  authors: string[];
+  isbn?: string;
+  cover_url?: string;
+  discipline: string;
+  format_type: string;
+  price_digital: number;
+  publication_year?: number | null;
+}
+
+export interface InstitutionBooksPreviewResponse {
+  institution_id: string;
+  institution_name: string;
+  institution_code: string;
+  books_count: number;
+  books: InstitutionBookPreviewItem[];
+}
+
+export async function getInstitutionBooksPreview(institutionId: string): Promise<InstitutionBooksPreviewResponse | null> {
+  try {
+    const res = await fetch(`/api/bff/partners/institutions/${institutionId}/books-preview/`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || null;
+    }
+  } catch (err) {
+    console.error("[getInstitutionBooksPreview] Error:", err);
+  }
+  return null;
 }
 
 // =========================================================================

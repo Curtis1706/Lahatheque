@@ -970,3 +970,271 @@ def task_distribute_bouquet_revenue():
     }
 
 
+def send_bouquet_subscription_emails(subscription_id: str):
+    """
+    Envoie les emails transactionnels officiels lors de l'activation d'un bouquet :
+    1. À l'établissement / client avec détails, date d'échéance et facture PDF acquittée en pièce jointe.
+    2. À l'administrateur de LAHAThèque avec référence Moneroo, formule et échéance.
+    """
+    from apps.partners.models import UniversityBouquetSubscription
+    from apps.commerce.models import ClientBouquetSubscription
+    from apps.reporting.pdf_service import BouquetInvoicePdfService
+    from apps.communications.services.email_service import send_transactional_email
+    from apps.communications.services.email_provider_base import EmailAttachment
+    from apps.accounts.models import User
+    from django.conf import settings
+    from django.utils import timezone
+
+    univ_sub = UniversityBouquetSubscription.objects.filter(id=subscription_id).select_related('institution', 'institution__user').first()
+    client_sub = None
+    if not univ_sub:
+        client_sub = ClientBouquetSubscription.objects.filter(id=subscription_id).select_related('user').first()
+
+    if not univ_sub and not client_sub:
+        logger.warning(f"[EMAIL BOUQUET] Aucune souscription trouvée pour ID {subscription_id}")
+        return
+
+    sub = univ_sub or client_sub
+    is_univ = bool(univ_sub)
+    institution = getattr(univ_sub, 'institution', None)
+    user = institution.user if (institution and institution.user) else getattr(client_sub, 'user', None)
+
+    recipient_email = (
+        (user.email if user else None)
+        or (institution.contact_email if institution else None)
+    )
+    recipient_name = (
+        institution.name if institution
+        else (f"{user.first_name} {user.last_name}".strip() or user.email if user else "Abonné")
+    )
+    period = getattr(sub, 'subscription_period', 'annual')
+    period_label = "Formule Mensuelle (30 jours)" if period == "monthly" else "Formule Annuelle (365 jours)"
+    invoice_number = f"FAC-BOUQ-{str(sub.id)[:8].upper()}"
+    date_str = sub.created_at.strftime("%d/%m/%Y") if hasattr(sub, 'created_at') and sub.created_at else timezone.now().strftime("%d/%m/%Y")
+    end_date_str = sub.end_date.strftime("%d/%m/%Y") if sub.end_date else "Indéterminée"
+    amount = float(getattr(sub, 'price_paid', None) or getattr(sub, 'annual_price', 0.0) or 0.0)
+    currency = getattr(sub, 'currency', 'XOF') or 'XOF'
+    if currency == "XOF":
+        currency = "FCFA"
+
+    tx_ref = ""
+    if sub.payment_transaction:
+        tx_ref = sub.payment_transaction.moneroo_id or str(sub.payment_transaction.id)[:8]
+
+    # Génération de la facture PDF acquittée
+    invoice_data = {
+        "invoice_number": invoice_number,
+        "customer_name": recipient_name,
+        "customer_email": recipient_email or "",
+        "institution_code": institution.code if institution else "",
+        "date": date_str,
+        "bouquet_title": sub.title,
+        "period_label": period_label,
+        "amount": amount,
+        "currency": currency,
+        "payment_method": "Moneroo Mobile Money",
+        "transaction_ref": tx_ref or "PAIEMENT_VALIDE",
+        "start_date": sub.start_date.strftime("%d/%m/%Y") if sub.start_date else date_str,
+        "end_date": end_date_str,
+        "is_university": is_univ,
+    }
+
+    attachments = []
+    try:
+        pdf_bytes = BouquetInvoicePdfService.generate_invoice_pdf(invoice_data)
+        attachments.append(
+            EmailAttachment(
+                filename=f"Facture_{invoice_number}.pdf",
+                content=pdf_bytes,
+                content_type="application/pdf"
+            )
+        )
+    except Exception as pdf_err:
+        logger.error(f"[EMAIL BOUQUET] Erreur génération PDF facture: {pdf_err}")
+
+    # 1. Envoi au client ou à l'université
+    if recipient_email:
+        context_client = {
+            "recipient_name": recipient_name,
+            "bouquet_title": sub.title,
+            "period_label": period_label,
+            "end_date": end_date_str,
+            "amount": f"{amount:,.0f} {currency}".replace(",", " "),
+            "invoice_number": invoice_number,
+            "site_url": getattr(settings, 'FRONTEND_URL', 'https://lahatheque.com'),
+        }
+        try:
+            send_transactional_email(
+                email_type="bouquet_subscription_confirmed",
+                to_email=recipient_email,
+                subject=f"Confirmation d'abonnement Bouquet • {sub.title} • Facture Acquittée",
+                template_name="emails/orders/bouquet_confirmation.html",
+                context=context_client,
+                recipient_name=recipient_name,
+                attachments=attachments,
+                async_send=True
+            )
+            logger.info(f"[EMAIL BOUQUET] Email envoyé à {recipient_email}")
+        except Exception as mail_err:
+            logger.error(f"[EMAIL BOUQUET] Erreur envoi email client {recipient_email}: {mail_err}")
+
+    # 2. Notification administrateur
+    try:
+        admin_emails = list(
+            User.objects.filter(role__in=['admin', 'super_admin'], is_active=True)
+            .exclude(email='')
+            .values_list('email', flat=True)
+        )
+        official_admin = getattr(settings, 'ADMIN_NOTIFICATION_EMAIL', 'lahaeditions1@gmail.com')
+        if official_admin and official_admin not in admin_emails:
+            admin_emails.append(official_admin)
+
+        context_admin = {
+            "institution_name": recipient_name,
+            "bouquet_title": sub.title,
+            "period_label": period_label,
+            "end_date": end_date_str,
+            "amount": f"{amount:,.0f} {currency}".replace(",", " "),
+            "payment_ref": tx_ref or "Moneroo",
+            "invoice_number": invoice_number,
+        }
+        for a_email in set(admin_emails):
+            send_transactional_email(
+                email_type="admin_bouquet_subscription_alert",
+                to_email=str(a_email),
+                subject=f"[ADMIN LAHAThèque] Nouvelle souscription bouquet : {sub.title} ({recipient_name})",
+                template_name="emails/orders/admin_bouquet_alert.html",
+                context=context_admin,
+                recipient_name="Administration LAHA",
+                attachments=attachments,
+                async_send=True
+            )
+    except Exception as adm_err:
+        logger.error(f"[EMAIL BOUQUET] Erreur notification admin: {adm_err}")
+
+
+@shared_task
+def check_bouquet_subscriptions_and_remind():
+    """
+    Tâche quotidienne Celery :
+    1. Relance préventive par email :
+       - J-7 pour les formules annuelles (décision Q4)
+       - J-3 pour les formules mensuelles (décision Q4)
+       avec lien direct de renouvellement.
+    2. Expiration automatique :
+       - Passage à status='expired' des souscriptions dont end_date < aujourd'hui
+       et coupure granulaire des accès.
+    """
+    from apps.partners.models import UniversityBouquetSubscription
+    from apps.commerce.models import ClientBouquetSubscription
+    from apps.communications.services.email_service import send_transactional_email
+    from django.conf import settings
+    from django.utils import timezone
+
+    today = timezone.now().date()
+    results = {"reminders_sent": 0, "expired_count": 0}
+
+    # 1. Universités
+    univ_subs = UniversityBouquetSubscription.objects.filter(status='active').select_related('institution', 'institution__user')
+    for sub in univ_subs:
+        if not sub.end_date:
+            continue
+
+        days_remaining = (sub.end_date - today).days
+
+        # Expiration échue
+        if days_remaining < 0:
+            sub.status = 'expired'
+            sub.save(update_fields=['status'])
+            results["expired_count"] += 1
+            logger.info(f"[BOUQUET EXPIRY] Bouquet univ {sub.id} ({sub.institution.name}) marqué expiré.")
+            continue
+
+        # Relance préventive (J-7 annuel ou J-3 mensuel)
+        is_annual_reminder = (sub.subscription_period == 'annual' and days_remaining == 7)
+        is_monthly_reminder = (sub.subscription_period == 'monthly' and days_remaining == 3)
+
+        if is_annual_reminder or is_monthly_reminder:
+            recip_email = (
+                (sub.institution.user.email if sub.institution.user else None)
+                or sub.institution.contact_email
+            )
+            if recip_email:
+                frontend_url = getattr(settings, 'FRONTEND_URL', 'https://lahatheque.com')
+                renew_url = f"{frontend_url}/university/bouquets"
+                try:
+                    send_transactional_email(
+                        email_type="bouquet_expiration_warning",
+                        to_email=recip_email,
+                        subject=f"Rappel d'échéance : Votre accès au bouquet « {sub.title} » expire dans {days_remaining} jours",
+                        template_name="emails/admin/custom_message.html",
+                        context={
+                            "recipient_name": sub.institution.name,
+                            "subject": f"Expiration imminente du bouquet « {sub.title} »",
+                            "message_content": (
+                                f"Nous vous informons que la licence de votre établissement pour le bouquet "
+                                f"« {sub.title} » arrivera à échéance le {sub.end_date.strftime('%d/%m/%Y')} (dans {days_remaining} jours).\n\n"
+                                f"Afin de maintenir sans interruption la continuité des lectures et l'accès API pour vos étudiants, "
+                                f"nous vous invitons à renouveler votre abonnement dès maintenant."
+                            ),
+                            "action_label": "Renouveler le Bouquet",
+                            "action_url": renew_url,
+                        },
+                        recipient_name=sub.institution.name,
+                        async_send=True
+                    )
+                    results["reminders_sent"] += 1
+                    logger.info(f"[BOUQUET REMINDER] Relance J-{days_remaining} envoyée à {recip_email} pour bouquet {sub.id}")
+                except Exception as mail_err:
+                    logger.error(f"[BOUQUET REMINDER] Erreur envoi relance {recip_email}: {mail_err}")
+
+    # 2. Clients Individuels (B2C)
+    client_subs = ClientBouquetSubscription.objects.filter(status='active').select_related('user')
+    for csub in client_subs:
+        if not csub.end_date:
+            continue
+
+        days_remaining = (csub.end_date - today).days
+
+        if days_remaining < 0:
+            csub.status = 'expired'
+            csub.save(update_fields=['status'])
+            results["expired_count"] += 1
+            logger.info(f"[BOUQUET EXPIRY] Bouquet client {csub.id} marqué expiré.")
+            continue
+
+        is_annual_reminder = (csub.subscription_period == 'annual' and days_remaining == 7)
+        is_monthly_reminder = (csub.subscription_period == 'monthly' and days_remaining == 3)
+
+        if (is_annual_reminder or is_monthly_reminder) and csub.user and csub.user.email:
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'https://lahatheque.com')
+            renew_url = f"{frontend_url}/student/bouquets"
+            try:
+                send_transactional_email(
+                    email_type="bouquet_expiration_warning",
+                    to_email=csub.user.email,
+                    subject=f"Rappel : Votre bouquet « {csub.title} » expire dans {days_remaining} jours",
+                    template_name="emails/admin/custom_message.html",
+                    context={
+                        "recipient_name": f"{csub.user.first_name} {csub.user.last_name}".strip() or csub.user.email,
+                        "subject": f"Expiration imminente de votre bouquet « {csub.title} »",
+                        "message_content": (
+                            f"Votre accès au bouquet « {csub.title} » arrive à expiration le "
+                            f"{csub.end_date.strftime('%d/%m/%Y')} (dans {days_remaining} jours).\n\n"
+                            f"Renouvelez votre abonnement dès maintenant pour conserver vos lectures."
+                        ),
+                        "action_label": "Renouveler mon Bouquet",
+                        "action_url": renew_url,
+                    },
+                    recipient_name=csub.user.email,
+                    async_send=True
+                )
+                results["reminders_sent"] += 1
+                logger.info(f"[BOUQUET REMINDER] Relance J-{days_remaining} envoyée au client {csub.user.email}")
+            except Exception as mail_err:
+                logger.error(f"[BOUQUET REMINDER] Erreur relance client {csub.user.email}: {mail_err}")
+
+    return results
+
+
+

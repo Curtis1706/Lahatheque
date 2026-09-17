@@ -40,7 +40,19 @@ class PartnerApp(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name='partner_apps_restricted',
-        help_text="Si défini, cette clé API n'a accès qu'aux livres de ce bouquet précis."
+        help_text="Si défini, cette clé API n'a accès qu'aux livres de ce bouquet précis (rétro-compatibilité)."
+    )
+    restricted_bouquets = models.ManyToManyField(
+        'partners.BouquetOffering',
+        blank=True,
+        related_name='partner_apps_multi',
+        help_text="Périmètre cumulé de tous les bouquets souscrits par l'institution partenaire."
+    )
+    access_mode = models.CharField(
+        max_length=32,
+        choices=[('catalog_only', 'Catalogue Seul'), ('full_reader', 'Lecteur Intégré')],
+        default='catalog_only',
+        help_text="Mode d'accès accordé à la clé API"
     )
     allowed_return_origins = models.JSONField(
         default=list,
@@ -88,6 +100,35 @@ class PartnerApp(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.id})"
+
+    def get_active_bouquets(self):
+        """
+        Retourne la liste des bouquets actifs et non expirés pour cette application.
+        Prend en compte restricted_bouquets M2M et l'ancien restricted_bouquet.
+        """
+        from django.utils import timezone
+        today = timezone.now().date()
+        if self.linked_institution:
+            active_offering_ids = set(
+                self.linked_institution.bouquet_subscriptions.filter(
+                    status='active',
+                    end_date__gte=today
+                ).values_list('offering_id', flat=True)
+            )
+            # Récupérer les bouquets qui sont soit dans restricted_bouquets, soit restricted_bouquet
+            qs = self.restricted_bouquets.filter(id__in=active_offering_ids)
+            if not qs.exists() and self.restricted_bouquet_id in active_offering_ids:
+                from apps.partners.models import BouquetOffering
+                return BouquetOffering.objects.filter(id=self.restricted_bouquet_id)
+            return qs
+
+        # Si pas d'institution liée, retourne restricted_bouquets ou l'unique bouquet
+        if self.restricted_bouquets.exists():
+            return self.restricted_bouquets.all()
+        if self.restricted_bouquet:
+            from apps.partners.models import BouquetOffering
+            return BouquetOffering.objects.filter(id=self.restricted_bouquet_id)
+        return self.restricted_bouquets.none()
 
 
 class PartnerEndUser(models.Model):

@@ -25,6 +25,8 @@ export interface UniversityKpis {
   top_disciplines: { discipline: string; consultations: number; percent: number }[];
   faculty_distribution: { code: string; name: string; consultations: number; percent: number; color: string }[];
   consultations_trend_percent: number;
+  consultations_timeline?: { date: string; value: number }[];
+  paper_orders_count?: number;
   audience_share_percent?: number;
   revenue_split?: UniversityRevenueSplit | null;
 }
@@ -42,12 +44,15 @@ export interface UniversityBouquet {
   id: string;
   offering_id?: string | null;
   title: string;
-  bouquet_type: "discipline" | "faculty" | "university" | "custom" | "general";
+  bouquet_type: "discipline" | "faculty" | "university" | "country" | "custom" | "general";
   faculty_code?: string;
   discipline?: string;
   books_count: number;
   my_books_count?: number;
+  monthly_price?: number;
   annual_price: number;
+  subscription_period?: "monthly" | "annual";
+  price_paid?: number;
   currency: string;
   status: "active" | "pending" | "expired" | "available";
   is_subscribed: boolean;
@@ -55,6 +60,20 @@ export interface UniversityBouquet {
   end_date?: string;
   description?: string;
   sample_books?: { id: string; title: string; author: string; cover_url?: string }[];
+  books?: {
+    id: string;
+    title: string;
+    subtitle?: string;
+    authors?: string[];
+    author?: string;
+    discipline?: string;
+    cover_url?: string | null;
+    page_count?: number;
+    format_type?: string;
+    summary?: string;
+    isbn?: string;
+    has_sample?: boolean;
+  }[];
 }
 
 export interface UniversityBookCatalogItem {

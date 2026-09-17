@@ -142,6 +142,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         avatar_url: user.avatar_url || user.avatar || (user as any).profile_photo || null,
         profile_photo: user.profile_photo || user.avatar_url || user.avatar || null,
         has_active_family_subscription: !!(user as any).has_active_family_subscription,
+        institution_detail: (user as any).institution_detail || null,
+        university_profile: (user as any).university_profile || (user as any).institution_detail || null,
       }))
       document.cookie = `user_session_client=${sessionData}; path=/; max-age=${12 * 60 * 60}; SameSite=Lax`
     } else {

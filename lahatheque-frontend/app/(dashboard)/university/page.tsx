@@ -31,21 +31,6 @@ import type {
   UniversityFacultyData,
 } from "@/lib/types/university";
 
-// Générateur de timeline pour activer les barres bâtonnets sparklines de ProgressMetricCard
-const getRollingTimeline = (count: number) => {
-  const monthNames = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
-  const now = new Date();
-  const res = [];
-  for (let i = 3; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
-    res.push({
-      date: `${String(d.getDate()).padStart(2, "0")} ${monthNames[d.getMonth()]}`,
-      value: i === 0 ? count : Math.max(0, Math.round(count * (0.6 + (3 - i) * 0.13))),
-    });
-  }
-  return res;
-};
-
 export default function UniversityOverviewPage() {
   const [kpis, setKpis] = useState<UniversityKpis | null>(null);
   const [bouquets, setBouquets] = useState<UniversityBouquet[]>([]);
@@ -153,8 +138,6 @@ export default function UniversityOverviewPage() {
             accent="gold"
             delta="Campus"
             deltaLabel="souscrits"
-            defaultView="bar"
-            data={getRollingTimeline(kpis.active_bouquets_count)}
           />
           <ProgressMetricCard
             title="Ouvrages Accessibles"
@@ -164,8 +147,6 @@ export default function UniversityOverviewPage() {
             accent="navy"
             delta="Abonnements campus"
             deltaLabel="actifs"
-            defaultView="bar"
-            data={getRollingTimeline(accessibleBooks)}
           />
           <ProgressMetricCard
             title="Lectures Campus"
@@ -176,7 +157,7 @@ export default function UniversityOverviewPage() {
             delta="Ce mois"
             deltaLabel="sessions actives"
             defaultView="bar"
-            data={getRollingTimeline(kpis.monthly_consultations_count)}
+            data={kpis.consultations_timeline}
           />
           <ProgressMetricCard
             title="Commandes Papier"
@@ -186,8 +167,6 @@ export default function UniversityOverviewPage() {
             accent="gold"
             delta="Commandes"
             deltaLabel="passées"
-            defaultView="bar"
-            data={getRollingTimeline(paperOrders)}
           />
         </div>
 
@@ -224,16 +203,16 @@ export default function UniversityOverviewPage() {
         {/* Raccourcis Rapides */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
           <Link
-            href="/university/catalog"
+            href="/university/bouquets"
             className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-navy-light flex items-center justify-center group-hover:bg-gold/15 transition-colors">
-                <BookOpen className="w-5 h-5 text-gold" />
+                <Layers className="w-5 h-5 text-gold" />
               </div>
               <div>
-                <p className="font-serif font-bold text-sm text-navy">Catalogue Numérique</p>
-                <p className="text-[11px] text-foreground-muted">Ouvrages accessibles via vos abonnements</p>
+                <p className="font-serif font-bold text-sm text-navy">Bouquets Documentaires</p>
+                <p className="text-[11px] text-foreground-muted">Gérer et souscrire vos collections campus</p>
               </div>
             </div>
             <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors" />
@@ -296,13 +275,6 @@ export default function UniversityOverviewPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link
-            href="/university/purchases/new"
-            className="px-4 py-2.5 rounded-xl bg-background border border-border hover:border-gold text-navy text-xs font-bold transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
-          >
-            <ShoppingBag className="w-4 h-4 text-gold" />
-            Passer Commande
-          </Link>
-          <Link
             href="/university/royalties"
             className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
           >
@@ -315,15 +287,13 @@ export default function UniversityOverviewPage() {
       {/* 4 KPI Cards Partenaire */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <ProgressMetricCard
-          title="Ouvrages Catalogue"
-          total={`${bouquets.reduce((acc, b) => acc + (b.my_books_count ?? 0), 0)} Ouvrages`}
+          title="Vos Ouvrages Déposés"
+          total={`${kpis.catalog_books_count != null ? kpis.catalog_books_count : bouquets.reduce((acc, b) => acc + (b.my_books_count ?? 0), 0)} Ouvrages`}
           percent="Inclus"
           trend="up"
           accent="navy"
           delta="Catalogue partagé"
           deltaLabel="multi-établissements"
-          defaultView="bar"
-          data={getRollingTimeline(bouquets.reduce((acc, b) => acc + (b.my_books_count ?? 0), 0))}
         />
         <ProgressMetricCard
           title="Part d'Audience"
@@ -333,8 +303,6 @@ export default function UniversityOverviewPage() {
           accent="emerald"
           delta="Consultations"
           deltaLabel="au prorata officiel"
-          defaultView="bar"
-          data={getRollingTimeline(kpis.audience_share_percent ? Math.round(kpis.audience_share_percent) : 0)}
         />
         <ProgressMetricCard
           title="Lectures Enregistrées"
@@ -345,7 +313,7 @@ export default function UniversityOverviewPage() {
           delta="Ce mois"
           deltaLabel="sessions actives"
           defaultView="bar"
-          data={getRollingTimeline(kpis.monthly_consultations_count)}
+          data={kpis.consultations_timeline}
         />
         <ProgressMetricCard
           title="Redevances Disponibles"
@@ -355,8 +323,6 @@ export default function UniversityOverviewPage() {
           accent="gold"
           delta="Disponibles"
           deltaLabel="au virement"
-          defaultView="bar"
-          data={getRollingTimeline(kpis.total_royalties_available)}
         />
       </div>
 
@@ -447,21 +413,6 @@ export default function UniversityOverviewPage() {
       {/* Raccourcis Rapides Partenaire */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
         <Link
-          href="/university/catalog"
-          className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-navy-light flex items-center justify-center group-hover:bg-gold/15 transition-colors">
-              <BookOpen className="w-5 h-5 text-gold" />
-            </div>
-            <div>
-              <p className="font-serif font-bold text-sm text-navy">Catalogue Affilié</p>
-              <p className="text-[11px] text-foreground-muted">Consulter et prévisualiser</p>
-            </div>
-          </div>
-          <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors" />
-        </Link>
-        <Link
           href="/university/royalties"
           className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
         >
@@ -471,7 +422,22 @@ export default function UniversityOverviewPage() {
             </div>
             <div>
               <p className="font-serif font-bold text-sm text-navy">Redevances Institutionnelles</p>
-              <p className="text-[11px] text-foreground-muted">Relevés et demande de virement</p>
+              <p className="text-[11px] text-foreground-muted">Relevés et demande de virement bancaire</p>
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors" />
+        </Link>
+        <Link
+          href="/university/profile"
+          className="p-5 rounded-2xl bg-background border border-border hover:border-gold transition-all shadow-xs flex items-center justify-between group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-navy-light flex items-center justify-center group-hover:bg-gold/15 transition-colors">
+              <Building2 className="w-5 h-5 text-gold" />
+            </div>
+            <div>
+              <p className="font-serif font-bold text-sm text-navy">Profil & Coordonnées Bancaires</p>
+              <p className="text-[11px] text-foreground-muted">Coordonnées de virement et paramètres</p>
             </div>
           </div>
           <ArrowRight className="w-4 h-4 text-foreground-muted group-hover:text-gold transition-colors" />

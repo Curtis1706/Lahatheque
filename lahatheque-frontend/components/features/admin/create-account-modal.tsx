@@ -16,15 +16,15 @@ export interface CreateAccountModalProps {
 }
 
 const ROLE_OPTIONS: { role: AdminRole; label: string; desc: string }[] = [
-  { role: "student", label: "Client Lecteur / Étudiant", desc: "Accès à la liseuse LCP DRM, abonnements et achats" },
+  { role: "student", label: "Espace Client", desc: "Accès à la liseuse LCP DRM, abonnements et achats numériques" },
+  { role: "wholesaler", label: "Grossiste", desc: "Commandes volumiques avec tarifs dégressifs institutionnels" },
+  { role: "university", label: "Université", desc: "Portail établissement (suivi des redevances ou abonnements campus)" },
   { role: "author", label: "Auteur", desc: "Consultation des droits propres, redevances et dépôts manuscrit" },
   { role: "publisher", label: "Éditeur Tiers", desc: "Portail éditeur, dépôts ONIX 3.0 et suivi financier" },
-  { role: "university", label: "Université Partenaire", desc: "Gestion des bouquets institutionnels, affiliations et redevances 15%" },
+  { role: "legal_reviewer", label: "Juriste / Relecteur", desc: "Validation des contrats, droits d'auteur et impayés" },
   { role: "layout_artist", label: "Maquettiste", desc: "Dépôt des épreuves PDF/EPUB et classification catalogue" },
   { role: "chief_layout", label: "Chef Maquettiste", desc: "Validation des épreuves et publication officielle" },
   { role: "manager", label: "Gestionnaire Stock & Livraison", desc: "Stock papier physique et suivi des livraisons" },
-  { role: "legal_reviewer", label: "Juriste", desc: "Validation des contrats, droits d'auteur et impayés" },
-  { role: "wholesaler", label: "Grossiste", desc: "Achats et commandes à tarifs dégressifs grossiste" },
 ];
 
 const normalizeAdminRole = (r?: string): AdminRole => {

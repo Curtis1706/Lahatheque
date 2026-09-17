@@ -63,7 +63,7 @@ export default function StudentBooksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterTab, setFilterTab] = useState<"all" | "audio" | "favorites">("all");
+  const [filterTab, setFilterTab] = useState<"all" | "audio" | "favorites" | "bouquets">("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   // Pagination
@@ -98,9 +98,10 @@ export default function StudentBooksPage() {
     }
   };
 
-  // Filtrage combiné : recherche textuelle et filtre onglet (tous / audio / favoris)
+  // Filtrage combiné : recherche textuelle et filtre onglet (tous / audio / favoris / bouquets)
   const filteredBooks = useMemo(() => {
     return books.filter((b) => {
+      if (filterTab === "bouquets" && !b.is_bouquet_book) return false;
       if (filterTab === "favorites" && !b.is_favorite) return false;
       if (filterTab === "audio") {
         const hasAudio = Boolean(
@@ -121,12 +122,14 @@ export default function StudentBooksPage() {
             a.last_name.toLowerCase().includes(q) ||
             a.full_name.toLowerCase().includes(q)
         ) ||
-        b.discipline_name?.toLowerCase().includes(q)
+        b.discipline_name?.toLowerCase().includes(q) ||
+        b.bouquet_name?.toLowerCase().includes(q)
       );
     });
   }, [books, filterTab, searchQuery]);
 
   const favoriteCount = useMemo(() => books.filter((b) => b.is_favorite).length, [books]);
+  const bouquetCount = useMemo(() => books.filter((b) => b.is_bouquet_book).length, [books]);
   const audioCount = useMemo(
     () =>
       books.filter(
@@ -274,6 +277,23 @@ export default function StudentBooksPage() {
             <Bookmark className={`w-3.5 h-3.5 ${filterTab === "favorites" ? "fill-current text-navy" : "text-gold"}`} />
             <span>Mes Favoris ({favoriteCount})</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFilterTab("bouquets");
+              setCurrentPage(1);
+              toast.info("Bouquets en cours");
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors border flex items-center gap-2 min-h-[40px] cursor-pointer ${
+              filterTab === "bouquets"
+                ? "bg-gold text-navy border-gold shadow-xs"
+                : "bg-background-secondary text-foreground-muted border-border hover:text-navy hover:bg-background"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-navy" />
+            <span>Bouquets en cours ({bouquetCount})</span>
+          </button>
         </div>
       </div>
 
@@ -294,6 +314,8 @@ export default function StudentBooksPage() {
                 ? "dans vos favoris"
                 : filterTab === "audio"
                 ? "en version audio"
+                : filterTab === "bouquets"
+                ? "inclus dans vos bouquets actifs"
                 : "dans votre bibliothèque"}
               {searchQuery && (
                 <span>
@@ -331,6 +353,8 @@ export default function StudentBooksPage() {
                 <Bookmark className="w-7 h-7 text-gold opacity-80" />
               ) : filterTab === "audio" ? (
                 <Headphones className="w-7 h-7 text-gold opacity-80" />
+              ) : filterTab === "bouquets" ? (
+                <Sparkles className="w-7 h-7 text-gold opacity-80" />
               ) : (
                 <BookOpen className="w-7 h-7 opacity-60" />
               )}
@@ -341,6 +365,8 @@ export default function StudentBooksPage() {
                   ? "Aucun favori enregistré"
                   : filterTab === "audio"
                   ? "Aucun livre audio disponible"
+                  : filterTab === "bouquets"
+                  ? "Aucun bouquet en cours"
                   : books.length === 0
                   ? "Votre bibliothèque est vide"
                   : "Aucun résultat trouvé"}
@@ -350,12 +376,22 @@ export default function StudentBooksPage() {
                   ? "Cliquez sur l'icône de marque-page d'un ouvrage pour l'ajouter à vos favoris."
                   : filterTab === "audio"
                   ? "Explorez le catalogue pour découvrir des ouvrages avec version audio intégrée."
+                  : filterTab === "bouquets"
+                  ? "Vous n'avez aucun bouquet documentaire actif. Explorez nos bouquets pour débloquer des collections complètes d'ouvrages."
                   : books.length === 0
                   ? "Explorez le catalogue académique pour acquérir vos premiers ouvrages ou débloquer vos bouquets campus."
                   : "Modifiez vos critères de recherche ou réinitialisez les filtres."}
               </p>
             </div>
-            {books.length === 0 ? (
+            {filterTab === "bouquets" ? (
+              <Link
+                href="/student/bouquets"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px] shadow-xs cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-gold" />
+                <span>Découvrir les Bouquets</span>
+              </Link>
+            ) : books.length === 0 ? (
               <Link
                 href="/student/catalog"
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors min-h-[44px] shadow-xs cursor-pointer"
@@ -388,6 +424,10 @@ export default function StudentBooksPage() {
                       format: "PDF",
                       progress_percent: book.progress_percent || 0,
                       is_favorite: Boolean(book.is_favorite),
+                      is_bouquet_book: book.is_bouquet_book,
+                      bouquet_name: book.bouquet_name,
+                      bouquet_id: book.bouquet_id,
+                      bouquet_end_date: book.bouquet_end_date,
                     }}
                     onToggleFavorite={handleToggleFavorite}
                   />
@@ -405,6 +445,10 @@ export default function StudentBooksPage() {
                       format: "PDF",
                       progress_percent: book.progress_percent || 0,
                       is_favorite: Boolean(book.is_favorite),
+                      is_bouquet_book: book.is_bouquet_book,
+                      bouquet_name: book.bouquet_name,
+                      bouquet_id: book.bouquet_id,
+                      bouquet_end_date: book.bouquet_end_date,
                     }}
                     onToggleFavorite={handleToggleFavorite}
                   />

@@ -21,19 +21,6 @@ import type { UniversityBouquet } from "@/lib/types/university";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
-const getRollingTimeline = (count: number) => {
-  const monthNames = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
-  const now = new Date();
-  const res = [];
-  for (let i = 3; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
-    res.push({
-      date: `${String(d.getDate()).padStart(2, "0")} ${monthNames[d.getMonth()]}`,
-      value: i === 0 ? count : Math.max(0, Math.round(count * (0.6 + (3 - i) * 0.13))),
-    });
-  }
-  return res;
-};
 
 export default function UniversityBouquetsPage() {
   const { user } = useAuth();
@@ -75,12 +62,35 @@ export default function UniversityBouquetsPage() {
     loadData();
   }, []);
 
-  const handleSubscribe = async (offeringOrBouquetId: string) => {
-    const ok = await subscribeUniversityBouquet(offeringOrBouquetId);
-    if (ok) {
-      await loadData();
+  const handleSubscribe = async (offeringOrBouquetId: string, period: "monthly" | "annual" = "annual") => {
+    console.info("[UNIV BOUQUET SUBSCRIBE]", new Date().toISOString(), {
+      bouquetId: offeringOrBouquetId,
+      period,
+      institution: (user as any)?.institution_detail?.code || (user as any)?.institution_detail?.name || "client",
+    });
+
+    try {
+      const res = await subscribeUniversityBouquet(offeringOrBouquetId, period);
+      if (res.success) {
+        if (res.checkout_url) {
+          toast.info("Redirection vers la passerelle de paiement sécurisée...");
+          console.info("[UNIV BOUQUET SUBSCRIBE]", new Date().toISOString(), `Redirecting to Moneroo: ${res.checkout_url}`);
+          window.location.href = res.checkout_url;
+          return true;
+        }
+        toast.success("Souscription enregistrée avec succès.");
+        await loadData();
+        return true;
+      } else {
+        toast.error(res.error || "Échec de l'initialisation de la souscription.");
+        console.error("[UNIV BOUQUET SUBSCRIBE ERROR]", new Date().toISOString(), res.error);
+        return false;
+      }
+    } catch (err: any) {
+      console.error("[UNIV BOUQUET SUBSCRIBE ERROR]", new Date().toISOString(), err);
+      toast.error("Une erreur réseau est survenue lors de la souscription.");
+      return false;
     }
-    return ok;
   };
 
   const matchesSearch = (b: UniversityBouquet) => {
@@ -136,7 +146,7 @@ export default function UniversityBouquetsPage() {
         </div>
       </div>
 
-      {/* 4 KPI Cards Consolidées du Catalogue Bouquets (ZÉRO MODALE) */}
+      {/* 4 KPI Cards Consolidées du Catalogue Bouquets */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <ProgressMetricCard
           title="Bouquets Souscrits"
@@ -146,52 +156,36 @@ export default function UniversityBouquetsPage() {
           accent="gold"
           delta="Actifs"
           deltaLabel="sur le campus"
-          defaultView="bar"
-          data={getRollingTimeline(activeBouquets.length)}
         />
 
         <ProgressMetricCard
-          title="Vos Ouvrages Référencés"
-          total={`${bouquets.reduce(
-            (acc, b) => acc + (b.my_books_count ?? 0),
-            0
-          )} Ouvrages`}
-          percent="Catalogue Partagé"
+          title="Ouvrages Débloqués"
+          total={`${activeBouquets.reduce((acc, b) => acc + (b.books_count || 0), 0)} Volumes`}
+          percent="Numérique"
           trend="up"
           accent="navy"
-          delta="Multi-universités"
-          deltaLabel="inclus dans les packs"
-          defaultView="bar"
-          data={getRollingTimeline(
-            bouquets.reduce(
-              (acc, b) => acc + (b.my_books_count ?? 0),
-              0
-            )
-          )}
+          delta="Accès campus"
+          deltaLabel="pour vos étudiants"
         />
 
         <ProgressMetricCard
-          title="Part d'Audience Moyenne"
-          total="38.5 %"
-          percent="Usage réel"
+          title="Bouquets Disponibles"
+          total={`${availableBouquets.length} Packs`}
+          percent="En catalogue"
           trend="up"
           accent="emerald"
-          delta="Consultations"
-          deltaLabel="au prorata officiel"
-          defaultView="bar"
-          data={getRollingTimeline(38)}
+          delta="À souscrire"
+          deltaLabel="par faculté ou filière"
         />
 
         <ProgressMetricCard
-          title="Redevances Estimées (15%)"
-          total={`${Math.round(bouquets.reduce((acc, b) => acc + (b.is_subscribed ? b.annual_price : 0), 0) * 0.385 * 0.15 || 82500).toLocaleString("fr-FR")} XOF`}
-          percent="Taux 15%"
+          title="Format d'Accès"
+          total="100 %"
+          percent="Sécurisé"
           trend="up"
           accent="gold"
-          delta="Conventionnées"
-          deltaLabel="au prorata d'usage"
-          defaultView="bar"
-          data={getRollingTimeline(82500)}
+          delta="Liseuse numérique"
+          deltaLabel="et extraits gratuits"
         />
       </div>
 

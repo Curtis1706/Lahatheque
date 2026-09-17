@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ClientBouquetSubscriptionContract",
+  "description": "Contrat d'API pour la souscription bouquet lecteur particulier (B2C) et consultation bibliothèque",
+  "definitions": {
+    "ClientSubscribeRequest": {
+      "type": "object",
+      "required": ["period"],
+      "properties": {
+        "period": { "type": "string", "enum": ["monthly", "annual"] },
+        "mode_paiement": { "type": "string", "default": "moneroo" },
+        "return_url": { "type": "string", "format": "uri" }
+      }
+    },
+    "StudentBooksResponseWithBouquets": {
+      "type": "object",
+      "required": ["success", "data"],
+      "properties": {
+        "success": { "type": "boolean" },
+        "data": {
+          "type": "object",
+          "required": ["purchased_books", "bouquet_books", "active_bouquets"],
+          "properties": {
+            "purchased_books": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "title", "cover_url", "access_expires_at"],
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "title": { "type": "string" },
+                  "cover_url": { "type": "string", "format": "uri" },
+                  "access_type": { "type": "string", "enum": ["purchased"] },
+                  "access_expires_at": { "type": "string", "format": "date" }
+                }
+              }
+            },
+            "bouquet_books": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "title", "cover_url", "bouquet_title", "access_expires_at"],
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "title": { "type": "string" },
+                  "cover_url": { "type": "string", "format": "uri" },
+                  "access_type": { "type": "string", "enum": ["bouquet"] },
+                  "bouquet_title": { "type": "string" },
+                  "access_expires_at": { "type": "string", "format": "date" }
+                }
+              }
+            },
+            "active_bouquets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "title", "period", "end_date", "status"],
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "title": { "type": "string" },
+                  "period": { "type": "string", "enum": ["monthly", "annual"] },
+                  "end_date": { "type": "string", "format": "date" },
+                  "status": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "error": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

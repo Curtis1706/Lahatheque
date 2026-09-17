@@ -23,15 +23,15 @@ export const ADMIN_ROLE_LABELS: Record<string, string> = {
   parent: "Parent d'élève",
   author: "Auteur",
   publisher: "Éditeur Tiers",
-  university: "Université / Établissement",
+  university: "Université",
   layout_artist: "Maquettiste",
   chief_layout: "Chef Maquettiste",
   manager: "Gestionnaire Stock & Livraison",
   coordination_manager: "Gestionnaire Coordination",
   legal_reviewer: "Juriste / Relecteur",
-  wholesaler: "Grossiste Commercial",
-  super_client: "Grossiste Commercial",
-  commercial_wholesaler: "Grossiste Commercial",
+  wholesaler: "Grossiste",
+  super_client: "Grossiste",
+  commercial_wholesaler: "Grossiste",
   partner_api: "Partenaire API",
   admin: "Administrateur",
   super_admin: "Super Administrateur",
@@ -409,6 +409,9 @@ export interface PartnerApiKey {
   // Restriction Bouquet
   restricted_bouquet_id?: string | null;
   restrictedBouquetName?: string | null;
+  restricted_bouquets?: { id: string; title: string; end_date?: string; status?: string }[];
+  restrictedBouquetsSummary?: string;
+  institutionExpirationDate?: string | null;
 }
 
 export interface AdminValidationProof {

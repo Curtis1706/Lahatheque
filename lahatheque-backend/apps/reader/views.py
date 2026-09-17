@@ -86,6 +86,28 @@ class ReaderSessionViewSet(ViewSet):
         ttl_seconds = validated_data.get('ttl_seconds', 14400)
         expires_at = timezone.now() + timedelta(seconds=ttl_seconds)
 
+        # Contrôle granulaire des bouquets partenaires et de leur validité (T020)
+        ouvrage = validated_data.get('validated_ouvrage')
+        if source_type == 'catalog_book' and ouvrage:
+            has_bouquet_restrictions = partner.restricted_bouquets.exists() or bool(partner.restricted_bouquet_id)
+            if has_bouquet_restrictions:
+                active_bouquets = partner.get_active_bouquets()
+                if not active_bouquets.exists():
+                    return standard_response(
+                        error="L'accès à la liseuse est suspendu car l'abonnement bouquet de votre établissement a expiré.",
+                        status_code=status.HTTP_403_FORBIDDEN
+                    )
+                institution = partner.linked_institution
+                allowed_books_ids = set()
+                for bq in active_bouquets:
+                    allowed_books_ids.update(bq.get_books_queryset(requesting_institution=institution).values_list('id', flat=True))
+
+                if ouvrage.id not in allowed_books_ids:
+                    return standard_response(
+                        error=f"L'ouvrage '{ouvrage.title}' n'appartient à aucun bouquet actif souscrit par votre établissement.",
+                        status_code=status.HTTP_403_FORBIDDEN
+                    )
+
         with transaction.atomic():
             # 1. Résolution ou création de l'utilisateur partenaire
             external_user_ref = validated_data['external_user_ref']
@@ -960,13 +982,19 @@ class PartnerCatalogListView(APIView):
         from apps.student.serializers import OuvrageBasicSerializer
 
         partner = getattr(request, 'partner', None)
-        restricted_bouquet = getattr(partner, 'restricted_bouquet', None) if partner else None
         partner_id = str(partner.id) if partner else "anon"
-        bouquet_id = str(restricted_bouquet.id) if restricted_bouquet else "all"
 
-        # 1. Clé de cache déterministe contextuelle au partenaire et aux filtres
+        has_bouquet_restrictions = False
+        if partner:
+            has_bouquet_restrictions = partner.restricted_bouquets.exists() or bool(partner.restricted_bouquet_id)
+
+        active_bouquets = partner.get_active_bouquets() if partner else None
+        active_ids = list(active_bouquets.values_list('id', flat=True)) if active_bouquets else []
+        active_ids_str = "-".join(sorted(str(i) for i in active_ids))
+
+        # 1. Clé de cache déterministe contextuelle au partenaire et aux bouquets actifs
         query_items = sorted(request.query_params.items())
-        cache_raw = f"partner_catalog:{partner_id}:{bouquet_id}:{query_items}"
+        cache_raw = f"partner_catalog:{partner_id}:{active_ids_str}:{query_items}"
         cache_key = "partner:cat:" + hashlib.md5(cache_raw.encode("utf-8")).hexdigest()
 
         cached_response = cache.get(cache_key)
@@ -974,9 +1002,20 @@ class PartnerCatalogListView(APIView):
             return Response(cached_response)
 
         # 2. Construction du QuerySet avec préchargement complet anti-N+1
-        if restricted_bouquet:
+        if has_bouquet_restrictions:
+            if not active_bouquets or not active_bouquets.exists():
+                return Response({
+                    "success": False,
+                    "error": "L'abonnement bouquet de votre établissement a expiré. Veuillez renouveler votre formule pour accéder au catalogue.",
+                    "data": []
+                }, status=status.HTTP_403_FORBIDDEN)
+
             institution = getattr(partner, 'linked_institution', None)
-            qs = restricted_bouquet.get_books_queryset(requesting_institution=institution).select_related(
+            allowed_book_ids = set()
+            for bq in active_bouquets:
+                allowed_book_ids.update(bq.get_books_queryset(requesting_institution=institution).values_list('id', flat=True))
+
+            qs = Ouvrage.objects.filter(id__in=allowed_book_ids, status='published').select_related(
                 'discipline', 'institution'
             ).prefetch_related('authors', 'language_versions', 'audio_tracks')
         else:
@@ -1078,7 +1117,6 @@ class PartnerCatalogDetailView(APIView):
         from apps.student.serializers import OuvrageBasicSerializer
 
         partner = getattr(request, 'partner', None)
-        restricted_bouquet = getattr(partner, 'restricted_bouquet', None) if partner else None
 
         try:
             ouvrage = Ouvrage.objects.select_related(
@@ -1087,11 +1125,24 @@ class PartnerCatalogDetailView(APIView):
         except (Ouvrage.DoesNotExist, Exception):
             return Response({"success": False, "error": "Ouvrage introuvable."}, status=404)
 
-        if restricted_bouquet:
+        if partner and (partner.restricted_bouquets.exists() or bool(partner.restricted_bouquet_id)):
+            active_bouquets = partner.get_active_bouquets()
+            if not active_bouquets.exists():
+                return Response({
+                    "success": False,
+                    "error": "L'accès à cet ouvrage est refusé car l'abonnement bouquet de votre établissement a expiré."
+                }, status=status.HTTP_403_FORBIDDEN)
+
             institution = getattr(partner, 'linked_institution', None)
-            allowed_ids = restricted_bouquet.get_books_queryset(requesting_institution=institution).values_list('id', flat=True)
+            allowed_ids = set()
+            for bq in active_bouquets:
+                allowed_ids.update(bq.get_books_queryset(requesting_institution=institution).values_list('id', flat=True))
+
             if ouvrage.id not in allowed_ids:
-                return Response({"success": False, "error": "Cet ouvrage n'appartient pas au bouquet autorisé pour cette clé."}, status=403)
+                return Response({
+                    "success": False,
+                    "error": "Cet ouvrage n'appartient à aucun bouquet actif souscrit par votre établissement."
+                }, status=status.HTTP_403_FORBIDDEN)
 
         serializer = OuvrageBasicSerializer(
             ouvrage,

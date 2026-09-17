@@ -80,6 +80,12 @@ export interface ClientBookAccess {
     paper_stock: number;
     translation_status: string;
   }>;
+
+  // Bouquets documentaires
+  is_bouquet_book?: boolean;
+  bouquet_name?: string | null;
+  bouquet_id?: string | null;
+  bouquet_end_date?: string | null;
 }
 
 // Alias

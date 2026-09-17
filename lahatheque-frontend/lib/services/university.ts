@@ -91,10 +91,32 @@ export async function getUniversityBouquets(): Promise<UniversityBouquet[]> {
   return bffGet<UniversityBouquet[]>("/bouquets/");
 }
 
-export async function subscribeUniversityBouquet(bouquetId: string): Promise<boolean> {
-  await bffPost(`/bouquets/${bouquetId}/subscribe/`, {});
-  return true;
+export async function subscribeUniversityBouquet(
+  bouquetId: string,
+  period: "monthly" | "annual" = "annual"
+): Promise<{ success: boolean; checkout_url?: string; subscription_id?: string; error?: string }> {
+  try {
+    const res = await fetch(`/api/bff/university/bouquets/${bouquetId}/subscribe/`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ period }),
+    });
+    const json = await res.json();
+    if (res.ok && json.success) {
+      return {
+        success: true,
+        checkout_url: json.data?.checkout_url,
+        subscription_id: json.data?.bouquet_id,
+      };
+    }
+    return { success: false, error: json.error || "Erreur lors de la souscription." };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erreur réseau" };
+  }
 }
+
+export const subscribeToBouquet = subscribeUniversityBouquet;
 
 export interface BouquetRelevanceReport {
   bouquet_id: string;
@@ -117,6 +139,42 @@ export async function getBouquetRelevanceReport(bouquetId: string): Promise<Bouq
     }
   } catch (err) {
     console.error("Erreur récupération rapport de pertinence bouquet:", err);
+  }
+  return null;
+}
+
+export interface BouquetPostPaymentCredentials {
+  subscription_id: string;
+  institution_name: string;
+  institution_code: string;
+  offering_title: string;
+  subscription_period: "monthly" | "annual";
+  price_paid: number;
+  currency: string;
+  start_date: string | null;
+  end_date: string | null;
+  status: string;
+  client_id: string | null;
+  client_secret: string | null;
+  client_secret_last4: string | null;
+  is_new: boolean;
+  env_content: string;
+  suggested_filename: string;
+  guide_pdf_url: string;
+}
+
+export async function getBouquetCredentials(subscriptionId: string): Promise<BouquetPostPaymentCredentials | null> {
+  try {
+    const res = await fetch(`/api/bff/university/subscriptions/${subscriptionId}/credentials/`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.success ? json.data : null;
+    }
+  } catch (err) {
+    console.error("Erreur récupération identifiants bouquet:", err);
   }
   return null;
 }

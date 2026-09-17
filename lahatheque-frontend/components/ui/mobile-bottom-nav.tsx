@@ -89,24 +89,29 @@ export function MobileBottomNav() {
           ]
         };
       case "university": {
-        const instType =
-          (user as any)?.institution_detail?.institution_type ||
-          (user as any)?.university_profile?.institution_type ||
+        const instDetail =
+          (user as any)?.institution_detail ||
+          (user as any)?.university_profile ||
+          (user as any)?.institution ||
           null;
-        const isPartner = instType === "partner";
-        const isClient = instType === "client";
+        const instCode = (instDetail?.code || (user as any)?.institution_code || "").toUpperCase();
+        const isHistoricalPartner = ["UAC", "UP", "UNSTIM", "UNA"].includes(instCode);
+        const resolvedType =
+          instDetail?.institution_type ||
+          (user as any)?.institution_type ||
+          (isHistoricalPartner ? "partner" : null);
+        const isPartner = resolvedType === "partner" || isHistoricalPartner;
+        const isClient = resolvedType === "client";
 
-        // Pour les partenaires : Redevances en CTA ou à droite, pas de Bouquets
+        // Pour les partenaires : Redevances en CTA ou à droite, pas de Bouquets ni de Commandes
         // Pour les clientes : Bouquets en CTA, Commandes à droite, zéro Redevance
         if (isPartner) {
           return {
             leftItems: [
               { label: "Aperçu", href: "/university", icon: <LayoutDashboard className="w-5 h-5" /> },
-              { label: "Catalogue", href: "/university/catalog", icon: <BookOpen className="w-5 h-5" /> },
             ],
             centerCta: { label: "Redevances", href: "/university/royalties", icon: <DollarSign className="w-6 h-6" /> },
             rightItems: [
-              { label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="w-5 h-5" /> },
               { label: "Profil", href: "/university/profile", icon: <UserIcon className="w-5 h-5" /> },
             ],
           };
@@ -115,11 +120,10 @@ export function MobileBottomNav() {
         return {
           leftItems: [
             { label: "Aperçu", href: "/university", icon: <LayoutDashboard className="w-5 h-5" /> },
-            { label: "Catalogue", href: "/university/catalog", icon: <BookOpen className="w-5 h-5" /> },
+            { label: "Bouquets", href: "/university/bouquets", icon: <Sparkles className="w-5 h-5" /> },
           ],
-          centerCta: { label: "Bouquets", href: "/university/bouquets", icon: <Sparkles className="w-6 h-6" /> },
+          centerCta: { label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="w-6 h-6" /> },
           rightItems: [
-            ...(!isClient ? [{ label: "Redevances", href: "/university/royalties", icon: <DollarSign className="w-5 h-5" /> }] : [{ label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="w-5 h-5" /> }]),
             { label: "Profil", href: "/university/profile", icon: <UserIcon className="w-5 h-5" /> },
           ],
         };
@@ -296,18 +300,24 @@ export function MobileBottomNav() {
           { label: "Mon Profil", href: "/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
       case "university": {
-        const instType =
-          (user as any)?.institution_detail?.institution_type ||
-          (user as any)?.university_profile?.institution_type ||
+        const instDetail =
+          (user as any)?.institution_detail ||
+          (user as any)?.university_profile ||
+          (user as any)?.institution ||
           null;
-        const isPartner = instType === "partner";
-        const isClient = instType === "client";
+        const instCode = (instDetail?.code || (user as any)?.institution_code || "").toUpperCase();
+        const isHistoricalPartner = ["UAC", "UP", "UNSTIM", "UNA"].includes(instCode);
+        const resolvedType =
+          instDetail?.institution_type ||
+          (user as any)?.institution_type ||
+          (isHistoricalPartner ? "partner" : null);
+        const isPartner = resolvedType === "partner" || isHistoricalPartner;
+        const isClient = resolvedType === "client";
 
         return [
           { label: "Espace Université", href: "/university", icon: <LayoutDashboard className="w-4 h-4" /> },
           ...(!isPartner ? [{ label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="w-4 h-4" /> }] : []),
-          { label: "Catalogue Universitaire", href: "/university/catalog", icon: <BookOpen className="w-4 h-4" /> },
-          { label: "Achats Livres Papier", href: "/university/purchases", icon: <ShoppingBag className="w-4 h-4" /> },
+          ...(!isPartner ? [{ label: "Achats Livres Papier", href: "/university/purchases", icon: <ShoppingBag className="w-4 h-4" /> }] : []),
           ...(!isClient ? [{ label: "Redevances", href: "/university/royalties", icon: <DollarSign className="w-4 h-4" /> }] : []),
           { label: "Profil Établissement", href: "/university/profile", icon: <UserIcon className="w-4 h-4" /> },
         ];
@@ -350,11 +360,18 @@ export function MobileBottomNav() {
       case "legal_reviewer":
         return "RELECTEUR JURIDIQUE";
       case "university": {
-        const instType =
-          (user as any)?.institution_detail?.institution_type ||
-          (user as any)?.university_profile?.institution_type ||
+        const instDetail =
+          (user as any)?.institution_detail ||
+          (user as any)?.university_profile ||
+          (user as any)?.institution ||
           null;
-        return instType === "client" ? "UNIVERSITÉ CLIENTE" : "UNIVERSITÉ PARTENAIRE";
+        const instCode = (instDetail?.code || (user as any)?.institution_code || "").toUpperCase();
+        const isHistoricalPartner = ["UAC", "UP", "UNSTIM", "UNA"].includes(instCode);
+        const resolvedType =
+          instDetail?.institution_type ||
+          (user as any)?.institution_type ||
+          (isHistoricalPartner ? "partner" : null);
+        return resolvedType === "client" ? "UNIVERSITÉ CLIENTE" : "UNIVERSITÉ PARTENAIRE";
       }
       case "manager":
         return "GESTIONNAIRE LOGISTIQUE";

@@ -31,11 +31,20 @@ export default function AdminUsersGlobalPage() {
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<AdminUser | null>(null);
   const [emailUser, setEmailUser] = useState<AdminUser | null>(null);
 
+  const normalizeRole = (role?: string): AdminRole => {
+    if (!role) return "student";
+    const r = role.toLowerCase().trim();
+    if (r === "reader" || r === "client") return "student";
+    if (r === "super_admin") return "admin";
+    if (r === "commercial_wholesaler" || r === "super_client") return "wholesaler";
+    return r as AdminRole;
+  };
+
   const loadUsers = async () => {
     try {
       setLoading(true);
       const data = await getAdminUsers();
-      setUsers(data);
+      setUsers(data.map((u) => ({ ...u, role: normalizeRole(u.role) })));
     } catch (err) {
       toast.error("Erreur lors de la récupération des utilisateurs.");
     } finally {
@@ -82,19 +91,16 @@ export default function AdminUsersGlobalPage() {
   };
 
   const roleFilterOptions = [
-    { value: "all", label: "Tous les Rôles" },
-    { value: "student", label: "Clients / Lecteurs" },
-    { value: "teacher", label: "Enseignants" },
-    { value: "author", label: "Auteurs" },
-    { value: "publisher", label: "Éditeurs Tiers" },
-    { value: "university", label: "Universités Partenaires" },
-    { value: "layout_artist", label: "Maquettistes" },
+    { value: "student", label: "Espace Client" },
+    { value: "wholesaler", label: "Grossiste" },
+    { value: "university", label: "Université" },
+    { value: "author", label: "Auteur" },
+    { value: "publisher", label: "Éditeur Tiers" },
+    { value: "legal_reviewer", label: "Juriste / Relecteur" },
+    { value: "layout_artist", label: "Maquettiste" },
     { value: "chief_layout", label: "Chef Maquettiste" },
-    { value: "manager", label: "Gestionnaires Stock & Livraison" },
-    { value: "legal_reviewer", label: "Juristes / Relecteurs" },
-    { value: "wholesaler", label: "Grossistes Commerciaux" },
-    { value: "partner_api", label: "Partenaires API" },
-    { value: "admin", label: "Administrateurs" },
+    { value: "manager", label: "Gestionnaire Stock & Livraison" },
+    { value: "admin", label: "Administrateur" },
   ];
 
   const columns: DataTableColumn<AdminUser>[] = [
@@ -244,7 +250,7 @@ export default function AdminUsersGlobalPage() {
         loading={loading}
         filterKey="role"
         filterOptions={roleFilterOptions}
-        filterPlaceholder="Filtrer par rôle..."
+        filterPlaceholder="Tous les Rôles"
         searchPlaceholder="Rechercher par nom, e-mail ou téléphone..."
         pageSize={20}
         pageSizeOptions={[10, 20, 50, 100]}

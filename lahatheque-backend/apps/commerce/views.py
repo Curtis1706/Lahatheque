@@ -758,38 +758,75 @@ class ClientBouquetListView(APIView):
     def get(self, request):
         from apps.partners.models import BouquetOffering
         from .models import ClientBouquetSubscription
+        from django.utils import timezone
 
-        subscribed_ids = set(
-            ClientBouquetSubscription.objects.filter(
-                user=request.user, status="active"
-            ).values_list("offering_id", flat=True)
-        )
+        today = timezone.now().date()
+        active_subs = {
+            str(sub.offering_id): sub
+            for sub in ClientBouquetSubscription.objects.filter(
+                user=request.user, status="active", end_date__gte=today
+            )
+            if sub.offering_id
+        }
+
+        def serialize_bouquet_books(qs):
+            books_data = []
+            for bk in qs.select_related('discipline').prefetch_related('authors')[:60]:
+                cover_url = None
+                if bk.cover_image:
+                    try:
+                        cover_url = bk.cover_image.url
+                    except Exception:
+                        cover_url = None
+                authors_list = [a.name for a in bk.authors.all()]
+                author_display = ", ".join(authors_list) if authors_list else "Auteur académique"
+                books_data.append({
+                    "id": str(bk.id),
+                    "title": bk.title,
+                    "subtitle": bk.subtitle or "",
+                    "authors": authors_list,
+                    "author": author_display,
+                    "discipline": bk.discipline.name if bk.discipline else "",
+                    "cover_url": cover_url,
+                    "page_count": bk.page_count,
+                    "format_type": "digital",
+                    "isbn": bk.isbn or "",
+                    "summary": bk.summary or "",
+                    "has_sample": True,
+                })
+            return books_data
 
         data = []
         for o in BouquetOffering.objects.filter(is_active=True):
+            o_id_str = str(o.id)
+            sub = active_subs.get(o_id_str)
+            b_qs = o.get_books_queryset()
             data.append({
-                "id": str(o.id),
+                "id": o_id_str,
                 "title": o.title,
                 "bouquet_type": o.bouquet_type,
                 "discipline": o.discipline,
-                "books_count": o.get_books_queryset().count(),
-                "annual_price": float(o.annual_price),
+                "books_count": b_qs.count(),
+                "annual_price": float(o.get_real_annual_price()),
+                "monthly_price": float(o.get_real_monthly_price()),
                 "currency": o.currency,
                 "description": o.description,
-                "is_subscribed": str(o.id) in {str(x) for x in subscribed_ids},
+                "is_subscribed": bool(sub),
+                "end_date": sub.end_date.strftime("%d/%m/%Y") if (sub and sub.end_date) else None,
+                "subscription_period": getattr(sub, 'subscription_period', None) if sub else None,
+                "books": serialize_bouquet_books(b_qs),
             })
         return Response({"success": True, "data": data})
 
 
 class ClientBouquetSubscribeView(APIView):
-    """POST /api/v1/commerce/bouquets/<offering_id>/subscribe/ - Souscription directe."""
+    """POST /api/v1/commerce/bouquets/<offering_id>/subscribe/ - Souscription directe B2C."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, offering_id):
         from apps.partners.models import BouquetOffering
         from .models import ClientBouquetSubscription, Currency, PaymentTransaction
         from .payment_providers import get_payment_provider
-        from datetime import timedelta
         from django.utils import timezone
 
         try:
@@ -797,29 +834,38 @@ class ClientBouquetSubscribeView(APIView):
         except BouquetOffering.DoesNotExist:
             return Response({"success": False, "error": "Bouquet introuvable ou indisponible."}, status=404)
 
-        if ClientBouquetSubscription.objects.filter(
-            user=request.user, offering_id=offering.id, status="active"
-        ).exists():
-            return Response({"success": False, "error": "Vous êtes déjà abonné à ce bouquet."}, status=400)
+        period = request.data.get("period", "annual")
+        if period not in ["monthly", "annual"]:
+            period = "annual"
 
+        amount = offering.get_real_monthly_price() if period == "monthly" else offering.get_real_annual_price()
+
+        # Prolongation cumulative si renouvellement anticipé
+        existing_sub = ClientBouquetSubscription.objects.filter(
+            user=request.user, offering_id=offering.id, status="active"
+        ).order_by('-end_date').first()
+        existing_end_date = existing_sub.end_date if existing_sub else None
         start = timezone.now().date()
+        end = ClientBouquetSubscription.compute_end_date(existing_end_date, period)
+
         sub = ClientBouquetSubscription.objects.create(
             user=request.user,
             offering_id=offering.id,
             title=offering.title,
-            price_paid=offering.annual_price,
+            subscription_period=period,
+            price_paid=amount,
             currency=offering.currency,
             start_date=start,
-            end_date=start + timedelta(days=365),
-            status="pending",  # <-- PAS 'active'
+            end_date=end,
+            status="pending",
         )
 
         mode_paiement = request.data.get("mode_paiement", "mobile_money")
         if mode_paiement != "mobile_money":
             return Response({
                 "success": True,
-                "data": {"id": str(sub.id), "status": "pending", "end_date": str(sub.end_date)},
-                "message": f"Souscription enregistrée. Paiement par {mode_paiement} en attente de confirmation.",
+                "data": {"id": str(sub.id), "status": "pending", "period": period, "end_date": str(sub.end_date)},
+                "message": f"Souscription ({'Mensuelle' if period == 'monthly' else 'Annuelle'}) enregistrée. Paiement par {mode_paiement} en attente de confirmation.",
             }, status=201)
 
         currency, _ = Currency.objects.get_or_create(
@@ -828,18 +874,19 @@ class ClientBouquetSubscribeView(APIView):
         )
         provider = get_payment_provider("moneroo")
         frontend_base = get_frontend_base_url(request)
-        return_url = request.data.get("return_url") or f"{frontend_base}/student/books"
+        return_url = request.data.get("return_url") or f"{frontend_base}/student/books?tab=bouquets"
 
         try:
             payment_res = provider.initiate_payment(
-                amount=offering.annual_price,
+                amount=amount,
                 currency=currency.code,
-                description=f"Bouquet « {offering.title} »",
+                description=f"Bouquet « {offering.title} » ({'Mensuel 30j' if period == 'monthly' else 'Annuel 365j'})",
                 customer_email=request.user.email,
                 customer_name=request.user.get_full_name() or request.user.email,
                 return_url=return_url,
                 metadata={
                     "client_bouquet_subscription_id": str(sub.id),
+                    "subscription_period": period,
                     "type": "bouquet_client",
                 },
             ) or {}
@@ -853,7 +900,7 @@ class ClientBouquetSubscribeView(APIView):
 
         tx = PaymentTransaction.objects.create(
             user=request.user,
-            amount=offering.annual_price,
+            amount=amount,
             currency=currency,
             status=payment_res.get("status", "pending"),
             moneroo_id=payment_res.get("moneroo_id") or payment_res.get("payment_id"),
@@ -872,6 +919,7 @@ class ClientBouquetSubscribeView(APIView):
             "data": {
                 "id": str(sub.id),
                 "status": sub.status,
+                "period": period,
                 "checkout_url": payment_res.get("checkout_url"),
                 "end_date": str(sub.end_date),
             },

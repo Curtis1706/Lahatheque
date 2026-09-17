@@ -143,30 +143,36 @@ export function DashboardSidebar() {
         ];
 
       case "university": {
-        // Résolution du type d'institution depuis le cookie UI (propagé par le BFF sans appel réseau)
-        const institutionType =
-          (user as any)?.institution_detail?.institution_type ||
-          (user as any)?.university_profile?.institution_type ||
-          null; // null = indéterminé (affichage conservateur : tout visible)
-        const isPartner = institutionType === 'partner';
-        const isClient = institutionType === 'client';
+        // Résolution du type d'institution depuis le cookie UI ou les codes partenaires historiques (UAC, UP, UNSTIM, UNA)
+        const instDetail =
+          (user as any)?.institution_detail ||
+          (user as any)?.university_profile ||
+          (user as any)?.institution ||
+          null;
+        const instCode = (instDetail?.code || (user as any)?.institution_code || "").toUpperCase();
+        const isHistoricalPartner = ["UAC", "UP", "UNSTIM", "UNA"].includes(instCode);
+        const resolvedType =
+          instDetail?.institution_type ||
+          (user as any)?.institution_type ||
+          (isHistoricalPartner ? "partner" : null);
+
+        const isPartner = resolvedType === "partner" || isHistoricalPartner;
+        const isClient = resolvedType === "client";
 
         const universityItems: NavLinkItem[] = [
           { label: "Vue d'ensemble", href: "/university", icon: <LayoutDashboard className="size-4" /> },
-          // T014 : Bouquets masqués pour les partenaires (ils ne souscrivent pas)
+          // Bouquets masqués pour les partenaires (ils ne souscrivent pas d'abonnements)
           ...(!isPartner ? [{ label: "Bouquets Documentaires", href: "/university/bouquets", icon: <Sparkles className="size-4" /> }] : []),
-          { label: "Catalogue Universitaire", href: "/university/catalog", icon: <BookOpen className="size-4" /> },
-          // { label: "Statistiques & Usage", href: "/university/stats", icon: <FileBarChart className="size-4" /> },
-          // { label: "Affiliations Étudiants", href: "/university/affiliations", icon: <GraduationCap className="size-4" /> },
-          { label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="size-4" /> },
-          // T010 : Redevances masquées pour les universités clientes
+          // Commandes masquées pour les partenaires (réservé aux universités clientes acheteuses de stock papier)
+          ...(!isPartner ? [{ label: "Commandes", href: "/university/purchases", icon: <PackageCheck className="size-4" /> }] : []),
+          // Redevances masquées pour les universités clientes
           ...(!isClient ? [{ label: "Redevances", href: "/university/royalties", icon: <DollarSign className="size-4" /> }] : []),
           { label: "Profil & Paramètres", href: "/university/profile", icon: <Building2 className="size-4" /> },
         ];
 
         return [
           {
-            groupLabel: "Espace Université",
+            groupLabel: isPartner ? "Université Partenaire" : "Université Cliente",
             items: universityItems,
           },
         ];

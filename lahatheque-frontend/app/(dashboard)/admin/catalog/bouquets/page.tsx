@@ -21,6 +21,8 @@ import {
   Check,
   PieChart,
   RotateCcw,
+  Users,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
@@ -30,6 +32,7 @@ import {
   createBouquetOffering,
   updateBouquetOffering,
   deleteBouquetOffering,
+  getInstitutionBooksPreview,
   BouquetOfferingAdmin,
 } from "@/lib/services/admin";
 import { searchBooks } from "@/lib/services/catalog";
@@ -37,11 +40,13 @@ import { Book } from "@/lib/types/catalog";
 import { BouquetDistributionModal } from "@/components/features/bouquets/bouquet-distribution-modal";
 import { BookMultiCombobox } from "@/components/features/bouquets/book-multi-combobox";
 import { getDisciplines, DisciplineItem } from "@/lib/services/classification";
+import { BouquetBooksPreviewModal } from "@/components/features/bouquets/bouquet-books-preview-modal";
+import { BouquetSubscriptionsDrawer } from "@/components/features/bouquets/bouquet-subscriptions-drawer";
 
+// Type 'faculty' définitivement supprimé selon CDC & spécifications 010
 const BOUQUET_TYPES = [
   { value: "discipline", label: "Par Discipline", desc: "Tous les ouvrages rattachés à une discipline académique" },
-  { value: "faculty", label: "Par Faculté", desc: "Ouvrages d'une faculté ou département universitaire" },
-  { value: "university", label: "Intégral Université", desc: "Tous les ouvrages affiliés à un établissement partenaire" },
+  { value: "university", label: "Intégral Université", desc: "Tous les ouvrages affiliés à une université partenaire (obligatoire)" },
   { value: "country", label: "Par Pays", desc: "Ouvrages édités ou rattachés à un pays spécifique" },
   { value: "custom", label: "Personnalisé (Sur-mesure)", desc: "Sélection manuelle d'ouvrages par l'administrateur" },
 ] as const;
@@ -67,25 +72,30 @@ export default function AdminBouquetsPage() {
   const [subFilter, setSubFilter] = useState<string>("all");
   const [dbDisciplines, setDbDisciplines] = useState<DisciplineItem[]>([]);
 
-  // Modal State
+  // Modal & Drawers State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOffering, setEditingOffering] = useState<BouquetOfferingAdmin | null>(null);
   const [selectedDistributionBouquet, setSelectedDistributionBouquet] = useState<BouquetOfferingAdmin | null>(null);
+  const [selectedSubscribersBouquet, setSelectedSubscribersBouquet] = useState<BouquetOfferingAdmin | null>(null);
+  const [previewInstitutionId, setPreviewInstitutionId] = useState<string | null>(null);
+  const [previewInstitutionName, setPreviewInstitutionName] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
   // Form State
   const [title, setTitle] = useState("");
-  const [bouquetType, setBouquetType] = useState<"discipline" | "faculty" | "university" | "country" | "custom">("discipline");
+  const [bouquetType, setBouquetType] = useState<"discipline" | "university" | "country" | "custom">("discipline");
   const [discipline, setDiscipline] = useState("");
-  const [facultyCode, setFacultyCode] = useState("");
   const [targetInstitution, setTargetInstitution] = useState<string>("");
+  const [institutionLiveCount, setInstitutionLiveCount] = useState<number | null>(null);
+  const [institutionLoadingCount, setInstitutionLoadingCount] = useState(false);
   const [country, setCountry] = useState("BJ");
+  const [monthlyPrice, setMonthlyPrice] = useState("50000");
   const [annualPrice, setAnnualPrice] = useState("500000");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [selectedBookIds, setSelectedBookIds] = useState<string[]>([]);
 
-  // Auxiliary data for custom & institution selectors
+  // Auxiliary data
   const [catalogBooks, setCatalogBooks] = useState<Book[]>([]);
   const [institutions, setInstitutions] = useState<{ id: string; name: string }[]>([]);
 
@@ -104,11 +114,8 @@ export default function AdminBouquetsPage() {
 
   useEffect(() => {
     loadData();
-    // Load catalog books for custom bouquets
     searchBooks({}).then((books) => setCatalogBooks(books)).catch(() => {});
-    // Load real disciplines from database
     getDisciplines().then((d) => setDbDisciplines(d)).catch(() => {});
-    // Load institutions
     fetch("/api/bff/partners/institutions/", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
@@ -117,6 +124,25 @@ export default function AdminBouquetsPage() {
       })
       .catch(() => {});
   }, []);
+
+  // Décompte dynamique en temps réel pour l'université sélectionnée
+  useEffect(() => {
+    if (bouquetType === "university" && targetInstitution) {
+      setInstitutionLoadingCount(true);
+      getInstitutionBooksPreview(targetInstitution)
+        .then((res) => {
+          setInstitutionLiveCount(res ? res.books_count : 0);
+        })
+        .catch(() => {
+          setInstitutionLiveCount(0);
+        })
+        .finally(() => {
+          setInstitutionLoadingCount(false);
+        });
+    } else {
+      setInstitutionLiveCount(null);
+    }
+  }, [bouquetType, targetInstitution]);
 
   const handleTypeFilterChange = (newType: string) => {
     setTypeFilter(newType);
@@ -128,9 +154,9 @@ export default function AdminBouquetsPage() {
     setTitle("");
     setBouquetType("discipline");
     setDiscipline("");
-    setFacultyCode("");
     setTargetInstitution("");
     setCountry("BJ");
+    setMonthlyPrice("50000");
     setAnnualPrice("500000");
     setDescription("");
     setIsActive(true);
@@ -141,12 +167,13 @@ export default function AdminBouquetsPage() {
   const openEditModal = (offering: BouquetOfferingAdmin) => {
     setEditingOffering(offering);
     setTitle(offering.title);
-    setBouquetType(offering.bouquet_type);
+    const bType = offering.bouquet_type === "faculty" ? "discipline" : offering.bouquet_type;
+    setBouquetType(bType as any);
     setDiscipline(offering.discipline || "");
-    setFacultyCode(offering.faculty_code || "");
     setTargetInstitution(offering.target_institution || "");
     setCountry(offering.country || "BJ");
-    setAnnualPrice(String(offering.annual_price));
+    setMonthlyPrice(String(offering.monthly_price || 50000));
+    setAnnualPrice(String(offering.annual_price || 500000));
     setDescription(offering.description || "");
     setIsActive(offering.is_active);
     setSelectedBookIds(offering.custom_book_ids || []);
@@ -156,7 +183,12 @@ export default function AdminBouquetsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      toast.error("Le titre du bouquet est obligatoire");
+      toast.error("Le titre du bouquet est obligatoire.");
+      return;
+    }
+
+    if (bouquetType === "university" && !targetInstitution) {
+      toast.error("La sélection d'une université partenaire est obligatoire pour le type Intégral Université.");
       return;
     }
 
@@ -164,9 +196,9 @@ export default function AdminBouquetsPage() {
       title: title.trim(),
       bouquet_type: bouquetType,
       discipline: bouquetType === "discipline" ? discipline.trim() : "",
-      faculty_code: bouquetType === "faculty" ? facultyCode.trim() : "",
-      target_institution: (bouquetType === "faculty" || bouquetType === "university") && targetInstitution ? targetInstitution : null,
+      target_institution: bouquetType === "university" ? targetInstitution : null,
       country: bouquetType === "country" ? country : "",
+      monthly_price: Number(monthlyPrice) || 0,
       annual_price: Number(annualPrice) || 0,
       description: description.trim(),
       is_active: isActive,
@@ -182,7 +214,7 @@ export default function AdminBouquetsPage() {
           setIsModalOpen(false);
           loadData();
         } else {
-          toast.error("Erreur lors de la mise à jour du bouquet");
+          toast.error("Erreur lors de la mise à jour du bouquet.");
         }
       } else {
         const ok = await createBouquetOffering(payload);
@@ -191,12 +223,12 @@ export default function AdminBouquetsPage() {
           setIsModalOpen(false);
           loadData();
         } else {
-          toast.error("Erreur lors de la création du bouquet");
+          toast.error("Erreur lors de la création du bouquet.");
         }
       }
     } catch (err) {
       console.error(err);
-      toast.error("Une erreur inattendue est survenue");
+      toast.error("Une erreur inattendue est survenue.");
     } finally {
       setSubmitting(false);
     }
@@ -218,7 +250,7 @@ export default function AdminBouquetsPage() {
     }
   };
 
-  // Liste consolidée des disciplines réelles de la base de données & des bouquets
+  // Liste consolidée des disciplines réelles
   const availableDisciplines = useMemo(() => {
     const map = new Map<string, string>();
     dbDisciplines.forEach((d) => {
@@ -237,18 +269,6 @@ export default function AdminBouquetsPage() {
     return Array.from(map.values()).sort((a, b) => a.localeCompare(b, "fr"));
   }, [dbDisciplines, offerings]);
 
-  // Liste consolidée des facultés
-  const availableFaculties = useMemo(() => {
-    const set = new Set<string>();
-    ["FADESP", "FASEG", "FAST", "FSS", "EPAC", "FLASH", "ENEAM", "ENSET", "INMES"].forEach((f) => set.add(f));
-    offerings.forEach((o) => {
-      if (o.bouquet_type === "faculty" && o.faculty_code && o.faculty_code.trim()) {
-        set.add(o.faculty_code.trim());
-      }
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "fr"));
-  }, [offerings]);
-
   const filteredOfferings = useMemo(() => {
     return offerings.filter((o) => {
       if (typeFilter !== "all" && o.bouquet_type !== typeFilter) return false;
@@ -258,12 +278,6 @@ export default function AdminBouquetsPage() {
           const oDisc = (o.discipline || "").toLowerCase().trim();
           const targetDisc = subFilter.toLowerCase().trim();
           if (!oDisc.includes(targetDisc) && !targetDisc.includes(oDisc)) {
-            return false;
-          }
-        } else if (typeFilter === "faculty") {
-          const oFac = (o.faculty_code || "").toLowerCase().trim();
-          const targetFac = subFilter.toLowerCase().trim();
-          if (!oFac.includes(targetFac) && !targetFac.includes(oFac)) {
             return false;
           }
         } else if (typeFilter === "university") {
@@ -282,8 +296,7 @@ export default function AdminBouquetsPage() {
         const matchTitle = o.title.toLowerCase().includes(q);
         const matchDesc = (o.description || "").toLowerCase().includes(q);
         const matchDisc = (o.discipline || "").toLowerCase().includes(q);
-        const matchFaculty = (o.faculty_code || "").toLowerCase().includes(q);
-        if (!matchTitle && !matchDesc && !matchDisc && !matchFaculty) return false;
+        if (!matchTitle && !matchDesc && !matchDisc) return false;
       }
       return true;
     });
@@ -291,28 +304,32 @@ export default function AdminBouquetsPage() {
 
   const typeLabels: Record<string, string> = {
     discipline: "Discipline",
-    faculty: "Faculté",
     university: "Intégral Université",
     country: "Pays",
     custom: "Sur-mesure",
+    general: "Général",
+    faculty: "Université",
   };
 
   const columns: DataTableColumn<BouquetOfferingAdmin>[] = [
     {
       key: "title",
-      header: "Bouquet & Cible",
+      header: "Bouquet & Périmètre",
       cell: (row) => (
-        <div className="space-y-1 py-1">
-          <p className="font-serif font-bold text-xs text-navy leading-snug">{row.title}</p>
-          <div className="flex items-center gap-2 flex-wrap text-[11px] text-foreground-muted">
-            <span className="px-2 py-0.5 rounded-md bg-navy-light text-navy text-[10px] font-bold border border-navy-hover/20">
+        <div className="space-y-1 py-1 font-poppins">
+          <p className="font-playfair font-bold text-xs sm:text-sm text-navy leading-snug">{row.title}</p>
+          <div className="flex items-center gap-2 flex-wrap text-[11px] text-foreground/70">
+            <span className="px-2 py-0.5 rounded-md bg-navy/10 text-navy text-[10px] font-bold border border-navy/20">
               {typeLabels[row.bouquet_type] || row.bouquet_type}
             </span>
             {row.bouquet_type === "discipline" && row.discipline && (
               <span className="font-medium text-navy">Discipline : {row.discipline}</span>
             )}
-            {row.bouquet_type === "faculty" && row.faculty_code && (
-              <span className="font-medium text-navy">Faculté : {row.faculty_code}</span>
+            {row.bouquet_type === "university" && (
+              <span className="font-medium text-navy flex items-center gap-1">
+                <Building2 className="w-3 h-3 text-gold" />
+                {row.target_institution_name || institutions.find((i) => i.id === row.target_institution)?.name || "Établissement lié"}
+              </span>
             )}
             {row.bouquet_type === "country" && row.country && (
               <span className="font-medium text-navy">Pays : {row.country}</span>
@@ -322,21 +339,44 @@ export default function AdminBouquetsPage() {
             )}
           </div>
           {row.description && (
-            <p className="text-[10px] text-foreground-muted line-clamp-1 max-w-[340px]">{row.description}</p>
+            <p className="text-[10px] text-foreground/60 line-clamp-1 max-w-[340px]">{row.description}</p>
           )}
         </div>
       ),
     },
     {
       key: "books_count",
-      header: "Contenu Réel (Calculé)",
+      header: "Contenu Réel",
       cell: (row) => (
-        <div className="text-xs space-y-0.5">
+        <div className="text-xs space-y-1 font-poppins">
           <span className="inline-flex items-center gap-1 font-mono font-bold text-navy bg-background-secondary px-2.5 py-1 rounded-lg border border-border">
             <BookOpen className="w-3.5 h-3.5 text-gold" />
             {row.books_count.toLocaleString("fr-FR")} livre(s)
           </span>
-          <p className="text-[9px] text-foreground-muted">Calcul temps réel</p>
+          {row.bouquet_type === "university" && row.target_institution && (
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewInstitutionId(row.target_institution);
+                setPreviewInstitutionName(row.target_institution_name || institutions.find((i) => i.id === row.target_institution)?.name || "");
+              }}
+              className="block text-[10px] text-gold hover:underline font-medium"
+            >
+              Voir la liste &amp; couvertures
+            </button>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "monthly_price",
+      header: "Tarif Mensuel",
+      cell: (row) => (
+        <div className="text-xs font-poppins">
+          <p className="font-mono font-bold text-navy">
+            {(row.monthly_price || 50000).toLocaleString("fr-FR")} {row.currency || "XOF"}
+          </p>
+          <p className="text-[10px] text-foreground/60">Formule 30 jours</p>
         </div>
       ),
     },
@@ -344,11 +384,11 @@ export default function AdminBouquetsPage() {
       key: "annual_price",
       header: "Tarif Annuel",
       cell: (row) => (
-        <div className="text-xs">
+        <div className="text-xs font-poppins">
           <p className="font-mono font-bold text-navy">
-            {row.annual_price.toLocaleString("fr-FR")} {row.currency}
+            {(row.annual_price || 500000).toLocaleString("fr-FR")} {row.currency || "XOF"}
           </p>
-          <p className="text-[10px] text-foreground-muted">Par an / établissement</p>
+          <p className="text-[10px] text-foreground/60">Formule 365 jours</p>
         </div>
       ),
     },
@@ -364,21 +404,37 @@ export default function AdminBouquetsPage() {
     },
     {
       key: "actions" as keyof BouquetOfferingAdmin,
-      header: "",
+      header: "Actions",
       cell: (row) => (
-        <div className="flex items-center gap-2 justify-end">
+        <div className="flex items-center gap-2 justify-end font-poppins">
+          {/* Bouton Consulter les Abonnés (T011) */}
           <button
+            type="button"
+            onClick={() => setSelectedSubscribersBouquet(row)}
+            className="px-2.5 py-1.5 rounded-xl bg-navy/10 text-navy text-xs font-semibold hover:bg-navy hover:text-white transition-colors inline-flex items-center gap-1 min-h-[36px]"
+            title="Consulter les abonnés actifs et expirés de ce bouquet"
+          >
+            <Users className="w-3.5 h-3.5 text-gold" />
+            <span className="hidden sm:inline">Abonnés</span>
+          </button>
+
+          {/* Bouton Modifier */}
+          <button
+            type="button"
             onClick={() => openEditModal(row)}
-            className="px-2.5 py-1.5 rounded-xl bg-navy-light text-navy text-xs font-bold hover:bg-navy-hover hover:text-white transition-colors inline-flex items-center gap-1 min-h-[36px]"
+            className="px-2.5 py-1.5 rounded-xl bg-background-secondary border border-border text-navy text-xs font-semibold hover:bg-navy-hover hover:text-white transition-colors inline-flex items-center gap-1 min-h-[36px]"
             title="Modifier le bouquet"
           >
             <Edit2 className="w-3.5 h-3.5" />
-            <span>Modifier</span>
+            <span className="hidden sm:inline">Modifier</span>
           </button>
+
+          {/* Bouton Désactiver */}
           {row.is_active && (
             <button
+              type="button"
               onClick={() => handleDelete(row)}
-              className="p-2 rounded-xl text-error-foreground hover:bg-error/10 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+              className="p-2 rounded-xl text-foreground/50 hover:text-navy hover:bg-background-secondary transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
               title="Désactiver cette offre"
             >
               <Trash2 className="w-4 h-4" />
@@ -390,12 +446,12 @@ export default function AdminBouquetsPage() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto font-poppins">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-foreground-muted">
-        <Link href="/admin" className="hover:text-navy">Administration</Link>
+      <div className="flex items-center gap-2 text-xs text-foreground/60">
+        <Link href="/admin" className="hover:text-navy transition-colors">Administration</Link>
         <span>/</span>
-        <Link href="/admin/catalog" className="hover:text-navy">Catalogue &amp; Tarifs</Link>
+        <Link href="/admin/catalog" className="hover:text-navy transition-colors">Catalogue &amp; Tarifs</Link>
         <span>/</span>
         <span className="text-navy font-semibold">Bouquets Documentaires</span>
       </div>
@@ -404,24 +460,25 @@ export default function AdminBouquetsPage() {
       <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <Link href="/admin/catalog" className="inline-flex items-center gap-1 text-xs text-navy font-bold hover:underline mb-1">
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="w-3.5 h-3.5 text-gold" />
             Catalogue &amp; Tarifs
           </Link>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
             <Layers className="w-4 h-4 text-gold" />
-            Offres Institutionnelles &amp; Campus
+            Offres Documentaires &amp; Campus
           </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+          <h1 className="font-playfair text-2xl sm:text-3xl font-bold text-navy">
             Catalogue des Bouquets Documentaires
           </h1>
-          <p className="text-xs text-foreground-muted mt-1">
-            Créez et configurez les bouquets automatiques (discipline, faculté, pays) ou personnalisés proposés aux universités partenaires.
+          <p className="text-xs text-foreground/70 mt-1">
+            Gérez les bouquets documentaires avec double tarification mensuelle (30j) et annuelle (365j), configuration des universités partenaires et suivi des souscriptions.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={openCreateModal}
-          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
+          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-sm min-h-[44px]"
         >
           <Plus className="w-4 h-4 text-gold" />
           Nouveau Bouquet
@@ -430,44 +487,44 @@ export default function AdminBouquetsPage() {
 
       {/* 4 KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="p-4 rounded-2xl bg-background border border-border shadow-xs space-y-1">
-          <p className="text-[11px] font-bold text-foreground-muted uppercase">Total Offres</p>
-          <p className="font-serif text-2xl font-bold text-navy">{offerings.length}</p>
-          <p className="text-[10px] text-foreground-muted">Bouquets enregistrés</p>
+        <div className="p-4 rounded-2xl bg-background border border-border shadow-sm space-y-1">
+          <p className="text-[11px] font-bold text-foreground/60 uppercase">Total Offres</p>
+          <p className="font-playfair text-2xl font-bold text-navy">{offerings.length}</p>
+          <p className="text-[10px] text-foreground/60">Bouquets enregistrés</p>
         </div>
-        <div className="p-4 rounded-2xl bg-background border border-border shadow-xs space-y-1">
-          <p className="text-[11px] font-bold text-foreground-muted uppercase">Automatiques</p>
-          <p className="font-serif text-2xl font-bold text-navy">
+        <div className="p-4 rounded-2xl bg-background border border-border shadow-sm space-y-1">
+          <p className="text-[11px] font-bold text-foreground/60 uppercase">Automatiques</p>
+          <p className="font-playfair text-2xl font-bold text-navy">
             {offerings.filter((o) => o.bouquet_type !== "custom").length}
           </p>
-          <p className="text-[10px] text-foreground-muted">Calculés en direct</p>
+          <p className="text-[10px] text-foreground/60">Calculés en direct</p>
         </div>
-        <div className="p-4 rounded-2xl bg-background border border-border shadow-xs space-y-1">
-          <p className="text-[11px] font-bold text-foreground-muted uppercase">Personnalisés</p>
-          <p className="font-serif text-2xl font-bold text-navy">
+        <div className="p-4 rounded-2xl bg-background border border-border shadow-sm space-y-1">
+          <p className="text-[11px] font-bold text-foreground/60 uppercase">Personnalisés</p>
+          <p className="font-playfair text-2xl font-bold text-navy">
             {offerings.filter((o) => o.bouquet_type === "custom").length}
           </p>
-          <p className="text-[10px] text-foreground-muted">Sélections manuelles</p>
+          <p className="text-[10px] text-foreground/60">Sélections manuelles</p>
         </div>
-        <div className="p-4 rounded-2xl bg-background border border-border shadow-xs space-y-1">
-          <p className="text-[11px] font-bold text-foreground-muted uppercase">Actifs</p>
-          <p className="font-serif text-2xl font-bold text-navy">
+        <div className="p-4 rounded-2xl bg-background border border-border shadow-sm space-y-1">
+          <p className="text-[11px] font-bold text-foreground/60 uppercase">Actifs</p>
+          <p className="font-playfair text-2xl font-bold text-navy">
             {offerings.filter((o) => o.is_active).length}
           </p>
-          <p className="text-[10px] text-foreground-muted">Visibles aux universités</p>
+          <p className="text-[10px] text-foreground/60">Visibles pour souscription</p>
         </div>
       </div>
 
       {/* Filtres & Recherche */}
-      <div className="p-4 rounded-2xl bg-background border border-border flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xs">
+      <div className="p-4 rounded-2xl bg-background border border-border flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-sm">
         <div className="relative w-full md:w-80 shrink-0">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-foreground/50 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher par titre, discipline ou faculté..."
-            className="w-full pl-9 pr-3.5 py-2 text-xs bg-background-secondary border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
+            placeholder="Rechercher par titre ou discipline..."
+            className="w-full pl-9 pr-3.5 py-2 text-xs bg-background-secondary/40 border border-border rounded-xl focus:outline-none focus:border-gold text-navy min-h-[40px]"
           />
         </div>
 
@@ -477,7 +534,7 @@ export default function AdminBouquetsPage() {
             <select
               value={typeFilter}
               onChange={(e) => handleTypeFilterChange(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
+              className="w-full px-3 py-2 text-xs bg-background-secondary/40 border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
             >
               <option value="all">Tous les Types de Bouquets</option>
               {BOUQUET_TYPES.map((t) => (
@@ -488,13 +545,13 @@ export default function AdminBouquetsPage() {
             </select>
           </div>
 
-          {/* 2ème Filtre Dynamique Contextuel : Disciplines de la BD */}
+          {/* 2ème Filtre Dynamique : Disciplines */}
           {typeFilter === "discipline" && (
             <div className="relative min-w-[220px] flex-1 sm:flex-initial animate-in fade-in duration-200">
               <select
                 value={subFilter}
                 onChange={(e) => setSubFilter(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-background-secondary border border-gold/50 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
+                className="w-full px-3 py-2 text-xs bg-background-secondary/40 border border-gold/40 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
               >
                 <option value="all">Toutes les Disciplines ({availableDisciplines.length})</option>
                 {availableDisciplines.map((d) => (
@@ -506,31 +563,13 @@ export default function AdminBouquetsPage() {
             </div>
           )}
 
-          {/* 2ème Filtre Dynamique Contextuel : Facultés */}
-          {typeFilter === "faculty" && (
-            <div className="relative min-w-[200px] flex-1 sm:flex-initial animate-in fade-in duration-200">
-              <select
-                value={subFilter}
-                onChange={(e) => setSubFilter(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-background-secondary border border-gold/50 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
-              >
-                <option value="all">Toutes les Facultés ({availableFaculties.length})</option>
-                {availableFaculties.map((f) => (
-                  <option key={f} value={f}>
-                    Faculté : {f}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* 2ème Filtre Dynamique Contextuel : Universités */}
+          {/* 2ème Filtre Dynamique : Universités */}
           {typeFilter === "university" && (
             <div className="relative min-w-[220px] flex-1 sm:flex-initial animate-in fade-in duration-200">
               <select
                 value={subFilter}
                 onChange={(e) => setSubFilter(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-background-secondary border border-gold/50 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
+                className="w-full px-3 py-2 text-xs bg-background-secondary/40 border border-gold/40 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
               >
                 <option value="all">Toutes les Universités ({institutions.length})</option>
                 {institutions.map((i) => (
@@ -542,13 +581,13 @@ export default function AdminBouquetsPage() {
             </div>
           )}
 
-          {/* 2ème Filtre Dynamique Contextuel : Pays */}
+          {/* 2ème Filtre Dynamique : Pays */}
           {typeFilter === "country" && (
             <div className="relative min-w-[200px] flex-1 sm:flex-initial animate-in fade-in duration-200">
               <select
                 value={subFilter}
                 onChange={(e) => setSubFilter(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-background-secondary border border-gold/50 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
+                className="w-full px-3 py-2 text-xs bg-background-secondary/40 border border-gold/40 rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[40px]"
               >
                 <option value="all">Tous les Pays ({WEST_AFRICAN_COUNTRIES.length})</option>
                 {WEST_AFRICAN_COUNTRIES.map((c) => (
@@ -569,7 +608,7 @@ export default function AdminBouquetsPage() {
                 setSubFilter("all");
                 setSearchQuery("");
               }}
-              className="px-3 py-2 text-xs rounded-xl bg-navy-light text-navy font-semibold hover:bg-navy hover:text-white transition-colors flex items-center gap-1.5 min-h-[40px] shrink-0"
+              className="px-3 py-2 text-xs rounded-xl bg-navy/10 text-navy font-semibold hover:bg-navy hover:text-white transition-colors flex items-center gap-1.5 min-h-[40px] shrink-0"
               title="Réinitialiser les filtres"
             >
               <RotateCcw className="w-3.5 h-3.5 text-gold" />
@@ -585,28 +624,29 @@ export default function AdminBouquetsPage() {
         columns={columns}
         rowKey="id"
         loading={loading}
-        emptyMessage="Aucun bouquet documentaire ne correspond à vos filtres."
+        emptyMessage="Aucun bouquet documentaire ne correspond à vos critères."
         pageSize={20}
         pageSizeOptions={[10, 20, 50, 100]}
       />
 
       {/* Modal Création / Édition */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 overflow-y-auto">
-          <div className="relative w-full max-w-2xl rounded-3xl bg-background border border-border shadow-2xl p-6 sm:p-8 my-8 max-h-[90vh] overflow-y-auto space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-dark/60 backdrop-blur-sm overflow-y-auto font-poppins">
+          <div className="relative w-full max-w-2xl rounded-2xl bg-background border border-border shadow-2xl p-6 sm:p-8 my-8 max-h-[90vh] overflow-y-auto space-y-6">
             <div className="flex items-center justify-between border-b border-border pb-4">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-navy flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-gold" />
-                  {editingOffering ? "Édition Bouquet" : "Nouvelle Offre"}
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gold flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5" />
+                  {editingOffering ? "Édition Bouquet" : "Nouveau Bouquet Documentaire"}
                 </span>
-                <h3 className="font-serif text-xl font-bold text-navy">
-                  {editingOffering ? `Modifier « ${editingOffering.title} »` : "Créer un Bouquet Documentaire"}
+                <h3 className="font-playfair text-xl font-bold text-navy">
+                  {editingOffering ? `Modifier « ${editingOffering.title} »` : "Configurer un Bouquet Documentaire"}
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-xl text-foreground-muted hover:bg-background-secondary transition-colors"
+                className="p-2 rounded-xl text-foreground/60 hover:bg-background-secondary hover:text-navy transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -621,7 +661,7 @@ export default function AdminBouquetsPage() {
                 <select
                   value={bouquetType}
                   onChange={(e) => setBouquetType(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary/40 border border-border rounded-xl text-navy font-semibold focus:outline-none focus:border-gold min-h-[44px]"
                 >
                   {BOUQUET_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -629,7 +669,7 @@ export default function AdminBouquetsPage() {
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-foreground-muted">
+                <p className="text-[10px] text-foreground/60">
                   {bouquetType === "custom"
                     ? "Bouquet sur-mesure composé manuellement par sélection d'ouvrages."
                     : "Bouquet dynamique : le volume d'ouvrages est recalculé en direct à chaque consultation selon les critères."}
@@ -647,13 +687,13 @@ export default function AdminBouquetsPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Ex : Bouquet Sciences Juridiques & Politiques"
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy focus:outline-none focus:border-gold min-h-[44px]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary/40 border border-border rounded-xl text-navy focus:outline-none focus:border-gold min-h-[44px]"
                 />
               </div>
 
               {/* Champs Conditionnels selon le type */}
               {bouquetType === "discipline" && (
-                <div className="space-y-2 p-4 rounded-2xl bg-background-secondary border border-border">
+                <div className="space-y-2 p-4 rounded-xl bg-background-secondary/30 border border-border">
                   <label className="block text-xs font-bold text-navy">
                     Discipline Académique <span className="text-gold">*</span>
                   </label>
@@ -685,37 +725,28 @@ export default function AdminBouquetsPage() {
                       className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy focus:outline-none focus:border-gold min-h-[44px]"
                     />
                   </div>
-                  <p className="text-[10px] text-foreground-muted">
+                  <p className="text-[10px] text-foreground/60">
                     Tous les ouvrages publiés rattachés à cette discipline seront inclus automatiquement.
                   </p>
                 </div>
               )}
 
-              {bouquetType === "faculty" && (
-                <div className="space-y-4 p-4 rounded-2xl bg-background-secondary border border-border">
+              {bouquetType === "university" && (
+                <div className="space-y-3 p-4 rounded-xl bg-background-secondary/30 border border-border">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-navy">
-                      Code ou Nom de Faculté <span className="text-gold">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={facultyCode}
-                      onChange={(e) => setFacultyCode(e.target.value)}
-                      placeholder="Ex : FADESP, FASEG, FAST, FSS..."
-                      className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy focus:outline-none focus:border-gold min-h-[44px]"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-navy">
-                      Établissement Spécifique (Optionnel)
+                    <label className="flex items-center justify-between text-xs font-bold text-navy">
+                      <span>Université Partenaire <span className="text-gold">*</span></span>
+                      {institutionLoadingCount && (
+                        <span className="text-[10px] text-gold animate-pulse">Décompte en cours...</span>
+                      )}
                     </label>
                     <select
+                      required
                       value={targetInstitution}
                       onChange={(e) => setTargetInstitution(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy focus:outline-none focus:border-gold min-h-[44px]"
+                      className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy font-medium focus:outline-none focus:border-gold min-h-[44px]"
                     >
-                      <option value="">Tous les établissements (Portée générale)</option>
+                      <option value="">-- Sélectionner l&apos;université partenaire cible --</option>
                       {institutions.map((i) => (
                         <option key={i.id} value={i.id}>
                           {i.name}
@@ -723,34 +754,39 @@ export default function AdminBouquetsPage() {
                       ))}
                     </select>
                   </div>
-                </div>
-              )}
 
-              {bouquetType === "university" && (
-                <div className="space-y-1.5 p-4 rounded-2xl bg-background-secondary border border-border">
-                  <label className="block text-xs font-bold text-navy">
-                    Université Cible (Optionnel pour offre générale)
-                  </label>
-                  <select
-                    value={targetInstitution}
-                    onChange={(e) => setTargetInstitution(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs bg-background border border-border rounded-xl text-navy focus:outline-none focus:border-gold min-h-[44px]"
-                  >
-                    <option value="">Université de l&apos;établissement connecté (Automatique)</option>
-                    {institutions.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-foreground-muted">
-                    Si vide, le bouquet sélectionnera l&apos;ensemble du catalogue affilié à l&apos;université qui consulte l&apos;offre.
+                  {targetInstitution && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-gold/5 border border-gold/20">
+                      <div className="flex items-center gap-2 text-xs">
+                        <BookOpen className="w-4 h-4 text-gold" />
+                        <span className="text-navy font-semibold">
+                          {institutionLoadingCount
+                            ? "Calcul du catalogue..."
+                            : `${institutionLiveCount ?? 0} ouvrage(s) publié(s) actuellement`}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreviewInstitutionId(targetInstitution);
+                          setPreviewInstitutionName(institutions.find((i) => i.id === targetInstitution)?.name || "");
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-medium hover:bg-navy-hover transition-colors"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-gold" />
+                        <span>Inspecter les livres &amp; couvertures</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-foreground/60">
+                    Tous les ouvrages publiés rattachés à cette université seront inclus automatiquement et mis à jour en temps réel.
                   </p>
                 </div>
               )}
 
               {bouquetType === "country" && (
-                <div className="space-y-1.5 p-4 rounded-2xl bg-background-secondary border border-border">
+                <div className="space-y-1.5 p-4 rounded-xl bg-background-secondary/30 border border-border">
                   <label className="block text-xs font-bold text-navy">
                     Pays de Rattachement <span className="text-gold">*</span>
                   </label>
@@ -765,14 +801,14 @@ export default function AdminBouquetsPage() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-foreground-muted">
+                  <p className="text-[10px] text-foreground/60">
                     Regroupe tous les ouvrages édités dans le pays sélectionné.
                   </p>
                 </div>
               )}
 
               {bouquetType === "custom" && (
-                <div className="p-4 rounded-2xl bg-background-secondary border border-border">
+                <div className="p-4 rounded-xl bg-background-secondary/30 border border-border">
                   <BookMultiCombobox
                     books={catalogBooks}
                     selectedBookIds={selectedBookIds}
@@ -782,8 +818,24 @@ export default function AdminBouquetsPage() {
                 </div>
               )}
 
-              {/* Tarif Annuel & Statut */}
+              {/* Double Tarification : Mensuelle (30j) & Annuelle (365j) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-navy">
+                    Tarif Mensuel (XOF) <span className="text-gold">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    step="any"
+                    value={monthlyPrice}
+                    onChange={(e) => setMonthlyPrice(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-xs bg-background-secondary/40 border border-border rounded-xl text-navy font-mono font-bold focus:outline-none focus:border-gold min-h-[44px]"
+                  />
+                  <p className="text-[10px] text-foreground/60">Formule pour 30 jours d&apos;accès</p>
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-navy">
                     Tarif Annuel (XOF) <span className="text-gold">*</span>
@@ -795,21 +847,23 @@ export default function AdminBouquetsPage() {
                     step="any"
                     value={annualPrice}
                     onChange={(e) => setAnnualPrice(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy font-mono font-bold focus:outline-none focus:border-gold min-h-[44px]"
+                    className="w-full px-3.5 py-2.5 text-xs bg-background-secondary/40 border border-border rounded-xl text-navy font-mono font-bold focus:outline-none focus:border-gold min-h-[44px]"
                   />
+                  <p className="text-[10px] text-foreground/60">Formule pour 365 jours d&apos;accès</p>
                 </div>
+              </div>
 
-                <div className="space-y-1.5 flex flex-col justify-end">
-                  <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-background-secondary border border-border cursor-pointer min-h-[44px]">
-                    <input
-                      type="checkbox"
-                      checked={isActive}
-                      onChange={(e) => setIsActive(e.target.checked)}
-                      className="w-4 h-4 rounded text-gold focus:ring-gold border-border"
-                    />
-                    <span className="text-xs font-bold text-navy">Offre Active &amp; Proposée</span>
-                  </label>
-                </div>
+              {/* Statut d'activation */}
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2.5 p-3 rounded-xl bg-background-secondary/30 border border-border cursor-pointer min-h-[44px]">
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
+                    className="w-4 h-4 rounded text-gold focus:ring-gold border-border"
+                  />
+                  <span className="text-xs font-bold text-navy">Offre Active &amp; Ouverte à la Souscription</span>
+                </label>
               </div>
 
               {/* Description */}
@@ -820,7 +874,7 @@ export default function AdminBouquetsPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Décrivez les avantages et le périmètre documentaire de cette offre..."
-                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary border border-border rounded-xl text-navy focus:outline-none focus:border-gold resize-none"
+                  className="w-full px-3.5 py-2.5 text-xs bg-background-secondary/40 border border-border rounded-xl text-navy focus:outline-none focus:border-gold resize-none"
                 />
               </div>
 
@@ -836,7 +890,7 @@ export default function AdminBouquetsPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px] disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-sm min-h-[44px] disabled:opacity-50"
                 >
                   <Layers className="w-4 h-4 text-gold" />
                   <span>
@@ -844,7 +898,7 @@ export default function AdminBouquetsPage() {
                       ? "Enregistrement..."
                       : editingOffering
                       ? "Enregistrer les Modifications"
-                      : "Créer l'Offre"}
+                      : "Créer le Bouquet"}
                   </span>
                 </button>
               </div>
@@ -852,6 +906,24 @@ export default function AdminBouquetsPage() {
           </div>
         </div>
       )}
+
+      {/* Modale d'inspection des livres avec couvertures (T009) */}
+      <BouquetBooksPreviewModal
+        isOpen={!!previewInstitutionId}
+        onClose={() => {
+          setPreviewInstitutionId(null);
+          setPreviewInstitutionName("");
+        }}
+        institutionId={previewInstitutionId}
+        institutionName={previewInstitutionName}
+      />
+
+      {/* Tiroir d'audit des abonnés (T011) */}
+      <BouquetSubscriptionsDrawer
+        isOpen={!!selectedSubscribersBouquet}
+        onClose={() => setSelectedSubscribersBouquet(null)}
+        bouquet={selectedSubscribersBouquet}
+      />
 
       {/* Modale Répartition Multi-Universités & Statistiques */}
       <BouquetDistributionModal

@@ -530,6 +530,12 @@ class ClientBouquetSubscription(models.Model):
     )
     offering_id = models.UUIDField()
     title = models.CharField(max_length=255)
+    subscription_period = models.CharField(
+        max_length=10,
+        choices=[('monthly', 'Mensuel (30j)'), ('annual', 'Annuel (365j)')],
+        default='monthly',
+        verbose_name="Formule de souscription"
+    )
     price_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     currency = models.CharField(max_length=10, default="XOF")
     status = models.CharField(
@@ -550,6 +556,15 @@ class ClientBouquetSubscription(models.Model):
         indexes = [
             models.Index(fields=['user', 'status', 'start_date', 'end_date']),
         ]
+
+    @classmethod
+    def compute_end_date(cls, existing_end_date, period: str):
+        """Calcule la date d'échéance avec prolongation cumulative (décision Q2)."""
+        from datetime import timedelta
+        days = 30 if period == 'monthly' else 365
+        today = timezone.now().date()
+        base_date = existing_end_date if (existing_end_date and existing_end_date > today) else today
+        return base_date + timedelta(days=days)
 
 
 # ─── Fonctions centrales de calcul du stock physique réel ─────────────────────

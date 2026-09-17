@@ -23,6 +23,7 @@ import {
 import type { UniversityBookCatalogItem } from "@/lib/types/university";
 import { toast } from "sonner";
 import { PageLoader, InlineLoader } from "@/components/ui/page-loader";
+import { useAuth } from "@/hooks/use-auth";
 
 interface UniversityCartItem {
   book_id: string;
@@ -32,6 +33,28 @@ interface UniversityCartItem {
 
 export default function NewUniversityPaperOrderPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const instDetail =
+    (user as any)?.institution_detail ||
+    (user as any)?.university_profile ||
+    (user as any)?.institution ||
+    null;
+  const instCode = (instDetail?.code || (user as any)?.institution_code || "").toUpperCase();
+  const isHistoricalPartner = ["UAC", "UP", "UNSTIM", "UNA"].includes(instCode);
+  const resolvedType =
+    instDetail?.institution_type ||
+    (user as any)?.institution_type ||
+    (isHistoricalPartner ? "partner" : null);
+  const isPartner = resolvedType === "partner" || isHistoricalPartner;
+
+  // Redirection immédiate : les universités partenaires ne commandent pas de livres physiques
+  useEffect(() => {
+    if (isPartner) {
+      console.info("[UNIV ACCESS GUARD]", new Date().toISOString(), "- Partner redirected from /purchases/new to /university");
+      router.replace("/university");
+    }
+  }, [isPartner, router]);
+
   const [catalogBooks, setCatalogBooks] = useState<UniversityBookCatalogItem[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -40,12 +63,12 @@ export default function NewUniversityPaperOrderPage() {
   const [cartItems, setCartItems] = useState<UniversityCartItem[]>([]);
 
   const [deliveryCampus, setDeliveryCampus] = useState(
-    "Bibliothèque Centrale — Campus Universitaire d'Abomey-Calavi"
+    instDetail?.name ? `Bibliothèque Centrale — ${instDetail.name}` : "Bibliothèque Centrale du Campus"
   );
   const [contactPerson, setContactPerson] = useState(
-    "M. SOSSOU Théophile (Conservateur en Chef)"
+    user ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || "Responsable Acquisitions" : "Responsable Acquisitions"
   );
-  const [contactPhone, setContactPhone] = useState("+229 97 33 44 55");
+  const [contactPhone, setContactPhone] = useState(user?.phone || "");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -142,6 +165,10 @@ export default function NewUniversityPaperOrderPage() {
       setSubmitting(false);
     }
   };
+
+  if (isPartner) {
+    return null;
+  }
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-4xl mx-auto animate-in fade-in duration-300">

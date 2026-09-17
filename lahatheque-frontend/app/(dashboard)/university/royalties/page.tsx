@@ -54,18 +54,21 @@ export default function UniversityRoyaltiesPage() {
   const [formatFilter, setFormatFilter] = useState<"all" | "paper" | "digital" | "audio">("all");
   const [buyerFilter, setBuyerFilter] = useState<string>("all");
 
-  // T012 : Redirection de sécurité — les universités clientes n'ont pas accès aux redevances
+  const isClient =
+    (user as any)?.institution_detail?.institution_type === "client" ||
+    (user as any)?.university_profile?.institution_type === "client" ||
+    (user as any)?.institution_type === "client";
+
+  // Redirection de sécurité stricte — les universités clientes n'ont jamais accès aux redevances
   useEffect(() => {
-    const instType =
-      (user as any)?.institution_detail?.institution_type ||
-      (user as any)?.university_profile?.institution_type;
-    if (instType === "client") {
+    if (isClient) {
       console.info("[UNIV ACCESS GUARD]", new Date().toISOString(), "- Client redirected from /royalties to /university");
       router.replace("/university");
     }
-  }, [user, router]);
+  }, [isClient, router]);
 
   useEffect(() => {
+    if (isClient) return;
     async function loadData() {
       setLoading(true);
       const res = await getUniversityRoyalties();
@@ -73,7 +76,7 @@ export default function UniversityRoyaltiesPage() {
       setLoading(false);
     }
     loadData();
-  }, []);
+  }, [isClient]);
 
   const handleWithdraw = async (amount: number) => {
     const ok = await requestUniversityRoyaltyWithdrawal(amount);
@@ -393,6 +396,10 @@ export default function UniversityRoyaltiesPage() {
       },
     },
   ];
+
+  if (isClient) {
+    return null;
+  }
 
   if (loading || !data) {
     return (

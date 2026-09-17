@@ -360,12 +360,55 @@ class OrderStudentSerializer(serializers.ModelSerializer):
 
 
 class BouquetSerializer(serializers.ModelSerializer):
+    books = serializers.SerializerMethodField()
+
     class Meta:
         model = UniversityBouquetSubscription
         fields = [
             'id', 'title', 'bouquet_type', 'faculty_code',
             'discipline', 'books_count', 'status', 'start_date', 'end_date',
+            'books',
         ]
+
+    def get_books(self, obj):
+        from apps.partners.models import BouquetOffering
+        offering = BouquetOffering.objects.filter(id=obj.offering_id).first() if obj.offering_id else None
+        if offering:
+            b_qs = offering.get_books_queryset(requesting_institution=obj.institution)
+        else:
+            b_qs = Ouvrage.objects.filter(status='published')
+            if obj.bouquet_type == 'discipline' and obj.discipline:
+                b_qs = b_qs.filter(discipline__name__icontains=obj.discipline)
+            elif obj.bouquet_type == 'faculty' and obj.faculty_code:
+                b_qs = b_qs.filter(faculty__icontains=obj.faculty_code)
+            if obj.institution:
+                b_qs = b_qs.filter(institution=obj.institution)
+
+        books_data = []
+        for bk in b_qs.select_related('discipline').prefetch_related('authors')[:60]:
+            cover_url = None
+            if bk.cover_image:
+                try:
+                    cover_url = bk.cover_image.url
+                except Exception:
+                    cover_url = None
+            authors_list = [a.name for a in bk.authors.all()]
+            author_display = ", ".join(authors_list) if authors_list else "Auteur académique"
+            books_data.append({
+                "id": str(bk.id),
+                "title": bk.title,
+                "subtitle": bk.subtitle or "",
+                "authors": authors_list,
+                "author": author_display,
+                "discipline": bk.discipline.name if bk.discipline else "",
+                "cover_url": cover_url,
+                "page_count": bk.page_count,
+                "format_type": "digital",
+                "summary": bk.summary or "",
+                "isbn": bk.isbn or "",
+                "has_sample": True,
+            })
+        return books_data
 
 
 class InstitutionBasicSerializer(serializers.ModelSerializer):

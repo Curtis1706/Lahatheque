@@ -17,17 +17,41 @@ import {
 import { toast } from "sonner";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { getUniversityPaperOrders } from "@/lib/services/university";
+import { useRouter } from "next/navigation";
 import { generateOfficialPdf } from "@/lib/services/export-service";
 import type { UniversityPaperOrder } from "@/lib/types/university";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function UniversityPurchasesPage() {
+  const router = useRouter();
   const { user } = useAuth();
+  const instDetail =
+    (user as any)?.institution_detail ||
+    (user as any)?.university_profile ||
+    (user as any)?.institution ||
+    null;
+  const instCode = (instDetail?.code || (user as any)?.institution_code || "").toUpperCase();
+  const isHistoricalPartner = ["UAC", "UP", "UNSTIM", "UNA"].includes(instCode);
+  const resolvedType =
+    instDetail?.institution_type ||
+    (user as any)?.institution_type ||
+    (isHistoricalPartner ? "partner" : null);
+  const isPartner = resolvedType === "partner" || isHistoricalPartner;
+
+  // Redirection immédiate : les universités partenaires ne commandent pas de livres physiques
+  useEffect(() => {
+    if (isPartner) {
+      console.info("[UNIV ACCESS GUARD]", new Date().toISOString(), "- Partner redirected from /purchases to /university");
+      router.replace("/university");
+    }
+  }, [isPartner, router]);
+
   const [orders, setOrders] = useState<UniversityPaperOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isPartner) return;
     async function loadData() {
       setLoading(true);
       try {
@@ -40,7 +64,7 @@ export default function UniversityPurchasesPage() {
       }
     }
     loadData();
-  }, []);
+  }, [isPartner]);
 
   const handleDownloadBonPdf = async (order: UniversityPaperOrder) => {
     setGeneratingPdfId(order.id);
@@ -213,6 +237,10 @@ export default function UniversityPurchasesPage() {
       ),
     },
   ];
+
+  if (isPartner) {
+    return null;
+  }
 
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full space-y-6 max-w-7xl mx-auto">

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   BookOpen,
   ArrowLeft,
@@ -17,6 +18,7 @@ import { useDisciplines } from "@/lib/hooks/use-disciplines";
 import type { UniversityBookCatalogItem } from "@/lib/types/university";
 import { CATALOG_LANGUAGE_OPTIONS, matchesLanguageFilter } from "@/lib/constants/catalog-languages";
 import { FormatFilterTabs } from "@/components/features/catalog/format-filter-tabs";
+import { useAuth } from "@/hooks/use-auth";
 
 function matchesFormatFilter(book: UniversityBookCatalogItem, format: string): boolean {
   if (!format || format === "all") return true;
@@ -33,6 +35,30 @@ function matchesFormatFilter(book: UniversityBookCatalogItem, format: string): b
 }
 
 export default function UniversityCatalogPage() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const instDetail =
+    (user as any)?.institution_detail ||
+    (user as any)?.university_profile ||
+    (user as any)?.institution ||
+    null;
+  const instCode = (instDetail?.code || (user as any)?.institution_code || "").toUpperCase();
+  const isHistoricalPartner = ["UAC", "UP", "UNSTIM", "UNA"].includes(instCode);
+  const resolvedType =
+    instDetail?.institution_type ||
+    (user as any)?.institution_type ||
+    (isHistoricalPartner ? "partner" : null);
+  const isPartner = resolvedType === "partner" || isHistoricalPartner;
+
+  // Redirection immédiate : la page catalogue est masquée pour partenaires et clientes
+  useEffect(() => {
+    if (isPartner) {
+      router.replace("/university/royalties");
+    } else {
+      router.replace("/university/bouquets");
+    }
+  }, [isPartner, router]);
+
   const [books, setBooks] = useState<UniversityBookCatalogItem[]>([]);
   const [selectedFormat, setSelectedFormat] = useState<string>("all");
   const [loading, setLoading] = useState(true);
@@ -163,14 +189,16 @@ export default function UniversityCatalogPage() {
             </Link>
           )}
 
-          <Link
-            href={`/university/purchases/new`}
-            className="px-3 py-1.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-[11px] font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
-            title="Commander des exemplaires papier"
-          >
-            <ShoppingBag className="w-3.5 h-3.5 text-gold" />
-            <span>Commander</span>
-          </Link>
+          {!isPartner && (
+            <Link
+              href={`/university/purchases/new`}
+              className="px-3 py-1.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-[11px] font-bold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap min-h-[36px]"
+              title="Commander des exemplaires papier"
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-gold" />
+              <span>Commander</span>
+            </Link>
+          )}
         </div>
       ),
     },
@@ -186,7 +214,7 @@ export default function UniversityCatalogPage() {
       <div className="flex items-center gap-2 text-xs text-foreground-muted">
         <Link href="/university" className="hover:text-navy">Vue d&apos;ensemble</Link>
         <span>/</span>
-        <span className="text-navy font-semibold">Catalogue Universitaire</span>
+        <span className="text-navy font-semibold">{isPartner ? "Fonds Académique" : "Catalogue Universitaire"}</span>
       </div>
 
       {/* Header */}
@@ -198,23 +226,27 @@ export default function UniversityCatalogPage() {
           </Link>
           <div className="flex items-center gap-2 text-xs font-bold text-navy uppercase tracking-wider mb-1">
             <BookOpen className="w-4 h-4 text-gold" />
-            Ressources Documentaires &amp; Fonds Académique
+            {isPartner ? "Fonds Académique & Ouvrages Déposés" : "Ressources Documentaires & Fonds Campus"}
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
-            Catalogue d&apos;Ouvrages de Votre Université
+            {isPartner ? "Ouvrages Déposés par Votre Établissement" : "Catalogue d'Ouvrages de Votre Université"}
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Consultez les ouvrages du fonds académique, lisez leurs extraits gratuits ou commandez des exemplaires papier pour votre campus.
+            {isPartner
+              ? "Consultez l'ensemble des titres déposés par votre université sur LAHAThèque et prévisualisez leurs extraits officiels."
+              : "Consultez les ouvrages du fonds académique, lisez leurs extraits gratuits ou commandez des exemplaires papier pour votre campus."}
           </p>
         </div>
 
-        <Link
-          href="/university/purchases/new"
-          className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
-        >
-          <ShoppingBag className="w-4 h-4 text-gold" />
-          Passer Commande
-        </Link>
+        {!isPartner && (
+          <Link
+            href="/university/purchases/new"
+            className="px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors inline-flex items-center gap-2 shadow-xs min-h-[44px]"
+          >
+            <ShoppingBag className="w-4 h-4 text-gold" />
+            Passer Commande
+          </Link>
+        )}
       </div>
 
       {/* Onglets de filtrage par format */}
@@ -318,13 +350,15 @@ export default function UniversityCatalogPage() {
                     <span>Lire</span>
                   </Link>
                 )}
-                <Link
-                  href="/university/purchases/new"
-                  className="px-3 py-1.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
-                >
-                  <ShoppingBag className="w-3.5 h-3.5 text-gold" />
-                  <span>Commander</span>
-                </Link>
+                {!isPartner && (
+                  <Link
+                    href="/university/purchases/new"
+                    className="px-3 py-1.5 rounded-xl bg-navy hover:bg-navy-hover text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 min-h-[36px]"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5 text-gold" />
+                    <span>Commander</span>
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -336,6 +370,7 @@ export default function UniversityCatalogPage() {
         book={selectedBook}
         isOpen={!!selectedBook}
         onClose={() => setSelectedBook(null)}
+        isPartner={isPartner}
       />
     </div>
   );

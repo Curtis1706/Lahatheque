@@ -1,41 +1,44 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-/**
- * PAGE BOUQUETS DOCUMENTAIRES CLIENT (MASQUÉE / MISE EN COMMENTAIRE)
- * Désactivée à la demande du client. Redirection automatique vers /student.
- */
-export default function StudentBouquetsPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/student");
-  }, [router]);
-
-  return null;
-}
-
-/*
-import React, { useState } from "react";
-import { Layers, BookOpen, Check, Sparkles, ArrowRight, ShieldCheck, Clock, CheckCircle2, Loader2, Info } from "lucide-react";
-import { getClientBouquets, subscribeToClientBouquet, ClientBouquet } from "@/lib/services/bouquets";
-import { Modal } from "@/components/ui/modal";
-import { toast } from "sonner";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import {
+  Layers,
+  BookOpen,
+  Check,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Clock,
+  RefreshCw,
+  Library,
+} from "lucide-react";
+import {
+  getClientBouquets,
+  subscribeToClientBouquet,
+  ClientBouquet,
+} from "@/lib/services/bouquets";
+import { toast } from "sonner";
+import { BouquetBooksModal } from "@/components/features/bouquets/bouquet-books-modal";
 
-function ArchivedStudentBouquetsPage() {
+export default function StudentBouquetsPage() {
   const [bouquets, setBouquets] = useState<ClientBouquet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBouquet, setSelectedBouquet] = useState<ClientBouquet | null>(null);
-  const [subscribing, setSubscribing] = useState(false);
+  const [selectedPeriods, setSelectedPeriods] = useState<Record<string, "monthly" | "annual">>({});
+  const [subscribingId, setSubscribingId] = useState<string | null>(null);
+  const [selectedBouquetDetails, setSelectedBouquetDetails] = useState<ClientBouquet | null>(null);
 
   const loadBouquets = async () => {
     try {
       setLoading(true);
       const data = await getClientBouquets();
       setBouquets(data);
+      // Période par défaut : annuelle
+      const initialPeriods: Record<string, "monthly" | "annual"> = {};
+      data.forEach((b) => {
+        initialPeriods[b.id] = "annual";
+      });
+      setSelectedPeriods(initialPeriods);
     } catch {
       toast.error("Impossible de charger les bouquets documentaires.");
     } finally {
@@ -47,22 +50,30 @@ function ArchivedStudentBouquetsPage() {
     loadBouquets();
   }, []);
 
-  const handleConfirmSubscribe = async () => {
-    if (!selectedBouquet) return;
-    setSubscribing(true);
+  const handlePeriodChange = (bouquetId: string, period: "monthly" | "annual") => {
+    setSelectedPeriods((prev) => ({ ...prev, [bouquetId]: period }));
+  };
+
+  const handleSubscribe = async (bouquet: ClientBouquet) => {
+    const period = selectedPeriods[bouquet.id] || "annual";
+    setSubscribingId(bouquet.id);
     try {
-      const res = await subscribeToClientBouquet(selectedBouquet.id);
+      const res = await subscribeToClientBouquet(bouquet.id, period);
       if (res.success) {
-        toast.success(res.message || `Abonnement au bouquet « ${selectedBouquet.title} » activé avec succès.`);
-        setSelectedBouquet(null);
-        await loadBouquets();
+        if (res.checkout_url) {
+          toast.info("Redirection vers la passerelle de paiement sécurisée Moneroo...");
+          window.location.href = res.checkout_url;
+        } else {
+          toast.success("Abonnement enregistré avec succès !");
+          await loadBouquets();
+        }
       } else {
         toast.error(res.error || "Erreur lors de la souscription.");
       }
-    } catch {
-      toast.error("Erreur serveur lors de la souscription.");
+    } catch (err: any) {
+      toast.error(err.message || "Erreur réseau lors de la souscription.");
     } finally {
-      setSubscribing(false);
+      setSubscribingId(null);
     }
   };
 
@@ -75,234 +86,211 @@ function ArchivedStudentBouquetsPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-16 animate-in fade-in duration-300">
+    <div className="p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto space-y-8 pb-16 font-poppins animate-in fade-in duration-300">
+      {/* ── En-tête ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
         <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-lg bg-gold/10 border border-gold/30 flex items-center justify-center text-gold shrink-0">
-              <Layers className="size-5" />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gold/10 border border-gold/30 flex items-center justify-center text-gold shrink-0">
+              <Layers className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy">
+              <h1 className="font-playfair text-2xl sm:text-3xl font-bold text-navy">
                 Bouquets Documentaires
               </h1>
-              <p className="font-sans text-xs sm:text-sm text-foreground-muted">
-                Accédez en illimité à des collections complètes d'ouvrages par discipline ou thématique.
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Accédez en illimité à des collections complètes d'ouvrages académiques dans votre bibliothèque.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/student/books"
-            className="font-sans text-xs sm:text-sm px-4 py-2 rounded-lg border border-border bg-background hover:bg-background-secondary text-foreground font-medium transition-colors flex items-center gap-2"
-          >
-            <BookOpen className="size-4 text-navy" />
-            Ma Bibliothèque
-          </Link>
-        </div>
+        <Link
+          href="/student/books?tab=bouquets"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-card hover:bg-background-secondary text-foreground text-xs sm:text-sm font-medium transition-colors"
+        >
+          <Library className="h-4 w-4 text-gold" />
+          <span>Mes Bouquets en cours</span>
+        </Link>
       </div>
 
-      <div className="bg-navy/5 border border-navy/15 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="size-5 text-gold shrink-0 mt-0.5" />
-          <div className="space-y-0.5">
-            <h3 className="font-sans text-sm font-semibold text-navy">
-              Lecture illimitée et sécurisée
-            </h3>
-            <p className="font-sans text-xs text-foreground-muted leading-relaxed">
-              La souscription à un bouquet débloque immédiatement la lecture intégrale de tous les ouvrages inclus dans votre liseuse connectée pendant 1 an.
-            </p>
-          </div>
-        </div>
-      </div>
-
+      {/* ── État Chargement ── */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((n) => (
-            <div
-              key={n}
-              className="h-80 rounded-xl border border-border bg-background-secondary/50 animate-pulse p-6 space-y-4"
-            >
-              <div className="h-6 bg-border/60 rounded w-2/3" />
-              <div className="h-4 bg-border/40 rounded w-1/3" />
-              <div className="h-20 bg-border/30 rounded w-full" />
-              <div className="h-10 bg-border/50 rounded w-full mt-auto" />
-            </div>
-          ))}
+        <div className="py-20 flex flex-col items-center justify-center text-center">
+          <RefreshCw className="h-8 w-8 text-gold animate-spin mb-3" />
+          <p className="text-sm text-muted-foreground">Chargement des bouquets disponibles...</p>
         </div>
       ) : bouquets.length === 0 ? (
-        <div className="text-center py-16 px-4 border border-dashed border-border rounded-2xl bg-background-secondary/30 space-y-3">
-          <div className="w-12 h-12 rounded-full bg-navy/5 border border-border mx-auto flex items-center justify-center text-navy">
-            <Layers className="size-6 text-foreground-muted" />
-          </div>
-          <h3 className="font-serif text-lg font-bold text-navy">Aucun bouquet disponible</h3>
-          <p className="font-sans text-xs sm:text-sm text-foreground-muted max-w-md mx-auto">
-            Les offres de bouquets documentaires seront bientôt publiées sur le catalogue.
+        <div className="p-12 text-center bg-card border border-border rounded-2xl max-w-md mx-auto">
+          <Layers className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+          <h2 className="font-playfair font-bold text-navy text-lg mb-1">Aucun bouquet disponible</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            De nouveaux bouquets thématiques seront ouverts prochainement.
           </p>
+          <Link
+            href="/student/books"
+            className="text-xs font-semibold text-gold hover:underline"
+          >
+            Retour à ma bibliothèque
+          </Link>
         </div>
       ) : (
+        /* ── Grille des Bouquets ── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {bouquets.map((b) => (
-            <div
-              key={b.id}
-              className={`rounded-2xl border transition-all duration-200 flex flex-col justify-between bg-background overflow-hidden relative group ${
-                b.is_subscribed
-                  ? "border-gold/50 shadow-sm ring-1 ring-gold/20"
-                  : "border-border hover:border-gold/40 hover:shadow-md"
-              }`}
-            >
-              {b.is_subscribed && (
-                <div className="bg-gold text-white font-sans text-[11px] font-semibold tracking-wider uppercase px-3 py-1 flex items-center justify-center gap-1.5 shadow-sm">
-                  <CheckCircle2 className="size-3.5" />
-                  Abonnement Actif
-                </div>
-              )}
+          {bouquets.map((bouquet) => {
+            const currentPeriod = selectedPeriods[bouquet.id] || "annual";
+            const isMonthly = currentPeriod === "monthly";
+            const price = isMonthly
+              ? (bouquet.monthly_price ?? Math.round(bouquet.annual_price / 10))
+              : bouquet.annual_price;
 
-              <div className="p-5 sm:p-6 space-y-4 flex-1 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="font-sans inline-block text-[11px] font-semibold text-gold uppercase tracking-wider bg-gold/10 px-2.5 py-0.5 rounded-md mb-2">
-                        {b.discipline || (b.bouquet_type === "discipline" ? "Par Discipline" : "Thématique")}
-                      </span>
-                      <h3 className="font-serif text-lg sm:text-xl font-bold text-navy group-hover:text-gold transition-colors leading-snug">
-                        {b.title}
-                      </h3>
+            const isSubscribed = bouquet.is_subscribed;
+            const isPendingThis = subscribingId === bouquet.id;
+
+            return (
+              <div
+                key={bouquet.id}
+                className="bg-card border border-border hover:border-gold/40 rounded-2xl p-6 flex flex-col justify-between transition-all duration-200 shadow-sm relative overflow-hidden"
+              >
+                {/* Badge Statut */}
+                {isSubscribed && (
+                  <div className="absolute top-4 right-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <Check className="h-3 w-3" />
+                    <span>Abonné</span>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  {/* Titre & Discipline */}
+                  <div>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-gold bg-gold/10 px-2.5 py-0.5 rounded-full">
+                      {bouquet.discipline || "Toutes disciplines"}
+                    </span>
+                    <h3 className="font-playfair font-bold text-navy text-lg sm:text-xl mt-2 line-clamp-2">
+                      {bouquet.title}
+                    </h3>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-xs sm:text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+                    {bouquet.description || "Accès intégral et illimité à l'ensemble des titres académiques de cette collection."}
+                  </p>
+
+                  {/* Métadonnées */}
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t border-border">
+                    <div className="flex items-center gap-1.5">
+                      <BookOpen className="h-4 w-4 text-gold" />
+                      <span>{bouquet.books_count} ouvrages inclus</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-gold" />
+                      <span>Liseuse sécurisée</span>
                     </div>
                   </div>
 
-                  {b.description && (
-                    <p className="font-sans text-xs sm:text-sm text-foreground-muted line-clamp-3 leading-relaxed">
-                      {b.description}
-                    </p>
-                  )}
+                  {/* Sélecteur de formule Bi-périodique */}
+                  <div className="p-3 bg-background-secondary rounded-xl border border-border space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      <span>Formule d'accès</span>
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePeriodChange(bouquet.id, "monthly")}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${
+                          isMonthly
+                            ? "bg-navy text-primary-foreground shadow-sm"
+                            : "bg-card text-muted-foreground hover:text-foreground border border-border"
+                        }`}
+                      >
+                        Mensuel (30j)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePeriodChange(bouquet.id, "annual")}
+                        className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${
+                          !isMonthly
+                            ? "bg-navy text-primary-foreground shadow-sm"
+                            : "bg-card text-muted-foreground hover:text-foreground border border-border"
+                        }`}
+                      >
+                        Annuel (365j)
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-3 pt-4 border-t border-border mt-4">
-                  <div className="flex items-center justify-between text-xs font-sans text-foreground-muted">
-                    <span className="flex items-center gap-1.5">
-                      <BookOpen className="size-4 text-navy" />
-                      <strong>{b.books_count}</strong> {b.books_count > 1 ? "ouvrages inclus" : "ouvrage inclus"}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="size-3.5" />
-                      1 an d'accès
-                    </span>
+                {/* Prix & Action */}
+                <div className="pt-6 border-t border-border mt-6 space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <div>
+                      <span className="text-2xl font-bold font-playfair text-navy">
+                        {formatPrice(price, bouquet.currency)}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-1">
+                        / {isMonthly ? "mois" : "an"}
+                      </span>
+                    </div>
+
+                    {isSubscribed && bouquet.end_date && (
+                      <span className="text-xs text-gold font-medium">
+                        Valide jusqu'au {bouquet.end_date}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex items-baseline justify-between pt-1">
-                    <span className="font-sans text-xs text-foreground-muted uppercase tracking-wider">
-                      Tarif annuel
-                    </span>
-                    <span className="font-sans text-lg sm:text-xl font-bold text-navy">
-                      {formatPrice(b.annual_price, b.currency)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 pt-0 sm:p-6 sm:pt-0">
-                {b.is_subscribed ? (
-                  <Link
-                    href="/student/books"
-                    className="w-full py-2.5 px-4 rounded-xl bg-gold/10 text-gold hover:bg-gold/20 font-sans text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-                  >
-                    <BookOpen className="size-4" />
-                    Consulter les livres
-                  </Link>
-                ) : (
                   <button
-                    onClick={() => setSelectedBouquet(b)}
-                    className="w-full py-2.5 px-4 rounded-xl bg-navy hover:bg-navy-hover text-white font-sans text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-sm"
+                    type="button"
+                    onClick={() => setSelectedBouquetDetails(bouquet)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-background border border-border hover:border-gold hover:text-navy text-navy text-xs font-bold transition-colors min-h-[42px] cursor-pointer"
                   >
-                    <Sparkles className="size-4 text-gold" />
-                    S'abonner maintenant
+                    <BookOpen className="w-4 h-4 text-gold" />
+                    <span>Consulter les Ouvrages ({bouquet.books_count})</span>
                   </button>
-                )}
+
+                  <button
+                    type="button"
+                    disabled={isPendingThis}
+                    onClick={() => handleSubscribe(bouquet)}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-navy hover:bg-navy-hover text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {isPendingThis ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin text-gold" />
+                        <span>Initialisation du paiement...</span>
+                      </>
+                    ) : isSubscribed ? (
+                      <>
+                        <span>Renouveler pour {isMonthly ? "30 jours" : "1 an"}</span>
+                        <ArrowRight className="h-4 w-4 text-gold" />
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 text-gold" />
+                        <span>Souscrire ({isMonthly ? "Mensuel" : "Annuel"})</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {selectedBouquet && (
-        <Modal
-          open={Boolean(selectedBouquet)}
-          onClose={() => !subscribing && setSelectedBouquet(null)}
-          title="Souscrire au Bouquet Documentaire"
-          description="Confirmation de votre abonnement annuel"
-          maxWidth={520}
-        >
-          <div className="space-y-5 p-1">
-            <div className="bg-background-secondary/50 rounded-xl p-4 border border-border space-y-2">
-              <span className="font-sans text-[11px] font-semibold text-gold uppercase tracking-wider">
-                {selectedBouquet.discipline || "Bouquet Documentaire"}
-              </span>
-              <h4 className="font-serif text-lg font-bold text-navy">{selectedBouquet.title}</h4>
-              <p className="font-sans text-xs text-foreground-muted leading-relaxed">
-                {selectedBouquet.description || "Accès illimité à tous les ouvrages de cette collection dans votre liseuse numérique."}
-              </p>
-            </div>
-
-            <div className="space-y-2 text-xs font-sans">
-              <div className="flex justify-between py-2 border-b border-border text-foreground-muted">
-                <span>Nombre de livres inclus</span>
-                <span className="font-semibold text-navy">{selectedBouquet.books_count} titres</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-border text-foreground-muted">
-                <span>Durée de validité</span>
-                <span className="font-semibold text-navy">12 mois (1 an)</span>
-              </div>
-              <div className="flex justify-between py-2 text-sm">
-                <span className="font-semibold text-navy">Total à régler</span>
-                <span className="font-bold text-navy text-base">
-                  {formatPrice(selectedBouquet.annual_price, selectedBouquet.currency)}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-navy/5 border border-navy/10 text-xs font-sans text-foreground-muted">
-              <Info className="size-4 text-navy shrink-0" />
-              <span>
-                L'accès à tous les livres du bouquet sera immédiatement actif dans votre bibliothèque.
-              </span>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
-              <button
-                type="button"
-                disabled={subscribing}
-                onClick={() => setSelectedBouquet(null)}
-                className="px-4 py-2 rounded-lg border border-border bg-background hover:bg-background-secondary text-foreground text-xs sm:text-sm font-medium transition-colors"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                disabled={subscribing}
-                onClick={handleConfirmSubscribe}
-                className="px-5 py-2 rounded-lg bg-gold hover:bg-gold-dark text-white text-xs sm:text-sm font-semibold transition-colors flex items-center gap-2 shadow-sm"
-              >
-                {subscribing ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Validation...
-                  </>
-                ) : (
-                  <>
-                    Confirmer l'abonnement
-                    <ArrowRight className="size-4" />
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {/* Modale d'inspection des livres du bouquet */}
+      <BouquetBooksModal
+        bouquet={selectedBouquetDetails as any}
+        isOpen={!!selectedBouquetDetails}
+        onClose={() => setSelectedBouquetDetails(null)}
+        onSubscribe={async (id, period) => {
+          if (selectedBouquetDetails) {
+            await handleSubscribe(selectedBouquetDetails);
+          }
+        }}
+      />
     </div>
   );
 }
-*/
-

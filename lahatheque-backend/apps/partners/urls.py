@@ -22,6 +22,8 @@ from .university_views import (
     UniversityBouquetDistributionView,
     BouquetRelevanceReportView,
     UniversityClientCatalogView,
+    UniversityPostPaymentCredentialsView,
+    PartnerGuidePdfDownloadView,
 )
 from apps.reporting.admin_views import AdminBouquetOfferingsView
 
@@ -52,5 +54,8 @@ urlpatterns = [
     path('university/royalties/withdraw/', UniversityRoyaltyWithdrawView.as_view(), name='university-royalty-withdraw'),
     path('university/profile/', UniversityProfileView.as_view(), name='university-profile'),
     path('university/catalog/', UniversityClientCatalogView.as_view(), name='university-client-catalog'),
+    path('university/subscriptions/<uuid:pk>/credentials/', UniversityPostPaymentCredentialsView.as_view(), name='university-subscription-credentials'),
+    path('university/subscriptions/<str:pk>/credentials/', UniversityPostPaymentCredentialsView.as_view()),
+    path('university/guides/catalog-only-pdf/', PartnerGuidePdfDownloadView.as_view(), name='partner-guide-pdf-download'),
     path('admin/bouquets/', AdminBouquetOfferingsView.as_view(), name='partner-admin-bouquets'),
 ] + router.urls

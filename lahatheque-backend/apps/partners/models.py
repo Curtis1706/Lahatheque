@@ -184,16 +184,22 @@ class UniversityBouquetSubscription(models.Model):
         choices=[
             ("general", "Bouquet Général (Catalogue Intégral)"),
             ("discipline", "Par Discipline"),
-            ("faculty", "Par Faculté"),
             ("university", "Intégral Université"),
             ("country", "Par Pays"),
             ("custom", "Personnalisé"),
         ],
         default="discipline"
     )
-    faculty_code = models.CharField(max_length=32, blank=True, default="", verbose_name="Faculté associée")
+    faculty_code = models.CharField(max_length=32, blank=True, default="", verbose_name="Faculté associée (obsolète)")
     discipline = models.CharField(max_length=128, blank=True, default="", verbose_name="Discipline")
     books_count = models.PositiveIntegerField(default=0)
+    subscription_period = models.CharField(
+        max_length=10,
+        choices=[('monthly', 'Mensuel (30j)'), ('annual', 'Annuel (365j)')],
+        default='annual',
+        verbose_name="Formule de souscription"
+    )
+    price_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, verbose_name="Montant acquitté (XOF)")
     annual_price = models.DecimalField(max_digits=12, decimal_places=2, default=1000000.00)
     currency = models.CharField(max_length=10, default="XOF")
     status = models.CharField(max_length=20, choices=[("active", "Actif"), ("pending", "En attente"), ("expired", "Expiré")], default="active")
@@ -207,6 +213,15 @@ class UniversityBouquetSubscription(models.Model):
 
     class Meta:
         ordering = ["-start_date"]
+
+    @classmethod
+    def compute_end_date(cls, existing_end_date, period: str):
+        """Calcule la date d'échéance avec prolongation cumulative (décision Q2)."""
+        from datetime import timedelta
+        days = 30 if period == 'monthly' else 365
+        today = timezone.now().date()
+        base_date = existing_end_date if (existing_end_date and existing_end_date > today) else today
+        return base_date + timedelta(days=days)
 
 
 class UniversityPaperOrder(models.Model):
@@ -246,15 +261,13 @@ class UniversityRoyaltyStatement(models.Model):
 
 class BouquetOffering(models.Model):
     """
-    Bouquet documentaire proposable aux universités.
-    Types automatiques (discipline/faculty/university/country) : le contenu est calculé en
-    direct depuis le catalogue réel, jamais stocké en dur.
+    Bouquet documentaire proposable aux universités et clients.
+    Types automatiques (discipline/university/country) : le contenu est calculé en direct.
     Type 'custom' : sélection manuelle de livres par l'Admin.
     """
     BOUQUET_TYPE_CHOICES = [
         ("general", "Bouquet Général (Catalogue Intégral)"),
         ("discipline", "Par Discipline"),
-        ("faculty", "Par Faculté"),
         ("university", "Intégral Université"),
         ("country", "Par Pays"),
         ("custom", "Personnalisé"),
@@ -268,7 +281,8 @@ class BouquetOffering(models.Model):
     faculty_code = models.CharField(max_length=32, blank=True, default="")
     target_institution = models.ForeignKey(
         Institution, null=True, blank=True, on_delete=models.SET_NULL,
-        related_name="bouquet_offerings_scoped"
+        related_name="bouquet_offerings_scoped",
+        help_text="Obligatoire pour le type Intégral Université"
     )
     country = models.CharField(max_length=2, blank=True, default="")
 
@@ -276,7 +290,8 @@ class BouquetOffering(models.Model):
         'catalog.Ouvrage', blank=True, related_name="custom_bouquet_offerings"
     )
 
-    annual_price = models.DecimalField(max_digits=12, decimal_places=2, default=500000.00)
+    monthly_price = models.DecimalField(max_digits=12, decimal_places=2, default=50000.00, verbose_name="Tarif Mensuel (XOF)")
+    annual_price = models.DecimalField(max_digits=12, decimal_places=2, default=500000.00, verbose_name="Tarif Annuel (XOF)")
     currency = models.CharField(max_length=10, default="XOF")
     description = models.TextField(blank=True, default="")
     is_active = models.BooleanField(default=True)
@@ -290,11 +305,25 @@ class BouquetOffering(models.Model):
     class Meta:
         ordering = ["title"]
 
+    def clean(self) -> None:
+        """Validation métier stricte : université obligatoire si type=university."""
+        from django.core.exceptions import ValidationError
+        if self.bouquet_type == "university" and not self.target_institution:
+            raise ValidationError({
+                'target_institution': "La sélection d'une université partenaire est obligatoire pour le type « Intégral Université »."
+            })
+        if self.monthly_price is not None and self.monthly_price < 0:
+            raise ValidationError({'monthly_price': "Le tarif mensuel ne peut pas être négatif."})
+        if self.annual_price is not None and self.annual_price < 0:
+            raise ValidationError({'annual_price': "Le tarif annuel ne peut pas être négatif."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def get_books_queryset(self, requesting_institution=None):
         """
-        Calcule le contenu RÉEL du bouquet. Pour les types automatiques, interroge le
-        catalogue en direct — jamais de liste figée. Pour 'custom', renvoie la sélection
-        manuelle de l'Admin.
+        Calcule le contenu RÉEL du bouquet en interrogeant le catalogue en direct.
         """
         from apps.catalog.models import Ouvrage
 
@@ -311,14 +340,12 @@ class BouquetOffering(models.Model):
                 Q(discipline__name__icontains=self.discipline) |
                 Q(disciplines__name__icontains=self.discipline)
             ).distinct()
-        elif self.bouquet_type == "faculty" and self.faculty_code:
-            qs = qs.filter(faculty__icontains=self.faculty_code)
-            if self.target_institution:
-                qs = qs.filter(institution=self.target_institution)
         elif self.bouquet_type == "university":
             target = self.target_institution or requesting_institution
             if target:
                 qs = qs.filter(institution=target)
+            else:
+                qs = qs.none()
         elif self.bouquet_type == "country" and self.country:
             qs = qs.filter(country=self.country)
 
@@ -339,5 +366,17 @@ class BouquetOffering(models.Model):
             total = self.get_books_queryset().aggregate(total=Sum('price_digital'))['total']
             return total if total is not None else Decimal('0.00')
         return self.annual_price
+
+    def get_real_monthly_price(self):
+        """
+        Calcule le tarif mensuel réel du bouquet.
+        """
+        from decimal import Decimal
+        if self.bouquet_type == "general":
+            # Pour le général, formule mensuelle au 1/10ème du catalogue
+            annual = self.get_real_annual_price()
+            return (annual / Decimal('10.0')).quantize(Decimal('0.01'))
+        return self.monthly_price
+
 
 

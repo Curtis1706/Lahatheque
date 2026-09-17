@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Facture Acquittée • Souscription Bouquet LAHAThèque</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@400;500;600&display=swap');
+
+    :root {
+      --color-navy: #1B2A4E;
+      --color-navy-dark: #0F1A33;
+      --color-gold: #B08D42;
+      --color-background: #FFFFFF;
+      --color-background-secondary: #F8FAFC;
+      --color-border: #E2E8F0;
+      --color-text-main: #1E293B;
+      --color-text-muted: #64748B;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--color-background);
+      color: var(--color-text-main);
+      line-height: 1.5;
+      padding: 40px;
+      font-size: 13px;
+    }
+
+    .header-table {
+      width: 100%;
+      margin-bottom: 30px;
+      border-bottom: 2px solid var(--color-gold);
+      padding-bottom: 20px;
+    }
+
+    .brand-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--color-navy);
+      letter-spacing: 0.5px;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: var(--color-gold);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .invoice-badge {
+      display: inline-block;
+      background: var(--color-navy);
+      color: #FFFFFF;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .paid-stamp {
+      display: inline-block;
+      margin-top: 8px;
+      border: 1.5px solid #10B981;
+      color: #059669;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .info-grid {
+      width: 100%;
+      margin-bottom: 30px;
+    }
+
+    .info-col {
+      vertical-align: top;
+      width: 50%;
+    }
+
+    .section-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+
+    .items-table th {
+      background: var(--color-navy);
+      color: #FFFFFF;
+      font-weight: 600;
+      font-size: 12px;
+      text-align: left;
+      padding: 10px 14px;
+    }
+
+    .items-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--color-border);
+      font-size: 13px;
+    }
+
+    .items-table tr:nth-child(even) td {
+      background: var(--color-background-secondary);
+    }
+
+    .totals-table {
+      width: 320px;
+      margin-left: auto;
+      margin-bottom: 40px;
+      border-collapse: collapse;
+    }
+
+    .totals-table td {
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .totals-table tr.total-row td {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-navy);
+      border-top: 2px solid var(--color-gold);
+      padding-top: 12px;
+    }
+
+    .validity-box {
+      background: var(--color-background-secondary);
+      border: 1px solid var(--color-border);
+      border-left: 4px solid var(--color-gold);
+      padding: 16px 20px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 40px;
+    }
+
+    .footer {
+      border-top: 1px solid var(--color-border);
+      padding-top: 20px;
+      font-size: 11px;
+      color: var(--color-text-muted);
+      text-align: center;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <table class="header-table">
+    <tr>
+      <td>
+        <div class="brand-title">LAHATHÈQUE</div>
+        <div class="brand-sub">Éditions LAHA • Plateforme Académique Officielle</div>
+        <div style="font-size: 11px; color: var(--color-text-muted); margin-top: 4px;">
+          Cotonou, République du Bénin • contact@lahatheque.com
+        </div>
+      </td>
+      <td style="text-align: right;">
+        <div class="invoice-badge">Facture N° {{ invoice_number }}</div>
+        <div>
+          <span class="paid-stamp">Acquittée &bull; Paiement Validé</span>
+        </div>
+        <div style="font-size: 11px; color: var(--color-text-muted); margin-top: 6px;">
+          Date d'émission : {{ invoice_date }}
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="info-grid">
+    <tr>
+      <td class="info-col">
+        <div class="section-title">Destinataire / Souscripteur</div>
+        <div style="font-weight: 600; font-size: 14px; color: var(--color-navy);">{{ customer_name }}</div>
+        {% if institution_code %}
+          <div style="color: var(--color-text-muted);">Code Établissement : {{ institution_code }}</div>
+        {% endif %}
+        <div style="color: var(--color-text-muted);">Email : {{ customer_email }}</div>
+      </td>
+      <td class="info-col" style="text-align: right;">
+        <div class="section-title">Règlement &amp; Transaction</div>
+        <div>Mode d'encaissement : <strong>{{ payment_method }}</strong></div>
+        <div>Référence transaction : <strong>{{ transaction_ref }}</strong></div>
+        <div>Devise : <strong>{{ currency }}</strong></div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th>Description de l'Abonnement</th>
+        <th>Formule</th>
+        <th style="text-align: right;">Montant Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <strong>Bouquet Académique « {{ bouquet_title }} »</strong>
+          <div style="font-size: 11px; color: var(--color-text-muted); margin-top: 2px;">
+            Accès illimité aux ouvrages de la discipline • Licence numérique multi-utilisateurs
+          </div>
+        </td>
+        <td>{{ period_label }}</td>
+        <td style="text-align: right; font-weight: 600;">{{ amount_formatted }} {{ currency }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <table class="totals-table">
+    <tr>
+      <td>Total Brut HT</td>
+      <td style="text-align: right;">{{ amount_formatted }} {{ currency }}</td>
+    </tr>
+    <tr>
+      <td>TVA (0% Régime Éducation / Édition)</td>
+      <td style="text-align: right;">0 {{ currency }}</td>
+    </tr>
+    <tr class="total-row">
+      <td>Net Payé TTC</td>
+      <td style="text-align: right; color: var(--color-gold);">{{ amount_formatted }} {{ currency }}</td>
+    </tr>
+  </table>
+
+  <div class="validity-box">
+    <strong style="color: var(--color-navy); font-size: 13px;">Période de Validité de la Licence :</strong>
+    <p style="margin-top: 4px; color: var(--color-text-main);">
+      Vos droits d'accès au bouquet sont officiellement certifiés du <strong>{{ start_date }}</strong> au <strong>{{ end_date }}</strong>.
+      {% if is_university %}
+        La clé API associée restera active durant toute cette période pour les étudiants et enseignants de votre établissement.
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="footer">
+    LAHA Éditions SARL &bull; IFU : 3201501234567 &bull; RCCM : RB/COT/15 B 14120<br>
+    Facture électronique certifiée conforme aux normes OHADA / DGI Bénin &bull; Document généré automatiquement par LAHAThèque
+  </div>
+
+</body>
+</html>

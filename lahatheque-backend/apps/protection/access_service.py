@@ -179,11 +179,16 @@ class AccessService:
                 offering = BouquetOffering.objects.get(id=sub.offering_id, is_active=True)
             except BouquetOffering.DoesNotExist:
                 continue
-            if offering.get_books_queryset().filter(id=book_id).exists():
+            if offering.get_books_queryset().filter(id=resolved_book_id).exists():
                 return {
                     "access_granted": True,
                     "reason": "client_bouquet_subscription",
-                    "stream_url": f"/api/v1/catalog/books/{book_id}/stream/"
+                    "bouquet_title": sub.title,
+                    "bouquet_id": str(sub.id),
+                    "expires_at": sub.end_date.isoformat() if sub.end_date else None,
+                    "resolved_book_id": str(resolved_book_id),
+                    "language": resolved_lang,
+                    "stream_url": f"/api/v1/catalog/books/{resolved_book_id}/stream/{stream_query}"
                 }
 
         # Abonnement institutionnel (UAC, UNA, etc.)
