@@ -4,19 +4,23 @@ Gère la création de sessions, la validation de token, les quiz, la progression
 """
 
 from datetime import timedelta
+import hashlib
 import logging
+import secrets
 from typing import Any, Dict, List, Optional, Union
 import uuid
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
-from rest_framework import status
+from rest_framework import status, throttling as rest_framework_throttling
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSet
+import rest_framework.throttling
 
 from apps.protection.models import TraceAcces
 from .models import PartnerApp, PartnerEndUser, ReaderSession, ResultatQuizSession
@@ -174,11 +178,20 @@ class ReaderSessionViewSet(ViewSet):
             # 3. Génération du token JWT éphémère
             token_str, token_hash = ReaderTokenService.generate_token_for_session(session)
             session.token_hash = token_hash
+
+            # S-04 : Génération d'un code court opaque unique pour l'URL (élimine le JWT en clair dans l'URL)
+            access_code = f"rtk_{secrets.token_urlsafe(18)}"
+            session_metadata['access_code'] = access_code
+            session.metadata = session_metadata
             session.save()
 
-        # 4. Construction de l'URL publique de lecture (avec paramètre de langue si spécifié)
+            # Enregistrement dans le cache Redis avec le TTL de la session
+            cache_ttl = int((expires_at - timezone.now()).total_seconds()) if expires_at else ttl_seconds
+            cache.set(f"reader_code:{access_code}", token_str, timeout=max(60, cache_ttl))
+
+        # 4. Construction de l'URL publique de lecture avec le code court opaque (S-04)
         frontend_base = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-        reader_url = f"{frontend_base.rstrip('/')}/read/{token_str}"
+        reader_url = f"{frontend_base.rstrip('/')}/read/{access_code}"
         if req_lang:
             reader_url = f"{reader_url}?lang={req_lang}"
 
@@ -251,6 +264,8 @@ class ReaderSessionViewSet(ViewSet):
             data={
                 "session_id": str(session.id),
                 "reader_url": reader_url,
+                "access_code": access_code,
+                "reader_token": token_str,
                 "expires_at": expires_at.isoformat(),
                 "book": book_info,
                 "status": "created"
@@ -307,13 +322,21 @@ class ReaderSessionViewSet(ViewSet):
         return standard_response(data={"message": "Session révoquée avec succès"})
 
 
+class _TokenValidationThrottle(rest_framework.throttling.AnonRateThrottle):
+    """Rate limiting sur l'endpoint public de validation de token (S-05)."""
+    scope = 'reader_token_validation'
+    rate = '30/min'
+
+
 class ReaderValidateTokenView(APIView):
     """
     POST /api/v1/reader/sessions/validate-token/
-    Endpoint public appelé par la page Next.js /read/[token] pour initialiser le lecteur.
+    Endpoint public appele par la page Next.js /read/[token] pour initialiser le lecteur.
+    Rate-limited a 30 requetes/minute par IP (S-05).
     """
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [_TokenValidationThrottle]
 
     def post(self, request: Request) -> Response:
         token_str = request.data.get('token')
@@ -332,15 +355,9 @@ class ReaderValidateTokenView(APIView):
             session = ReaderTokenService.decode_and_validate_token(token_str)
         except ReaderTokenError as e:
             error_msg = str(e)
-            # Fallback 1: Recherche par empreinte de token (token_hash)
+            # Fallback par empreinte SHA-256 du token uniquement (necessite le token en clair)
+            # Le fallback par UUID est supprime car il bypasse la signature JWT (S-06)
             session = ReaderSession.objects.filter(token_hash=token_str).first()
-            # Fallback 2: Recherche par UUID direct si format UUID valide
-            if not session:
-                try:
-                    uuid_val = uuid.UUID(str(token_str))
-                    session = ReaderSession.objects.filter(id=uuid_val).first()
-                except (ValueError, TypeError, AttributeError):
-                    session = None
 
         if not session:
             return standard_response(
@@ -402,7 +419,8 @@ class ReaderValidateTokenView(APIView):
             or request.COOKIES.get(session_cookie_key)
             or request.COOKIES.get("laha_reader_bind")
             or (request.data.get("device_binding_token") if hasattr(request, "data") and isinstance(request.data, dict) else None)
-            or request.query_params.get("device_token")
+            # query_params.get("device_token") supprime : les tokens de securite ne doivent pas
+            # transiter par l'URL (journalise en clair par Nginx/Cloudflare) (S-13)
         )
         if incoming_device_token:
             incoming_device_token = str(incoming_device_token).strip()
@@ -519,26 +537,52 @@ class ReaderValidateTokenView(APIView):
             }
         }
 
+        # S-04 : Résolution du token JWT actif pour les appels internes du frontend
+        active_jwt = None
+        if token_str.count(".") == 2:
+            active_jwt = token_str
+        else:
+            cached_jwt = cache.get(f"reader_code:{token_str}")
+            if cached_jwt and isinstance(cached_jwt, str) and cached_jwt.count(".") == 2:
+                active_jwt = cached_jwt
+            else:
+                active_jwt, new_hash = ReaderTokenService.generate_token_for_session(session)
+                session.token_hash = new_hash
+                session.save(update_fields=['token_hash', 'updated_at'])
+                ttl_left = int((session.expires_at - timezone.now()).total_seconds()) if session.expires_at else 14400
+                cache.set(f"reader_code:{token_str}", active_jwt, timeout=max(60, ttl_left))
+
+        if active_jwt:
+            response_data["session_token"] = active_jwt
+
+        access_code_val = session_meta.get("access_code") or (token_str if token_str.count(".") != 2 else None)
+        if access_code_val:
+            response_data["access_code"] = access_code_val
+
         if device_binding_token_for_response:
             response_data["device_binding_token"] = device_binding_token_for_response
 
         response = standard_response(data=response_data)
         if device_binding_token_for_response:
+            # max_age aligne sur la duree reelle de la session (S-14)
+            # secure=True systématique, samesite='Strict' pour protection CSRF renforcee
+            cookie_max_age = int((session.expires_at - timezone.now()).total_seconds()) if session.expires_at else 86400
+            cookie_max_age = max(60, cookie_max_age)  # minimum 60s pour eviter expiration immediate
             response.set_cookie(
                 session_cookie_key,
                 device_binding_token_for_response,
-                max_age=86400,
+                max_age=cookie_max_age,
                 httponly=True,
-                samesite='Lax',
-                secure=request.is_secure()
+                samesite='Strict',
+                secure=True
             )
             response.set_cookie(
                 "laha_reader_bind",
                 device_binding_token_for_response,
-                max_age=86400,
+                max_age=cookie_max_age,
                 httponly=True,
-                samesite='Lax',
-                secure=request.is_secure()
+                samesite='Strict',
+                secure=True
             )
         return response
 
@@ -775,11 +819,11 @@ class QuizRetrieveOrGenerateView(APIView):
 class QuizSubmitAnswersView(APIView):
     """
     POST /api/v1/reader/quizzes/<quiz_id>/submit/
-    Soumet les réponses de l'étudiant et calcule le score.
-    Accessible aux lecteurs internes et aux étudiants invités.
+    Soumet les reponses de l'etudiant et calcule le score.
+    Accessible aux lecteurs internes authentifies uniquement (SEC-06).
     Body: { "answers": { "question_id": selected_index, ... } }
     """
-    permission_classes = []
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, quiz_id):
         from apps.catalog.models import Quiz
@@ -791,7 +835,7 @@ class QuizSubmitAnswersView(APIView):
 
         answers = request.data.get('answers', {})
         if not answers:
-            return Response({"success": False, "error": "Aucune réponse soumise."}, status=400)
+            return Response({"success": False, "error": "Aucune reponse soumise."}, status=400)
 
         questions = list(quiz.questions.all())
         total = len(questions)
@@ -807,10 +851,9 @@ class QuizSubmitAnswersView(APIView):
                 "question_id": str(q.id),
                 "question": q.question_text,
                 "user_answer": user_answer,
-                "correct_index": q.correct_index,
-                "correct_option": q.options[q.correct_index] if q.correct_index < len(q.options) else "",
+                # correct_index intentionnellement absent de la reponse (S-02)
                 "is_correct": is_correct,
-                "explanation": q.explanation,
+                "explanation": q.explanation if is_correct else "",
             })
 
         score_percent = (correct / total * 100) if total > 0 else 0
@@ -828,6 +871,7 @@ class QuizSubmitAnswersView(APIView):
                 "details": details,
             }
         })
+
 
 
 import re
@@ -910,9 +954,10 @@ class ReaderProtectedStreamView(APIView):
             is_blocked = True
 
         if is_blocked:
-            session.is_revoked = True
-            session.revoked_reason = "Accès révoqué pour violation des droits d'auteur (Liste noire active)."
-            session.save(update_fields=["is_revoked", "revoked_reason"])
+            # Correction S-07 : les champs is_revoked/revoked_reason n'existent pas dans le modele.
+            # Utilisation du champ status='revoked' defini dans STATUS_CHOICES.
+            session.status = 'revoked'
+            session.save(update_fields=["status", "updated_at"])
             logger.warning(
                 f"[ReaderStream BLOCKED] Accès refusé au lecteur bloqué: {reader_email or client_ip} "
                 f"(Session: {session.id} | Partenaire: {session.partner_id})"
@@ -1026,7 +1071,11 @@ class ReaderProtectedStreamView(APIView):
 
         response["Accept-Ranges"] = "bytes"
         response["Cache-Control"] = "private, no-store, must-revalidate"
+        response["Pragma"] = "no-cache"  # S-11 : compatibilite proxies HTTP/1.0
         response["X-Content-Type-Options"] = "nosniff"
+        response["X-Frame-Options"] = "SAMEORIGIN"  # S-11 : anti-clickjacking iframe
+        safe_title = (doc_title or "document")[:50].replace('"', '')
+        response["Content-Disposition"] = f'inline; filename="{safe_title}.pdf"'  # S-11
         return response
 
     def _parse_range_header(self, range_header, total_size):
@@ -1090,10 +1139,11 @@ class PartnerCatalogListView(APIView):
         active_ids = list(active_bouquets.values_list('id', flat=True)) if active_bouquets else []
         active_ids_str = "-".join(sorted(str(i) for i in active_ids))
 
-        # 1. Clé de cache déterministe contextuelle au partenaire et aux bouquets actifs
+        # 1. Cle de cache deterministe contextuelle au partenaire et aux bouquets actifs
+        # SHA-256 au lieu de MD5 (casse cryptographiquement) : S-12
         query_items = sorted(request.query_params.items())
         cache_raw = f"partner_catalog:{partner_id}:{active_ids_str}:{query_items}"
-        cache_key = "partner:cat:" + hashlib.md5(cache_raw.encode("utf-8")).hexdigest()
+        cache_key = "partner:cat:" + hashlib.sha256(cache_raw.encode("utf-8")).hexdigest()[:32]
 
         cached_response = cache.get(cache_key)
         if cached_response is not None:

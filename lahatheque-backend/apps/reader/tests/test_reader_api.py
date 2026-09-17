@@ -1,17 +1,19 @@
 """
 Tests unitaires et d'intégration pour l'application Reader (API Lecteur Hébergé).
-Valide la création de sessions multi-sources, la sécurité des tokens, les quiz et l'anti-open-redirect.
+Valide la création de sessions multi-sources, la sécurité des tokens, les quiz,
+l'anti-open-redirect et la protection S-04 (code d'accès court opaque dans l'URL).
 """
 
 from datetime import timedelta
 import json
+from unittest.mock import patch
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 from apps.catalog.models import Ouvrage
 from apps.publishers_portal.models import Publisher
-from .models import PartnerApp, PartnerEndUser, ReaderSession, ResultatQuizSession, WebhookLog
-from .tokens import ReaderTokenService, ReaderTokenError
+from apps.reader.models import PartnerApp, PartnerEndUser, ReaderSession, ResultatQuizSession, WebhookLog
+from apps.reader.tokens import ReaderTokenService, ReaderTokenError
 
 
 class ReaderAPITestCase(TestCase):
@@ -19,6 +21,13 @@ class ReaderAPITestCase(TestCase):
 
     def setUp(self) -> None:
         self.client = APIClient()
+        webhook_patcher = patch("apps.reader.views.dispatch_partner_webhook_sync")
+        self.mock_webhook = webhook_patcher.start()
+        self.addCleanup(webhook_patcher.stop)
+
+        celery_patcher = patch("apps.protection.tasks.prepare_derived_document_task.delay")
+        self.mock_celery = celery_patcher.start()
+        self.addCleanup(celery_patcher.stop)
 
         # 1. Création d'un éditeur et d'un ouvrage pour le test de catalogue
         self.editeur = Publisher.objects.create(
@@ -35,7 +44,7 @@ class ReaderAPITestCase(TestCase):
         )
 
         # 2. Création d'un partenaire avec identifiants client sécurisés et origines autorisées
-        from .auth_utils import generate_client_id, generate_client_secret, hash_secret
+        from apps.reader.auth_utils import generate_client_id, generate_client_secret, hash_secret
         self.client_id = generate_client_id()
         self.client_secret = generate_client_secret()
         self.partner = PartnerApp.objects.create(
@@ -49,7 +58,7 @@ class ReaderAPITestCase(TestCase):
         )
 
     def test_create_session_catalog_book(self) -> None:
-        """Test de création d'une session pour un livre du catalogue interne."""
+        """Test de création d'une session pour un livre du catalogue interne avec code court opaque (S-04)."""
         url = "/api/v1/reader/sessions/"
         payload = {
             "source_type": "catalog_book",
@@ -78,7 +87,98 @@ class ReaderAPITestCase(TestCase):
         self.assertTrue(res_data["success"])
         self.assertIn("session_id", res_data["data"])
         self.assertIn("reader_url", res_data["data"])
+        self.assertIn("access_code", res_data["data"])
+
+        # S-04 : L'URL de lecture doit contenir le code court et JAMAIS un JWT avec 2 points
+        reader_url = res_data["data"]["reader_url"]
+        self.assertIn("/read/rtk_", reader_url)
+        url_token = reader_url.split("/read/")[-1].split("?")[0]
+        self.assertNotEqual(url_token.count("."), 2, "L'URL ne doit pas exposer de token JWT avec signature.")
+
         self.assertEqual(res_data["data"]["book"]["title"], "Manuel d'Intelligence Artificielle")
+
+    def test_s04_short_code_exchange_and_validation(self) -> None:
+        """S-04 : Test d'échange du code court opaque contre la session et le token JWT."""
+        # 1. Création de session
+        create_resp = self.client.post(
+            "/api/v1/reader/sessions/",
+            data=json.dumps({
+                "source_type": "catalog_book",
+                "book_id": str(self.ouvrage.id),
+                "external_user_ref": "etudiant-s04",
+                "external_user_name": "Bakary Diop",
+                "return_url": "https://uac.bj/cours"
+            }),
+            content_type="application/json",
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret
+        )
+        self.assertEqual(create_resp.status_code, 201)
+        access_code = create_resp.json()["data"]["access_code"]
+        self.assertTrue(access_code.startswith("rtk_"))
+
+        # 2. Validation de la session via le code court
+        val_resp = self.client.post(
+            "/api/v1/reader/sessions/validate-token/",
+            data=json.dumps({"token": access_code}),
+            content_type="application/json"
+        )
+        self.assertEqual(val_resp.status_code, 200)
+        val_data = val_resp.json()["data"]
+        self.assertEqual(val_data["book"]["title"], "Manuel d'Intelligence Artificielle")
+        self.assertEqual(val_data["user"]["name"], "Bakary Diop")
+        # Le session_token JWT doit être retourné pour les appels internes du lecteur
+        self.assertIn("session_token", val_data)
+        self.assertEqual(val_data["session_token"].count("."), 2)
+
+    def test_anti_sharing_lock_with_short_code(self) -> None:
+        """S-04 : Test du verrouillage de session au premier navigateur et rejet d'un second navigateur."""
+        create_resp = self.client.post(
+            "/api/v1/reader/sessions/",
+            data=json.dumps({
+                "source_type": "catalog_book",
+                "book_id": str(self.ouvrage.id),
+                "external_user_ref": "etudiant-sharing",
+                "return_url": "https://uac.bj/cours"
+            }),
+            content_type="application/json",
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret
+        )
+        access_code = create_resp.json()["data"]["access_code"]
+
+        # Navigateur 1 : Première activation réussie
+        client_browser_1 = APIClient()
+        val_1 = client_browser_1.post(
+            "/api/v1/reader/sessions/validate-token/",
+            data=json.dumps({"token": access_code}),
+            content_type="application/json",
+            HTTP_USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"
+        )
+        self.assertEqual(val_1.status_code, 200)
+        device_token_1 = val_1.json()["data"]["device_binding_token"]
+        self.assertTrue(device_token_1)
+
+        # Navigateur 2 : Tentative d'accès avec le même code court sans le device token -> Refus 403
+        client_browser_2 = APIClient()
+        val_2 = client_browser_2.post(
+            "/api/v1/reader/sessions/validate-token/",
+            data=json.dumps({"token": access_code}),
+            content_type="application/json",
+            HTTP_USER_AGENT="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15"
+        )
+        self.assertEqual(val_2.status_code, 403)
+        self.assertIn("verrouillée sur un autre navigateur", val_2.json()["error"])
+
+        # Navigateur 1 : Rechargement (F5) avec son device token -> Autorisé 200
+        val_1_reload = client_browser_1.post(
+            "/api/v1/reader/sessions/validate-token/",
+            data=json.dumps({"token": access_code, "device_binding_token": device_token_1}),
+            content_type="application/json",
+            HTTP_X_READER_DEVICE_TOKEN=device_token_1,
+            HTTP_USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"
+        )
+        self.assertEqual(val_1_reload.status_code, 200)
 
     def test_create_session_external_url_byod(self) -> None:
         """Test de création d'une session pour un document externe SaaS (BYOD)."""
@@ -121,15 +221,15 @@ class ReaderAPITestCase(TestCase):
         self.assertEqual(res_data["data"]["book"]["title"], "Support de Cours — Droit International")
 
     def test_anti_open_redirect_rejection(self) -> None:
-        """Test de validation des return_url : acceptation de toutes les origines HTTP/HTTPS et rejet des protocoles invalides."""
+        """Test de validation des return_url : acceptation des origines autorisées et rejet des autres (S-03)."""
         url = "/api/v1/reader/sessions/"
         
-        # 1. URL externe valide acceptée (whitelist universelle)
+        # 1. URL externe autorisée dans la liste blanche (https://uac.bj) acceptée
         payload_valid = {
             "source_type": "catalog_book",
             "book_id": str(self.ouvrage.id),
             "external_user_ref": "etudiant-wh",
-            "return_url": "https://any-external-domain.com/app/dashboard"
+            "return_url": "https://uac.bj/app/dashboard"
         }
         resp_valid = self.client.post(
             url,
@@ -141,7 +241,25 @@ class ReaderAPITestCase(TestCase):
         self.assertEqual(resp_valid.status_code, 201)
         self.assertTrue(resp_valid.json()["success"])
 
-        # 2. Protocole non supporté (ex: javascript:) rejeté
+        # 2. Domaine non autorisé rejeté (S-03)
+        payload_unauthorized = {
+            "source_type": "catalog_book",
+            "book_id": str(self.ouvrage.id),
+            "external_user_ref": "etudiant-attack",
+            "return_url": "https://site-malveillant.com/phishing"
+        }
+        resp_unauth = self.client.post(
+            url,
+            data=json.dumps(payload_unauthorized),
+            content_type="application/json",
+            HTTP_X_CLIENT_ID=self.client_id,
+            HTTP_X_CLIENT_SECRET=self.client_secret
+        )
+        self.assertEqual(resp_unauth.status_code, 400)
+        self.assertFalse(resp_unauth.json()["success"])
+        self.assertIn("return_url", str(resp_unauth.json()["error"]))
+
+        # 3. Protocole non supporté (ex: javascript:) rejeté
         payload_invalid = {
             "source_type": "catalog_book",
             "book_id": str(self.ouvrage.id),
@@ -349,7 +467,6 @@ class ReaderAPITestCase(TestCase):
         offering = BouquetOffering.objects.create(
             title="Bouquet Juridique & Sciences",
             bouquet_type="custom",
-            books_count=1,
             annual_price=250000,
             currency="XOF",
             is_active=True,

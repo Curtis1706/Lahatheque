@@ -132,6 +132,7 @@ REST_FRAMEWORK = {
         'auth': '10/min',
         'auth_reset': '5/min',
         'quiz_generation': '3/hour',
+        'reader_token_validation': '30/min',  # S-05 : endpoint public validate-token
     },
     'EXCEPTION_HANDLER': 'common.exceptions.custom_exception_handler',
 }
@@ -149,8 +150,10 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-# ── OAuth2 Provider Configuration (DOT) ──────────────────────────────────────
 OAUTH2_PROVIDER_APPLICATION_MODEL = 'oauth2_provider.Application'
+OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = 'oauth2_provider.AccessToken'
+OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = 'oauth2_provider.RefreshToken'
+OAUTH2_PROVIDER_ID_TOKEN_MODEL = 'oauth2_provider.IDToken'
 OAUTH2_PROVIDER = {
     'SCOPES': {
         'read': 'Lecture',

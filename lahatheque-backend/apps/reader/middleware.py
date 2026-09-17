@@ -58,16 +58,28 @@ class ReaderApiLoggingMiddleware:
 
                 if token_str:
                     try:
-                        payload = jwt.decode(token_str, settings.SECRET_KEY, algorithms=["HS256"])
-                        partner_id = payload.get("partner_id")
-                        if partner_id:
-                            partner = PartnerApp.objects.filter(id=partner_id).first()
-                        if not partner:
-                            session_id = payload.get("session_id")
-                            if session_id:
-                                session = ReaderSession.objects.select_related("partner").filter(id=session_id).first()
-                                if session:
-                                    partner = session.partner
+                        if token_str.count(".") != 2:
+                            from django.core.cache import cache
+                            cached_jwt = cache.get(f"reader_code:{token_str}")
+                            if cached_jwt and isinstance(cached_jwt, str):
+                                token_str = cached_jwt
+                            else:
+                                sess = ReaderSession.objects.select_related("partner").filter(metadata__access_code=token_str).first()
+                                if sess:
+                                    partner = sess.partner
+
+                        if not partner and token_str.count(".") == 2:
+                            reader_key = str(getattr(settings, "READER_JWT_SIGNING_KEY", settings.SECRET_KEY))
+                            payload = jwt.decode(token_str, reader_key, algorithms=["HS256"])
+                            partner_id = payload.get("partner_id")
+                            if partner_id:
+                                partner = PartnerApp.objects.filter(id=partner_id).first()
+                            if not partner:
+                                session_id = payload.get("session_id")
+                                if session_id:
+                                    session = ReaderSession.objects.select_related("partner").filter(id=session_id).first()
+                                    if session:
+                                        partner = session.partner
                     except Exception:
                         pass
 

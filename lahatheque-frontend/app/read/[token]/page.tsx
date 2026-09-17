@@ -138,10 +138,11 @@ export default function HostedReaderPage() {
 
     try {
       const targetUrl = `/api/bff/reader/sessions/stream/?lang=${newLang}`;
+      const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
       const deviceToken = hostedReaderApi.getDeviceBindingToken(token);
       const streamHeaders: Record<string, string> = {
         Accept: "application/pdf",
-        "X-Reader-Token": token,
+        "X-Reader-Token": activeToken,
       };
       if (deviceToken) {
         streamHeaders["X-Reader-Device-Token"] = deviceToken;
@@ -233,10 +234,11 @@ export default function HostedReaderPage() {
 
     const loadBlob = async () => {
       try {
+        const activeToken = session?.session_token || hostedReaderApi.getActiveToken(token) || token;
         const deviceToken = hostedReaderApi.getDeviceBindingToken(token);
         const streamHeaders: Record<string, string> = {
           Accept: "application/pdf",
-          "X-Reader-Token": token,
+          "X-Reader-Token": activeToken,
         };
         if (deviceToken) {
           streamHeaders["X-Reader-Device-Token"] = deviceToken;

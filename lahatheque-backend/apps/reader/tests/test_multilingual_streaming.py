@@ -69,9 +69,9 @@ class MultilingualStreamingTestCase(APITestCase):
     def test_streaming_with_language_parameter(self, mock_materialize):
         mock_materialize.return_value = (b"%PDF-1.4 mock stream bytes", 28)
 
-        # Requête streaming en version anglaise
-        resp_en = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/stream/?lang=en")
-        self.assertEqual(resp_en.status_code, status.HTTP_200_OK)
+        # Requête streaming en version anglaise (avec en-tête Range conforme DRM-01)
+        resp_en = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/stream/?lang=en", HTTP_RANGE="bytes=0-27")
+        self.assertIn(resp_en.status_code, [status.HTTP_200_OK, status.HTTP_206_PARTIAL_CONTENT])
         self.assertEqual(resp_en["Content-Type"], "application/pdf")
         self.assertIn("bytes", resp_en["Accept-Ranges"])
 
@@ -81,7 +81,8 @@ class MultilingualStreamingTestCase(APITestCase):
         self.assertIn(f"{self.ouvrage.id}:en", call_args.kwargs.get("source_reference", ""))
 
         # Requête streaming en version française
-        resp_fr = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/stream/?lang=fr")
-        self.assertEqual(resp_fr.status_code, status.HTTP_200_OK)
+        resp_fr = self.client.get(f"/api/v1/catalog/books/{self.ouvrage.id}/stream/?lang=fr", HTTP_RANGE="bytes=0-27")
+        self.assertIn(resp_fr.status_code, [status.HTTP_200_OK, status.HTTP_206_PARTIAL_CONTENT])
         call_args_fr = mock_materialize.call_args
         self.assertIn(f"{self.ouvrage.id}:fr", call_args_fr.kwargs.get("source_reference", ""))
+

@@ -181,8 +181,13 @@ class ReaderSessionCreateSerializer(serializers.Serializer):
                             break
 
                     if not allowed:
-                        # Si non listé mais whitelist non stricte, accepter tout par défaut
-                        allowed = True
+                        raise serializers.ValidationError({
+                            "return_url": (
+                                f"L'URL de retour '{return_url}' n'est pas dans la liste "
+                                "des origines autorisees pour ce partenaire. Mettez a jour "
+                                "le champ 'allowed_return_origins' dans la configuration partenaire."
+                            )
+                        })
 
         return attrs
 
