@@ -411,7 +411,7 @@ function CatalogSearchInner() {
                   onClick={() => setShowMobileFilters(false)}
                   className="flex-1 py-3 rounded-xl bg-navy hover:bg-navy-dark text-white font-bold text-xs transition-all text-center cursor-pointer shadow-md"
                 >
-                  Voir les résultats ({totalCount})
+                  Voir les résultats
                 </button>
               </div>
             </div>
@@ -874,7 +874,6 @@ function CatalogSearchInner() {
                     onPageChange={handlePageChange}
                     onPageSizeChange={handlePageSizeChange}
                     pageSizeOptions={[12, 20, 36, 48]}
-                    itemLabel="ouvrages disponibles"
                   />
                 </div>
               </>

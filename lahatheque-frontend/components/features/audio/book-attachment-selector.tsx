@@ -199,7 +199,7 @@ export function BookAttachmentSelector({ onSelectBook, selectedBook }: BookAttac
               {books.length > 0 && hasNext && (
                 <div className="p-3 bg-background-secondary/90 border-t border-border flex items-center justify-between sticky bottom-0 backdrop-blur-xs">
                   <span className="text-[11px] text-foreground-muted font-medium">
-                    {books.length} affichés sur {totalBooks}
+                    {books.length} titres affichés
                   </span>
                   <button
                     type="button"
@@ -221,7 +221,7 @@ export function BookAttachmentSelector({ onSelectBook, selectedBook }: BookAttac
 
               {books.length > 0 && !hasNext && (
                 <div className="p-2.5 bg-background-secondary/40 text-center text-[11px] text-foreground-muted font-medium border-t border-border">
-                  Tous les {totalBooks} ouvrages disponibles sont chargés
+                  Tous les ouvrages de la sélection sont chargés
                 </div>
               )}
             </div>
