@@ -80,6 +80,8 @@ export interface HostedReaderSessionData {
   quiz_completed: boolean;
   quiz_score?: number | null;
   user: HostedReaderEndUser;
+  access_code?: string;
+  session_token?: string;
 }
 
 export interface QuizSubmitPayload {
@@ -125,6 +127,17 @@ export const hostedReaderApi = {
   },
 
   /**
+   * Récupère le jeton JWT actif pour les appels sécurisés (stream, progress, quiz).
+   * Si la session a été ouverte par un code d'accès court (S-04), le JWT retourné
+   * lors de la validation est conservé en sessionStorage.
+   */
+  getActiveToken(token: string): string {
+    if (typeof window === "undefined" || !token) return token;
+    const tokenStorageKey = `laha_reader_token_${token.slice(0, 32)}`;
+    return sessionStorage.getItem(tokenStorageKey) || token;
+  },
+
+  /**
    * Valide un token de session et récupère les données de configuration complètes.
    * Gère le verrouillage anti-partage de navigateur via le secret de liaison.
    */
@@ -162,8 +175,14 @@ export const hostedReaderApi = {
     if (response) {
       const resJson = await response.json().catch(() => ({}));
       if (response.ok && resJson.data && resJson.data.book) {
-        if (typeof window !== "undefined" && resJson.data.device_binding_token) {
-          sessionStorage.setItem(storageKey, resJson.data.device_binding_token);
+        if (typeof window !== "undefined") {
+          if (resJson.data.device_binding_token) {
+            sessionStorage.setItem(storageKey, resJson.data.device_binding_token);
+          }
+          if (resJson.data.session_token) {
+            const tokenStorageKey = `laha_reader_token_${token.slice(0, 32)}`;
+            sessionStorage.setItem(tokenStorageKey, resJson.data.session_token);
+          }
         }
         return resJson.data as HostedReaderSessionData;
       }
@@ -183,11 +202,12 @@ export const hostedReaderApi = {
    */
   async syncProgress(payload: ProgressSyncPayload): Promise<void> {
     try {
+      const activeToken = this.getActiveToken(payload.token);
       const deviceToken = this.getDeviceBindingToken(payload.token);
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        "X-Reader-Token": payload.token,
-        "Authorization": `Bearer ${payload.token}`,
+        "X-Reader-Token": activeToken,
+        "Authorization": `Bearer ${activeToken}`,
       };
       if (deviceToken) {
         headers["X-Reader-Device-Token"] = deviceToken;
@@ -208,11 +228,12 @@ export const hostedReaderApi = {
    * Soumet les réponses d'un quiz interactif validé par l'apprenant.
    */
   async submitQuiz(payload: QuizSubmitPayload): Promise<QuizSubmitResponse> {
+    const activeToken = this.getActiveToken(payload.token);
     const deviceToken = this.getDeviceBindingToken(payload.token);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "X-Reader-Token": payload.token,
-      "Authorization": `Bearer ${payload.token}`,
+      "X-Reader-Token": activeToken,
+      "Authorization": `Bearer ${activeToken}`,
     };
     if (deviceToken) {
       headers["X-Reader-Device-Token"] = deviceToken;

@@ -17,8 +17,9 @@ from .auth_utils import verify_secret
 def _authenticate_by_client_credentials(request) -> PartnerApp | None:
     """
     Authentifie un partenaire par client_id + client_secret.
-    Cherche les identifiants dans les headers (X-Client-Id / X-Client-Secret / HTTP_X_CLIENT_ID)
-    OU dans le corps JSON (client_id / client_secret). Le secret est TOUJOURS requis.
+    Cherche les identifiants UNIQUEMENT dans les en-tetes HTTP (X-Client-Id / X-Client-Secret).
+    L'acceptation dans le corps JSON est supprimee car les corps de requete sont souvent
+    journalises en clair par les outils APM et proxies. (S-09)
     """
     client_id = (
         request.headers.get("X-Client-Id")
@@ -30,11 +31,8 @@ def _authenticate_by_client_credentials(request) -> PartnerApp | None:
         or request.META.get("HTTP_X_CLIENT_SECRET")
         or (request.headers.get("x-client-secret") if hasattr(request, "headers") else None)
     )
-
-    if not client_id and hasattr(request, 'data') and isinstance(request.data, dict):
-        client_id = request.data.get("client_id")
-    if not client_secret and hasattr(request, 'data') and isinstance(request.data, dict):
-        client_secret = request.data.get("client_secret")
+    # client_id et client_secret depuis le body JSON supprimes (S-09) :
+    # les credentials ne doivent transiter que par les en-tetes HTTP.
 
     if not client_id or not client_secret:
         return None
@@ -86,8 +84,13 @@ class PartnerAuthentication(BaseAuthentication):
                         if hasattr(request, "_request"):
                             request._request.partner = partner
                         return (None, partner)
-            except Exception:
-                pass
+            except jwt.InvalidTokenError:
+                pass  # Token JWT invalide : comportement attendu, on passe au fallback
+            except Exception as jwt_err:
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    f"[PartnerAuthentication] Erreur inattendue lors de la verification JWT: {jwt_err}"
+                )
 
         # 2. client_id + client_secret (headers ou body)
         partner = _authenticate_by_client_credentials(request)
@@ -129,8 +132,13 @@ class IsAuthenticatedPartner(BasePermission):
                         if hasattr(request, "_request"):
                             request._request.partner = partner
                         return True
-            except Exception:
-                pass
+            except jwt.InvalidTokenError:
+                pass  # Token JWT invalide : comportement attendu, on passe au fallback
+            except Exception as jwt_err:
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    f"[IsAuthenticatedPartner] Erreur inattendue lors de la verification JWT: {jwt_err}"
+                )
 
         # 2. client_id + client_secret — SEUL chemin d'authentification directe
         partner = _authenticate_by_client_credentials(request)
@@ -178,8 +186,9 @@ class IsValidReaderSession(BasePermission):
                     or request.COOKIES.get(session_cookie_key)
                     or request.COOKIES.get("laha_reader_bind")
                     or (request.data.get("device_binding_token") if hasattr(request, "data") and isinstance(request.data, dict) else None)
-                    or request.query_params.get("device_token")
                 )
+                # query_params.get("device_token") supprime (S-13) : token sensible ne doit pas
+                # transiter par l'URL (journalise en clair par les serveurs et proxies)
                 if not incoming_device_token:
                     return False
                 calc_hash = hashlib.sha256(str(incoming_device_token).strip().encode("utf-8")).hexdigest()

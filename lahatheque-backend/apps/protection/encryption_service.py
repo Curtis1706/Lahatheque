@@ -20,15 +20,27 @@ class EncryptionService:
 
     @classmethod
     def _get_key(cls) -> bytes:
-        """Récupère la clé de 256 bits (32 octets) depuis les paramètres."""
-        raw_key = getattr(settings, "FIELD_ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+        """Recupere la cle de 256 bits (32 octets) depuis les parametres.
+
+        Leve ImproperlyConfigured si la variable FIELD_ENCRYPTION_KEY est absente afin
+        d'empecher tout deploiement silencieux avec une cle par defaut (S-10).
+        """
+        from django.core.exceptions import ImproperlyConfigured
+        raw_key = getattr(settings, "FIELD_ENCRYPTION_KEY", None)
+        if not raw_key:
+            raise ImproperlyConfigured(
+                "FIELD_ENCRYPTION_KEY est obligatoire et absent de la configuration. "
+                "Generez une cle de 256 bits (64 caracteres hexadecimaux) et ajoutez-la "
+                "dans vos variables d'environnement ou votre fichier .env.\n"
+                "Exemple (Python) : import secrets; print(secrets.token_hex(32))"
+            )
         if isinstance(raw_key, str):
             if len(raw_key) == 64:  # Hex string
                 try:
                     return bytes.fromhex(raw_key)
                 except ValueError:
                     pass
-            # Troncature ou padding à 32 octets
+            # Troncature ou padding a 32 octets si format non-hex
             key_bytes = raw_key.encode("utf-8")
             return key_bytes.ljust(32, b"0")[:32]
         return bytes(raw_key)[:32]

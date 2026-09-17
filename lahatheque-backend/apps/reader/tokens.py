@@ -67,20 +67,52 @@ class ReaderTokenService:
     @classmethod
     def decode_and_validate_token(cls, token_str: str) -> ReaderSession:
         """
-        Décode un token JWT, vérifie sa signature, son expiration et retrouve la session en base.
+        Décode un token JWT ou résout un code d'accès court opaque (S-04),
+        vérifie sa validité, son expiration et retrouve la session en base.
 
         Args:
-            token_str: La chaîne JWT reçue.
+            token_str: Chaîne JWT ou code court opaque (rtk_...).
 
         Returns:
             ReaderSession: L'instance de session valide avec relations pré-chargées.
 
         Raises:
-            ReaderTokenError: Si le token est invalide, expiré ou révoqué.
+            ReaderTokenError: Si le token ou code est invalide, expiré ou révoqué.
         """
         if not token_str:
             raise ReaderTokenError("Token de session manquant")
 
+        token_str = token_str.strip()
+
+        # S-04 : Si ce n'est pas un JWT complet (pas de séparateurs de parties JWT '.'),
+        # il s'agit d'un code d'accès court opaque (ex: rtk_...).
+        if token_str.count(".") != 2:
+            from django.core.cache import cache
+
+            # 1. Tentative de résolution rapide depuis le cache Redis
+            cached_jwt = cache.get(f"reader_code:{token_str}")
+            if cached_jwt and isinstance(cached_jwt, str) and cached_jwt.count(".") == 2:
+                return cls.decode_and_validate_token(cached_jwt)
+
+            # 2. Fallback robuste en base de données si le cache a expiré ou redémarré
+            session = ReaderSession.objects.select_related(
+                'partner', 'ouvrage', 'end_user'
+            ).prefetch_related(
+                'ouvrage__language_versions'
+            ).filter(metadata__access_code=token_str).first()
+
+            if not session:
+                raise ReaderTokenError("Code d'accès de session invalide ou introuvable")
+
+            if session.is_expired():
+                raise ReaderTokenError("La session de lecture a expiré")
+
+            if not session.is_valid:
+                raise ReaderTokenError(f"Session inactive ou révoquée (Statut: {session.status})")
+
+            return session
+
+        # Décodage classique du JWT
         try:
             payload = jwt.decode(token_str, settings.READER_JWT_SIGNING_KEY, algorithms=[cls.ALGORITHM])
         except jwt.ExpiredSignatureError:
@@ -110,3 +142,4 @@ class ReaderTokenService:
             raise ReaderTokenError(f"Session inactive ou révoquée (Statut: {session.status})")
 
         return session
+
