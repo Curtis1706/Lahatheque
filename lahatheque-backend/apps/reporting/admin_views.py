@@ -4171,41 +4171,50 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
             }
 
     # Calcul des consultations réelles par institution universitaire sur les ouvrages de ce bouquet
+    is_general_bouquet = not offering or getattr(offering, "bouquet_type", "") == "general"
+
     if books_qs and inst_data:
         for key, info in inst_data.items():
             inst_books = books_qs.filter(institution_id=key)
 
             # 1. Lectures numériques étudiantes qualifiées : durée >= 30s et au moins 3 pages (anti-rebond COUNTER)
             from apps.student.models import ReadingSession as StudentReadingSession
-            qualified_student_readings = StudentReadingSession.objects.filter(
+            qs_student = StudentReadingSession.objects.filter(
                 ouvrage__in=inst_books,
                 duration_seconds__gte=30,
                 pages_read__gte=3,
-            ).count()
+            )
+            qualified_student_readings = qs_student.count()
+            student_ca = qs_student.aggregate(total=Sum('ouvrage__price_digital'))['total'] or Decimal('0.00')
 
             # 2. Lectures partenaires SaaS via ReaderSession (API Lecteur Hébergé) : durée >= 30s et au moins 3 pages
             from apps.reader.models import ReaderSession
-            qualified_partner_readings = ReaderSession.objects.filter(
+            qs_partner = ReaderSession.objects.filter(
                 ouvrage__in=inst_books,
                 reading_time_seconds__gte=30,
                 last_page__gte=3,
-            ).count()
+            )
+            qualified_partner_readings = qs_partner.count()
+            partner_ca = qs_partner.aggregate(total=Sum('ouvrage__price_digital'))['total'] or Decimal('0.00')
 
             # 3. Écoutes audio qualifiées : >= 10% du livre complet ou chapitre terminé (>= 90%)
             from apps.audio.models import AudioListeningSession
-            qualified_audio_listens = AudioListeningSession.objects.filter(
+            qs_audio = AudioListeningSession.objects.filter(
                 ouvrage__in=inst_books
             ).filter(
                 Q(audio_track__track_type='full', completion_percent__gte=10.0) |
                 Q(audio_track__track_type='chapter', completion_percent__gte=90.0) |
                 Q(completion_percent__gte=10.0)
-            ).count()
+            )
+            qualified_audio_listens = qs_audio.count()
+            audio_ca = qs_audio.aggregate(total=Sum('ouvrage__price_digital'))['total'] or Decimal('0.00')
 
             # Total consultations réelles consolidées (étudiants directs + partenaires SaaS + audio)
             info["reads_count"] = qualified_student_readings + qualified_partner_readings + qualified_audio_listens
+            info["consumed_ca"] = float(student_ca + partner_ca + audio_ca)
 
     total_reads = sum(item["reads_count"] for item in inst_data.values())
-    total_inst_books = sum(item["books_count"] for item in inst_data.values()) or 1
+    total_consumed_ca = sum(item.get("consumed_ca", 0.0) for item in inst_data.values())
     palette = ["#1B2A4E", "#B08D42", "#059669", "#0891B2", "#7C3AED", "#D97706", "#DC2626"]
 
     distribution = []
@@ -4225,7 +4234,14 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
             else:
                 usage_pct = round(raw_pct, 2)
                 accumulated_pct += usage_pct
-            ca_share = round(annual_price * (usage_pct / 100.0), 2)
+
+            if is_general_bouquet:
+                # Pour le Bouquet Général (catalogue global) : l'assiette est la valeur réelle consommée par les lectures
+                ca_share = round(info.get("consumed_ca", 0.0), 2)
+            else:
+                # Pour un bouquet souscrit avec forfait prépayé : prorata d'utilisation
+                ca_share = round(annual_price * (usage_pct / 100.0), 2)
+
             royalty_amt = round(ca_share * (rate / 100.0), 2)
             total_royalties += royalty_amt
         else:
@@ -4283,12 +4299,14 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
         distribution = anonymized_distribution
 
     total_usage_pct = 100.0 if total_reads > 0 else 0.0
-    platform_revenue = max(0.0, round(annual_price - total_royalties, 2)) if total_reads > 0 else 0.0
+    effective_total_ca = round(total_consumed_ca, 2) if is_general_bouquet else annual_price
+    platform_revenue = max(0.0, round(effective_total_ca - total_royalties, 2)) if total_reads > 0 else 0.0
 
     return {
         "bouquet_id": bouquet_id,
         "bouquet_title": title,
         "annual_price": annual_price,
+        "total_consumed_ca": round(total_consumed_ca, 2),
         "currency": currency,
         "total_books_count": total_books,
         "royalty_rate_applied": default_royalty_rate,
@@ -4296,7 +4314,7 @@ def compute_bouquet_distribution_payload(offering_or_sub, requesting_institution
         "totals": {
             "total_books": total_books,
             "total_usage_percentage": total_usage_pct,
-            "total_ca": annual_price,
+            "total_ca": effective_total_ca,
             "total_royalties": round(total_royalties, 2),
             "platform_revenue": platform_revenue,
         }

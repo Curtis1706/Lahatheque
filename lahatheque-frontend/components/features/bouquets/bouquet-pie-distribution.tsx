@@ -34,13 +34,15 @@ export function BouquetPieDistribution({
 
   const items = distribution.items || distribution.distribution || [];
   const bouquet_title = distribution.bouquet_title || "Bouquet Documentaire";
-  const total_ca = distribution.total_ca ?? distribution.annual_price ?? distribution.totals?.total_ca ?? 0;
+  const catalog_envelope = distribution.annual_price ?? distribution.total_ca ?? 0;
+  const total_consumed_ca = items.reduce((acc, it) => acc + (it.ca_share_allocated || it.ca_share || 0), 0);
+  const total_ca = distribution.totals?.total_ca ?? (total_consumed_ca > 0 ? total_consumed_ca : catalog_envelope);
   const currency = distribution.currency || "XOF";
   const royalty_rate = distribution.royalty_rate ?? distribution.royalty_rate_applied ?? 15;
   const total_consultations = distribution.total_consultations ?? items.reduce((acc, it) => acc + (it.reads_count || it.consultations_count || 0), 0);
-  const total_royalties = total_consultations > 0 ? (distribution.total_royalties ?? distribution.totals?.total_royalties ?? 0) : 0;
+  const total_royalties = total_consultations > 0 ? (distribution.total_royalties ?? distribution.totals?.total_royalties ?? items.reduce((acc, it) => acc + (it.royalty_amount || 0), 0)) : 0;
   const total_books = distribution.total_books ?? distribution.total_books_count ?? distribution.totals?.total_books ?? 0;
-  const platformRevenue = total_consultations > 0 ? (distribution.totals?.platform_revenue ?? Math.max(0, total_ca - total_royalties)) : 0;
+  const platformRevenue = total_consultations > 0 ? (distribution.totals?.platform_revenue ?? Math.max(0, (total_consumed_ca || total_ca) - total_royalties)) : 0;
 
   if (!items || items.length === 0) {
     return (
@@ -154,9 +156,9 @@ export function BouquetPieDistribution({
             <span className="text-[11px] font-bold uppercase tracking-wider">Enveloppe CA Bouquet</span>
           </div>
           <p className="font-mono text-lg font-bold text-navy">
-            {total_ca.toLocaleString("fr-FR")} {currency}
+            {catalog_envelope.toLocaleString("fr-FR")} {currency}
           </p>
-          <p className="text-[10px] text-foreground-muted">Tarif annuel global souscrit</p>
+          <p className="text-[10px] text-foreground-muted">Valeur globale du fonds souscrit</p>
         </div>
 
         {isUniv ? (
@@ -555,7 +557,7 @@ export function BouquetPieDistribution({
                 </td>
                 <td className="py-3 px-3 sm:px-4 text-right font-mono">
                   {total_consultations > 0
-                    ? `${total_ca.toLocaleString("fr-FR", {
+                    ? `${total_consumed_ca.toLocaleString("fr-FR", {
                         minimumFractionDigits: isFcfa ? 0 : 2,
                         maximumFractionDigits: isFcfa ? 0 : 2,
                       })} ${currency}`
