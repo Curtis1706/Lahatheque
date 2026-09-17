@@ -358,11 +358,14 @@ class BouquetOffering(models.Model):
     def get_real_annual_price(self):
         """
         Calcule le prix annuel réel du bouquet.
-        Pour le Bouquet Général, c'est la somme exacte de tous les prix numériques du catalogue.
+        Si un tarif annuel spécifique est défini (> 0), il est prioritaire.
+        Pour le Bouquet Général sans tarif personnalisé, c'est la somme exacte de tous les prix numériques du catalogue.
         """
-        from django.db.models import Sum
-        from decimal import Decimal
+        if self.annual_price is not None and self.annual_price > 0:
+            return self.annual_price
         if self.bouquet_type == "general":
+            from django.db.models import Sum
+            from decimal import Decimal
             total = self.get_books_queryset().aggregate(total=Sum('price_digital'))['total']
             return total if total is not None else Decimal('0.00')
         return self.annual_price
@@ -370,13 +373,16 @@ class BouquetOffering(models.Model):
     def get_real_monthly_price(self):
         """
         Calcule le tarif mensuel réel du bouquet.
+        Si un tarif mensuel spécifique est défini (> 0), il est prioritaire.
+        Sinon (pour le Bouquet Général), formule mensuelle au 1/10ème du tarif annuel.
         """
+        if self.monthly_price is not None and self.monthly_price > 0:
+            return self.monthly_price
         from decimal import Decimal
-        if self.bouquet_type == "general":
-            # Pour le général, formule mensuelle au 1/10ème du catalogue
-            annual = self.get_real_annual_price()
-            return (annual / Decimal('10.0')).quantize(Decimal('0.01'))
-        return self.monthly_price
+        annual = Decimal(str(self.get_real_annual_price()))
+        return (annual / Decimal('10.0')).quantize(Decimal('0.01'))
+
+
 
 
 

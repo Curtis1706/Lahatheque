@@ -1323,13 +1323,26 @@ export async function createBouquetOffering(data: Partial<BouquetOfferingAdmin>)
 }
 
 export async function updateBouquetOffering(id: string, data: Partial<BouquetOfferingAdmin>): Promise<boolean> {
-  const res = await fetch(`/api/bff/admin/bouquet-offerings/${id}/`, {
-    method: "PATCH", credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return res.ok;
+  try {
+    const res = await fetch(`/api/bff/admin/bouquet-offerings/${id}/`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("[updateBouquetOffering] Erreur:", err);
+      return false;
+    }
+    const json = await res.json().catch(() => ({}));
+    return json.success !== false;
+  } catch (err) {
+    console.error("[updateBouquetOffering] Network error:", err);
+    return false;
+  }
 }
+
 
 export async function deleteBouquetOffering(id: string): Promise<boolean> {
   const res = await fetch(`/api/bff/admin/bouquet-offerings/${id}/`, {
@@ -1427,7 +1440,7 @@ export interface BouquetOfferingBooksPreviewResponse {
 
 export async function getBouquetOfferingBooksPreview(bouquetId: string): Promise<BouquetOfferingBooksPreviewResponse | null> {
   try {
-    const res = await fetch(`/api/bff/reporting/bouquet-offerings/${bouquetId}/`, {
+    const res = await fetch(`/api/bff/admin/bouquet-offerings/${bouquetId}/`, {
       credentials: "include",
       cache: "no-store",
     });

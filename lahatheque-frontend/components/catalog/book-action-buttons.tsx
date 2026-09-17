@@ -21,7 +21,6 @@ import {
   Languages
 } from "lucide-react";
 import { useCart } from "@/context/cart-context";
-import { formatEur } from "@/components/cart/cart-drawer";
 import { SampleChoiceModal } from "@/components/features/catalog/sample-choice-modal";
 
 interface BookActionButtonsProps {
@@ -234,10 +233,7 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
 
               <div>
                 <div className="font-bold text-xs sm:text-sm font-mono text-navy">
-                  {pricePaper.toLocaleString("fr-FR")} F CFA
-                </div>
-                <div className="text-[10px] text-foreground-muted font-mono">
-                  ≈ {formatEur(pricePaper)} €
+                  {pricePaper.toLocaleString("fr-FR")} FCFA
                 </div>
               </div>
 
@@ -282,10 +278,7 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
 
               <div>
                 <div className="font-bold text-xs sm:text-sm font-mono text-navy">
-                  {priceDigital.toLocaleString("fr-FR")} F CFA
-                </div>
-                <div className="text-[10px] text-foreground-muted font-mono">
-                  ≈ {formatEur(priceDigital)} €
+                  {priceDigital.toLocaleString("fr-FR")} FCFA
                 </div>
               </div>
 
@@ -327,10 +320,7 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
 
               <div>
                 <div className="font-bold text-xs sm:text-sm font-mono text-navy">
-                  {priceAudio.toLocaleString("fr-FR")} F CFA
-                </div>
-                <div className="text-[10px] text-foreground-muted font-mono">
-                  ≈ {formatEur(priceAudio)} €
+                  {priceAudio.toLocaleString("fr-FR")} FCFA
                 </div>
               </div>
 
@@ -408,10 +398,7 @@ export function BookActionButtons({ book }: BookActionButtonsProps) {
           </div>
           <div className="text-right">
             <div className="font-mono text-base sm:text-lg font-bold text-navy">
-              {totalAmount.toLocaleString("fr-FR")} F CFA
-            </div>
-            <div className="text-[10px] text-foreground-muted font-mono">
-              ≈ {formatEur(totalAmount)} €
+              {totalAmount.toLocaleString("fr-FR")} FCFA
             </div>
           </div>
         </div>

@@ -111,8 +111,8 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
               {isActive
                 ? (bouquet.subscription_period === "monthly" ? "Mensuel (30j)" : "Annuel (365j)")
                 : (selectedPeriod === "monthly"
-                    ? `${monthlyPrice.toLocaleString("fr-FR")} ${bouquet.currency || "XOF"}/mois`
-                    : `${annualPrice.toLocaleString("fr-FR")} ${bouquet.currency || "XOF"}/an`)}
+                    ? `${monthlyPrice.toLocaleString("fr-FR")} FCFA/mois`
+                    : `${annualPrice.toLocaleString("fr-FR")} FCFA/an`)}
             </p>
           </div>
         </div>
@@ -135,7 +135,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
               >
                 <span className="text-[10px] font-medium block opacity-80">Mensuel (30 jours)</span>
                 <span className="font-mono text-xs font-bold block mt-0.5">
-                  {monthlyPrice.toLocaleString("fr-FR")} {bouquet.currency || "XOF"}
+                  {monthlyPrice.toLocaleString("fr-FR")} FCFA
                 </span>
               </button>
               <button
@@ -154,7 +154,7 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
                   </span>
                 </div>
                 <span className="font-mono text-xs font-bold block mt-0.5">
-                  {annualPrice.toLocaleString("fr-FR")} {bouquet.currency || "XOF"}
+                  {annualPrice.toLocaleString("fr-FR")} FCFA
                 </span>
               </button>
             </div>

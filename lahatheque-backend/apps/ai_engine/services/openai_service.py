@@ -5,6 +5,7 @@ Manuels Scolaires, Thèses, Ouvrages Universitaires (Droit, Économie, Médecine
 Conforme au format d'échange international ONIX 3.0 Release 3.0.
 """
 
+import datetime
 import json
 import logging
 import re
@@ -46,6 +47,57 @@ def extract_text_sample_from_bytes(file_bytes: bytes, file_ext: str = "pdf") -> 
         return "", 0
 
 
+def extract_publication_year_from_text(text: str, filename: str = "", min_year: int = 1500) -> Optional[int]:
+    """
+    Extrait l'année de parution réelle d'un document à partir de son texte brut.
+    Scrute les patterns de copyright, dépôt légal, édition, etc.
+    Retourne None si aucune année plausible n'est trouvée.
+    """
+    current_year = datetime.date.today().year
+    max_year = current_year  # Un livre ne peut pas être publié dans le futur
+
+    # Patterns ordonnés par fiabilité décroissante
+    year_patterns = [
+        # Copyright explicite
+        r'(?:©|copyright|\(c\))\s*(?:by\s+)?(?:[a-z][^,\n]{0,60},?\s+)?([12][0-9]{3})',
+        # Dépôt légal
+        r'[Dd][é\xe9]p[oô]t\s+l[eé]gal\s*[:\-–]?\s*(?:[a-z][^,\n]{0,30},?\s+)?([12][0-9]{3})',
+        # Première / Deuxième / Nième édition
+        r'(?:premi[eè]re|deuxi[eè]me|troisi[eè]me|\d+[eè]?(?:re|me)?)\s+[eé]dition\s*[,:\-–]?\s*([12][0-9]{3})',
+        # Edition YYYY
+        r'[eé]dition\s+([12][0-9]{3})',
+        # Published YYYY / Publié en YYYY
+        r'(?:published|publié|paru)\s+(?:in|en)?\s*([12][0-9]{3})',
+        # "Imprimé en YYYY" / "Printed in YYYY"
+        r'(?:imprimé|printed)\s+(?:en|in)\s+([12][0-9]{3})',
+        # "YYYY by [Publisher]"
+        r'([12][0-9]{3})\s+by\s+[A-Z][a-z]',
+        # Année seule entre parenthèses sur une ligne de titre/page de garde
+        r'^\(?([12][0-9]{3})\)?\s*$',
+        # Patterns génériques "année, mois" ou "mois année" (moins fiables)
+        r'(?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+([12][0-9]{3})',
+        r'(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+([12][0-9]{3})',
+    ]
+
+    candidates: list = []
+    for pattern in year_patterns:
+        for match in re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE):
+            try:
+                year = int(match.group(1))
+                if min_year <= year <= max_year:
+                    candidates.append(year)
+            except (IndexError, ValueError):
+                continue
+
+    if not candidates:
+        return None
+
+    # Stratégie : retourner l'année la plus récente parmi les 5 premières occurrences
+    # (les premières occurrences sont généralement dans les pages de copyright)
+    first_candidates = candidates[:5]
+    return max(first_candidates)
+
+
 def generate_laha_isbn(seed_text: str = "") -> str:
     """
     Génère un code ISBN-13 LAHA normalisé (978-99919-XXX-X-X) avec calcul exact de la clé de contrôle EAN-13.
@@ -80,7 +132,8 @@ def generate_onix_3_xml(data: Dict[str, Any]) -> str:
     dewey = data.get("dewey_code") or "000"
     language = data.get("language_code") or "fre"
     genre = data.get("genre_category") or "Littérature"
-    year = data.get("publication_year") or 2026
+    current_year = datetime.date.today().year
+    year = data.get("publication_year") or current_year
 
     contributors_xml = ""
     for idx, author in enumerate(authors, 1):
@@ -291,7 +344,7 @@ Renvoie STRICTEMENT un JSON valide :
   "subtitle": "Sous-titre commercial et explicatif",
   "authors": ["Nom Prénom"],
   "publisher_name": "Maison d'édition identifiée (partenaire en base ou éditeur tiers)",
-  "publication_year": 2026,
+  "publication_year": null,
   "isbn": "978-...",
   "isbn_found_in_document": true,
   "summary": "Résumé de 4e de couverture captivant et valorisant (512 caractères maximum)...",
@@ -496,7 +549,7 @@ def _fallback_heuristic_analysis(filename: str, text_sample: str, total_pages: i
             "Éditions MENSAH" if "mensah" in lower_name else
             "LAHA Éditions"
         ),
-        "publication_year": 2026,
+        "publication_year": extract_publication_year_from_text(text_sample, filename),
         "isbn": extracted_isbn,
         "isbn_found_in_document": isbn_found,
         "summary": (

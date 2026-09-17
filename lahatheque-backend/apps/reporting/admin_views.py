@@ -42,7 +42,12 @@ from apps.accounts.permissions import IsAdminOrSuperAdmin
 class StandardAdminPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
-    max_page_size = 500
+    max_page_size = 10000
+
+    def paginate_queryset(self, queryset, request, view=None):
+        if request.query_params.get('all') in ('true', '1', 'True') or request.query_params.get('page_size') in ('all', '-1'):
+            return None
+        return super().paginate_queryset(queryset, request, view=view)
 
 
 logger = logging.getLogger(__name__)
@@ -485,7 +490,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "title": b.titre,
                 "subtitle": getattr(b, 'subtitle', '') or "",
                 "summary": b.summary or "",
-                "publication_year": b.publication_date.year if b.publication_date else (b.created_at.year if b.created_at else 2026),
+                "publication_year": getattr(b, 'publication_year', None) or (b.publication_date.year if b.publication_date else None),
                 "page_count": b.page_count or 0,
                 "is_paper_available": is_paper_avail,
                 "paper_stock": real_stock,
@@ -581,7 +586,7 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
                 "title": b.titre,
                 "subtitle": getattr(b, 'subtitle', '') or "",
                 "summary": b.summary or "",
-                "publication_year": b.publication_date.year if b.publication_date else (b.created_at.year if b.created_at else 2026),
+                "publication_year": getattr(b, 'publication_year', None) or (b.publication_date.year if b.publication_date else None),
                 "page_count": b.page_count or 0,
                 "is_paper_available": is_really_available_paper(b),
                 "paper_stock": get_real_paper_stock(b.id),
@@ -665,7 +670,9 @@ class AdminCatalogPricingViewSet(viewsets.ViewSet):
             if 'publication_year' in data and data['publication_year']:
                 import datetime
                 try:
-                    book.publication_date = datetime.date(int(data['publication_year']), 1, 1)
+                    year_int = int(data['publication_year'])
+                    book.publication_year = year_int
+                    book.publication_date = datetime.date(year_int, 1, 1)
                 except Exception:
                     pass
             if 'is_paper_available' in data:
@@ -4014,20 +4021,19 @@ class AdminBouquetOfferingsView(APIView):
             total=Sum('price_digital')
         )['total'] or Decimal('0.00')
 
-        # S'assurer de la présence du Bouquet Général en base avec le prix réel calculé
+        # S'assurer de la présence du Bouquet Général en base avec un prix initial calculé si absent
         general_b = BouquetOffering.objects.filter(bouquet_type="general").first()
         if not general_b:
             general_b = BouquetOffering.objects.create(
                 bouquet_type="general",
                 title="Bouquet Général (Catalogue Intégral)",
+                monthly_price=(total_catalog_price / Decimal('10.0')).quantize(Decimal('0.01')),
                 annual_price=total_catalog_price,
                 currency="FCFA",
                 description="Bouquet global regroupant l'intégralité du catalogue des ouvrages publiés. Appliqué par défaut pour les API partenaires et consultations transversales.",
                 is_active=True,
             )
-        elif general_b.annual_price != total_catalog_price:
-            general_b.annual_price = total_catalog_price
-            general_b.save(update_fields=['annual_price'])
+
 
         offerings = BouquetOffering.objects.all().select_related('target_institution').order_by(
             models.Case(models.When(bouquet_type='general', then=0), default=1),
@@ -4114,8 +4120,9 @@ class AdminBouquetOfferingDetailView(APIView):
             return Response({"success": False, "error": "Bouquet introuvable."}, status=404)
 
         books_qs = offering.get_books_queryset().select_related('discipline').prefetch_related('authors').order_by('title')
+        total_count = books_qs.count()
         books_list = []
-        for book in books_qs:
+        for book in books_qs[:100]:
             cover_url = ""
             if book.cover_image:
                 try:
@@ -4154,7 +4161,7 @@ class AdminBouquetOfferingDetailView(APIView):
                 "country": offering.country,
                 "target_institution": str(offering.target_institution_id) if offering.target_institution_id else None,
                 "target_institution_name": offering.target_institution.name if offering.target_institution else None,
-                "books_count": len(books_list),
+                "books_count": total_count,
                 "books": books_list,
             }
         })

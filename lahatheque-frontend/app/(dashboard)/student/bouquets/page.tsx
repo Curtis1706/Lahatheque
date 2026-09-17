@@ -77,12 +77,8 @@ export default function StudentBouquetsPage() {
     }
   };
 
-  const formatPrice = (amount: number, currency: string = "XOF") => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: currency === "XOF" ? "XOF" : "EUR",
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const formatPrice = (amount: number, _currency?: string) => {
+    return `${Math.round(amount).toLocaleString("fr-FR")} FCFA`;
   };
 
   return (
@@ -180,7 +176,11 @@ export default function StudentBouquetsPage() {
                   <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t border-border">
                     <div className="flex items-center gap-1.5">
                       <BookOpen className="h-4 w-4 text-gold" />
-                      <span>{bouquet.books_count} ouvrages inclus</span>
+                      <span>
+                        {bouquet.bouquet_type === "general"
+                          ? "Catalogue complet inclus"
+                          : `${bouquet.books_count} ouvrages inclus`}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <ShieldCheck className="h-4 w-4 text-gold" />
@@ -199,9 +199,9 @@ export default function StudentBouquetsPage() {
                       <button
                         type="button"
                         onClick={() => handlePeriodChange(bouquet.id, "monthly")}
-                        className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${
+                        className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
                           isMonthly
-                            ? "bg-navy text-primary-foreground shadow-sm"
+                            ? "bg-navy text-white shadow-xs"
                             : "bg-card text-muted-foreground hover:text-foreground border border-border"
                         }`}
                       >
@@ -210,9 +210,9 @@ export default function StudentBouquetsPage() {
                       <button
                         type="button"
                         onClick={() => handlePeriodChange(bouquet.id, "annual")}
-                        className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${
+                        className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
                           !isMonthly
-                            ? "bg-navy text-primary-foreground shadow-sm"
+                            ? "bg-navy text-white shadow-xs"
                             : "bg-card text-muted-foreground hover:text-foreground border border-border"
                         }`}
                       >
@@ -247,29 +247,32 @@ export default function StudentBouquetsPage() {
                     className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-background border border-border hover:border-gold hover:text-navy text-navy text-xs font-bold transition-colors min-h-[42px] cursor-pointer"
                   >
                     <BookOpen className="w-4 h-4 text-gold" />
-                    <span>Consulter les Ouvrages ({bouquet.books_count})</span>
+                    <span>
+                      Consulter les Ouvrages
+                      {bouquet.bouquet_type === "general" ? "" : ` (${bouquet.books_count})`}
+                    </span>
                   </button>
 
                   <button
                     type="button"
                     disabled={isPendingThis}
                     onClick={() => handleSubscribe(bouquet)}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-navy hover:bg-navy-hover text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-navy hover:bg-navy-hover text-white text-sm font-semibold tracking-wide transition-colors disabled:opacity-50 cursor-pointer shadow-md"
                   >
                     {isPendingThis ? (
                       <>
                         <RefreshCw className="h-4 w-4 animate-spin text-gold" />
-                        <span>Initialisation du paiement...</span>
+                        <span className="text-white">Initialisation du paiement...</span>
                       </>
                     ) : isSubscribed ? (
                       <>
-                        <span>Renouveler pour {isMonthly ? "30 jours" : "1 an"}</span>
+                        <span className="text-white">Renouveler pour {isMonthly ? "30 jours" : "1 an"}</span>
                         <ArrowRight className="h-4 w-4 text-gold" />
                       </>
                     ) : (
                       <>
                         <Sparkles className="h-4 w-4 text-gold" />
-                        <span>Souscrire ({isMonthly ? "Mensuel" : "Annuel"})</span>
+                        <span className="text-white">Souscrire ({isMonthly ? "Mensuel" : "Annuel"})</span>
                       </>
                     )}
                   </button>

@@ -14,7 +14,6 @@ import { Book } from "@/lib/types/catalog";
 import { getBookById, searchBooks } from "@/lib/services/catalog";
 import { BookActionButtons } from "@/components/catalog/book-action-buttons";
 import { Book as Book3D } from "@/components/ui/book";
-import { formatEur } from "@/components/cart/cart-drawer";
 import { AuthorsDisplay } from "@/components/features/catalog/authors-display";
 
 export default function BookDetailPage() {
@@ -342,13 +341,7 @@ export default function BookDetailPage() {
                       {((item.price_digital !== undefined && item.price_digital !== null)
                         ? Number(item.price_digital)
                         : (item.price !== undefined && item.price !== null ? Number(item.price) : 2500)
-                      ).toLocaleString("fr-FR")} F CFA
-                    </div>
-                    <div className="text-[10px] text-foreground-muted font-mono">
-                      ≈ {formatEur((item.price_digital !== undefined && item.price_digital !== null)
-                        ? Number(item.price_digital)
-                        : (item.price !== undefined && item.price !== null ? Number(item.price) : 2500)
-                      )} €
+                      ).toLocaleString("fr-FR")} FCFA
                     </div>
                   </div>
                 </Link>

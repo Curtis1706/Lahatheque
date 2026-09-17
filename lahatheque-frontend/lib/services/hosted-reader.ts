@@ -116,30 +116,58 @@ const API_BASE_URL = RAW_API_URL.endsWith("/v1") ? RAW_API_URL : `${RAW_API_URL.
 
 export const hostedReaderApi = {
   /**
+   * Récupère le jeton secret de terminal lié stocké pour cette session.
+   */
+  getDeviceBindingToken(token: string): string | null {
+    if (typeof window === "undefined" || !token) return null;
+    const storageKey = `laha_reader_device_${token.slice(0, 32)}`;
+    return sessionStorage.getItem(storageKey);
+  },
+
+  /**
    * Valide un token de session et récupère les données de configuration complètes.
+   * Gère le verrouillage anti-partage de navigateur via le secret de liaison.
    */
   async validateSessionToken(token: string): Promise<HostedReaderSessionData> {
     const endpoint = "/api/bff/reader/sessions/validate-token/";
+    const storageKey = `laha_reader_device_${token.slice(0, 32)}`;
+    const storedDeviceToken = typeof window !== "undefined" ? sessionStorage.getItem(storageKey) : null;
+
+    const reqHeaders: Record<string, string> = { "Content-Type": "application/json" };
+    if (storedDeviceToken) {
+      reqHeaders["X-Reader-Device-Token"] = storedDeviceToken;
+    }
+
+    const payload: { token: string; device_binding_token?: string } = { token };
+    if (storedDeviceToken) {
+      payload.device_binding_token = storedDeviceToken;
+    }
+
     let response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
+      headers: reqHeaders,
+      credentials: "include",
+      body: JSON.stringify(payload),
     }).catch(() => null);
 
     if (!response) {
       response = await fetch(`${API_BASE_URL}/reader/sessions/validate-token/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+        headers: reqHeaders,
+        credentials: "include",
+        body: JSON.stringify(payload),
       }).catch(() => null);
     }
 
     if (response) {
       const resJson = await response.json().catch(() => ({}));
       if (response.ok && resJson.data && resJson.data.book) {
+        if (typeof window !== "undefined" && resJson.data.device_binding_token) {
+          sessionStorage.setItem(storageKey, resJson.data.device_binding_token);
+        }
         return resJson.data as HostedReaderSessionData;
       }
-      // Rejet immédiat si révoqué, expiré ou invalide
+      // Rejet immédiat si révoqué, expiré ou verrouillé sur un autre navigateur
       if (response.status === 403 || response.status === 401 || !response.ok) {
         throw new Error(
           resJson.error || "Cette session de lecture a été révoquée par l'administrateur ou a expiré."
@@ -155,13 +183,20 @@ export const hostedReaderApi = {
    */
   async syncProgress(payload: ProgressSyncPayload): Promise<void> {
     try {
+      const deviceToken = this.getDeviceBindingToken(payload.token);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "X-Reader-Token": payload.token,
+        "Authorization": `Bearer ${payload.token}`,
+      };
+      if (deviceToken) {
+        headers["X-Reader-Device-Token"] = deviceToken;
+      }
+
       await fetch("/api/bff/reader/sessions/progress/", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Reader-Token": payload.token,
-          "Authorization": `Bearer ${payload.token}`,
-        },
+        headers,
+        credentials: "include",
         body: JSON.stringify(payload),
       });
     } catch (e) {
@@ -173,13 +208,20 @@ export const hostedReaderApi = {
    * Soumet les réponses d'un quiz interactif validé par l'apprenant.
    */
   async submitQuiz(payload: QuizSubmitPayload): Promise<QuizSubmitResponse> {
+    const deviceToken = this.getDeviceBindingToken(payload.token);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "X-Reader-Token": payload.token,
+      "Authorization": `Bearer ${payload.token}`,
+    };
+    if (deviceToken) {
+      headers["X-Reader-Device-Token"] = deviceToken;
+    }
+
     const response = await fetch("/api/bff/reader/sessions/quiz-submit/", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Reader-Token": payload.token,
-        "Authorization": `Bearer ${payload.token}`,
-      },
+      headers,
+      credentials: "include",
       body: JSON.stringify(payload),
     });
 

@@ -35,7 +35,7 @@ import {
   getInstitutionBooksPreview,
   BouquetOfferingAdmin,
 } from "@/lib/services/admin";
-import { searchBooks } from "@/lib/services/catalog";
+import { searchBooks, searchCatalogBooks } from "@/lib/services/catalog";
 import { Book } from "@/lib/types/catalog";
 import { BouquetDistributionModal } from "@/components/features/bouquets/bouquet-distribution-modal";
 import { BookMultiCombobox } from "@/components/features/bouquets/book-multi-combobox";
@@ -43,8 +43,8 @@ import { getDisciplines, DisciplineItem } from "@/lib/services/classification";
 import { BouquetBooksPreviewModal } from "@/components/features/bouquets/bouquet-books-preview-modal";
 import { BouquetSubscriptionsDrawer } from "@/components/features/bouquets/bouquet-subscriptions-drawer";
 
-// Type 'faculty' définitivement supprimé selon CDC & spécifications 010
 const BOUQUET_TYPES = [
+  { value: "general", label: "Bouquet Général (Catalogue Intégral)", desc: "Tous les ouvrages publiés du catalogue" },
   { value: "discipline", label: "Par Discipline", desc: "Tous les ouvrages rattachés à une discipline académique" },
   { value: "university", label: "Intégral Université", desc: "Tous les ouvrages affiliés à une université partenaire (obligatoire)" },
   { value: "country", label: "Par Pays", desc: "Ouvrages édités ou rattachés à un pays spécifique" },
@@ -87,7 +87,7 @@ export default function AdminBouquetsPage() {
 
   // Form State
   const [title, setTitle] = useState("");
-  const [bouquetType, setBouquetType] = useState<"discipline" | "university" | "country" | "custom">("discipline");
+  const [bouquetType, setBouquetType] = useState<"general" | "discipline" | "university" | "country" | "custom">("discipline");
   const [discipline, setDiscipline] = useState("");
   const [targetInstitution, setTargetInstitution] = useState<string>("");
   const [institutionLiveCount, setInstitutionLiveCount] = useState<number | null>(null);
@@ -149,7 +149,7 @@ export default function AdminBouquetsPage() {
   useEffect(() => {
     loadData();
     loadInstitutions();
-    searchBooks({ page_size: 2000 }).then((books) => setCatalogBooks(books)).catch(() => {});
+    searchBooks({ page_size: 5000 }).then((books) => setCatalogBooks(books)).catch(() => {});
     getDisciplines().then((d) => setDbDisciplines(d)).catch(() => {});
   }, []);
 
@@ -181,22 +181,54 @@ export default function AdminBouquetsPage() {
       }
     } else if (bouquetType === "discipline") {
       if (discipline.trim()) {
-        const discLower = discipline.toLowerCase().trim();
-        const matched = catalogBooks.filter((b) => {
-          const bDisc = (b.discipline_detail?.name || "").toLowerCase().trim();
-          return bDisc.includes(discLower) || discLower.includes(bDisc);
-        });
-        setInstitutionLiveCount(matched.length);
+        setInstitutionLoadingCount(true);
+        searchCatalogBooks({ discipline: discipline.trim(), page_size: 20 })
+          .then((res) => {
+            setInstitutionLiveCount(res.count);
+          })
+          .catch(() => {
+            const discLower = discipline.toLowerCase().trim();
+            const matched = catalogBooks.filter((b) => {
+              const bDisc = (b.discipline_detail?.name || "").toLowerCase().trim();
+              return bDisc.includes(discLower) || discLower.includes(bDisc);
+            });
+            setInstitutionLiveCount(matched.length);
+          })
+          .finally(() => {
+            setInstitutionLoadingCount(false);
+          });
       } else {
         setInstitutionLiveCount(0);
       }
     } else if (bouquetType === "country") {
       if (country) {
-        const matched = catalogBooks.filter((b) => (b.country || "").toUpperCase() === country.toUpperCase());
-        setInstitutionLiveCount(matched.length);
+        setInstitutionLoadingCount(true);
+        searchCatalogBooks({ country, page_size: 20 })
+          .then((res) => {
+            setInstitutionLiveCount(res.count);
+          })
+          .catch(() => {
+            const matched = catalogBooks.filter((b) => (b.country || "").toUpperCase() === country.toUpperCase());
+            setInstitutionLiveCount(matched.length);
+          })
+          .finally(() => {
+            setInstitutionLoadingCount(false);
+          });
       } else {
         setInstitutionLiveCount(0);
       }
+    } else if (bouquetType === "general") {
+      setInstitutionLoadingCount(true);
+      searchCatalogBooks({ page_size: 20 })
+        .then((res) => {
+          setInstitutionLiveCount(res.count);
+        })
+        .catch(() => {
+          setInstitutionLiveCount(catalogBooks.length);
+        })
+        .finally(() => {
+          setInstitutionLoadingCount(false);
+        });
     } else if (bouquetType === "custom") {
       setInstitutionLiveCount(selectedBookIds.length);
     }
@@ -230,8 +262,10 @@ export default function AdminBouquetsPage() {
     setDiscipline(offering.discipline || "");
     setTargetInstitution(offering.target_institution || "");
     setCountry(offering.country || "BJ");
-    setMonthlyPrice(String(offering.monthly_price || 50000));
-    setAnnualPrice(String(offering.annual_price || 500000));
+    const mPrice = offering.monthly_price !== undefined ? Math.round(Number(offering.monthly_price)) : 50000;
+    const aPrice = offering.annual_price !== undefined ? Math.round(Number(offering.annual_price)) : 500000;
+    setMonthlyPrice(String(mPrice));
+    setAnnualPrice(String(aPrice));
     setDescription(offering.description || "");
     setIsActive(offering.is_active);
     setSelectedBookIds(offering.custom_book_ids || []);
@@ -250,18 +284,26 @@ export default function AdminBouquetsPage() {
       return;
     }
 
+    const parsePrice = (val: string | number | undefined, fallback = 0) => {
+      if (val === undefined || val === null) return fallback;
+      const cleaned = String(val).replace(/\s+/g, "").replace(",", ".");
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? fallback : Math.max(0, num);
+    };
+
     const payload: Partial<BouquetOfferingAdmin> = {
       title: title.trim(),
       bouquet_type: bouquetType,
       discipline: bouquetType === "discipline" ? discipline.trim() : "",
       target_institution: bouquetType === "university" ? targetInstitution : null,
       country: bouquetType === "country" ? country : "",
-      monthly_price: Number(monthlyPrice) || 0,
-      annual_price: Number(annualPrice) || 0,
+      monthly_price: parsePrice(monthlyPrice, 50000),
+      annual_price: parsePrice(annualPrice, 500000),
       description: description.trim(),
       is_active: isActive,
       custom_book_ids: bouquetType === "custom" ? selectedBookIds : [],
     };
+
 
     setSubmitting(true);
     try {
@@ -756,6 +798,63 @@ export default function AdminBouquetsPage() {
               </div>
 
               {/* Champs Conditionnels selon le type */}
+              {bouquetType === "general" && (
+                <div className="space-y-3 p-4 rounded-xl bg-background-secondary/30 border border-border">
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-gold/5 border border-gold/20">
+                    <div className="flex items-center gap-2 text-xs">
+                      <BookOpen className="w-4 h-4 text-gold" />
+                      <span className="text-navy font-semibold">
+                        {institutionLiveCount ?? catalogBooks.length} ouvrage(s) dans le catalogue intégral
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setPreviewDirectTitle("Bouquet Général (Catalogue Intégral)");
+                        try {
+                          const res = await searchCatalogBooks({ page_size: 5000 });
+                          if (res && res.results && res.results.length > 0) {
+                            setPreviewDirectBooks(res.results.map((b) => ({
+                              id: b.id,
+                              title: b.title,
+                              authors: (b.authors_details || []).map((a) => `${a.first_name} ${a.last_name}`.trim()),
+                              isbn: b.isbn,
+                              cover_url: b.cover_url || b.cover_image,
+                              discipline: b.discipline_detail?.name || "",
+                              format_type: b.format_type,
+                              price_digital: b.price_digital || 0,
+                              publication_year: b.publication_year,
+                            })));
+                            return;
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        }
+                        const matched = catalogBooks.map((b) => ({
+                          id: b.id,
+                          title: b.title,
+                          authors: (b.authors_details || []).map((a) => `${a.first_name} ${a.last_name}`.trim()),
+                          isbn: b.isbn,
+                          cover_url: b.cover_url || b.cover_image,
+                          discipline: b.discipline_detail?.name || "",
+                          format_type: b.format_type,
+                          price_digital: b.price_digital || 0,
+                          publication_year: b.publication_year,
+                        }));
+                        setPreviewDirectBooks(matched);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-medium hover:bg-navy-hover transition-colors cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-gold" />
+                      <span>Inspecter les livres &amp; couvertures</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-foreground/60">
+                    L&apos;intégralité des ouvrages publiés du catalogue est automatiquement incluse et mise à jour en direct pour ce bouquet.
+                  </p>
+                </div>
+              )}
+
               {bouquetType === "discipline" && (
                 <div className="space-y-2 p-4 rounded-xl bg-background-secondary/30 border border-border">
                   <label className="block text-xs font-bold text-navy">
@@ -800,7 +899,27 @@ export default function AdminBouquetsPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
+                          setPreviewDirectTitle(`Discipline : ${discipline}`);
+                          try {
+                            const res = await searchCatalogBooks({ discipline: discipline.trim(), page_size: 5000 });
+                            if (res && res.results && res.results.length > 0) {
+                              setPreviewDirectBooks(res.results.map((b) => ({
+                                id: b.id,
+                                title: b.title,
+                                authors: (b.authors_details || []).map((a) => `${a.first_name} ${a.last_name}`.trim()),
+                                isbn: b.isbn,
+                                cover_url: b.cover_url || b.cover_image,
+                                discipline: b.discipline_detail?.name || discipline,
+                                format_type: b.format_type,
+                                price_digital: b.price_digital || 0,
+                                publication_year: b.publication_year,
+                              })));
+                              return;
+                            }
+                          } catch (err) {
+                            console.error(err);
+                          }
                           const discLower = discipline.toLowerCase().trim();
                           const matched = catalogBooks.filter((b) => {
                             const bDisc = (b.discipline_detail?.name || "").toLowerCase().trim();
@@ -817,7 +936,6 @@ export default function AdminBouquetsPage() {
                             publication_year: b.publication_year,
                           }));
                           setPreviewDirectBooks(matched);
-                          setPreviewDirectTitle(`Discipline : ${discipline}`);
                         }}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-medium hover:bg-navy-hover transition-colors cursor-pointer"
                       >
@@ -915,7 +1033,28 @@ export default function AdminBouquetsPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
+                        const countryLabel = WEST_AFRICAN_COUNTRIES.find((c) => c.code === country)?.label || country;
+                        setPreviewDirectTitle(`Pays : ${countryLabel}`);
+                        try {
+                          const res = await searchCatalogBooks({ country, page_size: 5000 });
+                          if (res && res.results && res.results.length > 0) {
+                            setPreviewDirectBooks(res.results.map((b) => ({
+                              id: b.id,
+                              title: b.title,
+                              authors: (b.authors_details || []).map((a) => `${a.first_name} ${a.last_name}`.trim()),
+                              isbn: b.isbn,
+                              cover_url: b.cover_url || b.cover_image,
+                              discipline: b.discipline_detail?.name || "",
+                              format_type: b.format_type,
+                              price_digital: b.price_digital || 0,
+                              publication_year: b.publication_year,
+                            })));
+                            return;
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        }
                         const matched = catalogBooks.filter((b) => (b.country || "").toUpperCase() === country.toUpperCase()).map((b) => ({
                           id: b.id,
                           title: b.title,
@@ -928,8 +1067,6 @@ export default function AdminBouquetsPage() {
                           publication_year: b.publication_year,
                         }));
                         setPreviewDirectBooks(matched);
-                        const countryLabel = WEST_AFRICAN_COUNTRIES.find((c) => c.code === country)?.label || country;
-                        setPreviewDirectTitle(`Pays : ${countryLabel}`);
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white text-xs font-medium hover:bg-navy-hover transition-colors cursor-pointer"
                     >

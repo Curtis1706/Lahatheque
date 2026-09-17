@@ -389,17 +389,73 @@ class ReaderValidateTokenView(APIView):
             derived_hash=session.token_hash[:16] if session.token_hash else "nohash"
         )
 
-        # Mettre à jour l'IP réelle du lecteur si pas encore enregistrée
-        if not isinstance(session.metadata, dict):
-            session.metadata = {}
-        if not session.metadata.get('user_ip'):
-            session.metadata['user_ip'] = ip_addr
-            session.save(update_fields=['metadata'])
+        import hashlib
+        import secrets
 
-        # Si le statut était 'created', on le passe à 'opened'
-        if session.status == 'created':
+        # Contrôle anti-partage et verrouillage au premier navigateur (Device/Browser Binding)
+        session_meta = dict(session.metadata) if isinstance(session.metadata, dict) else {}
+        expected_device_hash = session_meta.get('device_binding_hash')
+
+        session_cookie_key = f"laha_reader_bind_{session.id}"
+        incoming_device_token = (
+            request.headers.get("X-Reader-Device-Token")
+            or request.COOKIES.get(session_cookie_key)
+            or request.COOKIES.get("laha_reader_bind")
+            or (request.data.get("device_binding_token") if hasattr(request, "data") and isinstance(request.data, dict) else None)
+            or request.query_params.get("device_token")
+        )
+        if incoming_device_token:
+            incoming_device_token = str(incoming_device_token).strip()
+
+        device_binding_token_for_response = None
+
+        if not expected_device_hash:
+            # Première activation légitime : on génère un secret unique et on verrouille la session à ce navigateur
+            new_device_token = secrets.token_urlsafe(32)
+            new_device_hash = hashlib.sha256(new_device_token.encode('utf-8')).hexdigest()
+            session_meta['device_binding_hash'] = new_device_hash
+            session_meta['bound_ip'] = ip_addr
+            session_meta['bound_user_agent'] = request.META.get('HTTP_USER_AGENT', '')[:500]
+            session_meta['first_opened_at'] = timezone.now().isoformat()
+            if not session_meta.get('user_ip'):
+                session_meta['user_ip'] = ip_addr
+            session.metadata = session_meta
             session.status = 'opened'
-            session.save(update_fields=['status', 'updated_at'])
+            session.save(update_fields=['status', 'metadata', 'updated_at'])
+            device_binding_token_for_response = new_device_token
+        else:
+            # Session déjà activée sur un navigateur : vérification stricte de non-partage
+            is_valid_device = False
+            if incoming_device_token:
+                incoming_hash = hashlib.sha256(incoming_device_token.encode('utf-8')).hexdigest()
+                if incoming_hash == expected_device_hash:
+                    is_valid_device = True
+
+            if not is_valid_device:
+                logger.warning(
+                    f"[AntiSharing] Tentative de partage refusée pour la session {session.id}. "
+                    f"Session verrouillée sur un autre navigateur. IP appelante: {ip_addr}, IP liée: {session_meta.get('bound_ip')}"
+                )
+                try:
+                    TraceAcces.objects.create(
+                        ouvrage=session.ouvrage,
+                        partner_id=str(session.partner_id) if hasattr(session, 'partner_id') and session.partner_id else str(session.partner.id),
+                        document_title=doc_title,
+                        ip_address=ip_addr,
+                        user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+                        access_type='unauthorized_sharing_attempt',
+                        derived_hash=session.token_hash[:16] if session.token_hash else "nohash"
+                    )
+                except Exception as log_err:
+                    logger.warning(f"Erreur journalisation TraceAcces partage: {log_err}")
+
+                return standard_response(
+                    error="Cette session de lecture est déjà verrouillée sur un autre navigateur. Pour des raisons de sécurité et de droits d'auteur, le partage de session est interdit.",
+                    status_code=status.HTTP_403_FORBIDDEN
+                )
+
+            # C'est le même navigateur qui recharge : on maintient son jeton actif
+            device_binding_token_for_response = incoming_device_token
 
         doc_cover = getattr(session.ouvrage, 'couverture', None) or getattr(session.ouvrage, 'cover_image', None)
         doc_cover_url = doc_cover.url if (doc_cover and hasattr(doc_cover, 'url')) else None
@@ -463,7 +519,28 @@ class ReaderValidateTokenView(APIView):
             }
         }
 
-        return standard_response(data=response_data)
+        if device_binding_token_for_response:
+            response_data["device_binding_token"] = device_binding_token_for_response
+
+        response = standard_response(data=response_data)
+        if device_binding_token_for_response:
+            response.set_cookie(
+                session_cookie_key,
+                device_binding_token_for_response,
+                max_age=86400,
+                httponly=True,
+                samesite='Lax',
+                secure=request.is_secure()
+            )
+            response.set_cookie(
+                "laha_reader_bind",
+                device_binding_token_for_response,
+                max_age=86400,
+                httponly=True,
+                samesite='Lax',
+                secure=request.is_secure()
+            )
+        return response
 
 
 class ReaderProgressView(APIView):
@@ -791,6 +868,27 @@ class ReaderProtectedStreamView(APIView):
                 error="Session de lecture expirée ou révoquée.",
                 status_code=status.HTTP_403_FORBIDDEN
             )
+
+        # Contrôle anti-partage : vérification de la liaison au terminal/navigateur légitime
+        if isinstance(session.metadata, dict) and session.metadata.get("device_binding_hash"):
+            import hashlib
+            expected_hash = session.metadata["device_binding_hash"]
+            session_cookie_key = f"laha_reader_bind_{session.id}"
+            incoming_device_token = (
+                request.headers.get("X-Reader-Device-Token")
+                or request.COOKIES.get(session_cookie_key)
+                or request.COOKIES.get("laha_reader_bind")
+                or (request.data.get("device_binding_token") if hasattr(request, "data") and isinstance(request.data, dict) else None)
+                or request.query_params.get("device_token")
+            )
+            if not incoming_device_token or hashlib.sha256(str(incoming_device_token).strip().encode("utf-8")).hexdigest() != expected_hash:
+                logger.warning(
+                    f"[AntiSharing] Flux refusé pour session {session.id} : jeton de terminal absent ou non concordant."
+                )
+                return standard_response(
+                    error="Accès au flux refusé : cette session de lecture est verrouillée sur un autre navigateur.",
+                    status_code=status.HTTP_403_FORBIDDEN
+                )
 
         # Vérification de sécurité : Liste noire des lecteurs bloqués (BlockedReaderIdentity)
         from apps.protection.models import BlockedReaderIdentity

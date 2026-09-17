@@ -559,11 +559,31 @@ class OuvrageCreateSerializer(serializers.Serializer):
             try:
                 if book_file.name.lower().endswith('.pdf'):
                     import fitz  # PyMuPDF
+                    import datetime as _dt_inline
                     book_file.seek(0)
                     file_bytes = book_file.read()
                     book_file.seek(0)
                     with fitz.open(stream=file_bytes, filetype="pdf") as doc:
                         ouvrage.page_count = doc.page_count
+                    # Extraction de l'année de parution depuis le texte PDF (regex, 0 coût IA)
+                    if not ouvrage.publication_date:
+                        try:
+                            from apps.ai_engine.services.openai_service import (
+                                extract_text_sample_from_bytes,
+                                extract_publication_year_from_text,
+                            )
+                            book_file.seek(0)
+                            pdf_raw = book_file.read()
+                            book_file.seek(0)
+                            text_sample, _ = extract_text_sample_from_bytes(pdf_raw, file_ext="pdf")
+                            detected_year = extract_publication_year_from_text(
+                                text_sample, filename=book_file.name
+                            )
+                            current_year = _dt_inline.date.today().year
+                            if detected_year and 1960 <= detected_year <= current_year:
+                                ouvrage.publication_date = _dt_inline.date(detected_year, 1, 1)
+                        except Exception:
+                            pass
             except Exception:
                 pass
 
