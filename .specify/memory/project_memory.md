@@ -221,5 +221,31 @@
   - Validation binaire PDF : 100% de détection du tatouage invisible et signature cryptographique.
   - Validation image/capture d'écran : 95% de score sur filigrane semi-transparent à 20% d'opacité.
   - Validation sanctions : suspension immédiate et révocation instantanée des sessions de lecture vérifiées.
+---
 
+## 9. Courriers Officiels de Redevances & Relances sur Papier à En-tête (Feature 008 - Spécifiée le 2026-09-17)
 
+- **Objectif** : Remplacer l'action directe non tracée "Envoyer Relevé" sur les tableaux de bord redevances (universités, éditeurs) et relances (créances, auteurs) par l'action "Préparer le courrier". Centraliser la gestion dans une page dédiée sous forme de DataTable, exploitant le gabarit papier à en-tête officiel LAHAThèque (`Lahatheque-PapierEntete-SansNumero.pdf`).
+- **Cycle de Vie & Statuts** :
+  - **Brouillon** : Texte modifiable librement, prévisualisation PDF à tout moment dans le navigateur, sauvegarde en brouillon, action d'édition contextuelle via modale ("Corriger") pour le courrier spécifique.
+  - **Validé** : Fige irrévocablement le texte, génère et scelle le PDF final officiel sur le gabarit institutionnel. L'action principale devient "Envoyer par email".
+  - **Annulé** : Neutralise le courrier (depuis brouillon ou validé avant envoi) tout en conservant la traçabilité dans la table.
+  - **Envoyé** : Transmet l'email avec le PDF scellé en pièce jointe au destinataire et horodate l'expédition.
+- **Décisions de Cadrage Validées (/speckit-clarify & Cadrage Métier)** :
+  1. *Corps de l'e-mail* : Reprend l'intégralité du texte rédigé du courrier et joint le PDF officiel scellé à en-tête.
+  2. *Navigation* : Accès exclusif par redirection lors du clic sur "Préparer le courrier", avec fil d'Ariane de retour vers la page d'origine.
+  3. *Action globale de période* : Bouton transformé en "Préparer les courriers de la période" (génération en lot des brouillons puis redirection).
+  4. *Modale de correction* : Modification libre de l'Objet et du Corps du message ; destinataire, email officiel et montants calculés verrouillés en lecture seule.
+  5. *Procédure d'annulation* : Modale d'avertissement simple sans saisie de motif textuel obligatoire.
+  6. *Devise Unique* : Exclusivement **FCFA** (aucun affichage de XOF, EUR ou autre).
+- **Ressource Graphique Client** : `lahatheque-backend/static/Lahatheque-PapierEntete-SansNumero.pdf` (logo + devise en en-tête, coordonnées postales et email en pied de page).
+- **Artefacts SpecKit** :
+  - Spécification : `specs/008-courrier-redevances-relances/spec.md`
+  - Checklist qualité : `specs/008-courrier-redevances-relances/checklists/requirements.md` (100% validée)
+  - Plan d'implémentation : `specs/008-courrier-redevances-relances/plan.md`
+  - Recherche technique (Phase 0) : `specs/008-courrier-redevances-relances/research.md`
+  - Modèle de données (Phase 1) : `specs/008-courrier-redevances-relances/data-model.md`
+  - Guide de démarrage rapide (Phase 1) : `specs/008-courrier-redevances-relances/quickstart.md`
+  - Contrats d'API (Phase 1) : `specs/008-courrier-redevances-relances/contracts/api-courriers.md`
+  - Modèles de courriers types : `specs/008-courrier-redevances-relances/templates-courriers.md`
+  - Tâches d'implémentation (Phase 2) : `specs/008-courrier-redevances-relances/tasks.md` (34 tâches ordonnées)

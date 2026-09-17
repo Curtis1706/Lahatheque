@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { DollarSign, ArrowLeft, Building2, Edit2, ShieldCheck, Mail, Lock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { DollarSign, ArrowLeft, Building2, Edit2, ShieldCheck, Mail, Lock, FileText } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "sonner";
@@ -12,6 +13,7 @@ import {
   getThirdPartyPublisherRoyalties,
   updateThirdPartyPublisherRate,
 } from "@/lib/services/legal";
+import { prepareCourrier } from "@/lib/services/courrier";
 import type { UniversityRoyalty, ThirdPartyPublisherRoyalty } from "@/lib/types/legal";
 import {
   SendInstitutionStatementModal,
@@ -19,9 +21,11 @@ import {
 } from "@/components/features/legal/send-institution-statement-modal";
 
 export default function LegalRedevancesPage() {
+  const router = useRouter();
   const [univRoyalties, setUnivRoyalties] = useState<UniversityRoyalty[]>([]);
   const [pubRoyalties, setPubRoyalties] = useState<ThirdPartyPublisherRoyalty[]>([]);
   const [loading, setLoading] = useState(true);
+  const [preparingId, setPreparingId] = useState<string | null>(null);
 
   // Modification du taux éditeur tiers
   const [selectedPub, setSelectedPub] = useState<ThirdPartyPublisherRoyalty | null>(null);
@@ -45,6 +49,48 @@ export default function LegalRedevancesPage() {
     }
     loadData();
   }, []);
+
+  const handlePrepareUnivCourrier = async (row: UniversityRoyalty) => {
+    setPreparingId(row.university_id);
+    try {
+      const res = await prepareCourrier({
+        category: "royalty_university",
+        recipient_type: "university",
+        recipient_id: row.university_id,
+      });
+      if (res.success && res.data) {
+        toast.success("Brouillon de courrier officiel préparé avec succès.");
+        router.push("/legal-reviewer/courriers");
+      } else {
+        toast.error(res.error || "Impossible de préparer le courrier officiel.");
+      }
+    } catch {
+      toast.error("Erreur de connexion lors de la préparation du courrier.");
+    } finally {
+      setPreparingId(null);
+    }
+  };
+
+  const handlePreparePubCourrier = async (row: ThirdPartyPublisherRoyalty) => {
+    setPreparingId(row.publisher_id);
+    try {
+      const res = await prepareCourrier({
+        category: "royalty_publisher",
+        recipient_type: "publisher",
+        recipient_id: row.publisher_id,
+      });
+      if (res.success && res.data) {
+        toast.success("Brouillon de courrier officiel préparé avec succès.");
+        router.push("/legal-reviewer/courriers");
+      } else {
+        toast.error(res.error || "Impossible de préparer le courrier officiel.");
+      }
+    } catch {
+      toast.error("Erreur de connexion lors de la préparation du courrier.");
+    } finally {
+      setPreparingId(null);
+    }
+  };
 
   const handleUpdatePubRate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,12 +197,17 @@ export default function LegalRedevancesPage() {
       cell: (row) => (
         <button
           type="button"
-          onClick={() => handleOpenUnivStatement(row)}
-          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-          title="Expédier le bordereau officiel de redevances par e-mail"
+          onClick={() => handlePrepareUnivCourrier(row)}
+          disabled={preparingId === row.university_id}
+          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+          title="Préparer le courrier officiel sur papier à en-tête LAHA"
         >
-          <Mail className="w-3.5 h-3.5 text-gold" />
-          Envoyer Relevé
+          {preparingId === row.university_id ? (
+            <InlineLoader size={16} />
+          ) : (
+            <FileText className="w-3.5 h-3.5 text-gold" />
+          )}
+          Préparer le courrier
         </button>
       ),
     },
@@ -198,12 +249,17 @@ export default function LegalRedevancesPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => handleOpenPubStatement(row)}
-            className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Expédier le bordereau contractuel officiel par e-mail"
+            onClick={() => handlePreparePubCourrier(row)}
+            disabled={preparingId === row.publisher_id}
+            className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+            title="Préparer le courrier officiel sur papier à en-tête LAHA"
           >
-            <Mail className="w-3.5 h-3.5 text-gold" />
-            Envoyer Relevé
+            {preparingId === row.publisher_id ? (
+              <InlineLoader size={16} />
+            ) : (
+              <FileText className="w-3.5 h-3.5 text-gold" />
+            )}
+            Préparer le courrier
           </button>
           <button
             type="button"
@@ -245,8 +301,18 @@ export default function LegalRedevancesPage() {
             Redevances Universités &amp; Éditeurs Tiers
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Barème officiel conventionné : 15% fixe institutionnel pour les universités, taux contractuels négociés pour les éditeurs tiers, et expédition des bordereaux officiels.
+            Barème officiel conventionné : 15% fixe institutionnel pour les universités, taux contractuels négociés pour les éditeurs tiers, et préparation des courriers officiels sur papier à en-tête.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Link
+            href="/legal-reviewer/courriers"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[44px]"
+          >
+            <FileText className="w-4 h-4 text-gold" />
+            <span>Voir les courriers officiels</span>
+          </Link>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   BellRing,
@@ -15,6 +15,7 @@ import {
   PlusCircle,
   Calendar,
   Layers,
+  FileText,
 } from "lucide-react";
 import { DataTable, DataTableColumn } from "@/components/ui/data-table";
 import { DebtReminderConfigModal } from "@/components/features/legal/debt-reminder-config-modal";
@@ -28,6 +29,7 @@ import {
   updateDebtReminderConfig,
   sendBatchAuthorStatements,
 } from "@/lib/services/legal";
+import { prepareCourrier, prepareBatchCourriers } from "@/lib/services/courrier";
 import type {
   AuthorEmailReport,
   ClientDebt,
@@ -50,6 +52,7 @@ const QUARTER_NAMES = [
 ];
 
 export default function LegalRelancesPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const initialTab: "authors" | "debts" | "create_debt" =
@@ -60,6 +63,7 @@ export default function LegalRelancesPage() {
   const [debts, setDebts] = useState<ClientDebt[]>([]);
   const [reminderConfig, setReminderConfig] = useState<DebtReminderConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [preparingId, setPreparingId] = useState<string | null>(null);
 
   // Filtres de périodicité pour les relevés d'auteurs
   const currentYear = new Date().getFullYear();
@@ -125,6 +129,80 @@ export default function LegalRelancesPage() {
   const handleOpenDebtModal = (debt: ClientDebt) => {
     setSelectedDebtForReminder(debt);
     setIsDebtReminderModalOpen(true);
+  };
+
+  const handlePrepareAuthorCourrier = async (author: AuthorEmailReport) => {
+    const authorId = author.author_id || author.report_id;
+    if (!authorId) {
+      toast.error("Identifiant de l'auteur introuvable.");
+      return;
+    }
+    setPreparingId(authorId);
+    try {
+      const res = await prepareCourrier({
+        category: "royalty_author",
+        recipient_type: "author",
+        recipient_id: authorId,
+        period_type: periodType,
+        year: periodYear,
+        month: periodType === "monthly" ? periodMonth : undefined,
+        quarter: periodType === "quarterly" ? periodQuarter : undefined,
+      });
+      if (res.success && res.data) {
+        toast.success("Brouillon de courrier officiel préparé avec succès.");
+        router.push("/legal-reviewer/courriers");
+      } else {
+        toast.error(res.error || "Impossible de préparer le courrier de l'auteur.");
+      }
+    } catch {
+      toast.error("Erreur lors de la préparation du courrier.");
+    } finally {
+      setPreparingId(null);
+    }
+  };
+
+  const handlePrepareDebtCourrier = async (debt: ClientDebt) => {
+    setPreparingId(debt.id);
+    try {
+      const res = await prepareCourrier({
+        category: "debt_reminder",
+        recipient_type: "client",
+        recipient_id: debt.id,
+      });
+      if (res.success && res.data) {
+        toast.success("Brouillon de courrier de relance préparé avec succès.");
+        router.push("/legal-reviewer/courriers");
+      } else {
+        toast.error(res.error || "Impossible de préparer le courrier de relance.");
+      }
+    } catch {
+      toast.error("Erreur lors de la préparation du courrier de relance.");
+    } finally {
+      setPreparingId(null);
+    }
+  };
+
+  const handlePrepareBatchCourriers = async () => {
+    setIsBatchSending(true);
+    try {
+      const res = await prepareBatchCourriers({
+        category: "royalty_author",
+        period_type: periodType,
+        year: periodYear,
+        month: periodType === "monthly" ? periodMonth : undefined,
+        quarter: periodType === "quarterly" ? periodQuarter : undefined,
+      });
+      if (res.success && res.data) {
+        toast.success(`${res.data.prepared_count} courriers officiels préparés pour la période.`);
+        router.push("/legal-reviewer/courriers");
+      } else {
+        toast.error(res.error || "Échec de la préparation groupée des courriers.");
+      }
+    } catch {
+      toast.error("Erreur réseau lors de la préparation groupée.");
+    } finally {
+      setIsBatchSending(false);
+    }
   };
 
   const handleSendBatchAuthorStatements = async () => {
@@ -193,7 +271,7 @@ export default function LegalRelancesPage() {
       header: "Droits Calculés (Période)",
       cell: (row) => (
         <span className="font-mono font-bold text-gold text-xs">
-          {(row.total_royalties_paid || 0).toLocaleString("fr-FR")} {row.currency || "XOF"}
+          {(row.total_royalties_paid || 0).toLocaleString("fr-FR")} FCFA
         </span>
       ),
     },
@@ -214,12 +292,17 @@ export default function LegalRelancesPage() {
       cell: (row) => (
         <button
           type="button"
-          onClick={() => handleOpenAuthorModal(row)}
-          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-          title="Transmettre le relevé de ventes et redevances par e-mail officiel"
+          onClick={() => handlePrepareAuthorCourrier(row)}
+          disabled={preparingId === (row.author_id || row.report_id)}
+          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+          title="Préparer le courrier officiel de droits d'auteur sur papier à en-tête LAHA"
         >
-          <Mail className="w-3.5 h-3.5 text-gold" />
-          Envoyer Relevé
+          {preparingId === (row.author_id || row.report_id) ? (
+            <InlineLoader size={16} />
+          ) : (
+            <FileText className="w-3.5 h-3.5 text-gold" />
+          )}
+          Préparer le courrier
         </button>
       ),
     },
@@ -280,11 +363,17 @@ export default function LegalRelancesPage() {
       cell: (row) => (
         <button
           type="button"
-          onClick={() => handleOpenDebtModal(row)}
-          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+          onClick={() => handlePrepareDebtCourrier(row)}
+          disabled={preparingId === row.id}
+          className="px-3 py-1.5 rounded-xl bg-navy text-white text-[10px] font-bold hover:bg-navy-hover transition-colors whitespace-nowrap min-h-[36px] inline-flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+          title="Préparer le courrier officiel de relance sur papier à en-tête LAHA"
         >
-          <Send className="w-3.5 h-3.5 text-gold" />
-          Déclencher Relance
+          {preparingId === row.id ? (
+            <InlineLoader size={16} />
+          ) : (
+            <FileText className="w-3.5 h-3.5 text-gold" />
+          )}
+          Préparer le courrier
         </button>
       ),
     },
@@ -319,6 +408,13 @@ export default function LegalRelancesPage() {
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <Link
+            href="/legal-reviewer/courriers"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors shadow-xs min-h-[44px]"
+          >
+            <FileText className="w-4 h-4 text-gold" />
+            <span>Voir les courriers officiels</span>
+          </Link>
           <button
             type="button"
             onClick={() => setActiveTab("create_debt")}
@@ -452,15 +548,16 @@ export default function LegalRelancesPage() {
             <button
               type="button"
               disabled={isBatchSending || authorReports.length === 0}
-              onClick={handleSendBatchAuthorStatements}
+              onClick={handlePrepareBatchCourriers}
               className="inline-flex items-center justify-center gap-2 bg-navy hover:bg-navy-hover text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-xs min-h-[44px] cursor-pointer disabled:opacity-50"
+              title="Préparer les courriers officiels pour tous les auteurs de la période"
             >
               {isBatchSending ? (
                 <InlineLoader size={16} />
               ) : (
                 <>
                   <Layers className="w-4 h-4 text-gold" />
-                  Expédier les Relevés de la Période ({authorReports.length})
+                  Préparer les courriers de la période ({authorReports.length})
                 </>
               )}
             </button>

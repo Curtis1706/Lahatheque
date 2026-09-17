@@ -75,3 +75,69 @@ class LegalContractSerializer(serializers.ModelSerializer):
         if obj.texte_integral_index:
             return obj.texte_integral_index[:300].strip()
         return ""
+
+
+class CourrierOfficielSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur complet pour les courriers officiels de redevances et relances.
+    Fournit les libellés de statuts, catégories et l'URL de prévisualisation PDF.
+    """
+    category_label = serializers.CharField(read_only=True)
+    status_label = serializers.CharField(read_only=True)
+    has_pdf = serializers.SerializerMethodField()
+    pdf_url = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        from .models import CourrierOfficiel
+        model = CourrierOfficiel
+        fields = [
+            "id",
+            "reference",
+            "category",
+            "category_label",
+            "status",
+            "status_label",
+            "recipient_type",
+            "recipient_id",
+            "recipient_name",
+            "recipient_email",
+            "period",
+            "amount",
+            "currency",
+            "subject",
+            "body_text",
+            "has_pdf",
+            "pdf_url",
+            "created_at",
+            "updated_at",
+            "validated_at",
+            "sent_at",
+            "canceled_at",
+            "created_by_name",
+        ]
+        read_only_fields = [
+            "id",
+            "reference",
+            "category_label",
+            "status_label",
+            "created_at",
+            "updated_at",
+            "validated_at",
+            "sent_at",
+            "canceled_at",
+            "created_by_name",
+        ]
+
+    def get_has_pdf(self, obj) -> bool:
+        # En mode brouillon, le PDF est généré dynamiquement à la volée
+        # En mode validé/envoyé, le fichier scellé existe
+        return True
+
+    def get_pdf_url(self, obj) -> str:
+        return f"/api/v1/rights/legal/courriers/{obj.id}/preview-pdf/"
+
+    def get_created_by_name(self, obj) -> str:
+        if obj.created_by:
+            return obj.created_by.get_full_name() or obj.created_by.email
+        return "Service Juridique"

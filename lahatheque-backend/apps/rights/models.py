@@ -371,3 +371,97 @@ class PublicManuscriptLead(models.Model):
     class Meta:
         db_table = 'rights_public_manuscript_lead'
         ordering = ['-created_at']
+
+
+class CourrierOfficiel(models.Model):
+    """
+    Modèle centralisé pour la gestion des courriers officiels de redevances et relances.
+    Supporte le papier à en-tête LAHAThèque et un cycle de vie strict :
+    Brouillon (draft) -> Validé (validated) -> Envoyé (sent) ou Annulé (canceled).
+    Devise officielle : FCFA exclusivement.
+    """
+    CATEGORY_CHOICES = [
+        ('royalty_author', "Redevance Auteur"),
+        ('royalty_university', "Redevance Université"),
+        ('royalty_publisher', "Redevance Éditeur Tiers"),
+        ('debt_reminder', "Relance Impayé"),
+        ('other', "Correspondance Officielle"),
+    ]
+
+    STATUS_CHOICES = [
+        ('draft', "Brouillon"),
+        ('validated', "Validé"),
+        ('canceled', "Annulé"),
+        ('sent', "Envoyé"),
+    ]
+
+    RECIPIENT_TYPE_CHOICES = [
+        ('author', "Auteur"),
+        ('university', "Université Partenaire"),
+        ('publisher', "Éditeur Tiers"),
+        ('client', "Client Débiteur"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    reference = models.CharField(max_length=100, unique=True, db_index=True)
+    category = models.CharField(max_length=40, choices=CATEGORY_CHOICES, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
+    recipient_type = models.CharField(max_length=30, choices=RECIPIENT_TYPE_CHOICES)
+    recipient_id = models.CharField(max_length=100, blank=True, default='')
+    recipient_name = models.CharField(max_length=255)
+    recipient_email = models.EmailField()
+    period = models.CharField(max_length=100, blank=True, default='')
+    amount = models.DecimalField(max_digits=14, decimal_places=2, default=0.0)
+    currency = models.CharField(max_length=10, default='FCFA')
+    subject = models.CharField(max_length=255)
+    body_text = models.TextField()
+    pdf_file = models.FileField(upload_to='courriers_officiels/%Y/%m/', null=True, blank=True)
+    pdf_key = models.CharField(max_length=500, blank=True, default='')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='courriers_officiels'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    validated_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    canceled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'rights_courrier_officiel'
+        ordering = ['-created_at']
+        verbose_name = "Courrier Officiel"
+        verbose_name_plural = "Courriers Officiels"
+
+    def __str__(self) -> str:
+        return f"{self.reference} - {self.recipient_name} ({self.get_status_display()})"
+
+    @classmethod
+    def generate_reference(cls, category: str) -> str:
+        """Génère une référence unique horodatée lisible."""
+        from django.utils import timezone
+        import random
+        now = timezone.now()
+        prefix_map = {
+            'royalty_author': 'AUT',
+            'royalty_university': 'UNIV',
+            'royalty_publisher': 'EDIT',
+            'debt_reminder': 'REL',
+            'other': 'CORR',
+        }
+        prefix = prefix_map.get(category, 'CR')
+        year_month = now.strftime("%Y%m")
+        suffix = f"{random.randint(1000, 9999)}"
+        count = cls.objects.filter(created_at__year=now.year, created_at__month=now.month).count() + 1
+        return f"LTQ-CR-{prefix}-{year_month}-{count:04d}-{suffix}"
+
+    @property
+    def category_label(self) -> str:
+        return dict(self.CATEGORY_CHOICES).get(str(self.category), str(self.category))
+
+    @property
+    def status_label(self) -> str:
+        return dict(self.STATUS_CHOICES).get(str(self.status), str(self.status))
