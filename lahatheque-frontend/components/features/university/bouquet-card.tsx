@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Layers,
   BookOpen,
@@ -10,6 +11,7 @@ import {
   Sparkles,
   Clock,
   CreditCard,
+  Key,
 } from "lucide-react";
 import {
   getBouquetRelevanceReport,
@@ -246,11 +248,18 @@ export function BouquetCard({ bouquet, onSubscribe }: BouquetCardProps) {
         </button>
 
         {isActive ? (
-          <div className="w-full sm:w-auto">
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold w-full justify-center border border-emerald-200 min-h-[44px]">
+          <div className="w-full sm:flex-1 flex flex-col sm:flex-row items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold w-full sm:w-auto justify-center border border-emerald-200 min-h-[44px]">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               <span>Campus Abonné</span>
             </span>
+            <Link
+              href={`/university/bouquets/success?subscription_id=${bouquet.id}`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-navy text-white text-xs font-bold hover:bg-navy-hover transition-colors w-full sm:w-auto justify-center min-h-[44px] shadow-xs"
+            >
+              <Key className="w-3.5 h-3.5 text-gold" />
+              <span>Identifiants &amp; Guide</span>
+            </Link>
           </div>
         ) : (
           <button

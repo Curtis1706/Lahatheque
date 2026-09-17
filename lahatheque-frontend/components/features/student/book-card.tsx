@@ -28,6 +28,16 @@ interface BookCardProps {
   className?: string;
 }
 
+function formatExpirationDate(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return dateStr;
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
+  return dateStr;
+}
+
 export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
   const { playBook } = useAudioPlayer();
   const [showPaperModal, setShowPaperModal] = useState(false);
@@ -195,10 +205,10 @@ export function BookCard({ book, onToggleFavorite, className }: BookCardProps) {
                     Bouquet Campus
                   </span>
                 ) : null}
-                {book.is_bouquet_book && book.bouquet_end_date ? (
+                {book.is_bouquet_book && (book.bouquet_end_date || book.expires_at) ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-medium text-navy bg-gold/10 px-2 py-0.5 rounded-md border border-gold/25 shrink-0">
                     <Clock className="w-3 h-3 text-gold shrink-0" />
-                    <span>Expire le {new Date(book.bouquet_end_date).toLocaleDateString("fr-FR")}</span>
+                    <span>Expire le {formatExpirationDate(book.expires_at || book.bouquet_end_date)}</span>
                   </span>
                 ) : ((book.expires_in_days !== undefined && book.expires_in_days !== null) || book.expiresInDays !== undefined) ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-medium text-navy bg-navy/5 px-2 py-0.5 rounded-md border border-border shrink-0">

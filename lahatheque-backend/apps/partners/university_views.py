@@ -708,7 +708,12 @@ class UniversityBouquetSubscribeView(APIView):
 
         provider = get_payment_provider("moneroo")
         frontend_base = get_frontend_base_url(request)
-        return_url = request.data.get("return_url") or f"{frontend_base}/university/bouquets/success?subscription_id={sub.id}"
+        custom_return = request.data.get("return_url")
+        if custom_return:
+            delimiter = "&" if "?" in custom_return else "?"
+            return_url = f"{custom_return}{delimiter}subscription_id={sub.id}" if "subscription_id=" not in custom_return else custom_return
+        else:
+            return_url = f"{frontend_base}/university/bouquets/success?subscription_id={sub.id}"
 
         try:
             payment_res = provider.initiate_payment(
@@ -750,10 +755,10 @@ class UniversityBouquetSubscribeView(APIView):
 
         # Si le provider est mock et succès immédiat (dev uniquement)
         if payment_res.get("status") == "success":
+            from apps.commerce.services import handle_bouquet_payment_success
             tx.status = "success"
             tx.save(update_fields=["status"])
-            sub.status = "active"
-            sub.save(update_fields=["status"])
+            handle_bouquet_payment_success(tx)
 
         return Response({
             "success": True,

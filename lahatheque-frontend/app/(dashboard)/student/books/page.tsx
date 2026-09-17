@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   BookOpen,
   ArrowLeft,
@@ -10,6 +11,7 @@ import {
   Sparkles,
   RotateCcw,
   Headphones,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -59,11 +61,17 @@ function SkeletonBookList() {
 // ─── Page Principale ──────────────────────────────────────────────────────────
 
 export default function StudentBooksPage() {
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const initialTab = (tabFromUrl === "bouquets" || tabFromUrl === "audio" || tabFromUrl === "favorites")
+    ? tabFromUrl
+    : "all";
+
   const [books, setBooks] = useState<BookAPI[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterTab, setFilterTab] = useState<"all" | "audio" | "favorites" | "bouquets">("all");
+  const [filterTab, setFilterTab] = useState<"all" | "audio" | "favorites" | "bouquets">(initialTab);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   // Pagination
@@ -86,6 +94,13 @@ export default function StudentBooksPage() {
   useEffect(() => {
     loadBooks();
   }, [loadBooks]);
+
+  useEffect(() => {
+    if (tabFromUrl === "bouquets" || tabFromUrl === "audio" || tabFromUrl === "favorites" || tabFromUrl === "all") {
+      setFilterTab(tabFromUrl);
+      setCurrentPage(1);
+    }
+  }, [tabFromUrl]);
 
   const handleToggleFavorite = async (id: string) => {
     try {
@@ -203,8 +218,21 @@ export default function StudentBooksPage() {
           </p>
         </div>
 
-        {/* Contrôles Header : Sélecteur Grille/Liste */}
-        <div className="shrink-0 flex items-center gap-3">
+        {/* Contrôles Header : Sélecteur Grille/Liste & Actualiser */}
+        <div className="shrink-0 flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              loadBooks();
+              toast.info("Actualisation de votre bibliothèque...");
+            }}
+            disabled={loading}
+            className="p-2.5 rounded-xl border border-border bg-background-secondary hover:border-gold text-navy transition-colors inline-flex items-center gap-1.5 text-xs font-semibold shadow-xs min-h-[40px] cursor-pointer disabled:opacity-50"
+            title="Actualiser la bibliothèque"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-gold ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Actualiser</span>
+          </button>
           <ViewToggle mode={viewMode} onChange={handleViewModeChange} />
         </div>
       </div>

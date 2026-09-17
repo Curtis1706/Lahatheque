@@ -158,11 +158,12 @@ def get_student_books_cache_key(user_id: int, query_params: dict) -> str:
     return "student_books:" + hashlib.md5(raw_key.encode()).hexdigest()
 
 
-def invalidate_student_books_cache(user_id: int):
+def invalidate_student_books_cache(user_id):
     try:
-        cache.incr(f"student_books_v_{user_id}")
+        current_v = cache.get(f"student_books_v_{user_id}") or 1
+        cache.set(f"student_books_v_{user_id}", int(current_v) + 1, 86400 * 30)
     except Exception:
-        cache.set(f"student_books_v_{user_id}", 2, 86400 * 30)
+        pass
 
 
 # ─── Ma Bibliothèque ───────────────────────────────────────────────────────────
@@ -282,7 +283,7 @@ class StudentBooksView(APIView):
                         bouquet_books_map[b_id_str] = {
                             "bouquet_name": bsub.title,
                             "bouquet_id": str(bsub.id),
-                            "bouquet_end_date": bsub.end_date.strftime("%d/%m/%Y") if bsub.end_date else None,
+                            "bouquet_end_date": bsub.end_date.isoformat() if bsub.end_date else None,
                             "expires_at": bsub.end_date.isoformat() if bsub.end_date else None,
                             "expires_in_days": max(0, (bsub.end_date - today).days) if bsub.end_date else None,
                         }
@@ -312,7 +313,7 @@ class StudentBooksView(APIView):
                                 bouquet_books_map[ub_id_str] = {
                                     "bouquet_name": usub.title or offering.name,
                                     "bouquet_id": str(usub.id),
-                                    "bouquet_end_date": usub.end_date.strftime("%d/%m/%Y") if usub.end_date else None,
+                                    "bouquet_end_date": usub.end_date.isoformat() if usub.end_date else None,
                                     "expires_at": usub.end_date.isoformat() if usub.end_date else None,
                                     "expires_in_days": max(0, (usub.end_date - today).days) if usub.end_date else None,
                                 }

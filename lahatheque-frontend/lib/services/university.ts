@@ -96,18 +96,22 @@ export async function subscribeUniversityBouquet(
   period: "monthly" | "annual" = "annual"
 ): Promise<{ success: boolean; checkout_url?: string; subscription_id?: string; error?: string }> {
   try {
+    const returnUrl = typeof window !== "undefined"
+      ? `${window.location.origin}/university/bouquets/success`
+      : undefined;
+
     const res = await fetch(`/api/bff/university/bouquets/${bouquetId}/subscribe/`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ period }),
+      body: JSON.stringify({ period, return_url: returnUrl }),
     });
     const json = await res.json();
     if (res.ok && json.success) {
       return {
         success: true,
         checkout_url: json.data?.checkout_url,
-        subscription_id: json.data?.bouquet_id,
+        subscription_id: json.data?.subscription_id || json.data?.bouquet_id,
       };
     }
     return { success: false, error: json.error || "Erreur lors de la souscription." };

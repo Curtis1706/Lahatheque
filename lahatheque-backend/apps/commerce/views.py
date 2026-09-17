@@ -913,6 +913,8 @@ class ClientBouquetSubscribeView(APIView):
             tx.save(update_fields=["status"])
             sub.status = "active"
             sub.save(update_fields=["status"])
+            from apps.student.views import invalidate_student_books_cache
+            invalidate_student_books_cache(request.user.id)
 
         return Response({
             "success": True,
