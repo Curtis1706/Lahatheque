@@ -38,3 +38,17 @@ Thumbs.db
 .idea/
 var/
 lahatheque-backend/var/
+
+# Graphify
+graphify-out/
+**/graphify-out/
+.graphify/
+**/.graphify/
+graph.json
+graph.html
+graph.compact.txt
+GRAPH_REPORT.md
+COMPASS.md
+DOMAINS.md
+intelligence.json
+
