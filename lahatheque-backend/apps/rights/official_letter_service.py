@@ -87,12 +87,12 @@ class OfficialLetterPdfService:
             page.insert_text(fitz.Point(322, 180), str(courrier.recipient_email)[:40], fontsize=8, fontname="helv", color=dark_gray)
 
         # 3. Objet Officiel (y: 205 à 225)
-        obj_text = f"Objet : {courrier.subject}"
+        obj_text = f"Objet : {courrier.subject}".replace("•", "-").replace("—", "-")
         page.draw_rect(fitz.Rect(65, 198, 530, 222), color=navy, fill=(244/255, 246/255, 250/255))
         page.insert_text(fitz.Point(75, 214), obj_text[:95], fontsize=9.5, fontname="helv", color=navy)
 
         # 4. Corps du message (Zone utile : Rect(65, 235, 530, 765))
-        body_text = courrier.body_text or ""
+        body_text = (courrier.body_text or "").replace("•", "-").replace("—", "-")
         body_rect = fitz.Rect(65, 235, 530, 765)
 
         # Insertion avec gestion du débordement (multi-pages)
